@@ -1,3 +1,7 @@
+const { db } = require('../db');
+const fs = require('fs').promises;
+const path = require('path');
+
 /**
  * Chat con el tutor IA usando contexto de la materia (Groq)
  */
@@ -57,5 +61,230 @@ ${context_text || 'El estudiante no proporcionó contexto específico para esta 
     res.json({ reply });
   } catch (err) {
     res.status(500).json({ error: 'Error en el chat de IA', details: err.message });
+  }
+};
+
+/**
+ * Construye un contexto unificado a partir de una lista de archivos/recursos seleccionados.
+ * Soporta fotos (OCR), audios, videos de YouTube y documentos.
+ */
+exports.buildContext = async (req, res) => {
+  const { items } = req.body; // Array de { id, type, label }
+
+  if (!items || !Array.isArray(items)) {
+    return res.status(400).json({ error: 'Se requiere un array de items para construir el contexto.' });
+  }
+
+  try {
+    const contextPromises = items.map(async (item) => {
+      let text = '';
+      
+      try {
+        if (item.type === 'photo') {
+          // Leer ocr_text de la tabla photos (donde PhotoCaptureModal y DocumentScannerModal guardan las fotos)
+          const photo = await new Promise((resolve, reject) => {
+            db.get('SELECT ocr_text, local_uri FROM photos WHERE id = ?', [item.id], (err, row) => {
+              if (err) reject(err); else resolve(row);
+            });
+          });
+          text = photo?.ocr_text ? `[FOTO: ${item.label}]\n${photo.ocr_text}` : '';
+        } 
+        else if (item.type === 'recording') {
+          // Obtener transcripción de audio
+          const transcript = await new Promise((resolve, reject) => {
+            db.get(`
+              SELECT transcript_text, transcript_uri 
+              FROM audio_transcripts 
+              WHERE recording_id = ?
+            `, [item.id], (err, row) => {
+              if (err) reject(err); else resolve(row);
+            });
+          });
+
+          if (transcript?.transcript_text) {
+            text = `[AUDIO: ${item.label}]\n${transcript.transcript_text}`;
+          } else if (transcript?.transcript_uri) {
+            // Intentar leer desde archivo si no está inline
+            try {
+              const fileContent = await fs.readFile(transcript.transcript_uri, 'utf8');
+              text = `[AUDIO: ${item.label}]\n${fileContent}`;
+            } catch (fErr) {
+              console.warn(`No se pudo leer archivo de audio: ${transcript.transcript_uri}`);
+            }
+          }
+        }
+        else if (item.type === 'video') {
+          // 1. Buscar transcript cacheado en la BD
+          const ytTranscript = await new Promise((resolve, reject) => {
+            db.get(`
+              SELECT transcript_text, transcript_uri 
+              FROM youtube_transcripts 
+              WHERE video_id = ?
+            `, [item.id], (err, row) => {
+              if (err) reject(err); else resolve(row);
+            });
+          });
+
+          if (ytTranscript?.transcript_text) {
+            // Caso ideal: texto inline en la BD — costo cero
+            text = `[VIDEO YOUTUBE: ${item.label}]\n${ytTranscript.transcript_text}`;
+          } else if (ytTranscript?.transcript_uri) {
+            // Fallback: leer desde archivo
+            try {
+              const fileContent = await fs.readFile(ytTranscript.transcript_uri, 'utf8');
+              text = `[VIDEO YOUTUBE: ${item.label}]\n${fileContent}`;
+            } catch (fErr) {
+              console.warn(`No se pudo leer archivo de video: ${ytTranscript.transcript_uri}`);
+            }
+          } else {
+            // No hay transcript cacheado — obtener captions de YouTube en tiempo real
+            // y guardarlas en la BD para las próximas consultas
+            try {
+              const ytVideo = await new Promise((resolve, reject) => {
+                db.get('SELECT video_id FROM youtube_videos WHERE id = ?', [item.id], (err, row) => {
+                  if (err) reject(err); else resolve(row);
+                });
+              });
+
+              if (ytVideo?.video_id) {
+                const captionRes = await fetch(
+                  `http://localhost:${process.env.PORT || 3000}/api/youtube-captions`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_id: ytVideo.video_id }),
+                  }
+                );
+
+                if (captionRes.ok) {
+                  const captionData = await captionRes.json();
+                  if (captionData.captions) {
+                    text = `[VIDEO YOUTUBE: ${item.label}]\n${captionData.captions}`;
+                    // Guardar en BD para no repetir el fetch la próxima vez
+                    db.run(
+                      `INSERT OR REPLACE INTO youtube_transcripts (video_id, transcript_text)
+                       VALUES (?, ?)
+                       ON CONFLICT(video_id) DO UPDATE SET transcript_text = excluded.transcript_text`,
+                      [item.id, captionData.captions],
+                      (saveErr) => { if (saveErr) console.warn('No se pudo cachear transcript de YouTube:', saveErr.message); }
+                    );
+                  }
+                }
+              }
+            } catch (captionErr) {
+              console.warn(`No se pudieron obtener captions para video ${item.id}:`, captionErr.message);
+            }
+          }
+        }
+        else if (item.type === 'document') {
+          // Obtener OCR de documentos escaneados (columna nueva ocr_text)
+          const doc = await new Promise((resolve, reject) => {
+            db.get('SELECT ocr_text, name FROM scanned_documents WHERE id = ?', [item.id], (err, row) => {
+              if (err) reject(err); else resolve(row);
+            });
+          });
+          text = doc?.ocr_text ? `[DOCUMENTO: ${doc.name || item.label}]\n${doc.ocr_text}` : `[DOCUMENTO: ${doc?.name || item.label}] (Sin contenido de texto extraído aún)`;
+        }
+      } catch (itemErr) {
+        console.error(`Error procesando item ${item.id} (${item.type}):`, itemErr);
+      }
+
+      return text;
+    });
+
+    const results = await Promise.all(contextPromises);
+    const finalContext = results.filter(t => t.length > 0).join('\n\n---\n\n');
+
+    res.json({ 
+      context: finalContext,
+      itemsCount: results.filter(t => t.length > 0).length
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Error al construir el contexto', details: err.message });
+  }
+};
+
+/**
+ * Genera flashcards estructuradas (pares pregunta/respuesta) a partir de un
+ * bloque de texto de contexto académico usando Groq LLaMA.
+ *
+ * El modelo retorna un array JSON de objetos { front, back } donde:
+ *   - front: pregunta o concepto clave
+ *   - back:  respuesta o definición concisa
+ */
+exports.generateFlashcards = async (req, res) => {
+  const { context_text, count = 10 } = req.body;
+
+  if (!context_text) {
+    return res.status(400).json({ error: 'Falta context_text para generar las flashcards.' });
+  }
+
+  const groqApiKey = process.env.GROQ_API_KEY;
+  if (!groqApiKey) {
+    return res.status(500).json({ error: 'Groq API Key no está configurada' });
+  }
+
+  // Limitar el contexto a ~80k caracteres para no exceder el límite de tokens del modelo
+  const trimmedContext = context_text.length > 80000
+    ? context_text.substring(0, 80000) + '\n[...contexto truncado por longitud]'
+    : context_text;
+
+  const systemPrompt = `Eres un experto pedagogo universitario. Tu tarea es generar exactamente ${count} flashcards de estudio a partir del material académico proporcionado.
+
+REGLAS ESTRICTAS:
+1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional, sin markdown, sin explicaciones.
+2. Cada elemento del array debe tener exactamente dos campos: "front" (pregunta o concepto) y "back" (respuesta o definición).
+3. Las preguntas deben ser precisas y directas. Las respuestas, concisas pero completas.
+4. Cubre los conceptos más importantes del material. Evita preguntas triviales.
+5. Formato exacto requerido: [{"front": "...", "back": "..."}, ...]
+
+Ejemplo de respuesta válida:
+[{"front": "¿Qué es la fotosíntesis?", "back": "Proceso por el cual las plantas convierten luz solar en glucosa usando CO₂ y agua."}]`;
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Genera ${count} flashcards a partir de este material:\n\n${trimmedContext}` },
+        ],
+        temperature: 0.4,
+        max_tokens: 4096,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return res.status(500).json({ error: 'Error al llamar a Groq', details: errorData });
+    }
+
+    const groqData = await response.json();
+    const rawContent = groqData.choices?.[0]?.message?.content || '{}';
+
+    // Parsear el JSON retornado por el modelo
+    let flashcards = [];
+    try {
+      const parsed = JSON.parse(rawContent);
+      // El modelo puede retornar el array directamente o dentro de una clave
+      flashcards = Array.isArray(parsed)
+        ? parsed
+        : (parsed.flashcards || parsed.cards || parsed.data || []);
+    } catch (parseErr) {
+      console.error('Error parseando JSON de flashcards:', rawContent.substring(0, 200));
+      return res.status(500).json({ error: 'El modelo no retornó un JSON válido.', raw: rawContent.substring(0, 500) });
+    }
+
+    res.json({ flashcards, count: flashcards.length });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Error generando flashcards', details: err.message });
   }
 };

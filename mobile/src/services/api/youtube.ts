@@ -82,12 +82,15 @@ export const deleteYouTubeVideo = async (id: number) => {
 };
 
 /**
- * Crea o actualiza las URIs de transcripción y resumen de un video.
- * Usa upsert: si ya existe un registro para `video_id`, lo actualiza.
+ * Crea o actualiza la transcripción de un video de YouTube.
+ * Ahora soporta transcript_text inline (además de la URI de archivo local) para que
+ * el asistente IA pueda leerlo directamente de la BD sin acceder al dispositivo.
  */
 export const upsertYouTubeTranscript = async (payload: {
   video_id: number;
   transcript_uri?: string | null;
+  /** Texto inline de la transcripción — leído directamente por buildContext */
+  transcript_text?: string | null;
   summary_uri?: string | null;
 }) => {
   const response = await fetchWithFallback('/youtube-transcripts', {

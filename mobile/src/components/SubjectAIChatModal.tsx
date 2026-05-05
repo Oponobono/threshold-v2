@@ -1,221 +1,469 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View, Text, Modal, TouchableOpacity, TextInput, FlatList,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard
-} from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
-import * as FileSystem from 'expo-file-system/legacy';
-import { theme } from '../styles/theme';
-import { chatStyles as styles } from '../styles/SubjectAIChatModal.styles';
-import { AIContextItemData } from './AIContextItem';
-import { extractTextFromImage } from '../services/api/documents';
-import { sendAIChatMessage } from '../services/api';
-import { ChatMessageBubble, ChatMessage } from './ChatMessageBubble';
-
-export interface SubjectAIChatModalProps {
-  isVisible: boolean;
-  onClose: () => void;
-  selectedItems: AIContextItemData[];
-  subjectName: string;
-}
-
 /**
  * SubjectAIChatModal.tsx
  *
- * Pantalla modal que aloja la interfaz de chat interactivo con la Inteligencia Artificial.
- * Se encarga de procesar los archivos seleccionados por el usuario (Contexto) al abrirse,
- * extrayendo texto mediante OCR o cargando transcripciones locales, para luego iniciar
- * una conversación estilo chat. Mantiene el historial de la conversación usando la API de Groq/Gemini.
+ * Modal de chat conversacional con el Asistente IA de Threshold.
+ * Recibe el contexto académico ya ensamblado (texto OCR, transcripciones, captions)
+ * y gestiona el historial de mensajes con el modelo Groq LLaMA en el backend.
  *
- * @param isVisible - Estado de visibilidad del modal de chat.
- * @param onClose - Función ejecutada al cerrar el chat (limpia el estado).
- * @param selectedItems - Arreglo con la metadata de los archivos seleccionados como contexto.
- * @param subjectName - Nombre de la materia (usado en el mensaje de bienvenida).
+ * Características:
+ * - Historial de mensajes en burbuja (usuario / asistente).
+ * - Indicador de "pensando..." animado mientras espera la respuesta.
+ * - Chip de fuentes activas (cuántos archivos alimentan el contexto).
+ * - Botón de nueva conversación para limpiar el historial.
  */
-export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
-  isVisible,
-  onClose,
-  selectedItems,
-  subjectName,
-}) => {
-  const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [isLoadingContext, setIsLoadingContext] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [contextText, setContextText] = useState('');
-  const flatListRef = useRef<FlatList>(null);
 
-  // Compilar contexto al abrir
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import {
+  View, Text, Modal, TouchableOpacity, ScrollView,
+  TextInput, KeyboardAvoidingView, Platform, StyleSheet,
+  Animated, ActivityIndicator,
+} from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { sendAIChatMessage } from '../services/api/ai';
+
+// ─── Tokens de color (misma paleta que SubjectAIContextModal) ─────────────────
+const PRIMARY  = '#7B72FF';
+const ASK_CLR  = '#00C896';
+const BG_SHEET = '#0E0E18';
+const BORDER   = 'rgba(255,255,255,0.08)';
+const TXT_PRI  = '#F0F0F8';
+const TXT_SEC  = 'rgba(240,240,248,0.45)';
+const USER_BG  = '#1E1E30';
+const AI_BG    = `${PRIMARY}18`;
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface SubjectAIChatModalProps {
+  /** Controla si el modal está visible */
+  isVisible: boolean;
+  /** Callback para cerrar el modal */
+  onClose: () => void;
+  /** Nombre de la materia para el encabezado */
+  subjectName: string;
+  /** Contexto académico ensamblado por el backend */
+  contextText: string;
+  /** Número de archivos que alimentan el contexto */
+  contextItemCount: number;
+}
+
+// ─── Burbuja de mensaje ───────────────────────────────────────────────────────
+const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
+  const isUser = msg.role === 'user';
+  return (
+    <View style={[s.bubbleRow, isUser ? s.bubbleRowUser : s.bubbleRowAI]}>
+      {/* Ícono del asistente solo para mensajes IA */}
+      {!isUser && (
+        <View style={s.aiAvatar}>
+          <MaterialCommunityIcons name="auto-fix" size={14} color={PRIMARY} />
+        </View>
+      )}
+      <View style={[s.bubble, isUser ? s.bubbleUser : s.bubbleAI]}>
+        <Text style={[s.bubbleText, isUser ? s.bubbleTextUser : s.bubbleTextAI]}>
+          {msg.content}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+// ─── Indicador de escritura animado ──────────────────────────────────────────
+const TypingIndicator: React.FC = () => {
+  // Tres puntos que pulsan en secuencia
+  const anims = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
+
   useEffect(() => {
-    if (isVisible && selectedItems.length > 0 && !contextText) {
-      compileContext();
-    }
-    if (!isVisible) {
-      setMessages([]);
-      setContextText('');
-      setInputText('');
-    }
-  }, [isVisible]);
-
-  const compileContext = async () => {
-    setIsLoadingContext(true);
-    let compiled = '';
-
-    for (const item of selectedItems) {
-      compiled += `\n\n=== ARCHIVO: ${item.label} (${item.type}) ===\n`;
-      try {
-        if (item.type === 'photo' || item.type === 'document') {
-          if (item.uri) {
-            const base64 = await FileSystem.readAsStringAsync(item.uri, { encoding: FileSystem.EncodingType.Base64 });
-            const ocrText = await extractTextFromImage(base64);
-            compiled += ocrText ? ocrText : (t('ai.errors.noClearText') || '(No se pudo extraer texto claro de la imagen)');
-          }
-        } else if (item.type === 'recording' || item.type === 'video') {
-          const transcriptUri = item.rawItem?.transcript_uri;
-          const summaryUri = item.rawItem?.summary_uri;
-          
-          if (transcriptUri) {
-            const transcriptText = await FileSystem.readAsStringAsync(transcriptUri);
-            compiled += transcriptText;
-          } else if (summaryUri) {
-            const summaryText = await FileSystem.readAsStringAsync(summaryUri);
-            compiled += summaryText;
-          } else {
-            compiled += (t('ai.errors.noTranscription') || '(Aún no hay transcripción generada para este archivo. El estudiante debe transcribirlo primero en su respectiva pantalla.)');
-          }
-        }
-      } catch (error) {
-        console.error(`Error leyendo contexto para ${item.label}:`, error);
-        compiled += (t('ai.errors.localFileRead') || '(Error al leer el archivo local)');
-      }
-    }
-
-    setContextText(compiled.trim());
-    setIsLoadingContext(false);
-    
-    // Mensaje de bienvenida inicial
-    setMessages([
-      {
-        id: 'welcome',
-        role: 'assistant',
-        content: t('ai.chatWelcome', { count: selectedItems.length, subject: subjectName }) || `¡Hola! He analizado los ${selectedItems.length} archivos de contexto de **${subjectName}**.\n\n¿Qué te gustaría saber o repasar sobre esto?`
-      }
-    ]);
-  };
-
-  const handleSend = async () => {
-    if (!inputText.trim() || isSending || isLoadingContext) return;
-
-    const userText = inputText.trim();
-    const newUserMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: userText };
-    setMessages(prev => [...prev, newUserMsg]);
-    setInputText('');
-    setIsSending(true);
-    Keyboard.dismiss();
-
-    try {
-      // Formato esperado por Groq: array de { role, content } sin 'id'
-      const historyForApi = messages.map(m => ({ role: m.role, content: m.content }));
-      historyForApi.push({ role: 'user', content: userText });
-
-      const response = await sendAIChatMessage(contextText, historyForApi);
-      
-      const botMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.reply.content
-      };
-      
-      setMessages(prev => [...prev, botMsg]);
-    } catch (error: any) {
-      const errorMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: t('ai.errors.processFailed', { error: error.message }) || `Error: No pude procesar tu pregunta. ${error.message}`
-      };
-      setMessages(prev => [...prev, errorMsg]);
-    } finally {
-      setIsSending(false);
-    }
-  };
+    const sequence = anims.map((anim, i) =>
+      Animated.sequence([
+        Animated.delay(i * 150),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 0, duration: 400, useNativeDriver: true }),
+          ])
+        ),
+      ])
+    );
+    Animated.parallel(sequence).start();
+    return () => anims.forEach(a => a.stopAnimation());
+  }, []);
 
   return (
-    <Modal visible={isVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.container, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Ionicons name="chevron-down" size={24} color={theme.colors.text.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <MaterialCommunityIcons name="auto-fix" size={20} color={theme.colors.primary} />
-            <Text style={styles.headerTitle}>{t('ai.tutorTitle') || 'Tutor IA'}</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{selectedItems.length} {t('ai.refs') || 'refs'}</Text>
-            </View>
-          </View>
-          <View style={{ width: 40 }} />
-        </View>
-
-        {/* Body */}
-        {isLoadingContext ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>{t('ai.readingContext') || 'Leyendo y consolidando contexto...'}</Text>
-            <Text style={styles.loadingSub}>
-              {t('ai.processingFiles', { count: selectedItems.length }) || `Procesando ${selectedItems.length} archivos para responder tus dudas.`}
-            </Text>
-          </View>
-        ) : (
-          <KeyboardAvoidingView 
-            style={{ flex: 1 }} 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={i => i.id}
-              renderItem={({ item }) => <ChatMessageBubble item={item} />}
-              contentContainerStyle={styles.chatList}
-              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-            />
-
-            {/* Input Area */}
-            <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('ai.placeholderChat') || 'Escribe tu pregunta...'}
-                  placeholderTextColor={theme.colors.text.secondary}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  multiline
-                  maxLength={500}
-                />
-                <TouchableOpacity 
-                  onPress={handleSend} 
-                  disabled={!inputText.trim() || isSending}
-                  style={[
-                    styles.sendBtn, 
-                    (!inputText.trim() || isSending) && styles.sendBtnDisabled
-                  ]}
-                >
-                  {isSending ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name="send" size={18} color="#fff" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        )}
+    <View style={[s.bubbleRow, s.bubbleRowAI]}>
+      <View style={s.aiAvatar}>
+        <MaterialCommunityIcons name="auto-fix" size={14} color={PRIMARY} />
       </View>
+      <View style={[s.bubble, s.bubbleAI, { paddingVertical: 12, paddingHorizontal: 16 }]}>
+        <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
+          {anims.map((anim, i) => (
+            <Animated.View
+              key={i}
+              style={{
+                width: 6, height: 6, borderRadius: 3,
+                backgroundColor: PRIMARY,
+                opacity: anim,
+                transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
+              }}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
+  isVisible, onClose, subjectName, contextText, contextItemCount,
+}) => {
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+
+  const [messages, setMessages]   = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  /** Scroll automático al último mensaje */
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 0) scrollToBottom();
+  }, [messages, isLoading]);
+
+  /** Limpiar historial al cerrar */
+  const handleClose = useCallback(() => {
+    setMessages([]);
+    setInputText('');
+    onClose();
+  }, [onClose]);
+
+  /** Enviar un mensaje al asistente IA */
+  const handleSend = useCallback(async () => {
+    const text = inputText.trim();
+    if (!text || isLoading) return;
+
+    // Agregar mensaje del usuario al historial
+    const userMsg: Message = { role: 'user', content: text };
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setInputText('');
+    setIsLoading(true);
+
+    try {
+      // Enviar al backend con el contexto y el historial completo
+      const data = await sendAIChatMessage(contextText, updatedMessages);
+      const aiMsg: Message = {
+        role: 'assistant',
+        content: data?.reply?.content || 'Lo siento, no pude procesar tu pregunta.',
+      };
+      setMessages(prev => [...prev, aiMsg]);
+    } catch (err: any) {
+      // Mostrar error como mensaje del asistente
+      const errMsg: Message = {
+        role: 'assistant',
+        content: `⚠️ Error al conectar con el asistente: ${err.message}`,
+      };
+      setMessages(prev => [...prev, errMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [inputText, isLoading, messages, contextText]);
+
+  return (
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      transparent
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <View style={s.backdrop}>
+          <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+
+            {/* Asa de arrastre */}
+            <View style={s.handle} />
+
+            {/* Encabezado */}
+            <View style={s.header}>
+              <View style={s.aiIconWrap}>
+                <MaterialCommunityIcons name="auto-fix" size={17} color={PRIMARY} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.title}>Asistente IA</Text>
+                <Text style={s.subtitle} numberOfLines={1}>{subjectName}</Text>
+              </View>
+
+              {/* Chip de contexto activo */}
+              {contextItemCount > 0 && (
+                <View style={s.contextChip}>
+                  <Ionicons name="layers-outline" size={11} color={ASK_CLR} />
+                  <Text style={s.contextChipText}>
+                    {contextItemCount} {contextItemCount === 1 ? 'fuente' : 'fuentes'}
+                  </Text>
+                </View>
+              )}
+
+              {/* Botón nueva conversación */}
+              {messages.length > 0 && (
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={() => setMessages([])}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="refresh-outline" size={16} color={TXT_SEC} />
+                </TouchableOpacity>
+              )}
+
+              {/* Cerrar */}
+              <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.7}>
+                <Ionicons name="close" size={18} color={TXT_PRI} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Área de mensajes */}
+            <ScrollView
+              ref={scrollRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={s.messageList}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {messages.length === 0 ? (
+                /* Estado vacío — sugerencias iniciales */
+                <View style={s.emptyState}>
+                  <View style={s.emptyIconWrap}>
+                    <MaterialCommunityIcons name="auto-fix" size={32} color={PRIMARY} />
+                  </View>
+                  <Text style={s.emptyTitle}>¿Qué quieres saber?</Text>
+                  <Text style={s.emptySubtitle}>
+                    Tengo acceso a {contextItemCount > 0 ? `${contextItemCount} archivo${contextItemCount > 1 ? 's' : ''}` : 'tus materiales'} de {subjectName}.
+                  </Text>
+
+                  {/* Sugerencias de preguntas */}
+                  {[
+                    '¿Cuáles son los conceptos más importantes?',
+                    '¿Puedes hacer un resumen de los temas?',
+                    'Explícame el tema principal con ejemplos.',
+                  ].map((q, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={s.suggestionChip}
+                      onPress={() => {
+                        setInputText(q);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.suggestionText}>{q}</Text>
+                      <Ionicons name="arrow-forward" size={13} color={PRIMARY} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)
+              )}
+
+              {/* Indicador de "pensando..." */}
+              {isLoading && <TypingIndicator />}
+            </ScrollView>
+
+            {/* Input de texto */}
+            <View style={s.inputRow}>
+              <TextInput
+                style={s.input}
+                placeholder="Haz una pregunta..."
+                placeholderTextColor={TXT_SEC}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={1000}
+                returnKeyType="send"
+                blurOnSubmit
+                onSubmitEditing={handleSend}
+              />
+              <TouchableOpacity
+                style={[s.sendBtn, (!inputText.trim() || isLoading) && s.sendBtnDisabled]}
+                onPress={handleSend}
+                disabled={!inputText.trim() || isLoading}
+                activeOpacity={0.8}
+              >
+                {isLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="send" size={18} color="#fff" />
+                }
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: BG_SHEET,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    height: '92%',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+  },
+  handle: {
+    width: 38, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignSelf: 'center', marginBottom: 16,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 10, marginBottom: 12,
+    paddingHorizontal: 20,
+  },
+  aiIconWrap: {
+    width: 34, height: 34, borderRadius: 11,
+    backgroundColor: `${PRIMARY}20`,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: `${PRIMARY}30`,
+  },
+  title: {
+    fontSize: 16, fontWeight: '800', color: TXT_PRI, letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontSize: 11, color: TXT_SEC,
+  },
+  contextChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: `${ASK_CLR}14`,
+    borderRadius: 12, borderWidth: 1, borderColor: `${ASK_CLR}30`,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  contextChipText: {
+    fontSize: 11, fontWeight: '700', color: ASK_CLR,
+  },
+  clearBtn: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: BORDER,
+  },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: BORDER,
+  },
+
+  // Lista de mensajes
+  messageList: {
+    paddingHorizontal: 16, paddingBottom: 12, paddingTop: 4,
+    flexGrow: 1,
+  },
+
+  // Estado vacío
+  emptyState: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingTop: 40, gap: 12, paddingHorizontal: 24,
+  },
+  emptyIconWrap: {
+    width: 64, height: 64, borderRadius: 20,
+    backgroundColor: `${PRIMARY}18`,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: `${PRIMARY}30`,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 18, fontWeight: '800', color: TXT_PRI, letterSpacing: -0.4,
+  },
+  emptySubtitle: {
+    fontSize: 13, color: TXT_SEC, textAlign: 'center', lineHeight: 20,
+    marginBottom: 12,
+  },
+  suggestionChip: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  suggestionText: {
+    flex: 1, fontSize: 13, color: TXT_PRI, fontWeight: '500',
+  },
+
+  // Burbujas de chat
+  bubbleRow: {
+    flexDirection: 'row', marginBottom: 10, alignItems: 'flex-end',
+  },
+  bubbleRowUser: { justifyContent: 'flex-end' },
+  bubbleRowAI:   { justifyContent: 'flex-start', gap: 8 },
+  aiAvatar: {
+    width: 26, height: 26, borderRadius: 9,
+    backgroundColor: `${PRIMARY}20`,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: `${PRIMARY}30`,
+  },
+  bubble: {
+    maxWidth: '78%', borderRadius: 18,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
+  bubbleUser: {
+    backgroundColor: USER_BG,
+    borderBottomRightRadius: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+  },
+  bubbleAI: {
+    backgroundColor: AI_BG,
+    borderBottomLeftRadius: 4,
+    borderWidth: 1, borderColor: `${PRIMARY}25`,
+  },
+  bubbleText: { fontSize: 14, lineHeight: 21 },
+  bubbleTextUser: { color: TXT_PRI },
+  bubbleTextAI:   { color: TXT_PRI },
+
+  // Input
+  inputRow: {
+    flexDirection: 'row', alignItems: 'flex-end', gap: 10,
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4,
+    borderTopWidth: 1, borderTopColor: BORDER,
+    backgroundColor: 'rgba(14,14,24,0.95)',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 18, borderWidth: 1, borderColor: BORDER,
+    color: TXT_PRI, fontSize: 14,
+    paddingHorizontal: 14, paddingVertical: 10,
+    maxHeight: 100,
+  },
+  sendBtn: {
+    width: 42, height: 42, borderRadius: 14,
+    backgroundColor: PRIMARY,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: PRIMARY,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5, shadowRadius: 10, elevation: 8,
+  },
+  sendBtnDisabled: {
+    opacity: 0.35, shadowOpacity: 0, elevation: 0,
+  },
+});

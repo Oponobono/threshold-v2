@@ -80,12 +80,15 @@ export const deleteAudioRecording = async (id: number) => {
 };
 
 /**
- * Crea o actualiza las URIs de transcripción y resumen de una grabación.
- * Usa upsert: si ya existe un registro para `recording_id`, lo actualiza.
+ * Crea o actualiza la transcripción de una grabación.
+ * Ahora soporta texto inline (transcript_text) además de URI de archivo.
+ * Priorizar transcript_text si está disponible, ya que el backend lo leerá
+ * directamente sin necesidad de acceder al sistema de archivos.
  */
 export const upsertAudioTranscript = async (payload: {
   recording_id: number;
   transcript_uri?: string | null;
+  transcript_text?: string | null;
   summary_uri?: string | null;
 }) => {
   const response = await fetchWithFallback('/audio-transcripts', {

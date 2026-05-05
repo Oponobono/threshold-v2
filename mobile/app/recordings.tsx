@@ -320,36 +320,62 @@ export default function RecordingsScreen() {
         </View>
       </Animated.View>
 
-      {/* ── Tab indicators (subtle, always visible) ─────────────────── */}
+      {/* ── Filter pills (match AI modal chip style) ─────────────────── */}
       <View
         style={{
           flexDirection: 'row',
           backgroundColor: theme.colors.card,
-          paddingHorizontal: 20,
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          gap: 8,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
         }}
       >
         {(['all', 'recording', 'video'] as const).map((f) => {
-          const labels = { all: t('recordings.filterAll'), recording: t('recordings.filterAudio'), video: t('recordings.filterVideo') };
+          const labels = {
+            all:       t('recordings.filterAll'),
+            recording: t('recordings.filterAudio'),
+            video:     t('recordings.filterVideo'),
+          };
+          const icons = {
+            all:       'layers-outline'       as const,
+            recording: 'mic-outline'          as const,
+            video:     'logo-youtube'         as const,
+          };
           const isActive = activeFilter === f;
           return (
             <TouchableOpacity
               key={f}
               onPress={() => setActiveFilter(f)}
+              activeOpacity={0.72}
               style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderBottomWidth: 2,
-                borderBottomColor: isActive ? theme.colors.text.primary : 'transparent',
-                marginBottom: -1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+                paddingHorizontal: 13,
+                paddingVertical: 7,
+                borderRadius: 20,
+                borderWidth: 1.5,
+                borderColor: isActive
+                  ? theme.colors.text.primary
+                  : theme.colors.border,
+                backgroundColor: isActive
+                  ? theme.colors.text.primary
+                  : 'transparent',
               }}
             >
+              <Ionicons
+                name={icons[f]}
+                size={13}
+                color={isActive ? theme.colors.white : theme.colors.text.secondary}
+              />
               <Text
                 style={{
                   fontSize: 13,
-                  fontWeight: isActive ? '700' : '400',
-                  color: isActive ? theme.colors.text.primary : theme.colors.text.placeholder,
+                  fontWeight: isActive ? '700' : '500',
+                  color: isActive ? theme.colors.white : theme.colors.text.secondary,
+                  letterSpacing: -0.1,
                 }}
               >
                 {labels[f]}
@@ -358,6 +384,7 @@ export default function RecordingsScreen() {
           );
         })}
       </View>
+
 
       {/* Main scrollable content */}
       <ScrollView

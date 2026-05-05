@@ -21,12 +21,15 @@ export const getGalleryItems = async () => {
 };
 
 /**
- * Crea una nueva entrada de foto en la base de datos
+ * Crea una nueva entrada de foto en la base de datos.
+ * Acepta ocr_text opcional para que el asistente IA pueda leerlo directamente sin acceder al archivo.
  */
 export const createPhoto = async (photoData: {
   subject_id: number;
   local_uri: string;
   es_favorita?: number;
+  /** Texto extraído por OCR — alimenta el contexto del asistente IA */
+  ocr_text?: string | null;
 }) => {
   try {
     const response = await fetchWithFallback('/photos', {

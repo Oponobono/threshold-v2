@@ -1,18 +1,77 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
+  Animated, Dimensions, StyleSheet,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { theme } from '../styles/theme';
-import { AIContextCarousel } from './AIContextCarousel';
 import { AIContextItemData, AIContextItemType } from './AIContextItem';
+import { BentoContextCard, CELL_W, FULL_W } from './BentoContextCard';
 import { RecordingItem } from '../hooks/useAudioRecorder';
 import { YouTubeVideo } from '../services/api/types';
 import { mapRecordings, mapPhotos, mapDocuments, mapVideos } from '../utils/aiContextMappers';
-import { contextModalStyles as styles } from '../styles/SubjectAIContextModal.styles';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+const PRIMARY   = '#7B72FF';
+const ASK_CLR   = '#00C896';
+const BG_SHEET  = '#0E0E18';
+const BG_CARD   = '#1C1C2A';
+const BORDER    = 'rgba(255,255,255,0.08)';
+const TXT_PRI   = '#F0F0F8';
+const TXT_SEC   = 'rgba(240,240,248,0.45)';
+const GAP       = 10;
+const PAD       = 20;
+
+type FilterKey = 'all' | 'audio' | 'videos' | 'docs' | 'photos';
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all',    label: 'Todo'   },
+  { key: 'audio',  label: 'Audio'  },
+  { key: 'videos', label: 'Videos' },
+  { key: 'docs',   label: 'Docs'   },
+  { key: 'photos', label: 'Fotos'  },
+];
+
+const FILTER_TYPE_MAP: Partial<Record<FilterKey, AIContextItemType>> = {
+  audio:  'recording',
+  videos: 'video',
+  docs:   'document',
+  photos: 'photo',
+};
+
+// ─── Bento span assignment ────────────────────────────────────────────────────
+// Only the first card in the filtered list is a hero (full-width).
+// Everything else is 'half' so items pair up in 2-column rows.
+function assignSpan(_item: AIContextItemData, index: number, list: AIContextItemData[]): 'full' | 'half' {
+  if (list.length <= 2) return 'full';   // ≤2 items → each gets full width
+  if (index === 0) return 'full';        // single hero anchor card
+  return 'half';
+}
+
+// Build rows: 'full' items get their own row; 'half' items fill rows of 3 (3-column grid).
+function buildRows(items: AIContextItemData[]) {
+  type Cell = { item: AIContextItemData; span: 'full' | 'half' };
+  const cells: Cell[] = items.map((item, i) => ({ item, span: assignSpan(item, i, items) }));
+  const rows: Cell[][] = [];
+  let i = 0;
+  while (i < cells.length) {
+    if (cells[i].span === 'full') {
+      rows.push([cells[i]]);
+      i++;
+    } else {
+      // Collect up to 3 consecutive half-cells per row
+      const group: Cell[] = [];
+      while (i < cells.length && cells[i].span === 'half' && group.length < 3) {
+        group.push(cells[i]);
+        i++;
+      }
+      rows.push(group);
+    }
+  }
+  return rows;
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 export interface SubjectAIContextModalProps {
   isVisible: boolean;
   onClose: () => void;
@@ -21,58 +80,53 @@ export interface SubjectAIContextModalProps {
   photos?: any[];
   documents?: any[];
   videos?: YouTubeVideo[];
-  onGenerateFlashcards?: (selectedItems: AIContextItemData[]) => void;
-  onAskQuestions?: (selectedItems: AIContextItemData[]) => void;
+  onGenerateFlashcards?: (selected: AIContextItemData[]) => void;
+  onAskQuestions?: (selected: AIContextItemData[]) => void;
 }
 
 /**
- * SubjectAIContextModal.tsx
+ * SubjectAIContextModal — Bento Grid redesign (iOS 18 / Apple Intelligence dark aesthetic).
  *
- * Hoja modal (Bottom Sheet extendido) que funciona como "Selector de Contexto".
- * Se abre al presionar el FAB (SubjectAIFab) en la pantalla de la materia.
- * Recopila todos los archivos de la materia (videos, audios, fotos, documentos) y los 
- * agrupa utilizando `AIContextCarousel`. Permite al usuario decidir qué enviar a la IA
- * antes de desencadenar flujos secundarios (crear flashcards o abrir el chat).
- *
- * @param isVisible - Estado de visibilidad.
- * @param onClose - Método para cerrar la hoja de selección.
- * @param subjectName - Nombre de la materia actual.
- * @param recordings - Arreglo de notas de voz de la materia.
- * @param photos - Arreglo de fotos.
- * @param documents - Arreglo de PDFs.
- * @param videos - Arreglo de videos vinculados.
- * @param onGenerateFlashcards - Callback ejecutado al presionar el botón de crear flashcards.
- * @param onAskQuestions - Callback ejecutado al presionar el botón de "Preguntar a IA".
+ * Bottom Sheet with Smart Filter chips, modular Bento Grid cards, glassmorphism
+ * action bar, and an animated selection counter badge.
  */
 export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
-  isVisible,
-  onClose,
-  subjectName,
-  recordings = [],
-  photos = [],
-  documents = [],
-  videos = [],
-  onGenerateFlashcards,
-  onAskQuestions,
+  isVisible, onClose, subjectName,
+  recordings = [], photos = [], documents = [], videos = [],
+  onGenerateFlashcards, onAskQuestions,
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+  const badgeScale = useRef(new Animated.Value(1)).current;
 
-  // Map raw data once per render
-  const allSections: { type: AIContextItemType; items: AIContextItemData[] }[] = useMemo(() => [
-    { type: 'document',  items: mapDocuments(documents)   },
-    { type: 'photo',     items: mapPhotos(photos)         },
-    { type: 'recording', items: mapRecordings(recordings) },
-    { type: 'video',     items: mapVideos(videos)         },
+  // Map raw data to unified format
+  const allItems = useMemo<AIContextItemData[]>(() => [
+    ...mapDocuments(documents),
+    ...mapPhotos(photos),
+    ...mapRecordings(recordings),
+    ...mapVideos(videos),
   ], [documents, photos, recordings, videos]);
 
-  const allItems = useMemo(() => allSections.flatMap(s => s.items), [allSections]);
+  // Filter items
+  const filteredItems = useMemo(() => {
+    if (activeFilter === 'all') return allItems;
+    const type = FILTER_TYPE_MAP[activeFilter];
+    return allItems.filter(i => i.type === type);
+  }, [allItems, activeFilter]);
 
+  const rows = useMemo(() => buildRows(filteredItems), [filteredItems]);
   const totalSelected = selectedIds.size;
   const hasContent = allItems.length > 0;
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  // Pulse badge on count change
+  const pulseBadge = useCallback(() => {
+    Animated.sequence([
+      Animated.spring(badgeScale, { toValue: 1.25, useNativeDriver: true, tension: 400, friction: 12 }),
+      Animated.spring(badgeScale, { toValue: 1,    useNativeDriver: true, tension: 400, friction: 12 }),
+    ]).start();
+  }, []);
 
   const handleToggle = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -80,123 +134,304 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  }, []);
+    pulseBadge();
+  }, [pulseBadge]);
 
-  const handleSelectAll = useCallback((items: AIContextItemData[]) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      const allSelected = items.every(i => next.has(i.id));
-      if (allSelected) {
-        items.forEach(i => next.delete(i.id));
-      } else {
-        items.forEach(i => next.add(i.id));
-      }
-      return next;
-    });
-  }, []);
-
-  const handleGenerate = useCallback(() => {
-    const selected = allItems.filter(i => selectedIds.has(i.id));
-    onGenerateFlashcards?.(selected);
-  }, [allItems, selectedIds, onGenerateFlashcards]);
+  const handleClose = () => { setSelectedIds(new Set()); setActiveFilter('all'); onClose(); };
 
   const handleAsk = useCallback(() => {
-    const selected = allItems.filter(i => selectedIds.has(i.id));
-    onAskQuestions?.(selected);
+    onAskQuestions?.(allItems.filter(i => selectedIds.has(i.id)));
   }, [allItems, selectedIds, onAskQuestions]);
 
-  const handleClose = () => {
-    setSelectedIds(new Set());
-    onClose();
-  };
+  const handleFlashcards = useCallback(() => {
+    onGenerateFlashcards?.(allItems.filter(i => selectedIds.has(i.id)));
+  }, [allItems, selectedIds, onGenerateFlashcards]);
 
   return (
     <Modal visible={isVisible} animationType="slide" transparent onRequestClose={handleClose}>
-      <View style={styles.backdrop}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={s.backdrop}>
+        <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+
           {/* Handle */}
-          <View style={styles.handle} />
+          <View style={s.handle} />
 
           {/* Header */}
-          <View style={styles.header}>
+          <View style={s.header}>
+            <View style={s.aiIconWrap}>
+              <MaterialCommunityIcons name="auto-fix" size={18} color={PRIMARY} />
+            </View>
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <MaterialCommunityIcons name="auto-fix" size={22} color={theme.colors.primary} />
-                <Text style={styles.title}>{t('ai.assistantTitle') || 'Asistente de IA'}</Text>
-              </View>
-              <Text style={styles.subtitle}>
-                {t('ai.selectFilesOf') || 'Selecciona archivos de '}
-                <Text style={{ fontWeight: '700', color: theme.colors.text.primary }}>{subjectName}</Text>
-                {t('ai.toGiveContext') || ' para dar contexto a la IA'}
+              <Text style={s.title}>Asistente de IA</Text>
+              <Text style={s.subtitle} numberOfLines={1}>
+                Añade contexto a tu sesión
               </Text>
             </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color={theme.colors.text.primary} />
+            <TouchableOpacity onPress={handleClose} style={s.closeBtn}>
+              <Ionicons name="close" size={18} color={TXT_PRI} />
             </TouchableOpacity>
           </View>
 
-          {/* Badge de selección */}
-          {totalSelected > 0 && (
-            <View style={styles.selectionBadge}>
-              <Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} />
-              <Text style={styles.selectionBadgeText}>
-                {totalSelected} {totalSelected === 1 ? (t('ai.fileSelected') || 'archivo seleccionado') : (t('ai.filesSelected') || 'archivos seleccionados')}
-              </Text>
-            </View>
-          )}
+          {/* Smart Filter chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.filterRow}
+            style={{ flexGrow: 0 }}
+          >
+            {FILTERS.map(f => {
+              const active = activeFilter === f.key;
+              const count = f.key === 'all'
+                ? allItems.length
+                : allItems.filter(i => i.type === FILTER_TYPE_MAP[f.key]).length;
+              if (f.key !== 'all' && count === 0) return null;
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  onPress={() => setActiveFilter(f.key)}
+                  style={[s.chip, active && s.chipActive]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.chipText, active && s.chipTextActive]}>{f.label}</Text>
+                  {count > 0 && (
+                    <View style={[s.chipBadge, active && s.chipBadgeActive]}>
+                      <Text style={[s.chipBadgeText, active && { color: PRIMARY }]}>{count}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
-          {/* Carruseles */}
+          {/* Bento Grid */}
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={s.gridContent}
             showsVerticalScrollIndicator={false}
           >
             {!hasContent ? (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="folder-open-outline" size={48} color={theme.colors.border} />
-                <Text style={styles.emptyTitle}>{t('ai.noResourcesTitle') || 'Sin recursos disponibles'}</Text>
-                <Text style={styles.emptyText}>
-                  {t('ai.noResourcesText') || 'Agrega grabaciones, fotos, documentos o videos a esta materia para usarlos con la IA.'}
+              <View style={s.emptyState}>
+                <MaterialCommunityIcons name="folder-open-outline" size={52} color="rgba(255,255,255,0.1)" />
+                <Text style={s.emptyTitle}>Sin recursos</Text>
+                <Text style={s.emptyText}>
+                  Agrega grabaciones, fotos, documentos o videos a esta materia para usar la IA.
                 </Text>
               </View>
+            ) : filteredItems.length === 0 ? (
+              <View style={s.emptyState}>
+                <MaterialCommunityIcons name="filter-outline" size={42} color="rgba(255,255,255,0.1)" />
+                <Text style={s.emptyTitle}>Sin resultados</Text>
+                <Text style={s.emptyText}>No hay archivos de este tipo.</Text>
+              </View>
             ) : (
-              allSections.map(section => (
-                <AIContextCarousel
-                  key={section.type}
-                  type={section.type}
-                  items={section.items}
-                  selectedIds={selectedIds}
-                  onToggle={handleToggle}
-                  onSelectAll={() => handleSelectAll(section.items)}
-                />
+              rows.map((row, ri) => (
+                <View key={ri} style={s.row}>
+                  {row.map(({ item, span }) => (
+                    <BentoContextCard
+                      key={item.id}
+                      item={item}
+                      span={span}
+                      isSelected={selectedIds.has(item.id)}
+                      onToggle={handleToggle}
+                    />
+                  ))}
+                </View>
               ))
             )}
           </ScrollView>
 
-          {/* Botones de acción */}
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-            <TouchableOpacity
-              onPress={handleAsk}
-              disabled={totalSelected === 0}
-              style={[styles.actionBtn, styles.askBtn, totalSelected === 0 && styles.actionBtnDisabled]}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="chat-processing-outline" size={20} color="#fff" />
-              <Text style={styles.actionBtnText}>{t('ai.askAI') || 'Preguntar a IA'}</Text>
-            </TouchableOpacity>
+          {/* Glassmorphism bottom action bar */}
+          <View style={s.actionBar}>
+            {/* Floating counter badge */}
+            {totalSelected > 0 && (
+              <Animated.View style={[s.counterBadge, { transform: [{ scale: badgeScale }] }]}>
+                <Ionicons name="checkmark-circle" size={13} color={PRIMARY} />
+                <Text style={s.counterText}>
+                  {totalSelected} {totalSelected === 1 ? 'archivo' : 'archivos'} seleccionados
+                </Text>
+              </Animated.View>
+            )}
 
-            <TouchableOpacity
-              onPress={handleGenerate}
-              disabled={totalSelected === 0}
-              style={[styles.actionBtn, styles.generateBtn, totalSelected === 0 && styles.actionBtnDisabled]}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="cards-outline" size={20} color="#fff" />
-              <Text style={styles.actionBtnText}>{t('ai.createFlashcards') || 'Crear Flashcards'}</Text>
-            </TouchableOpacity>
+            <View style={s.btnRow}>
+              {/* Primary: Ask Assistant */}
+              <TouchableOpacity
+                onPress={handleAsk}
+                disabled={totalSelected === 0}
+                activeOpacity={0.82}
+                style={[
+                  s.btn, s.btnPrimary,
+                  totalSelected === 0 && s.btnDisabled,
+                ]}
+              >
+                <MaterialCommunityIcons name="chat-processing-outline" size={18} color="#fff" />
+                <Text style={s.btnPrimaryText}>Preguntar a IA</Text>
+              </TouchableOpacity>
+
+              {/* Secondary: Flashcards */}
+              <TouchableOpacity
+                onPress={handleFlashcards}
+                disabled={totalSelected === 0}
+                activeOpacity={0.82}
+                style={[
+                  s.btn, s.btnSecondary,
+                  totalSelected === 0 && s.btnDisabled,
+                ]}
+              >
+                <MaterialCommunityIcons name="cards-outline" size={18} color={totalSelected > 0 ? TXT_PRI : TXT_SEC} />
+                <Text style={[s.btnSecondaryText, totalSelected === 0 && { color: TXT_SEC }]}>
+                  Flashcards
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
+
         </View>
       </View>
     </Modal>
   );
 };
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: BG_SHEET,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    height: '92%',
+    paddingTop: 12,
+    overflow: 'hidden',
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+  },
+  handle: {
+    width: 38, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignSelf: 'center', marginBottom: 18,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 12, marginBottom: 16,
+    paddingHorizontal: PAD,
+  },
+  aiIconWrap: {
+    width: 34, height: 34, borderRadius: 11,
+    backgroundColor: `${PRIMARY}20`,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: `${PRIMARY}30`,
+  },
+  title: {
+    fontSize: 17, fontWeight: '800', color: TXT_PRI, letterSpacing: -0.4,
+  },
+  subtitle: {
+    fontSize: 12, color: TXT_SEC, marginTop: 2,
+  },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: BORDER,
+  },
+
+  // Filter chips
+  filterRow: {
+    flexDirection: 'row', gap: 8,
+    paddingHorizontal: PAD, paddingBottom: 14,
+  },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 20, borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  chipActive: {
+    borderColor: `${PRIMARY}60`,
+    backgroundColor: `${PRIMARY}18`,
+  },
+  chipText: { fontSize: 13, fontWeight: '600', color: TXT_SEC },
+  chipTextActive: { color: PRIMARY },
+  chipBadge: {
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  chipBadgeActive: { backgroundColor: `${PRIMARY}22` },
+  chipBadgeText: { fontSize: 10, fontWeight: '700', color: TXT_SEC },
+
+  // Grid
+  gridContent: { paddingHorizontal: PAD, paddingBottom: 24, paddingTop: 4 },
+  row: {
+    flexDirection: 'row', gap: GAP, marginBottom: GAP,
+  },
+
+  // Empty state
+  emptyState: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 60, gap: 12, paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 16, fontWeight: '700', color: TXT_PRI,
+  },
+  emptyText: {
+    fontSize: 13, color: TXT_SEC,
+    textAlign: 'center', lineHeight: 20,
+  },
+
+  // Action bar
+  actionBar: {
+    paddingHorizontal: PAD,
+    paddingTop: 14,
+    paddingBottom: 6,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    backgroundColor: 'rgba(14,14,24,0.88)',
+    gap: 10,
+  },
+  counterBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'center',
+    backgroundColor: `${PRIMARY}15`,
+    borderRadius: 20, borderWidth: 1, borderColor: `${PRIMARY}30`,
+    paddingHorizontal: 14, paddingVertical: 6,
+  },
+  counterText: {
+    fontSize: 12, fontWeight: '700', color: PRIMARY,
+  },
+  btnRow: {
+    flexDirection: 'row', gap: 10,
+  },
+  btn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 8,
+    paddingVertical: 15, borderRadius: 18,
+  },
+  btnPrimary: {
+    backgroundColor: ASK_CLR,
+    shadowColor: ASK_CLR,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  btnPrimaryText: {
+    color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: -0.2,
+  },
+  btnSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  btnSecondaryText: {
+    color: TXT_PRI, fontSize: 14, fontWeight: '700', letterSpacing: -0.2,
+  },
+  btnDisabled: {
+    opacity: 0.35,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+});

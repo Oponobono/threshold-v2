@@ -212,6 +212,15 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       const di = await FileSystem.getInfoAsync(dir);
       if (!di.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify({ text, date: new Date().toISOString() }));
+
+      // Persistir el texto en la BD para que el asistente IA no tenga que releer el archivo
+      if (videoData?.id && type === 'transcript') {
+        await upsertYouTubeTranscript({
+          video_id: videoData.id,
+          transcript_uri: fileUri,
+          transcript_text: text,  // clave nueva — leida directamente por buildContext
+        }).catch(e => console.warn('upsert youtube transcript DB:', e));
+      }
     } catch (e) { console.error('saveTextToFile:', e); }
   };
 
@@ -248,14 +257,8 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
 
       setTranscription(text);
       setShowTutorial(false);
+      // saveTextToFile ya persiste en BD mediante upsertYouTubeTranscript
       await saveTextToFile(text, 'transcript');
-
-      if (videoData?.id) {
-        await upsertYouTubeTranscript({
-          video_id: videoData.id,
-          transcript_uri: videoData.youtube_url, // For DB we keep the original url reference
-        }).catch(e => console.warn('upsert transcript DB:', e));
-      }
     } catch (e) {
       console.error('ERROR EN TRANSCRIPCIÓN:', e);
       const errorMsg = e instanceof Error ? e.message : String(e);

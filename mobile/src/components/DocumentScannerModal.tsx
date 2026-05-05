@@ -120,8 +120,6 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
       return;
     }
 
-    const finalImageUri = capturedImage;
-
     try {
       setIsProcessing(true);
       
@@ -145,23 +143,35 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
           </html>
         `;
         const { uri: pdfUri } = await Print.printToFileAsync({ html });
-        console.log("PDF generado en:", pdfUri);
+
+        // Extraer OCR del texto de la imagen para alimentar el contexto IA.
+        // Se intenta en background y si falla no interrumpe el guardado.
+        let ocrText: string | null = null;
+        if (base64Img) {
+          try {
+            ocrText = await extractTextFromImage(base64Img);
+          } catch (ocrErr) {
+            console.warn('[DocumentScannerModal] OCR automático falló, se guardará sin texto:', ocrErr);
+          }
+        }
         
         await createScannedDocument({
           subject_id: selectedSubjectId,
           local_uri: pdfUri,
-          name: `Documento Escaneado ${new Date().toLocaleDateString()}`
+          name: `Documento Escaneado ${new Date().toLocaleDateString()}`,
+          ocr_text: ocrText,   // null si el OCR falló — el backend lo acepta
         });
         
         finalImageUri = pdfUri;
       } else {
+        // Para imágenes de galería se guarda como foto, sin OCR automático
         await createPhoto({
           subject_id: selectedSubjectId,
           local_uri: finalImageUri,
         });
       }
       
-      if (onSave) onSave(exportFormat === 'pdf' ? finalImageUri /* should be pdfUri eventually */ : finalImageUri, selectedSubjectId);
+      if (onSave) onSave(finalImageUri, selectedSubjectId, base64Img || undefined);
       showAlert({ title: t('common.success'), message: t('dashboard.documentScannerModal.success', { subject: subjects.find(s => s.id === selectedSubjectId)?.name }), type: 'success' });
       resetAndClose();
     } catch (error) {
@@ -170,6 +180,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
       setIsProcessing(false);
     }
   };
+
 
 
   const handleOCR = async () => {

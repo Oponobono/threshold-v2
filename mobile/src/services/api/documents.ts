@@ -16,6 +16,8 @@ export interface ScannedDocument {
   subject_id?: number | null;
   name?: string | null;
   local_uri: string;
+  /** Texto extraído por OCR — alimenta el contexto del asistente IA */
+  ocr_text?: string | null;
   created_at?: string;
 }
 
@@ -43,6 +45,7 @@ export const createScannedDocument = async (
     const userId = await getUserId();
     if (!userId) throw new Error('Usuario no autenticado');
 
+    // Enviar ocr_text junto a la URI para que la IA tenga contexto inmediato
     const response = await fetchWithFallback('/scanned_documents', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

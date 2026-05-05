@@ -196,11 +196,15 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       if (recordingData?.id) {
         await upsertAudioTranscript({
           recording_id: recordingData.id,
+          // Guardar la URI del archivo local para acceso offline
           ...(type === 'transcript' ? { transcript_uri: fileUri } : { summary_uri: fileUri }),
+          // Guardar el texto inline para que el asistente IA pueda leerlo sin acceder al dispositivo
+          ...(type === 'transcript' ? { transcript_text: text } : {}),
         }).catch(e => console.warn('upsert transcript DB:', e));
       }
     } catch (e) { console.error('saveTextToFile:', e); }
   };
+
 
   // ---------------------------------------------------------------------------
   // Subject association

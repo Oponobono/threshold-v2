@@ -142,6 +142,7 @@ const tableSchema = {
         subject_id INTEGER NOT NULL,
         local_uri TEXT NOT NULL,
         es_favorita INTEGER DEFAULT 0,
+        ocr_text TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
@@ -152,9 +153,13 @@ const tableSchema = {
         subject_id INTEGER NOT NULL REFERENCES subjects (id) ON DELETE CASCADE,
         local_uri TEXT NOT NULL,
         es_favorita INTEGER DEFAULT 0,
+        ocr_text TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `
+    `,
+    columns: [
+      { name: 'ocr_text', type: 'TEXT' }
+    ]
   },
   assessments: {
     sqlite: `
@@ -229,6 +234,7 @@ const tableSchema = {
         subject_id INTEGER,
         name TEXT,
         local_uri TEXT NOT NULL,
+        ocr_text TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
@@ -241,9 +247,13 @@ const tableSchema = {
         subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
         name TEXT,
         local_uri TEXT NOT NULL,
+        ocr_text TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `
+    `,
+    columns: [
+      { name: 'ocr_text', type: 'TEXT' }
+    ]
   },
   audio_recordings: {
     sqlite: `
@@ -280,6 +290,7 @@ const tableSchema = {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         recording_id INTEGER NOT NULL,
         transcript_uri TEXT,
+        transcript_text TEXT,
         summary_uri TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (recording_id) REFERENCES audio_recordings(id) ON DELETE CASCADE
@@ -290,10 +301,14 @@ const tableSchema = {
         id SERIAL PRIMARY KEY,
         recording_id INTEGER NOT NULL REFERENCES audio_recordings(id) ON DELETE CASCADE,
         transcript_uri TEXT,
+        transcript_text TEXT,
         summary_uri TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `
+    `,
+    columns: [
+      { name: 'transcript_text', type: 'TEXT' }
+    ]
   },
   youtube_videos: {
     sqlite: `
@@ -331,6 +346,7 @@ const tableSchema = {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         video_id INTEGER NOT NULL,
         transcript_uri TEXT,
+        transcript_text TEXT,
         summary_uri TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (video_id) REFERENCES youtube_videos(id) ON DELETE CASCADE
@@ -341,10 +357,14 @@ const tableSchema = {
         id SERIAL PRIMARY KEY,
         video_id INTEGER NOT NULL REFERENCES youtube_videos(id) ON DELETE CASCADE,
         transcript_uri TEXT,
+        transcript_text TEXT,
         summary_uri TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `
+    `,
+    columns: [
+      { name: 'transcript_text', type: 'TEXT' }
+    ]
   },
   flashcard_decks: {
     sqlite: `

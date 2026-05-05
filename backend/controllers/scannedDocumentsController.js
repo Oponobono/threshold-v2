@@ -19,18 +19,19 @@ exports.getScannedDocumentsBySubject = (req, res) => {
  * Guardar un nuevo documento escaneado
  */
 exports.saveScannedDocument = (req, res) => {
-  const { user_id, subject_id, name, local_uri } = req.body;
+  // Acepta ocr_text para persistirlo junto al documento y hacer el contexto IA disponible de inmediato
+  const { user_id, subject_id, name, local_uri, ocr_text } = req.body;
   
   if (!user_id || !local_uri) {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id, local_uri)' });
   }
 
   const query = `
-    INSERT INTO scanned_documents (user_id, subject_id, name, local_uri)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO scanned_documents (user_id, subject_id, name, local_uri, ocr_text)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [user_id, subject_id || null, name || null, local_uri], function(err) {
+  db.run(query, [user_id, subject_id || null, name || null, local_uri, ocr_text || null], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({
       id: this.lastID,
@@ -38,6 +39,7 @@ exports.saveScannedDocument = (req, res) => {
       subject_id,
       name,
       local_uri,
+      ocr_text: ocr_text || null,
       message: 'Documento escaneado registrado en BD'
     });
   });

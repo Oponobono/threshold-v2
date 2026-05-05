@@ -13,7 +13,6 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
-import * as FileSystem from 'expo-file-system/legacy';
 import {
   getAssessments,
   getSubjectById,
@@ -44,7 +43,6 @@ import { SubjectStats } from '../../src/components/SubjectStats';
 import { SubjectThreshold } from '../../src/components/SubjectThreshold';
 import { SubjectInsights } from '../../src/components/SubjectInsights';
 import { SubjectAIFab } from '../../src/components/SubjectAIFab';
-import { SubjectAIChatModal } from '../../src/components/SubjectAIChatModal';
 import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
 import { useCameraPermissions, CameraView } from 'expo-camera';
 import { subjectDetailStyles as styles } from '../../src/styles/SubjectDetail.styles';
@@ -107,9 +105,8 @@ export default function SubjectDetailScreen() {
   const recentRecordings = useMemo(() => allSubjectRecordings.slice(0, 3), [allSubjectRecordings]);
   
   const [isFlashcardModalVisible, setIsFlashcardModalVisible] = useState(false);
-  const [isAIChatModalVisible, setIsAIChatModalVisible] = useState(false);
-  const [flashcardBase64, setFlashcardBase64] = useState<string | undefined>();
-  const [selectedItemsForAI, setSelectedItemsForAI] = useState<any[]>([]);
+  /** contextText construido por el backend — se pasa directamente al FlashcardCreatorModal como `content` */
+  const [flashcardContextText, setFlashcardContextText] = useState<string>('');
   const { showAlert } = useCustomAlert();
 
   /** Muestra la alerta de confirmación y elimina la materia completa (en cascada) */
@@ -417,7 +414,8 @@ export default function SubjectDetailScreen() {
           onSuccess={() => {
             setIsFlashcardModalVisible(false);
           }}
-          imageBase64={flashcardBase64}
+          // Pasar el texto construido por el backend — sin dependencia de archivos del dispositivo
+          content={flashcardContextText}
           contentType="document"
           title={selectedSubject?.name || 'Documento'}
           subjectId={subjectId}
@@ -432,35 +430,21 @@ export default function SubjectDetailScreen() {
           photos={imagePhotos}
           documents={pdfDocuments as any}
           videos={allSubjectVideos}
-          onGenerateFlashcards={async (selectedItems) => {
-            // For now: pick the first document/photo and open the flashcard creator
-            const firstDoc = selectedItems.find(i => i.type === 'document' || i.type === 'photo');
-            if (firstDoc?.uri && subjectId && profile?.id) {
-              try {
-                const FileSystem = require('expo-file-system/legacy');
-                const base64Data = await FileSystem.readAsStringAsync(firstDoc.uri, {
-                  encoding: FileSystem.EncodingType.Base64,
-                });
-                setFlashcardBase64(base64Data);
-                setIsFlashcardModalVisible(true);
-              } catch (e) {
-                console.error('Error reading file for flashcards:', e);
-              }
+          onGenerateFlashcards={async (contextText, selectedItems) => {
+            // El contextText ya fue construido por el backend (texto de transcripciones,
+            // OCR de docs, captions de videos). Se pasa directamente como `content`
+            // al FlashcardCreatorModal sin necesidad de leer archivos del dispositivo.
+            if (contextText && subjectId && profile?.id) {
+              setFlashcardContextText(contextText);
+              setIsFlashcardModalVisible(true);
+            } else {
+              showAlert({
+                title: 'Sin contexto',
+                message: 'Selecciona al menos un archivo con texto procesado para generar flashcards.',
+                type: 'warning',
+              });
             }
           }}
-          onAskQuestions={(selectedItems) => {
-            setSelectedItemsForAI(selectedItems);
-            setIsAIChatModalVisible(true);
-          }}
-        />
-      )}
-
-      {selectedSubject && (
-        <SubjectAIChatModal
-          isVisible={isAIChatModalVisible}
-          onClose={() => setIsAIChatModalVisible(false)}
-          selectedItems={selectedItemsForAI}
-          subjectName={selectedSubject.name}
         />
       )}
     </>

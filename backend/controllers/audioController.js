@@ -81,7 +81,8 @@ exports.deleteAudioRecording = (req, res) => {
  * Upsert (Crear o actualizar) transcripción/resumen
  */
 exports.upsertAudioTranscript = (req, res) => {
-  const { recording_id, transcript_uri, summary_uri } = req.body;
+  // Acepta transcript_text (texto inline) además de las URIs de archivo
+  const { recording_id, transcript_uri, transcript_text, summary_uri } = req.body;
   
   if (!recording_id) {
     return res.status(400).json({ error: 'Falta recording_id' });
@@ -97,6 +98,11 @@ exports.upsertAudioTranscript = (req, res) => {
       if (transcript_uri !== undefined) {
         updateFields.push('transcript_uri = ?');
         updateValues.push(transcript_uri);
+      }
+      // Guardar el texto de transcripción inline para acceso rápido por la IA
+      if (transcript_text !== undefined) {
+        updateFields.push('transcript_text = ?');
+        updateValues.push(transcript_text);
       }
       if (summary_uri !== undefined) {
         updateFields.push('summary_uri = ?');
@@ -116,10 +122,10 @@ exports.upsertAudioTranscript = (req, res) => {
       });
     } else {
       const insertQuery = `
-        INSERT INTO audio_transcripts (recording_id, transcript_uri, summary_uri)
-        VALUES (?, ?, ?)
+        INSERT INTO audio_transcripts (recording_id, transcript_uri, transcript_text, summary_uri)
+        VALUES (?, ?, ?, ?)
       `;
-      db.run(insertQuery, [recording_id, transcript_uri, summary_uri], function(insertErr) {
+      db.run(insertQuery, [recording_id, transcript_uri, transcript_text || null, summary_uri], function(insertErr) {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
         res.status(201).json({ success: true, id: this.lastID, action: 'created' });
       });

@@ -35,27 +35,29 @@ exports.getPhotosBySubject = (req, res) => {
 };
 
 /**
- * Guarda una nueva foto de una materia
+ * Guarda una nueva foto de una materia.
+ * Acepta ocr_text opcional para que el asistente IA tenga contexto inmediato.
  */
 exports.savePhoto = (req, res) => {
-  const { subject_id, local_uri, es_favorita } = req.body;
+  const { subject_id, local_uri, es_favorita, ocr_text } = req.body;
   
   if (!subject_id || !local_uri) {
     return res.status(400).json({ error: 'Faltan campos requeridos (subject_id, local_uri)' });
   }
 
   const query = `
-    INSERT INTO photos (subject_id, local_uri, es_favorita)
-    VALUES (?, ?, ?)
+    INSERT INTO photos (subject_id, local_uri, es_favorita, ocr_text)
+    VALUES (?, ?, ?, ?)
   `;
 
-  db.run(query, [subject_id, local_uri, es_favorita || 0], function(err) {
+  db.run(query, [subject_id, local_uri, es_favorita || 0, ocr_text || null], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({
       id: this.lastID,
       subject_id,
       local_uri,
       es_favorita: es_favorita || 0,
+      ocr_text: ocr_text || null,
       message: 'Foto registrada en BD'
     });
   });
