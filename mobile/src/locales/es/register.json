@@ -1,28 +1,28 @@
-﻿{
+{
     "title":  "Crear cuenta",
-    "subtitle":  "Ãšnete a Threshold para organizar mejor tu vida acadÃ©mica.",
-    "confirmPasswordLabel":  "Confirmar contraseÃ±a",
-    "confirmPasswordPlaceholder":  "Reingresa tu contraseÃ±a",
+    "subtitle":  "Únete a Threshold para organizar mejor tu vida académica.",
+    "confirmPasswordLabel":  "Confirmar contraseña",
+    "confirmPasswordPlaceholder":  "Reingresa tu contraseña",
     "createAccountBtn":  "Registrarse",
-    "alreadyHaveAccount":  "Â¿Ya tienes una cuenta?",
-    "login":  "Iniciar sesiÃ³n",
-    "passwordRequirements":  "La contraseÃ±a no cumple los criterios.",
-    "passwordValid":  "La contraseÃ±a cumple los requisitos.",
-    "passwordMismatch":  "Las contraseÃ±as no coinciden.",
-    "passwordMatch":  "Las contraseÃ±as coinciden.",
-    "invalidCharacters":  "Contiene caracteres invÃ¡lidos.",
-    "invalidEmail":  "Por favor, ingresa un correo vÃ¡lido.",
-    "reqTitle":  "La contraseÃ±a debe contener:",
+    "alreadyHaveAccount":  "¿Ya tienes una cuenta?",
+    "login":  "Iniciar sesión",
+    "passwordRequirements":  "La contraseña no cumple los criterios.",
+    "passwordValid":  "La contraseña cumple los requisitos.",
+    "passwordMismatch":  "Las contraseñas no coinciden.",
+    "passwordMatch":  "Las contraseñas coinciden.",
+    "invalidCharacters":  "Contiene caracteres inválidos.",
+    "invalidEmail":  "Por favor, ingresa un correo válido.",
+    "reqTitle":  "La contraseña debe contener:",
     "reqLength":  "Al menos 8 caracteres",
-    "reqUpper":  "Una letra mayÃºscula",
-    "reqNumber":  "Un nÃºmero",
-    "reqSpecial":  "Un carÃ¡cter especial (@$!%*?\u0026)",
+    "reqUpper":  "Una letra mayúscula",
+    "reqNumber":  "Un número",
+    "reqSpecial":  "Un carácter especial (@$!%*?&)",
     "errors":  {
                    "registerTitle":  "Error de registro",
-                   "generic":  "No pudimos crear tu cuenta ahora. IntÃ©ntalo de nuevo."
+                   "generic":  "No pudimos crear tu cuenta ahora. Inténtalo de nuevo."
                },
     "success":  {
-                    "accountCreated":  "Tu cuenta estÃ¡ lista. Â¡Bienvenido a Threshold!"
+                    "accountCreated":  "Tu cuenta está lista. ¡Bienvenido a Threshold!"
                 },
     "examplePrefix":  "Ej:",
     "actions":  {
@@ -33,30 +33,30 @@
                   "title":  "Configura tu perfil",
                   "subtitle":  "Comencemos con tu nombre para personalizar tu experiencia.",
                   "firstNameLabel":  "Nombre(s)",
-                  "firstNamePlaceholder":  "Ej: MarÃ­a",
+                  "firstNamePlaceholder":  "Ej: María",
                   "lastNameLabel":  "Apellido(s)",
-                  "lastNamePlaceholder":  "Ej: SÃ¡nchez",
+                  "lastNamePlaceholder":  "Ej: Sánchez",
                   "usernameLabel":  "Usuario o apodo",
                   "usernamePlaceholder":  "Ej: marias99"
               },
     "step2":  {
-                  "title":  "Preferencias de calificaciÃ³n",
-                  "subtitle":  "CuÃ©ntanos cÃ³mo califica tu universidad para mostrar tu avance correctamente.",
-                  "gradingScaleLabel":  "Escala de calificaciÃ³n",
-                  "approvalThresholdLabel":  "Â¿CuÃ¡l es la nota mÃ­nima para aprobar?"
+                  "title":  "Preferencias de calificación",
+                  "subtitle":  "Cuéntanos cómo califica tu universidad para mostrar tu avance correctamente.",
+                  "gradingScaleLabel":  "Escala de calificación",
+                  "approvalThresholdLabel":  "¿Cuál es la nota mínima para aprobar?"
               },
     "step3":  {
-                  "title":  "Contexto acadÃ©mico",
+                  "title":  "Contexto académico",
                   "subtitle":  "Esto nos ayuda a adaptar tu panel. Puedes omitirlo por ahora.",
                   "majorLabel":  "Carrera / especialidad (opcional)",
-                  "majorPlaceholder":  "Ej: IngenierÃ­a de Software",
-                  "universityLabel":  "Universidad / instituciÃ³n (opcional)",
+                  "majorPlaceholder":  "Ej: Ingeniería de Software",
+                  "universityLabel":  "Universidad / institución (opcional)",
                   "universityPlaceholder":  "Ej: Universidad Nacional",
-                  "emptyState":  "Agrega tu universidad para recibir recomendaciones mÃ¡s Ãºtiles despuÃ©s."
+                  "emptyState":  "Agrega tu universidad para recibir recomendaciones más útiles después."
               },
     "step4":  {
                   "title":  "Protege tu cuenta",
-                  "subtitle":  "Ãšltimo paso. Crea tu acceso para mantener tu informaciÃ³n segura.",
+                  "subtitle":  "Último paso. Crea tu acceso para mantener tu información segura.",
                   "finishBtn":  "Crear cuenta"
               }
 }

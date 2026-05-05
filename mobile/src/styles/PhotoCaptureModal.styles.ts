@@ -1,4 +1,4 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, Platform } from 'react-native';
 import { theme } from './theme';
 
 const { width, height } = Dimensions.get('window');
@@ -36,10 +36,14 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     justifyContent: 'flex-end',
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 64,
   },
   captureButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
     alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 20,
   },
   captureButtonOuter: {
     width: 76,
@@ -55,6 +59,14 @@ export const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     backgroundColor: 'white',
+  },
+  sideButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   previewContainer: {
     flex: 1,

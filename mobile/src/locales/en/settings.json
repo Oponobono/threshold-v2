@@ -1,4 +1,4 @@
-﻿{
+{
     "title":  "Profile \u0026 Settings",
     "save":  "Save",
     "cancel":  "Cancel",
@@ -67,7 +67,7 @@
     "deleteBtn":  "Delete",
     "deleteWarning":  "Important warning",
     "deleteWarningMsg":  "This action will permanently disable your account. You have 14 days to recover it before everything is permanently deleted.",
-    "deleteIrreversible":  "âš ï¸ After 14 days, we won\u0027t be able to recover your data.",
+    "deleteIrreversible":  "âš ï¸️ After 14 days, we won\u0027t be able to recover your data.",
     "verifyPassword":  "Verify Password",
     "passwordVerifyMsg":  "To confirm, please enter your password",
     "whatWillBeLost":  "Data that will be lost",
@@ -77,10 +77,10 @@
     "video":  "video",
     "photo":  "photo",
     "deck":  "deck",
-    "recoveryInfo":  "â„¹ï¸ You can recover your account by logging in with your credentials within 14 days.",
+    "recoveryInfo":  "â„¹ï¸️ You can recover your account by logging in with your credentials within 14 days.",
     "confirmDeletion":  "Final Confirmation",
     "typeToConfirm":  "Type your username to confirm",
-    "oneWayRoad":  "âš ï¸ This is your last chance to change your mind.",
+    "oneWayRoad":  "âš ï¸️ This is your last chance to change your mind.",
     "continueBtn":  "Continue",
     "backBtn":  "Back",
     "integrations":  "Integrations",

@@ -1,4 +1,4 @@
-﻿{
+{
     "swipeToExplore":  "Desliza para explorar",
     "swipeToStart":  "Volver al inicio",
     "bento":  {
@@ -7,10 +7,10 @@
               },
     "gpa":  {
                 "title":  "Seguimiento de promedio",
-                "desc":  "MantÃ©n un registro exacto de tu rendimiento."
+                "desc":  "Mantén un registro exacto de tu rendimiento."
             },
     "photo":  {
-                  "title":  "Fotos rÃ¡pidas",
+                  "title":  "Fotos rápidas",
                   "desc":  "Guarda apuntes en fotos con un clic."
               },
     "schedule":  {
@@ -18,23 +18,23 @@
                      "desc":  "Planifica tus clases y tiempo de estudio."
                  },
     "tasks":  {
-                  "title":  "GestiÃ³n de Tareas",
-                  "desc":  "Administra fechas de entrega y exÃ¡menes."
+                  "title":  "Gestión de Tareas",
+                  "desc":  "Administra fechas de entrega y exámenes."
               },
     "gallery":  {
-                    "title":  "GalerÃ­a Organizada",
+                    "title":  "Galería Organizada",
                     "desc":  "Encuentra tus apuntes agrupados por materia."
                 },
     "cloud":  {
-                  "title":  "SincronizaciÃ³n Cloud",
+                  "title":  "Sincronización Cloud",
                   "desc":  "Accede a tus datos de forma segura."
               },
     "security":  {
                      "title":  "Privacidad Total",
-                     "desc":  "Tus notas estÃ¡n encriptadas y protegidas."
+                     "desc":  "Tus notas están encriptadas y protegidas."
                  },
     "custom":  {
-                   "title":  "PersonalizaciÃ³n",
+                   "title":  "Personalización",
                    "desc":  "Temas visuales y avatares a tu gusto."
                }
 }

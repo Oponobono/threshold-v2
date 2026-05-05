@@ -1,8 +1,8 @@
-﻿{
+{
     "weekOverview":  "Resumen semanal",
     "today":  "Hoy",
     "defaultClassTitle":  "Clase",
-    "allDay":  "Todo el dÃ­a",
-    "defaultAssessmentTitle":  "EvaluaciÃ³n",
-    "emptyEvents":  "Sin actividades este dÃ­a"
+    "allDay":  "Todo el día",
+    "defaultAssessmentTitle":  "Evaluación",
+    "emptyEvents":  "Sin actividades este día"
 }

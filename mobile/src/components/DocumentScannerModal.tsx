@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Modal, TouchableOpacity, ActivityIndicator, Platform, Share, ScrollView } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ActivityIndicator, Platform, Share, ScrollView, TextInput } from 'react-native';
 import { useCustomAlert } from './CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { documentScannerStyles as localStyles } from '../styles/DocumentScannerM
 import { Subject, createPhoto, createScannedDocument, extractTextFromImage } from '../services/api';
 import { AdvancedImageEnhancer, AdvancedImageEnhancerRef } from './AdvancedImageEnhancer';
 import * as Print from 'expo-print';
+import * as Clipboard from 'expo-clipboard';
 
 // Importes condicionales para plataformas nativas
 let DocumentScanner: any = null;
@@ -69,6 +70,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
   const [isLevel, setIsLevel] = useState(false);
   const [exportFormat, setExportFormat] = useState<'image' | 'pdf'>('image');
   const [activeFilter, setActiveFilter] = useState('original');
+  const [extractedText, setExtractedText] = useState<string | null>(null);
   const enhancerRef = useRef<AdvancedImageEnhancerRef>(null);
 
   useEffect(() => {
@@ -197,10 +199,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
         return;
       }
 
-      await Share.share({
-        title: t('dashboard.documentScannerModal.transcribedText') || 'Texto extraído de Threshold',
-        message: text,
-      });
+      setExtractedText(text);
     } catch (error: any) {
       console.error('[OCR] Error:', error.message);
       showAlert({ title: t('common.ocrError') || 'Error OCR', message: error.message, type: 'error' });
@@ -216,6 +215,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
     setSelectedSubjectId(null);
     setIsProcessing(false);
     setIsLevel(false);
+    setExtractedText(null);
     onClose();
   };
 
@@ -228,7 +228,11 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
   const isSaveDisabled = !selectedSubjectId || isProcessing;
 
   return (
-    <Modal visible={isVisible} animationType="slide" transparent={false} onRequestClose={step === 'saving' ? handleDiscard : resetAndClose}>
+    <Modal visible={isVisible} animationType="slide" transparent={false} onRequestClose={() => {
+      if (extractedText) setExtractedText(null);
+      else if (step === 'saving') handleDiscard();
+      else resetAndClose();
+    }}>
       <View style={localStyles.container}>
         
         {step === 'guide' && (
@@ -395,6 +399,36 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
           <View style={localStyles.loaderOverlay}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={localStyles.loaderText}>{t('dashboard.documentScannerModal.saving')}</Text>
+          </View>
+        )}
+
+        {/* Panel Inferior para Texto Extraído */}
+        {extractedText && (
+          <View style={[localStyles.ocrOverlay, { paddingBottom: Platform.OS === 'ios' ? 44 : 48 }]}>
+            <View style={localStyles.ocrHeader}>
+              <Text style={localStyles.ocrTitle}>{t('dashboard.documentScannerModal.transcribedText') || 'Texto Extraído'}</Text>
+              <TouchableOpacity onPress={() => setExtractedText(null)}>
+                <Ionicons name="close" size={24} color={theme.colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <TextInput 
+              style={[localStyles.ocrScroll, localStyles.ocrText, { textAlignVertical: 'top' }]}
+              multiline={true}
+              value={extractedText}
+              onChangeText={setExtractedText}
+            />
+            
+            <TouchableOpacity 
+              style={localStyles.ocrCopyButton}
+              onPress={async () => {
+                await Clipboard.setStringAsync(extractedText);
+                showAlert({ title: t('common.success') || 'Copiado', message: t('common.copiedToClipboard') || 'Texto copiado al portapapeles', type: 'success' });
+              }}
+            >
+              <Ionicons name="copy-outline" size={20} color={theme.colors.white} style={{ marginRight: 8 }} />
+              <Text style={localStyles.ocrCopyText}>{t('common.copyText') || 'Copiar Texto'}</Text>
+            </TouchableOpacity>
           </View>
         )}
 

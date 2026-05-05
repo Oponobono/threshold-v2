@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { theme } from './theme';
 import { globalStyles } from './globalStyles';
 
@@ -304,7 +304,7 @@ export const dashboardStyles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 52,
     maxHeight: '85%',
     ...globalStyles.shadow,
   },

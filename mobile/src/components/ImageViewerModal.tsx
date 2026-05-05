@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import { deletePhoto, extractTextFromImage } from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { styles } from '../styles/ImageViewerModal.styles';
 
@@ -52,7 +51,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedText, setExtractedText] = useState<string | null>(null);
-  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (isVisible && photos.length > 0) {
@@ -186,7 +184,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
         {/* Panel Inferior para Texto Extraído */}
         {extractedText && (
-          <View style={[styles.ocrOverlay, { paddingBottom: Math.max(insets.bottom + 10, 20) }]}>
+          <View style={[styles.ocrOverlay, { paddingBottom: Platform.OS === 'ios' ? 44 : 48 }]}>
             <View style={styles.ocrHeader}>
               <Text style={styles.ocrTitle}>{t('dashboard.documentScannerModal.transcribedText') || 'Texto Extraído'}</Text>
               <TouchableOpacity onPress={() => setExtractedText(null)}>

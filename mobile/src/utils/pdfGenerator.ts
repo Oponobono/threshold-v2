@@ -77,13 +77,18 @@ export const generatePdfFromImages = async (uris: string[]): Promise<string> => 
     );
     console.log('[PDF] Guardado en:', pdfUri);
 
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(pdfUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+    const isSharingAvailable = await Sharing.isAvailableAsync();
+    if (isSharingAvailable) {
+      await Sharing.shareAsync(pdfUri);
+    } else {
+      console.warn('[PDF] Sharing is not available on this device');
     }
+
+    console.log('[PDF] PDF completado y listo');
 
     return pdfUri;
   } catch (error) {
-    console.error('[PDF] Error guardando o compartiendo PDF:', error);
+    console.error('[PDF] Error guardando PDF:', error);
     throw new Error(`Error al guardar el PDF: ${error instanceof Error ? error.message : String(error)}`);
   }
 };

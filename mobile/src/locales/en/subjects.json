@@ -1,4 +1,4 @@
-﻿{
+{
     "title":  "Subject Manager \u0026 Pass Threshold",
     "loadingList":  "Loading subjects...",
     "listSubtitle":  "Your subject dashboard",
@@ -95,13 +95,13 @@
     "sample":  {
                    "csName":  "Computer Systems II",
                    "csProf":  "Prof. Aguilar K.",
-                   "csNext":  "Next: Quiz Â· Apr 28",
+                   "csNext":  "Next: Quiz · Apr 28",
                    "maName":  "Calculus III",
                    "maProf":  "Dr. Ruiz M.",
-                   "maNext":  "Next: Midterm Â· May 05",
+                   "maNext":  "Next: Midterm · May 05",
                    "enName":  "English Lit: Modern",
                    "enProf":  "Prof. S. Patel",
-                   "enNext":  "Next: Essay Â· May 12",
+                   "enNext":  "Next: Essay · May 12",
                    "assess1Name":  "Assignment 4: Memory Management",
                    "assess1Due":  "Apr 30",
                    "assess2Name":  "Quiz 5: Caching Strategies",

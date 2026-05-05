@@ -1,16 +1,16 @@
-﻿{
+{
     "cancel":  "Cancelar",
     "save":  "Guardar",
     "select":  "Seleccionar",
     "retake":  "Retomar",
     "editScan":  "Editar Escaneo",
-    "exportFormat":  "Formato de exportaciÃ³n",
-    "durationMinutes":  "DuraciÃ³n (minutos)",
-    "selectYear":  "Seleccionar AÃ±o",
+    "exportFormat":  "Formato de exportación",
+    "durationMinutes":  "Duración (minutos)",
+    "selectYear":  "Seleccionar Año",
     "deleteDeck":  "Eliminar Mazo",
-    "deleteDeckConfirm":  "Â¿EstÃ¡s seguro de que deseas eliminar el mazo \"{{title}}\"? Esta acciÃ³n no se puede deshacer.",
+    "deleteDeckConfirm":  "¿Estás seguro de que deseas eliminar el mazo \"{{title}}\"? Esta acción no se puede deshacer.",
     "deleteCard":  "Eliminar Tarjeta",
-    "deleteCardConfirm":  "Â¿EstÃ¡s seguro de que deseas eliminar esta tarjeta?",
+    "deleteCardConfirm":  "¿Estás seguro de que deseas eliminar esta tarjeta?",
     "shared":  "Compartido",
     "shareDeck":  "Compartir mazo",
     "shareDeckDesc":  "Ingresa el PIN del usuario con quien deseas compartir \"{{title}}\".",
@@ -21,7 +21,7 @@
                     "prefix":  "Filtro: ",
                     "smartEnhancements":  "Mejoras Inteligentes",
                     "original":  "Original",
-                    "magic":  "Texto MÃ¡gico",
+                    "magic":  "Texto Mágico",
                     "bw":  "B/N OCR",
                     "grayscale":  "Escala de Grises"
                 }

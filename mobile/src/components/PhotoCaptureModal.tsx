@@ -2,9 +2,9 @@ import React, { useState, useRef } from 'react';
 import { View, Text, Modal, TouchableOpacity, Image, ActivityIndicator, StyleSheet } from 'react-native';
 import { useCustomAlert } from './CustomAlert';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { dashboardStyles } from '../styles/Dashboard.styles';
 import { Subject, createPhoto } from '../services/api';
@@ -47,7 +47,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const insets = useSafeAreaInsets();
+  const [flashEnabled, setFlashEnabled] = useState(false);
 
   // If permissions are not yet determined
   if (!permission) {
@@ -81,6 +81,22 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     }
   };
 
+  const pickImage = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        setCapturedImage(result.assets[0].uri);
+      }
+    } catch (err) {
+      showAlert({ title: t('common.error'), message: t('common.error') || 'Error', type: 'error' });
+    }
+  };
+
   const handleSave = async () => {
     if (!capturedImage || !selectedSubjectId) {
       showAlert({ title: t('common.error'), message: t('dashboard.documentScannerModal.selectSubjectError') || 'Error', type: 'warning' });
@@ -107,6 +123,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     setCapturedImage(null);
     setSelectedSubjectId(initialSubjectId || null);
     setIsProcessing(false);
+    setFlashEnabled(false);
     onClose();
   };
 
@@ -125,12 +142,22 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
 
         {!capturedImage ? (
           <View style={styles.camera}>
-            <CameraView style={StyleSheet.absoluteFillObject} facing="back" ref={cameraRef} />
+            <CameraView style={StyleSheet.absoluteFillObject} facing="back" ref={cameraRef} enableTorch={flashEnabled} />
             <View style={[styles.cameraOverlay, { position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
               <View style={styles.captureButtonContainer}>
+                
+                <TouchableOpacity onPress={pickImage} style={styles.sideButton}>
+                  <Ionicons name="images-outline" size={28} color="white" />
+                </TouchableOpacity>
+
                 <TouchableOpacity style={styles.captureButtonOuter} onPress={takePicture}>
                   <View style={styles.captureButtonInner} />
                 </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setFlashEnabled(!flashEnabled)} style={styles.sideButton}>
+                  <Ionicons name={flashEnabled ? "flash" : "flash-off"} size={24} color="white" />
+                </TouchableOpacity>
+
               </View>
             </View>
           </View>
@@ -138,7 +165,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           <View style={styles.previewContainer}>
             <Image source={{ uri: capturedImage }} style={styles.previewImage} resizeMode="contain" />
             
-            <View style={[styles.actionSheet, { paddingBottom: Math.max(insets.bottom + 20, 40) }]}>
+            <View style={[styles.actionSheet, { paddingBottom: Platform.OS === 'ios' ? 44 : 52 }]}>
               <Text style={styles.sheetTitle}>{t('dashboard.documentScannerModal.save') || 'Guardar'}</Text>
               
               <View style={styles.subjectGrid}>
