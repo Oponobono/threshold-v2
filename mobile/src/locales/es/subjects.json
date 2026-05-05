@@ -127,5 +127,19 @@
     "flashcards":  "Tarjetas",
     "selectSubject":  "Asignar materia",
     "deleteAssessmentConfirm":  "¿Estás seguro de que quieres eliminar esta nota/evaluación?",
-    "deleteDocumentConfirm":  "¿Estás seguro de que quieres eliminar este documento?"
+    "deleteDocumentConfirm":  "¿Estás seguro de que quieres eliminar este documento?",
+    "deletePhotoTitle": "Eliminar Foto",
+    "deletePhotoConfirm": "¿Estás seguro de que deseas eliminar esta foto de forma permanente?",
+    "deletePhotoError": "Hubo un error al intentar eliminar la foto.",
+    "deleteSubjectTitle": "Eliminar Materia",
+    "deleteSubjectConfirm": "¿Estás seguro de que deseas eliminar esta materia? Esta acción eliminará permanentemente todos sus documentos, fotos y grabaciones asociadas.",
+    "deleteSubjectSuccess": "Materia eliminada exitosamente.",
+    "deleteSubjectError": "Hubo un error al intentar eliminar la materia.",
+    "rescanSuccessTitle": "Reescaneo completado",
+    "rescanSuccessMessage": "Se extrajo texto exitosamente de {{count}} documento(s).",
+    "rescanErrorTitle": "Error de extracción",
+    "rescanErrorMessage": "No se pudo extraer texto de los documentos seleccionados. Verifica que los archivos no estén corruptos.",
+    "noContextTitle": "Sin contexto",
+    "noContextMessage": "Selecciona al menos un archivo con texto procesado para generar flashcards.",
+    "scannedDocumentsEmpty": "Aún no hay documentos guardados. Usa el botón '+' para importar archivos PDF."
 }

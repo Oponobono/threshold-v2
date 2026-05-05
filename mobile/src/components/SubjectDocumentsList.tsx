@@ -46,8 +46,6 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
   const [ocrInProgress, setOcrInProgress] = useState<Set<string | number>>(new Set());
   const [isRescanningAll, setIsRescanningAll] = useState(false);
 
-  if (documents.length === 0) return null;
-
   const openDocument = async (uri: string) => {
     try {
       // Verificar si el archivo existe antes de intentar abrirlo
@@ -214,10 +212,10 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
   };
 
   const handleRescanSelected = async () => {
-    // Filtramos solo los seleccionados
+    // Filtramos solo los seleccionados que no tienen texto activo
     const docsToRescan = documents.filter(d => {
       const docId = d.id || documents.indexOf(d);
-      return selectedIds.has(docId);
+      return selectedIds.has(docId) && (!d.ocr_text || d.ocr_text.trim() === '');
     });
     
     if (docsToRescan.length === 0) return;
@@ -262,16 +260,16 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
     
     if (successCount > 0) {
       showAlert({
-        title: 'Reescaneo completado',
-        message: `Se extrajo texto exitosamente de ${successCount} documento(s).`,
+        title: t('subjects.rescanSuccessTitle'),
+        message: t('subjects.rescanSuccessMessage', { count: successCount }),
         type: 'success',
       });
       // Llamamos a la función para recargar todo, simulando una eliminación para forzar el refetch del padre
       onDocumentDeleted?.(-1); 
     } else {
       showAlert({
-        title: 'Error',
-        message: 'No se pudo extraer texto de los documentos pendientes. Verifica que no estén corruptos.',
+        title: t('subjects.rescanErrorTitle'),
+        message: t('subjects.rescanErrorMessage'),
         type: 'error',
       });
     }
@@ -285,23 +283,25 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
           <Text style={sectionStyles.sectionHint}>{t('subjects.scannedDocumentsHint')}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <TouchableOpacity 
-            onPress={() => {
-              if (selectionMode) {
-                setSelectionMode(false);
-                setSelectedIds(new Set());
-              } else {
-                setSelectionMode(true);
-              }
-            }} 
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons 
-              name={selectionMode ? "document-text" : "document-text-outline"} 
-              size={22} 
-              color={selectionMode ? theme.colors.primary : theme.colors.text.secondary} 
-            />
-          </TouchableOpacity>
+          {documents.length > 0 && (
+            <TouchableOpacity 
+              onPress={() => {
+                if (selectionMode) {
+                  setSelectionMode(false);
+                  setSelectedIds(new Set());
+                } else {
+                  setSelectionMode(true);
+                }
+              }} 
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons 
+                name={selectionMode ? "document-text" : "document-text-outline"} 
+                size={22} 
+                color={selectionMode ? theme.colors.primary : theme.colors.text.secondary} 
+              />
+            </TouchableOpacity>
+          )}
           {onOpenImportPDF && (
             <TouchableOpacity onPress={onOpenImportPDF} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
@@ -310,38 +310,70 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
         </View>
       </View>
 
-      <View style={styles.list}>
-        {documents.map((doc, index) => {
-          const docId = doc.id || index;
-          const isSelected = selectedIds.has(docId);
-          const isExtracting = ocrInProgress.has(docId);
+      <View style={documents.length === 0 ? sectionStyles.insightsCard : styles.list}>
+        {documents.length === 0 ? (
+          <View style={sectionStyles.emptyStateCard}>
+            <Ionicons name="document-text-outline" size={24} color={theme.colors.text.secondary} />
+            <Text style={sectionStyles.emptyStateTitle}>{t('subjects.scannedDocuments')}</Text>
+            <Text style={sectionStyles.emptyStateText}>{t('subjects.scannedDocumentsEmpty')}</Text>
+          </View>
+        ) : (
+          documents.map((doc, index) => {
+            const docId = doc.id || index;
+            const isSelected = selectedIds.has(docId);
+            const isExtracting = ocrInProgress.has(docId);
 
-          return (
-            <SubjectDocumentCard
-              key={docId}
-              doc={doc}
-              index={index}
-              isSelected={isSelected}
-              selectionMode={selectionMode}
-              onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc.local_uri)}
-              onLongPress={() => handleLongPress(docId)}
-              onDelete={() => handleDelete(docId)}
-              onExtractOCR={() => handleExtractOCR(docId)}
-              isExtractingOCR={isExtracting}
-            />
-          );
-        })}
+            return (
+              <SubjectDocumentCard
+                key={docId}
+                doc={doc}
+                index={index}
+                isSelected={isSelected}
+                selectionMode={selectionMode}
+                onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc.local_uri)}
+                onLongPress={() => handleLongPress(docId)}
+                onDelete={() => handleDelete(docId)}
+                onExtractOCR={() => handleExtractOCR(docId)}
+                isExtractingOCR={isExtracting}
+              />
+            );
+          })
+        )}
       </View>
 
-      {selectionMode && selectedIds.size > 0 && (
+      {selectionMode && (
         <View style={styles.actionBottomBar}>
-          <Text style={styles.actionText}>{selectedIds.size} documento(s)</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity style={styles.actionBtn} onPress={handleRescanSelected}>
-              <Ionicons name="document-text" size={16} color={theme.colors.primary} />
-              <Text style={styles.actionBtnText}>Reescanear</Text>
-            </TouchableOpacity>
-          </View>
+          {selectedIds.size === 0 ? (
+            <Text style={[styles.actionText, { flex: 1, textAlign: 'center' }]}>
+              Selecciona un documento
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.actionText}>{selectedIds.size} documento(s)</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {(() => {
+                  const selectedDocs = documents.filter(d => selectedIds.has(d.id || documents.indexOf(d)));
+                  const canRescan = selectedDocs.some(d => !d.ocr_text || d.ocr_text.trim() === '');
+                  
+                  if (canRescan) {
+                    return (
+                      <TouchableOpacity style={styles.actionBtn} onPress={handleRescanSelected}>
+                        <Ionicons name="document-text" size={16} color={theme.colors.primary} />
+                        <Text style={styles.actionBtnText}>Reescanear</Text>
+                      </TouchableOpacity>
+                    );
+                  } else {
+                    return (
+                      <View style={[styles.actionBtn, { opacity: 0.7, backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.colors.border }]}>
+                        <Ionicons name="checkmark-done" size={16} color={theme.colors.text.secondary} />
+                        <Text style={[styles.actionBtnText, { color: theme.colors.text.secondary }]}>Texto activo</Text>
+                      </View>
+                    );
+                  }
+                })()}
+              </View>
+            </>
+          )}
         </View>
       )}
     </View>

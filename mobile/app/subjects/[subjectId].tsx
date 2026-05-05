@@ -116,13 +116,13 @@ export default function SubjectDetailScreen() {
   /** Muestra la alerta de confirmación y elimina la materia completa (en cascada) */
   const handleDeleteSubject = () => {
     showAlert({
-      title: 'Eliminar Materia',
-      message: '¿Estás seguro de que deseas eliminar esta materia? Al hacerlo, se eliminarán todos los elementos asociados a ella de forma permanente.',
+      title: t('subjects.deleteSubjectTitle'),
+      message: t('subjects.deleteSubjectConfirm'),
       type: 'confirm',
       buttons: [
-        { text: t('subjects.cancel') || 'Cancelar', style: 'cancel' },
+        { text: t('common.cancel') || 'Cancelar', style: 'cancel' },
         {
-          text: t('subjects.delete') || 'Eliminar',
+          text: t('common.delete') || 'Eliminar',
           style: 'destructive',
           onPress: async () => {
             if (!subjectId) return;
@@ -130,10 +130,10 @@ export default function SubjectDetailScreen() {
               setIsLoading(true);
               await deleteSubject(subjectId);
               router.back();
-              showAlert({ title: 'Materia eliminada', message: 'La materia ha sido eliminada exitosamente.', type: 'info' });
+              showAlert({ title: t('subjects.deleteSubjectTitle'), message: t('subjects.deleteSubjectSuccess'), type: 'info' });
             } catch (e: any) {
               setIsLoading(false);
-              showAlert({ title: t('subjects.error') || 'Error', message: e.message || 'Error al eliminar', type: 'error' });
+              showAlert({ title: t('subjects.error') || 'Error', message: t('subjects.deleteSubjectError'), type: 'error' });
             }
           }
         }
@@ -465,8 +465,8 @@ export default function SubjectDetailScreen() {
               setIsFlashcardModalVisible(true);
             } else {
               showAlert({
-                title: 'Sin contexto',
-                message: 'Selecciona al menos un archivo con texto procesado para generar flashcards.',
+                title: t('subjects.noContextTitle'),
+                message: t('subjects.noContextMessage'),
                 type: 'warning',
               });
             }

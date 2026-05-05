@@ -114,8 +114,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
   const handleDelete = async (photoId: number) => {
     showAlert({
-      title: t('common.delete') || 'Eliminar',
-      message: t('subjects.deletePhotoConfirm') || '¿Estás seguro de que quieres eliminar esta foto?',
+      title: t('subjects.deletePhotoTitle'),
+      message: t('subjects.deletePhotoConfirm'),
       type: 'confirm',
       buttons: [
         { text: t('common.cancel') || 'Cancelar', style: 'cancel' },
@@ -130,7 +130,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 onClose(); // Cerrar si no quedan más fotos
               }
             } catch (error) {
-              showAlert({ title: t('common.error'), message: t('subjects.deletePhotoError') || 'Error al eliminar', type: 'error' });
+              showAlert({ title: t('common.error'), message: t('subjects.deletePhotoError'), type: 'error' });
             }
           }
         }
