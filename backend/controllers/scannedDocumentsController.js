@@ -1,4 +1,5 @@
 const { db } = require('../db');
+const pdfParse = require('pdf-parse');
 
 /**
  * Obtener documentos escaneados por materia
@@ -164,5 +165,24 @@ exports.performOCR = async (req, res) => {
     res.json({ text: extractedText });
   } catch (error) {
     res.status(500).json({ error: `Error interno al comunicarse con Groq: ${error.message}` });
+  }
+};
+
+/**
+ * Extraer texto nativo de un archivo PDF
+ */
+exports.extractPDFText = async (req, res) => {
+  const { base64Pdf } = req.body;
+  if (!base64Pdf) {
+    return res.status(400).json({ error: 'Falta base64Pdf en el body' });
+  }
+
+  try {
+    const buffer = Buffer.from(base64Pdf, 'base64');
+    const data = await pdfParse(buffer);
+    res.json({ text: data.text });
+  } catch (error) {
+    console.error('Error parseando PDF:', error);
+    res.status(500).json({ error: `Error extrayendo texto del PDF: ${error.message}` });
   }
 };

@@ -129,3 +129,27 @@ export const extractTextFromImage = async (base64Image: string): Promise<string>
     throw new Error(error.message || 'Error de red al invocar el servicio de OCR');
   }
 };
+
+/**
+ * Extrae texto de un PDF a través del backend usando pdf-parse.
+ * @param base64Pdf - Archivo PDF codificado en base64
+ * @returns Texto plano extraído del PDF.
+ */
+export const extractTextFromPDF = async (base64Pdf: string): Promise<string> => {
+  try {
+    const response = await fetchWithFallback('/pdf-extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64Pdf }),
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      const errMsg = typeof data?.error === 'string' ? data.error : 'Error al parsear el PDF';
+      console.error('[PDF Extract] Backend error:', errMsg);
+      throw new Error(errMsg);
+    }
+    return data?.text || '';
+  } catch (error: any) {
+    throw new Error(error.message || 'Error de red al invocar el servicio de extracción PDF');
+  }
+};

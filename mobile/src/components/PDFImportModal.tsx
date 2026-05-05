@@ -15,7 +15,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { theme } from '../styles/theme';
 import { pdfImportStyles as s } from '../styles/PDFImportModal.styles';
 import { useCustomAlert } from './CustomAlert';
-import { createScannedDocument, extractTextFromImage } from '../services/api';
+import { createScannedDocument, extractTextFromPDF } from '../services/api';
 
 export interface PDFImportModalProps {
   isVisible: boolean;
@@ -113,9 +113,9 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
           const base64Data = await FileSystem.readAsStringAsync(localPdfUri, {
             encoding: FileSystem.EncodingType.Base64,
           });
-          ocrText = await extractTextFromImage(base64Data);
+          ocrText = await extractTextFromPDF(base64Data);
         } catch (ocrErr) {
-          console.warn('[PDFImportModal] OCR falló:', ocrErr);
+          console.warn('[PDFImportModal] Extracción de texto falló:', ocrErr);
         }
       }
 
@@ -196,10 +196,10 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
               />
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>
-                  Extraer texto (OCR)
+                  Extraer texto nativo
                 </Text>
                 <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginTop: 4 }}>
-                  Permite a la inteligencia artificial leer el contenido.
+                  Permite a la IA leer el contenido de este PDF.
                 </Text>
               </View>
             </TouchableOpacity>

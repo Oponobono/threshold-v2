@@ -127,4 +127,27 @@ router.put('/scanned_documents/:documentId', scannedDocumentsController.updateSc
  */
 router.post('/ocr', scannedDocumentsController.performOCR);
 
+/**
+ * @swagger
+ * /api/pdf-extract:
+ *   post:
+ *     summary: Extrae texto de un archivo PDF codificado en base64
+ *     tags: [AI Services]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - base64Pdf
+ *             properties:
+ *               base64Pdf:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Texto extraído
+ */
+router.post('/pdf-extract', scannedDocumentsController.extractPDFText);
+
 module.exports = router;
