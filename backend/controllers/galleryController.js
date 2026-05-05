@@ -35,8 +35,35 @@ exports.getPhotosBySubject = (req, res) => {
 };
 
 /**
+ * Buscar fotos por tags (palabras clave)
+ * Acepta un tag y retorna todas las fotos que lo contienen
+ */
+exports.searchPhotosByTag = (req, res) => {
+  const { subjectId } = req.params;
+  const { tag } = req.query;
+
+  if (!tag || tag.trim().length === 0) {
+    return res.status(400).json({ error: 'Se requiere un tag para buscar' });
+  }
+
+  // Buscar fotos que contengan el tag en su JSON array de tags
+  const query = `
+    SELECT * FROM photos 
+    WHERE subject_id = ? AND tags LIKE ?
+    ORDER BY created_at DESC
+  `;
+
+  const searchPattern = `%"${tag.toLowerCase()}"%`;
+  db.all(query, [subjectId, searchPattern], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+};
+
+/**
  * Guarda una nueva foto de una materia.
  * Acepta ocr_text opcional para que el asistente IA tenga contexto inmediato.
+ * Genera automáticamente tags/palabras clave a partir del OCR para búsqueda.
  */
 exports.savePhoto = (req, res) => {
   const { subject_id, local_uri, es_favorita, ocr_text } = req.body;
@@ -46,11 +73,17 @@ exports.savePhoto = (req, res) => {
   }
 
   const query = `
-    INSERT INTO photos (subject_id, local_uri, es_favorita, ocr_text)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO photos (subject_id, local_uri, es_favorita, ocr_text, tags)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [subject_id, local_uri, es_favorita || 0, ocr_text || null], function(err) {
+  // Generar tags a partir del OCR si existe
+  let tags = null;
+  if (ocr_text && ocr_text.trim().length > 0) {
+    tags = generateTagsFromOCR(ocr_text);
+  }
+
+  db.run(query, [subject_id, local_uri, es_favorita || 0, ocr_text || null, tags], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({
       id: this.lastID,
@@ -58,6 +91,7 @@ exports.savePhoto = (req, res) => {
       local_uri,
       es_favorita: es_favorita || 0,
       ocr_text: ocr_text || null,
+      tags: tags,
       message: 'Foto registrada en BD'
     });
   });
@@ -81,6 +115,47 @@ exports.toggleFavoritePhoto = (req, res) => {
 };
 
 /**
+ * Actualiza una foto (ej: guardar OCR extraído posteriormente)
+ * Genera automáticamente tags si se actualiza ocr_text
+ */
+exports.updatePhoto = (req, res) => {
+  const { photoId } = req.params;
+  const { ocr_text, es_favorita } = req.body;
+
+  const updateFields = [];
+  const updateValues = [];
+
+  if (ocr_text !== undefined) {
+    updateFields.push('ocr_text = ?');
+    updateValues.push(ocr_text);
+    
+    // Generar tags automáticamente a partir del OCR
+    if (ocr_text && ocr_text.trim().length > 0) {
+      const tags = generateTagsFromOCR(ocr_text);
+      updateFields.push('tags = ?');
+      updateValues.push(tags);
+    }
+  }
+  
+  if (es_favorita !== undefined) {
+    updateFields.push('es_favorita = ?');
+    updateValues.push(es_favorita ? 1 : 0);
+  }
+
+  if (updateFields.length === 0) {
+    return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
+  }
+
+  updateValues.push(photoId);
+  const query = `UPDATE photos SET ${updateFields.join(', ')} WHERE id = ?`;
+
+  db.run(query, updateValues, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, changes: this.changes });
+  });
+};
+
+/**
  * Elimina una foto
  */
 exports.deletePhoto = (req, res) => {
@@ -96,3 +171,35 @@ exports.deletePhoto = (req, res) => {
     });
   });
 };
+
+/**
+ * Extrae palabras clave del texto OCR para crear tags de búsqueda
+ * Usa estrategia simple: extrae sustantivos, adjetivos y verbos principales
+ * Retorna JSON array string: '["tag1", "tag2", "tag3"]'
+ */
+function generateTagsFromOCR(ocrText) {
+  if (!ocrText || ocrText.trim().length === 0) return null;
+
+  // Palabras comunes a filtrar (stopwords)
+  const stopwords = new Set([
+    'el', 'la', 'los', 'las', 'de', 'que', 'y', 'a', 'en', 'es', 'se', 'lo', 'por', 'con', 'su',
+    'para', 'es', 'del', 'una', 'un', 'o', 'al', 'este', 'ese', 'aquello', 'este', 'cual',
+    'cuando', 'donde', 'como', 'porque', 'si', 'no', 'más', 'menos', 'muy', 'solo',
+    'también', 'entre', 'hasta', 'desde', 'según', 'sin', 'sobre', 'durante', 'antes', 'después'
+  ]);
+
+  // Extraer palabras (solo alfanuméricas y espacios)
+  const words = ocrText
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Remover puntuación
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopwords.has(word))
+    .slice(0, 15); // Limitar a 15 tags máximo
+
+  // Remover duplicados manteniendo orden
+  const uniqueTags = [...new Set(words)];
+
+  return JSON.stringify(uniqueTags);
+}
+
+module.exports = { ...exports, generateTagsFromOCR };

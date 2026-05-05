@@ -4,25 +4,18 @@ import {
   Text,
   TouchableOpacity,
   Modal,
-  ScrollView,
   ActivityIndicator,
-  Platform,
-  Alert,
+  Pressable,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as DocumentPicker from 'expo-document-picker';
 import { theme } from '../styles/theme';
+import { pdfImportStyles as s } from '../styles/PDFImportModal.styles';
 import { useCustomAlert } from './CustomAlert';
 import { createScannedDocument, extractTextFromImage } from '../services/api';
-
-// Intenta importar expo-document-picker, si no está disponible usa una alternativa
-let DocumentPicker: any = null;
-try {
-  DocumentPicker = require('expo-document-picker');
-} catch (e) {
-  // expo-document-picker no está disponible
-}
 
 export interface PDFImportModalProps {
   isVisible: boolean;
@@ -36,14 +29,8 @@ const PDF_DIR = () => `${FileSystem.documentDirectory}Threshold/pdf/`;
 /**
  * PDFImportModal.tsx
  *
- * Modal para importar documentos PDF desde el almacenamiento local del móvil.
- * Permite seleccionar uno o múltiples archivos PDF, copiarlos al directorio local
- * de la aplicación, guardarlos en la base de datos y opcionalmente procesarlos con OCR.
- *
- * @param isVisible - Controla la visibilidad del modal
- * @param onClose - Callback para cerrar el modal
- * @param selectedSubjectId - ID de la materia para vincular el documento
- * @param onImportSuccess - Callback después de importar exitosamente
+ * Modal para importar documentos PDF utilizando el selector nativo del sistema
+ * (expo-document-picker), lo cual resuelve las limitaciones de Scoped Storage en Android 11+.
  */
 export const PDFImportModal: React.FC<PDFImportModalProps> = ({
   isVisible,
@@ -51,102 +38,87 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
   selectedSubjectId,
   onImportSuccess,
 }) => {
+  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractOCR, setExtractOCR] = useState(true);
 
-  const ensurePdfDirectory = async () => {
-    const pdfDir = PDF_DIR();
-    const dirInfo = await FileSystem.getInfoAsync(pdfDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(pdfDir, { intermediates: true });
-    }
-    return pdfDir;
-  };
-
-  const handlePickPDF = async () => {
+  const handleLaunchPicker = async () => {
     if (!selectedSubjectId) {
       showAlert({
         title: t('common.error') || 'Error',
-        message: t('subjects.selectSubjectFirst') || 'Selecciona una materia primero',
+        message: 'Selecciona una materia primero',
         type: 'error',
       });
       return;
     }
 
     try {
-      setIsProcessing(true);
-
-      if (!DocumentPicker) {
-        // Si DocumentPicker no está disponible, mostrar instrucciones
-        showAlert({
-          title: t('common.info') || 'Información',
-          message: 'Para importar PDFs, por favor: 1) Abre tu gestor de archivos 2) Selecciona un PDF 3) Elige "Compartir" y busca esta app',
-          type: 'info',
-        });
-        setIsProcessing(false);
-        return;
-      }
-
-      // Usar DocumentPicker para seleccionar PDFs
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true,
       });
 
       if (result.canceled) {
-        setIsProcessing(false);
         return;
       }
 
-      const file = result.assets?.[0];
-      if (!file) {
-        throw new Error('No file selected');
-      }
+      const file = result.assets[0];
+      await handleImportPDF(file);
+    } catch (error: any) {
+      console.error('[PDFImportModal] DocumentPicker error:', error);
+      showAlert({
+        title: 'Error',
+        message: 'No se pudo abrir el selector de archivos',
+        type: 'error',
+      });
+    }
+  };
 
-      // Validar que sea un PDF
-      if (!file.name.toLowerCase().endsWith('.pdf')) {
+  const handleImportPDF = async (file: DocumentPicker.DocumentPickerAsset) => {
+    try {
+      setIsProcessing(true);
+
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (file.size && file.size > maxSize) {
         showAlert({
           title: t('common.error') || 'Error',
-          message: t('subjects.onlyPdfAllowed') || 'Solo se permiten archivos PDF',
+          message: 'El archivo es demasiado grande (máx. 50MB)',
           type: 'error',
         });
         setIsProcessing(false);
         return;
       }
 
-      // Copiar el archivo al directorio local de la app
-      const pdfDir = await ensurePdfDirectory();
-      const filename = `imported_${Date.now()}_${file.name}`;
+      const pdfDir = PDF_DIR();
+      const pdfDirInfo = await FileSystem.getInfoAsync(pdfDir);
+      if (!pdfDirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(pdfDir, { intermediates: true });
+      }
+
+      // Evitar espacios u otros caracteres raros en el nombre de archivo interno
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const filename = `imported_${Date.now()}_${safeName}`;
       const localPdfUri = `${pdfDir}${filename}`;
 
-      // Copiar el archivo
       await FileSystem.copyAsync({
         from: file.uri,
         to: localPdfUri,
       });
 
-      // Leer el contenido para OCR (si está habilitado)
       let ocrText: string | null = null;
       if (extractOCR) {
         try {
-          // Para PDFs necesitamos convertirlos a imagen primero
-          // Por ahora, intentaremos leer el PDF como base64 (nota: esto podría no funcionar directamente)
-          // Una alternativa es usar expo-pdf para renderizar páginas como imágenes
           const base64Data = await FileSystem.readAsStringAsync(localPdfUri, {
             encoding: FileSystem.EncodingType.Base64,
           });
-
-          // Intentar extraer texto del PDF
           ocrText = await extractTextFromImage(base64Data);
         } catch (ocrErr) {
-          console.warn('[PDFImportModal] OCR automático falló:', ocrErr);
-          // Continuar sin OCR
+          console.warn('[PDFImportModal] OCR falló:', ocrErr);
         }
       }
 
-      // Guardar el documento en la base de datos
       const savedDoc = await createScannedDocument({
         subject_id: selectedSubjectId,
         local_uri: localPdfUri,
@@ -156,17 +128,17 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
 
       showAlert({
         title: t('common.success') || 'Éxito',
-        message: t('subjects.pdfImportedSuccess') || 'PDF importado correctamente',
+        message: `${file.name} importado`,
         type: 'success',
       });
 
       onImportSuccess?.(localPdfUri, savedDoc.id);
       onClose();
     } catch (error: any) {
-      console.error('[PDFImportModal] Error:', error);
+      console.error('[PDFImportModal] Error importando:', error);
       showAlert({
         title: t('common.error') || 'Error',
-        message: error?.message || t('subjects.pdfImportError') || 'No se pudo importar el PDF',
+        message: error?.message || 'Error al importar el archivo',
         type: 'error',
       });
     } finally {
@@ -181,159 +153,89 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
-        <View
-          style={{
-            backgroundColor: 'white',
-            borderRadius: 12,
-            padding: 24,
-            width: '85%',
-            maxWidth: 360,
-            elevation: 5,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 3.84,
-          }}
-        >
+      <Pressable style={s.backdrop} onPress={onClose}>
+        <Pressable style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 24) }]} onPress={() => null}>
+          <View style={s.handle} />
+
           {/* Header */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '700',
-                color: theme.colors.text.primary,
-                marginBottom: 4,
-              }}
-            >
-              {t('subjects.importPDF') || 'Importar PDF'}
-            </Text>
-            <Text
-              style={{
-                fontSize: 13,
-                color: theme.colors.text.secondary,
-              }}
-            >
-              {t('subjects.importPDFDescription') || 'Selecciona un PDF de tu dispositivo para importarlo'}
-            </Text>
+          <View style={s.header}>
+            <View style={s.headerLeft}>
+              <Text style={s.headerTitle}>Importar Documento PDF</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} disabled={isProcessing} style={s.closeBtn}>
+              <Ionicons name="close" size={18} color={theme.colors.text.secondary} />
+            </TouchableOpacity>
           </View>
 
-          {/* OCR Preference */}
-          <View
-            style={{
-              backgroundColor: theme.colors.background || '#f9f9f9',
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 20,
-              borderWidth: 1,
-              borderColor: theme.colors.border || '#e0e0e0',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary }}>
-                  {t('subjects.extractTextOCR') || 'Extraer texto (OCR)'}
+          {/* Body */}
+          <View style={{ paddingHorizontal: 24, paddingTop: 16 }}>
+            <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginBottom: 24, lineHeight: 20 }}>
+              Utiliza el explorador nativo de tu dispositivo para buscar y seleccionar el archivo PDF que deseas importar a esta materia.
+            </Text>
+
+            {/* OCR Toggle */}
+            <TouchableOpacity
+              onPress={() => setExtractOCR(!extractOCR)}
+              disabled={isProcessing}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: theme.colors.inputBackground,
+                padding: 16,
+                borderRadius: 12,
+                marginBottom: 24,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={extractOCR ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={extractOCR ? theme.colors.primary : theme.colors.text.secondary}
+              />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>
+                  Extraer texto (OCR)
                 </Text>
-                <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 4 }}>
-                  {t('subjects.extractTextOCRDescription') || 'Procesa el PDF con IA para extraer texto'}
+                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginTop: 4 }}>
+                  Permite a la inteligencia artificial leer el contenido.
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={() => setExtractOCR(!extractOCR)}
-                style={{
-                  width: 50,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: extractOCR ? theme.colors.primary : '#ccc',
-                  justifyContent: 'center',
-                  alignItems: extractOCR ? 'flex-end' : 'flex-start',
-                  paddingHorizontal: 3,
-                  marginLeft: 12,
-                }}
-              >
-                <View
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 12,
-                    backgroundColor: 'white',
-                  }}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
+            </TouchableOpacity>
 
-          {/* Buttons */}
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {/* Launch Button */}
             <TouchableOpacity
-              onPress={onClose}
+              onPress={handleLaunchPicker}
               disabled={isProcessing}
               style={{
-                flex: 1,
-                paddingVertical: 12,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: theme.colors.border || '#ddd',
+                backgroundColor: theme.colors.primary,
+                borderRadius: 16,
+                paddingVertical: 18,
+                flexDirection: 'row',
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
+              activeOpacity={0.8}
             >
-              <Text
-                style={{
-                  color: theme.colors.text.secondary,
-                  fontWeight: '600',
-                  fontSize: 14,
-                }}
-              >
-                {t('modals.cancel') || 'Cancelar'}
+              <Ionicons name="folder-open-outline" size={20} color="white" />
+              <Text style={{ color: 'white', fontSize: 16, fontWeight: '700', marginLeft: 10 }}>
+                Abrir explorador de archivos
               </Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handlePickPDF}
-              disabled={isProcessing}
-              style={{
-                flex: 1,
-                paddingVertical: 12,
-                borderRadius: 8,
-                backgroundColor: theme.colors.primary,
-                justifyContent: 'center',
-                alignItems: 'center',
-                flexDirection: 'row',
-                gap: 8,
-              }}
-            >
-              {isProcessing ? (
-                <>
-                  <ActivityIndicator size="small" color="white" />
-                  <Text
-                    style={{
-                      color: 'white',
-                      fontWeight: '600',
-                      fontSize: 14,
-                    }}
-                  >
-                    {t('common.processing') || 'Procesando...'}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="file-pdf-box" size={18} color="white" />
-                  <Text
-                    style={{
-                      color: 'white',
-                      fontWeight: '600',
-                      fontSize: 14,
-                    }}
-                  >
-                    {t('subjects.selectPDF') || 'Seleccionar PDF'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
           </View>
-        </View>
-      </View>
+
+          {/* Processing Overlay */}
+          {isProcessing && (
+            <View style={s.processingOverlay}>
+              <View style={s.processingBox}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={s.processingText}>Importando archivo...</Text>
+              </View>
+            </View>
+          )}
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 };

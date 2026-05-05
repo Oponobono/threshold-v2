@@ -61,6 +61,8 @@ export type Photo = {
   local_uri: string;
   created_at?: string;
   es_favorita?: number;
+  ocr_text?: string | null;
+  tags?: string | null; // JSON array string de palabras clave: '["tag1", "tag2"]'
 };
 
 /** Bloque de clase semanal de una materia (día, hora de inicio y fin) */

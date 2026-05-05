@@ -185,7 +185,7 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
 
       showAlert({
         title: t('common.success') || 'Éxito',
-        message: t('subjects.ocrExtracted') || 'Texto extraído correctamente. Ya puedes usar este documento en el asistente IA.',
+        message: t('subjects.ocrExtracted') || 'Texto extraído correctamente. Ya puedes usar este documento con Zyren.',
         type: 'success',
       });
 

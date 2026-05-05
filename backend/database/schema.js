@@ -143,6 +143,7 @@ const tableSchema = {
         local_uri TEXT NOT NULL,
         es_favorita INTEGER DEFAULT 0,
         ocr_text TEXT,
+        tags TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
@@ -154,11 +155,13 @@ const tableSchema = {
         local_uri TEXT NOT NULL,
         es_favorita INTEGER DEFAULT 0,
         ocr_text TEXT,
+        tags TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `,
     columns: [
-      { name: 'ocr_text', type: 'TEXT' }
+      { name: 'ocr_text', type: 'TEXT' },
+      { name: 'tags', type: 'TEXT' }
     ]
   },
   assessments: {

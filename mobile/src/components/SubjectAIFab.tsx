@@ -50,7 +50,7 @@ const BuildingContextOverlay: React.FC = () => (
       <ActivityIndicator size="large" color="#7B72FF" />
       <Text style={o.title}>Analizando archivos...</Text>
       <Text style={o.subtitle}>
-        Extrayendo texto y transcripciones para el asistente.
+        Extrayendo texto y transcripciones para Zyren.
       </Text>
     </View>
   </View>

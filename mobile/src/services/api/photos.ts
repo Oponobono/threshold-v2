@@ -86,3 +86,45 @@ export const deletePhoto = async (photoId: number) => {
     throw new Error(error.message || 'Error de red al intentar eliminar la foto');
   }
 };
+
+/**
+ * Actualiza una foto (ej: guardar OCR extraído posteriormente y tags generados)
+ */
+export const updatePhoto = async (photoId: number, data: { ocr_text?: string; tags?: string; es_favorita?: boolean }) => {
+  try {
+    const response = await fetchWithFallback(`/photos/${photoId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(result?.error || 'Error al actualizar la foto');
+    }
+
+    return result;
+  } catch (error: any) {
+    throw new Error(error.message || 'Error de red al intentar actualizar la foto');
+  }
+};
+
+/**
+ * Busca fotos por etiqueta/palabra clave en una materia
+ */
+export const searchPhotosByTag = async (subjectId: number, tag: string): Promise<Photo[]> => {
+  try {
+    const response = await fetchWithFallback(`/photos/${subjectId}/search?tag=${encodeURIComponent(tag)}`);
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      console.warn('[searchPhotosByTag] Error:', data?.error);
+      return [];
+    }
+    return data || [];
+  } catch (error: any) {
+    console.warn('[searchPhotosByTag] Network error:', error.message);
+    return [];
+  }
+};

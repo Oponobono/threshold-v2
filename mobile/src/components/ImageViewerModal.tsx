@@ -3,7 +3,7 @@ import { View, Modal, TouchableOpacity, Image, FlatList, Dimensions, Share, Acti
 import { useCustomAlert } from './CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { deletePhoto, extractTextFromImage } from '../services/api';
+import { deletePhoto, extractTextFromImage, updatePhoto } from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
 import { theme } from '../styles/theme';
@@ -94,6 +94,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
       }
 
       setExtractedText(text);
+
+      // Guardar OCR en la BD para que el asistente IA pueda acceder a él
+      if (currentPhoto.id) {
+        try {
+          await updatePhoto(currentPhoto.id, { ocr_text: text });
+          console.log(`[ImageViewerModal] OCR guardado para foto ${currentPhoto.id}`);
+        } catch (err: any) {
+          console.warn('[ImageViewerModal] Error guardando OCR:', err.message);
+          // El OCR se muestra de todas formas aunque falle el guardado en BD
+        }
+      }
     } catch (error: any) {
       showAlert({ title: t('common.ocrError') || 'Error OCR', message: error.message, type: 'error' });
     } finally {

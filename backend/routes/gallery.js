@@ -76,6 +76,29 @@ router.get('/photos/:subjectId', galleryController.getPhotosBySubject);
 
 /**
  * @swagger
+ * /api/photos/{subjectId}/search:
+ *   get:
+ *     summary: Buscar fotos por tag/palabra clave
+ *     tags: [Photos]
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: tag
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Lista de fotos con el tag
+ */
+router.get('/photos/:subjectId/search', galleryController.searchPhotosByTag);
+
+/**
+ * @swagger
  * /api/photos:
  *   post:
  *     summary: Guarda una nueva foto de una materia
@@ -128,6 +151,35 @@ router.post('/photos', galleryController.savePhoto);
  *         description: Estado de favorita actualizado
  */
 router.patch('/photos/:photoId/favorite', galleryController.toggleFavoritePhoto);
+
+/**
+ * @swagger
+ * /api/photos/{photoId}:
+ *   put:
+ *     summary: Actualiza una foto (ej: OCR extraído posteriormente)
+ *     tags: [Photos]
+ *     parameters:
+ *       - in: path
+ *         name: photoId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ocr_text:
+ *                 type: string
+ *               es_favorita:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Foto actualizada
+ */
+router.put('/photos/:photoId', galleryController.updatePhoto);
 
 /**
  * @swagger

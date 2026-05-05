@@ -82,12 +82,26 @@ exports.buildContext = async (req, res) => {
       try {
         if (item.type === 'photo') {
           // Leer ocr_text de la tabla photos (donde PhotoCaptureModal y DocumentScannerModal guardan las fotos)
+          console.log(`[buildContext] Processing photo: id=${item.id}, label="${item.label}"`);
+          
           const photo = await new Promise((resolve, reject) => {
             db.get('SELECT ocr_text, local_uri FROM photos WHERE id = ?', [item.id], (err, row) => {
-              if (err) reject(err); else resolve(row);
+              if (err) {
+                console.error(`[buildContext] DB error for photo_id=${item.id}:`, err.message);
+                reject(err);
+              } else {
+                console.log(`[buildContext] Query result for photo_id=${item.id}:`, row);
+                resolve(row);
+              }
             });
           });
-          text = photo?.ocr_text ? `[FOTO: ${item.label}]\n${photo.ocr_text}` : '';
+          
+          if (photo?.ocr_text) {
+            console.log(`[buildContext] Using ocr_text for photo_id=${item.id}`);
+            text = `[FOTO: ${item.label}]\n${photo.ocr_text}`;
+          } else {
+            console.log(`[buildContext] No ocr_text for photo_id=${item.id}, label="${item.label}"`);
+          }
         } 
         else if (item.type === 'recording') {
           // Obtener transcripción de audio

@@ -212,7 +212,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
               <MaterialCommunityIcons name="auto-fix" size={18} color={PRIMARY} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.title}>Asistente de IA</Text>
+              <Text style={s.title}>Zyren</Text>
               <Text style={s.subtitle} numberOfLines={1}>
                 Añade contexto a tu sesión
               </Text>

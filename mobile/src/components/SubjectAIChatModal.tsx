@@ -1,12 +1,12 @@
 /**
  * SubjectAIChatModal.tsx
  *
- * Modal de chat conversacional con el Asistente IA de Threshold.
+ * Modal de chat conversacional con Zyren, el asistente educativo de Threshold.
  * Recibe el contexto académico ya ensamblado (texto OCR, transcripciones, captions)
  * y gestiona el historial de mensajes con el modelo Groq LLaMA en el backend.
  *
  * Características:
- * - Historial de mensajes en burbuja (usuario / asistente).
+ * - Historial de mensajes en burbuja (usuario / Zyren).
  * - Indicador de "pensando..." animado mientras espera la respuesta.
  * - Chip de fuentes activas (cuántos archivos alimentan el contexto).
  * - Botón de nueva conversación para limpiar el historial.
@@ -147,7 +147,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     onClose();
   }, [onClose]);
 
-  /** Enviar un mensaje al asistente IA */
+  /** Enviar un mensaje a Zyren */
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
     if (!text || isLoading) return;
@@ -168,10 +168,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch (err: any) {
-      // Mostrar error como mensaje del asistente
+      // Mostrar error como mensaje de Zyren
       const errMsg: Message = {
         role: 'assistant',
-        content: `⚠️ Error al conectar con el asistente: ${err.message}`,
+        content: `⚠️ Error al conectar con Zyren: ${err.message}`,
       };
       setMessages(prev => [...prev, errMsg]);
     } finally {
@@ -203,7 +203,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 <MaterialCommunityIcons name="auto-fix" size={17} color={PRIMARY} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.title}>Asistente IA</Text>
+                <Text style={s.title}>Zyren</Text>
                 <Text style={s.subtitle} numberOfLines={1}>{subjectName}</Text>
               </View>
 
