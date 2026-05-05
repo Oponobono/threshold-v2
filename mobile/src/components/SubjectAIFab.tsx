@@ -19,6 +19,22 @@ export interface SubjectAIFabProps {
   onAskQuestions?: (selectedItems: AIContextItemData[]) => void;
 }
 
+/**
+ * SubjectAIFab.tsx
+ *
+ * Floating Action Button (FAB) animado que aparece en la pantalla de una materia.
+ * Genera un efecto visual de "pulso" contínuo para llamar la atención del usuario.
+ * Al presionarlo, despliega el modal `SubjectAIContextModal`, el cual recolecta todo 
+ * el contexto disponible de la materia (fotos, audios, documentos) para interactuar con la IA.
+ *
+ * @param subjectName - Nombre de la materia (para el modal IA).
+ * @param recordings - Grabaciones asociadas a la materia.
+ * @param photos - Fotografías escaneadas.
+ * @param documents - PDFs subidos.
+ * @param videos - Videos de YouTube vinculados.
+ * @param onGenerateFlashcards - Callback ejecutado si el usuario decide crear flashcards desde la IA.
+ * @param onAskQuestions - Callback ejecutado si el usuario decide entrar al chat de dudas.
+ */
 export const SubjectAIFab: React.FC<SubjectAIFabProps> = ({
   subjectName,
   recordings,

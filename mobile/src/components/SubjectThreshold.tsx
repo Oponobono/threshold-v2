@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
+import { thresholdStyles as styles } from '../styles/SubjectThreshold.styles';
+import { getStatusColor, getStatusIcon, getStatusLabel, darkenColor } from '../utils/subjectThresholdHelpers';
 
 interface SubjectThresholdProps {
   securedPercent: number;
@@ -11,43 +13,20 @@ interface SubjectThresholdProps {
   status?: 'safe' | 'caution' | 'risk';
 }
 
-/** Returns a status color based on the academic risk status */
-const getStatusColor = (status?: string): string => {
-  if (status === 'safe') return '#00C47D'; // green
-  if (status === 'caution') return '#FF9F0A'; // amber
-  return '#FF3B30'; // red (default/risk)
-};
-
-const getStatusIcon = (status?: string): string => {
-  if (status === 'safe') return 'shield-check-outline';
-  if (status === 'caution') return 'shield-half-full';
-  return 'shield-alert-outline';
-};
-
-const getStatusLabel = (status: string | undefined, t: any): string => {
-  if (status === 'safe') return t('subjects.statusSafe') || 'En buen camino';
-  if (status === 'caution') return t('subjects.statusCaution') || 'Atención requerida';
-  return t('subjects.statusRisk') || 'En riesgo';
-};
-
-const darkenColor = (hex: string, percent: number): string => {
-  let color = hex.replace('#', '');
-  if (color.length === 3) color = color.split('').map(c => c + c).join('');
-  if (color.length !== 6) return hex;
-  
-  const num = parseInt(color, 16);
-  const amt = Math.round(2.55 * percent);
-  let r = (num >> 16) - amt;
-  let g = ((num >> 8) & 0x00FF) - amt;
-  let b = (num & 0x0000FF) - amt;
-
-  r = Math.max(0, Math.min(255, r));
-  g = Math.max(0, Math.min(255, g));
-  b = Math.max(0, Math.min(255, b));
-
-  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
-};
-
+/**
+ * SubjectThreshold.tsx
+ *
+ * "Threshold" (Umbral) es la métrica principal de la aplicación.
+ * Este componente renderiza una tarjeta visual (Bento) detallando qué porcentaje
+ * de la materia ya tiene "asegurado" el estudiante frente a lo que aún necesita
+ * sacar en el examen final para aprobar.
+ * Renderiza una barra de progreso inteligente y un "Status Pill" de riesgo.
+ *
+ * @param securedPercent - Porcentaje numérico (0 a 100) ya ganado matemáticamente.
+ * @param finalNeededText - Texto computado que dicta la nota exacta que falta en el corte final.
+ * @param subjectColor - Color temático de la materia, o verde por defecto.
+ * @param status - Nivel de riesgo académico evaluado por el motor (safe, caution, risk).
+ */
 export const SubjectThreshold: React.FC<SubjectThresholdProps> = ({
   securedPercent,
   finalNeededText,
@@ -124,7 +103,7 @@ export const SubjectThreshold: React.FC<SubjectThresholdProps> = ({
         <View style={styles.track}>
           <View
             style={[
-              styles.fill,
+               styles.fill,
               {
                 width: `${clampedPct}%`,
                 backgroundColor: accentColor,
@@ -141,152 +120,4 @@ export const SubjectThreshold: React.FC<SubjectThresholdProps> = ({
       </View>
     </View>
   );
-
 };
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: theme.colors.background,
-    borderRadius: 28,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  labelGroup: {
-    flex: 1,
-  },
-  eyebrow: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: theme.colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 99,
-  },
-  statusPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: 16,
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 20,
-  },
-  percentBlock: {
-    alignItems: 'center',
-    minWidth: 72,
-  },
-  percentValue: {
-    fontSize: 36,
-    fontWeight: '800',
-    letterSpacing: -1.5,
-    lineHeight: 40,
-  },
-  percentSign: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0,
-  },
-  percentLabel: {
-    marginTop: 2,
-    fontSize: 11,
-    color: theme.colors.text.secondary,
-    fontWeight: '600',
-    textTransform: 'lowercase',
-    textAlign: 'center',
-  },
-  neededBlock: {
-    flex: 1,
-    backgroundColor: theme.colors.card,
-    borderRadius: 20,
-    padding: 14,
-    gap: 6,
-  },
-  neededHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  neededIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  neededTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  neededValue: {
-    fontSize: 15,
-    fontWeight: '500',
-    letterSpacing: -0.1,
-    lineHeight: 22,
-    textAlign: 'justify',
-  },
-  trackWrap: {
-    gap: 6,
-  },
-  track: {
-    height: 10,
-    borderRadius: 99,
-    backgroundColor: theme.colors.inputBackground,
-    overflow: 'visible',
-    position: 'relative',
-  },
-  fill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    height: '100%',
-    borderRadius: 99,
-  },
-  midMarker: {
-    position: 'absolute',
-    left: '50%',
-    top: -2,
-    width: 2,
-    height: 14,
-    borderRadius: 1,
-    backgroundColor: theme.colors.border,
-  },
-  trackLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  trackLabel: {
-    fontSize: 10,
-    color: theme.colors.text.secondary,
-    fontWeight: '600',
-  },
-});

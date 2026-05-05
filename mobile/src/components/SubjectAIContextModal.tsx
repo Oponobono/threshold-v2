@@ -1,16 +1,17 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet,
+  View, Text, Modal, TouchableOpacity, ScrollView,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/theme';
 import { AIContextCarousel } from './AIContextCarousel';
 import { AIContextItemData, AIContextItemType } from './AIContextItem';
 import { RecordingItem } from '../hooks/useAudioRecorder';
 import { YouTubeVideo } from '../services/api/types';
-
-// ─── Props ───────────────────────────────────────────────────────────────────
+import { mapRecordings, mapPhotos, mapDocuments, mapVideos } from '../utils/aiContextMappers';
+import { contextModalStyles as styles } from '../styles/SubjectAIContextModal.styles';
 
 export interface SubjectAIContextModalProps {
   isVisible: boolean;
@@ -24,50 +25,25 @@ export interface SubjectAIContextModalProps {
   onAskQuestions?: (selectedItems: AIContextItemData[]) => void;
 }
 
-// ─── Helpers: mappers to AIContextItemData ───────────────────────────────────
-
-function mapRecordings(recordings: RecordingItem[]): AIContextItemData[] {
-  return recordings.map((r, i) => ({
-    id: `rec_${r.id_string || r.id || i}`,
-    label: r.name || 'Grabación de voz',
-    uri: r.uri || r.local_uri,
-    type: 'recording' as AIContextItemType,
-    rawItem: r,
-  }));
-}
-
-function mapPhotos(photos: any[]): AIContextItemData[] {
-  return photos.map((p, i) => ({
-    id: `photo_${p.id ?? i}`,
-    label: (p.local_uri || '').split('/').pop() || 'Foto',
-    uri: p.local_uri,
-    type: 'photo' as AIContextItemType,
-    rawItem: p,
-  }));
-}
-
-function mapDocuments(documents: any[]): AIContextItemData[] {
-  return documents.map((d, i) => ({
-    id: `doc_${d.id ?? i}`,
-    label: d.name || (d.local_uri || '').split('/').pop() || 'Documento',
-    uri: d.local_uri,
-    type: 'document' as AIContextItemType,
-    rawItem: d,
-  }));
-}
-
-function mapVideos(videos: YouTubeVideo[]): AIContextItemData[] {
-  return videos.map((v, i) => ({
-    id: `vid_${v.id ?? i}`,
-    label: v.title || 'Video de YouTube',
-    thumbnailUrl: v.thumbnail_url || undefined,
-    type: 'video' as AIContextItemType,
-    rawItem: v,
-  }));
-}
-
-// ─── Component ───────────────────────────────────────────────────────────────
-
+/**
+ * SubjectAIContextModal.tsx
+ *
+ * Hoja modal (Bottom Sheet extendido) que funciona como "Selector de Contexto".
+ * Se abre al presionar el FAB (SubjectAIFab) en la pantalla de la materia.
+ * Recopila todos los archivos de la materia (videos, audios, fotos, documentos) y los 
+ * agrupa utilizando `AIContextCarousel`. Permite al usuario decidir qué enviar a la IA
+ * antes de desencadenar flujos secundarios (crear flashcards o abrir el chat).
+ *
+ * @param isVisible - Estado de visibilidad.
+ * @param onClose - Método para cerrar la hoja de selección.
+ * @param subjectName - Nombre de la materia actual.
+ * @param recordings - Arreglo de notas de voz de la materia.
+ * @param photos - Arreglo de fotos.
+ * @param documents - Arreglo de PDFs.
+ * @param videos - Arreglo de videos vinculados.
+ * @param onGenerateFlashcards - Callback ejecutado al presionar el botón de crear flashcards.
+ * @param onAskQuestions - Callback ejecutado al presionar el botón de "Preguntar a IA".
+ */
 export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   isVisible,
   onClose,
@@ -80,6 +56,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   onAskQuestions,
 }) => {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Map raw data once per render
@@ -145,10 +122,12 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <MaterialCommunityIcons name="auto-fix" size={22} color={theme.colors.primary} />
-                <Text style={styles.title}>Asistente de IA</Text>
+                <Text style={styles.title}>{t('ai.assistantTitle') || 'Asistente de IA'}</Text>
               </View>
               <Text style={styles.subtitle}>
-                Selecciona archivos de <Text style={{ fontWeight: '700', color: theme.colors.text.primary }}>{subjectName}</Text> para dar contexto a la IA
+                {t('ai.selectFilesOf') || 'Selecciona archivos de '}
+                <Text style={{ fontWeight: '700', color: theme.colors.text.primary }}>{subjectName}</Text>
+                {t('ai.toGiveContext') || ' para dar contexto a la IA'}
               </Text>
             </View>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
@@ -161,7 +140,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             <View style={styles.selectionBadge}>
               <Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} />
               <Text style={styles.selectionBadgeText}>
-                {totalSelected} {totalSelected === 1 ? 'archivo seleccionado' : 'archivos seleccionados'}
+                {totalSelected} {totalSelected === 1 ? (t('ai.fileSelected') || 'archivo seleccionado') : (t('ai.filesSelected') || 'archivos seleccionados')}
               </Text>
             </View>
           )}
@@ -175,9 +154,9 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             {!hasContent ? (
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons name="folder-open-outline" size={48} color={theme.colors.border} />
-                <Text style={styles.emptyTitle}>Sin recursos disponibles</Text>
+                <Text style={styles.emptyTitle}>{t('ai.noResourcesTitle') || 'Sin recursos disponibles'}</Text>
                 <Text style={styles.emptyText}>
-                  Agrega grabaciones, fotos, documentos o videos a esta materia para usarlos con la IA.
+                  {t('ai.noResourcesText') || 'Agrega grabaciones, fotos, documentos o videos a esta materia para usarlos con la IA.'}
                 </Text>
               </View>
             ) : (
@@ -203,7 +182,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
               activeOpacity={0.8}
             >
               <MaterialCommunityIcons name="chat-processing-outline" size={20} color="#fff" />
-              <Text style={styles.actionBtnText}>Preguntar a IA</Text>
+              <Text style={styles.actionBtnText}>{t('ai.askAI') || 'Preguntar a IA'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -213,7 +192,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
               activeOpacity={0.8}
             >
               <MaterialCommunityIcons name="cards-outline" size={20} color="#fff" />
-              <Text style={styles.actionBtnText}>Crear Flashcards</Text>
+              <Text style={styles.actionBtnText}>{t('ai.createFlashcards') || 'Crear Flashcards'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -221,83 +200,3 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     </Modal>
   );
 };
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: theme.colors.background,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    height: '88%',
-    paddingTop: 12,
-    paddingHorizontal: 20,
-  },
-  handle: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: theme.colors.border,
-    alignSelf: 'center', marginBottom: 16,
-  },
-  header: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    gap: 12, marginBottom: 12,
-  },
-  title: {
-    fontSize: 18, fontWeight: '800',
-    color: theme.colors.text.primary, letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 13, marginTop: 4,
-    color: theme.colors.text.secondary, lineHeight: 18,
-  },
-  closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: theme.colors.card,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: theme.colors.border,
-  },
-  selectionBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: `${theme.colors.primary}15`,
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-    alignSelf: 'flex-start', marginBottom: 14,
-  },
-  selectionBadgeText: {
-    fontSize: 12, fontWeight: '700', color: theme.colors.primary,
-  },
-  scrollContent: {
-    paddingTop: 8, paddingBottom: 20,
-  },
-  emptyState: {
-    alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 40, gap: 10,
-  },
-  emptyTitle: {
-    fontSize: 15, fontWeight: '700', color: theme.colors.text.primary,
-  },
-  emptyText: {
-    fontSize: 13, color: theme.colors.text.secondary,
-    textAlign: 'center', lineHeight: 19,
-  },
-  actionBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 14, borderRadius: 16,
-  },
-  askBtn: {
-    backgroundColor: theme.colors.secondary || '#10B981',
-  },
-  generateBtn: {
-    backgroundColor: theme.colors.primary,
-  },
-  actionBtnDisabled: {
-    backgroundColor: theme.colors.border,
-  },
-  actionBtnText: {
-    color: '#fff', fontWeight: '700', fontSize: 13,
-  },
-});

@@ -14,6 +14,21 @@ interface SubjectHeroCardProps {
   onDelete?: () => void;
 }
 
+/**
+ * SubjectHeroCard.tsx
+ *
+ * Componente principal (Hero) que encabeza el dashboard de una materia.
+ * Renderiza una tarjeta grande con color temático, ícono de la asignatura,
+ * nombre, profesor (subtítulo) y un texto meta (ej. información de créditos).
+ * Opcionalmente incluye un botón de papelera para desencadenar la eliminación de la materia.
+ *
+ * @param color - Color principal de la materia (hex).
+ * @param iconName - Nombre del ícono que representa la materia.
+ * @param title - Nombre principal de la materia.
+ * @param subtitle - Texto secundario, comúnmente el nombre del profesor.
+ * @param meta - Metadatos adicionales de la materia a mostrar abajo.
+ * @param onDelete - (Opcional) Callback si el usuario desea borrar la materia.
+ */
 export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
   color,
   iconName,

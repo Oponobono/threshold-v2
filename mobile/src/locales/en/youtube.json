@@ -1,0 +1,12 @@
+﻿{
+    "title":  "Videos",
+    "loadingList":  "Loading videos...",
+    "loading":  "Loading video...",
+    "errors":  {
+                   "groqApiKeyMissing":  "Groq API Key is missing from .env.local file",
+                   "videoIdNotFound":  "Video ID not found. Please try refreshing.",
+                   "captionsFetchFailed":  "Could not fetch video captions. It\u0027s possible that:\nâ€¢ The video has no captions available\nâ€¢ The video is private or does not exist\nâ€¢ There are connectivity issues",
+                   "summaryFailed":  "Error generating summary.",
+                   "videoLoadFailed":  "Could not load video. Try opening it directly on YouTube."
+               }
+}

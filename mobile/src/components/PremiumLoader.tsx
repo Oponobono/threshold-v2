@@ -9,6 +9,19 @@ interface PremiumLoaderProps {
   text?: string;
 }
 
+/**
+ * PremiumLoader.tsx
+ *
+ * Overlay de carga inline (no de pantalla completa) que se monta sobre el contenido
+ * cuando se ejecutan operaciones intensivas como la generación de flashcards con IA.
+ * A diferencia de `PremiumLoading`, este componente es controlado por un prop `visible`
+ * y soporta transiciones de fade in/out al montarse y desmontarse.
+ * Muestra el icón `DragonflyIcon` con un anillo de pulso expansivo y una barra
+ * de progreso indeterminada animada en bucle.
+ *
+ * @param visible - Controla si el loader está visible (con animación de entrada/salida).
+ * @param text - Texto descriptivo mostrado bajo el ícono (por defecto 'CARGANDO...').
+ */
 export const PremiumLoader: React.FC<PremiumLoaderProps> = ({ visible, text = 'CARGANDO...' }) => {
   const [isRendered, setIsRendered] = useState(visible);
   const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;

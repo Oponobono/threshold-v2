@@ -21,6 +21,21 @@ interface StudyTimerCardProps {
 
 const TIMER_STORAGE_KEY = '@threshold_timer_state';
 
+/**
+ * StudyTimerCard.tsx
+ *
+ * Tarjeta interactiva del dashboard que implementa el temporizador de estudio.
+ * Soporta dos modos de funcionamiento:
+ * - `pomodoro`: Cuenta regresiva desde el tiempo configurado (ej. 25 min).
+ * - `threshold`: Cuenta progresiva de tiempo trabajado, con ciclos de 45 min.
+ * Persiste el estado en `AsyncStorage` con sincroniación del reloj para que el timer
+ * siga corriendo en segundo plano aunque la app sea minimizada.
+ * Usa el icón animado `DragonflyIcon` con efecto "breathing" y un círculo SVG de progreso.
+ *
+ * @param onOpenConfig - Callback disparado al presionar la tarjeta (abre la configuración).
+ * @param onFinish - Callback ejecutado al terminar la sesión con su duración, materia y modo.
+ * @param refreshTrigger - Valor numérico que al cambiar fuerza la recarga del estado persistido.
+ */
 export const StudyTimerCard: React.FC<StudyTimerCardProps> = ({ onOpenConfig, onFinish, refreshTrigger }) => {
   const { t } = useTranslation();
   

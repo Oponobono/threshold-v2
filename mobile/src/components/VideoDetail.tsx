@@ -1,34 +1,29 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   Alert,
-  Modal,
   Dimensions,
   StatusBar,
-  Animated,
-  Pressable,
-  Linking,
-  Image,
-  ActivityIndicator,
 } from 'react-native';
 import { alertRef } from './CustomAlert';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { WebView } from 'react-native-webview';
 
 import { theme } from '../styles/theme';
 import { detailStyles as styles } from '../styles/RecordingDetailScreen.styles';
-import { RecordingAITabs, AITabType } from './RecordingAITabs';
+import { AITabType } from './RecordingAITabs';
 import { RecordingAIContent } from './RecordingAIContent';
 import { PremiumLoading } from './PremiumLoading';
 import { FlashcardCreatorModal } from './FlashcardCreatorModal';
+import { SubjectPickerModal } from './SubjectPickerModal';
+import { AnimatedSubjectSelector } from './AnimatedSubjectSelector';
 import {
   getSubjects,
   Subject,
@@ -46,6 +41,7 @@ const GROQ_API_KEY: string = process.env.EXPO_PUBLIC_GROK_API_KEY ?? process.env
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 const YOUTUBE_API_KEY: string = process.env.EXPO_PUBLIC_YOUTUBE_API_KEY ?? '';
 const TRANSCRIPTS_DIR = () => `${FileSystem.documentDirectory}Threshold/transcripts/`;
+
 // Groq helpers
 // ---------------------------------------------------------------------------
 async function transcribeYouTubeWithWhisper(videoId: string, apiKey: string): Promise<string> {
@@ -96,183 +92,6 @@ async function summarizeWithGroq(transcription: string, apiKey: string): Promise
 }
 
 // ---------------------------------------------------------------------------
-// Subject Picker Modal
-// ---------------------------------------------------------------------------
-interface SubjectPickerModalProps {
-  visible: boolean;
-  subjects: Subject[];
-  selectedId: number | null;
-  onSelect: (id: number | null) => void;
-  onClose: () => void;
-}
-
-const SubjectPickerModal: React.FC<SubjectPickerModalProps> = ({
-  visible, subjects, selectedId, onSelect, onClose,
-}) => {
-  const { t } = useTranslation();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={{
-          backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          paddingTop: 12,
-          paddingBottom: 32,
-          paddingHorizontal: 20,
-          maxHeight: '60%',
-        }}>
-          <View style={{ width: 40, height: 4, backgroundColor: theme.colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
-          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 16 }}>
-            {t('subjects.selectSubject') || 'Asignar materia'}
-          </Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row', alignItems: 'center',
-                paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 6,
-                backgroundColor: selectedId === null ? `${theme.colors.primary}15` : theme.colors.background,
-                borderWidth: 1, borderColor: selectedId === null ? theme.colors.primary : theme.colors.border,
-              }}
-              onPress={() => { onSelect(null); onClose(); }}
-            >
-              <Ionicons name="albums-outline" size={20} color={theme.colors.text.secondary} style={{ marginRight: 12 }} />
-              <Text style={{ color: theme.colors.text.secondary, fontSize: 15, fontStyle: 'italic' }}>
-                {t('subjects.noSubjectSelected') || '— Sin Materia —'}
-              </Text>
-              {selectedId === null && (
-                <Ionicons name="checkmark" size={18} color={theme.colors.primary} style={{ marginLeft: 'auto' }} />
-              )}
-            </TouchableOpacity>
-            {subjects.map(sub => (
-              <TouchableOpacity
-                key={sub.id}
-                style={{
-                  flexDirection: 'row', alignItems: 'center',
-                  paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 6,
-                  backgroundColor: selectedId === sub.id ? `${sub.color || theme.colors.primary}20` : theme.colors.background,
-                  borderWidth: 1, borderColor: selectedId === sub.id ? (sub.color || theme.colors.primary) : theme.colors.border,
-                }}
-                onPress={() => { onSelect(sub.id!); onClose(); }}
-              >
-                <View style={{
-                  width: 28, height: 28, borderRadius: 8,
-                  backgroundColor: sub.color || theme.colors.primary,
-                  justifyContent: 'center', alignItems: 'center', marginRight: 12,
-                }}>
-                  <MaterialCommunityIcons name={(sub.icon as any) || 'book-outline'} size={16} color="#fff" />
-                </View>
-                <Text style={{ color: theme.colors.text.primary, fontSize: 15, fontWeight: '500', flex: 1 }}>
-                  {sub.name}
-                </Text>
-                {selectedId === sub.id && (
-                  <Ionicons name="checkmark" size={18} color={sub.color || theme.colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Animated Subject Selector
-// ---------------------------------------------------------------------------
-interface AnimatedSubjectSelectorProps {
-  subjectForId?: Subject;
-  onSelect: () => void;
-}
-
-const AnimatedSubjectSelector: React.FC<AnimatedSubjectSelectorProps> = ({
-  subjectForId, onSelect
-}) => {
-  const { t } = useTranslation();
-  const fillAnim = useRef(new Animated.Value(0)).current;
-
-  const handlePressIn = () => {
-    if (!subjectForId) return;
-    Animated.timing(fillAnim, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished) {
-        onSelect();
-        Animated.timing(fillAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
-      }
-    });
-  };
-
-  const handlePressOut = () => {
-    if (!subjectForId) return;
-    Animated.timing(fillAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  const widthInterpolation = fillAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%']
-  });
-
-  return (
-    <Pressable
-      onPress={() => { if (!subjectForId) onSelect(); }}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={{
-        width: '100%',
-        backgroundColor: theme.colors.card,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: subjectForId?.color || theme.colors.border,
-        overflow: 'hidden',
-        marginBottom: 24,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
-      }}
-    >
-      <Animated.View style={{
-        position: 'absolute',
-        left: 0, top: 0, bottom: 0,
-        width: widthInterpolation,
-        backgroundColor: subjectForId ? `${subjectForId.color}30` : 'transparent',
-      }} />
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        paddingVertical: 14, paddingHorizontal: 16,
-      }}>
-        {subjectForId ? (
-          <View style={{
-            width: 24, height: 24, borderRadius: 6,
-            backgroundColor: subjectForId.color || theme.colors.primary,
-            justifyContent: 'center', alignItems: 'center', position: 'absolute', left: 16,
-          }}>
-            <MaterialCommunityIcons name={(subjectForId.icon as any) || 'book-outline'} size={14} color="#fff" />
-          </View>
-        ) : (
-          <Ionicons name="albums-outline" size={20} color={theme.colors.text.placeholder} style={{ position: 'absolute', left: 16 }} />
-        )}
-        <Text style={{
-          color: subjectForId ? theme.colors.text.primary : theme.colors.text.placeholder,
-          fontSize: 15, fontWeight: '600', textAlign: 'center',
-        }}>
-          {subjectForId?.name || (t('subjects.noSubjectSelected') || 'Sin materia asignada')}
-        </Text>
-        <Ionicons name="chevron-down" size={16} color={theme.colors.text.placeholder} style={{ position: 'absolute', right: 16 }} />
-      </View>
-    </Pressable>
-  );
-};
-
-// ---------------------------------------------------------------------------
 // VideoDetail Component
 // ---------------------------------------------------------------------------
 interface VideoDetailProps {
@@ -280,6 +99,17 @@ interface VideoDetailProps {
   onBack: () => void;
 }
 
+/**
+ * VideoDetail.tsx
+ *
+ * Pantalla completa de detalle para un Video de YouTube enlazado a la plataforma.
+ * Instancia un iframe nativo optimizado con `react-native-youtube-iframe` y extrae sus subtítulos
+ * originales desde la API conectada al backend de Python, en lugar de transcribir audio (por velocidad).
+ * Permite mandar ese texto directamente al LLM (Groq) para extraer un resumen en viñetas o generar flashcards.
+ *
+ * @param videoId - Identificador interno o hash local del registro del video.
+ * @param onBack - Callback para regresar y desmontar el reproductor Iframe.
+ */
 export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -399,11 +229,6 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
   // Transcription (Whisper via Groq)
   // ---------------------------------------------------------------------------
   const startTranscriptionFlow = async () => {
-    if (!GROQ_API_KEY) {
-      alertRef.show({ title: 'Error', message: t('common.errors.groqApiKeyMissing'), type: 'error' });
-      return;
-    }
-
     if (!videoData?.video_id) {
       alertRef.show({ title: 'Error', message: t('youtube.errors.videoIdNotFound'), type: 'error' });
       return;

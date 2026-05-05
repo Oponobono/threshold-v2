@@ -1,0 +1,11 @@
+﻿{
+    "tutorTitle":  "AI Tutor",
+    "refs":  "refs",
+    "readingContext":  "Reading and consolidating context...",
+    "processingFiles":  "Processing {{count}} files to answer your questions.",
+    "placeholderChat":  "Write your question...",
+    "chatWelcome":  "Hello! I have analyzed the {{count}} context files from **{{subject}}**.\n\nWhat would you like to know or review?",
+    "errors":  {
+                   "processFailed":  "Error: Could not process your question. {{error}}"
+               }
+}

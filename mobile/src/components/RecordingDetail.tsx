@@ -36,333 +36,22 @@ import {
   updateAudioRecording,
 } from '../services/api';
 
+import { SubjectPickerModal } from './SubjectPickerModal';
+import { AnimatedSubjectSelector } from './AnimatedSubjectSelector';
+import { WaveformBars } from './WaveformBars';
+import { transcribeWithWhisper, summarizeWithGroq } from '../utils/groqHelpers';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 const GROQ_API_KEY: string = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
-const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 const AUDIO_DIR = () => `${FileSystem.documentDirectory}Threshold/audio/`;
 const TRANSCRIPTS_DIR = () => `${FileSystem.documentDirectory}Threshold/transcripts/`;
-
-// ---------------------------------------------------------------------------
-// Groq helpers
-// ---------------------------------------------------------------------------
-async function transcribeWithWhisper(audioUri: string, apiKey: string): Promise<string> {
-  const fileInfo = await FileSystem.getInfoAsync(audioUri);
-  if (!fileInfo.exists) throw new Error('El archivo de audio no existe en el dispositivo.');
-
-  const formData = new FormData();
-  formData.append('file', {
-    uri: audioUri,
-    name: 'audio.m4a',
-    type: 'audio/mp4',
-  } as any);
-  formData.append('model', 'whisper-large-v3');
-  formData.append('language', 'es');
-  formData.append('response_format', 'text');
-
-  const response = await fetch(`${GROQ_BASE_URL}/audio/transcriptions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`Error de Groq Whisper ${response.status}: ${errBody}`);
-  }
-
-  const text = await response.text();
-  return text.trim();
-}
-
-async function summarizeWithGroq(transcription: string, apiKey: string): Promise<string> {
-  const body = {
-    model: 'llama-3.3-70b-versatile',
-    messages: [
-      {
-        role: 'system',
-        content: 'Eres un asistente educativo experto especializado en crear material de estudio universitario altamente efectivo. A partir de la transcripción proporcionada, genera un resumen estructurado siguiendo estas reglas:\n1. Extrae los conceptos fundamentales y ordénalos por temas usando títulos claros (###).\n2. Usa viñetas breves para desglosar los detalles importantes de cada tema.\n3. Identifica términos clave, definiciones o fechas y resáltalos en **negrita**.\n4. Elimina toda la "paja" (titubeos, saludos, repeticiones) y ve directo al grano.\n5. Finaliza con una sección de "Idea Central" de máximo 2 oraciones.\nTu tono debe ser académico, estructurado y directo. No agregues introducciones conversacionales (como "Aquí tienes el resumen").',
-      },
-      {
-        role: 'user',
-        content: `Resume el siguiente texto:\n\n${transcription}`,
-      },
-    ],
-    temperature: 0.3,
-  };
-
-  const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`Error de Groq ${response.status}: ${errBody}`);
-  }
-
-  const data = await response.json();
-  return data?.choices?.[0]?.message?.content ?? 'No se pudo generar el resumen.';
-}
 
 function getLocalKey(recordingData: AudioRecording | null, id: string): string {
   if (recordingData?.id) return recordingData.id.toString();
   return id.replace(/\.m4a$/, '');
 }
-
-// ---------------------------------------------------------------------------
-// Subject Picker Modal
-// ---------------------------------------------------------------------------
-interface SubjectPickerModalProps {
-  visible: boolean;
-  subjects: Subject[];
-  selectedId: number | null;
-  onSelect: (id: number | null) => void;
-  onClose: () => void;
-}
-
-const SubjectPickerModal: React.FC<SubjectPickerModalProps> = ({
-  visible, subjects, selectedId, onSelect, onClose,
-}) => {
-  const { t } = useTranslation();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={{
-          backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          paddingTop: 12,
-          paddingBottom: 32,
-          paddingHorizontal: 20,
-          maxHeight: '60%',
-        }}>
-          <View style={{ width: 40, height: 4, backgroundColor: theme.colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
-          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 16 }}>
-            {t('subjects.selectSubject') || 'Asignar materia'}
-          </Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row', alignItems: 'center',
-                paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 6,
-                backgroundColor: selectedId === null ? `${theme.colors.primary}15` : theme.colors.background,
-                borderWidth: 1, borderColor: selectedId === null ? theme.colors.primary : theme.colors.border,
-              }}
-              onPress={() => { onSelect(null); onClose(); }}
-            >
-              <Ionicons name="albums-outline" size={20} color={theme.colors.text.secondary} style={{ marginRight: 12 }} />
-              <Text style={{ color: theme.colors.text.secondary, fontSize: 15, fontStyle: 'italic' }}>
-                {t('subjects.noSubjectSelected') || '— Sin Materia —'}
-              </Text>
-              {selectedId === null && (
-                <Ionicons name="checkmark" size={18} color={theme.colors.primary} style={{ marginLeft: 'auto' }} />
-              )}
-            </TouchableOpacity>
-            {subjects.map(sub => (
-              <TouchableOpacity
-                key={sub.id}
-                style={{
-                  flexDirection: 'row', alignItems: 'center',
-                  paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 6,
-                  backgroundColor: selectedId === sub.id ? `${sub.color || theme.colors.primary}20` : theme.colors.background,
-                  borderWidth: 1, borderColor: selectedId === sub.id ? (sub.color || theme.colors.primary) : theme.colors.border,
-                }}
-                onPress={() => { onSelect(sub.id!); onClose(); }}
-              >
-                <View style={{
-                  width: 28, height: 28, borderRadius: 8,
-                  backgroundColor: sub.color || theme.colors.primary,
-                  justifyContent: 'center', alignItems: 'center', marginRight: 12,
-                }}>
-                  <MaterialCommunityIcons name={(sub.icon as any) || 'book-outline'} size={16} color="#fff" />
-                </View>
-                <Text style={{ color: theme.colors.text.primary, fontSize: 15, fontWeight: '500', flex: 1 }}>
-                  {sub.name}
-                </Text>
-                {selectedId === sub.id && (
-                  <Ionicons name="checkmark" size={18} color={sub.color || theme.colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Animated Subject Selector
-// ---------------------------------------------------------------------------
-interface AnimatedSubjectSelectorProps {
-  subjectForId?: Subject;
-  onSelect: () => void;
-}
-
-const AnimatedSubjectSelector: React.FC<AnimatedSubjectSelectorProps> = ({
-  subjectForId, onSelect
-}) => {
-  const { t } = useTranslation();
-  const fillAnim = useRef(new Animated.Value(0)).current;
-
-  const handlePressIn = () => {
-    if (!subjectForId) return;
-    Animated.timing(fillAnim, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished) {
-        onSelect();
-        Animated.timing(fillAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
-      }
-    });
-  };
-
-  const handlePressOut = () => {
-    if (!subjectForId) return;
-    Animated.timing(fillAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  const widthInterpolation = fillAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%']
-  });
-
-  return (
-    <Pressable
-      onPress={() => { if (!subjectForId) onSelect(); }}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={{
-        width: '100%',
-        backgroundColor: theme.colors.card,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: subjectForId?.color || theme.colors.border,
-        overflow: 'hidden',
-        marginBottom: 24,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
-      }}
-    >
-      <Animated.View style={{
-        position: 'absolute',
-        left: 0, top: 0, bottom: 0,
-        width: widthInterpolation,
-        backgroundColor: subjectForId ? `${subjectForId.color}30` : 'transparent',
-      }} />
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        paddingVertical: 14, paddingHorizontal: 16,
-      }}>
-        {subjectForId ? (
-          <View style={{
-            width: 24, height: 24, borderRadius: 6,
-            backgroundColor: subjectForId.color || theme.colors.primary,
-            justifyContent: 'center', alignItems: 'center', position: 'absolute', left: 16,
-          }}>
-            <MaterialCommunityIcons name={(subjectForId.icon as any) || 'book-outline'} size={14} color="#fff" />
-          </View>
-        ) : (
-          <Ionicons name="albums-outline" size={20} color={theme.colors.text.placeholder} style={{ position: 'absolute', left: 16 }} />
-        )}
-        <Text style={{
-          color: subjectForId ? theme.colors.text.primary : theme.colors.text.placeholder,
-          fontSize: 15, fontWeight: '600', textAlign: 'center',
-        }}>
-          {subjectForId?.name || (t('subjects.noSubjectSelected') || 'Sin materia asignada')}
-        </Text>
-        <Ionicons name="chevron-down" size={16} color={theme.colors.text.placeholder} style={{ position: 'absolute', right: 16 }} />
-      </View>
-    </Pressable>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// WaveformBars – animated spectrum visualizer
-// ---------------------------------------------------------------------------
-const WAVE_HEIGHTS = [12, 22, 32, 26, 40, 18, 36, 28, 44, 24, 34, 16, 38, 28, 20];
-
-const WaveformBars: React.FC<{ isPlaying: boolean }> = ({ isPlaying }) => {
-  const anims = useRef(
-    WAVE_HEIGHTS.map(() => new Animated.Value(0.3))
-  ).current;
-  const activeRef = useRef(false);
-
-  useEffect(() => {
-    if (!isPlaying) {
-      activeRef.current = false;
-      Animated.parallel(
-        anims.map((anim) =>
-          Animated.timing(anim, {
-            toValue: 0.3,
-            duration: 500,
-            useNativeDriver: true,
-          })
-        )
-      ).start();
-      return;
-    }
-
-    activeRef.current = true;
-
-    const animateBar = (anim: Animated.Value) => {
-      if (!activeRef.current) return;
-      const target = 0.25 + Math.random() * 0.85;
-      Animated.timing(anim, {
-        toValue: target,
-        duration: 120 + Math.random() * 220,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished && activeRef.current) animateBar(anim);
-      });
-    };
-
-    anims.forEach((anim, i) => {
-      // staggered start so bars don't sync
-      setTimeout(() => animateBar(anim), i * 25);
-    });
-
-    return () => { activeRef.current = false; };
-  }, [isPlaying]);
-
-  return (
-    <View style={styles.waveformRow} pointerEvents="none">
-      {anims.map((anim, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            styles.waveBar,
-            { 
-              height: WAVE_HEIGHTS[i], 
-              opacity: isPlaying ? 0.65 : 0.2,
-              transform: [
-                { scaleY: anim },
-                { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [WAVE_HEIGHTS[i] / 2, 0] }) }
-              ]
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // RecordingDetail Component
@@ -372,6 +61,17 @@ interface RecordingDetailProps {
   onBack: () => void;
 }
 
+/**
+ * RecordingDetail.tsx
+ *
+ * Pantalla completa de detalle para un archivo de audio (nota de voz).
+ * Implementa el reproductor nativo `expo-av` con una barra de progreso (`Slider`).
+ * Carga o solicita la transcripción a la API de Groq (Whisper) y la sintetiza a un resumen
+ * académico mediante Llama-3. También invoca la creación de flashcards desde la transcripción.
+ *
+ * @param recordingId - Identificador único o nombre de archivo de la grabación.
+ * @param onBack - Función para retroceder en la navegación y detener el audio.
+ */
 export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, onBack }) => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -596,7 +296,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // ---------------------------------------------------------------------------
   const startTranscriptionFlow = async () => {
     if (!GROQ_API_KEY) {
-      alertRef.show({ title: 'Error', message: t('common.errors.groqApiKeyMissing'), type: 'error' });
+      alertRef.show({ title: t('common.error') || 'Error', message: t('common.errors.groqApiKeyMissing'), type: 'error' });
       return;
     }
 
@@ -628,7 +328,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // ---------------------------------------------------------------------------
   const startSummaryFlow = async () => {
     if (!GROQ_API_KEY) {
-      alertRef.show({ title: 'Error', message: t('common.errors.groqApiKeyMissing'), type: 'error' });
+      alertRef.show({ title: t('common.error') || 'Error', message: t('common.errors.groqApiKeyMissing'), type: 'error' });
       return;
     }
     if (!transcription) {

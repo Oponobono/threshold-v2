@@ -11,246 +11,38 @@ import { CustomInput } from '../src/components/CustomInput';
 import { CustomButton } from '../src/components/CustomButton';
 import { FeatureCarousel } from '../src/components/FeatureCarousel';
 import { MapuviaFooter } from '../src/components/MapuviaFooter';
-import { trackGuestVisit, loginUser, enrollBiometric, biometricLogin, getUserId, reactivateAccount } from '../src/services/api';
-import { enrollBiometricToken, authenticateWithBiometrics, hasBiometricTokenStored, isBiometricAvailable } from '../src/services/biometricService';
-import { alertRef } from '../src/components/CustomAlert';
-import * as SecureStore from 'expo-secure-store';
+import { useLoginAuth } from '../src/hooks/useLoginAuth';
 
+/**
+ * Pantalla principal de autenticación (LoginScreen)
+ *
+ * Sirve de orquestador visual para el inicio de sesión.
+ * La lógica de estado, llamadas a la API y enrolamiento biométrico
+ * ha sido abstraída al hook `useLoginAuth`.
+ */
 export default function LoginScreen() {
-  const { t, i18n } = useTranslation();
-  const router = useRouter();
-  
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
-  const [biometricReady, setBiometricReady] = useState(false); // true si el dispositivo tiene huella enrollada Y token guardado
-  const lastGuestToggleAtRef = useRef(0);
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    rememberMe,
+    setRememberMe,
+    isGuest,
+    isLoading,
+    isBiometricLoading,
+    biometricReady,
+    sloganOpacity,
+    sloganTranslateY,
+    handleLogin,
+    handleGuestToggle,
+    handleTouchId,
+    toggleLanguage,
+    t,
+    i18n,
+    router
+  } = useLoginAuth();
 
-  // Animaciones para la transición inmersiva
-  const sloganOpacity = useRef(new Animated.Value(1)).current;
-  const sloganTranslateY = useRef(new Animated.Value(0)).current;
-
-  // Cargar correo guardado y verificar disponibilidad biométrica al iniciar
-  React.useEffect(() => {
-    const initialize = async () => {
-      try {
-        // Cargar correo recordado
-        const savedEmail = await SecureStore.getItemAsync('remembered_email');
-        if (savedEmail) {
-          setEmail(savedEmail);
-          setRememberMe(true);
-        }
-        // Verificar si el botón Touch ID debe mostrarse activo
-        const available = await isBiometricAvailable();
-        const hasToken = await hasBiometricTokenStored();
-        setBiometricReady(available && hasToken);
-      } catch (error) {
-        console.log('Error en initialize:', error);
-      }
-    };
-    initialize();
-  }, []);
-
-  const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'en' ? 'es' : 'en');
-  };
-
-  const handleLogin = async () => {
-    if (!email || !password) {
-      alertRef.show({ title: t('common.error'), message: t('login.errors.missingCredentials'), type: 'error' });
-      return;
-    }
-
-    setIsLoading(true);
-
-    // Animación de salida: El eslogan brilla/desaparece hacia arriba al intentar entrar
-    Animated.parallel([
-      Animated.timing(sloganOpacity, {
-        toValue: 0,
-        duration: 350,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sloganTranslateY, {
-        toValue: -15,
-        duration: 350,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    try {
-      const loginData = await loginUser(email, password);
-      
-      // Verificar si la cuenta está pendiente de eliminación
-      if (loginData.status === 'pending_deletion') {
-        setIsLoading(false);
-        
-        // Mostrar pantalla de reactivación
-        const daysRemaining = loginData.days_remaining;
-        const deletionDate = new Date(loginData.deletion_date);
-        const formattedDate = deletionDate.toLocaleDateString(i18n.language);
-        
-        alertRef.show({
-          title: t('login.accountPendingDeletion'),
-          message: t('login.pendingDeletionMsg', { 
-            days: daysRemaining, 
-            date: formattedDate 
-          }),
-          type: 'confirm',
-          buttons: [
-            {
-              text: t('login.cancelBtn'),
-              style: 'cancel',
-              onPress: () => {
-                // Revertir animación
-                Animated.parallel([
-                  Animated.timing(sloganOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-                  Animated.timing(sloganTranslateY, { toValue: 0, duration: 350, useNativeDriver: true }),
-                ]).start();
-              }
-            },
-            {
-              text: t('login.recoverBtn'),
-              style: 'default',
-              onPress: async () => {
-                try {
-                  await reactivateAccount(loginData.user.id.toString());
-                  
-                  // Guardar sesión
-                  const sessionToken = `dummy-token-${Date.now()}`;
-                  if (Platform.OS === 'web') {
-                    localStorage.setItem('app_session_token', sessionToken);
-                    localStorage.setItem('app_user_email', email);
-                    localStorage.setItem('app_user_id', loginData.user.id.toString());
-                  } else {
-                    await SecureStore.setItemAsync('app_session_token', sessionToken);
-                    await SecureStore.setItemAsync('app_user_email', email);
-                    await SecureStore.setItemAsync('app_user_id', loginData.user.id.toString());
-                  }
-                  
-                  alertRef.show({
-                    title: t('common.success'),
-                    message: t('login.accountRecovered'),
-                    type: 'success'
-                  });
-                  router.replace('/(tabs)');
-                } catch (error: any) {
-                  alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
-                }
-              }
-            }
-          ]
-        });
-        return;
-      }
-      
-      // Guardar o borrar correo según la preferencia
-      if (rememberMe) {
-        await SecureStore.setItemAsync('remembered_email', email);
-      } else {
-        await SecureStore.deleteItemAsync('remembered_email');
-      }
-
-      // Ofrecer enrollment biométrico si el dispositivo lo soporta y aún no está registrado
-      const available = await isBiometricAvailable();
-      const hasToken = await hasBiometricTokenStored();
-      const userId = loginData?.user?.id?.toString();
-
-      if (available && !hasToken && userId) {
-        alertRef.show({
-          title: 'Activar Touch ID',
-          message: '¿Deseas iniciar sesión con tu huella dactilar la próxima vez?',
-          type: 'confirm',
-          buttons: [
-            { text: 'Ahora no', style: 'cancel', onPress: () => router.replace('/(tabs)') },
-            {
-              text: 'Activar',
-              onPress: async () => {
-                const token = await enrollBiometricToken(email);
-                if (token) {
-                  try {
-                    await enrollBiometric(userId, token);
-                    setBiometricReady(true);
-                  } catch (e: any) {
-                    console.warn('Error al registrar token en backend:', e);
-                    // Si falla el backend, revocamos el token local para evitar desincronización
-                    const { revokeBiometricToken } = require('../src/services/biometricService');
-                    await revokeBiometricToken();
-                    alertRef.show({ title: 'Touch ID', message: 'Hubo un error al guardar la configuración en el servidor.', type: 'error' });
-                  }
-                }
-                router.replace('/(tabs)');
-              },
-            },
-          ]
-        });
-      } else {
-        router.replace('/(tabs)');
-      }
-    } catch (error: any) {
-      alertRef.show({ title: t('login.errors.loginTitle'), message: error.message, type: 'error' });
-      setIsLoading(false);
-      // Revertir animación si hay error
-      Animated.parallel([
-        Animated.timing(sloganOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(sloganTranslateY, { toValue: 0, duration: 350, useNativeDriver: true }),
-      ]).start();
-    }
-  };
-
-  const handleGuestToggle = (value: boolean) => {
-    const now = Date.now();
-    if (now - lastGuestToggleAtRef.current < 300) return;
-    lastGuestToggleAtRef.current = now;
-
-    setIsGuest(value);
-    if (value) {
-      router.replace('/(tabs)');
-      void trackGuestVisit();
-    }
-  };
-
-  const handleTouchId = async () => {
-    if (!biometricReady) {
-      alertRef.show({
-        title: 'Touch ID no configurado',
-        message: 'Inicia sesión con tu correo y contraseña primero para activar esta función.',
-        type: 'warning'
-      });
-      return;
-    }
-
-    setIsBiometricLoading(true);
-    try {
-      const result = await authenticateWithBiometrics();
-
-      if (!result.success) {
-        if (result.reason !== 'cancelled') {
-          alertRef.show({ title: 'Touch ID', message: 'No se pudo verificar tu huella. Intenta de nuevo o usa tu contraseña.', type: 'error' });
-        }
-        setIsBiometricLoading(false);
-        return;
-      }
-
-      // El OS confirmó la huella. Autenticar con el backend.
-      await biometricLogin(result.token);
-      router.replace('/(tabs)');
-    } catch (error: any) {
-      alertRef.show({ title: 'Error', message: error.message || 'No se pudo iniciar sesión con Touch ID.', type: 'error' });
-      setIsBiometricLoading(false);
-      
-      // Si el backend rechaza el token (ej: base de datos desincronizada), revocamos localmente
-      if (error.message && error.message.includes('fallida')) {
-        const { revokeBiometricToken } = require('../src/services/biometricService');
-        await revokeBiometricToken();
-        setBiometricReady(false);
-      }
-    }
-  };
 
 
   return (

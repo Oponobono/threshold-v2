@@ -14,6 +14,17 @@ interface AudioRecorderModalProps {
   onClose: () => void;
 }
 
+/**
+ * AudioRecorderModal.tsx
+ *
+ * Hoja modal "Bottom Sheet" que alberga la grabadora de voz principal de la app.
+ * Gestiona el ciclo completo de grabación (iniciar, pausar, detener) y muestra una animación
+ * reactiva del micrófono basándose en el volumen detectado (decibeles).
+ * Debajo de los controles de grabación, despliega una lista rápida con los últimos 4 audios grabados.
+ *
+ * @param isVisible - Controla si el modal de grabación está visible.
+ * @param onClose - Función ejecutada al cerrar el modal (o al minimizarlo).
+ */
 export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ isVisible, onClose }) => {
   const { t } = useTranslation();
   const router = useRouter();
@@ -250,7 +261,7 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ isVisibl
               recordings.length > 4 ? (
                 <TouchableOpacity style={{ marginTop: 12, alignItems: 'center', padding: 8 }} onPress={handleOpenFullList}>
                   <Text style={{ color: theme.colors.primary, fontWeight: '500' }}>
-                    Ver todas ({recordings.length})
+                    {t('dashboard.audioRecorderModal.viewAll', { count: recordings.length })}
                   </Text>
                 </TouchableOpacity>
               ) : null

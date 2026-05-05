@@ -1,3 +1,12 @@
+/**
+ * audio.ts
+ *
+ * Servicio CRUD para grabaciones de voz (.m4a) del usuario.
+ * Los archivos físicos se guardan localmente con `expo-file-system`; este servicio
+ * persiste la referencia (URI) y metadatos en la BD del servidor para sincronización
+ * entre dispositivos. También gestiona los registros de transcripciones y resúmenes
+ * generados por Groq Whisper que se almacenan como archivos locales adicionales.
+ */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { AudioRecording } from './types';
@@ -71,7 +80,8 @@ export const deleteAudioRecording = async (id: number) => {
 };
 
 /**
- * Upsert para guardar rutas de transcripciones/resúmenes
+ * Crea o actualiza las URIs de transcripción y resumen de una grabación.
+ * Usa upsert: si ya existe un registro para `recording_id`, lo actualiza.
  */
 export const upsertAudioTranscript = async (payload: {
   recording_id: number;

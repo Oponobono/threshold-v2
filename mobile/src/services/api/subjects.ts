@@ -1,3 +1,11 @@
+/**
+ * subjects.ts
+ *
+ * Servicio CRUD para las materias académicas del usuario.
+ * Una materia es la entidad central del ecosistema Threshold: agrupa grabaciones,
+ * fotos, documentos, flashcards, horarios y evaluaciones.
+ * Incluye el endpoint de predicción que sugiere la materia activa según el horario actual.
+ */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Subject } from './types';
@@ -56,7 +64,8 @@ export const createSubject = async (payload: {
 };
 
 /**
- * Obtiene la materia sugerida según el horario actual
+ * Consulta el servidor para obtener la materia más probable según los bloques
+ * de horario que coincidan con la hora y día actuales del usuario.
  */
 export const getPredictedSubject = async (): Promise<Subject | null> => {
   const userId = await getUserId();

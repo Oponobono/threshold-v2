@@ -49,7 +49,8 @@ import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
 import { useCameraPermissions, CameraView } from 'expo-camera';
 import { subjectDetailStyles as styles } from '../../src/styles/SubjectDetail.styles';
 import { useCustomAlert } from '../../src/components/CustomAlert';
-import { PDFDocument } from 'pdf-lib';
+import { SubjectYouTubeVideos } from '../../src/components/SubjectYouTubeVideos';
+import { generatePdfFromImages } from '../../src/utils/pdfGenerator';
 
 // Helper removed
 
@@ -58,6 +59,13 @@ type DetailSubject = Subject & {
   completion_percent?: number | null;
 };
 
+/**
+ * SubjectDetailScreen
+ *
+ * Pantalla principal de detalle de una materia. Actúa como el orquestador o contenedor (Smart Component)
+ * que reúne y distribuye todos los datos académicos (grabaciones, documentos, fotos, flashcards y estadísticas).
+ * Provee callbacks para el manejo de estado y persistencia hacia los componentes hijos (Dumb Components).
+ */
 export default function SubjectDetailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -104,6 +112,7 @@ export default function SubjectDetailScreen() {
   const [selectedItemsForAI, setSelectedItemsForAI] = useState<any[]>([]);
   const { showAlert } = useCustomAlert();
 
+  /** Muestra la alerta de confirmación y elimina la materia completa (en cascada) */
   const handleDeleteSubject = () => {
     showAlert({
       title: 'Eliminar Materia',
@@ -131,6 +140,7 @@ export default function SubjectDetailScreen() {
     });
   };
 
+  /** Muestra la alerta de confirmación y elimina el enlace de un video de YouTube */
   const handleDeleteVideo = (videoId: number | string) => {
     showAlert({
       title: t('subjects.deleteVideo'),
@@ -314,55 +324,7 @@ export default function SubjectDetailScreen() {
             onExportPdf={async (uris) => {
               if (uris.length === 0) return;
               try {
-                console.log('[PDF] Iniciando exportación. URIs:', uris);
-                const ImageManipulator = require('expo-image-manipulator');
-                const pdfDoc = await PDFDocument.create();
-
-                for (const uri of uris) {
-                  if (!uri) continue;
-                  console.log('[PDF] Procesando:', uri);
-
-                  // Comprimir imagen antes de incrustar (reduce de 5MB a ~300KB)
-                  // Esto acelera embedJpg y saveAsBase64 drasticamente
-                  const compressed = await ImageManipulator.manipulateAsync(
-                    uri,
-                    [], // sin transformaciones de escala
-                    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-                  );
-                  console.log('[PDF] Imagen comprimida:', compressed.width, 'x', compressed.height);
-
-                  const fileResponse = await fetch(compressed.uri);
-                  const arrayBuffer = await fileResponse.arrayBuffer();
-                  console.log('[PDF] ArrayBuffer bytes:', arrayBuffer.byteLength);
-
-                  const embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
-                  console.log('[PDF] Imagen incrustada');
-
-                  // Página exactamente del tamaño de la imagen comprimida
-                  const page = pdfDoc.addPage([compressed.width, compressed.height]);
-                  page.drawImage(embeddedImage, {
-                    x: 0,
-                    y: 0,
-                    width: compressed.width,
-                    height: compressed.height,
-                  });
-                  console.log('[PDF] Página añadida');
-                }
-
-                console.log('[PDF] Guardando...');
-                const pdfBase64 = await pdfDoc.saveAsBase64({ dataUri: false });
-                const pdfUri = `${FileSystem.cacheDirectory}Documento_${Date.now()}.pdf`;
-                await FileSystem.writeAsStringAsync(
-                  pdfUri,
-                  pdfBase64,
-                  { encoding: FileSystem.EncodingType.Base64 }
-                );
-                console.log('[PDF] Guardado en:', pdfUri);
-
-                const Sharing = require('expo-sharing');
-                if (await Sharing.isAvailableAsync()) {
-                  await Sharing.shareAsync(pdfUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
-                }
+                await generatePdfFromImages(uris);
               } catch (e: any) {
                 console.error('[PDF] Error:', e?.message || e);
                 const message = t('subjects.pdfGenerationError').replace('{{message}}', e?.message || 'desconocido');
@@ -390,50 +352,10 @@ export default function SubjectDetailScreen() {
             deleteRecording={deleteRecordingConfirmed}
           />
 
-          {recentVideos.length > 0 && (
-            <View style={styles.sectionBlock}>
-              <View style={styles.sectionHeaderRow}>
-                <View>
-                  <Text style={styles.sectionTitle}>{t('subjects.youtubeVideos')}</Text>
-                  <Text style={styles.sectionHint}>{t('subjects.savedVideos')}</Text>
-                </View>
-              </View>
-              <View style={{ gap: 12 }}>
-                {recentVideos.map(video => (
-                  <TouchableOpacity
-                    key={video.id}
-                    onPress={() => router.push(`/recordings/${video.id}?type=video` as any)}
-                    style={{
-                      backgroundColor: theme.colors.card,
-                      borderRadius: 12,
-                      padding: 12,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <MaterialCommunityIcons name="youtube" size={40} color={theme.colors.text.error} style={{ marginRight: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: theme.colors.text.primary, fontWeight: '600', fontSize: 15 }} numberOfLines={2}>
-                        {video.title || t('subjects.youtubeVideoDefault')}
-                      </Text>
-                      <Text style={{ color: theme.colors.text.secondary, fontSize: 13, marginTop: 2 }}>
-                        {video.created_at
-                          ? new Date(video.created_at).toLocaleDateString()
-                          : t('subjects.unknownDate')}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={(e) => { e.stopPropagation(); handleDeleteVideo(video.id!); }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ padding: 4 }}
-                    >
-                      <Ionicons name="trash-outline" size={20} color={theme.colors.text.secondary} />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
+          <SubjectYouTubeVideos
+            videos={recentVideos}
+            onDeleteVideo={handleDeleteVideo}
+          />
 
           {isDetailLoading && (
             <View style={styles.detailLoadingRow}>

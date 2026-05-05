@@ -10,6 +10,27 @@ const MODEL_URLS = {
   base: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
 };
 
+/**
+ * useWhisper
+ *
+ * Hook para la transcripción de audio completamente on-device usando el modelo Whisper
+ * de OpenAI a través de la librería `whisper.rn` (GGML bindings nativos).
+ * Gestiona el ciclo de vida del modelo:
+ * 1. Verificar si el modelo binario (`.bin`) ya existe en el almacenamiento del dispositivo.
+ * 2. Descargar el modelo desde Hugging Face con seguimiento de progreso si no existe.
+ * 3. Inicializar el contexto de Whisper y mantenerlo en estado para reutilizarlo.
+ * 4. Transcribir archivos de audio locales por URI directamente en el dispositivo.
+ *
+ * Soporta dos tamaños de modelo: `tiny` (~75MB) y `base` (~142MB).
+ *
+ * @returns `isDownloading` - `true` mientras el modelo se descarga.
+ * @returns `downloadProgress` - Progreso normalizado (0-1) de la descarga del modelo.
+ * @returns `isTranscribing` - `true` mientras se procesa el audio.
+ * @returns `checkModelExists` - Verifica si el modelo está ya disponible localmente.
+ * @returns `downloadModel` - Descarga e inicializa el modelo seleccionado.
+ * @returns `transcribeAudio` - Transcribe un archivo de audio local por URI.
+ * @returns `initContextIfNeeded` - Inicializa el contexto si el modelo ya existe pero no está cargado.
+ */
 export function useWhisper() {
   const { t } = useTranslation();
   const [isDownloading, setIsDownloading] = useState(false);

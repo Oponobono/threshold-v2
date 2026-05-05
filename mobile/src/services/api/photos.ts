@@ -1,3 +1,11 @@
+/**
+ * photos.ts
+ *
+ * Servicio CRUD para la galería de fotos del usuario.
+ * Las fotos son capturadas con `PhotoCaptureModal` (cámara nativa) y quedan
+ * vinculadas a una materia específica. También incluye la galería global del usuario
+ * que agrega fotos y documentos escaneados de todas las materias.
+ */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Photo } from './types';

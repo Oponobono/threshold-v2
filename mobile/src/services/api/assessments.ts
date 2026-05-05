@@ -1,3 +1,11 @@
+/**
+ * assessments.ts
+ *
+ * Servicio CRUD para evaluaciones académicas (notas, tareas, exámenes).
+ * Cada evaluación pertenece a una materia y puede tener peso porcentual,
+ * calificación obtenida, fecha y tipo ('task' o evaluación tradicional).
+ * Los datos son usados por `useSubjectGrades` para calcular el Threshold de aprobación.
+ */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Assessment } from './types';

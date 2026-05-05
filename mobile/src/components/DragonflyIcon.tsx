@@ -11,6 +11,19 @@ interface DragonflyIconProps {
   wingOpacity?: Animated.Value | number;
 }
 
+/**
+ * DragonflyIcon.tsx
+ *
+ * Componente que dibuja un ícono de libélula personalizado mediante SVG vectorial.
+ * Creado específicamente como identidad gráfica o mascota (Dragonfly) para ciertas
+ * partes de la interfaz, como la pantalla de carga (PremiumLoader) o interacciones de IA.
+ * Incluye soporte para alas con opacidad animada mediante `AnimatedG`.
+ *
+ * @param size - Tamaño base (ancho) del ícono. La altura escala proporcionalmente.
+ * @param color - Color del contorno (stroke) del SVG vectorial.
+ * @param style - Estilos adicionales inyectados al contenedor.
+ * @param wingOpacity - Valor (animable) para aplicar una transparencia o efecto de aleteo a las alas.
+ */
 export const DragonflyIcon: React.FC<DragonflyIconProps> = ({ 
   size = 42, 
   color = '#F5F5F0', 

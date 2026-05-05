@@ -22,6 +22,20 @@ interface AIContextCarouselProps {
   onSelectAll: () => void;
 }
 
+/**
+ * AIContextCarousel.tsx
+ *
+ * Carrusel horizontal deslizable que agrupa archivos por tipo (ej. documentos, fotos, audios).
+ * Es utilizado dentro del modal de Inteligencia Artificial para que el usuario pueda
+ * seleccionar rápidamente qué información desea enviar como "contexto" al LLM.
+ * Incluye un botón para seleccionar/deseleccionar todos los elementos de la categoría.
+ *
+ * @param type - Tipo de archivo (document, photo, recording, video).
+ * @param items - Lista de archivos a renderizar en este carrusel.
+ * @param selectedIds - Conjunto (Set) de IDs que están actualmente seleccionados.
+ * @param onToggle - Función para alternar la selección de un solo ítem.
+ * @param onSelectAll - Función para marcar o desmarcar todos los ítems de esta categoría.
+ */
 export const AIContextCarousel: React.FC<AIContextCarouselProps> = ({
   type,
   items,

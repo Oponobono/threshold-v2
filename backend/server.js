@@ -6,6 +6,8 @@ const { swaggerUi, specs } = require('./swagger');
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
+const usersRoutes = require('./routes/users');
+const analyticsRoutes = require('./routes/analytics');
 const subjectsRoutes = require('./routes/subjects');
 const assessmentsRoutes = require('./routes/assessments');
 const schedulesRoutes = require('./routes/schedules');
@@ -45,6 +47,8 @@ app.get('/api/status', (req, res) => {
 
 // Registrar rutas
 app.use('/api', authRoutes);
+app.use('/api', usersRoutes);
+app.use('/api', analyticsRoutes);
 app.use('/api', subjectsRoutes);
 app.use('/api', assessmentsRoutes);
 app.use('/api', schedulesRoutes);

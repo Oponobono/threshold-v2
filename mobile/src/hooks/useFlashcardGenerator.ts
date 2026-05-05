@@ -28,6 +28,24 @@ interface GeneratedDeck {
   }>;
 }
 
+/**
+ * useFlashcardGenerator
+ *
+ * Hook que gestiona la generación automática de flashcards mediante la API del servidor.
+ * Soporta dos fuentes de contexto mutuamente excluyentes:
+ * - `text`: Texto plano (transcripciones, resúmenes) de al menos 50 caracteres.
+ * - `imageBase64`: Imagen codificada en base64 para generación por visión (OCR + LLM).
+ *
+ * Internamente valida la entrada, despacha la petición correcta a la API y expone
+ * el estado de carga, posibles errores y el mazo resultante para previsualizar.
+ *
+ * @returns `generate` - Función async que recibe los parámetros y retorna `{ success, deck?, error? }`.
+ * @returns `loading` - `true` mientras la petición al LLM está en curso.
+ * @returns `error` - Mensaje de error de la última llamada fallida (o `null`).
+ * @returns `generatedDeck` - El mazo devuelto por la API con sus tarjetas incluidas.
+ * @returns `clearError` - Limpia el estado de error manualmente.
+ * @returns `clearGeneratedDeck` - Resetea el mazo generado (usado al cerrar el modal).
+ */
 export const useFlashcardGenerator = () => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);

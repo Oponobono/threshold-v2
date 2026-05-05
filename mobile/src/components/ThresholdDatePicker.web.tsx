@@ -17,6 +17,20 @@ const MONTHS_ES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+/**
+ * ThresholdDatePicker.web.tsx
+ *
+ * Implementación web-compatible del selector de fechas de Threshold.
+ * Al estar en la plataforma web, los pickers nativos de iOS/Android no están disponibles,
+ * por lo que este componente construye desde cero un calendario modal en React Native.
+ * Soporta dos vistas: `calendar` (cuadrícula de días del mes) y `year` (lista de años).
+ * El archivo es detectado automáticamente por Metro bundler por su extensión `.web.tsx`
+ * en lugar del archivo base `ThresholdDatePicker.tsx`.
+ *
+ * @param value - La fecha actualmente seleccionada.
+ * @param onChange - Callback compatible con la API de `@react-native-community/datetimepicker`.
+ * @param mode - (No usado en web, mantiene la misma firma de interface que la versión nativa).
+ */
 export const ThresholdDatePicker = ({ value, onChange }: Props) => {
   const { t } = useTranslation();
   const [currentMonth, setCurrentMonth] = useState(new Date(value.getFullYear(), value.getMonth(), 1));

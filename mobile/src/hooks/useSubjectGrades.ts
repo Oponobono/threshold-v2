@@ -9,6 +9,26 @@ import {
   SCALE_MAX,
 } from '../utils/grades';
 
+/**
+ * useSubjectGrades
+ *
+ * Hook de cálculo académico que centraliza toda la lógica del "Threshold" (umbral de aprobación).
+ * Recibe las evaluaciones de una materia y calcula de forma reactiva (usando `useMemo`) los
+ * indicadores clave necesarios para que el alumno entienda su situación académica:
+ *
+ * - `evaluatedPercentage` (Pe): Porcentaje del curso ya evaluado.
+ * - `accumulatedPoints` (Pts): Suma ponderada de los puntos obtenidos.
+ * - `averageGrade` (A_actual): Promedio actual del alumno en la materia.
+ * - `targetGrade`: Nota mínima requerida para aprobar (configurable por materia o por perfil).
+ * - `requiredGrade`: Nota que se necesita en el porcentaje restante para alcanzar `targetGrade`.
+ * - `thresholdStatus`: Semafóro de riesgo ('safe' | 'caution' | 'risk').
+ * - `finalNeededText`: Mensaje en lenguaje natural (i18n) explicando la situación.
+ *
+ * @param assessments - Lista completa de evaluaciones/tareas de la materia.
+ * @param selectedSubject - Objeto de la materia (para leer `target_grade`).
+ * @param profile - Perfil del usuario (fallback de `approval_threshold`).
+ * @returns Objeto con todos los indicadores de rendimiento académico calculados.
+ */
 export function useSubjectGrades(
   assessments: Assessment[],
   selectedSubject: Subject | null,

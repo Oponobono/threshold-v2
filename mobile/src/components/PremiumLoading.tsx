@@ -9,6 +9,16 @@ interface PremiumLoadingProps {
   text?: string;
 }
 
+/**
+ * PremiumLoading.tsx
+ *
+ * Pantalla de carga a pantalla completa que se sobrepone mientras la app
+ * realiza tareas intensivas o transiciones mayores (ej. procesamiento IA de Groq/Gemini, 
+ * renderizado pesado inicial, o validaciones criptográficas biométricas).
+ * Presenta un diseño premium, "limpio", con el logo corporativo con un pulso animado.
+ *
+ * @param text - Texto personalizado a mostrar (ej. "CARGANDO...", "ANALIZANDO...").
+ */
 export const PremiumLoading: React.FC<PremiumLoadingProps> = ({ text = 'CARGANDO' }) => {
   return (
     <SafeAreaView style={[globalStyles.safeArea, { backgroundColor: '#fff' }]}>

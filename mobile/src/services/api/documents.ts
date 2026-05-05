@@ -1,6 +1,15 @@
+/**
+ * documents.ts
+ *
+ * Servicio CRUD para documentos escaneados y extracción de texto por OCR.
+ * Los documentos se generan con `DocumentScannerModal` y pueden exportarse como
+ * imagen JPEG o PDF. El endpoint `/ocr` utiliza Groq Vision para extraer texto
+ * del documento y retornarlo como string plano para compartir o procesar con IA.
+ */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 
+/** Representa un documento escaneado vinculado a una materia y guardado localmente */
 export interface ScannedDocument {
   id?: number;
   user_id?: number;
@@ -10,6 +19,7 @@ export interface ScannedDocument {
   created_at?: string;
 }
 
+/** Obtiene todos los documentos escaneados de una materia específica */
 export const getScannedDocumentsBySubject = async (subjectId: number | string): Promise<ScannedDocument[]> => {
   try {
     const response = await fetchWithFallback(`/scanned_documents/subject/${subjectId}`);
@@ -25,6 +35,7 @@ export const getScannedDocumentsBySubject = async (subjectId: number | string): 
   }
 };
 
+/** Guarda un documento escaneado en el servidor. Inyecta automáticamente el `user_id` */
 export const createScannedDocument = async (
   data: Omit<ScannedDocument, 'id' | 'created_at' | 'user_id'>
 ): Promise<ScannedDocument> => {
@@ -48,6 +59,7 @@ export const createScannedDocument = async (
   }
 };
 
+/** Elimina un documento escaneado de la base de datos por su ID */
 export const deleteScannedDocument = async (documentId: number | string): Promise<any> => {
   try {
     const response = await fetchWithFallback(`/scanned_documents/${documentId}`, {
@@ -63,6 +75,12 @@ export const deleteScannedDocument = async (documentId: number | string): Promis
   }
 };
 
+/**
+ * Extrae texto de una imagen usando Groq Vision (OCR on-cloud).
+ * La imagen debe enviarse como base64. El tamaño máximo recomendado es ~3.5 MB.
+ * @param base64Image - Imagen codificada en base64 (sin prefijo `data:image/...`).
+ * @returns Texto plano extraído de la imagen.
+ */
 export const extractTextFromImage = async (base64Image: string): Promise<string> => {
   try {
     const response = await fetchWithFallback('/ocr', {

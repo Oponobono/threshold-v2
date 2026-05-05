@@ -9,6 +9,15 @@ const { width } = Dimensions.get('window');
 const PAGE_WIDTH = width - theme.spacing.lg * 2;
 const AUTO_SLIDE_INTERVAL = 4000; // 4 seconds
 
+/**
+ * FeatureCarousel.tsx
+ *
+ * Carrusel de presentación de funcionalidades usado en la pantalla de onboarding/login.
+ * Muestra las características principales de la app en grupos de 3 por página con
+ * deslizamiento horizontal y avance automático cada 4 segundos. El timer se pausa
+ * al arrastrar manualmente y se reinicia al soltar.
+ * Los textos se obtienen del sistema de internacionalización (i18n).
+ */
 export const FeatureCarousel = () => {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(0);

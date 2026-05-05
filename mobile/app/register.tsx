@@ -16,6 +16,12 @@ import { alertRef } from '../src/components/CustomAlert';
 
 const TOTAL_STEPS = 4;
 
+/**
+ * Pantalla de Registro de Usuario (RegisterScreen).
+ * Implementa un flujo progresivo (wizard) de 4 pasos para recolectar
+ * los datos del nuevo usuario, validarlos en tiempo real y registrar la cuenta
+ * mediante llamadas a la API de Threshold.
+ */
 export default function RegisterScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -50,6 +56,12 @@ export default function RegisterScreen() {
     }).start();
   }, [step]);
 
+  /**
+   * Cambia el paso actual del formulario de registro usando
+   * una transición de fundido cruzado (fade out/fade in).
+   *
+   * @param {number} newStep - El número del nuevo paso a renderizar.
+   */
   const changeStep = (newStep: number) => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -82,6 +94,10 @@ export default function RegisterScreen() {
   const isPasswordValid = Object.values(reqs).every(Boolean);
   const isStep4Valid = isEmailValid(email) && isPasswordValid && password === confirmPassword;
 
+  /**
+   * Avanza al siguiente paso del formulario o invoca el registro final si ya se
+   * encuentra en el último paso.
+   */
   const handleNext = () => {
     if (step < TOTAL_STEPS) {
       changeStep(step + 1);
@@ -90,6 +106,10 @@ export default function RegisterScreen() {
     }
   };
 
+  /**
+   * Retrocede al paso anterior del formulario. Si el usuario se encuentra en el primer
+   * paso, devuelve la navegación a la pantalla previa (ej. login).
+   */
   const handleBack = () => {
     if (step > 1) {
       changeStep(step - 1);
@@ -98,6 +118,10 @@ export default function RegisterScreen() {
     }
   };
 
+  /**
+   * Compila todos los datos del formulario de registro y realiza la
+   * petición al backend para crear la cuenta de usuario.
+   */
   const handleRegister = async () => {
     setIsLoading(true);
     try {
@@ -121,6 +145,9 @@ export default function RegisterScreen() {
     }
   };
 
+  /**
+   * Renderiza la barra de progreso animada ubicada en la cabecera.
+   */
   const renderProgressBar = () => (
     <View style={localStyles.progressBarContainer}>
       <Animated.View style={[
@@ -135,6 +162,12 @@ export default function RegisterScreen() {
     </View>
   );
 
+  /**
+   * Renderiza un ítem individual de validación de requisitos de contraseña.
+   *
+   * @param {boolean} fulfilled - Indica si el requerimiento de contraseña está satisfecho.
+   * @param {string} text - El texto del requerimiento a mostrar.
+   */
   const RequirementItem = ({ fulfilled, text }: { fulfilled: boolean; text: string }) => (
     <View style={localStyles.reqItem}>
       <Feather 

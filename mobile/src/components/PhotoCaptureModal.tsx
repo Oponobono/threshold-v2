@@ -18,6 +18,21 @@ interface PhotoCaptureModalProps {
   initialSubjectId?: number;
 }
 
+/**
+ * PhotoCaptureModal.tsx
+ *
+ * Modal de pantalla completa que activa la cámara trasera nativa del dispositivo
+ * para capturar una fotografía y guardarla en la galería de la materia seleccionada.
+ * Muestra primero el visor de la cámara y, al capturar, cambia a la vista de
+ * previsualización donde el usuario puede elegir la materia de destino, reintentar
+ * la captura, o confirmar y subir la foto al servidor.
+ *
+ * @param isVisible - Controla si el modal está montado y visible.
+ * @param onClose - Callback para cerrar y limpiar el estado.
+ * @param subjects - Lista de materias disponibles para asignar la foto.
+ * @param onSave - Callback opcional disparado con la URI y el ID de materia tras guardar.
+ * @param initialSubjectId - Materia pre-seleccionada al abrir (ej. desde SubjectDetailScreen).
+ */
 export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   isVisible,
   onClose,

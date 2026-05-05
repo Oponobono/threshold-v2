@@ -14,6 +14,19 @@ interface SubjectGalleryGridProps {
   onOpenViewer: (index: number) => void;
 }
 
+/**
+ * SubjectGalleryGrid.tsx
+ *
+ * Componente que muestra una cuadrícula dinámica estilo "Bento" con las fotos escaneadas
+ * para una materia específica. Se adapta visualmente dependiendo de si hay 0, 1, 2, 3 o 4+ fotos.
+ * Contiene botones rápidos para abrir el escáner de documentos o ver la galería completa.
+ *
+ * @param photos - Array de objetos de fotos pertenecientes a la materia.
+ * @param subjectName - Nombre de la materia (usado en el pie de página de la galería).
+ * @param onOpenScanner - Función para abrir el modal de captura/escaneo de fotos.
+ * @param onTakePhoto - Alias para tomar fotos de forma rápida desde el pie.
+ * @param onOpenViewer - Función para abrir la imagen seleccionada en pantalla completa.
+ */
 export const SubjectGalleryGrid: React.FC<SubjectGalleryGridProps> = ({
   photos,
   subjectName,

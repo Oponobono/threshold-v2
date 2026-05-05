@@ -1,3 +1,11 @@
+/**
+ * schedules.ts
+ *
+ * Servicio CRUD para los horarios académicos del usuario.
+ * Cada horario define un bloque de clase semanal (`day_of_week`, `start_time`, `end_time`)
+ * vinculado a una materia. Los horarios son utilizados por el dashboard para mostrar
+ * la clase actual y por el sistema de predicción de materia activa.
+ */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 

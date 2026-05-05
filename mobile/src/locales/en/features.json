@@ -1,0 +1,40 @@
+﻿{
+    "swipeToExplore":  "Swipe to explore",
+    "swipeToStart":  "Swipe to start",
+    "bento":  {
+                  "title":  "Subjects Panel",
+                  "desc":  "Organize all your subjects in a visual dashboard."
+              },
+    "gpa":  {
+                "title":  "GPA Tracking",
+                "desc":  "Keep an accurate record of your performance."
+            },
+    "photo":  {
+                  "title":  "Quick Photos",
+                  "desc":  "Save notes as photos with one click."
+              },
+    "schedule":  {
+                     "title":  "Weekly Schedule",
+                     "desc":  "Plan your classes and study time."
+                 },
+    "tasks":  {
+                  "title":  "Task Management",
+                  "desc":  "Manage due dates and exams."
+              },
+    "gallery":  {
+                    "title":  "Organized Gallery",
+                    "desc":  "Find your notes grouped by subject."
+                },
+    "cloud":  {
+                  "title":  "Cloud Sync",
+                  "desc":  "Access your data securely."
+              },
+    "security":  {
+                     "title":  "Total Privacy",
+                     "desc":  "Your notes are encrypted and protected."
+                 },
+    "custom":  {
+                   "title":  "Customization",
+                   "desc":  "Visual themes and avatars to your liking."
+               }
+}

@@ -9,6 +9,18 @@ interface CustomButtonProps extends TouchableOpacityProps {
   loading?: boolean;
 }
 
+/**
+ * CustomButton.tsx
+ *
+ * Componente de botón reutilizable que envuelve un `TouchableOpacity`.
+ * Provee dos variantes visuales ('primary' y 'outline') e incluye soporte
+ * integrado para estado de carga (`loading`), renderizando un `ActivityIndicator`
+ * y deshabilitando la interacción automáticamente.
+ *
+ * @param title - Texto a mostrar dentro del botón.
+ * @param variant - Estilo visual del botón ('primary' por defecto o 'outline').
+ * @param loading - Si es `true`, deshabilita el botón y muestra un spinner.
+ */
 export const CustomButton: React.FC<CustomButtonProps> = ({ 
   title, 
   variant = 'primary', 

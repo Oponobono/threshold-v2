@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, TextInput, FlatList,
-  KeyboardAvoidingView, Platform, ActivityIndicator, StyleSheet, Keyboard
+  KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import * as FileSystem from 'expo-file-system/legacy';
 import { theme } from '../styles/theme';
+import { chatStyles as styles } from '../styles/SubjectAIChatModal.styles';
 import { AIContextItemData } from './AIContextItem';
 import { extractTextFromImage } from '../services/api/documents';
 import { sendAIChatMessage } from '../services/api';
+import { ChatMessageBubble, ChatMessage } from './ChatMessageBubble';
 
 export interface SubjectAIChatModalProps {
   isVisible: boolean;
@@ -18,12 +21,19 @@ export interface SubjectAIChatModalProps {
   subjectName: string;
 }
 
-type ChatMessage = {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-};
-
+/**
+ * SubjectAIChatModal.tsx
+ *
+ * Pantalla modal que aloja la interfaz de chat interactivo con la Inteligencia Artificial.
+ * Se encarga de procesar los archivos seleccionados por el usuario (Contexto) al abrirse,
+ * extrayendo texto mediante OCR o cargando transcripciones locales, para luego iniciar
+ * una conversación estilo chat. Mantiene el historial de la conversación usando la API de Groq/Gemini.
+ *
+ * @param isVisible - Estado de visibilidad del modal de chat.
+ * @param onClose - Función ejecutada al cerrar el chat (limpia el estado).
+ * @param selectedItems - Arreglo con la metadata de los archivos seleccionados como contexto.
+ * @param subjectName - Nombre de la materia (usado en el mensaje de bienvenida).
+ */
 export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   isVisible,
   onClose,
@@ -31,6 +41,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   subjectName,
 }) => {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoadingContext, setIsLoadingContext] = useState(false);
@@ -61,7 +72,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           if (item.uri) {
             const base64 = await FileSystem.readAsStringAsync(item.uri, { encoding: FileSystem.EncodingType.Base64 });
             const ocrText = await extractTextFromImage(base64);
-            compiled += ocrText ? ocrText : '(No se pudo extraer texto claro de la imagen)';
+            compiled += ocrText ? ocrText : (t('ai.errors.noClearText') || '(No se pudo extraer texto claro de la imagen)');
           }
         } else if (item.type === 'recording' || item.type === 'video') {
           const transcriptUri = item.rawItem?.transcript_uri;
@@ -74,12 +85,12 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
             const summaryText = await FileSystem.readAsStringAsync(summaryUri);
             compiled += summaryText;
           } else {
-            compiled += '(Aún no hay transcripción generada para este archivo. El estudiante debe transcribirlo primero en su respectiva pantalla.)';
+            compiled += (t('ai.errors.noTranscription') || '(Aún no hay transcripción generada para este archivo. El estudiante debe transcribirlo primero en su respectiva pantalla.)');
           }
         }
       } catch (error) {
         console.error(`Error leyendo contexto para ${item.label}:`, error);
-        compiled += '(Error al leer el archivo local)';
+        compiled += (t('ai.errors.localFileRead') || '(Error al leer el archivo local)');
       }
     }
 
@@ -91,7 +102,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       {
         id: 'welcome',
         role: 'assistant',
-        content: `¡Hola! He analizado los ${selectedItems.length} archivos de contexto de **${subjectName}**.\n\n¿Qué te gustaría saber o repasar sobre esto?`
+        content: t('ai.chatWelcome', { count: selectedItems.length, subject: subjectName }) || `¡Hola! He analizado los ${selectedItems.length} archivos de contexto de **${subjectName}**.\n\n¿Qué te gustaría saber o repasar sobre esto?`
       }
     ]);
   };
@@ -124,30 +135,12 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Error: No pude procesar tu pregunta. ${error.message}`
+        content: t('ai.errors.processFailed', { error: error.message }) || `Error: No pude procesar tu pregunta. ${error.message}`
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsSending(false);
     }
-  };
-
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
-    const isUser = item.role === 'user';
-    return (
-      <View style={[styles.messageBubble, isUser ? styles.messageUser : styles.messageBot]}>
-        {!isUser && (
-          <View style={styles.botIcon}>
-            <MaterialCommunityIcons name="robot-outline" size={16} color={theme.colors.primary} />
-          </View>
-        )}
-        <View style={[styles.messageContent, isUser ? styles.messageContentUser : styles.messageContentBot]}>
-          <Text style={[styles.messageText, isUser ? styles.messageTextUser : styles.messageTextBot]}>
-            {item.content}
-          </Text>
-        </View>
-      </View>
-    );
   };
 
   return (
@@ -160,9 +153,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <MaterialCommunityIcons name="auto-fix" size={20} color={theme.colors.primary} />
-            <Text style={styles.headerTitle}>Tutor IA</Text>
+            <Text style={styles.headerTitle}>{t('ai.tutorTitle') || 'Tutor IA'}</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{selectedItems.length} refs</Text>
+              <Text style={styles.badgeText}>{selectedItems.length} {t('ai.refs') || 'refs'}</Text>
             </View>
           </View>
           <View style={{ width: 40 }} />
@@ -172,9 +165,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         {isLoadingContext ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>Leyendo y consolidando contexto...</Text>
+            <Text style={styles.loadingText}>{t('ai.readingContext') || 'Leyendo y consolidando contexto...'}</Text>
             <Text style={styles.loadingSub}>
-              Procesando {selectedItems.length} archivos para responder tus dudas.
+              {t('ai.processingFiles', { count: selectedItems.length }) || `Procesando ${selectedItems.length} archivos para responder tus dudas.`}
             </Text>
           </View>
         ) : (
@@ -186,7 +179,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
               ref={flatListRef}
               data={messages}
               keyExtractor={i => i.id}
-              renderItem={renderMessage}
+              renderItem={({ item }) => <ChatMessageBubble item={item} />}
               contentContainerStyle={styles.chatList}
               onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
               onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
@@ -197,7 +190,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
               <View style={styles.inputWrapper}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Escribe tu pregunta..."
+                  placeholder={t('ai.placeholderChat') || 'Escribe tu pregunta...'}
                   placeholderTextColor={theme.colors.text.secondary}
                   value={inputText}
                   onChangeText={setInputText}
@@ -226,100 +219,3 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: theme.colors.border,
-  },
-  closeBtn: {
-    width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-  },
-  headerTitle: {
-    fontSize: 18, fontWeight: '800', color: theme.colors.text.primary,
-  },
-  badge: {
-    backgroundColor: `${theme.colors.primary}20`,
-    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, marginLeft: 4,
-  },
-  badgeText: {
-    fontSize: 11, fontWeight: '700', color: theme.colors.primary,
-  },
-  loadingContainer: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12,
-  },
-  loadingText: {
-    fontSize: 16, fontWeight: '700', color: theme.colors.text.primary, marginTop: 8,
-  },
-  loadingSub: {
-    fontSize: 14, color: theme.colors.text.secondary, textAlign: 'center',
-  },
-  chatList: {
-    padding: 16, paddingBottom: 32,
-  },
-  messageBubble: {
-    flexDirection: 'row', marginBottom: 16, alignItems: 'flex-end',
-  },
-  messageUser: {
-    justifyContent: 'flex-end',
-  },
-  messageBot: {
-    justifyContent: 'flex-start',
-  },
-  botIcon: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: `${theme.colors.primary}15`,
-    alignItems: 'center', justifyContent: 'center',
-    marginRight: 8,
-  },
-  messageContent: {
-    maxWidth: '80%', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20,
-  },
-  messageContentUser: {
-    backgroundColor: theme.colors.primary, borderBottomRightRadius: 4,
-  },
-  messageContentBot: {
-    backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border,
-    borderBottomLeftRadius: 4,
-  },
-  messageText: {
-    fontSize: 15, lineHeight: 22,
-  },
-  messageTextUser: {
-    color: '#fff',
-  },
-  messageTextBot: {
-    color: theme.colors.text.primary,
-  },
-  inputContainer: {
-    paddingHorizontal: 16, paddingTop: 12,
-    borderTopWidth: 1, borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
-  },
-  inputWrapper: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 10,
-  },
-  input: {
-    flex: 1, backgroundColor: theme.colors.card,
-    borderWidth: 1, borderColor: theme.colors.border,
-    borderRadius: 24, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
-    fontSize: 15, color: theme.colors.text.primary,
-    maxHeight: 120, minHeight: 48,
-  },
-  sendBtn: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  sendBtnDisabled: {
-    backgroundColor: theme.colors.border,
-  },
-});

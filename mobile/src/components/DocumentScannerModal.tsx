@@ -36,9 +36,26 @@ interface DocumentScannerModalProps {
 
 type ScannerStep = 'guide' | 'saving';
 
-export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({ 
-  isVisible, 
-  onClose, 
+/**
+ * DocumentScannerModal.tsx
+ *
+ * Modal de escaneo de documentos que integra el plugin nativo `react-native-document-scanner-plugin`
+ * para obtener una imagen con corrección automática de perspectiva.
+ * Incluye un paso previo de guía que usa el acelerómetro (`expo-sensors`) para verificar
+ * que el dispositivo esté paralelo al documento antes de disparar el escáner.
+ * Una vez escaneado, ofrece el editor `AdvancedImageEnhancer` para aplicar filtros
+ * (B/N, alto contraste, etc.) y finalmente permite exportar como Imagen o PDF.
+ * También integra OCR vía Groq Vision para extraer texto directamente desde la vista de edición.
+ *
+ * @param isVisible - Controla si el modal está activo.
+ * @param onClose - Callback para cerrar y limpiar el estado de escaneo.
+ * @param subjects - Lista de materias para asignar el documento escaneado.
+ * @param onSave - Callback opcional con la URI final y el ID de materia.
+ * @param onOCR - (Deprecado/opcional) Función externa para extracción de texto.
+ */
+export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
+  isVisible,
+  onClose,
   subjects,
   onSave,
   onOCR
@@ -166,8 +183,8 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
       
       if ((base64Data.length * 3) / 4 > 3.5 * 1024 * 1024) {
         showAlert({ 
-          title: 'Imagen muy grande', 
-          message: `La imagen pesa ~${estimatedMB}MB. Aplica el filtro "B/N OCR" para reducir el tamaño e intenta de nuevo.`, 
+          title: t('common.errors.imageTooLarge') || 'Imagen muy grande', 
+          message: (t('common.errors.imageTooLargeDesc') || `La imagen pesa ~${estimatedMB}MB. Aplica el filtro "B/N OCR" para reducir el tamaño e intenta de nuevo.`), 
           type: 'warning' 
         });
         return;
@@ -176,17 +193,17 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
       const text = await extractTextFromImage(base64Data);
       
       if (!text || text.trim() === '') {
-        showAlert({ title: 'Sin texto', message: 'No se detectó texto en la imagen.', type: 'info' });
+        showAlert({ title: t('common.notice') || 'Sin texto', message: t('common.errors.noTextDetected') || 'No se detectó texto en la imagen.', type: 'info' });
         return;
       }
 
       await Share.share({
-        title: 'Texto extraído de Threshold',
+        title: t('dashboard.documentScannerModal.transcribedText') || 'Texto extraído de Threshold',
         message: text,
       });
     } catch (error: any) {
       console.error('[OCR] Error:', error.message);
-      showAlert({ title: 'Error OCR', message: error.message, type: 'error' });
+      showAlert({ title: t('common.ocrError') || 'Error OCR', message: error.message, type: 'error' });
     } finally {
       setIsProcessing(false);
     }
@@ -294,7 +311,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
                     color={exportFormat === 'image' ? theme.colors.primary : theme.colors.text.secondary}
                   />
                   <Text style={[localStyles.modeBadgeText, exportFormat === 'image' && localStyles.modeBadgeTextActive]}>
-                    {' '}Foto de Galería
+                    {' '}{t('common.photo') || 'Foto de Galería'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -307,7 +324,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
                     color={exportFormat === 'pdf' ? theme.colors.primary : theme.colors.text.secondary}
                   />
                   <Text style={[localStyles.modeBadgeText, exportFormat === 'pdf' && localStyles.modeBadgeTextActive]}>
-                    {' '}Documento PDF
+                    {' '}{t('common.document') || 'Documento PDF'}
                   </Text>
                 </TouchableOpacity>
               </View>

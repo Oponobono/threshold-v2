@@ -25,26 +25,38 @@ interface SubjectInsightsProps {
   onDeleteAssessment?: (id: number) => void;
 }
 
+/**
+ * SubjectInsights.tsx
+ *
+ * Sección de la pantalla de detalle de materia que muestra el historial reciente
+ * de evaluaciones (notas, tareas, exámenes). Cada elemento incluye el nombre,
+ * tipo, peso porcentual, fecha, calificación obtenida y una barra de progreso con
+ * color semántico (verde/naranja/rojo) basado en el porcentaje de logro.
+ * Permite eliminar evaluaciones individuales con confirmación.
+ *
+ * @param recentAssessments - Lista de evaluaciones de la materia para mostrar.
+ * @param onDeleteAssessment - Callback opcional llamado con el ID al eliminar una evaluación.
+ */
 export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessments, onDeleteAssessment }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
 
   const handleDelete = (id: number) => {
     showAlert({
-      title: 'Eliminar nota',
-      message: '¿Estás seguro de que quieres eliminar esta nota/evaluación?',
+      title: t('common.deleteItem') || 'Eliminar',
+      message: t('subjects.deleteAssessmentConfirm') || '¿Estás seguro de que quieres eliminar esta nota/evaluación?',
       type: 'confirm',
       buttons: [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('common.cancel') || 'Cancelar', style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: t('common.delete') || 'Eliminar',
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteAssessment(id);
               onDeleteAssessment?.(id);
             } catch (e: any) {
-              showAlert({ title: 'Error', message: `No se pudo eliminar: ${e.message || 'Error de red'}`, type: 'error' });
+              showAlert({ title: t('common.error') || 'Error', message: (t('common.errors.deleteFailed') || 'No se pudo eliminar: ') + `${e.message || 'Error de red'}`, type: 'error' });
             }
           }
         }

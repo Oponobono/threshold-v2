@@ -17,10 +17,19 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   /* ignore error */
 });
 
+/**
+ * Configuración de navegación de Expo Router. Define la ruta inicial como 'welcome'.
+ */
 export const unstable_settings = {
   initialRouteName: 'welcome',
 };
 
+/**
+ * Componente principal de enrutamiento y layout (RootLayout).
+ * Se encarga de inicializar los proveedores de estado globales (Theme, SafeArea, CustomAlerts),
+ * configurar la navegación en Stack y gestionar el ciclo de vida del Splash Screen
+ * durante la carga inicial de recursos.
+ */
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [appIsReady, setAppIsReady] = useState(false);

@@ -1,0 +1,62 @@
+﻿{
+    "title":  "Crear cuenta",
+    "subtitle":  "Ãšnete a Threshold para organizar mejor tu vida acadÃ©mica.",
+    "confirmPasswordLabel":  "Confirmar contraseÃ±a",
+    "confirmPasswordPlaceholder":  "Reingresa tu contraseÃ±a",
+    "createAccountBtn":  "Registrarse",
+    "alreadyHaveAccount":  "Â¿Ya tienes una cuenta?",
+    "login":  "Iniciar sesiÃ³n",
+    "passwordRequirements":  "La contraseÃ±a no cumple los criterios.",
+    "passwordValid":  "La contraseÃ±a cumple los requisitos.",
+    "passwordMismatch":  "Las contraseÃ±as no coinciden.",
+    "passwordMatch":  "Las contraseÃ±as coinciden.",
+    "invalidCharacters":  "Contiene caracteres invÃ¡lidos.",
+    "invalidEmail":  "Por favor, ingresa un correo vÃ¡lido.",
+    "reqTitle":  "La contraseÃ±a debe contener:",
+    "reqLength":  "Al menos 8 caracteres",
+    "reqUpper":  "Una letra mayÃºscula",
+    "reqNumber":  "Un nÃºmero",
+    "reqSpecial":  "Un carÃ¡cter especial (@$!%*?\u0026)",
+    "errors":  {
+                   "registerTitle":  "Error de registro",
+                   "generic":  "No pudimos crear tu cuenta ahora. IntÃ©ntalo de nuevo."
+               },
+    "success":  {
+                    "accountCreated":  "Tu cuenta estÃ¡ lista. Â¡Bienvenido a Threshold!"
+                },
+    "examplePrefix":  "Ej:",
+    "actions":  {
+                    "continue":  "Continuar",
+                    "skipAndContinue":  "Omitir y continuar"
+                },
+    "step1":  {
+                  "title":  "Configura tu perfil",
+                  "subtitle":  "Comencemos con tu nombre para personalizar tu experiencia.",
+                  "firstNameLabel":  "Nombre(s)",
+                  "firstNamePlaceholder":  "Ej: MarÃ­a",
+                  "lastNameLabel":  "Apellido(s)",
+                  "lastNamePlaceholder":  "Ej: SÃ¡nchez",
+                  "usernameLabel":  "Usuario o apodo",
+                  "usernamePlaceholder":  "Ej: marias99"
+              },
+    "step2":  {
+                  "title":  "Preferencias de calificaciÃ³n",
+                  "subtitle":  "CuÃ©ntanos cÃ³mo califica tu universidad para mostrar tu avance correctamente.",
+                  "gradingScaleLabel":  "Escala de calificaciÃ³n",
+                  "approvalThresholdLabel":  "Â¿CuÃ¡l es la nota mÃ­nima para aprobar?"
+              },
+    "step3":  {
+                  "title":  "Contexto acadÃ©mico",
+                  "subtitle":  "Esto nos ayuda a adaptar tu panel. Puedes omitirlo por ahora.",
+                  "majorLabel":  "Carrera / especialidad (opcional)",
+                  "majorPlaceholder":  "Ej: IngenierÃ­a de Software",
+                  "universityLabel":  "Universidad / instituciÃ³n (opcional)",
+                  "universityPlaceholder":  "Ej: Universidad Nacional",
+                  "emptyState":  "Agrega tu universidad para recibir recomendaciones mÃ¡s Ãºtiles despuÃ©s."
+              },
+    "step4":  {
+                  "title":  "Protege tu cuenta",
+                  "subtitle":  "Ãšltimo paso. Crea tu acceso para mantener tu informaciÃ³n segura.",
+                  "finishBtn":  "Crear cuenta"
+              }
+}

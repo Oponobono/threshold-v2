@@ -4,6 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { welcomeStyles as styles } from '../src/styles/Welcome.styles';
 
+/**
+ * Pantalla de bienvenida (WelcomeScreen).
+ * Renderiza la animación inicial de presentación de la app (logo, título y eslogan)
+ * usando Animated de React Native. Después de un temporizador de ~2.8s, redirige
+ * automáticamente al usuario hacia la pantalla de `/login`.
+ */
 export default function WelcomeScreen() {
   const router = useRouter();
 

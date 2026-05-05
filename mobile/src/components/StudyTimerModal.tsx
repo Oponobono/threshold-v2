@@ -16,10 +16,26 @@ interface StudyTimerModalProps {
   onSaveFeedback: (feedback: string) => void;
 }
 
-export const StudyTimerModal: React.FC<StudyTimerModalProps> = ({ 
-  isVisible, 
-  onClose, 
-  subjects, 
+/**
+ * StudyTimerModal.tsx
+ *
+ * Modal de configuración/feedback del temporizador de estudio. Opera en dos vistas:
+ * - `config`: Permite elegir el modo (Pomodoro o Threshold), la duración en minutos
+ *   (solo Pomodoro) y la materia activa. Al confirmar dispara `onStart`.
+ * - `feedback`: Aparece al terminar una sesión, preguntando al alumno cómo siente
+ *   su avance mediante botones de opciones predefinidas traducidas via i18n.
+ *
+ * @param isVisible - Controla la visibilidad del Bottom Sheet.
+ * @param onClose - Callback para cerrar el modal.
+ * @param subjects - Lista de materias disponibles para seleccionar.
+ * @param onStart - Callback con la configuración final (modo, materia, duración en segundos).
+ * @param viewState - Vista activa del modal ('config' | 'feedback').
+ * @param onSaveFeedback - Callback con la opción de feedback seleccionada al finalizar.
+ */
+export const StudyTimerModal: React.FC<StudyTimerModalProps> = ({
+  isVisible,
+  onClose,
+  subjects,
   onStart,
   viewState = 'config',
   onSaveFeedback

@@ -25,6 +25,20 @@ interface ImageViewerModalProps {
   onPhotoDeleted: (id: number) => void;
 }
 
+/**
+ * ImageViewerModal.tsx
+ *
+ * Modal de pantalla completa para visualizar imágenes en un carrusel deslizable (FlatList).
+ * Permite al usuario deslizar horizontalmente entre fotos. Incluye controles superiores
+ * para compartir nativamente la foto, extraer su texto mediante OCR (Inteligencia Artificial),
+ * y eliminarla. Si se detecta texto (OCR), se despliega un panel inferior interactivo.
+ *
+ * @param isVisible - Define si el modal visor de fotos está abierto o no.
+ * @param photos - Arreglo de fotos con sus URIs locales para ser visualizadas.
+ * @param initialIndex - Índice de la foto desde la cual iniciar el carrusel.
+ * @param onClose - Función ejecutada al cerrar el modal visor.
+ * @param onPhotoDeleted - Callback invocado exitosamente al borrar una foto de la galería.
+ */
 export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   isVisible,
   photos,
@@ -77,13 +91,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
       const text = await extractTextFromImage(base64Data);
       
       if (!text || text.trim() === '') {
-        showAlert({ title: 'Aviso', message: 'No se detectó texto en la imagen.', type: 'info' });
+        showAlert({ title: t('common.notice') || 'Aviso', message: t('common.errors.noTextDetected') || 'No se detectó texto en la imagen.', type: 'info' });
         return;
       }
 
       setExtractedText(text);
     } catch (error: any) {
-      showAlert({ title: 'Error OCR', message: error.message, type: 'error' });
+      showAlert({ title: t('common.ocrError') || 'Error OCR', message: error.message, type: 'error' });
     } finally {
       setIsProcessing(false);
     }
@@ -191,7 +205,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
               style={styles.ocrCopyButton}
               onPress={async () => {
                 await Clipboard.setStringAsync(extractedText);
-                showAlert({ title: t('common.success') || 'Copiado', message: 'Texto copiado al portapapeles', type: 'success' });
+                showAlert({ title: t('common.success') || 'Copiado', message: t('common.copiedToClipboard') || 'Texto copiado al portapapeles', type: 'success' });
               }}
             >
               <Ionicons name="copy-outline" size={20} color={theme.colors.white} style={{ marginRight: 8 }} />

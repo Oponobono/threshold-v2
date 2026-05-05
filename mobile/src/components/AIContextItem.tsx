@@ -27,6 +27,19 @@ const ICON_MAP: Record<AIContextItemType, { icon: string; color: string; bg: str
   video:    { icon: 'youtube',                color: '#EF4444', bg: '#EF444420' },
 };
 
+/**
+ * AIContextItem.tsx
+ *
+ * Tarjeta individual (Card) para un archivo elegible dentro del flujo de IA.
+ * Renderiza visualmente el contenido del archivo dependiendo de su tipo:
+ * las fotos y videos muestran una miniatura (`thumbnailUrl` o `uri`), mientras que
+ * los audios y documentos muestran iconos vectoriales.
+ * Actúa como un botón toggleable (checkbox).
+ *
+ * @param item - Objeto con la información estructurada del archivo (ID, título, URI, tipo).
+ * @param isSelected - Si el archivo fue marcado para ser enviado como contexto.
+ * @param onToggle - Función de callback que se dispara al presionar la tarjeta.
+ */
 export const AIContextItem: React.FC<AIContextItemProps> = ({ item, isSelected, onToggle }) => {
   const meta = ICON_MAP[item.type];
 

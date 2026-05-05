@@ -15,6 +15,19 @@ interface RecordingAITabsProps {
   hasSummary: boolean;
 }
 
+/**
+ * RecordingAITabs.tsx
+ *
+ * Fila de botones o pestañas para alternar entre "Transcripción" y "Resumen".
+ * Bloquea el botón de resumen si la transcripción no existe, informando al usuario
+ * que primero debe transcribir el material para resumirlo.
+ *
+ * @param activeTab - Cual pestaña está siendo visualizada.
+ * @param onTabPress - Callback de navegación entre pestañas.
+ * @param onSummaryPress - Se ejecuta si el usuario presiona "Resumen" sin tenerlo generado.
+ * @param hasTranscription - Boolean que indica si el documento base (transcripción) ya existe.
+ * @param hasSummary - Boolean que indica si el resumen ya fue generado previamente.
+ */
 export const RecordingAITabs: React.FC<RecordingAITabsProps> = ({
   activeTab,
   onTabPress,

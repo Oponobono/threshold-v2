@@ -112,6 +112,24 @@ function mergeLocalAndDb(
 // ─────────────────────────────────────────────────────────────────────────────
 // Hook
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * useAudioRecorder
+ *
+ * Hook central para la gestión del ciclo completo de grabaciones de voz.
+ * Implementa una estrategia offline-first:
+ * 1. Muestra inmediatamente los archivos `.m4a` almacenados localmente.
+ * 2. En segundo plano sincroniza con la BD del servidor (metadatos enriquecidos).
+ * 3. Los archivos locales sin registro en BD se sincronizan automáticamente.
+ * 4. Los registros en BD cuyos archivos físicos ya no existen se marcan como `missingFile`.
+ *
+ * Expone el estado y los controladores necesarios para:
+ * - Iniciar, pausar, reanudar y detener una grabación (`expo-av`).
+ * - Reproducir y detener un audio de la lista.
+ * - Eliminar una grabación del sistema de archivos y de la BD.
+ *
+ * @returns Objeto con el estado de la grabación activa, la lista de audios,
+ *          métricas en tiempo real (duración, decibelios) y todas las funciones de control.
+ */
 export function useAudioRecorder() {
   const { t } = useTranslation();
 

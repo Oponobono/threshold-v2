@@ -14,6 +14,20 @@ interface SubjectRecentRecordingsProps {
   deleteRecording: (id: string | number, uri: string) => void;
 }
 
+/**
+ * SubjectRecentRecordings.tsx
+ *
+ * Muestra una lista apilada verticalmente de los últimos audios (notas de voz)
+ * grabados para una materia en específico dentro del dashboard de la materia.
+ * Utiliza internamente `AudioPlayerItem` para renderizar los controles de reproducción
+ * de cada elemento.
+ *
+ * @param recentRecordings - Arreglo de grabaciones de audio limitadas a la materia.
+ * @param playingId - ID del audio que se está reproduciendo actualmente.
+ * @param playSound - Función para iniciar la reproducción nativa del audio.
+ * @param stopSound - Función para detener la reproducción actual.
+ * @param deleteRecording - Función para eliminar el audio (física y lógicamente).
+ */
 export const SubjectRecentRecordings: React.FC<SubjectRecentRecordingsProps> = ({
   recentRecordings,
   playingId,

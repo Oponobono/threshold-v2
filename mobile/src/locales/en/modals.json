@@ -1,0 +1,28 @@
+﻿{
+    "cancel":  "Cancel",
+    "save":  "Save",
+    "select":  "Select",
+    "retake":  "Retake",
+    "editScan":  "Edit Scan",
+    "exportFormat":  "Export format",
+    "durationMinutes":  "Duration (minutes)",
+    "selectYear":  "Select Year",
+    "deleteDeck":  "Delete Deck",
+    "deleteDeckConfirm":  "Are you sure you want to delete the deck \"{{title}}\"? This action cannot be undone.",
+    "deleteCard":  "Delete Card",
+    "deleteCardConfirm":  "Are you sure you want to delete this card?",
+    "shared":  "Shared",
+    "shareDeck":  "Share deck",
+    "shareDeckDesc":  "Enter the PIN of the user you want to share \"{{title}}\" with.",
+    "pinPlaceholder":  "e.g. ABC123",
+    "sharing":  "Sharing...",
+    "share":  "Share",
+    "filters":  {
+                    "prefix":  "Filter: ",
+                    "smartEnhancements":  "Smart Enhancements",
+                    "original":  "Original",
+                    "magic":  "Magic Text",
+                    "bw":  "B\u0026W OCR",
+                    "grayscale":  "Grayscale"
+                }
+}

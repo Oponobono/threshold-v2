@@ -1,3 +1,12 @@
+/**
+ * youtube.ts
+ *
+ * Servicio CRUD para videos de YouTube vinculados al usuario.
+ * Los videos se enlazan (no se descargan) guardando solo la URL y metadatos.
+ * Los subtítulos se obtienen desde el backend Python que envuelve la API de YouTube
+ * (`youtube-transcript-api`), lo que es más rápido que transcribir el audio con Whisper.
+ * Las transcripciones y resúmenes generados se persisten como archivos locales.
+ */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { YouTubeVideo } from './types';
@@ -73,7 +82,8 @@ export const deleteYouTubeVideo = async (id: number) => {
 };
 
 /**
- * Upsert para guardar rutas de transcripciones/resúmenes de videos
+ * Crea o actualiza las URIs de transcripción y resumen de un video.
+ * Usa upsert: si ya existe un registro para `video_id`, lo actualiza.
  */
 export const upsertYouTubeTranscript = async (payload: {
   video_id: number;
@@ -95,7 +105,9 @@ export const upsertYouTubeTranscript = async (payload: {
 };
 
 /**
- * Obtiene subtítulos de un video de YouTube
+ * Obtiene los subtítulos de un video de YouTube desde el backend.
+ * @param videoId - ID de YouTube del video (ej. `dQw4w9WgXcQ`).
+ * @param language - Código de idioma preferido (por defecto 'es').
  */
 export const getYouTubeSubtitles = async (videoId: string, language: string = 'es'): Promise<{ captions: string; language: string }> => {
   const response = await fetchWithFallback('/youtube-captions', {

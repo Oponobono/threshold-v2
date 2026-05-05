@@ -1,6 +1,17 @@
+/**
+ * client.ts
+ *
+ * Núcleo HTTP de la capa de servicios. Centraliza la lógica de:
+ * - Detección automática de la IP LAN del servidor en desarrollo.
+ * - Construcción de las URLs base de la API (soporta varios puertos y env. de producción).
+ * - `fetchWithFallback`: intenta todos los candidatos de URL en orden, rotando
+ *   el servidor activo para las llamadas siguientes si uno falla.
+ * - `parseJsonSafely`: evita que errores de parseo de JSON rompan el flujo.
+ */
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+/** Valida que un string tenga formato de dirección IPv4 válida */
 export const isValidIpv4 = (value: string): boolean => {
   const parts = value.split('.');
   if (parts.length !== 4) return false;
@@ -12,6 +23,7 @@ export const isValidIpv4 = (value: string): boolean => {
   });
 };
 
+/** Devuelve `true` si la IP pertenece a un rango privado LAN (10.x, 192.168.x, 172.16-31.x) */
 export const isPrivateLanIpv4 = (value: string): boolean => {
   if (!isValidIpv4(value)) return false;
 
@@ -25,6 +37,7 @@ export const isPrivateLanIpv4 = (value: string): boolean => {
   return false;
 };
 
+/** Extrae la IP LAN del host de Expo Metro para determinar la dirección del servidor de desarrollo */
 export const getExpoHostIp = (): string | null => {
   if (Platform.OS === 'web') {
     return window.location.hostname || '127.0.0.1';
@@ -68,6 +81,11 @@ export let activeBaseUrl = API_BASE_URLS[0];
 
 export const buildApiError = (message: string): Error => new Error(message);
 
+/**
+ * Realiza la petición HTTP probándolas todas las URLs base en orden.
+ * Si la URL activa falla, prueba las alternativas y actualiza `activeBaseUrl`
+ * con la que responda para que las siguientes peticiones usen esa directamente.
+ */
 export const fetchWithFallback = async (path: string, init?: RequestInit): Promise<Response> => {
   const candidates = [
     activeBaseUrl,
@@ -89,6 +107,7 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
   throw lastError || buildApiError('No se pudo conectar con el servidor.');
 };
 
+/** Deserializa el cuerpo JSON de una `Response`. Retorna `null` si el cuerpo está vacío o es inválido */
 export const parseJsonSafely = async (response: Response) => {
   try {
     return await response.json();

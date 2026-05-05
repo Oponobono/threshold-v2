@@ -1,0 +1,12 @@
+﻿{
+    "title":  "Videos",
+    "loadingList":  "Cargando videos...",
+    "loading":  "Cargando video...",
+    "errors":  {
+                   "groqApiKeyMissing":  "Falta la API Key de Groq en el archivo .env.local",
+                   "videoIdNotFound":  "No se encontrÃ³ el ID del video. Por favor intenta recargar.",
+                   "captionsFetchFailed":  "No se pudieron obtener los subtÃ­tulos del video. Es posible que:\nâ€¢ El video no tenga subtÃ­tulos disponibles\nâ€¢ El video sea privado o no exista\nâ€¢ Hay problemas de conectividad",
+                   "summaryFailed":  "Error al generar el resumen.",
+                   "videoLoadFailed":  "No se pudo cargar el video. Intenta abrirlo directamente en YouTube."
+               }
+}

@@ -31,12 +31,18 @@ Todas las rutas de la API comienzan con `/api`. A continuación, se describen lo
 ### `/api/flashcards`
 - Modulo CRUD completo para mazos (`Decks`) y tarjetas (`Cards`).
 - **Endpoint Especial**: Sistema de compartición. Permite asociar a otros usuarios mediante el uso de un `PIN` único generado por el propietario del mazo.
+- **Generación por IA**: Endpoints `/flashcard-decks/generate-from-text` y `/flashcard-decks/generate-from-image` que utilizan Groq y Groq Vision para crear automáticamente mazos de estudio a partir de texto o imágenes (OCR).
 
 ### `/api/scanned_documents` y `/api/gallery`
 - Interacción con los recursos multimedia del estudiante.
 - Guarda la URI local del almacenamiento del dispositivo en la base de datos (PostgreSQL), vinculando el archivo al usuario y materia correcta.
 - **OCR Integrado**: Proporciona el texto extraído (`ocr_text`) de las imágenes o PDFs guardados para su uso posterior.
 
-### `/api/audio`
-- Guarda información de grabaciones de clase en formato `.m4a` (AAC).
+### `/api/audio` y `/api/youtube-videos`
+- Guarda información de grabaciones de clase en formato `.m4a` (AAC) o enlaces de YouTube.
 - Contiene los campos de texto para **Transcripción** (Speech-to-Text) y **Resumen de IA** procesado por LLMs de Groq.
+- **YouTube Captions**: Permite extraer automáticamente los subtítulos de videos de YouTube para procesarlos con IA.
+
+### `/api/ai`
+- **Chat Tutor**: Endpoint `/ai/chat` que permite interactuar con un modelo de lenguaje (Llama 3) alimentado con el contexto de los documentos, grabaciones y videos del estudiante.
+- Implementa RAG (Retrieval-Augmented Generation) para responder preguntas específicas sobre el contenido académico del usuario.

@@ -34,6 +34,27 @@ interface EditableCard {
   isDeleted?: boolean;
 }
 
+/**
+ * FlashcardCreatorModal.tsx
+ *
+ * Modal de generación automática de flashcards usando el LLM de Groq.
+ * Flujo de 3 pasos internos:
+ * 1. `input`: El usuario define cuántas tarjetas desea generar.
+ * 2. `preview`: Se muestran las tarjetas generadas para edición/eliminación antes de confirmar.
+ * 3. `complete`: Pantalla de éxito transitoria antes de cerrar el modal.
+ * Acepta contenido de tipo texto (transcripciones/resúmenes) o imagen en base64 para
+ * la generación contextual de las tarjetas educativas.
+ *
+ * @param visible - Controla la visibilidad del modal.
+ * @param onClose - Callback para cerrar y limpiar el estado.
+ * @param onSuccess - Callback ejecutado con el ID del mazo creado al finalizar.
+ * @param content - Texto de transcripción o resumen como fuente de contexto.
+ * @param imageBase64 - Imagen codificada en base64 como fuente alternativa de contexto.
+ * @param contentType - Tipo de fuente: 'recording', 'video', 'image' o 'document'.
+ * @param title - Título sugerido para el mazo de flashcards.
+ * @param subjectId - ID de la materia a la que pertenecerá el mazo.
+ * @param userId - ID del usuario propietario del mazo.
+ */
 export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
   visible,
   onClose,

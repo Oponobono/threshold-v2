@@ -1,3 +1,13 @@
+/**
+ * types.ts
+ *
+ * Definiciones de tipos e interfaces compartidas por toda la capa de servicios.
+ * Este archivo es la fuente de verdad de las entidades del dominio Threshold:
+ * usuarios, materias, evaluaciones, fotos, horarios, mazos y tarjetas flash,
+ * grabaciones de audio y videos de YouTube.
+ */
+
+/** Perfil académico completo del usuario autenticado */
 export type UserProfile = {
   id: number;
   email: string;
@@ -14,6 +24,7 @@ export type UserProfile = {
   display_name?: string | null;
 };
 
+/** Materia académica del usuario (curso o asignatura) */
 export type Subject = {
   id: number;
   user_id: number;
@@ -28,6 +39,7 @@ export type Subject = {
   completion_percent?: number | null;
 };
 
+/** Evaluación académica: nota, tarea o examen de una materia */
 export type Assessment = {
   id?: number;
   subject_id: number;
@@ -42,6 +54,7 @@ export type Assessment = {
   is_completed?: boolean;
 };
 
+/** Foto de la galería vinculada a una materia */
 export type Photo = {
   id?: number;
   subject_id: number;
@@ -50,6 +63,7 @@ export type Photo = {
   es_favorita?: number;
 };
 
+/** Bloque de clase semanal de una materia (día, hora de inicio y fin) */
 export type Schedule = {
   id: number;
   subject_id: number;
@@ -60,6 +74,7 @@ export type Schedule = {
   color?: string;
 };
 
+/** Mazo de tarjetas flash con metadatos de progreso por estado (new/learning/review) */
 export interface FlashcardDeck {
   id: number;
   user_id?: number;
@@ -78,6 +93,7 @@ export interface FlashcardDeck {
   owner_name?: string;
 }
 
+/** Tarjeta individual de un mazo con su contenido frontal/reverso y estado de repaso */
 export interface Flashcard {
   id: number;
   deck_id: number;
@@ -87,6 +103,7 @@ export interface Flashcard {
   created_at: string;
 }
 
+/** Grabación de audio (.m4a) con sus rutas locales de transcripción y resumen */
 export interface AudioRecording {
   id?: number;
   user_id: number;
@@ -102,6 +119,7 @@ export interface AudioRecording {
   summary_uri?: string;
 }
 
+/** Video de YouTube enlazado con sus rutas locales de transcripción y resumen */
 export interface YouTubeVideo {
   id?: number;
   user_id: number;

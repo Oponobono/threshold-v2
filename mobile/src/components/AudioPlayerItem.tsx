@@ -15,6 +15,21 @@ interface AudioPlayerItemProps {
   onPress?: () => void;
 }
 
+/**
+ * AudioPlayerItem.tsx
+ *
+ * Fila o tarjeta de lista que representa un archivo de audio/grabación.
+ * Contiene controles internos para reproducir/pausar la grabación usando llamadas a funciones prop.
+ * Soporta un modo "Missing File" donde desactiva la reproducción y cambia a un estado de error visual
+ * en caso de que la ruta física del audio ya no exista en el dispositivo.
+ *
+ * @param item - Objeto con datos de la grabación (nombre, fecha, URI, info de la materia).
+ * @param isPlaying - Estado boleano que indica si este audio es el que está sonando actualmente.
+ * @param onPlay - Callback para ordenar al reproductor nativo iniciar este `uri`.
+ * @param onStop - Callback para pausar/detener el audio en curso.
+ * @param onDelete - Callback para confirmar y ejecutar la eliminación de la grabación.
+ * @param onPress - (Opcional) Función al presionar toda la fila, útil para navegar a detalles.
+ */
 export const AudioPlayerItem: React.FC<AudioPlayerItemProps> = ({
   item,
   isPlaying,

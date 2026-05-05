@@ -1,0 +1,62 @@
+﻿{
+    "title":  "Create Account",
+    "subtitle":  "Join Threshold today to start organizing your study life.",
+    "confirmPasswordLabel":  "Confirm Password",
+    "confirmPasswordPlaceholder":  "Re-enter your password",
+    "createAccountBtn":  "Sign Up",
+    "alreadyHaveAccount":  "Already have an account?",
+    "login":  "Log in",
+    "passwordRequirements":  "Password does not meet criteria.",
+    "passwordValid":  "Password meets all requirements.",
+    "passwordMismatch":  "Passwords do not match.",
+    "passwordMatch":  "Passwords match.",
+    "invalidCharacters":  "Contains invalid characters.",
+    "invalidEmail":  "Please enter a valid email address.",
+    "reqTitle":  "Password must contain:",
+    "reqLength":  "At least 8 characters",
+    "reqUpper":  "One uppercase letter",
+    "reqNumber":  "One number",
+    "reqSpecial":  "One special character (@$!%*?\u0026)",
+    "errors":  {
+                   "registerTitle":  "Registration Error",
+                   "generic":  "We could not create your account right now. Please try again."
+               },
+    "success":  {
+                    "accountCreated":  "Your account is ready. Welcome to Threshold!"
+                },
+    "examplePrefix":  "Ex:",
+    "actions":  {
+                    "continue":  "Continue",
+                    "skipAndContinue":  "Skip and continue"
+                },
+    "step1":  {
+                  "title":  "Set Up Your Profile",
+                  "subtitle":  "Let\u0027s start with your name so we can personalize your experience.",
+                  "firstNameLabel":  "First name",
+                  "firstNamePlaceholder":  "Ex: Maria",
+                  "lastNameLabel":  "Last name",
+                  "lastNamePlaceholder":  "Ex: Sanchez",
+                  "usernameLabel":  "Username or nickname",
+                  "usernamePlaceholder":  "Ex: marias99"
+              },
+    "step2":  {
+                  "title":  "Grading Preferences",
+                  "subtitle":  "Tell us how your school grades so we can calculate your progress correctly.",
+                  "gradingScaleLabel":  "Grading scale",
+                  "approvalThresholdLabel":  "What is the minimum passing grade?"
+              },
+    "step3":  {
+                  "title":  "Academic Context",
+                  "subtitle":  "This helps us tailor your dashboard. You can skip it for now.",
+                  "majorLabel":  "Major / program (optional)",
+                  "majorPlaceholder":  "Ex: Software Engineering",
+                  "universityLabel":  "University / institution (optional)",
+                  "universityPlaceholder":  "Ex: National University",
+                  "emptyState":  "Add your university to get more relevant recommendations later."
+              },
+    "step4":  {
+                  "title":  "Secure Your Account",
+                  "subtitle":  "Final step. Create your login to protect your information.",
+                  "finishBtn":  "Create Account"
+              }
+}

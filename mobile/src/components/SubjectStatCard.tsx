@@ -11,6 +11,19 @@ interface SubjectStatCardProps {
   color: string;
 }
 
+/**
+ * SubjectStatCard.tsx
+ *
+ * Componente visual tipo "tarjeta" utilizado en el dashboard de una materia para
+ * mostrar una estadística rápida (ej. porcentaje completado, promedio actual).
+ * Renderiza un ícono con fondo translúcido, un valor central grande y notas adicionales.
+ *
+ * @param icon - Nombre del ícono de Ionicons a mostrar.
+ * @param label - Título o etiqueta de la estadística (ej. "Promedio").
+ * @param value - Valor principal a destacar (ej. "4.5").
+ * @param note - Nota secundaria o texto de tendencia.
+ * @param color - Color base hexadecimal que teñirá el ícono y su fondo.
+ */
 export const SubjectStatCard: React.FC<SubjectStatCardProps> = ({
   icon,
   label,

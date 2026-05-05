@@ -11,6 +11,17 @@ interface SubjectStatsProps {
   deliveredText: string;
 }
 
+/**
+ * SubjectStats.tsx
+ *
+ * Agrupa y muestra un conjunto de métricas (estadísticas) clave para una materia
+ * dentro de su vista de detalle. Compone tres instancias de `SubjectStatCard`
+ * para ilustrar el promedio actual, la proyección y la cantidad de tareas entregadas.
+ *
+ * @param averageGrade - Promedio de notas ponderado (ej. 4.2).
+ * @param projectedGrade - Nota proyectada si continúa la misma tendencia.
+ * @param deliveredText - Texto que indica el ratio de tareas entregadas (ej. "3/5").
+ */
 export const SubjectStats: React.FC<SubjectStatsProps> = ({
   averageGrade,
   projectedGrade,

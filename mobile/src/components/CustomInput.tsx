@@ -11,16 +11,30 @@ interface CustomInputProps extends TextInputProps {
   isPassword?: boolean;
 }
 
-export const CustomInput: React.FC<CustomInputProps> = ({ 
-  label, 
-  error, 
-  success, 
+/**
+ * CustomInput.tsx
+ *
+ * Campo de entrada de texto reutilizable con etiqueta flotante animada ("Floating Label").
+ * Al hacer foco o al escribir, la etiqueta sube y reduce su tamaño mediante interpolaciones
+ * de `Animated`. Soporta validación visual a través de los props `error` y `success`
+ * que colorean el borde. En modo contraseña (`isPassword`) muestra un ícono de ojo
+ * para alternar la visibilidad del texto.
+ *
+ * @param label - Texto de la etiqueta flotante (placeholder inteligente).
+ * @param error - Mensaje de error que colorea el borde en rojo y se muestra debajo.
+ * @param success - Mensaje de éxito que colorea el borde en verde (tiene prioridad sobre `error`).
+ * @param isPassword - Activa el modo contraseña con botón de visibilidad.
+ */
+export const CustomInput: React.FC<CustomInputProps> = ({
+  label,
+  error,
+  success,
   isPassword,
   secureTextEntry,
   value,
   onFocus,
   onBlur,
-  ...props 
+  ...props
 }) => {
   const [isSecure, setIsSecure] = useState(isPassword || secureTextEntry);
   const [isFocused, setIsFocused] = useState(false);

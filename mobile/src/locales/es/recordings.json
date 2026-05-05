@@ -1,0 +1,23 @@
+﻿{
+    "title":  "Grabaciones",
+    "multimedia":  "Multimedia",
+    "loadingList":  "Cargando grabaciones...",
+    "loading":  "Cargando grabaciÃ³n...",
+    "errors":  {
+                   "playbackFailed":  "No se pudo reproducir el audio.",
+                   "groqApiKeyMissing":  "Falta la API Key de Groq en el archivo .env.local",
+                   "noVoiceDetected":  "Whisper no detectÃ³ voz en el audio.",
+                   "transcriptionFailed":  "Error al transcribir el audio.",
+                   "summaryFailed":  "Error al generar el resumen."
+               },
+    "addYoutubeVideo":  "AÃ±adir Video de YouTube",
+    "youtubeLinkPrompt":  "Pega el enlace del video para transcribirlo.",
+    "youtubePlaceholder":  "https://www.youtube.com/watch?v=...",
+    "cancel":  "Cancelar",
+    "startTranscription":  "Iniciar transcripciÃ³n",
+    "startSummary":  "Iniciar resumen",
+    "searchPlaceholder":  "Buscar grabaciones o videos...",
+    "filterAll":  "Todo",
+    "filterAudio":  "Audio",
+    "filterVideo":  "Video"
+}
