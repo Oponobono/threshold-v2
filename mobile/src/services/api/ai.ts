@@ -26,6 +26,9 @@ export const sendAIChatMessage = async (
     // Obtener el proveedor preferido si no se especifica
     const selectedProvider = provider || (await getPreferredLLMProvider());
     
+    console.log(`[AI Service] 📡 Enviando a ${selectedProvider}...`);
+    console.log(`[AI Service] Mensajes: ${messages.length}, Context: ${contextText?.length || 0} chars`);
+
     const response = await fetchWithFallback(`/ai/chat?provider=${selectedProvider}`, {
       method: 'POST',
       headers: {
@@ -40,14 +43,25 @@ export const sendAIChatMessage = async (
     });
     
     const data = await parseJsonSafely(response);
+    
     if (!response.ok) {
-      const error: any = new Error(data?.error || 'Error al comunicarse con la IA');
+      console.error(`[AI Service] ❌ Error ${response.status}:`, data);
+      const error: any = new Error(data?.error || `Error ${response.status} del servidor`);
       error.details = data?.details;
       error.provider = data?.provider;
+      error.status = response.status;
       throw error;
     }
+    
+    console.log(`[AI Service] ✅ Respuesta exitosa`);
     return data;
   } catch (error: any) {
+    console.error(`[AI Service] Error completo:`, {
+      message: error.message,
+      status: error.status,
+      details: error.details,
+      provider: error.provider,
+    });
     throw new Error(error.message || 'Error de red al intentar chatear con la IA');
   }
 };

@@ -66,6 +66,10 @@ async function callGeminiAPI(messages, systemPrompt) {
   }
 
   try {
+    console.log('[callGeminiAPI] 🤖 Iniciando...');
+    console.log('[callGeminiAPI] Mensajes:', messages.length);
+    console.log('[callGeminiAPI] System prompt length:', systemPrompt?.length || 0);
+
     // Usar el nuevo servicio de Gemini con mejor manejo
     const result = await processAcademicChat(
       '',  // contextText ya está en systemPrompt
@@ -73,14 +77,21 @@ async function callGeminiAPI(messages, systemPrompt) {
       systemPrompt
     );
     
+    console.log('[callGeminiAPI] ✅ Respuesta exitosa');
+
     return {
       provider: 'gemini',
       reply: { role: 'assistant', content: result.content },
       duration: 0,
     };
   } catch (error) {
-    console.error('[Gemini] Error:', error.message);
-    throw error;
+    console.error('[callGeminiAPI] ❌ Error detallado:', {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      fullError: error
+    });
+    throw new Error(`[Gemini] ${error.message}`);
   }
 }
 

@@ -211,26 +211,33 @@ async function processAcademicChat(contextText, messages, systemPrompt) {
     });
 
     // Convertir formato OpenAI a formato Gemini
+    // ⚠️ IMPORTANTE: El último mensaje debe ser del usuario para sendMessage()
     const contents = [];
 
-    // Agregar mensajes previos
-    for (const msg of messages) {
-      contents.push({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.content }],
-      });
+    // Agregar todos los mensajes EXCEPTO el último
+    if (messages.length > 1) {
+      for (let i = 0; i < messages.length - 1; i++) {
+        const msg = messages[i];
+        contents.push({
+          role: msg.role === "user" ? "user" : "model",
+          parts: [{ text: msg.content }],
+        });
+      }
     }
 
-    // Iniciar chat
+    // Iniciar chat con el histórico
     const chat = model.startChat({ history: contents });
 
-    // No necesitamos enviar el último mensaje, solo iniciar la sesión
-    const result = await chat.sendMessage(
-      `Contexto: ${contextText.substring(0, 10000)}`
-    );
+    // Enviar el último mensaje del usuario
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.role !== "user") {
+      throw new Error("El último mensaje debe ser del usuario");
+    }
+
+    const result = await chat.sendMessage(lastMsg.content);
 
     const responseText = result.response.text();
-    console.log(`[Gemini] Respuesta de chat generada`);
+    console.log(`[Gemini] ✅ Respuesta de chat generada (${responseText.length} chars)`);
 
     return {
       content: responseText,
@@ -238,7 +245,7 @@ async function processAcademicChat(contextText, messages, systemPrompt) {
       provider: "gemini",
     };
   } catch (error) {
-    console.error(`[Gemini] Error en chat académico:`, error.message);
+    console.error(`[Gemini] ❌ Error en chat académico:`, error.message);
     throw error;
   }
 }
