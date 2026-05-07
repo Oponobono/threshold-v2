@@ -21,6 +21,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { sendAIChatMessage, getChatHistory, clearChatHistory } from '../services/api/ai';
+import { LLMProvider, getPreferredLLMProvider } from '../utils/llmProviderManager';
 
 // ─── Tokens de color (misma paleta que SubjectAIContextModal) ─────────────────
 const PRIMARY  = '#7B72FF';
@@ -136,16 +137,21 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [isTruncated, setIsTruncated] = useState(false);
+  const [currentProvider, setCurrentProvider] = useState<LLMProvider>('groq');
 
-  /** Cargar historial cuando se abre el modal */
+  /** Cargar historial y preferencia de proveedor cuando se abre el modal */
   useEffect(() => {
     const effectiveUserId = userId || 1; // Fallback para desarrollo/testing
     if (isVisible && subjectId) {
       setIsLoading(true);
-      getChatHistory(effectiveUserId, subjectId)
-        .then(data => {
+      Promise.all([
+        getChatHistory(effectiveUserId, subjectId),
+        getPreferredLLMProvider(),
+      ])
+        .then(([data, provider]) => {
           setSessionId(data.session_id);
           setMessages(data.messages || []);
+          setCurrentProvider(provider);
         })
         .catch(err => console.warn('[AIChat] Error cargando historial:', err))
         .finally(() => setIsLoading(false));
@@ -181,8 +187,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     setIsLoading(true);
 
     try {
-      // Enviar al backend con el contexto, historial y session_id
-      const data = await sendAIChatMessage(contextText, updatedMessages, sessionId);
+      // Enviar al backend con el contexto, historial, session_id y proveedor seleccionado
+      const data = await sendAIChatMessage(contextText, updatedMessages, sessionId, currentProvider);
       
       // Verificar si el contexto fue truncado
       if (data?.context_truncated) {
@@ -203,13 +209,13 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       // Mostrar error como mensaje de Zyren
       const errMsg: Message = {
         role: 'assistant',
-        content: `⚠️ Error al conectar con Zyren: ${err.message || 'Error desconocido'}. Revisa la consola para más detalles.`,
+        content: `⚠️ Error al conectar con Zyren (${currentProvider}): ${err.message || 'Error desconocido'}. Revisa la consola para más detalles.`,
       };
       setMessages(prev => [...prev, errMsg]);
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, messages, contextText, sessionId]);
+  }, [inputText, isLoading, messages, contextText, sessionId, currentProvider]);
 
   /** Limpiar la conversación actual y crear una nueva */
   const handleClearHistory = useCallback(async () => {
@@ -257,6 +263,28 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
               <View style={{ flex: 1 }}>
                 <Text style={s.title}>Zyren</Text>
                 <Text style={s.subtitle} numberOfLines={1}>{subjectName}</Text>
+              </View>
+
+              {/* Selector de proveedor LLM compacto */}
+              <View style={s.providerSelector}>
+                <TouchableOpacity
+                  style={[s.providerOption, currentProvider === 'groq' && s.providerOptionActive]}
+                  onPress={() => setCurrentProvider('groq')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.providerLabel, currentProvider === 'groq' && s.providerLabelActive]}>
+                    ⚡
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.providerOption, currentProvider === 'gemini' && s.providerOptionActive]}
+                  onPress={() => setCurrentProvider('gemini')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.providerLabel, currentProvider === 'gemini' && s.providerLabelActive]}>
+                    🧠
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Chip de contexto activo */}
@@ -545,5 +573,30 @@ const s = StyleSheet.create({
   },
   sendBtnDisabled: {
     opacity: 0.35, shadowOpacity: 0, elevation: 0,
+  },
+  
+  // Selector de proveedor LLM
+  providerSelector: {
+    flexDirection: 'row', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8, padding: 4,
+    borderWidth: 1, borderColor: BORDER,
+  },
+  providerOption: {
+    width: 28, height: 28,
+    borderRadius: 6,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  providerOptionActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  providerLabel: {
+    fontSize: 14,
+  },
+  providerLabelActive: {
+    fontSize: 14,
   },
 });

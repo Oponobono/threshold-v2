@@ -1,21 +1,32 @@
 /**
  * ai.ts
  *
- * Servicio de chat conversacional con IA (Groq LLaMA).
+ * Servicio de chat conversacional con IA.
+ * Soporta Groq (velocidad) y Gemini (mayor capacidad).
  * Envía al backend un historial de mensajes junto con texto de contexto académico
  * (transcripciones, resúmenes, OCR) para obtener una respuesta contextualizada.
  */
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
 
 /**
  * Envía un mensaje al LLM junto con el contexto académico del usuario.
  * @param contextText - Texto fuente (transcripción, resumen, OCR) que alimenta el sistema prompt.
  * @param messages - Historial de la conversación en formato `{ role, content }[]`.
  * @param sessionId - Opcional. ID de la sesión actual para guardar el historial.
+ * @param provider - Opcional. Proveedor LLM ('groq' o 'gemini'). Si no se especifica, usa la preferencia guardada.
  */
-export const sendAIChatMessage = async (contextText: string, messages: any[], sessionId?: number) => {
+export const sendAIChatMessage = async (
+  contextText: string,
+  messages: any[],
+  sessionId?: number,
+  provider?: LLMProvider
+) => {
   try {
-    const response = await fetchWithFallback('/ai/chat', {
+    // Obtener el proveedor preferido si no se especifica
+    const selectedProvider = provider || (await getPreferredLLMProvider());
+    
+    const response = await fetchWithFallback(`/ai/chat?provider=${selectedProvider}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -24,13 +35,15 @@ export const sendAIChatMessage = async (contextText: string, messages: any[], se
         context_text: contextText,
         messages: messages,
         session_id: sessionId,
+        provider: selectedProvider,
       }),
     });
     
     const data = await parseJsonSafely(response);
     if (!response.ok) {
       const error: any = new Error(data?.error || 'Error al comunicarse con la IA');
-      error.details = data?.details; // Adjuntar detalles para el log de telemetría
+      error.details = data?.details;
+      error.provider = data?.provider;
       throw error;
     }
     return data;

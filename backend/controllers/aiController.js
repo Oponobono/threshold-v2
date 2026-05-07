@@ -3,33 +3,145 @@ const fs = require('fs').promises;
 const path = require('path');
 
 /**
- * Chat con Zyren usando contexto de la materia (Groq)
+ * Helper para obtener el proveedor LLM seleccionado
+ * @returns {string} 'groq' o 'gemini'
+ */
+function getLLMProvider(req) {
+  const provider = req.query?.provider || req.body?.provider || 'groq';
+  return (provider === 'gemini' || provider === 'groq') ? provider : 'groq';
+}
+
+/**
+ * Helper para hacer llamadas a Groq API
+ */
+async function callGroqAPI(messages, systemPrompt) {
+  const groqApiKey = process.env.GROQ_API_KEY;
+  if (!groqApiKey) {
+    throw new Error('Groq API Key no está configurada');
+  }
+
+  const apiMessages = [{ role: 'system', content: systemPrompt }, ...messages];
+  
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${groqApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: apiMessages,
+      temperature: 0.3,
+      max_tokens: 2048,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Groq API Error: ${JSON.stringify(errorData)}`);
+  }
+
+  const data = await response.json();
+  return {
+    provider: 'groq',
+    reply: data.choices[0].message,
+    duration: 0,
+  };
+}
+
+/**
+ * Helper para hacer llamadas a Google Gemini API
+ */
+async function callGeminiAPI(messages, systemPrompt) {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    throw new Error('Gemini API Key no está configurada');
+  }
+
+  // Convertir formato OpenAI a formato Google Gemini
+  const geminiMessages = [];
+  let systemContent = systemPrompt;
+
+  // Agregar sistema como primer mensaje
+  geminiMessages.push({
+    role: 'user',
+    parts: [{ text: systemContent }],
+  });
+  
+  geminiMessages.push({
+    role: 'model',
+    parts: [{ text: 'Entendido. Soy Zyren, tu tutor académico personal. Estoy listo para ayudarte basándome en el material que proporcionaste.' }],
+  });
+
+  // Convertir mensajes de OpenAI a Gemini
+  messages.forEach(msg => {
+    geminiMessages.push({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }],
+    });
+  });
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: geminiMessages,
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 2048,
+        },
+        safetySettings: [
+          {
+            category: 'HARM_CATEGORY_UNSPECIFIED',
+            threshold: 'BLOCK_NONE',
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Gemini API Error: ${JSON.stringify(errorData)}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  
+  return {
+    provider: 'gemini',
+    reply: { role: 'assistant', content },
+    duration: 0,
+  };
+}
+
+/**
+ * Chat con Zyren usando contexto de la materia
+ * Soporta tanto Groq (velocidad) como Gemini (mayor capacidad)
  */
 exports.aiChat = async (req, res) => {
   console.log('--- [DEBUG] Petición recibida en aiChat ---');
   const { context_text, messages } = req.body;
+  const provider = getLLMProvider(req);
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'Falta el array de mensajes.' });
   }
 
-  const groqApiKey = process.env.GROQ_API_KEY;
-  if (!groqApiKey) {
-    return res.status(500).json({ error: 'Groq API Key no está configurada' });
-  }
-
-  // Limitar el contexto drásticamente por límites de cuenta (6000 TPM)
-  const MAX_CONTEXT_CHARS = 12000;
+  // Limitar el contexto según el proveedor
+  const MAX_CONTEXT_CHARS = provider === 'gemini' ? 50000 : 12000; // Gemini tiene más capacidad
   const contextLength = context_text ? context_text.length : 0;
   const trimmedContext = contextLength > MAX_CONTEXT_CHARS
     ? context_text.substring(0, MAX_CONTEXT_CHARS) + '\n\n[...Archivo demasiado extenso, contexto truncado por seguridad...]'
     : context_text;
 
-  console.log(`[GroqTelemetry] Context size: ${contextLength} chars -> Trimmed to: ${trimmedContext.length}`);
+  console.log(`[${provider.toUpperCase()}Telemetry] Context size: ${contextLength} chars -> Trimmed to: ${trimmedContext.length}`);
 
-  const systemMessage = {
-    role: 'system',
-    content: `Eres "Zyren", un tutor académico personal experto y paciente. 
+  const systemMessage = `Eres "Zyren", un tutor académico personal experto y paciente. 
 Tu objetivo es responder a las preguntas del estudiante basándote PRINCIPALMENTE en el siguiente material de sus clases (transcripciones, apuntes, documentos).
 
 REGLAS:
@@ -40,51 +152,24 @@ REGLAS:
 
 --- CONTEXTO DE LA MATERIA ---
 ${trimmedContext || 'El estudiante no proporcionó contexto específico para esta consulta.'}
-------------------------------`
-  };
-
-  const apiMessages = [systemMessage, ...messages];
+------------------------------`;
 
   try {
-    console.log('🤖 [GroqTelemetry] Llamando a Groq API...');
-    console.log('📋 [GroqTelemetry] Total mensajes en contexto:', apiMessages.length);
+    console.log(`🤖 [${provider.toUpperCase()}Telemetry] Llamando a ${provider.toUpperCase()} API...`);
+    console.log('📋 [Telemetry] Total mensajes en contexto:', messages.length + 1);
     
     const startTime = Date.now();
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: apiMessages,
-        temperature: 0.3,
-        max_tokens: 2048,
-      }),
-    });
-
-    const duration = Date.now() - startTime;
-    console.log(`📡 [GroqTelemetry] Respuesta recibida en ${duration}ms. Status: ${response.status}`);
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('❌ [GroqTelemetry] Error Detallado de Groq:', JSON.stringify(errorData, null, 2));
-      
-      // Guardar error en archivo para que el asistente pueda leerlo
-      await fs.writeFile(path.join(__dirname, '../groq_debug.log'), JSON.stringify(errorData, null, 2));
-      
-      return res.status(500).json({ 
-        error: 'Error al llamar a Groq API',
-        status: response.status,
-        details: errorData 
-      });
+    
+    let result;
+    if (provider === 'gemini') {
+      result = await callGeminiAPI(messages, systemMessage);
+    } else {
+      result = await callGroqAPI(messages, systemMessage);
     }
 
-    const groqData = await response.json();
-    const reply = groqData.choices[0].message;
-
-    console.log('✅ Respuesta exitosa de Groq');
+    const duration = Date.now() - startTime;
+    console.log(`📡 [${provider.toUpperCase()}Telemetry] Respuesta recibida en ${duration}ms.`);
+    console.log(`✅ Respuesta exitosa de ${provider.toUpperCase()}`);
     
     const context_truncated = context_text && context_text.length > MAX_CONTEXT_CHARS;
 
@@ -95,16 +180,18 @@ ${trimmedContext || 'El estudiante no proporcionó contexto específico para est
       if (lastUserMsg.role === 'user') {
         db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'user', lastUserMsg.content]);
       }
-      db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'assistant', reply.content]);
+      db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'assistant', result.reply.content]);
     }
 
     res.json({ 
-      reply,
-      context_truncated
+      reply: result.reply,
+      provider,
+      context_truncated,
+      duration,
     });
   } catch (err) {
-    console.error('💥 Error crítico en aiChat:', err);
-    res.status(500).json({ error: 'Error en el chat de IA', details: err.message });
+    console.error(`💥 Error crítico en aiChat [${provider}]:`, err);
+    res.status(500).json({ error: `Error en el chat de IA con ${provider}`, details: err.message, provider });
   }
 };
 
