@@ -13,7 +13,7 @@ const fs = require("fs").promises;
 const path = require("path");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL_NAME = "gemini-1.5-flash"; // Modelo estable: costo y velocidad óptimos
+const MODEL_NAME = "gemini-3.1-flash"; // Modelo más reciente: mejor velocidad y capacidad
 
 // ✅ SAFETY SETTINGS CORREGIDOS - Usar strings en lugar de objetos HarmCategory
 // Las categorías válidas son strings, no objetos de la librería
@@ -204,6 +204,7 @@ async function processAcademicChat(contextText, messages, systemPrompt) {
   try {
     console.log(`[Gemini] Iniciando chat académico con ${messages.length} mensajes`);
 
+    console.log(`[Gemini] Usando modelo: ${MODEL_NAME}`);
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
       systemInstruction: systemPrompt,
