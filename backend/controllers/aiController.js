@@ -18,8 +18,9 @@ exports.aiChat = async (req, res) => {
     return res.status(500).json({ error: 'Groq API Key no está configurada' });
   }
 
-  // Limitar el contexto para evitar errores de límite de tokens en Groq (aprox 12k - 15k tokens)
-  const MAX_CONTEXT_CHARS = 50000;
+  // Limitar el contexto para evitar errores de límite de tokens en Groq (TPM)
+  // Ajustado para el modelo 8B que permite más margen
+  const MAX_CONTEXT_CHARS = 30000;
   const contextLength = context_text ? context_text.length : 0;
   const trimmedContext = contextLength > MAX_CONTEXT_CHARS
     ? context_text.substring(0, MAX_CONTEXT_CHARS) + '\n\n[...Archivo demasiado extenso, contexto truncado por seguridad...]'
@@ -57,7 +58,7 @@ ${trimmedContext || 'El estudiante no proporcionó contexto específico para est
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: apiMessages,
         temperature: 0.3,
         max_tokens: 2048,
@@ -402,7 +403,7 @@ Ejemplo de respuesta válida:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Genera ${count} flashcards a partir de este material:\n\n${trimmedContext}` },
