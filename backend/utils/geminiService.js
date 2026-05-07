@@ -13,7 +13,7 @@ const fs = require("fs").promises;
 const path = require("path");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL_NAME = "gemini-1.5-pro"; // Modelo disponible en v1beta API
+const MODEL_NAME = "gemini-pro"; // Modelo estable y disponible
 
 // ✅ SAFETY SETTINGS CORREGIDOS - Usar strings en lugar de objetos HarmCategory
 // Las categorías válidas son strings, no objetos de la librería

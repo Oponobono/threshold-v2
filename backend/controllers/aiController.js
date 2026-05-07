@@ -108,12 +108,14 @@ exports.aiChat = async (req, res) => {
     return res.status(400).json({ error: 'Falta el array de mensajes.' });
   }
 
-  // Limitar el contexto según el proveedor
-  const MAX_CONTEXT_CHARS = provider === 'gemini' ? 50000 : 12000; // Gemini tiene más capacidad
+  // Limitar el contexto según el proveedor - MÁS AGRESIVO
+  const MAX_CONTEXT_CHARS = provider === 'gemini' ? 15000 : 5000; // Reducido para evitar límites
   const contextLength = context_text ? context_text.length : 0;
   const trimmedContext = contextLength > MAX_CONTEXT_CHARS
-    ? context_text.substring(0, MAX_CONTEXT_CHARS) + '\n\n[...Archivo demasiado extenso, contexto truncado por seguridad...]'
+    ? context_text.substring(0, MAX_CONTEXT_CHARS) + '\n\n[...Contexto truncado por límite de tokens...]'
     : context_text;
+  
+  console.log(`[${provider.toUpperCase()}] Context truncado: ${contextLength} -> ${trimmedContext.length} chars`);
 
   console.log(`[${provider.toUpperCase()}Telemetry] Context size: ${contextLength} chars -> Trimmed to: ${trimmedContext.length}`);
 
