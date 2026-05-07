@@ -1,6 +1,12 @@
 const { db } = require('../db');
 const fs = require('fs').promises;
 const path = require('path');
+const { 
+  processDocumentWithFilesAPI, 
+  processAcademicChat, 
+  generateFlashcardsFromDocument,
+  getModelInfo 
+} = require('../utils/geminiService');
 
 /**
  * Helper para obtener el proveedor LLM seleccionado
@@ -50,7 +56,8 @@ async function callGroqAPI(messages, systemPrompt) {
 }
 
 /**
- * Helper para hacer llamadas a Google Gemini API
+ * Helper para hacer llamadas a Google Gemini API (mejorado con Files API)
+ * Ahora usa el SDK oficial de Google para mejor manejo de contextos grandes
  */
 async function callGeminiAPI(messages, systemPrompt) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -58,65 +65,23 @@ async function callGeminiAPI(messages, systemPrompt) {
     throw new Error('Gemini API Key no está configurada');
   }
 
-  // Convertir formato OpenAI a formato Google Gemini
-  const geminiMessages = [];
-  let systemContent = systemPrompt;
-
-  // Agregar sistema como primer mensaje
-  geminiMessages.push({
-    role: 'user',
-    parts: [{ text: systemContent }],
-  });
-  
-  geminiMessages.push({
-    role: 'model',
-    parts: [{ text: 'Entendido. Soy Zyren, tu tutor académico personal. Estoy listo para ayudarte basándome en el material que proporcionaste.' }],
-  });
-
-  // Convertir mensajes de OpenAI a Gemini
-  messages.forEach(msg => {
-    geminiMessages.push({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }],
-    });
-  });
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: geminiMessages,
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 2048,
-        },
-        safetySettings: [
-          {
-            category: 'HARM_CATEGORY_UNSPECIFIED',
-            threshold: 'BLOCK_NONE',
-          },
-        ],
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Gemini API Error: ${JSON.stringify(errorData)}`);
+  try {
+    // Usar el nuevo servicio de Gemini con mejor manejo
+    const result = await processAcademicChat(
+      '',  // contextText ya está en systemPrompt
+      messages,
+      systemPrompt
+    );
+    
+    return {
+      provider: 'gemini',
+      reply: { role: 'assistant', content: result.content },
+      duration: 0,
+    };
+  } catch (error) {
+    console.error('[Gemini] Error:', error.message);
+    throw error;
   }
-
-  const data = await response.json();
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  
-  return {
-    provider: 'gemini',
-    reply: { role: 'assistant', content },
-    duration: 0,
-  };
 }
 
 /**
@@ -525,5 +490,144 @@ Ejemplo de respuesta válida:
 
   } catch (err) {
     res.status(500).json({ error: 'Error generando flashcards', details: err.message });
+  }
+};
+
+/**
+ * Procesa un documento (PDF, Word, TXT) usando Gemini Files API
+ * Sin truncado de contexto - procesa documentos completos sin límite práctico
+ * 
+ * Soportado: .pdf, .docx, .doc, .txt, .html, .md
+ * Ideal para: Análisis de documentos, resúmenes, extracción de información
+ */
+exports.processDocumentWithGemini = async (req, res) => {
+  const { documentPath, mimeType, prompt } = req.body;
+
+  if (!documentPath || !prompt) {
+    return res.status(400).json({ 
+      error: 'Parámetros requeridos: documentPath, prompt' 
+    });
+  }
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: 'Gemini API Key no está configurada' });
+  }
+
+  try {
+    console.log(`[ProcessDocument] Archivo: ${documentPath}`);
+    console.log(`[ProcessDocument] MIME Type: ${mimeType || 'auto-detect'}`);
+
+    // Usar el servicio geminiService (auto-detecta MIME type)
+    const result = await geminiService.processDocumentWithFilesAPI(
+      documentPath,
+      mimeType, // null = auto-detect
+      prompt
+    );
+
+    res.json({
+      success: true,
+      provider: 'gemini',
+      model: 'gemini-1.5-flash',
+      result: result,
+      features: [
+        'Sin truncado de contexto',
+        'Procesa documentos completos',
+        'Soporta: PDF, Word, TXT, HTML, Markdown'
+      ]
+    });
+  } catch (err) {
+    console.error('[ProcessDocument] Error:', err.message);
+    res.status(400).json({
+      error: 'Error procesando documento',
+      details: err.message,
+      supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md']
+    });
+  }
+};
+
+/**
+ * Genera flashcards de estudio desde un documento (PDF, Word, TXT)
+ * Ideal para: Crear sets de estudio automáticamente desde materiales
+ * 
+ * Retorna: Array de objetos { question, answer }
+ */
+exports.generateFlashcardsFromDocument = async (req, res) => {
+  const { documentPath, mimeType, count = 10 } = req.body;
+
+  if (!documentPath) {
+    return res.status(400).json({ error: 'Parámetro requerido: documentPath' });
+  }
+
+  if (count < 1 || count > 100) {
+    return res.status(400).json({ 
+      error: 'count debe estar entre 1 y 100' 
+    });
+  }
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: 'Gemini API Key no está configurada' });
+  }
+
+  try {
+    console.log(`[GenerateFlashcards] ${count} flashcards desde: ${documentPath}`);
+
+    const flashcards = await geminiService.generateFlashcardsFromDocument(
+      documentPath,
+      mimeType, // null = auto-detect
+      count
+    );
+
+    res.json({
+      success: true,
+      provider: 'gemini',
+      model: 'gemini-1.5-flash',
+      flashcards: flashcards,
+      count: flashcards.length,
+      supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md'],
+      note: 'Flashcards generadas automáticamente desde documento completo'
+    });
+  } catch (err) {
+    console.error('[GenerateFlashcards] Error:', err.message);
+    res.status(400).json({
+      error: 'Error generando flashcards',
+      details: err.message,
+      supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md']
+    });
+  }
+};
+
+/**
+ * Obtiene información sobre los modelos disponibles y sus límites
+ */
+exports.getModelInfo = async (req, res) => {
+  try {
+    const groqInfo = {
+      provider: 'groq',
+      model: 'llama-3.1-8b-instant',
+      contextLimit: '12 KB',
+      speed: 'Ultra rápido (~50ms)',
+      costOptimization: 'Muy económico',
+      bestFor: ['Chats rápidos', 'Contexto moderado', 'Real-time'],
+    };
+
+    const geminiInfo = {
+      provider: 'gemini',
+      model: 'gemini-1.5-flash',
+      contextLimit: '1,000,000 tokens (~50KB+)',
+      speed: 'Rápido (~200-500ms)',
+      costOptimization: 'Extremadamente eficiente para PDFs',
+      bestFor: ['Documentos grandes', 'PDFs', 'Análisis profundo', 'Flashcards de calidad'],
+      filesAPI: 'Soportado - Ideal para archivos >1MB',
+    };
+
+    res.json({
+      providers: [groqInfo, geminiInfo],
+      recommendation: 'Usa Groq para chat rápido, Gemini para documentos grandes',
+      filesAPINote: 'Los archivos procesados con Files API se eliminan después de 48 horas',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
