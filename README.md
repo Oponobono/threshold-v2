@@ -1,1 +1,1 @@
-# threshold-v2
+# Threshold - Educational app (Clean version)
