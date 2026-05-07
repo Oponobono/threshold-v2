@@ -29,7 +29,9 @@ export const sendAIChatMessage = async (contextText: string, messages: any[], se
     
     const data = await parseJsonSafely(response);
     if (!response.ok) {
-      throw new Error(data?.error || 'Error al comunicarse con la IA');
+      const error: any = new Error(data?.error || 'Error al comunicarse con la IA');
+      error.details = data?.details; // Adjuntar detalles para el log de telemetría
+      throw error;
     }
     return data;
   } catch (error: any) {

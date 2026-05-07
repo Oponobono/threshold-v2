@@ -135,6 +135,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<number | undefined>();
+  const [isTruncated, setIsTruncated] = useState(false);
 
   /** Cargar historial cuando se abre el modal */
   useEffect(() => {
@@ -182,16 +183,27 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     try {
       // Enviar al backend con el contexto, historial y session_id
       const data = await sendAIChatMessage(contextText, updatedMessages, sessionId);
+      
+      // Verificar si el contexto fue truncado
+      if (data?.context_truncated) {
+        setIsTruncated(true);
+      }
+
       const aiMsg: Message = {
         role: 'assistant',
         content: data?.reply?.content || 'Lo siento, no pude procesar tu pregunta.',
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch (err: any) {
+      console.error('[AIChatTelemetry] Error crítico al enviar mensaje:', err);
+      if (err.details) {
+        console.error('[AIChatTelemetry] Detalles del error:', JSON.stringify(err.details, null, 2));
+      }
+
       // Mostrar error como mensaje de Zyren
       const errMsg: Message = {
         role: 'assistant',
-        content: `⚠️ Error al conectar con Zyren: ${err.message}`,
+        content: `⚠️ Error al conectar con Zyren: ${err.message || 'Error desconocido'}. Revisa la consola para más detalles.`,
       };
       setMessages(prev => [...prev, errMsg]);
     } finally {
@@ -290,6 +302,16 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                   Por seguridad y rendimiento, los mensajes de más de 24 horas se eliminan automáticamente.
                 </Text>
               </View>
+
+              {/* Aviso de documento truncado */}
+              {isTruncated && (
+                <View style={[s.infoBanner, { backgroundColor: 'rgba(255, 149, 0, 0.12)', borderColor: 'rgba(255, 149, 0, 0.25)', borderWidth: 1, paddingVertical: 10 }]}>
+                  <Ionicons name="warning-outline" size={16} color="#FF9500" />
+                  <Text style={[s.infoBannerText, { color: '#FF9500', fontWeight: '600' }]}>
+                    No pude leer todo el documento ya que es muy extenso, sin embargo tengo algo de información para ayudarte.
+                  </Text>
+                </View>
+              )}
 
               {messages.length === 0 ? (
                 /* Estado vacío — sugerencias iniciales */

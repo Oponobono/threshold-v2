@@ -6,6 +6,7 @@ const path = require('path');
  * Chat con Zyren usando contexto de la materia (Groq)
  */
 exports.aiChat = async (req, res) => {
+  console.log('--- [DEBUG] Petición recibida en aiChat ---');
   const { context_text, messages } = req.body;
 
   if (!messages || !Array.isArray(messages)) {
@@ -16,6 +17,15 @@ exports.aiChat = async (req, res) => {
   if (!groqApiKey) {
     return res.status(500).json({ error: 'Groq API Key no está configurada' });
   }
+
+  // Limitar el contexto para evitar errores de límite de tokens en Groq (aprox 12k - 15k tokens)
+  const MAX_CONTEXT_CHARS = 50000;
+  const contextLength = context_text ? context_text.length : 0;
+  const trimmedContext = contextLength > MAX_CONTEXT_CHARS
+    ? context_text.substring(0, MAX_CONTEXT_CHARS) + '\n\n[...Archivo demasiado extenso, contexto truncado por seguridad...]'
+    : context_text;
+
+  console.log(`[GroqTelemetry] Context size: ${contextLength} chars -> Trimmed to: ${trimmedContext.length}`);
 
   const systemMessage = {
     role: 'system',
@@ -29,17 +39,17 @@ REGLAS:
 4. Mantén un tono alentador y profesional.
 
 --- CONTEXTO DE LA MATERIA ---
-${context_text || 'El estudiante no proporcionó contexto específico para esta consulta.'}
+${trimmedContext || 'El estudiante no proporcionó contexto específico para esta consulta.'}
 ------------------------------`
   };
 
   const apiMessages = [systemMessage, ...messages];
 
   try {
-    console.log('🤖 Iniciando llamada a Groq API...');
-    console.log('📋 Mensajes:', messages.length);
-    console.log('🔑 API Key presente:', !!groqApiKey);
+    console.log('🤖 [GroqTelemetry] Llamando a Groq API...');
+    console.log('📋 [GroqTelemetry] Total mensajes en contexto:', apiMessages.length);
     
+    const startTime = Date.now();
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -47,22 +57,23 @@ ${context_text || 'El estudiante no proporcionó contexto específico para esta 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-70b-versatile',
         messages: apiMessages,
         temperature: 0.3,
         max_tokens: 2048,
       }),
     });
 
-    console.log('📡 Estado de respuesta Groq:', response.status);
+    const duration = Date.now() - startTime;
+    console.log(`📡 [GroqTelemetry] Respuesta recibida en ${duration}ms. Status: ${response.status}`);
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('❌ Error de Groq:', {
-        status: response.status,
-        error: errorData,
-        headers: Object.fromEntries(response.headers)
-      });
+      console.error('❌ [GroqTelemetry] Error Detallado de Groq:', JSON.stringify(errorData, null, 2));
+      
+      // Guardar error en archivo para que el asistente pueda leerlo
+      await fs.writeFile(path.join(__dirname, '../groq_debug.log'), JSON.stringify(errorData, null, 2));
+      
       return res.status(500).json({ 
         error: 'Error al llamar a Groq API',
         status: response.status,
@@ -74,6 +85,8 @@ ${context_text || 'El estudiante no proporcionó contexto específico para esta 
     const reply = groqData.choices[0].message;
 
     console.log('✅ Respuesta exitosa de Groq');
+    
+    const context_truncated = context_text && context_text.length > MAX_CONTEXT_CHARS;
 
     // Guardar en el historial si se proporciona session_id
     const { session_id } = req.body;
@@ -85,7 +98,10 @@ ${context_text || 'El estudiante no proporcionó contexto específico para esta 
       db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'assistant', reply.content]);
     }
 
-    res.json({ reply });
+    res.json({ 
+      reply,
+      context_truncated
+    });
   } catch (err) {
     console.error('💥 Error crítico en aiChat:', err);
     res.status(500).json({ error: 'Error en el chat de IA', details: err.message });
