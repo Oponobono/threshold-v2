@@ -7,7 +7,7 @@
     "icon": "./src/images/ThresholdIcons/android/playstore/appicononline.png",
     "scheme": "threshold",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },

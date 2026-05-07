@@ -22,6 +22,7 @@ interface ImageViewerModalProps {
   initialIndex?: number;
   onClose: () => void;
   onPhotoDeleted: (id: number) => void;
+  onOCRSaved?: () => void;
 }
 
 /**
@@ -43,7 +44,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   photos,
   initialIndex = 0,
   onClose,
-  onPhotoDeleted
+  onPhotoDeleted,
+  onOCRSaved,
 }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
@@ -100,6 +102,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         try {
           await updatePhoto(currentPhoto.id, { ocr_text: text });
           console.log(`[ImageViewerModal] OCR guardado para foto ${currentPhoto.id}`);
+          // Notificar al padre que el OCR fue guardado para que refresque los datos
+          onOCRSaved?.();
         } catch (err: any) {
           console.warn('[ImageViewerModal] Error guardando OCR:', err.message);
           // El OCR se muestra de todas formas aunque falle el guardado en BD

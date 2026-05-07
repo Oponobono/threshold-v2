@@ -59,9 +59,23 @@ export function useSubjectGrades(
 
   // 2. Promedio Actual (A_actual)
   const averageGrade = useMemo(() => {
-    if (evaluatedPercentage === 0) return 0;
-    return accumulatedPoints / (evaluatedPercentage / 100);
-  }, [accumulatedPoints, evaluatedPercentage]);
+    if (evaluatedPercentage > 0) {
+      return accumulatedPoints / (evaluatedPercentage / 100);
+    }
+    
+    // FALLBACK: Simple average if no weights are defined but there are grades
+    if (gradedAssessments.length > 0) {
+      const validGrades = gradedAssessments
+        .map(a => normalizeGrade(a))
+        .filter(g => g !== null) as number[];
+      
+      if (validGrades.length > 0) {
+        return validGrades.reduce((sum, g) => sum + g, 0) / validGrades.length;
+      }
+    }
+    
+    return 0;
+  }, [accumulatedPoints, evaluatedPercentage, gradedAssessments]);
 
   // 4. Nota Necesaria (N_necesaria)
   const targetGrade = useMemo(() => {

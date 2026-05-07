@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
   Animated, Dimensions, StyleSheet,
@@ -122,6 +122,16 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     ...mapRecordings(recordings),
     ...mapVideos(videos),
   ], [documents, photos, recordings, videos]);
+
+  // Sincronizar selectedIds con los items actuales — limpiar IDs que ya no existen
+  useEffect(() => {
+    setSelectedIds(prev => {
+      const validIds = new Set(allItems.map(item => item.id));
+      const cleaned = new Set(Array.from(prev).filter(id => validIds.has(id)));
+      // Solo actualizar el estado si hay cambios
+      return cleaned.size === prev.size ? prev : cleaned;
+    });
+  }, [allItems]);
 
   // Filter items
   const filteredItems = useMemo(() => {

@@ -417,6 +417,12 @@ export default function SubjectDetailScreen() {
         onPhotoDeleted={(id) => {
           setPhotos(prev => prev.filter(p => p.id !== id));
         }}
+        onOCRSaved={async () => {
+          if (subjectId) {
+            const updatedPhotos = await getPhotosBySubject(subjectId);
+            setPhotos(updatedPhotos || []);
+          }
+        }}
       />
 
       <PDFImportModal

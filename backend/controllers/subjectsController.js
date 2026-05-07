@@ -34,6 +34,16 @@ exports.getSubjectById = (req, res) => {
                      ELSE 0 END
               ) / 100.0
             )
+          -- FALLBACK: If no weights are defined, calculate a simple average of existing scores
+          WHEN COUNT(CASE WHEN a.grade_value IS NOT NULL OR a.score IS NOT NULL THEN 1 END) > 0
+          THEN
+            AVG(
+              CASE
+                WHEN a.grade_value IS NOT NULL THEN a.grade_value
+                WHEN a.score IS NOT NULL AND a.out_of IS NOT NULL AND a.out_of > 0 THEN (a.score * 1.0 / a.out_of) * 5.0
+                ELSE 0
+              END
+            )
           ELSE 0 
         END
       FROM assessments a
@@ -90,6 +100,16 @@ exports.getSubjectsByUser = (req, res) => {
                      WHEN a.weight IS NOT NULL THEN CAST(REPLACE(a.weight, '%', '') AS REAL)
                      ELSE 0 END
               ) / 100.0
+            )
+          -- FALLBACK: If no weights are defined, calculate a simple average of existing scores
+          WHEN COUNT(CASE WHEN a.grade_value IS NOT NULL OR a.score IS NOT NULL THEN 1 END) > 0
+          THEN
+            AVG(
+              CASE
+                WHEN a.grade_value IS NOT NULL THEN a.grade_value
+                WHEN a.score IS NOT NULL AND a.out_of IS NOT NULL AND a.out_of > 0 THEN (a.score * 1.0 / a.out_of) * 5.0
+                ELSE 0
+              END
             )
           ELSE 0 
         END
@@ -187,5 +207,28 @@ exports.deleteSubject = (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true, message: 'Materia y elementos asociados eliminados correctamente' });
     });
+  });
+};
+
+/**
+ * Actualizar una materia
+ */
+exports.updateSubject = (req, res) => {
+  const { subjectId } = req.params;
+  const fields = req.body;
+  
+  if (Object.keys(fields).length === 0) {
+    return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
+  }
+
+  const columns = Object.keys(fields).map(key => `${key} = ?`).join(', ');
+  const values = [...Object.values(fields), subjectId];
+
+  const query = `UPDATE subjects SET ${columns} WHERE id = ?`;
+
+  db.run(query, values, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: 'Materia no encontrada' });
+    res.json({ success: true, message: 'Materia actualizada' });
   });
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
+import { globalStyles } from '../styles/globalStyles';
 import { subjectDetailStyles as styles } from '../styles/SubjectDetail.styles';
 import { SubjectIcon } from './SubjectIcon';
 
@@ -11,6 +12,8 @@ interface SubjectHeroCardProps {
   title: string;
   subtitle: string;
   meta: string;
+  progress?: number;
+  avgScore?: number;
   onDelete?: () => void;
 }
 
@@ -35,49 +38,73 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
   title,
   subtitle,
   meta,
+  progress,
+  avgScore,
   onDelete,
 }) => {
   return (
-    <View style={styles.heroCard}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-        <View style={{
-          width: 56,
-          height: 56,
-          borderRadius: 16,
-          backgroundColor: color || '#DDE7FF',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <SubjectIcon iconName={iconName} color={theme.colors.white} />
+    <View style={[styles.heroCard, { padding: 12, borderRadius: 16 }]}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+          <View style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            backgroundColor: color || '#5856D6',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <SubjectIcon iconName={iconName} color="#fff" size={20} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.heroTitle, { fontSize: 16, marginBottom: 0 }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={[styles.heroSubtitle, { fontSize: 12, opacity: 0.8 }]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          </View>
         </View>
 
-        {onDelete && (
-          <TouchableOpacity 
-            onPress={onDelete} 
-            style={{ 
-              backgroundColor: theme.colors.background, 
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Ionicons name="trash-outline" size={20} color={theme.colors.text.secondary} />
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 8, fontWeight: '800', color: theme.colors.text.secondary, textTransform: 'uppercase', marginBottom: -2 }}>
+              Promedio
+            </Text>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text.primary }}>
+              {avgScore?.toFixed(1) || '0.0'}
+            </Text>
+          </View>
+
+          {onDelete && (
+            <TouchableOpacity 
+              onPress={onDelete} 
+              style={{ padding: 4 }}
+            >
+              <Ionicons name="trash-outline" size={16} color="#FF2D55" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      <View>
-        <Text style={styles.heroTitle} numberOfLines={2}>
-          {title}
-        </Text>
-        <Text style={styles.heroSubtitle} numberOfLines={1}>
-          {subtitle}
-        </Text>
-        <Text style={styles.heroMeta}>{meta}</Text>
+      {/* Progress & Meta Row (Very compact) */}
+      <View style={{ marginTop: 4 }}>
+        <View style={{ height: 3, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 1.5, overflow: 'hidden', marginBottom: 6 }}>
+          <View 
+            style={{ 
+              height: '100%', 
+              width: `${Math.min(progress || 0, 100)}%`, 
+              backgroundColor: color || theme.colors.primary,
+              borderRadius: 1.5
+            }} 
+          />
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={[styles.heroMeta, { fontSize: 10 }]}>{meta}</Text>
+          <Text style={{ fontSize: 9, fontWeight: '800', color: theme.colors.text.secondary }}>
+            {Math.round(progress || 0)}% COMPLETADO
+          </Text>
+        </View>
       </View>
     </View>
   );

@@ -100,4 +100,30 @@ router.post('/subjects', subjectsController.createSubject);
  */
 router.delete('/subjects/:subjectId', subjectsController.deleteSubject);
 
+/**
+ * @swagger
+ * /api/subjects/{subjectId}:
+ *   put:
+ *     summary: Actualiza una materia
+ *     tags: [Subjects]
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Materia actualizada
+ *       404:
+ *         description: Materia no encontrada
+ */
+router.put('/subjects/:subjectId', subjectsController.updateSubject);
+
 module.exports = router;

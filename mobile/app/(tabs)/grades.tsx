@@ -8,6 +8,9 @@ import { LineChart } from 'react-native-chart-kit';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { gradesStyles as styles } from '../../src/styles/Grades.styles';
+import { getAllAssessments, getSubjects } from '../../src/services/api';
+import { Assessment, Subject } from '../../src/services/api/types';
+import { useFocusEffect } from 'expo-router';
 
 const GRADE_COLORS = (pct: number) => {
   if (pct >= 80) return '#34C759';
@@ -19,23 +22,45 @@ export default function GradesScreen() {
   const { t } = useTranslation();
   const chartWidth = Math.max(240, Dimensions.get('window').width - theme.spacing.xl * 2 - theme.spacing.lg * 2 - 2);
 
-  const ASSESSMENTS = [
-    {
-      id: 'a1', icon: 'help-circle', iconColor: '#FF9500',
-      name: t('grades.sample.a1Name'), subject: t('grades.sample.a1Subject'), type: t('grades.sample.a1Type'),
-      date: t('grades.sample.a1Date'), weight: '10%', outOf: 30, score: 23,
-    },
-    {
-      id: 'a2', icon: 'pencil', iconColor: '#5856D6',
-      name: t('grades.sample.a2Name'), subject: t('grades.sample.a2Subject'), type: t('grades.sample.a2Type'),
-      date: t('grades.sample.a2Date'), weight: '20%', outOf: 100, score: 88,
-    },
-    {
-      id: 'a3', icon: 'flask', iconColor: '#34C759',
-      name: t('grades.sample.a3Name'), subject: t('grades.sample.a3Subject'), type: t('grades.sample.a3Type'),
-      date: t('grades.sample.a3Date'), weight: '15%', outOf: 50, score: 41,
-    },
-  ];
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [termGpa, setTermGpa] = useState('0.00');
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [assessData, subjData] = await Promise.all([
+        getAllAssessments(),
+        getSubjects()
+      ]);
+      setAssessments(assessData || []);
+      setSubjects(subjData || []);
+
+      // Calculate GPA (simple average for now)
+      const graded = assessData.filter((a: any) => 
+        (a.grade_value !== null && a.grade_value !== undefined) || 
+        (a.score !== null && a.score !== undefined)
+      );
+      if (graded.length > 0) {
+        const sum = graded.reduce((acc: number, curr: any) => {
+          const val = curr.grade_value ?? (curr.out_of > 0 ? (curr.score / curr.out_of) * 5.0 : 0);
+          return acc + val;
+        }, 0);
+        setTermGpa((sum / graded.length).toFixed(2));
+      }
+    } catch (error) {
+      console.error('Error loading grades data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const [simScore, setSimScore] = useState('');
   const [simPossible, setSimPossible] = useState('');
@@ -129,23 +154,28 @@ export default function GradesScreen() {
           <View style={styles.gpaRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.gpaLabel}>{t('grades.termGpa')}</Text>
-              <Text style={styles.gpaValue}>3.78</Text>
+              <Text style={styles.gpaValue}>{termGpa}</Text>
             </View>
             <View style={styles.divider} />
             <View style={{ flex: 1, paddingLeft: 16 }}>
               <Text style={styles.gpaLabel}>{t('grades.cumulative')}</Text>
-              <Text style={styles.gpaValue}>3.65</Text>
+              <Text style={styles.gpaValue}>{termGpa}</Text>
             </View>
             <View style={styles.miniSparkline}>
-              {[40, 60, 45, 75, 65, 85].map((h, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.miniBar,
-                    { height: h * 0.35, backgroundColor: theme.colors.primary + (i === 5 ? 'ff' : '66') },
-                  ]}
-                />
-              ))}
+              {assessments.length === 0 ? (
+                [40, 40, 40, 40, 40, 40].map((h, i) => (
+                  <View key={i} style={[styles.miniBar, { height: `${h}%`, opacity: 0.2 }]} />
+                ))
+              ) : (
+                assessments.filter(a => a.score !== null || a.grade_value !== null).slice(-6).map((a: any, i) => {
+                  const score = a.score ?? a.grade_value ?? 0;
+                  const outOf = a.out_of ?? 5;
+                  const h = Math.max(20, Math.min(100, (score / outOf) * 100));
+                  return (
+                    <View key={i} style={[styles.miniBar, { height: `${h}%` }]} />
+                  );
+                })
+              )}
             </View>
           </View>
           <Text style={styles.scaleText}>{t('grades.gradingScale')}</Text>
@@ -171,52 +201,47 @@ export default function GradesScreen() {
             </View>
           </View>
 
-          {ASSESSMENTS.map((a) => {
-            const pct = Math.round((a.score / a.outOf) * 100);
+          {assessments.length === 0 ? (
+            <View style={{ padding: 24, alignItems: 'center' }}>
+              <Text style={{ color: theme.colors.text.secondary }}>{t('subjects.noAssessments')}</Text>
+            </View>
+          ) : assessments.map((a: any) => {
+            const score = a.score || 0;
+            const outOf = a.out_of || 5;
+            const pct = Math.round((score / outOf) * 100);
+            const subject = subjects.find(s => s.id === a.subject_id);
+            const color = subject?.color || '#5856D6';
+
             return (
               <View key={a.id} style={styles.assessCard}>
                 <View style={styles.assessTop}>
-                  <View style={[styles.assessIconBox, { backgroundColor: a.iconColor + '20' }]}>
-                    <MaterialCommunityIcons name={a.icon as any} size={22} color={a.iconColor} />
+                  <View style={[styles.assessIconBox, { backgroundColor: color + '20' }]}>
+                    <MaterialCommunityIcons name={a.type === 'exam' ? 'file-document' : 'help-circle'} size={22} color={color} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.assessName}>{a.name}</Text>
                     <View style={styles.tagsRow}>
-                      <View style={[styles.tag, { backgroundColor: a.iconColor + '20' }]}>
-                        <Text style={[styles.tagText, { color: a.iconColor }]}>{a.subject}</Text>
+                      <View style={[styles.tag, { backgroundColor: color + '20' }]}>
+                        <Text style={[styles.tagText, { color: color }]}>{subject?.name || 'Materia'}</Text>
                       </View>
                       <View style={[styles.tag, { backgroundColor: theme.colors.inputBackground }]}>
-                        <Text style={styles.tagText}>{a.type}</Text>
+                        <Text style={styles.tagText}>{a.type || 'Evaluación'}</Text>
                       </View>
-                      <Text style={styles.dateText}>{a.date}</Text>
+                      <Text style={styles.dateText}>{a.date || ''}</Text>
                     </View>
                     <Text style={styles.weightText}>
-                      {t('grades.weight')} {a.weight} · {t('grades.outOf')} {a.outOf} {t('grades.pts')}
+                      {t('grades.weight')} {a.weight || a.percentage + '%' || '—'} · {t('grades.outOf')} {outOf} {t('grades.pts')}
                     </Text>
                   </View>
                   <View style={styles.scoreBadge}>
                     <Text style={[styles.scoreText, { color: GRADE_COLORS(pct) }]}>
-                      {a.score} / {a.outOf}
+                      {score} / {outOf}
                     </Text>
                     <Text style={[styles.scorePct, { color: GRADE_COLORS(pct) }]}>{pct}%</Text>
                   </View>
                 </View>
                 <View style={styles.progressBar}>
                   <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: GRADE_COLORS(pct) }]} />
-                </View>
-                <View style={styles.assessActions}>
-                  <TouchableOpacity style={styles.actionPill}>
-                    <Text style={styles.actionPillText}>{t('grades.edit')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionPill}>
-                    <Text style={styles.actionPillText}>{t('grades.duplicate')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionPill, styles.deleteBtn]}>
-                    <Text style={[styles.actionPillText, { color: '#FF2D55' }]}>{t('grades.delete')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.fabAdd}>
-                    <Ionicons name="add" size={20} color={theme.colors.white} />
-                  </TouchableOpacity>
                 </View>
               </View>
             );

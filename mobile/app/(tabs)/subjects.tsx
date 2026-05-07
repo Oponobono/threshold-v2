@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { subjectsStyles as styles } from '../../src/styles/Subjects.styles';
+import { getSubjects, getAssessments, updateSubject } from '../../src/services/api';
+import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
+import { Subject, Assessment } from '../../src/services/api/types';
 
 // ─── Helpers ───────────────────────────────────────────────────
 const getAvgColor = (avg: number) => {
@@ -15,80 +19,154 @@ const getAvgColor = (avg: number) => {
   return '#FF2D55';
 };
 
-const getStatusColor = (minNeeded: number) => {
-  if (minNeeded > 90) return '#FF2D55';
-  if (minNeeded > 75) return '#FF9500';
-  return '#34C759';
+const getStatusColor = (minNeeded: number, target: number) => {
+  const maxScale = target <= 5 ? 5 : target <= 10 ? 10 : 100;
+  if (minNeeded > maxScale) return '#FF2D55'; // Impossible
+  if (minNeeded > target + (maxScale * 0.1)) return '#FF9500'; // Hard
+  return '#34C759'; // Safe
 };
 
-const getStatus = (minNeeded: number, t: any) => {
-  if (minNeeded > 90) return t('subjects.statusAtRisk');
-  if (minNeeded > 75) return t('subjects.statusBorderline');
+const getStatus = (minNeeded: number, target: number, t: any) => {
+  const maxScale = target <= 5 ? 5 : target <= 10 ? 10 : 100;
+  if (minNeeded > maxScale) return t('subjects.statusImpossible') || 'Inalcanzable';
+  if (minNeeded > target) return t('subjects.statusAtRisk');
   return t('subjects.statusSafe');
 };
 
 // ─── Main Screen ───────────────────────────────────────────────
 export default function SubjectsScreen() {
   const { t } = useTranslation();
-
-  const SUBJECTS = [
-    {
-      id: '1', code: 'CS', name: t('subjects.sample.csName'), credits: 3,
-      professor: t('subjects.sample.csProf'), avg: 78, color: '#5856D6',
-      nextLabel: t('subjects.sample.csNext'),
-    },
-    {
-      id: '2', code: 'MA', name: t('subjects.sample.maName'), credits: 4,
-      professor: t('subjects.sample.maProf'), avg: 85, color: '#34C759',
-      nextLabel: t('subjects.sample.maNext'),
-    },
-    {
-      id: '3', code: 'EN', name: t('subjects.sample.enName'), credits: 2,
-      professor: t('subjects.sample.enProf'), avg: 62, color: '#FF9500',
-      nextLabel: t('subjects.sample.enNext'),
-    },
-  ];
-
-  const ASSESSMENTS = [
-    { id: 'a1', icon: 'clipboard-text', color: '#5856D6', name: t('subjects.sample.assess1Name'), due: t('subjects.sample.assess1Due'), weight: '10%', score: '82%' },
-    { id: 'a2', icon: 'help-circle', color: '#FF9500', name: t('subjects.sample.assess2Name'), due: t('subjects.sample.assess2Due'), weight: '5%', score: '70%' },
-    { id: 'a3', icon: 'school', color: '#34C759', name: t('subjects.sample.assess3Name'), due: t('subjects.sample.assess3Due'), weight: '25%', score: '—' },
-  ];
-
+  
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [search, setSearch] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState(SUBJECTS[0]);
+
+  // Cargar materias al montar o al enfocar la pantalla
+  const loadSubjects = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getSubjects();
+      setSubjects(data || []);
+      
+      if (data && data.length > 0) {
+        if (!selectedSubject) {
+          setSelectedSubject(data[0]);
+        } else {
+          // Actualizar la materia seleccionada con los nuevos datos (promedios actualizados)
+          const updatedSelected = data.find((s: Subject) => s.id === selectedSubject.id);
+          if (updatedSelected) setSelectedSubject(updatedSelected);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading subjects:', error);
+      setSubjects([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadSubjects();
+    }, [selectedSubject?.id])
+  );
+
+  // Cargar evaluaciones de la materia seleccionada
+  useEffect(() => {
+    const loadAssessments = async () => {
+      if (!selectedSubject) {
+        setAssessments([]);
+        return;
+      }
+      try {
+        const data = await getAssessments(selectedSubject.id);
+        setAssessments(data || []);
+      } catch (error) {
+        console.error('Error loading assessments:', error);
+        setAssessments([]);
+      }
+    };
+
+    loadAssessments();
+  }, [selectedSubject]);
 
   // Calculator state
-  const [currentGrade, setCurrentGrade] = useState('78');
+  const [currentGrade, setCurrentGrade] = useState('');
   const [requiredPass, setRequiredPass] = useState('60');
-  const [remainingWeight, setRemainingWeight] = useState('40');
-  const [minNeeded, setMinNeeded] = useState<number | null>(44);
+  const [remainingWeight, setRemainingWeight] = useState('');
+  const [minNeeded, setMinNeeded] = useState<number | null>(null);
+
+  // Pre-llenar calculador cuando cambia la materia
+  useEffect(() => {
+    if (selectedSubject) {
+      // Usar el promedio actual como nota actual
+      setCurrentGrade(selectedSubject.avg_score ? String(Math.round(selectedSubject.avg_score)) : '');
+      // Usar el target_grade como nota requerida, sino usar 60 por defecto
+      setRequiredPass(selectedSubject.target_grade ? String(selectedSubject.target_grade) : '60');
+      setRemainingWeight('');
+      setMinNeeded(null);
+    }
+  }, [selectedSubject]);
 
   const handleSimulate = () => {
-    const cg = parseFloat(currentGrade);
-    const rp = parseFloat(requiredPass);
+    const cg = parseFloat(currentGrade || (selectedSubject?.avg_score?.toString() || '0'));
+    const rp = parseFloat(requiredPass || (selectedSubject?.target_grade?.toString() || '60'));
     const rw = parseFloat(remainingWeight);
-    if (isNaN(cg) || isNaN(rp) || isNaN(rw) || rw === 0) {
+
+    if (isNaN(cg) || isNaN(rp) || isNaN(rw) || rw <= 0) {
       alertRef.show({ title: t('common.error'), message: t('common.enterValidNumbers'), type: 'error' });
       return;
     }
-    // Formula: minNeeded = (requiredPass - currentGrade * (1 - remainingWeight/100)) / (remainingWeight/100)
+
     const doneWeight = 100 - rw;
     const result = (rp - (cg * doneWeight) / 100) / (rw / 100);
-    setMinNeeded(Math.round(result * 100) / 100);
+    setMinNeeded(Number(result.toFixed(2)));
   };
 
   const handleReset = () => {
-    setCurrentGrade('');
-    setRequiredPass('');
+    setCurrentGrade(selectedSubject?.avg_score ? selectedSubject.avg_score.toFixed(1) : '');
+    setRequiredPass(selectedSubject?.target_grade ? String(selectedSubject.target_grade) : '60');
     setRemainingWeight('');
     setMinNeeded(null);
   };
 
-  const filtered = SUBJECTS.filter(s =>
+  const handleSaveTarget = async () => {
+    if (!selectedSubject) return;
+    const rp = requiredPass ? parseFloat(requiredPass) : null;
+    if (rp === null || isNaN(rp)) {
+      alertRef.show({ title: t('common.error'), message: t('common.enterValidNumbers'), type: 'error' });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await updateSubject(selectedSubject.id, { target_grade: rp });
+      
+      // Actualizar estado local
+      const updatedSubjects = subjects.map(s => 
+        s.id === selectedSubject.id ? { ...s, target_grade: rp } : s
+      );
+      setSubjects(updatedSubjects);
+      setSelectedSubject({ ...selectedSubject, target_grade: rp });
+      
+      alertRef.show({ 
+        title: t('common.success') || 'Éxito', 
+        message: t('subjects.targetSaved') || 'Objetivo guardado correctamente.', 
+        type: 'success' 
+      });
+    } catch (error: any) {
+      alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filtered = subjects.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.code.toLowerCase().includes(search.toLowerCase()) ||
-    s.professor.toLowerCase().includes(search.toLowerCase())
+    (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
+    (s.professor && s.professor.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -107,205 +185,283 @@ export default function SubjectsScreen() {
       {/* Search Bar */}
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <Feather name="search" size={16} color={theme.colors.text.placeholder} style={{ marginRight: 8 }} />
-          <TextInput
-            style={styles.searchInput}
+          <Ionicons name="search" size={18} color={theme.colors.text.secondary} />
+          <TextInput 
+            style={styles.searchInput} 
             placeholder={t('subjects.searchPlaceholder')}
-            placeholderTextColor={theme.colors.text.placeholder}
-            value={search}
-            onChangeText={setSearch}
+            placeholderTextColor={theme.colors.text.secondary}
           />
         </View>
         <TouchableOpacity style={styles.filterBtn}>
-          <Feather name="filter" size={18} color={theme.colors.text.secondary} />
+          <Feather name="sliders" size={18} color={theme.colors.text.primary} />
         </TouchableOpacity>
       </View>
 
+      {/* Subject Pills Selection */}
+      <View>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={styles.pillsScroll}
+          contentContainerStyle={{ paddingRight: 20 }}
+        >
+          {subjects.map((s, idx) => {
+            const colors = ['#5856D6', '#FF9500', '#34C759', '#FF2D55', '#AF52DE', '#FF3B30'];
+            const color = colors[idx % colors.length];
+            const isActive = selectedSubject?.id === s.id;
+            
+            return (
+              <TouchableOpacity 
+                key={s.id} 
+                style={[styles.pill, isActive && styles.pillActive]}
+                onPress={() => setSelectedSubject(s)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.pillColor, { backgroundColor: color }]} />
+                <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
+                  {s.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
-        {/* ── ENROLLED SUBJECTS ── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t('subjects.enrolledSubjects')}</Text>
-            <Text style={styles.sectionHint}>{t('subjects.tapToView')}</Text>
+        {selectedSubject ? (
+          <View style={styles.section}>
+            <SubjectHeroCard 
+              color={selectedSubject.color}
+              iconName={selectedSubject.icon}
+              title={selectedSubject.name}
+              subtitle={selectedSubject.professor || t('subjects.noProfessor')}
+              meta={`${selectedSubject.credits || 0} ${t('subjects.credits')}`}
+              progress={selectedSubject.completion_percent || 0}
+              avgScore={selectedSubject.avg_score || 0}
+            />
           </View>
+        ) : (
+          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+            <MaterialCommunityIcons name="book-open-variant" size={48} color="rgba(255,255,255,0.1)" />
+            <Text style={{ color: theme.colors.text.secondary, marginTop: 16 }}>
+              {t('subjects.selectSubjectToView', 'Selecciona una materia para ver detalles')}
+            </Text>
+          </View>
+        )}
 
-          {filtered.map(subject => (
-            <TouchableOpacity
-              key={subject.id}
-              activeOpacity={0.85}
-              onPress={() => setSelectedSubject(subject)}
-              style={[styles.subjectCard, selectedSubject.id === subject.id && styles.subjectCardSelected]}
-            >
-              <View style={styles.subjectTop}>
-                {/* Colored abbreviation circle */}
-                <View style={[styles.codeCircle, { backgroundColor: subject.color }]}>
-                  <Text style={styles.codeText}>{subject.code}</Text>
-                </View>
-
-                {/* Name & professor */}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.subjectName}>{subject.name}</Text>
-                  <Text style={styles.subjectProf}>{subject.professor}</Text>
-                </View>
-
-                {/* Credits & average */}
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.creditsText}>{subject.credits} {t('subjects.credits')}</Text>
-                  <Text style={[styles.avgText, { color: getAvgColor(subject.avg) }]}>
-                    {t('subjects.avg')} {subject.avg}%
-                  </Text>
-                </View>
-              </View>
-
-              {/* Progress bar */}
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${subject.avg}%`, backgroundColor: getAvgColor(subject.avg) }]} />
-              </View>
-
-              {/* Bottom row */}
-              <View style={styles.subjectBottom}>
-                <TouchableOpacity style={styles.assessmentBtn}>
-                  <Ionicons name="add" size={14} color={theme.colors.white} />
-                  <Text style={styles.assessmentBtnText}>{t('subjects.assessment')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconAction}>
-                  <Ionicons name="notifications-outline" size={18} color={theme.colors.text.secondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconAction}>
-                  <Ionicons name="camera-outline" size={18} color={theme.colors.text.secondary} />
-                </TouchableOpacity>
-                <Text style={styles.nextLabel}>{subject.nextLabel}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* ── CALCULATOR: MINIMUM GRADE TO PASS ── */}
         <View style={styles.calcCard}>
           <View style={styles.calcHeaderRow}>
             <Text style={styles.calcTitle}>{t('subjects.minGradeTitle')}</Text>
-            <Text style={styles.calcSubject}>{selectedSubject.name}</Text>
+            <Text style={styles.calcSubject}>{selectedSubject?.name || t('subjects.selectSubject') || 'Selecciona una materia'}</Text>
           </View>
 
-          {/* Three number inputs */}
-          <View style={styles.calcInputsRow}>
-            {[
-              { label: t('subjects.currentGrade'), value: currentGrade, setter: setCurrentGrade },
-              { label: t('subjects.requiredPass'), value: requiredPass, setter: setRequiredPass },
-              { label: t('subjects.remainingWeight'), value: remainingWeight, setter: setRemainingWeight },
-            ].map((field, i) => (
-              <View key={i} style={styles.calcInputBox}>
-                <Text style={styles.calcInputLabel}>{field.label}</Text>
-                <TextInput
-                  style={styles.calcInput}
-                  keyboardType="numeric"
-                  value={field.value}
-                  onChangeText={field.setter}
-                  maxLength={5}
-                />
-              </View>
-            ))}
-          </View>
-
-          <Text style={styles.calcHint}>{t('subjects.minAvgNeeded')}</Text>
-
-          {/* Result */}
-          {minNeeded !== null && (
+          {!selectedSubject ? (
+            <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+              <MaterialCommunityIcons name="lightbulb-outline" size={40} color="rgba(255,255,255,0.1)" />
+              <Text style={{ color: theme.colors.text.secondary, marginTop: 12, fontSize: 13, textAlign: 'center' }}>
+                {t('subjects.selectSubjectToCalculate') || 'Selecciona una materia para simular calificaciones'}
+              </Text>
+            </View>
+          ) : (
             <>
-              <Text style={[styles.calcResult, { color: getStatusColor(minNeeded) }]}>
-                {minNeeded}%
-              </Text>
-              <Text style={[styles.calcStatus, { color: getStatusColor(minNeeded) }]}>
-                {getStatus(minNeeded, t)}
-              </Text>
-
-              {/* Status bar */}
-              <View style={styles.statusBar}>
-                <View style={[styles.statusSegment, { backgroundColor: '#FF2D55', borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }]} />
-                <View style={[styles.statusSegment, { backgroundColor: '#FF9500' }]} />
-                <View style={[styles.statusSegment, { backgroundColor: '#34C759', borderTopRightRadius: 4, borderBottomRightRadius: 4 }]} />
+              {/* Labels row */}
+              <View style={styles.calcLabelsRow}>
+                {[
+                  t('subjects.currentGrade'),
+                  t('subjects.requiredPass'),
+                  t('subjects.remainingWeight'),
+                ].map((label, i) => (
+                  <View key={i} style={styles.calcLabelBox}>
+                    <Text style={styles.calcInputLabel}>{label}</Text>
+                  </View>
+                ))}
               </View>
-              <View style={styles.statusLegend}>
-                <Text style={[styles.legendText, { color: '#FF2D55' }]}>● {t('subjects.failRisk')}</Text>
-                <Text style={[styles.legendText, { color: '#FF9500' }]}>● {t('subjects.borderline')}</Text>
-                <Text style={[styles.legendText, { color: '#34C759' }]}>● {t('subjects.safe')}</Text>
+
+              {/* Inputs row */}
+              <View style={styles.calcInputsRow}>
+                {[
+                  { value: currentGrade, setter: setCurrentGrade, placeholder: selectedSubject?.avg_score ? selectedSubject.avg_score.toFixed(1) : '0' },
+                  { value: requiredPass, setter: setRequiredPass, placeholder: selectedSubject?.target_grade ? `${selectedSubject.target_grade}` : '60' },
+                  { value: remainingWeight, setter: setRemainingWeight, placeholder: '%' },
+                ].map((field, i) => (
+                  <View key={i} style={styles.calcInputBox}>
+                    <TextInput
+                      style={styles.calcInput}
+                      keyboardType="numeric"
+                      value={field.value}
+                      onChangeText={field.setter}
+                      placeholder={field.placeholder}
+                      placeholderTextColor={theme.colors.text.placeholder}
+                      maxLength={5}
+                    />
+                  </View>
+                ))}
+              </View>
+
+              <Text style={styles.calcHint}>{t('subjects.minAvgNeeded')}</Text>
+
+              {/* Result */}
+              {minNeeded !== null && (
+                <>
+                  <Text style={[styles.calcResult, { color: getStatusColor(minNeeded, parseFloat(requiredPass || '60')) }]}>
+                    {minNeeded}
+                  </Text>
+                  <Text style={[styles.calcStatus, { color: getStatusColor(minNeeded, parseFloat(requiredPass || '60')) }]}>
+                    {getStatus(minNeeded, parseFloat(requiredPass || '60'), t)}
+                  </Text>
+
+                  {/* Status bar */}
+                  <View style={styles.statusBar}>
+                    <View style={[styles.statusSegment, { backgroundColor: '#FF2D55', borderTopLeftRadius: 3, borderBottomLeftRadius: 3 }]} />
+                    <View style={[styles.statusSegment, { backgroundColor: '#FF9500' }]} />
+                    <View style={[styles.statusSegment, { backgroundColor: '#34C759', borderTopRightRadius: 3, borderBottomRightRadius: 3 }]} />
+                  </View>
+                  <View style={styles.statusLegend}>
+                    <Text style={[styles.legendText, { color: '#FF2D55' }]}>● {t('subjects.failRisk')}</Text>
+                    <Text style={[styles.legendText, { color: '#FF9500' }]}>● {t('subjects.borderline')}</Text>
+                    <Text style={[styles.legendText, { color: '#34C759' }]}>● {t('subjects.safe')}</Text>
+                  </View>
+                </>
+              )}
+
+              {/* Action buttons */}
+              <View style={styles.calcActions}>
+                <TouchableOpacity style={[styles.calcBtn, { flex: 1.2 }]} onPress={handleSimulate}>
+                  <Text style={styles.calcBtnText}>{t('subjects.simulate')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.calcBtn, styles.calcBtnSecondary]} onPress={handleSaveTarget}>
+                  <Text style={styles.calcBtnSecText}>{t('subjects.saveThreshold')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.calcBtnReset} onPress={handleReset}>
+                  <Text style={styles.calcBtnSecText}>{t('subjects.reset')}</Text>
+                </TouchableOpacity>
               </View>
             </>
           )}
-
-          {/* Action buttons */}
-          <View style={styles.calcActions}>
-            <TouchableOpacity style={styles.calcBtn} onPress={handleSimulate}>
-              <Text style={styles.calcBtnText}>{t('subjects.simulate')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.calcBtn, styles.calcBtnSecondary]} onPress={handleSimulate}>
-              <Text style={styles.calcBtnSecText}>{t('subjects.saveThreshold')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.calcBtnReset} onPress={handleReset}>
-              <Text style={styles.calcBtnSecText}>{t('subjects.reset')}</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* ── ASSESSMENTS ── */}
-        <View style={styles.assessCard}>
-          <View style={styles.assessHeader}>
-            <Text style={styles.assessTitle}>{selectedSubject.name} – {t('subjects.assessments')}</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+        {selectedSubject && (
+          <View style={styles.assessCard}>
+            <View style={[styles.assessHeader, { marginBottom: 16 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ backgroundColor: theme.colors.primary + '15', padding: 6, borderRadius: 8 }}>
+                  <MaterialCommunityIcons name="clipboard-check-outline" size={18} color={theme.colors.primary} />
+                </View>
+                <View>
+                  <Text style={[styles.assessTitle, { marginBottom: 2 }]}>{t('subjects.academicTracking', 'Seguimiento académico')}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#34C759' }} />
+                    <Text style={{ fontSize: 10, color: theme.colors.text.secondary, fontWeight: '600' }}>
+                      {assessments.length} {t('subjects.registered', 'notas registradas')}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              
               <TouchableOpacity style={styles.addAssessBtn}>
-                <Ionicons name="add" size={14} color={theme.colors.white} />
+                <Ionicons name="add" size={16} color={theme.colors.white} />
                 <Text style={styles.addAssessBtnText}>{t('subjects.add')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity>
-                <Feather name="edit-2" size={18} color={theme.colors.text.secondary} />
+            </View>
+
+            {assessments.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                <MaterialCommunityIcons name="clipboard-text-outline" size={32} color="rgba(0,0,0,0.1)" />
+                <Text style={{ color: theme.colors.text.secondary, marginTop: 12, fontSize: 12 }}>
+                  {t('subjects.noAssessments')}
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.assessList}>
+                {assessments.map(a => {
+                  const iconMap: Record<string, string> = {
+                    'task': 'clipboard-check-outline',
+                    'exam': 'file-document-outline',
+                    'quiz': 'help-circle-outline',
+                    'grade': 'medal-outline',
+                  };
+                  const icon = iconMap[a.type as string] || 'school-outline';
+                  const score = a.score ?? a.grade_value;
+                  const colors = ['#5856D6', '#FF9500', '#34C759', '#FF2D55'];
+                  const color = colors[assessments.indexOf(a) % colors.length];
+
+                  return (
+                    <TouchableOpacity key={a.id} style={styles.assessRow} activeOpacity={0.6}>
+                      <View style={styles.assessIcon}>
+                        <MaterialCommunityIcons name={icon as any} size={18} color={color} />
+                      </View>
+                      <View style={styles.assessBody}>
+                        <Text style={styles.assessName} numberOfLines={1}>{a.name}</Text>
+                        <Text style={styles.assessMeta}>{a.date || 'Sin fecha'}</Text>
+                      </View>
+                      <View style={styles.assessRight}>
+                        <Text style={[styles.assessScore, { color: color }]}>
+                          {score !== null && score !== undefined ? score : '—'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+            {/* Performance sparkline (dynamic based on last 6 assessments) */}
+            <View style={styles.sparklineContainer}>
+                  <Text style={styles.sparklineLabel}>{t('subjects.performanceTrend')}</Text>
+                  <View style={styles.sparklineWrapper}>
+                    {/* Y Axis Labels */}
+                    <View style={styles.sparklineYAxis}>
+                      <Text style={[styles.yAxisLabel, { top: -6 }]}>5.0</Text>
+                      <Text style={[styles.yAxisLabel, { top: 18 }]}>3.0</Text>
+                      <Text style={[styles.yAxisLabel, { bottom: -6 }]}>0.0</Text>
+                    </View>
+                    
+                    <View style={[styles.sparkline, styles.sparklineMain]}>
+                      {(assessments.filter(a => (a.score !== null && a.score !== undefined) || (a.grade_value !== null && a.grade_value !== undefined)).slice(-6)).map((a, i, arr) => {
+                        const score = a.score ?? a.grade_value ?? 0;
+                        // Determine scale (5 or 100)
+                        const scale = score <= 5 ? 5 : 100;
+                        const barHeight = (score / scale) * 60;
+                        const isLast = i === arr.length - 1;
+                        const colors = ['#5856D6', '#FF9500', '#34C759', '#FF2D55'];
+                        const color = colors[assessments.indexOf(a) % colors.length];
+                        
+                        return (
+                          <View 
+                            key={a.id || i} 
+                            style={[
+                              styles.sparkBar, 
+                              { 
+                                height: Math.max(barHeight, 2), 
+                                backgroundColor: isLast ? color : color + '99'
+                              }
+                            ]} 
+                          />
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Photo link row */}
+            <View style={styles.photoRow}>
+              <Ionicons name="camera-outline" size={18} color={theme.colors.text.secondary} />
+              <Text style={styles.photoText}>{t('subjects.linkPhoto')}</Text>
+              <TouchableOpacity style={styles.photoBtn}>
+                <Ionicons name="camera" size={14} color={theme.colors.white} />
+                <Text style={styles.photoBtnText}>{t('subjects.photo')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.photoBtn, { backgroundColor: theme.colors.inputBackground }]}>
+                <Text style={[styles.photoBtnText, { color: theme.colors.text.primary }]}>{t('subjects.remind')}</Text>
               </TouchableOpacity>
             </View>
           </View>
-
-          {ASSESSMENTS.map(a => (
-            <View key={a.id} style={styles.assessRow}>
-              <View style={[styles.assessIconBox, { backgroundColor: a.color + '20' }]}>
-                <MaterialCommunityIcons name={a.icon as any} size={22} color={a.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.assessName}>{a.name}</Text>
-                <Text style={styles.assessMeta}>
-                  {t('subjects.dueDate')} {a.due} · {t('subjects.weight')} {a.weight}
-                </Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.assessScore}>{t('subjects.score')} {a.score}</Text>
-                <TouchableOpacity>
-                  <Text style={[styles.editText]}>{t('subjects.edit')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-
-          {/* Performance sparkline (visual placeholder) */}
-          <View style={styles.sparklineContainer}>
-            <Text style={styles.sparklineLabel}>{t('subjects.performanceTrend')}</Text>
-            <View style={styles.sparkline}>
-              {[30, 55, 40, 70, 60, 82].map((h, i) => (
-                <View key={i} style={[styles.sparkBar, { height: h * 0.6, backgroundColor: theme.colors.primary + (i === 5 ? 'ff' : '55') }]} />
-              ))}
-            </View>
-          </View>
-
-          {/* Photo link row */}
-          <View style={styles.photoRow}>
-            <Ionicons name="camera-outline" size={18} color={theme.colors.text.secondary} />
-            <Text style={styles.photoText}>{t('subjects.linkPhoto')}</Text>
-            <TouchableOpacity style={styles.photoBtn}>
-              <Ionicons name="camera" size={14} color={theme.colors.white} />
-              <Text style={styles.photoBtnText}>{t('subjects.photo')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.photoBtn, { backgroundColor: theme.colors.inputBackground }]}>
-              <Text style={[styles.photoBtnText, { color: theme.colors.text.primary }]}>{t('subjects.remind')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
 
       </ScrollView>
     </SafeAreaView>
