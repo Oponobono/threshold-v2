@@ -18,9 +18,8 @@ exports.aiChat = async (req, res) => {
     return res.status(500).json({ error: 'Groq API Key no está configurada' });
   }
 
-  // Limitar el contexto para evitar errores de límite de tokens en Groq (TPM)
-  // Ajustado para el modelo 8B que permite más margen
-  const MAX_CONTEXT_CHARS = 30000;
+  // Limitar el contexto drásticamente por límites de cuenta (6000 TPM)
+  const MAX_CONTEXT_CHARS = 12000;
   const contextLength = context_text ? context_text.length : 0;
   const trimmedContext = contextLength > MAX_CONTEXT_CHARS
     ? context_text.substring(0, MAX_CONTEXT_CHARS) + '\n\n[...Archivo demasiado extenso, contexto truncado por seguridad...]'
@@ -378,9 +377,9 @@ exports.generateFlashcards = async (req, res) => {
     return res.status(500).json({ error: 'Groq API Key no está configurada' });
   }
 
-  // Limitar el contexto a ~80k caracteres para no exceder el límite de tokens del modelo
-  const trimmedContext = context_text.length > 80000
-    ? context_text.substring(0, 80000) + '\n[...contexto truncado por longitud]'
+  // Limitar el contexto drásticamente por límites de cuenta (6000 TPM)
+  const trimmedContext = context_text.length > 12000
+    ? context_text.substring(0, 12000) + '\n[...contexto truncado por longitud]'
     : context_text;
 
   const systemPrompt = `Tu nombre es Zyren. Eres un experto pedagogo universitario. Tu tarea es generar exactamente ${count} flashcards de estudio a partir del material académico proporcionado.
