@@ -159,7 +159,7 @@ exports.aiChat = async (req, res) => {
 
   const systemMessage = {
     role: 'system',
-    content: `Eres "Threshold AI", un tutor académico personal experto y paciente. 
+    content: `Eres "Zyren", un tutor académico personal experto y paciente. 
 Tu objetivo es responder a las preguntas del estudiante basándote PRINCIPALMENTE en el siguiente material de sus clases.
 
 --- CONTEXTO DE LA MATERIA ---

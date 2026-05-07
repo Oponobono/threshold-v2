@@ -1,7 +1,7 @@
 # AI Assistant Chat: File Content Flow Analysis
 
 ## Overview
-This document traces how the Threshold AI assistant chat reads and passes content from selected files to the backend AI service.
+This document traces how the Zyren assistant chat reads and passes content from selected files to the backend AI service.
 
 ---
 
@@ -354,7 +354,7 @@ exports.aiChat = async (req, res) => {
   // Build system prompt with user's context
   const systemMessage = {
     role: 'system',
-    content: `Eres "Threshold AI", un tutor académico personal experto y paciente. 
+    content: `Eres "Zyren", un tutor académico personal experto y paciente. 
 Tu objetivo es responder a las preguntas del estudiante basándote PRINCIPALMENTE en el siguiente material de sus clases (transcripciones, apuntes, documentos).
 
 REGLAS:

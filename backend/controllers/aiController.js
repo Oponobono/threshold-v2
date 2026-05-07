@@ -3,7 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 /**
- * Chat con el tutor IA usando contexto de la materia (Groq)
+ * Chat con Zyren usando contexto de la materia (Groq)
  */
 exports.aiChat = async (req, res) => {
   const { context_text, messages } = req.body;
@@ -19,7 +19,7 @@ exports.aiChat = async (req, res) => {
 
   const systemMessage = {
     role: 'system',
-    content: `Eres "Threshold AI", un tutor académico personal experto y paciente. 
+    content: `Eres "Zyren", un tutor académico personal experto y paciente. 
 Tu objetivo es responder a las preguntas del estudiante basándote PRINCIPALMENTE en el siguiente material de sus clases (transcripciones, apuntes, documentos).
 
 REGLAS:
@@ -366,7 +366,7 @@ exports.generateFlashcards = async (req, res) => {
     ? context_text.substring(0, 80000) + '\n[...contexto truncado por longitud]'
     : context_text;
 
-  const systemPrompt = `Eres un experto pedagogo universitario. Tu tarea es generar exactamente ${count} flashcards de estudio a partir del material académico proporcionado.
+  const systemPrompt = `Tu nombre es Zyren. Eres un experto pedagogo universitario. Tu tarea es generar exactamente ${count} flashcards de estudio a partir del material académico proporcionado.
 
 REGLAS ESTRICTAS:
 1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional, sin markdown, sin explicaciones.

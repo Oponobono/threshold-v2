@@ -6,7 +6,7 @@ const aiController = require('../controllers/aiController');
  * @swagger
  * /api/ai/chat:
  *   post:
- *     summary: Chatea con el tutor IA usando contexto
+ *     summary: Chatea con Zyren usando contexto
  *     tags: [AI]
  *     requestBody:
  *       required: true
@@ -25,7 +25,7 @@ const aiController = require('../controllers/aiController');
  *                 type: integer
  *     responses:
  *       200:
- *         description: Respuesta del tutor
+ *         description: Respuesta de Zyren
  */
 router.post('/ai/chat', aiController.aiChat);
 
