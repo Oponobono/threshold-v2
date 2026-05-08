@@ -6,7 +6,7 @@
  *
  * Al presionarlo, abre el `SubjectAIContextModal` donde el usuario selecciona qué
  * archivos quiere que la IA analice. Una vez confirmada la selección:
- *   - Si elige "Preguntar a IA": construye el contexto en el backend y abre el chat.
+ *   - Si elige "Habla con Zyren": construye el contexto en el backend y abre el chat.
  *   - Si elige "Crear Flashcards": construye el contexto y delega al callback externo.
  *
  * Internamente gestiona el estado de carga mientras el backend procesa los archivos.
@@ -131,7 +131,16 @@ export const SubjectAIFab: React.FC<SubjectAIFabProps> = ({
   ) => {
     setIsContextModalVisible(false);
 
-    if (selectedItems.length === 0) return;
+    // Si no hay items seleccionados y la acción es chat → abrir sin contexto
+    if (selectedItems.length === 0) {
+      if (action === 'ask') {
+        setBuiltContext(''); // contexto vacío
+        setBuiltContextCount(0);
+        setIsChatVisible(true); // abre el chat sin archivos
+      }
+      // Si flashcards sin items → no hacer nada (requiere contenido)
+      return;
+    }
 
     setIsBuildingCtx(true);
     try {

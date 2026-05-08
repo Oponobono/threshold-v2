@@ -188,6 +188,14 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
 
   const handleAsk = useCallback(() => {
     const selected = allItems.filter(i => selectedIds.has(i.id));
+    
+    // Si no hay nada seleccionado, abrir chat sin contexto (Zyren responderá abiertamente)
+    if (selected.length === 0) {
+      showToast('💬 Abriendo chat libre. Puedes hacer preguntas sin contexto.');
+      onAskQuestions?.(selected);
+      return;
+    }
+    
     const { status, items } = checkTextReadiness(selected);
     if (status === 'all_empty') {
       showToast(getToastMessage(items));
@@ -313,21 +321,19 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             )}
 
             <View style={s.btnRow}>
-              {/* Primary: Ask Assistant */}
+              {/* Primary: Ask Assistant — HABILITADO incluso sin archivos para chat libre */}
               <TouchableOpacity
                 onPress={handleAsk}
-                disabled={totalSelected === 0}
                 activeOpacity={0.82}
                 style={[
                   s.btn, s.btnPrimary,
-                  totalSelected === 0 && s.btnDisabled,
                 ]}
               >
                 <MaterialCommunityIcons name="chat-processing-outline" size={18} color="#fff" />
-                <Text style={s.btnPrimaryText}>Preguntar a IA</Text>
+                <Text style={s.btnPrimaryText}>Habla con Zyren</Text>
               </TouchableOpacity>
 
-              {/* Secondary: Flashcards */}
+              {/* Secondary: Flashcards — REQUIERE archivos con contenido */}
               <TouchableOpacity
                 onPress={handleFlashcards}
                 disabled={totalSelected === 0}
