@@ -24,6 +24,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { sendAIChatMessage, getChatHistory, clearChatHistory, processDocumentUpload } from '../services/api/ai';
 import { LLMProvider, getPreferredLLMProvider } from '../utils/llmProviderManager';
 import * as DocumentPicker from 'expo-document-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Markdown from 'react-native-markdown-display';
 
 // ─── Tokens de color (misma paleta que SubjectAIContextModal) ─────────────────
 const PRIMARY  = '#7B72FF';
@@ -39,6 +41,10 @@ const AI_BG    = `${PRIMARY}18`;
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  isDocument?: boolean;
+  documentStatus?: 'loading' | 'success' | 'error';
+  documentName?: string;
+  documentId?: string;
 }
 
 export interface SubjectAIChatModalProps {
@@ -61,6 +67,26 @@ export interface SubjectAIChatModalProps {
 // ─── Burbuja de mensaje ───────────────────────────────────────────────────────
 const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
   const isUser = msg.role === 'user';
+  
+  if (msg.isDocument) {
+    return (
+      <View style={[s.bubbleRow, s.bubbleRowUser]}>
+        <View style={[s.bubble, s.bubbleUser, { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, minWidth: 200 }]}>
+          <Ionicons name="document-text" size={24} color={PRIMARY} />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.bubbleText, s.bubbleTextUser, { fontWeight: '600' }]} numberOfLines={1}>
+              {msg.documentName}
+            </Text>
+            <Text style={{ fontSize: 11, color: TXT_SEC, marginTop: 2 }}>Documento subido</Text>
+          </View>
+          {msg.documentStatus === 'loading' && <ActivityIndicator size="small" color={PRIMARY} />}
+          {msg.documentStatus === 'success' && <Ionicons name="checkmark-circle" size={20} color={ASK_CLR} />}
+          {msg.documentStatus === 'error' && <Ionicons name="close-circle" size={20} color="#FF3B30" />}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[s.bubbleRow, isUser ? s.bubbleRowUser : s.bubbleRowAI]}>
       {/* Ícono del asistente solo para mensajes IA */}
@@ -70,9 +96,15 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
         </View>
       )}
       <View style={[s.bubble, isUser ? s.bubbleUser : s.bubbleAI]}>
-        <Text style={[s.bubbleText, isUser ? s.bubbleTextUser : s.bubbleTextAI]}>
-          {msg.content}
-        </Text>
+        {!isUser ? (
+          <Markdown style={markdownStyles}>
+            {msg.content}
+          </Markdown>
+        ) : (
+          <Text style={[s.bubbleText, s.bubbleTextUser]}>
+            {msg.content}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -141,6 +173,59 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [isTruncated, setIsTruncated] = useState(false);
   const [currentProvider, setCurrentProvider] = useState<LLMProvider>('groq');
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [localContextText, setLocalContextText] = useState(contextText);
+  const [uploadedDocContext, setUploadedDocContext] = useState('');
+  
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastAnim = useRef(new Animated.Value(-100)).current;
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    toastAnim.setValue(-100);
+    Animated.sequence([
+      Animated.timing(toastAnim, { toValue: 20, duration: 300, useNativeDriver: true }),
+      Animated.delay(5000),
+      Animated.timing(toastAnim, { toValue: -100, duration: 300, useNativeDriver: true })
+    ]).start(() => setToastMessage(null));
+  }, [toastAnim]);
+
+  useEffect(() => {
+    setLocalContextText(contextText);
+  }, [contextText]);
+
+  // Cargar documento subido desde AsyncStorage (expira a las 12 horas)
+  useEffect(() => {
+    if (isVisible && subjectId) {
+      const loadSavedDoc = async () => {
+        try {
+          const key = `@chat_doc_${subjectId}`;
+          const savedStr = await AsyncStorage.getItem(key);
+          if (savedStr) {
+            const saved = JSON.parse(savedStr);
+            const now = Date.now();
+            const hours12 = 12 * 60 * 60 * 1000;
+            if (now - saved.timestamp > hours12) {
+              await AsyncStorage.removeItem(key);
+            } else {
+              setUploadedDocContext(saved.text);
+              setMessages(prev => {
+                if (prev.some(m => m.isDocument)) return prev;
+                return [...prev, {
+                  role: 'user',
+                  content: `[Documento recuperado: ${saved.fileName}]`,
+                  isDocument: true,
+                  documentName: saved.fileName,
+                  documentStatus: 'success',
+                  documentId: 'saved_doc',
+                }];
+              });
+            }
+          }
+        } catch (err) {}
+      };
+      loadSavedDoc();
+    }
+  }, [isVisible, subjectId]);
 
   /** Cargar historial y preferencia de proveedor cuando se abre el modal */
   useEffect(() => {
@@ -191,7 +276,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
     try {
       // Enviar al backend con el contexto, historial, session_id y proveedor seleccionado
-      const data = await sendAIChatMessage(contextText, updatedMessages, sessionId, currentProvider);
+      const combinedContext = localContextText + uploadedDocContext;
+      const data = await sendAIChatMessage(combinedContext, updatedMessages.filter(m => !m.isDocument), sessionId, currentProvider);
       
       // Verificar si el contexto fue truncado
       if (data?.context_truncated) {
@@ -218,7 +304,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, messages, contextText, sessionId, currentProvider]);
+  }, [inputText, isLoading, messages, localContextText, sessionId, currentProvider]);
 
   /** Limpiar la conversación actual y crear una nueva */
   const handleClearHistory = useCallback(async () => {
@@ -256,36 +342,64 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       console.log(`[AIChat] Documento seleccionado: ${file.name}, ${file.size} bytes`);
 
       setIsUploadingDocument(true);
+      const docId = Date.now().toString();
 
-      // Mostrar mensaje de que está procesando
-      const processingMsg: Message = {
-        role: 'assistant',
-        content: `📄 Procesando documento: ${file.name}...\n\nEsto puede tomar algunos segundos.`,
+      const docMsg: Message = {
+        role: 'user',
+        content: `[Documento adjunto: ${file.name}]`,
+        isDocument: true,
+        documentName: file.name,
+        documentStatus: 'loading',
+        documentId: docId,
       };
-      setMessages(prev => [...prev, processingMsg]);
+      
+      setMessages(prev => [...prev, docMsg]);
 
-      // Leer el archivo como blob
-      const response = await fetch(file.uri);
-      const blob = await response.blob();
+      // Preparar el archivo con el formato que React Native fetch FormData necesita
+      const fileObj = {
+        uri: file.uri,
+        name: file.name || 'documento.pdf',
+        type: file.mimeType || 'application/pdf',
+      };
 
       // Procesar con Gemini
-      const processResult = await processDocumentUpload(blob, `Resume este documento en puntos clave para un estudiante. Mantén la respuesta concisa pero informativa.`);
+      const processResult = await processDocumentUpload(fileObj, `Extrae la información completa y puntos clave de este documento para que sirva de contexto en nuestra conversación.`);
 
-      // Remover mensaje de procesamiento
-      setMessages(prev => prev.slice(0, -1));
+      const newDocText = `\n\n[DOCUMENTO SUBIDO: ${file.name}]\n${processResult.result}`;
 
-      // Agregar resultado del procesamiento como contexto
-      const contextMsg: Message = {
-        role: 'assistant',
-        content: `✅ Documento procesado: **${processResult.fileName}** (${processResult.fileSize})\n\n${processResult.result}`,
-      };
-      setMessages(prev => [...prev, contextMsg]);
+      // Actualizar el estado del mensaje a success y remover documentos anteriores
+      setMessages(prev => {
+        const filtered = prev.filter(m => !m.isDocument || m.documentId === docId);
+        return filtered.map(m => m.documentId === docId ? { ...m, documentStatus: 'success' } : m);
+      });
+
+      // Actualizar el contexto del documento subido
+      setUploadedDocContext(newDocText);
+
+      // Guardar en AsyncStorage para mantenerlo por 12 horas
+      if (subjectId) {
+        AsyncStorage.setItem(`@chat_doc_${subjectId}`, JSON.stringify({
+          fileName: file.name,
+          text: newDocText,
+          timestamp: Date.now(),
+        })).catch(console.warn);
+      }
+
+      // Mostrar el toast informativo
+      showToast(`El documento estará disponible por 12 horas o hasta subir uno nuevo.`);
 
     } catch (err: any) {
       console.error('[AIChat] Error al cargar documento:', err);
       
-      // Remover mensaje de procesamiento en caso de error
-      setMessages(prev => prev.slice(0, -1));
+      // Actualizar el estado del mensaje a error
+      setMessages(prev => {
+        const lastDocs = prev.filter(m => m.isDocument && m.documentStatus === 'loading');
+        if (lastDocs.length > 0) {
+           const lastDocId = lastDocs[lastDocs.length - 1].documentId;
+           return prev.map(m => m.documentId === lastDocId ? { ...m, documentStatus: 'error' } : m);
+        }
+        return prev;
+      });
 
       const errorMsg: Message = {
         role: 'assistant',
@@ -314,6 +428,14 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
             {/* Asa de arrastre */}
             <View style={s.handle} />
+
+            {/* Toast Flotante */}
+            {toastMessage && (
+              <Animated.View style={[s.toastContainer, { transform: [{ translateY: toastAnim }] }]}>
+                <Ionicons name="information-circle" size={18} color="#FFF" />
+                <Text style={s.toastText}>{toastMessage}</Text>
+              </Animated.View>
+            )}
 
             {/* Encabezado */}
             <View style={s.header}>
@@ -369,19 +491,17 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Botón upload documento */}
-              <TouchableOpacity
-                style={s.clearBtn}
-                onPress={handleUploadDocument}
-                disabled={isLoading || isUploadingDocument}
-                activeOpacity={0.7}
-              >
-                {isUploadingDocument ? (
-                  <ActivityIndicator size={16} color={TXT_SEC} />
-                ) : (
+              {/* Botón upload documento (Solo Gemini) */}
+              {currentProvider === 'gemini' && (
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={handleUploadDocument}
+                  disabled={isLoading || isUploadingDocument}
+                  activeOpacity={0.7}
+                >
                   <Ionicons name="document-attach-outline" size={16} color={TXT_SEC} />
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+              )}
 
               {/* Cerrar */}
               <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.7}>
@@ -679,4 +799,58 @@ const s = StyleSheet.create({
   providerLabelDisabled: {
     opacity: 0.5,
   },
+  
+  // Toast
+  toastContainer: {
+    position: 'absolute',
+    top: 10,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(123,114,255,0.9)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  toastText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+  },
+});
+
+const markdownStyles = StyleSheet.create({
+  body: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: TXT_PRI,
+  },
+  strong: {
+    fontWeight: 'bold',
+  },
+  em: {
+    fontStyle: 'italic',
+  },
+  link: {
+    color: PRIMARY,
+    textDecorationLine: 'underline',
+  },
+  heading1: { fontSize: 18, fontWeight: 'bold', color: TXT_PRI, marginTop: 10, marginBottom: 4 },
+  heading2: { fontSize: 16, fontWeight: 'bold', color: TXT_PRI, marginTop: 8, marginBottom: 4 },
+  heading3: { fontSize: 15, fontWeight: 'bold', color: TXT_PRI, marginTop: 6, marginBottom: 4 },
+  bullet_list: { marginTop: 4, marginBottom: 4 },
+  ordered_list: { marginTop: 4, marginBottom: 4 },
+  list_item: { marginBottom: 4 },
+  paragraph: { marginTop: 4, marginBottom: 4 },
+  code_inline: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 4, borderRadius: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  code_block: { backgroundColor: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginVertical: 6 },
 });

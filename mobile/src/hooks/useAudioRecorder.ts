@@ -212,8 +212,15 @@ export function useAudioRecorder() {
     }
   }, [t]);
 
+  const isStartingRef = useRef(false);
+
   // ── Recording controls ────────────────────────────────────────────────────
   async function startRecording() {
+    if (isStartingRef.current || isRecording || recording) {
+      console.warn('[useAudioRecorder] startRecording ignorado: ya está grabando o iniciando');
+      return;
+    }
+    isStartingRef.current = true;
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') {
@@ -253,6 +260,8 @@ export function useAudioRecorder() {
     } catch (err) {
       console.error('Failed to start recording', err);
       alertRef.show({ title: t('common.error'), message: t('dashboard.audioRecorderModal.recordingError'), type: 'error' });
+    } finally {
+      isStartingRef.current = false;
     }
   }
 

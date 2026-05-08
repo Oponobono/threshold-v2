@@ -157,17 +157,17 @@ export const generateFlashcardsFromContext = async (
  * Procesa un documento cargado directamente (sin guardar en disco).
  * Envía el archivo multipart/form-data a Gemini.
  *
- * @param file - Archivo a procesar (Blob o File)
+ * @param file - Archivo a procesar (objeto con uri, name, type)
  * @param prompt - Instrucción para procesar el documento
  * @returns Resultado del procesamiento de Gemini
  */
 export const processDocumentUpload = async (
-  file: Blob | File,
+  file: { uri: string; name: string; type: string } | any,
   prompt: string,
 ): Promise<{ result: string; fileName: string; fileSize: string }> => {
   try {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', file as any);
     formData.append('prompt', prompt);
 
     console.log(`[AI Service] 📄 Procesando documento: ${file.name || 'archivo'}`);
@@ -197,17 +197,17 @@ export const processDocumentUpload = async (
  * Genera flashcards desde un archivo cargado directamente.
  * Procesa en memoria con Gemini.
  *
- * @param file - Archivo a procesar (Blob o File)
+ * @param file - Archivo a procesar (objeto con uri, name, type)
  * @param count - Número de flashcards a generar (default: 10)
  * @returns Array de flashcards { front, back }
  */
 export const generateFlashcardsUpload = async (
-  file: Blob | File,
+  file: { uri: string; name: string; type: string } | any,
   count: number = 10,
 ): Promise<{ front: string; back: string }[]> => {
   try {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', file as any);
     formData.append('count', String(count));
 
     console.log(`[AI Service] 📚 Generando ${count} flashcards desde: ${file.name || 'archivo'}`);
