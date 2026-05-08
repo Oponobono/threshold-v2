@@ -481,7 +481,6 @@ module.exports = {
   processAcademicChat,
   generateFlashcardsFromDocument,
   generateFlashcardsFromBuffer,
-  generateFlashcardsFromText,
   getModelInfo,
   MODEL_NAME,
 };
