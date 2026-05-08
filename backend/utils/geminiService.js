@@ -13,7 +13,7 @@ const fs = require("fs").promises;
 const path = require("path");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL_NAME = "gemini-2.0-flash"; // Modelo más nuevo disponible
+const MODEL_NAME = "gemini-3-flash-preview"; // Modelo recomendado (May 2026): balance ideal entre inteligencia y velocidad
 
 // ✅ SAFETY SETTINGS CORREGIDOS - Usar strings en lugar de objetos HarmCategory
 // Las categorías válidas son strings, no objetos de la librería
@@ -306,6 +306,64 @@ Genera las flashcards:`;
 }
 
 /**
+ * Genera flashcards desde texto (contexto académico)
+ * Ideal para: Texto corto, resúmenes, apuntes
+ *
+ * @param {string} text - Texto académico para generar flashcards
+ * @param {number} count - Número de flashcards a generar
+ * @returns {Promise<Array>} Array de { question, answer }
+ */
+async function generateFlashcardsFromText(text, count = 10) {
+  try {
+    console.log(
+      `[Gemini] Generando ${count} flashcards desde texto (${text.length} chars)`
+    );
+
+    const prompt = `Eres un experto pedagogo. Analiza este texto y genera exactamente ${count} flashcards de estudio.
+
+REGLAS ESTRICTAS:
+1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional.
+2. Cada elemento: { "front": "...", "back": "..." }
+3. Preguntas precisas y directas. Respuestas concisas pero completas.
+4. Cubre conceptos clave. Evita trivialidades.
+5. Formato exacto: [{"front": "...", "back": "..."}, ...]
+
+Texto:
+${text}
+
+Genera las flashcards:`;
+
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      safetySettings: SAFETY_SETTINGS,
+    });
+
+    const result = await model.generateContent([{ text: prompt }]);
+    const response = result.response.text();
+
+    // Parsear respuesta JSON
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error("Gemini no retornó un array JSON válido");
+    }
+
+    const flashcards = JSON.parse(jsonMatch[0]);
+
+    if (!Array.isArray(flashcards)) {
+      throw new Error("Respuesta no es un array");
+    }
+
+    console.log(
+      `[Gemini] ${flashcards.length} flashcards generadas exitosamente desde texto`
+    );
+    return flashcards;
+  } catch (error) {
+    console.error(`[Gemini] Error generando flashcards desde texto:`, error.message);
+    throw error;
+  }
+}
+
+/**
  * Obtiene información sobre límites y disponibilidad
  */
 function getModelInfo() {
@@ -324,6 +382,7 @@ module.exports = {
   processTextInline,
   processAcademicChat,
   generateFlashcardsFromDocument,
+  generateFlashcardsFromText,
   getModelInfo,
   MODEL_NAME,
 };

@@ -277,11 +277,11 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[s.providerOption, currentProvider === 'gemini' && s.providerOptionActive, s.providerOptionDisabled]}
-                  disabled={true}
-                  activeOpacity={0.3}
+                  style={[s.providerOption, currentProvider === 'gemini' && s.providerOptionActive]}
+                  onPress={() => setCurrentProvider('gemini')}
+                  activeOpacity={0.7}
                 >
-                  <Text style={[s.providerLabel, currentProvider === 'gemini' && s.providerLabelActive, s.providerLabelDisabled]}>
+                  <Text style={[s.providerLabel, currentProvider === 'gemini' && s.providerLabelActive]}>
                     🧠
                   </Text>
                 </TouchableOpacity>

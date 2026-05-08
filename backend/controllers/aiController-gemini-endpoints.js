@@ -46,7 +46,7 @@ exports.processDocumentWithGemini = async (req, res) => {
       success: true,
       provider: 'gemini',
       result,
-      model: 'gemini-3-flash',
+      model: 'gemini-3-flash-preview',
     });
   } catch (err) {
     console.error('[ProcessDocument] Error:', err);
@@ -87,8 +87,8 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
       provider: 'gemini',
       flashcards,
       count: flashcards.length,
-      model: 'gemini-3-flash',
-      note: 'Generado con Gemini 3 Flash - Optimizado para documentos grandes',
+      model: 'gemini-3-flash-preview',
+      note: 'Generado con Gemini 3 Flash Preview - Optimizado para documentos grandes',
     });
   } catch (err) {
     console.error('[GenerateFlashcards] Error:', err);
@@ -115,7 +115,7 @@ exports.getModelInfo = async (req, res) => {
 
     const geminiInfo = {
       provider: 'gemini',
-      model: 'gemini-3-flash',
+      model: 'gemini-3-flash-preview',
       contextLimit: '1,000,000 tokens (~50KB+)',
       speed: 'Rápido (~200-500ms)',
       costOptimization: 'Extremadamente eficiente para PDFs',

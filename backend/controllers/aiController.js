@@ -1,12 +1,14 @@
 const { db } = require('../db');
 const fs = require('fs').promises;
 const path = require('path');
+const geminiService = require('../utils/geminiService');
 const { 
   processDocumentWithFilesAPI, 
   processAcademicChat, 
   generateFlashcardsFromDocument,
+  generateFlashcardsFromText,
   getModelInfo 
-} = require('../utils/geminiService');
+} = geminiService;
 
 /**
  * Helper para obtener el proveedor LLM seleccionado
@@ -441,30 +443,48 @@ exports.buildContext = async (req, res) => {
 
 /**
  * Genera flashcards estructuradas (pares pregunta/respuesta) a partir de un
- * bloque de texto de contexto académico usando Groq LLaMA.
+ * bloque de texto de contexto académico usando Groq o Gemini.
  *
- * El modelo retorna un array JSON de objetos { front, back } donde:
- *   - front: pregunta o concepto clave
- *   - back:  respuesta o definición concisa
+ * El modelo retorna un array JSON de objetos con { front, back } o { question, answer }
  */
 exports.generateFlashcards = async (req, res) => {
   const { context_text, count = 10 } = req.body;
+  const provider = getLLMProvider(req);
 
   if (!context_text) {
     return res.status(400).json({ error: 'Falta context_text para generar las flashcards.' });
   }
 
-  const groqApiKey = process.env.GROQ_API_KEY;
-  if (!groqApiKey) {
-    return res.status(500).json({ error: 'Groq API Key no está configurada' });
-  }
+  console.log(`[GenerateFlashcards] Usando proveedor: ${provider}`);
 
-  // Limitar el contexto drásticamente por límites de cuenta (6000 TPM)
-  const trimmedContext = context_text.length > 12000
-    ? context_text.substring(0, 12000) + '\n[...contexto truncado por longitud]'
-    : context_text;
+  try {
+    let flashcards = [];
+    let modelUsed = '';
 
-  const systemPrompt = `Tu nombre es Zyren. Eres un experto pedagogo universitario. Tu tarea es generar exactamente ${count} flashcards de estudio a partir del material académico proporcionado.
+    if (provider === 'gemini') {
+      // ─── GEMINI PATH ───────────────────────────────────────────────
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (!geminiApiKey) {
+        return res.status(500).json({ error: 'Gemini API Key no está configurada' });
+      }
+
+      console.log(`[GenerateFlashcards] Llamando a Gemini...`);
+      flashcards = await geminiService.generateFlashcardsFromText(context_text, count);
+      modelUsed = 'gemini-3-flash-preview';
+
+    } else {
+      // ─── GROQ PATH ────────────────────────────────────────────────
+      const groqApiKey = process.env.GROQ_API_KEY;
+      if (!groqApiKey) {
+        return res.status(500).json({ error: 'Groq API Key no está configurada' });
+      }
+
+      // Limitar el contexto por límites de Groq (6000 TPM)
+      const trimmedContext = context_text.length > 12000
+        ? context_text.substring(0, 12000) + '\n[...contexto truncado por longitud]'
+        : context_text;
+
+      const systemPrompt = `Tu nombre es Zyren. Eres un experto pedagogo universitario. Tu tarea es generar exactamente ${count} flashcards de estudio a partir del material académico proporcionado.
 
 REGLAS ESTRICTAS:
 1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional, sin markdown, sin explicaciones.
@@ -476,49 +496,60 @@ REGLAS ESTRICTAS:
 Ejemplo de respuesta válida:
 [{"front": "¿Qué es la fotosíntesis?", "back": "Proceso por el cual las plantas convierten luz solar en glucosa usando CO₂ y agua."}]`;
 
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Genera ${count} flashcards a partir de este material:\n\n${trimmedContext}` },
-        ],
-        temperature: 0.4,
-        max_tokens: 4096,
-        response_format: { type: 'json_object' },
-      }),
+      console.log(`[GenerateFlashcards] Llamando a Groq...`);
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Genera ${count} flashcards a partir de este material:\n\n${trimmedContext}` },
+          ],
+          temperature: 0.4,
+          max_tokens: 4096,
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return res.status(500).json({ error: 'Error al llamar a Groq', details: errorData });
+      }
+
+      const groqData = await response.json();
+      const rawContent = groqData.choices?.[0]?.message?.content || '{}';
+
+      // Parsear el JSON retornado por el modelo
+      try {
+        const parsed = JSON.parse(rawContent);
+        // El modelo puede retornar el array directamente o dentro de una clave
+        flashcards = Array.isArray(parsed)
+          ? parsed
+          : (parsed.flashcards || parsed.cards || parsed.data || []);
+      } catch (parseErr) {
+        console.error('Error parseando JSON de flashcards:', rawContent.substring(0, 200));
+        return res.status(500).json({ error: 'El modelo no retornó un JSON válido.', raw: rawContent.substring(0, 500) });
+      }
+
+      modelUsed = 'llama-3.1-8b-instant';
+    }
+
+    // Respuesta unificada
+    res.json({
+      success: true,
+      provider: provider,
+      model: modelUsed,
+      flashcards: flashcards,
+      count: flashcards.length,
+      note: `Generadas con ${provider.toUpperCase()} - ${modelUsed}`
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(500).json({ error: 'Error al llamar a Groq', details: errorData });
-    }
-
-    const groqData = await response.json();
-    const rawContent = groqData.choices?.[0]?.message?.content || '{}';
-
-    // Parsear el JSON retornado por el modelo
-    let flashcards = [];
-    try {
-      const parsed = JSON.parse(rawContent);
-      // El modelo puede retornar el array directamente o dentro de una clave
-      flashcards = Array.isArray(parsed)
-        ? parsed
-        : (parsed.flashcards || parsed.cards || parsed.data || []);
-    } catch (parseErr) {
-      console.error('Error parseando JSON de flashcards:', rawContent.substring(0, 200));
-      return res.status(500).json({ error: 'El modelo no retornó un JSON válido.', raw: rawContent.substring(0, 500) });
-    }
-
-    res.json({ flashcards, count: flashcards.length });
-
   } catch (err) {
+    console.error(`[GenerateFlashcards] Error:`, err.message);
     res.status(500).json({ error: 'Error generando flashcards', details: err.message });
   }
 };
@@ -558,7 +589,7 @@ exports.processDocumentWithGemini = async (req, res) => {
     res.json({
       success: true,
       provider: 'gemini',
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       result: result,
       features: [
         'Sin truncado de contexto',
@@ -578,12 +609,13 @@ exports.processDocumentWithGemini = async (req, res) => {
 
 /**
  * Genera flashcards de estudio desde un documento (PDF, Word, TXT)
- * Ideal para: Crear sets de estudio automáticamente desde materiales
+ * Soporta Groq y Gemini (recomendado para documentos grandes)
  * 
- * Retorna: Array de objetos { question, answer }
+ * Retorna: Array de objetos { question, answer } o { front, back }
  */
 exports.generateFlashcardsFromDocument = async (req, res) => {
   const { documentPath, mimeType, count = 10 } = req.body;
+  const provider = getLLMProvider(req);
 
   if (!documentPath) {
     return res.status(400).json({ error: 'Parámetro requerido: documentPath' });
@@ -595,33 +627,57 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
     });
   }
 
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  if (!geminiApiKey) {
-    return res.status(500).json({ error: 'Gemini API Key no está configurada' });
-  }
+  console.log(`[GenerateFlashcards] Documento: ${documentPath}, Proveedor: ${provider}`);
 
   try {
-    console.log(`[GenerateFlashcards] ${count} flashcards desde: ${documentPath}`);
+    let flashcards = [];
+    let modelUsed = '';
 
-    const flashcards = await geminiService.generateFlashcardsFromDocument(
-      documentPath,
-      mimeType, // null = auto-detect
-      count
-    );
+    if (provider === 'gemini') {
+      // ─── GEMINI PATH ───────────────────────────────────────────────
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (!geminiApiKey) {
+        return res.status(500).json({ error: 'Gemini API Key no está configurada' });
+      }
 
+      console.log(`[GenerateFlashcards] Llamando a Gemini Files API...`);
+      flashcards = await geminiService.generateFlashcardsFromDocument(
+        documentPath,
+        mimeType, // null = auto-detect
+        count
+      );
+      modelUsed = 'gemini-3-flash-preview';
+
+    } else {
+      // ─── GROQ PATH (requiere convertir documento a texto primero) ───
+      const groqApiKey = process.env.GROQ_API_KEY;
+      if (!groqApiKey) {
+        return res.status(500).json({ error: 'Groq API Key no está configurada' });
+      }
+
+      console.log(`[GenerateFlashcards] Groq requiere pre-procesamiento del documento`);
+      return res.status(400).json({ 
+        error: 'Para procesar documentos con Groq, primero convierte el documento a texto usando el endpoint de procesamiento.',
+        recommendation: 'Usa Gemini para documentos (endpoint: /ai/process-document) o proporciona el texto directamente (endpoint: /ai/generate-flashcards)',
+        supportedProviders: ['gemini'],
+      });
+    }
+
+    // Respuesta unificada
     res.json({
       success: true,
-      provider: 'gemini',
-      model: 'gemini-1.5-flash',
+      provider: provider,
+      model: modelUsed,
       flashcards: flashcards,
       count: flashcards.length,
       supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md'],
-      note: 'Flashcards generadas automáticamente desde documento completo'
+      note: `Generadas con ${provider.toUpperCase()} - ${modelUsed}`
     });
+
   } catch (err) {
     console.error('[GenerateFlashcards] Error:', err.message);
     res.status(400).json({
-      error: 'Error generando flashcards',
+      error: 'Error generando flashcards desde documento',
       details: err.message,
       supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md']
     });
@@ -644,7 +700,7 @@ exports.getModelInfo = async (req, res) => {
 
     const geminiInfo = {
       provider: 'gemini',
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contextLimit: '1,000,000 tokens (~50KB+)',
       speed: 'Rápido (~200-500ms)',
       costOptimization: 'Extremadamente eficiente para PDFs',
