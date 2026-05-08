@@ -48,12 +48,6 @@ const upload = multer({
   },
 });
 
-// Middleware para pasar upload al req para rutas específicas
-app.use((req, res, next) => {
-  req.upload = upload;
-  next();
-});
-
 // Middlewares
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));

@@ -1,6 +1,30 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const aiController = require('../controllers/aiController');
+
+// Configurar multer para memoria
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100 MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'text/plain',
+      'text/html',
+      'text/markdown',
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`MIME type ${file.mimetype} no soportado. Soportados: PDF, Word, TXT, HTML, Markdown`));
+    }
+  },
+});
 
 /**
  * @swagger
@@ -224,12 +248,7 @@ router.post('/ai/generate-flashcards-from-document', aiController.generateFlashc
  *       200:
  *         description: Documento procesado exitosamente
  */
-router.post('/ai/process-document-upload', (req, res, next) => {
-  req.upload.single('file')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
-    next();
-  });
-}, aiController.processDocumentUpload);
+router.post('/ai/process-document-upload', upload.single('file'), aiController.processDocumentUpload);
 
 /**
  * @swagger
@@ -262,12 +281,7 @@ router.post('/ai/process-document-upload', (req, res, next) => {
  *       200:
  *         description: Flashcards generadas exitosamente
  */
-router.post('/ai/generate-flashcards-upload', (req, res, next) => {
-  req.upload.single('file')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
-    next();
-  });
-}, aiController.generateFlashcardsUpload);
+router.post('/ai/generate-flashcards-upload', upload.single('file'), aiController.generateFlashcardsUpload);
 
 /**
  * @swagger
