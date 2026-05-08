@@ -15,6 +15,7 @@ interface SubjectHeroCardProps {
   progress?: number;
   avgScore?: number;
   onDelete?: () => void;
+  onPress?: () => void;
 }
 
 /**
@@ -41,9 +42,15 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
   progress,
   avgScore,
   onDelete,
+  onPress,
 }) => {
+  const Container = onPress ? TouchableOpacity : View;
   return (
-    <View style={[styles.heroCard, { padding: 12, borderRadius: 16 }]}>
+    <Container 
+      style={[styles.heroCard, { padding: 12, borderRadius: 16 }]}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.8 : 1}
+    >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
           <View style={{
@@ -84,6 +91,12 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
               <Ionicons name="trash-outline" size={16} color="#FF2D55" />
             </TouchableOpacity>
           )}
+
+          {onPress && (
+            <View style={{ marginLeft: -2, marginRight: -4, opacity: 0.5 }}>
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.text.primary} />
+            </View>
+          )}
         </View>
       </View>
 
@@ -106,6 +119,6 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
           </Text>
         </View>
       </View>
-    </View>
+    </Container>
   );
 };

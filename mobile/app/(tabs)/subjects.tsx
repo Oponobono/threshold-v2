@@ -4,7 +4,7 @@ import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { subjectsStyles as styles } from '../../src/styles/Subjects.styles';
@@ -36,6 +36,7 @@ const getStatus = (minNeeded: number, target: number, t: any) => {
 // ─── Main Screen ───────────────────────────────────────────────
 export default function SubjectsScreen() {
   const { t } = useTranslation();
+  const router = useRouter();
   
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
@@ -177,9 +178,6 @@ export default function SubjectsScreen() {
           <Ionicons name="school" size={22} color={theme.colors.primary} style={{ marginRight: 6 }} />
           <Text style={styles.headerTitle}>Threshold</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn}>
-          <Ionicons name="add" size={24} color={theme.colors.white} />
-        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -217,7 +215,7 @@ export default function SubjectsScreen() {
                 onPress={() => setSelectedSubject(s)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.pillColor, { backgroundColor: color }]} />
+                <View style={[styles.pillColor, { backgroundColor: s.color || color }]} />
                 <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
                   {s.name}
                 </Text>
@@ -238,6 +236,7 @@ export default function SubjectsScreen() {
               meta={`${selectedSubject.credits || 0} ${t('subjects.credits')}`}
               progress={selectedSubject.completion_percent || 0}
               avgScore={selectedSubject.avg_score || 0}
+              onPress={() => router.push(`/subjects/${selectedSubject.id}`)}
             />
           </View>
         ) : (
@@ -360,11 +359,6 @@ export default function SubjectsScreen() {
                   </View>
                 </View>
               </View>
-              
-              <TouchableOpacity style={styles.addAssessBtn}>
-                <Ionicons name="add" size={16} color={theme.colors.white} />
-                <Text style={styles.addAssessBtnText}>{t('subjects.add')}</Text>
-              </TouchableOpacity>
             </View>
 
             {assessments.length === 0 ? (
@@ -447,19 +441,6 @@ export default function SubjectsScreen() {
                 </View>
               </>
             )}
-
-            {/* Photo link row */}
-            <View style={styles.photoRow}>
-              <Ionicons name="camera-outline" size={18} color={theme.colors.text.secondary} />
-              <Text style={styles.photoText}>{t('subjects.linkPhoto')}</Text>
-              <TouchableOpacity style={styles.photoBtn}>
-                <Ionicons name="camera" size={14} color={theme.colors.white} />
-                <Text style={styles.photoBtnText}>{t('subjects.photo')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.photoBtn, { backgroundColor: theme.colors.inputBackground }]}>
-                <Text style={[styles.photoBtnText, { color: theme.colors.text.primary }]}>{t('subjects.remind')}</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         )}
 
