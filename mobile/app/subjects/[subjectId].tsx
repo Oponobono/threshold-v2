@@ -6,11 +6,13 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import * as DocumentPicker from 'expo-document-picker';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import {
@@ -30,6 +32,7 @@ import {
   type YouTubeVideo,
   type ScannedDocument,
 } from '../../src/services/api';
+import { processDocumentUpload } from '../../src/services/api/ai';
 import { useAudioRecorder, RecordingItem } from '../../src/hooks/useAudioRecorder';
 import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
 import { SubjectRecentRecordings } from '../../src/components/SubjectRecentRecordings';
@@ -243,6 +246,50 @@ export default function SubjectDetailScreen() {
   const handleTakePhoto = () => setIsPhotoModalVisible(true);
   const handleOpenScanner = () => setIsScannerVisible(true);
 
+  /** Cargar documento directo a Gemini sin OCR */
+  const handleUploadToGemini = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'text/html', 'text/markdown'],
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets[0];
+      
+      setIsDetailLoading(true);
+
+      // Leer archivo como blob
+      const response = await fetch(file.uri);
+      const blob = await response.blob();
+
+      // Procesar con Gemini
+      const processResult = await processDocumentUpload(
+        blob,
+        `Procesa este documento y extrae la información más importante. Mantén un formato claro y estructurado con puntos clave.`
+      );
+
+      // Mostrar resultado
+      Alert.alert(
+        `✅ ${processResult.fileName} procesado`,
+        processResult.result,
+        [{ text: 'OK' }]
+      );
+
+    } catch (err: any) {
+      console.error('[Subject] Error uploading to Gemini:', err);
+      Alert.alert(
+        '❌ Error',
+        err.message || 'Error al procesar el documento',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={[globalStyles.safeArea, { backgroundColor: '#fff' }]}>
@@ -275,6 +322,9 @@ export default function SubjectDetailScreen() {
               <View style={styles.headerBadge}>
                 <Ionicons name="book-outline" size={18} color={theme.colors.primary} />
               </View>
+              <TouchableOpacity style={styles.headerAction} onPress={handleUploadToGemini} disabled={isDetailLoading}>
+                <MaterialCommunityIcons name="cloud-upload-outline" size={16} color={theme.colors.text.primary} />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.headerAction} onPress={() => router.push('/gallery')}>
                 <Ionicons name="images-outline" size={16} color={theme.colors.text.primary} />
               </TouchableOpacity>

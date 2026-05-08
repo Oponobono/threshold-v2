@@ -306,20 +306,67 @@ Genera las flashcards:`;
 }
 
 /**
- * Genera flashcards desde texto (contexto académico)
- * Ideal para: Texto corto, resúmenes, apuntes
+ * Procesa un documento desde un buffer en memoria (sin guardar en disco)
+ * Ideal para: Upload directo desde cliente sin almacenamiento temporal
  *
- * @param {string} text - Texto académico para generar flashcards
- * @param {number} count - Número de flashcards a generar
- * @returns {Promise<Array>} Array de { question, answer }
+ * @param {Buffer} fileBuffer - Buffer del archivo
+ * @param {string} mimeType - MIME type del archivo
+ * @param {string} prompt - Instrucción para Gemini
+ * @returns {Promise<string>} Respuesta del modelo
  */
-async function generateFlashcardsFromText(text, count = 10) {
+async function processDocumentBuffer(fileBuffer, mimeType, prompt) {
   try {
+    console.log(`[Gemini Files API] Procesando buffer en memoria (${(fileBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
+    console.log(`[Gemini Files API] MIME Type: ${mimeType}`);
+
+    // Crear objeto para Files API desde buffer
+    const fileData = {
+      inlineData: {
+        data: fileBuffer.toString("base64"),
+        mimeType: mimeType,
+      },
+    };
+
+    // Enviar a Gemini
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
+Responde en español. Si el documento es muy largo, organiza la respuesta de forma clara y estructurada.
+Utiliza el contexto completo del documento para dar respuestas precisas.`,
+      safetySettings: SAFETY_SETTINGS,
+    });
+
+    console.log(`[Gemini Files API] Enviando buffer a modelo ${MODEL_NAME}...`);
+    const result = await model.generateContent([fileData, { text: prompt }]);
+
+    const responseText = result.response.text();
     console.log(
-      `[Gemini] Generando ${count} flashcards desde texto (${text.length} chars)`
+      `[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`
     );
 
-    const prompt = `Eres un experto pedagogo. Analiza este texto y genera exactamente ${count} flashcards de estudio.
+    return responseText;
+  } catch (error) {
+    console.error(`[Gemini Files API] ❌ Error procesando buffer:`, error.message);
+    throw new Error(`Error en Gemini Files API: ${error.message}`);
+  }
+}
+
+/**
+ * Genera flashcards desde un buffer de documento en memoria (sin guardar en disco)
+ * Ideal para: Upload directo desde cliente
+ *
+ * @param {Buffer} fileBuffer - Buffer del archivo
+ * @param {string} mimeType - MIME type del archivo
+ * @param {number} count - Número de flashcards a generar
+ * @returns {Promise<Array>} Array de { front, back }
+ */
+async function generateFlashcardsFromBuffer(fileBuffer, mimeType, count = 10) {
+  try {
+    console.log(
+      `[Gemini] Generando ${count} flashcards desde buffer (${(fileBuffer.length / 1024 / 1024).toFixed(2)}MB)`
+    );
+
+    const prompt = `Eres un experto pedagogo. Analiza este documento y genera exactamente ${count} flashcards de estudio.
 
 REGLAS ESTRICTAS:
 1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional.
@@ -328,17 +375,21 @@ REGLAS ESTRICTAS:
 4. Cubre conceptos clave. Evita trivialidades.
 5. Formato exacto: [{"front": "...", "back": "..."}, ...]
 
-Texto:
-${text}
-
 Genera las flashcards:`;
+
+    const fileData = {
+      inlineData: {
+        data: fileBuffer.toString("base64"),
+        mimeType: mimeType,
+      },
+    };
 
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
       safetySettings: SAFETY_SETTINGS,
     });
 
-    const result = await model.generateContent([{ text: prompt }]);
+    const result = await model.generateContent([fileData, { text: prompt }]);
     const response = result.response.text();
 
     // Parsear respuesta JSON
@@ -354,12 +405,58 @@ Genera las flashcards:`;
     }
 
     console.log(
-      `[Gemini] ${flashcards.length} flashcards generadas exitosamente desde texto`
+      `[Gemini] ${flashcards.length} flashcards generadas exitosamente desde buffer`
     );
     return flashcards;
   } catch (error) {
-    console.error(`[Gemini] Error generando flashcards desde texto:`, error.message);
+    console.error(`[Gemini] Error generando flashcards desde buffer:`, error.message);
     throw error;
+  }
+}
+
+/**
+ * Procesa un documento desde un buffer en memoria (sin guardar en disco)
+ * Ideal para: Upload directo desde cliente sin almacenamiento temporal
+ *
+ * @param {Buffer} fileBuffer - Buffer del archivo
+ * @param {string} mimeType - MIME type del archivo
+ * @param {string} prompt - Instrucción para Gemini
+ * @returns {Promise<string>} Respuesta del modelo
+ */
+async function processDocumentBuffer(fileBuffer, mimeType, prompt) {
+  try {
+    console.log(`[Gemini Files API] Procesando buffer en memoria (${(fileBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
+    console.log(`[Gemini Files API] MIME Type: ${mimeType}`);
+
+    // Crear objeto para Files API desde buffer
+    const fileData = {
+      inlineData: {
+        data: fileBuffer.toString("base64"),
+        mimeType: mimeType,
+      },
+    };
+
+    // Enviar a Gemini
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
+Responde en español. Si el documento es muy largo, organiza la respuesta de forma clara y estructurada.
+Utiliza el contexto completo del documento para dar respuestas precisas.`,
+      safetySettings: SAFETY_SETTINGS,
+    });
+
+    console.log(`[Gemini Files API] Enviando buffer a modelo ${MODEL_NAME}...`);
+    const result = await model.generateContent([fileData, { text: prompt }]);
+
+    const responseText = result.response.text();
+    console.log(
+      `[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`
+    );
+
+    return responseText;
+  } catch (error) {
+    console.error(`[Gemini Files API] ❌ Error procesando buffer:`, error.message);
+    throw new Error(`Error en Gemini Files API: ${error.message}`);
   }
 }
 
@@ -379,9 +476,11 @@ function getModelInfo() {
 
 module.exports = {
   processDocumentWithFilesAPI,
+  processDocumentBuffer,
   processTextInline,
   processAcademicChat,
   generateFlashcardsFromDocument,
+  generateFlashcardsFromBuffer,
   generateFlashcardsFromText,
   getModelInfo,
   MODEL_NAME,

@@ -194,6 +194,83 @@ router.post('/ai/generate-flashcards-from-document', aiController.generateFlashc
 
 /**
  * @swagger
+ * /api/ai/process-document-upload:
+ *   post:
+ *     summary: Procesa un documento cargado directamente sin guardar en disco
+ *     description: |
+ *       Envía el archivo directamente a Gemini para procesamiento.
+ *       Soporta: PDF, Word (.docx, .doc), TXT, HTML, Markdown
+ *       Tamaño máximo: 100 MB
+ *     tags: [AI]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Archivo a procesar (PDF, Word, TXT, HTML, Markdown)
+ *               prompt:
+ *                 type: string
+ *                 description: Instrucción para procesar el documento
+ *                 example: "Resume este documento en 3 puntos clave"
+ *             required:
+ *               - file
+ *               - prompt
+ *     responses:
+ *       200:
+ *         description: Documento procesado exitosamente
+ */
+router.post('/ai/process-document-upload', (req, res, next) => {
+  req.upload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, aiController.processDocumentUpload);
+
+/**
+ * @swagger
+ * /api/ai/generate-flashcards-upload:
+ *   post:
+ *     summary: Genera flashcards desde un archivo cargado directamente
+ *     description: |
+ *       Procesa el archivo y genera flashcards en tiempo real.
+ *       Soporta: PDF, Word (.docx, .doc), TXT, HTML, Markdown
+ *       Tamaño máximo: 100 MB
+ *     tags: [AI]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Archivo para generar flashcards
+ *               count:
+ *                 type: integer
+ *                 description: Número de flashcards a generar (1-100)
+ *                 default: 10
+ *             required:
+ *               - file
+ *     responses:
+ *       200:
+ *         description: Flashcards generadas exitosamente
+ */
+router.post('/ai/generate-flashcards-upload', (req, res, next) => {
+  req.upload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, aiController.generateFlashcardsUpload);
+
+/**
+ * @swagger
  * /api/ai/model-info:
  *   get:
  *     summary: Obtiene información sobre los modelos disponibles y sus límites

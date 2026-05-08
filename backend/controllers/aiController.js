@@ -685,6 +685,117 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
 };
 
 /**
+ * Procesa un documento (PDF, Word, TXT) cargado directamente sin guardar en disco
+ * Envía el archivo en memoria directamente a Gemini
+ * 
+ * Soporta: PDF, Word, TXT, HTML, Markdown
+ * Tamaño máximo: 100 MB
+ */
+exports.processDocumentUpload = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se proporcionó archivo' });
+  }
+
+  const { prompt } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ error: 'Parámetro requerido: prompt' });
+  }
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: 'Gemini API Key no está configurada' });
+  }
+
+  try {
+    console.log(`[ProcessDocumentUpload] Archivo: ${req.file.originalname}, Tamaño: ${(req.file.size / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`[ProcessDocumentUpload] MIME Type: ${req.file.mimetype}`);
+
+    // Procesar el buffer del archivo directamente con Gemini
+    const result = await geminiService.processDocumentBuffer(
+      req.file.buffer,
+      req.file.mimetype,
+      prompt
+    );
+
+    res.json({
+      success: true,
+      provider: 'gemini',
+      model: 'gemini-3-flash-preview',
+      fileName: req.file.originalname,
+      fileSize: `${(req.file.size / 1024 / 1024).toFixed(2)}MB`,
+      result: result,
+      features: [
+        'Sin truncado de contexto',
+        'Procesa documentos completos',
+        'Soporta: PDF, Word, TXT, HTML, Markdown',
+        'Sin guardar en disco'
+      ]
+    });
+  } catch (err) {
+    console.error('[ProcessDocumentUpload] Error:', err.message);
+    res.status(400).json({
+      error: 'Error procesando documento',
+      details: err.message,
+      supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md']
+    });
+  }
+};
+
+/**
+ * Genera flashcards desde un archivo cargado directamente (sin guardar en disco)
+ * Procesa en memoria con Gemini Files API
+ * 
+ * Soporta: PDF, Word, TXT, HTML, Markdown
+ */
+exports.generateFlashcardsUpload = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se proporcionó archivo' });
+  }
+
+  const { count = 10 } = req.body;
+
+  if (count < 1 || count > 100) {
+    return res.status(400).json({ 
+      error: 'count debe estar entre 1 y 100' 
+    });
+  }
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: 'Gemini API Key no está configurada' });
+  }
+
+  try {
+    console.log(`[GenerateFlashcardsUpload] Archivo: ${req.file.originalname}, ${count} flashcards`);
+
+    // Generar flashcards desde el buffer del archivo
+    const flashcards = await geminiService.generateFlashcardsFromBuffer(
+      req.file.buffer,
+      req.file.mimetype,
+      count
+    );
+
+    res.json({
+      success: true,
+      provider: 'gemini',
+      model: 'gemini-3-flash-preview',
+      fileName: req.file.originalname,
+      flashcards: flashcards,
+      count: flashcards.length,
+      supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md'],
+      note: 'Flashcards generadas en tiempo real sin guardar archivo'
+    });
+  } catch (err) {
+    console.error('[GenerateFlashcardsUpload] Error:', err.message);
+    res.status(400).json({
+      error: 'Error generando flashcards',
+      details: err.message,
+      supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md']
+    });
+  }
+};
+
+/**
  * Obtiene información sobre los modelos disponibles y sus límites
  */
 exports.getModelInfo = async (req, res) => {

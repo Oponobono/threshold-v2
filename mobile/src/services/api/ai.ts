@@ -152,3 +152,83 @@ export const generateFlashcardsFromContext = async (
     throw new Error(error.message || 'Error de red al generar flashcards');
   }
 };
+
+/**
+ * Procesa un documento cargado directamente (sin guardar en disco).
+ * Envía el archivo multipart/form-data a Gemini.
+ *
+ * @param file - Archivo a procesar (Blob o File)
+ * @param prompt - Instrucción para procesar el documento
+ * @returns Resultado del procesamiento de Gemini
+ */
+export const processDocumentUpload = async (
+  file: Blob | File,
+  prompt: string,
+): Promise<{ result: string; fileName: string; fileSize: string }> => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('prompt', prompt);
+
+    console.log(`[AI Service] 📄 Procesando documento: ${file.name || 'archivo'}`);
+
+    const response = await fetchWithFallback('/ai/process-document-upload', {
+      method: 'POST',
+      body: formData,
+      // NO incluir Content-Type header — el navegador lo configura automáticamente con boundary
+    });
+
+    const data = await parseJsonSafely(response);
+
+    if (!response.ok) {
+      console.error(`[AI Service] ❌ Error ${response.status}:`, data);
+      throw new Error(data?.error || `Error ${response.status} al procesar documento`);
+    }
+
+    console.log(`[AI Service] ✅ Documento procesado exitosamente`);
+    return data;
+  } catch (error: any) {
+    console.error(`[AI Service] Error procesando documento:`, error);
+    throw new Error(error.message || 'Error al procesar el documento');
+  }
+};
+
+/**
+ * Genera flashcards desde un archivo cargado directamente.
+ * Procesa en memoria con Gemini.
+ *
+ * @param file - Archivo a procesar (Blob o File)
+ * @param count - Número de flashcards a generar (default: 10)
+ * @returns Array de flashcards { front, back }
+ */
+export const generateFlashcardsUpload = async (
+  file: Blob | File,
+  count: number = 10,
+): Promise<{ front: string; back: string }[]> => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('count', String(count));
+
+    console.log(`[AI Service] 📚 Generando ${count} flashcards desde: ${file.name || 'archivo'}`);
+
+    const response = await fetchWithFallback('/ai/generate-flashcards-upload', {
+      method: 'POST',
+      body: formData,
+      // NO incluir Content-Type header — el navegador lo configura automáticamente con boundary
+    });
+
+    const data = await parseJsonSafely(response);
+
+    if (!response.ok) {
+      console.error(`[AI Service] ❌ Error ${response.status}:`, data);
+      throw new Error(data?.error || `Error ${response.status} al generar flashcards`);
+    }
+
+    console.log(`[AI Service] ✅ ${data.count} flashcards generadas`);
+    return data?.flashcards as { front: string; back: string }[] || [];
+  } catch (error: any) {
+    console.error(`[AI Service] Error generando flashcards:`, error);
+    throw new Error(error.message || 'Error al generar flashcards del documento');
+  }
+};

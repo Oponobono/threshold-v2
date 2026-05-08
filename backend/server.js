@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 const { db, initializeDb } = require('./db');
 const { swaggerUi, specs } = require('./swagger');
 
@@ -23,6 +24,35 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const MAX_PORT_RETRIES = 10;
+
+// Configurar multer para memoria (sin guardar en disco)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100 MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'text/plain',
+      'text/html',
+      'text/markdown',
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`MIME type ${file.mimetype} no soportado. Soportados: PDF, Word, TXT, HTML, Markdown`));
+    }
+  },
+});
+
+// Middleware para pasar upload al req para rutas específicas
+app.use((req, res, next) => {
+  req.upload = upload;
+  next();
+});
 
 // Middlewares
 app.use(cors());

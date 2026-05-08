@@ -10,6 +10,7 @@
  * - Indicador de "pensando..." animado mientras espera la respuesta.
  * - Chip de fuentes activas (cuántos archivos alimentan el contexto).
  * - Botón de nueva conversación para limpiar el historial.
+ * - Botón de upload de documentos directo a Gemini.
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -20,8 +21,9 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { sendAIChatMessage, getChatHistory, clearChatHistory } from '../services/api/ai';
+import { sendAIChatMessage, getChatHistory, clearChatHistory, processDocumentUpload } from '../services/api/ai';
 import { LLMProvider, getPreferredLLMProvider } from '../utils/llmProviderManager';
+import * as DocumentPicker from 'expo-document-picker';
 
 // ─── Tokens de color (misma paleta que SubjectAIContextModal) ─────────────────
 const PRIMARY  = '#7B72FF';
@@ -138,6 +140,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [isTruncated, setIsTruncated] = useState(false);
   const [currentProvider, setCurrentProvider] = useState<LLMProvider>('groq');
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
 
   /** Cargar historial y preferencia de proveedor cuando se abre el modal */
   useEffect(() => {
@@ -237,6 +240,63 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     }
   }, [subjectId, userId]);
 
+  /** Cargar y procesar documento directamente */
+  const handleUploadDocument = useCallback(async () => {
+    try {
+      const pickerResult = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'text/html', 'text/markdown'],
+      });
+
+      if (pickerResult.canceled) {
+        console.log('[AIChat] Upload cancelado');
+        return;
+      }
+
+      const file = pickerResult.assets[0];
+      console.log(`[AIChat] Documento seleccionado: ${file.name}, ${file.size} bytes`);
+
+      setIsUploadingDocument(true);
+
+      // Mostrar mensaje de que está procesando
+      const processingMsg: Message = {
+        role: 'assistant',
+        content: `📄 Procesando documento: ${file.name}...\n\nEsto puede tomar algunos segundos.`,
+      };
+      setMessages(prev => [...prev, processingMsg]);
+
+      // Leer el archivo como blob
+      const response = await fetch(file.uri);
+      const blob = await response.blob();
+
+      // Procesar con Gemini
+      const processResult = await processDocumentUpload(blob, `Resume este documento en puntos clave para un estudiante. Mantén la respuesta concisa pero informativa.`);
+
+      // Remover mensaje de procesamiento
+      setMessages(prev => prev.slice(0, -1));
+
+      // Agregar resultado del procesamiento como contexto
+      const contextMsg: Message = {
+        role: 'assistant',
+        content: `✅ Documento procesado: **${processResult.fileName}** (${processResult.fileSize})\n\n${processResult.result}`,
+      };
+      setMessages(prev => [...prev, contextMsg]);
+
+    } catch (err: any) {
+      console.error('[AIChat] Error al cargar documento:', err);
+      
+      // Remover mensaje de procesamiento en caso de error
+      setMessages(prev => prev.slice(0, -1));
+
+      const errorMsg: Message = {
+        role: 'assistant',
+        content: `⚠️ Error al procesar el documento: ${err.message}`,
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsUploadingDocument(false);
+    }
+  }, []);
+
   return (
     <Modal
       visible={isVisible}
@@ -308,6 +368,20 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                   <Ionicons name="refresh-outline" size={16} color={TXT_SEC} />
                 </TouchableOpacity>
               )}
+
+              {/* Botón upload documento */}
+              <TouchableOpacity
+                style={s.clearBtn}
+                onPress={handleUploadDocument}
+                disabled={isLoading || isUploadingDocument}
+                activeOpacity={0.7}
+              >
+                {isUploadingDocument ? (
+                  <ActivityIndicator size={16} color={TXT_SEC} />
+                ) : (
+                  <Ionicons name="document-attach-outline" size={16} color={TXT_SEC} />
+                )}
+              </TouchableOpacity>
 
               {/* Cerrar */}
               <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.7}>
