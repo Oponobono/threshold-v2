@@ -1,9 +1,12 @@
 require('dotenv').config();
 const express = require('express');
+const secrets = require('./config/secrets');
 const cors = require('cors');
 const multer = require('multer');
 const { db, initializeDb } = require('./db');
 const { swaggerUi, specs } = require('./swagger');
+const helmet = require('helmet');
+const { globalLimiter } = require('./middlewares/rateLimiter');
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
@@ -21,8 +24,8 @@ const learningRoutes = require('./routes/learning');
 const aiRoutes = require('./routes/ai');
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
+const PORT = secrets.PORT;
+const HOST = secrets.HOST;
 const MAX_PORT_RETRIES = 10;
 
 // Configurar multer para memoria (sin guardar en disco)
@@ -48,7 +51,14 @@ const upload = multer({
   },
 });
 
-// Middlewares
+// Middlewares de Seguridad Globales
+app.use(helmet()); // Añade cabeceras HTTP que previenen XSS, Clickjacking, etc.
+app.use(globalLimiter); // Evita DDoS limitando a 100 peticiones por IP cada 15 min.
+
+// 🛡️ Fase 6: Auditoría y Logging (Registro estructurado de accesos)
+const morgan = require('morgan');
+app.use(morgan(':remote-addr - :method :url :status :res[content-length] - :response-time ms'));
+
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
@@ -61,16 +71,23 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 // Ruta de estado
 app.get('/api/status', (req, res) => {
-  const dbType = process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite';
+  const dbType = secrets.DATABASE_URL ? 'PostgreSQL' : 'SQLite';
   res.json({ 
     status: 'API funcionando correctamente', 
     db: dbType,
-    env: process.env.NODE_ENV || 'development'
+    env: secrets.NODE_ENV
   });
 });
 
-// Registrar rutas
+// Registrar rutas públicas (Login, Registro)
 app.use('/api', authRoutes);
+
+// 🛡️ Fase 1: Escudo de Autenticación JWT
+// A partir de esta línea, TODAS las rutas requerirán un token válido
+const { authenticateToken } = require('./middlewares/authMiddleware');
+app.use('/api', authenticateToken);
+
+// Rutas privadas
 app.use('/api', usersRoutes);
 app.use('/api', analyticsRoutes);
 app.use('/api', subjectsRoutes);

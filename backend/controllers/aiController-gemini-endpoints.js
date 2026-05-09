@@ -23,7 +23,7 @@ exports.processDocumentWithGemini = async (req, res) => {
     return res.status(400).json({ error: 'Falta documentPath o prompt' });
   }
 
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = secrets.GEMINI_API_KEY;
   if (!geminiApiKey) {
     return res.status(500).json({ error: 'Gemini API Key no está configurada' });
   }
@@ -33,6 +33,7 @@ exports.processDocumentWithGemini = async (req, res) => {
     
     // Validar que el archivo existe
     const fileExists = await new Promise(resolve => {
+const secrets = require('../config/secrets');
       require('fs').access(documentPath, require('fs').constants.F_OK, err => resolve(!err));
     });
 
@@ -68,7 +69,7 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
     return res.status(400).json({ error: 'Falta documentPath' });
   }
 
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = secrets.GEMINI_API_KEY;
   if (!geminiApiKey) {
     return res.status(500).json({ error: 'Gemini API Key no está configurada' });
   }

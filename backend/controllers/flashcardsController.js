@@ -1,3 +1,4 @@
+const secrets = require('../config/secrets');
 const { db } = require('../db');
 
 /**
@@ -169,7 +170,7 @@ exports.generateDeckFromText = async (req, res) => {
     return res.status(400).json({ error: 'Faltan campos requeridos (text, count, title, subject_id, user_id).' });
   }
 
-  const groqApiKey = process.env.GROQ_API_KEY;
+  const groqApiKey = secrets.GROQ_API_KEY;
   if (!groqApiKey) {
     return res.status(500).json({ error: 'Groq API Key no está configurada' });
   }
@@ -319,7 +320,7 @@ exports.generateDeckFromImage = async (req, res) => {
     return res.status(400).json({ error: 'Faltan campos requeridos (image_base64, count, title, subject_id, user_id).' });
   }
 
-  const groqApiKey = process.env.GROQ_API_KEY;
+  const groqApiKey = secrets.GROQ_API_KEY;
   if (!groqApiKey) {
     return res.status(500).json({ error: 'Groq API Key no está configurada' });
   }

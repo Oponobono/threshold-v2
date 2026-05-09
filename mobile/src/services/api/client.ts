@@ -10,6 +10,7 @@
  */
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { storageService } from '../storageService';
 
 /** Valida que un string tenga formato de dirección IPv4 válida */
 export const isValidIpv4 = (value: string): boolean => {
@@ -94,9 +95,20 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
 
   let lastError: unknown = null;
 
+  // 🛡️ Fase 5: Inyectar el Token JWT automáticamente en cada petición
+  const token = await storageService.getSecure('jwt_token');
+  const headers = new Headers(init?.headers || {});
+  
+  // Si hay un token guardado, lo adjuntamos como un Bearer token
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const customInit = { ...init, headers };
+
   for (const base of candidates) {
     try {
-      const response = await fetch(`${base}${path}`, init);
+      const response = await fetch(`${base}${path}`, customInit);
       activeBaseUrl = base;
       return response;
     } catch (error) {

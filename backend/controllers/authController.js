@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { db } = require('../db');
 const { getUniqueSharePin } = require('../utils/pinHelper');
+const { JWT_SECRET } = require('../middlewares/authMiddleware');
 
 /**
  * Registra un nuevo usuario
@@ -36,9 +38,13 @@ exports.registerUser = async (req, res) => {
         return res.status(500).json({ error: 'Error interno del servidor.' });
       }
 
+      // Firmar token JWT
+      const token = jwt.sign({ id: this.lastID, email }, JWT_SECRET, { expiresIn: '30d' });
+
       res.status(201).json({ 
         message: 'Usuario registrado exitosamente', 
-        userId: this.lastID 
+        userId: this.lastID,
+        token
       });
     });
   } catch (error) {
@@ -93,9 +99,13 @@ exports.loginUser = async (req, res) => {
 
       db.run(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
 
+      // Firmar token JWT
+      const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+
       res.json({ 
         message: 'Login exitoso', 
-        user: { id: user.id, email: user.email } 
+        user: { id: user.id, email: user.email },
+        token
       });
     });
   } catch (error) {
@@ -159,9 +169,13 @@ exports.biometricLogin = (req, res) => {
 
       db.run(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
 
+      // Firmar token JWT
+      const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+
       res.json({
         message: 'Login biométrico exitoso',
         user: { id: user.id, email: user.email },
+        token
       });
     }
   );

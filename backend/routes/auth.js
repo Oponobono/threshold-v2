@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const { authLimiter } = require('../middlewares/rateLimiter');
 
+// Proteger login y registro contra fuerza bruta
+router.use('/login', authLimiter);
+router.use('/register', authLimiter);
+router.use('/biometric-login', authLimiter);
 /**
  * @swagger
  * /api/register:

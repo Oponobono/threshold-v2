@@ -1,3 +1,4 @@
+const secrets = require('../config/secrets');
 const { db } = require('../db');
 
 /**
@@ -110,7 +111,7 @@ exports.getYoutubeCaptions = async (req, res) => {
     return res.status(400).json({ error: 'Falta video_id' });
   }
 
-  const SUPADATA_KEY = process.env.SUPADATA_API_KEY;
+  const SUPADATA_KEY = secrets.SUPADATA_API_KEY;
   if (!SUPADATA_KEY) {
     return res.status(500).json({ error: 'SUPADATA_API_KEY no configurada en el servidor.' });
   }

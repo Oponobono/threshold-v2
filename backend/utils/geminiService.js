@@ -8,11 +8,12 @@
  * - Procesamiento estructurado (JSON para flashcards)
  */
 
+const secrets = require('../config/secrets');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require("fs").promises;
 const path = require("path");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(secrets.GEMINI_API_KEY);
 const MODEL_NAME = "gemini-3-flash-preview"; // Modelo recomendado (May 2026): balance ideal entre inteligencia y velocidad
 
 // ✅ SAFETY SETTINGS CORREGIDOS - Usar strings en lugar de objetos HarmCategory

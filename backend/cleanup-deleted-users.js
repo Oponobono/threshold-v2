@@ -4,11 +4,12 @@
  * Puede ser llamado manualmente o programado con node-cron
  */
 
+const secrets = require('./config/secrets');
 require('dotenv').config();
 const { db, initializeDb } = require('./db');
 const path = require('path');
 
-const isProduction = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL;
+const isProduction = secrets.NODE_ENV === 'production' || !!secrets.DATABASE_URL;
 
 // Función principal de limpieza
 const cleanupDeletedAccounts = () => {

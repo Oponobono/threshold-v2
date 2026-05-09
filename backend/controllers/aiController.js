@@ -1,7 +1,9 @@
+const secrets = require('../config/secrets');
 const { db } = require('../db');
 const fs = require('fs').promises;
 const path = require('path');
 const geminiService = require('../utils/geminiService');
+const { shieldPrompt } = require('../utils/promptShield');
 const { 
   processDocumentWithFilesAPI, 
   processAcademicChat, 
@@ -23,7 +25,7 @@ function getLLMProvider(req) {
  * Helper para hacer llamadas a Groq API
  */
 async function callGroqAPI(messages, systemPrompt) {
-  const groqApiKey = process.env.GROQ_API_KEY;
+  const groqApiKey = secrets.GROQ_API_KEY;
   if (!groqApiKey) {
     throw new Error('Groq API Key no está configurada');
   }
@@ -62,7 +64,7 @@ async function callGroqAPI(messages, systemPrompt) {
  * Ahora usa el SDK oficial de Google para mejor manejo de contextos grandes
  */
 async function callGeminiAPI(messages, systemPrompt) {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = secrets.GEMINI_API_KEY;
   if (!geminiApiKey) {
     throw new Error('Gemini API Key no está configurada');
   }
@@ -381,7 +383,7 @@ exports.buildContext = async (req, res) => {
 
               if (ytVideo?.video_id) {
                 const captionRes = await fetch(
-                  `http://localhost:${process.env.PORT || 3000}/api/youtube-captions`,
+                  `http://localhost:${secrets.PORT || 3000}/api/youtube-captions`,
                   {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -463,7 +465,7 @@ exports.generateFlashcards = async (req, res) => {
 
     if (provider === 'gemini') {
       // ─── GEMINI PATH ───────────────────────────────────────────────
-      const geminiApiKey = process.env.GEMINI_API_KEY;
+      const geminiApiKey = secrets.GEMINI_API_KEY;
       if (!geminiApiKey) {
         return res.status(500).json({ error: 'Gemini API Key no está configurada' });
       }
@@ -474,7 +476,7 @@ exports.generateFlashcards = async (req, res) => {
 
     } else {
       // ─── GROQ PATH ────────────────────────────────────────────────
-      const groqApiKey = process.env.GROQ_API_KEY;
+      const groqApiKey = secrets.GROQ_API_KEY;
       if (!groqApiKey) {
         return res.status(500).json({ error: 'Groq API Key no está configurada' });
       }
@@ -570,7 +572,7 @@ exports.processDocumentWithGemini = async (req, res) => {
     });
   }
 
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = secrets.GEMINI_API_KEY;
   if (!geminiApiKey) {
     return res.status(500).json({ error: 'Gemini API Key no está configurada' });
   }
@@ -579,11 +581,14 @@ exports.processDocumentWithGemini = async (req, res) => {
     console.log(`[ProcessDocument] Archivo: ${documentPath}`);
     console.log(`[ProcessDocument] MIME Type: ${mimeType || 'auto-detect'}`);
 
+    // 🛡️ Fase 3: Escudar el prompt contra Inyecciones (Jailbreaks)
+    const securePrompt = shieldPrompt(prompt);
+
     // Usar el servicio geminiService (auto-detecta MIME type)
     const result = await geminiService.processDocumentWithFilesAPI(
       documentPath,
       mimeType, // null = auto-detect
-      prompt
+      securePrompt
     );
 
     res.json({
@@ -635,7 +640,7 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
 
     if (provider === 'gemini') {
       // ─── GEMINI PATH ───────────────────────────────────────────────
-      const geminiApiKey = process.env.GEMINI_API_KEY;
+      const geminiApiKey = secrets.GEMINI_API_KEY;
       if (!geminiApiKey) {
         return res.status(500).json({ error: 'Gemini API Key no está configurada' });
       }
@@ -650,7 +655,7 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
 
     } else {
       // ─── GROQ PATH (requiere convertir documento a texto primero) ───
-      const groqApiKey = process.env.GROQ_API_KEY;
+      const groqApiKey = secrets.GROQ_API_KEY;
       if (!groqApiKey) {
         return res.status(500).json({ error: 'Groq API Key no está configurada' });
       }
@@ -701,7 +706,7 @@ exports.processDocumentUpload = async (req, res) => {
     return res.status(400).json({ error: 'Parámetro requerido: prompt' });
   }
 
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = secrets.GEMINI_API_KEY;
   if (!geminiApiKey) {
     return res.status(500).json({ error: 'Gemini API Key no está configurada' });
   }
@@ -710,11 +715,14 @@ exports.processDocumentUpload = async (req, res) => {
     console.log(`[ProcessDocumentUpload] Archivo: ${req.file.originalname}, Tamaño: ${(req.file.size / 1024 / 1024).toFixed(2)}MB`);
     console.log(`[ProcessDocumentUpload] MIME Type: ${req.file.mimetype}`);
 
+    // 🛡️ Fase 3: Escudar el prompt contra Inyecciones
+    const securePrompt = shieldPrompt(prompt);
+
     // Procesar el buffer del archivo directamente con Gemini
     const result = await geminiService.processDocumentBuffer(
       req.file.buffer,
       req.file.mimetype,
-      prompt
+      securePrompt
     );
 
     res.json({
@@ -760,7 +768,7 @@ exports.generateFlashcardsUpload = async (req, res) => {
     });
   }
 
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = secrets.GEMINI_API_KEY;
   if (!geminiApiKey) {
     return res.status(500).json({ error: 'Gemini API Key no está configurada' });
   }

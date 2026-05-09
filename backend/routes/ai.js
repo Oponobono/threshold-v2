@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const aiController = require('../controllers/aiController');
+const { aiLimiter } = require('../middlewares/rateLimiter');
+const { validateFileMagicNumber } = require('../middlewares/fileValidator');
+
+// 🚦 Fase 1: Proteger todas las rutas de Inteligencia Artificial con el límite estricto
+router.use(aiLimiter);
 
 // Configurar multer para memoria
 const upload = multer({
@@ -248,7 +253,7 @@ router.post('/ai/generate-flashcards-from-document', aiController.generateFlashc
  *       200:
  *         description: Documento procesado exitosamente
  */
-router.post('/ai/process-document-upload', upload.single('file'), aiController.processDocumentUpload);
+router.post('/ai/process-document-upload', upload.single('file'), validateFileMagicNumber, aiController.processDocumentUpload);
 
 /**
  * @swagger
@@ -281,7 +286,7 @@ router.post('/ai/process-document-upload', upload.single('file'), aiController.p
  *       200:
  *         description: Flashcards generadas exitosamente
  */
-router.post('/ai/generate-flashcards-upload', upload.single('file'), aiController.generateFlashcardsUpload);
+router.post('/ai/generate-flashcards-upload', upload.single('file'), validateFileMagicNumber, aiController.generateFlashcardsUpload);
 
 /**
  * @swagger

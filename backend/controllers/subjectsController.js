@@ -217,12 +217,22 @@ exports.updateSubject = (req, res) => {
   const { subjectId } = req.params;
   const fields = req.body;
   
-  if (Object.keys(fields).length === 0) {
-    return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
+  const allowedFields = ['code', 'name', 'credits', 'professor', 'color', 'icon', 'target_grade'];
+  const fieldsToUpdate = {};
+  
+  // Filtrar solo los campos permitidos
+  for (const key of Object.keys(fields)) {
+    if (allowedFields.includes(key)) {
+      fieldsToUpdate[key] = fields[key];
+    }
   }
 
-  const columns = Object.keys(fields).map(key => `${key} = ?`).join(', ');
-  const values = [...Object.values(fields), subjectId];
+  if (Object.keys(fieldsToUpdate).length === 0) {
+    return res.status(400).json({ error: 'No se proporcionaron campos válidos para actualizar' });
+  }
+
+  const columns = Object.keys(fieldsToUpdate).map(key => `${key} = ?`).join(', ');
+  const values = [...Object.values(fieldsToUpdate), subjectId];
 
   const query = `UPDATE subjects SET ${columns} WHERE id = ?`;
 

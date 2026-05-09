@@ -1,0 +1,16 @@
+{
+  "name": "threshold-architecture-tools",
+  "version": "1.0.0",
+  "description": "Herramientas aisladas para análisis de dependencias de Threshold",
+  "main": "index.js",
+  "scripts": {
+    "analyze:backend": "madge --circular ../../backend/",
+    "analyze:mobile": "madge --circular --extensions ts,tsx ../../mobile/src/ ../../mobile/app/",
+    "graph:backend": "echo ```mermaid > backend-graph.md && npx depcruise ../../backend/ --no-config --exclude \"node_modules\" --include-only \"^../../backend/\" --output-type mermaid >> backend-graph.md && echo ``` >> backend-graph.md",
+    "graph:mobile": "echo ```mermaid > mobile-graph.md && npx depcruise ../../mobile/src/ ../../mobile/app/ --no-config --exclude \"node_modules\" --include-only \"^../../mobile/\" --output-type mermaid >> mobile-graph.md && echo ``` >> mobile-graph.md"
+  },
+  "dependencies": {
+    "dependency-cruiser": "^16.2.2",
+    "madge": "^6.1.0"
+  }
+}

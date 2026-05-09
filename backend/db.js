@@ -1,7 +1,8 @@
 
+const secrets = require('./config/secrets');
 const path = require('path');
 
-const isProduction = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL;
+const isProduction = secrets.NODE_ENV === 'production' || !!secrets.DATABASE_URL;
 
 let db;
 let pool;
@@ -10,7 +11,7 @@ if (isProduction) {
   // ===== POSTGRESQL =====
   const { Pool } = require('pg');
   pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: secrets.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
   });
 

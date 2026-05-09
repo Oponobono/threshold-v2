@@ -1,3 +1,4 @@
+const secrets = require('../config/secrets');
 const { db } = require('../db');
 const pdfParse = require('pdf-parse');
 
@@ -147,7 +148,7 @@ exports.performOCR = async (req, res) => {
     return res.status(413).json({ error: 'La imagen es demasiado grande para OCR (máx 4MB). Prueba con el filtro B/N para reducir el tamaño.' });
   }
 
-  const groqApiKey = process.env.GROQ_API_KEY;
+  const groqApiKey = secrets.GROQ_API_KEY;
   if (!groqApiKey) {
     return res.status(500).json({ error: 'Groq API Key no está configurada' });
   }
