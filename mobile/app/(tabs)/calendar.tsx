@@ -1,12 +1,12 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../src/styles/theme';
 import { globalStyles } from '../../src/styles/globalStyles';
-import { getAllSchedules, getAllAssessments, Schedule } from '../../src/services/api';
+import { useDataStore } from '../../src/store/useDataStore';
 
 const TODAY = new Date();
 
@@ -24,28 +24,11 @@ export default function CalendarScreen() {
   const [selectedDayNum, setSelectedDayNum] = useState(TODAY.getDate());
 
   // ── Datos del backend ─────────────────────────────────────────
-  const [allSchedules, setAllSchedules]   = useState<Schedule[]>([]);
-  const [allAssessments, setAllAssessments] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { schedules: allSchedules, assessments: allAssessments, loadAllData } = useDataStore();
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        const [schedules, assessments] = await Promise.all([
-          getAllSchedules(),
-          getAllAssessments(),
-        ]);
-        setAllSchedules(schedules);
-        setAllAssessments(assessments);
-      } catch (error) {
-        console.error('Error loading calendar data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
-  }, []);
+    loadAllData();
+  }, [loadAllData]);
 
   // ── Cálculos del mes en vista ─────────────────────────────────
   const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -86,7 +69,7 @@ export default function CalendarScreen() {
   };
 
   // ── Lógica de actividades ─────────────────────────────────────
-  const getDaySchedule = (day: number) => {
+  const getDaySchedule = useCallback((day: number) => {
     const date = new Date(viewYear, viewMonth, day);
     let dayOfWeek = date.getDay();
     if (dayOfWeek === 0) dayOfWeek = 7;
@@ -110,22 +93,22 @@ export default function CalendarScreen() {
     const dateStrDMY  = `${dd}-${mm}-${yyyy}`;   // 26-04-2026
     const dateStrISO  = `${yyyy}-${mm}-${dd}`;   // 2026-04-26
 
-    const tasks = allAssessments
-      .filter(a => a.date === dateStrDMY || a.date === dateStrISO)
-      .map(a => ({
+    const tasks = (allAssessments as any[])
+      .filter((a: any) => a.date === dateStrDMY || a.date === dateStrISO)
+      .map((a: any) => ({
         id: a.id,
         title: a.name,
         time: a.type === 'task' ? (a.time || t('calendar.allDay')) : (a.type || t('calendar.defaultAssessmentTitle')),
         color: a.subject_color || theme.colors.primary,
         type: 'task',
-        start_time: '23:59', // las tareas van al final
+        start_time: '23:59',
         subject_id: a.subject_id,
       }));
 
     return [...classes, ...tasks].sort((a: any, b: any) =>
       (a.start_time || '00:00').localeCompare(b.start_time || '00:00')
     );
-  };
+  }, [allSchedules, allAssessments, viewYear, viewMonth, t]);
 
   const getActivitySummary = (day: number) => {
     const schedule = getDaySchedule(day);
@@ -137,7 +120,7 @@ export default function CalendarScreen() {
 
   const filteredEvents = useMemo(
     () => getDaySchedule(selectedDayNum),
-    [allSchedules, allAssessments, selectedDayNum, viewMonth, viewYear]
+    [getDaySchedule, selectedDayNum]
   );
 
   const isToday = (day: number) =>
@@ -236,31 +219,42 @@ export default function CalendarScreen() {
         </View>
 
         <View style={styles.eventsColumn}>
-          {filteredEvents.length > 0 ? filteredEvents.map((item: any, idx) => (
-            <TouchableOpacity 
-              key={idx} 
-              style={styles.eventItem} 
-              activeOpacity={0.7}
-              onPress={() => {
-                if (item.subject_id) {
-                  router.push(`/subjects/${item.subject_id}`);
-                }
-              }}
-            >
-              <View style={[styles.colorBar, { backgroundColor: item.color || theme.colors.primary }]} />
-              <View style={styles.eventTextContainer}>
-                <Text style={styles.eventTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.eventTime}>{item.time}</Text>
-              </View>
-              <View style={[styles.eventTypeBadge, { backgroundColor: item.type === 'task' ? '#FFE8CC' : '#DDEEFF' }]}>
-                <Ionicons
-                  name={item.type === 'task' ? 'clipboard-outline' : 'time-outline'}
-                  size={14}
-                  color={item.type === 'task' ? '#FF9500' : '#2F80ED'}
-                />
-              </View>
-            </TouchableOpacity>
-          )) : (
+          {filteredEvents.length > 0 ? (
+            <FlatList
+              data={filteredEvents}
+              keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
+              scrollEnabled={false} // Since it's inside a ScrollView
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              initialNumToRender={5}
+              windowSize={5}
+              contentContainerStyle={{ gap: 10 }}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity 
+                  style={styles.eventItem} 
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (item.subject_id) {
+                      router.push(`/subjects/${item.subject_id}`);
+                    }
+                  }}
+                >
+                  <View style={[styles.colorBar, { backgroundColor: item.color || theme.colors.primary }]} />
+                  <View style={styles.eventTextContainer}>
+                    <Text style={styles.eventTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.eventTime}>{item.time}</Text>
+                  </View>
+                  <View style={[styles.eventTypeBadge, { backgroundColor: item.type === 'task' ? '#FFE8CC' : '#DDEEFF' }]}>
+                    <Ionicons
+                      name={item.type === 'task' ? 'clipboard-outline' : 'time-outline'}
+                      size={14}
+                      color={item.type === 'task' ? '#FF9500' : '#2F80ED'}
+                    />
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          ) : (
             <View style={styles.emptyContainer}>
               <Ionicons name="cafe-outline" size={38} color={theme.colors.border} />
               <Text style={styles.emptyText}>{t('calendar.emptyEvents')}</Text>

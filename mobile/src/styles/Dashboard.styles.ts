@@ -15,13 +15,13 @@ export const dashboardStyles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   greetingText: {
-    fontSize: 28,
+    fontSize: theme.typography.sizes.xxl,
     fontWeight: '700',
     color: theme.colors.text.primary,
     letterSpacing: -0.5,
   },
   greetingSubtext: {
-    fontSize: 13,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
     fontWeight: '400',
     marginTop: 6,
@@ -37,7 +37,7 @@ export const dashboardStyles = StyleSheet.create({
     marginBottom: 28,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: theme.typography.sizes.lg,
     fontWeight: '700',
     color: theme.colors.text.primary,
     marginBottom: 16,
@@ -84,18 +84,18 @@ export const dashboardStyles = StyleSheet.create({
     zIndex: 2,
   },
   subjectTileName: {
-    fontSize: 15,
+    fontSize: theme.typography.sizes.md, // Close to 15
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
   subjectTileMeta: {
-    fontSize: 12,
+    fontSize: theme.typography.sizes.sm, // Close to 12
     color: theme.colors.text.secondary,
     marginTop: 4,
     fontWeight: '400',
   },
   subjectTileStats: {
-    fontSize: 12,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
     marginTop: 8,
     fontWeight: '500',
@@ -138,12 +138,12 @@ export const dashboardStyles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   quickAddTitle: {
-    fontSize: 16,
+    fontSize: theme.typography.sizes.lg,
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
   quickAddDesc: {
-    fontSize: 13,
+    fontSize: theme.typography.sizes.md,
     color: theme.colors.text.secondary,
     marginBottom: 14,
     fontWeight: '400',
@@ -185,12 +185,12 @@ export const dashboardStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   nextClassTitle: {
-    fontSize: 15,
+    fontSize: theme.typography.sizes.md,
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
   nextClassRoom: {
-    fontSize: 12,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
     marginTop: 3,
     fontWeight: '400',
@@ -228,7 +228,7 @@ export const dashboardStyles = StyleSheet.create({
     marginBottom: 10,
   },
   cardTitle: {
-    fontSize: 13,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
     fontWeight: '500',
     flex: 1,
@@ -241,14 +241,14 @@ export const dashboardStyles = StyleSheet.create({
     alignItems: 'center',
   },
   cardValue: {
-    fontSize: 26,
+    fontSize: theme.typography.sizes.xxl,
     fontWeight: '700',
     color: theme.colors.text.primary,
     marginBottom: 4,
     letterSpacing: -0.5,
   },
   cardSubtext: {
-    fontSize: 12,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
     fontWeight: '400',
   },
@@ -274,7 +274,7 @@ export const dashboardStyles = StyleSheet.create({
     borderWidth: 1,
   },
   actionText: {
-    fontSize: 12,
+    fontSize: theme.typography.sizes.sm,
     fontWeight: '500',
     color: theme.colors.text.primary,
     textAlign: 'center',
@@ -317,7 +317,7 @@ export const dashboardStyles = StyleSheet.create({
     marginBottom: 12,
   },
   sheetTitle: {
-    fontSize: 20,
+    fontSize: theme.typography.sizes.xl,
     fontWeight: '700',
     color: theme.colors.text.primary,
     letterSpacing: -0.5,
@@ -331,7 +331,7 @@ export const dashboardStyles = StyleSheet.create({
   sheetLabel: {
     marginTop: 14,
     marginBottom: 8,
-    fontSize: 14,
+    fontSize: theme.typography.sizes.md,
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
@@ -343,7 +343,7 @@ export const dashboardStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
     color: theme.colors.text.primary,
-    fontSize: 14,
+    fontSize: theme.typography.sizes.md,
   },
   optionsRow: {
     flexDirection: 'row',
@@ -438,7 +438,7 @@ export const dashboardStyles = StyleSheet.create({
     fontWeight: '500',
   },
   perfGpa: {
-    fontSize: 14,
+    fontSize: theme.typography.sizes.md,
     fontWeight: '600',
     color: theme.colors.text.secondary,
   },
@@ -468,12 +468,12 @@ export const dashboardStyles = StyleSheet.create({
     flex: 1,
   },
   quickAddMenuText: {
-    fontSize: 14,
+    fontSize: theme.typography.sizes.md,
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
   quickAddMenuSubtext: {
-    fontSize: 13,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
     marginTop: 2,
     fontWeight: '400',
@@ -495,7 +495,7 @@ export const dashboardStyles = StyleSheet.create({
     position: 'relative',
   },
   dropdownSelectorText: {
-    fontSize: 14,
+    fontSize: theme.typography.sizes.md,
     color: theme.colors.text.primary,
   },
   dropdownPlaceholder: {
@@ -562,13 +562,13 @@ export const dashboardStyles = StyleSheet.create({
     borderLeftColor: theme.colors.border + '40',
   },
   dayHeaderText: {
-    fontSize: 10,
+    fontSize: theme.typography.sizes.xs,
     fontWeight: '700',
     color: theme.colors.text.secondary,
     textTransform: 'uppercase',
   },
   scheduleHintText: {
-    fontSize: 12,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
     marginBottom: 10,
   },
@@ -585,7 +585,7 @@ export const dashboardStyles = StyleSheet.create({
     backgroundColor: theme.colors.inputBackground + '50',
   },
   hourText: {
-    fontSize: 10,
+    fontSize: theme.typography.sizes.xs,
     color: theme.colors.text.secondary,
     fontWeight: '600',
   },

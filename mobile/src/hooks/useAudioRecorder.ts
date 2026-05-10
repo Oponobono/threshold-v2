@@ -179,7 +179,8 @@ export function useAudioRecorder() {
       // Step 2: Try to enrich with DB data
       let dbRecordings: AudioRecording[] = [];
       try {
-        dbRecordings = await getAudioRecordings();
+        const raw = await getAudioRecordings();
+        dbRecordings = Array.isArray(raw) ? raw : [];
       } catch (networkErr) {
         console.warn('[useAudioRecorder] Backend unreachable, showing local files only.', networkErr);
         // Local files already shown — nothing more to do

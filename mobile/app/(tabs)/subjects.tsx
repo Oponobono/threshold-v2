@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, InteractionManager, FlatList } from 'react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,16 +8,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { subjectsStyles as styles } from '../../src/styles/Subjects.styles';
-import { getSubjects, getAssessments, updateSubject } from '../../src/services/api';
+import { updateSubject } from '../../src/services/api';
 import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
-import { Subject, Assessment } from '../../src/services/api/types';
+import { Subject } from '../../src/services/api/types';
+import { useDataStore } from '../../src/store/useDataStore';
 
-// ─── Helpers ───────────────────────────────────────────────────
-const getAvgColor = (avg: number) => {
-  if (avg >= 80) return '#34C759';
-  if (avg >= 65) return '#FF9500';
-  return '#FF2D55';
-};
+
 
 const getStatusColor = (minNeeded: number, target: number) => {
   const maxScale = target <= 5 ? 5 : target <= 10 ? 10 : 100;
@@ -38,60 +34,32 @@ export default function SubjectsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { subjects, assessments, loadAllData, refreshSubjects } = useDataStore();
+
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [search, setSearch] = useState('');
 
-  // Cargar materias al montar o al enfocar la pantalla
-  const loadSubjects = async () => {
-    try {
-      setIsLoading(true);
-      const data = await getSubjects();
-      setSubjects(data || []);
-      
-      if (data && data.length > 0) {
-        if (!selectedSubject) {
-          setSelectedSubject(data[0]);
-        } else {
-          // Actualizar la materia seleccionada con los nuevos datos (promedios actualizados)
-          const updatedSelected = data.find((s: Subject) => s.id === selectedSubject.id);
-          if (updatedSelected) setSelectedSubject(updatedSelected);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading subjects:', error);
-      setSubjects([]);
-    } finally {
-      setIsLoading(false);
+  // Keep selected subject in sync when subjects array updates
+  useEffect(() => {
+    if (subjects.length > 0) {
+      setSelectedSubject(prev => {
+        if (!prev) return subjects[0];
+        const updated = subjects.find(s => s.id === prev.id);
+        return updated ?? prev;
+      });
     }
-  };
+  }, [subjects]);
 
+  // Request a background refresh when returning to this tab
   useFocusEffect(
     React.useCallback(() => {
-      loadSubjects();
-    }, [selectedSubject?.id])
+      InteractionManager.runAfterInteractions(() => {
+        loadAllData(); // Will quickly return if already loaded, but triggers state update if needed
+      });
+    }, [loadAllData])
   );
 
-  // Cargar evaluaciones de la materia seleccionada
-  useEffect(() => {
-    const loadAssessments = async () => {
-      if (!selectedSubject) {
-        setAssessments([]);
-        return;
-      }
-      try {
-        const data = await getAssessments(selectedSubject.id);
-        setAssessments(data || []);
-      } catch (error) {
-        console.error('Error loading assessments:', error);
-        setAssessments([]);
-      }
-    };
 
-    loadAssessments();
-  }, [selectedSubject]);
 
   // Calculator state
   const [currentGrade, setCurrentGrade] = useState('');
@@ -142,15 +110,11 @@ export default function SubjectsScreen() {
     }
 
     try {
-      setIsLoading(true);
       await updateSubject(selectedSubject.id, { target_grade: rp });
       
-      // Actualizar estado local
-      const updatedSubjects = subjects.map(s => 
-        s.id === selectedSubject.id ? { ...s, target_grade: rp } : s
-      );
-      setSubjects(updatedSubjects);
-      setSelectedSubject({ ...selectedSubject, target_grade: rp });
+      // Actualizar DB y luego refrescar estado global en background
+      await updateSubject(selectedSubject.id, { target_grade: rp });
+      refreshSubjects(); // Update global store
       
       alertRef.show({ 
         title: t('common.success') || 'Éxito', 
@@ -159,8 +123,6 @@ export default function SubjectsScreen() {
       });
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -175,7 +137,7 @@ export default function SubjectsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={globalStyles.row}>
-          <Ionicons name="school" size={22} color={theme.colors.primary} style={{ marginRight: 6 }} />
+          <Ionicons name="school" size={22} color={theme.colors.primary} style={globalStyles.mr8} />
           <Text style={styles.headerTitle}>Threshold</Text>
         </View>
       </View>
@@ -188,6 +150,8 @@ export default function SubjectsScreen() {
             style={styles.searchInput} 
             placeholder={t('subjects.searchPlaceholder')}
             placeholderTextColor={theme.colors.text.secondary}
+            value={search}
+            onChangeText={setSearch}
           />
         </View>
         <TouchableOpacity style={styles.filterBtn}>
@@ -197,20 +161,24 @@ export default function SubjectsScreen() {
 
       {/* Subject Pills Selection */}
       <View>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
+        <FlatList
+          horizontal
+          data={filtered}
+          keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
+          showsHorizontalScrollIndicator={false}
           style={styles.pillsScroll}
           contentContainerStyle={{ paddingRight: 20 }}
-        >
-          {subjects.map((s, idx) => {
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={8}
+          initialNumToRender={5}
+          windowSize={5}
+          renderItem={({ item: s, index: idx }) => {
             const colors = ['#5856D6', '#FF9500', '#34C759', '#FF2D55', '#AF52DE', '#FF3B30'];
             const color = colors[idx % colors.length];
             const isActive = selectedSubject?.id === s.id;
             
             return (
               <TouchableOpacity 
-                key={s.id} 
                 style={[styles.pill, isActive && styles.pillActive]}
                 onPress={() => setSelectedSubject(s)}
                 activeOpacity={0.7}
@@ -221,8 +189,8 @@ export default function SubjectsScreen() {
                 </Text>
               </TouchableOpacity>
             );
-          })}
-        </ScrollView>
+          }}
+        />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -240,9 +208,9 @@ export default function SubjectsScreen() {
             />
           </View>
         ) : (
-          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+          <View style={[globalStyles.center, { paddingVertical: 40 }]}>
             <MaterialCommunityIcons name="book-open-variant" size={48} color="rgba(255,255,255,0.1)" />
-            <Text style={{ color: theme.colors.text.secondary, marginTop: 16 }}>
+            <Text style={[{ color: theme.colors.text.secondary }, globalStyles.mt16]}>
               {t('subjects.selectSubjectToView', 'Selecciona una materia para ver detalles')}
             </Text>
           </View>
@@ -257,9 +225,9 @@ export default function SubjectsScreen() {
           </View>
 
           {!selectedSubject ? (
-            <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+            <View style={[globalStyles.center, { paddingVertical: 32 }]}>
               <MaterialCommunityIcons name="lightbulb-outline" size={40} color="rgba(255,255,255,0.1)" />
-              <Text style={{ color: theme.colors.text.secondary, marginTop: 12, fontSize: 13, textAlign: 'center' }}>
+              <Text style={[{ color: theme.colors.text.secondary, marginTop: 12, fontSize: theme.typography.sizes.sm }, globalStyles.textCenter]}>
                 {t('subjects.selectSubjectToCalculate') || 'Selecciona una materia para simular calificaciones'}
               </Text>
             </View>
@@ -345,15 +313,15 @@ export default function SubjectsScreen() {
         {selectedSubject && (
           <View style={styles.assessCard}>
             <View style={[styles.assessHeader, { marginBottom: 16 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ backgroundColor: theme.colors.primary + '15', padding: 6, borderRadius: 8 }}>
+              <View style={[globalStyles.rowCenter, { gap: 10 }]}>
+                <View style={{ backgroundColor: theme.colors.primaryTransparent.light, padding: 6, borderRadius: 8 }}>
                   <MaterialCommunityIcons name="clipboard-check-outline" size={18} color={theme.colors.primary} />
                 </View>
                 <View>
                   <Text style={[styles.assessTitle, { marginBottom: 2 }]}>{t('subjects.academicTracking', 'Seguimiento académico')}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#34C759' }} />
-                    <Text style={{ fontSize: 10, color: theme.colors.text.secondary, fontWeight: '600' }}>
+                  <View style={[globalStyles.rowCenter, { gap: 4 }]}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.success }} />
+                    <Text style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, fontWeight: '600' }}>
                       {assessments.length} {t('subjects.registered', 'notas registradas')}
                     </Text>
                   </View>
@@ -370,37 +338,45 @@ export default function SubjectsScreen() {
               </View>
             ) : (
               <>
-                <View style={styles.assessList}>
-                {assessments.map(a => {
-                  const iconMap: Record<string, string> = {
-                    'task': 'clipboard-check-outline',
-                    'exam': 'file-document-outline',
-                    'quiz': 'help-circle-outline',
-                    'grade': 'medal-outline',
-                  };
-                  const icon = iconMap[a.type as string] || 'school-outline';
-                  const score = a.score ?? a.grade_value;
-                  const colors = ['#5856D6', '#FF9500', '#34C759', '#FF2D55'];
-                  const color = colors[assessments.indexOf(a) % colors.length];
+                <FlatList
+                  data={assessments.filter(a => a.subject_id === selectedSubject?.id)}
+                  keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
+                  style={styles.assessList}
+                  scrollEnabled={false} // Since it's inside a ScrollView
+                  removeClippedSubviews={true}
+                  maxToRenderPerBatch={8}
+                  initialNumToRender={5}
+                  windowSize={5}
+                  renderItem={({ item: a, index }) => {
+                    const iconMap: Record<string, string> = {
+                      'task': 'clipboard-check-outline',
+                      'exam': 'file-document-outline',
+                      'quiz': 'help-circle-outline',
+                      'grade': 'medal-outline',
+                    };
+                    const icon = iconMap[a.type as string] || 'school-outline';
+                    const score = a.score ?? a.grade_value;
+                    const colors = ['#5856D6', '#FF9500', '#34C759', '#FF2D55'];
+                    const color = colors[index % colors.length];
 
-                  return (
-                    <TouchableOpacity key={a.id} style={styles.assessRow} activeOpacity={0.6}>
-                      <View style={styles.assessIcon}>
-                        <MaterialCommunityIcons name={icon as any} size={18} color={color} />
-                      </View>
-                      <View style={styles.assessBody}>
-                        <Text style={styles.assessName} numberOfLines={1}>{a.name}</Text>
-                        <Text style={styles.assessMeta}>{a.date || 'Sin fecha'}</Text>
-                      </View>
-                      <View style={styles.assessRight}>
-                        <Text style={[styles.assessScore, { color: color }]}>
-                          {score !== null && score !== undefined ? score : '—'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                    return (
+                      <TouchableOpacity style={styles.assessRow} activeOpacity={0.6}>
+                        <View style={styles.assessIcon}>
+                          <MaterialCommunityIcons name={icon as any} size={18} color={color} />
+                        </View>
+                        <View style={styles.assessBody}>
+                          <Text style={styles.assessName} numberOfLines={1}>{a.name}</Text>
+                          <Text style={styles.assessMeta}>{a.date || 'Sin fecha'}</Text>
+                        </View>
+                        <View style={styles.assessRight}>
+                          <Text style={[styles.assessScore, { color: color }]}>
+                            {score !== null && score !== undefined ? score : '—'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
 
             {/* Performance sparkline (dynamic based on last 6 assessments) */}
             <View style={styles.sparklineContainer}>
@@ -414,7 +390,7 @@ export default function SubjectsScreen() {
                     </View>
                     
                     <View style={[styles.sparkline, styles.sparklineMain]}>
-                      {(assessments.filter(a => (a.score !== null && a.score !== undefined) || (a.grade_value !== null && a.grade_value !== undefined)).slice(-6)).map((a, i, arr) => {
+                      {(assessments.filter(a => a.subject_id === selectedSubject?.id && ((a.score !== null && a.score !== undefined) || (a.grade_value !== null && a.grade_value !== undefined))).slice(-6)).map((a, i, arr) => {
                         const score = a.score ?? a.grade_value ?? 0;
                         // Determine scale (5 or 100)
                         const scale = score <= 5 ? 5 : 100;

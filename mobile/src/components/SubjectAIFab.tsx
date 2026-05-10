@@ -27,6 +27,9 @@ import { RecordingItem } from '../hooks/useAudioRecorder';
 import { YouTubeVideo } from '../services/api/types';
 import { AIContextItemData } from './AIContextItem';
 import { buildAIContext } from '../services/api/ai';
+import LottieView from 'lottie-react-native';
+
+const zyrenOrbAnimation = require('../lottieFiles/ai_orb.json');
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface SubjectAIFabProps {
@@ -196,8 +199,8 @@ export const SubjectAIFab: React.FC<SubjectAIFabProps> = ({
       {/* FAB */}
       <View style={[styles.fabContainer, { bottom: Math.max(24, 24 + insets.bottom - 10) }]}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => setIsContextModalVisible(true)}>
-          <Animated.View style={[styles.fabButton, { transform: [{ scale: pulseAnim }] }]}>
-            <MaterialCommunityIcons name="auto-fix" size={28} color={theme.colors.white} />
+          <Animated.View style={[styles.fabButton, { backgroundColor: 'transparent', elevation: 0, shadowOpacity: 0, transform: [{ scale: pulseAnim }] }]}>
+            <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 72, height: 72 }} />
           </Animated.View>
         </TouchableOpacity>
       </View>

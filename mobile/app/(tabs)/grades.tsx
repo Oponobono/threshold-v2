@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Dimensions, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Dimensions, TextInput, TouchableOpacity, InteractionManager, FlatList } from 'react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,9 +8,10 @@ import { LineChart } from 'react-native-chart-kit';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { gradesStyles as styles } from '../../src/styles/Grades.styles';
-import { getAllAssessments, getSubjects } from '../../src/services/api';
-import { Assessment, Subject } from '../../src/services/api/types';
+
+
 import { useFocusEffect } from 'expo-router';
+import { useDataStore } from '../../src/store/useDataStore';
 
 const GRADE_COLORS = (pct: number) => {
   if (pct >= 80) return '#34C759';
@@ -22,9 +23,8 @@ export default function GradesScreen() {
   const { t } = useTranslation();
   const chartWidth = Math.max(240, Dimensions.get('window').width - theme.spacing.xl * 2 - theme.spacing.lg * 2 - 2);
 
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { subjects, assessments, loadAllData } = useDataStore();
+
   const [termGpa, setTermGpa] = useState('0.00');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
 
@@ -57,26 +57,13 @@ export default function GradesScreen() {
     }
   }, [filteredAssessments]);
 
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      const [assessData, subjData] = await Promise.all([
-        getAllAssessments(),
-        getSubjects()
-      ]);
-      setAssessments(assessData || []);
-      setSubjects(subjData || []);
-    } catch (error) {
-      console.error('Error loading grades data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useFocusEffect(
     React.useCallback(() => {
-      loadData();
-    }, [])
+      const task = InteractionManager.runAfterInteractions(() => {
+        loadAllData();
+      });
+      return () => task.cancel();
+    }, [loadAllData])
   );
 
   const [simScore, setSimScore] = useState('');
@@ -121,7 +108,7 @@ export default function GradesScreen() {
           const [da, ma, ya] = a.date.split('-');
           const [db, mb, yb] = b.date.split('-');
           return new Date(`${ya}-${ma}-${da}`).getTime() - new Date(`${yb}-${mb}-${db}`).getTime();
-        } catch(e) { return a.id - b.id; }
+        } catch { return a.id - b.id; }
       }
       return a.id - b.id;
     });
@@ -159,7 +146,7 @@ export default function GradesScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <View style={styles.header}>
         <View style={globalStyles.row}>
-          <Ionicons name="school" size={20} color={theme.colors.primary} style={{ marginRight: 6 }} />
+          <Ionicons name="school" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
           <Text style={styles.logoText}>Threshold</Text>
         </View>
         <TouchableOpacity style={styles.termPill}>
@@ -200,30 +187,39 @@ export default function GradesScreen() {
       </View>
 
       <View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, gap: 8 }}>
-          <TouchableOpacity 
-            style={{ 
-              paddingHorizontal: 16, 
-              paddingVertical: 8, 
-              borderRadius: 20, 
-              backgroundColor: selectedSubjectId === null ? theme.colors.primary : theme.colors.inputBackground,
-              borderWidth: 1,
-              borderColor: selectedSubjectId === null ? theme.colors.primary : theme.colors.border
-            }}
-            onPress={() => setSelectedSubjectId(null)}
-          >
-            <Text style={{ 
-              color: selectedSubjectId === null ? '#FFF' : theme.colors.text.primary, 
-              fontWeight: '600', 
-              fontSize: 13 
-            }}>
-              {t('common.all', 'Todas')}
-            </Text>
-          </TouchableOpacity>
-          
-          {subjects.map(sub => (
+        <FlatList
+          horizontal
+          data={subjects}
+          keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, gap: 8 }}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={8}
+          initialNumToRender={5}
+          windowSize={5}
+          ListHeaderComponent={
             <TouchableOpacity 
-              key={sub.id}
+              style={{ 
+                paddingHorizontal: 16, 
+                paddingVertical: 8, 
+                borderRadius: 20, 
+                backgroundColor: selectedSubjectId === null ? theme.colors.primary : theme.colors.inputBackground,
+                borderWidth: 1,
+                borderColor: selectedSubjectId === null ? theme.colors.primary : theme.colors.border
+              }}
+              onPress={() => setSelectedSubjectId(null)}
+            >
+              <Text style={{ 
+                color: selectedSubjectId === null ? '#FFF' : theme.colors.text.primary, 
+                fontWeight: '600', 
+                fontSize: 13 
+              }}>
+                {t('common.all', 'Todas')}
+              </Text>
+            </TouchableOpacity>
+          }
+          renderItem={({ item: sub }) => (
+            <TouchableOpacity 
               style={{ 
                 paddingHorizontal: 16, 
                 paddingVertical: 8, 
@@ -242,15 +238,15 @@ export default function GradesScreen() {
                 {sub.name}
               </Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          )}
+        />
       </View>
 
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.card}>
           {/* Top Action Row */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <View style={[globalStyles.rowBetweenCenter, globalStyles.mb16]}>
             <Text style={styles.sectionTitle}>
               {t('grades.academicPerformance', 'Rendimiento general')}
             </Text>
@@ -265,8 +261,8 @@ export default function GradesScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-            <View style={{ flex: 1, alignItems: 'center' }}>
+          <View style={[globalStyles.rowCenter, { marginBottom: 20 }]}>
+            <View style={[globalStyles.flex1, globalStyles.centerHorizontal]}>
               <Text numberOfLines={2} style={{ fontSize: 11, color: theme.colors.text.secondary, marginBottom: 8, fontWeight: '600', textTransform: 'uppercase', textAlign: 'center' }}>
                 {t('grades.termGpa')}
               </Text>
@@ -344,40 +340,51 @@ export default function GradesScreen() {
                 <Ionicons name="document-text-outline" size={32} color={theme.colors.text.secondary} style={{ opacity: 0.5, marginBottom: 8 }} />
                 <Text style={{ color: theme.colors.text.secondary, fontSize: 13 }}>{t('subjects.noAssessments', 'No hay evaluaciones')}</Text>
               </View>
-            ) : filteredAssessments.map((a: any, index: number, arr: any[]) => {
-              const score = a.grade_value !== null && a.grade_value !== undefined ? a.grade_value : (a.score || 0);
-              const outOf = a.out_of || (a.grade_value !== null && a.grade_value !== undefined ? 5 : 5);
-              const pct = Math.round((score / outOf) * 100);
-              const subject = subjects.find(s => s.id === a.subject_id);
-              const color = subject?.color || '#5856D6';
-              const isLast = index === arr.length - 1;
+            ) : (
+              <FlatList
+                data={filteredAssessments}
+                keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
+                scrollEnabled={false} // Since it's inside a ScrollView
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                initialNumToRender={6}
+                windowSize={5}
+                renderItem={({ item: a, index }) => {
+                  const score = a.grade_value !== null && a.grade_value !== undefined ? a.grade_value : (a.score || 0);
+                  const outOf = a.out_of || (a.grade_value !== null && a.grade_value !== undefined ? 5 : 5);
+                  const pct = Math.round((score / outOf) * 100);
+                  const subject = subjects.find(s => s.id === a.subject_id);
+                  const color = subject?.color || '#5856D6';
+                  const isLast = index === filteredAssessments.length - 1;
 
-              return (
-                <View key={a.id} style={{ padding: 16, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: color + '20', justifyContent: 'center', alignItems: 'center' }}>
-                    <MaterialCommunityIcons name={a.type === 'exam' ? 'file-document' : 'check-circle'} size={24} color={theme.colors.text.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 2 }} numberOfLines={1}>
-                      {a.name}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '500' }} numberOfLines={1}>
-                      {subject?.name || 'Materia'} 
-                      <Text style={{ opacity: 0.5 }}> • </Text> 
-                      {a.percentage ? `${a.percentage}%` : (a.weight || t('grades.eval', 'Evaluación'))}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: GRADE_COLORS(pct) }}>
-                      {pct}%
-                    </Text>
-                    <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600', marginTop: 1, textTransform: 'uppercase' }}>
-                      {score} / {outOf}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
+                  return (
+                    <View style={{ padding: 16, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                      <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: color + '20', justifyContent: 'center', alignItems: 'center' }}>
+                        <MaterialCommunityIcons name={a.type === 'exam' ? 'file-document' : 'check-circle'} size={24} color={theme.colors.text.primary} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 2 }} numberOfLines={1}>
+                          {a.name}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '500' }} numberOfLines={1}>
+                          {subject?.name || 'Materia'} 
+                          <Text style={{ opacity: 0.5 }}> • </Text> 
+                          {a.percentage ? `${a.percentage}%` : (a.weight || t('grades.eval', 'Evaluación'))}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: GRADE_COLORS(pct) }}>
+                          {pct}%
+                        </Text>
+                        <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600', marginTop: 1, textTransform: 'uppercase' }}>
+                          {score} / {outOf}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                }}
+              />
+            )}
           </View>
         </View>
 
@@ -516,5 +523,3 @@ export default function GradesScreen() {
     </SafeAreaView>
   );
 }
-
-

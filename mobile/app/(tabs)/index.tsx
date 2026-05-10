@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState, Suspense } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, TextInput, FlatList, Platform, Animated, Easing } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, TextInput, FlatList, Animated, Easing } from 'react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,18 +9,16 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { createSubject, getCurrentUserProfile, getSubjects, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, getAllSchedules, createPhoto, createStudySession, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
-
-import * as MediaLibrary from 'expo-media-library';
-import * as LegacyFS from 'expo-file-system/legacy';
-import { AudioRecorderModal } from '../../src/components/AudioRecorderModal';
+import { createSubject, getCurrentUserProfile, getSubjects, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, getAllSchedules, createStudySession, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
-import { StudyTimerModal } from '../../src/components/StudyTimerModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+const AudioRecorderModal = React.lazy(() => import('../../src/components/AudioRecorderModal').then(m => ({ default: m.AudioRecorderModal })));
+const StudyTimerModal = React.lazy(() => import('../../src/components/StudyTimerModal').then(m => ({ default: m.StudyTimerModal })));
 // Lazy load DocumentScannerModal to prevent native module load errors
 const DocumentScannerModal = React.lazy(() => import('../../src/components/DocumentScannerModal').then(m => ({ default: m.DocumentScannerModal })));
-import { PhotoCaptureModal } from '../../src/components/PhotoCaptureModal';
-import { FlashcardsModal } from '../../src/components/FlashcardsModal';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+const PhotoCaptureModal = React.lazy(() => import('../../src/components/PhotoCaptureModal').then(m => ({ default: m.PhotoCaptureModal })));
+const FlashcardsModal = React.lazy(() => import('../../src/components/FlashcardsModal').then(m => ({ default: m.FlashcardsModal })));
+
 
 const SUBJECT_COLORS = [
   '#E7EDF8', '#DDE7FF', '#EAF4EE', '#FCEFD9', '#F7E9EE', '#ECE8FF',
@@ -150,7 +148,7 @@ export default function HybridDashboardScreen() {
             const [d, m, y] = a.date.split('-').map(Number);
             const taskDate = new Date(y, m - 1, d);
             return taskDate.getTime() >= today.getTime();
-          } catch (e) {
+          } catch {
             return false;
           }
         });
@@ -162,7 +160,7 @@ export default function HybridDashboardScreen() {
             if (ya && ma && da && yb && mb && db) {
               return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
             }
-          } catch (e) {}
+          } catch {}
           return 0;
         });
         setNextAssessment(sorted[0] || null);
@@ -208,7 +206,7 @@ export default function HybridDashboardScreen() {
   const shouldUseInfiniteCarousel = subjects.length > SUBJECT_LOOP_THRESHOLD;
 
   const carouselSubjects = useMemo(() => {
-    if (!subjects.length) return [] as Array<Subject & { __key: string }>;
+    if (!subjects.length) return [] as (Subject & { __key: string })[];
 
     if (!shouldUseInfiniteCarousel) {
       return subjects.map((subject) => ({
@@ -217,7 +215,7 @@ export default function HybridDashboardScreen() {
       }));
     }
 
-    const result: Array<Subject & { __key: string }> = [];
+    const result: (Subject & { __key: string })[] = [];
     for (let loop = 0; loop < SUBJECT_LOOP_MULTIPLIER; loop += 1) {
       for (const subject of subjects) {
         result.push({
@@ -537,7 +535,7 @@ export default function HybridDashboardScreen() {
         <View style={[styles.subjectBadge, { backgroundColor: subject.color || '#CCCCCC' }]}>
           <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />
         </View>
-        <View style={{ flex: 1 }}>
+        <View style={globalStyles.flex1}>
           <Text style={styles.subjectTileName} numberOfLines={1}>{subject.name}</Text>
           <Text style={styles.subjectTileMeta} numberOfLines={1}>
             {subject.professor || t('dashboard.newSubject.noProfessor')}
@@ -573,7 +571,7 @@ export default function HybridDashboardScreen() {
       } else {
         pulseAnim.setValue(1);
       }
-    }, [showMood]);
+    }, [showMood, pulseAnim]);
 
     return (
       <TouchableOpacity 
@@ -617,7 +615,7 @@ export default function HybridDashboardScreen() {
     <View style={[styles.perfRow, isYou && styles.perfRowYou]}>
       <Text style={styles.perfRank}>#{rank}</Text>
       <View style={styles.perfUser}>
-        <Ionicons name={icon} size={20} color={iconColor} style={{ marginRight: 8 }} />
+        <Ionicons name={icon} size={20} color={iconColor} style={globalStyles.mr8} />
         <Text style={[styles.perfName, isYou && { fontWeight: '600' }]}>{name}</Text>
       </View>
       <Text style={styles.perfGpa}>{t('dashboard.gpa')} {gpa}</Text>
@@ -702,8 +700,8 @@ export default function HybridDashboardScreen() {
         {/* 3. QUICK ADD & NEXT CLASS */}
         <View style={styles.section}>
           <View style={styles.quickAddCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-              <Ionicons name="calendar-outline" size={20} color={theme.colors.text.primary} style={{ marginRight: 8 }} />
+            <View style={[globalStyles.rowCenter, globalStyles.mb8]}>
+              <Ionicons name="calendar-outline" size={20} color={theme.colors.text.primary} style={globalStyles.mr8} />
               <Text style={styles.quickAddTitle}>{t('dashboard.quickAdd')}</Text>
             </View>
             <Text style={styles.quickAddDesc}>{t('dashboard.quickAddDesc')}</Text>
@@ -718,7 +716,7 @@ export default function HybridDashboardScreen() {
               <View style={styles.nextClassBadge}>
                 <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={globalStyles.flex1}>
                 {nextClass ? (
                   <>
                     <Text style={styles.nextClassTitle} numberOfLines={1}>{nextClass.name}</Text>
@@ -791,7 +789,7 @@ export default function HybridDashboardScreen() {
         {/* 5. STUDY TOOLS (Fixed Row) */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('dashboard.studyTools')}</Text>
-          <View style={{ marginBottom: 16 }}>
+          <View style={globalStyles.mb16}>
             <StudyTimerCard 
               refreshTrigger={timerRefreshTrigger}
               onOpenConfig={() => {
@@ -831,7 +829,7 @@ export default function HybridDashboardScreen() {
 
         {/* 6. PERFORMANCE LEADERBOARD */}
         <View style={styles.section}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
             <Text style={styles.sectionTitle}>{t('dashboard.performance')}</Text>
             <View style={styles.allChip}><Text style={styles.allChipText}>{t('dashboard.filterAll')}</Text></View>
           </View>
@@ -938,7 +936,7 @@ export default function HybridDashboardScreen() {
       {/* TOAST FEEDBACK */}
       {toastMessage ? (
         <View style={styles.toastContainer}>
-          <Ionicons name="checkmark-circle" size={18} color={theme.colors.white} style={{ marginRight: 8 }} />
+          <Ionicons name="checkmark-circle" size={18} color={theme.colors.white} style={globalStyles.mr8} />
           <Text style={styles.toastText}>{toastMessage}</Text>
         </View>
       ) : null}
@@ -1052,7 +1050,7 @@ export default function HybridDashboardScreen() {
               />
 
               <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
+                <View style={globalStyles.flex1}>
                   <Text style={styles.sheetLabel}>{t('dashboard.quickAddMenu.grade.grade')}</Text>
                   <TextInput
                     value={gradeValue}
@@ -1063,7 +1061,7 @@ export default function HybridDashboardScreen() {
                     placeholderTextColor={theme.colors.text.placeholder}
                   />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={globalStyles.flex1}>
                   <Text style={styles.sheetLabel}>{t('dashboard.quickAddMenu.grade.percentage')}</Text>
                   <TextInput
                     value={gradePercentage}
@@ -1154,7 +1152,7 @@ export default function HybridDashboardScreen() {
                       try {
                         const [d, m, y] = taskDate.split('-').map(Number);
                         return new Date(y, m - 1, d);
-                      } catch (e) {
+                      } catch {
                         return new Date();
                       }
                     })()}
@@ -1204,7 +1202,7 @@ export default function HybridDashboardScreen() {
             <View style={styles.sheetHandle} />
 
             {/* Title row with X close button */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <View style={[globalStyles.rowBetweenCenter, { marginBottom: 14 }]}>
               <Text style={styles.sheetTitle}>{t('dashboard.weeklySchedule')}</Text>
               <TouchableOpacity
                 onPress={handleCloseSchedulePlanner}
@@ -1220,7 +1218,7 @@ export default function HybridDashboardScreen() {
               style={[styles.dropdownSelector, { marginBottom: 12 }]} 
               onPress={() => setIsSubjectSelectorVisible(true)}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <View style={[globalStyles.rowCenter, globalStyles.flex1]}>
                 {selectedSubjectId ? (
                   <View style={[styles.dot, { backgroundColor: subjects.find(s => s.id === selectedSubjectId)?.color || theme.colors.primary, marginRight: 8 }]} />
                 ) : null}
@@ -1401,84 +1399,91 @@ export default function HybridDashboardScreen() {
         </Pressable>
       </Modal>
       {/* FAB - BOTÓN MAESTRO */}
-      <TouchableOpacity 
+              <TouchableOpacity 
         style={styles.fab} 
         onPress={handleOpenQuickAdd}
       >
         <Ionicons name="add" size={32} color={theme.colors.white} />
       </TouchableOpacity>
 
-      <AudioRecorderModal 
-        isVisible={isAudioModalVisible} 
-        onClose={() => setIsAudioModalVisible(false)} 
-      />
-
-      <StudyTimerModal
-        isVisible={isTimerModalVisible}
-        onClose={() => setIsTimerModalVisible(false)}
-        subjects={subjects}
-        viewState={timerViewState}
-        onStart={(config) => {
-          const initialRemaining = config.mode === 'threshold' ? 0 : config.duration;
-          AsyncStorage.setItem('@threshold_timer_state', JSON.stringify({
-            isActive: true,
-            isPaused: false,
-            mode: config.mode,
-            totalSeconds: config.duration,
-            remainingSeconds: initialRemaining,
-            subjectId: config.subjectId,
-            lastSyncTime: Date.now(),
-          })).then(() => {
-            setTimerRefreshTrigger(prev => prev + 1);
-            setIsTimerModalVisible(false);
-          });
-        }}
-        onSaveFeedback={async (feedback) => {
-          try {
-            // Mapping string feedback to number rating (MVP)
-            const ratingMap: Record<string, number> = {
-              [t('dashboard.studyTimerModal.advanceOptions.great')]: 5,
-              [t('dashboard.studyTimerModal.advanceOptions.good')]: 4,
-              [t('dashboard.studyTimerModal.advanceOptions.ok')]: 3,
-              [t('dashboard.studyTimerModal.advanceOptions.bad')]: 2,
-              [t('dashboard.studyTimerModal.advanceOptions.terrible')]: 1,
-            };
-            const rating = ratingMap[feedback] || 3;
-
-            await createStudySession({
-              subject_id: lastSessionSubjectId,
-              session_type: lastSessionMode === 'pomodoro' ? 'Pomodoro' : 'Threshold',
-              duration_seconds: lastSessionDuration,
-              performance_rating: rating,
-            });
-            showToast(t('common.success') + ': Progreso guardado');
-          } catch (e) {
-            showToast('Error al guardar sesión de estudio');
-          }
-        }}
-      />
-
       <React.Suspense fallback={null}>
-        <DocumentScannerModal
-          isVisible={isScannerVisible}
-          onClose={() => setIsScannerVisible(false)}
-          subjects={subjects}
-          onSave={() => loadData()}
-        />
+        {isAudioModalVisible && (
+          <AudioRecorderModal isVisible={true} onClose={() => setIsAudioModalVisible(false)} />
+        )}
+
+        {isTimerModalVisible && (
+          <StudyTimerModal
+            isVisible={true}
+            onClose={() => setIsTimerModalVisible(false)}
+            subjects={subjects}
+            viewState={timerViewState}
+            onStart={(config) => {
+              const initialRemaining = config.mode === 'threshold' ? 0 : config.duration;
+              AsyncStorage.setItem('@threshold_timer_state', JSON.stringify({
+                isActive: true,
+                isPaused: false,
+                mode: config.mode,
+                totalSeconds: config.duration,
+                remainingSeconds: initialRemaining,
+                subjectId: config.subjectId,
+                lastSyncTime: Date.now(),
+              })).then(() => {
+                setTimerRefreshTrigger(prev => prev + 1);
+                setIsTimerModalVisible(false);
+              });
+            }}
+            onSaveFeedback={async (feedback) => {
+              try {
+                // Mapping string feedback to number rating (MVP)
+                const ratingMap: Record<string, number> = {
+                  [t('dashboard.studyTimerModal.advanceOptions.great')]: 5,
+                  [t('dashboard.studyTimerModal.advanceOptions.good')]: 4,
+                  [t('dashboard.studyTimerModal.advanceOptions.ok')]: 3,
+                  [t('dashboard.studyTimerModal.advanceOptions.bad')]: 2,
+                  [t('dashboard.studyTimerModal.advanceOptions.terrible')]: 1,
+                };
+                const rating = ratingMap[feedback] || 3;
+
+                await createStudySession({
+                  subject_id: lastSessionSubjectId,
+                  session_type: lastSessionMode === 'pomodoro' ? 'Pomodoro' : 'Threshold',
+                  duration_seconds: lastSessionDuration,
+                  performance_rating: rating,
+                });
+                showToast(t('common.success') + ': Progreso guardado');
+              } catch {
+                showToast('Error al guardar sesión de estudio');
+              }
+            }}
+          />
+        )}
+
+        {isScannerVisible && (
+          <DocumentScannerModal
+            isVisible={isScannerVisible}
+            onClose={() => setIsScannerVisible(false)}
+            subjects={subjects}
+            onSave={() => loadData()}
+          />
+        )}
+
+        {isPhotoModalVisible && (
+          <PhotoCaptureModal
+            isVisible={isPhotoModalVisible}
+            onClose={() => setIsPhotoModalVisible(false)}
+            subjects={subjects}
+            onSave={() => loadData()}
+          />
+        )}
+
+        {isFlashcardsVisible && (
+          <FlashcardsModal
+            isVisible={isFlashcardsVisible}
+            onClose={() => setIsFlashcardsVisible(false)}
+            subjects={subjects}
+          />
+        )}
       </React.Suspense>
-
-      <PhotoCaptureModal
-        isVisible={isPhotoModalVisible}
-        onClose={() => setIsPhotoModalVisible(false)}
-        subjects={subjects}
-        onSave={() => loadData()}
-      />
-
-      <FlashcardsModal
-        isVisible={isFlashcardsVisible}
-        onClose={() => setIsFlashcardsVisible(false)}
-        subjects={subjects}
-      />
     </>
   );
 }

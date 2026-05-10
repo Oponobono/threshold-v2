@@ -1,18 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image as RNImage,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as DocumentPicker from 'expo-document-picker';
+
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import {
@@ -32,8 +31,7 @@ import {
   type YouTubeVideo,
   type ScannedDocument,
 } from '../../src/services/api';
-import { processDocumentUpload } from '../../src/services/api/ai';
-import { useAudioRecorder, RecordingItem } from '../../src/hooks/useAudioRecorder';
+
 import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
 import { SubjectRecentRecordings } from '../../src/components/SubjectRecentRecordings';
 import { DocumentScannerModal } from '../../src/components/DocumentScannerModal';
@@ -47,7 +45,7 @@ import { SubjectThreshold } from '../../src/components/SubjectThreshold';
 import { SubjectInsights } from '../../src/components/SubjectInsights';
 import { SubjectAIFab } from '../../src/components/SubjectAIFab';
 import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
-import { useCameraPermissions, CameraView } from 'expo-camera';
+import { useAudioRecorder } from '../../src/hooks/useAudioRecorder';
 import * as FileSystem from 'expo-file-system/legacy';
 import { subjectDetailStyles as styles } from '../../src/styles/SubjectDetail.styles';
 import { useCustomAlert } from '../../src/components/CustomAlert';
@@ -87,18 +85,17 @@ export default function SubjectDetailScreen() {
   const [photos, setPhotos] = useState<any[]>([]);
   const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isDetailLoading] = useState(false);
+
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
   const [isPDFImportVisible, setIsPDFImportVisible] = useState(false);
   const [isViewerVisible, setIsViewerVisible] = useState(false);
   const [initialViewerIndex, setInitialViewerIndex] = useState(0);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const cameraRef = React.useRef<CameraView>(null);
+
   const [recentVideos, setRecentVideos] = useState<YouTubeVideo[]>([]);
   const [allSubjectVideos, setAllSubjectVideos] = useState<YouTubeVideo[]>([]);
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+
   const { playSound, stopSound, playingId, deleteRecordingConfirmed, recordings } = useAudioRecorder();
 
   // All recordings for this subject (used by the AI context modal — not sliced)
@@ -134,7 +131,7 @@ export default function SubjectDetailScreen() {
               await deleteSubject(subjectId);
               router.back();
               showAlert({ title: t('subjects.deleteSubjectTitle'), message: t('subjects.deleteSubjectSuccess'), type: 'info' });
-            } catch (e: any) {
+            } catch {
               setIsLoading(false);
               showAlert({ title: t('subjects.error') || 'Error', message: t('subjects.deleteSubjectError'), type: 'error' });
             }
@@ -159,7 +156,7 @@ export default function SubjectDetailScreen() {
             try {
               await deleteYouTubeVideo(Number(videoId));
               setRecentVideos(prev => prev.filter(v => v.id !== videoId));
-            } catch (e) {
+            } catch {
               showAlert({ title: t('subjects.error'), message: t('subjects.deleteVideoError'), type: 'error' });
             }
           }
@@ -176,7 +173,7 @@ export default function SubjectDetailScreen() {
 
       setIsLoading(true);
       try {
-        const [profileRes, subjectRes, photosRes, docsRes, assessmentsRes, schedulesRes, recordingsRes, videosRes] =
+        const [profileRes, subjectRes, photosRes, docsRes, assessmentsRes, schedulesRes, , videosRes] =
           await Promise.allSettled([
             getCurrentUserProfile(),
             getSubjectById(subjectId),
@@ -198,8 +195,9 @@ export default function SubjectDetailScreen() {
         if (schedulesRes.status === 'fulfilled') setSubjectSchedules(schedulesRes.value || []);
         // Grabaciones gestionadas por useAudioRecorder hook
         if (videosRes.status === 'fulfilled') {
+          const videoList = Array.isArray(videosRes.value) ? videosRes.value : [];
           // eslint-disable-next-line eqeqeq
-          const filtered = videosRes.value.filter(v => v.subject_id == subjectId);
+          const filtered = videoList.filter(v => v.subject_id == subjectId);
           setAllSubjectVideos(filtered);
           setRecentVideos(filtered.slice(0, 3));
         }
@@ -447,8 +445,9 @@ export default function SubjectDetailScreen() {
           onSuccess={() => {
             setIsFlashcardModalVisible(false);
           }}
-          // Pasar el texto construido por el backend — sin dependencia de archivos del dispositivo
+          // Pasar el texto construido por el backend o la imagen base64
           content={flashcardContextText}
+          imageBase64={flashcardBase64}
           contentType="document"
           title={selectedSubject?.name || 'Documento'}
           subjectId={subjectId}

@@ -5,10 +5,16 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../src/styles/theme';
+import { useDataStore } from '../../src/store/useDataStore';
 
 export default function TabLayout() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { loadAllData } = useDataStore();
+
+  React.useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
   
   // Calculate bottom padding factoring in the system navigation bar (Android/iOS)
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 28 : 16);

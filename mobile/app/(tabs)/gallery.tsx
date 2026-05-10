@@ -1,184 +1,485 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Image, FlatList, Dimensions } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, Image,
+  Dimensions, ActivityIndicator, RefreshControl, TextInput,
+  InteractionManager,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { galleryStyles as styles } from '../../src/styles/Gallery.styles';
+import {
+  getGalleryItems, updatePhoto,
+  type Photo,
+} from '../../src/services/api';
+import { useDataStore } from '../../src/store/useDataStore';
 
-// ─── Main Screen ───────────────────────────────────────────────
+// ── Lazy-loaded heavy modals ──────────────────────────────────────────────────
+const ImageViewerModal = React.lazy(() =>
+  import('../../src/components/ImageViewerModal').then(m => ({ default: m.ImageViewerModal }))
+);
+const PhotoCaptureModal = React.lazy(() =>
+  import('../../src/components/PhotoCaptureModal').then(m => ({ default: m.PhotoCaptureModal }))
+);
+const DocumentScannerModal = React.lazy(() =>
+  import('../../src/components/DocumentScannerModal').then(m => ({ default: m.DocumentScannerModal }))
+);
+
+const SCREEN_W = Dimensions.get('window').width;
+const GRID_COL_W = (SCREEN_W - 48 - 16) / 2;
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface GalleryPhoto extends Photo {
+  subject_name?: string;
+  subject_color?: string;
+}
+
+// ── Memoized grid item — prevents re-render of every card on star toggle ──────
+const GridItem = React.memo(function GridItem({
+  item,
+  onPress,
+  onStar,
+  formatDate,
+}: {
+  item: GalleryPhoto;
+  onPress: () => void;
+  onStar: () => void;
+  formatDate: (d?: string) => string;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.88}
+      style={[styles.gridCard, { width: GRID_COL_W }]}
+      onPress={onPress}
+    >
+      <Image source={{ uri: item.local_uri }} style={styles.gridImage} />
+
+      {item.ocr_text ? (
+        <View style={styles.ocrOverlay}>
+          <MaterialCommunityIcons name="text-recognition" size={10} color={theme.colors.primary} />
+          <Text style={styles.ocrOverlayText}>OCR</Text>
+        </View>
+      ) : null}
+
+      <TouchableOpacity
+        onPress={onStar}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{
+          position: 'absolute', top: 6, left: 6,
+          backgroundColor: theme.colors.primaryTransparent.heavy,
+          borderRadius: 12, padding: 4,
+        }}
+      >
+        <Ionicons
+          name={item.es_favorita ? 'star' : 'star-outline'}
+          size={14}
+          color={item.es_favorita ? '#FFD700' : '#fff'}
+        />
+      </TouchableOpacity>
+
+      <View style={styles.gridInfo}>
+        <View style={[globalStyles.rowCenter, globalStyles.mb4, { gap: 4 }]}>
+          <View style={{
+            width: 8, height: 8, borderRadius: 4,
+            backgroundColor: item.subject_color || theme.colors.primary,
+          }} />
+          <Text style={styles.gridSubject} numberOfLines={1}>{item.subject_name}</Text>
+        </View>
+        <Text style={styles.gridDate}>{formatDate(item.created_at)}</Text>
+        {item.ocr_text ? (
+          <Text style={styles.gridOcr} numberOfLines={2}>{item.ocr_text}</Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ── Empty State ───────────────────────────────────────────────────────────────
+const EmptyState = React.memo(function EmptyState({
+  icon, message, sub,
+}: {
+  icon: string; message: string; sub?: string;
+}) {
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 32 }}>
+      <View style={{
+        width: 72, height: 72, borderRadius: 36,
+        backgroundColor: theme.colors.primary + '15',
+        alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+      }}>
+        <Ionicons name={icon as any} size={32} color={theme.colors.primary} />
+      </View>
+      <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text.primary, textAlign: 'center', marginBottom: 6 }}>
+        {message}
+      </Text>
+      {sub ? (
+        <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center' }}>{sub}</Text>
+      ) : null}
+    </View>
+  );
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+// ── Main Screen ───────────────────────────────────────────────────────────────
 export default function GalleryScreen() {
   const { t } = useTranslation();
-  const STARRED = [
-    { id: 's1', subject: t('gallery.sample.star1Subject'), date: t('gallery.sample.star1Date'), uri: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=300&auto=format&fit=crop' },
-    { id: 's2', subject: t('gallery.sample.star2Subject'), date: t('gallery.sample.star2Date'), uri: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=300&auto=format&fit=crop' },
-    { id: 's3', subject: t('gallery.sample.star3Subject'), date: t('gallery.sample.star3Date'), uri: 'https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=300&auto=format&fit=crop' },
-  ];
 
-  const GALLERY_ITEMS = [
-    {
-      id: 'g1',
-      uri: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400&auto=format&fit=crop',
-      subject: t('gallery.sample.g1Subject'), date: t('gallery.sample.g1Date'), time: t('gallery.sample.g1Time'),
-      ocr: t('gallery.sample.g1Ocr'),
-    },
-    {
-      id: 'g2',
-      uri: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400&auto=format&fit=crop',
-      subject: t('gallery.sample.g2Subject'), date: t('gallery.sample.g2Date'), time: t('gallery.sample.g2Time'),
-      ocr: t('gallery.sample.g2Ocr'),
-    },
-    {
-      id: 'g3',
-      uri: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&auto=format&fit=crop',
-      subject: t('gallery.sample.g3Subject'), date: t('gallery.sample.g3Date'), time: t('gallery.sample.g3Time'),
-      ocr: t('gallery.sample.g3Ocr'),
-    },
-    {
-      id: 'g4',
-      uri: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&auto=format&fit=crop',
-      subject: t('gallery.sample.g4Subject'), date: t('gallery.sample.g4Date'), time: t('gallery.sample.g4Time'),
-      ocr: t('gallery.sample.g4Ocr'),
-    },
-  ];
-  const [filterTab, setFilterTab] = useState<'subject' | 'date'>('subject');
-  const [autoCrop, setAutoCrop] = useState(true);
-  const [starred, setStarred] = useState<string[]>(['s1', 's2', 's3']);
+  // Subjects come from the shared Zustand store — no extra fetch needed
+  const { subjects, loadAllData } = useDataStore();
 
-  const toggleStar = (id: string) => {
-    setStarred(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
-  };
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [filterTab, setFilterTab] = useState<'all' | 'starred' | 'ocr'>('all');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Modals — only mounted when opened
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [isScannerVisible, setIsScannerVisible] = useState(false);
+  const [isPhotoVisible, setIsPhotoVisible] = useState(false);
+
+  // ── Load photos ─────────────────────────────────────────────────────────────
+  const loadPhotos = useCallback(async (refreshing = false) => {
+    if (refreshing) setIsRefreshing(true);
+    else setIsLoading(true);
+    try {
+      const raw = await getGalleryItems();
+      const list = Array.isArray(raw) ? raw : [];
+      const subjectMap = new Map(subjects.map((s) => [s.id, s]));
+      const enriched: GalleryPhoto[] = list.map((item: any) => {
+        const subj = subjectMap.get(item.subject_id);
+        return {
+          ...item,
+          subject_name: subj?.name ?? t('gallery.unknownSubject'),
+          subject_color: subj?.color ?? theme.colors.primary,
+        };
+      });
+      setPhotos(enriched);
+    } catch (err) {
+      console.warn('[GalleryScreen] loadPhotos error:', err);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [subjects, t]);
+
+  // Defer load until navigation animations finish
+  useFocusEffect(
+    useCallback(() => {
+      const task = InteractionManager.runAfterInteractions(() => {
+        loadAllData();   // Refreshes subjects from the store (no-op if already loaded)
+        loadPhotos();
+      });
+      return () => task.cancel();
+    }, [loadAllData, loadPhotos])
+  );
+
+  // ── Toggle Starred ──────────────────────────────────────────────────────────
+  const toggleStar = useCallback(async (photo: GalleryPhoto) => {
+    const newVal = photo.es_favorita ? 0 : 1;
+    setPhotos((prev) => prev.map((p) => p.id === photo.id ? { ...p, es_favorita: newVal } : p));
+    try {
+      if (photo.id) await updatePhoto(photo.id, { es_favorita: newVal === 1 });
+    } catch {
+      setPhotos((prev) => prev.map((p) => p.id === photo.id ? { ...p, es_favorita: photo.es_favorita } : p));
+    }
+  }, []);
+
+  const handlePhotoDeleted = useCallback((id: number) => {
+    setPhotos((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+  const handleSave = useCallback(() => loadPhotos(), [loadPhotos]);
+
+  // ── Derived filtered lists — only recomputed when deps change ───────────────
+  const { imagePhotos, starred, allImagePhotos } = useMemo(() => {
+    const allImgs = photos.filter((p) => !p.local_uri?.endsWith('.pdf'));
+    const filtered = allImgs
+      .filter((p) => {
+        if (filterTab === 'starred') return p.es_favorita === 1;
+        if (filterTab === 'ocr') return !!p.ocr_text;
+        return true;
+      })
+      .filter((p) => selectedSubjectId === null || p.subject_id === selectedSubjectId)
+      .filter((p) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+          p.subject_name?.toLowerCase().includes(q) ||
+          p.ocr_text?.toLowerCase().includes(q) ||
+          p.tags?.toLowerCase().includes(q)
+        );
+      });
+    return {
+      imagePhotos: filtered,
+      starred: allImgs.filter((p) => p.es_favorita === 1),
+      allImagePhotos: allImgs,
+    };
+  }, [photos, filterTab, selectedSubjectId, searchQuery]);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
+        <View style={globalStyles.center}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
+
       {/* ── HEADER ── */}
       <View style={styles.header}>
         <View style={globalStyles.row}>
-          <Ionicons name="school" size={20} color={theme.colors.primary} style={{ marginRight: 6 }} />
-          <Text style={styles.logoText}>Threshold</Text>
+          <Ionicons name="images-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+          <Text style={styles.logoText}>{t('gallery.title') || 'Galería'}</Text>
         </View>
         <View style={globalStyles.row}>
-          <TouchableOpacity style={styles.scanBtn}>
-            <Ionicons name="scan-outline" size={16} color={theme.colors.text.primary} style={{ marginRight: 4 }} />
-            <Text style={styles.scanText}>{t('gallery.scan')}</Text>
+          {isSearchOpen ? (
+            <TextInput
+              autoFocus
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t('gallery.searchPlaceholder') || 'Buscar...'}
+              placeholderTextColor={theme.colors.text.secondary}
+              style={{
+                fontSize: 13, color: theme.colors.text.primary,
+                borderBottomWidth: 1, borderBottomColor: theme.colors.primary,
+                minWidth: 150, paddingBottom: 2,
+              }}
+              onBlur={() => { if (!searchQuery) setIsSearchOpen(false); }}
+            />
+          ) : null}
+          <TouchableOpacity
+            style={{ marginLeft: 8, padding: 4 }}
+            onPress={() => { setIsSearchOpen((v) => !v); if (isSearchOpen) setSearchQuery(''); }}
+          >
+            <Feather name={isSearchOpen ? 'x' : 'search'} size={18} color={theme.colors.text.secondary} />
           </TouchableOpacity>
-          <TouchableOpacity style={{ marginLeft: 10 }}>
-            <Feather name="more-vertical" size={20} color={theme.colors.text.secondary} />
+          <TouchableOpacity
+            style={[styles.scanBtn, { marginLeft: 8 }]}
+            onPress={() => setIsScannerVisible(true)}
+          >
+            <Ionicons name="scan-outline" size={16} color={theme.colors.text.primary} style={{ marginRight: 4 }} />
+            <Text style={styles.scanText}>{t('gallery.scan') || 'Escanear'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ marginLeft: 8, padding: 4 }} onPress={() => setIsPhotoVisible(true)}>
+            <Ionicons name="camera-outline" size={20} color={theme.colors.text.secondary} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ── FILTER TABS ── */}
       <View style={styles.tabRow}>
-        <TouchableOpacity
-          style={[styles.tab, filterTab === 'subject' && styles.tabActive]}
-          onPress={() => setFilterTab('subject')}
-        >
-          <Text style={[styles.tabText, filterTab === 'subject' && styles.tabTextActive]}>
-            {t('gallery.bySubject')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, filterTab === 'date' && styles.tabActive]}
-          onPress={() => setFilterTab('date')}
-        >
-          <Text style={[styles.tabText, filterTab === 'date' && styles.tabTextActive]}>
-            {t('gallery.byDate')}
-          </Text>
-        </TouchableOpacity>
-        <Text style={styles.itemCount}>{GALLERY_ITEMS.length} {t('gallery.items')}</Text>
-      </View>
-
-      {/* ── AUTO-CROP SETTINGS BAR ── */}
-      <View style={styles.settingsBar}>
-        <View style={styles.settingsLeft}>
-          <View style={styles.settingsThumb} />
-          <View>
-            <Text style={styles.settingsTitle}>{t('gallery.autoCrop')}</Text>
-            <Text style={styles.settingsSubtitle}>{t('gallery.contrast')}</Text>
-          </View>
-        </View>
-        <View style={globalStyles.row}>
-          <Switch
-            value={autoCrop}
-            onValueChange={setAutoCrop}
-            trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-            thumbColor={theme.colors.white}
-            style={{ transform: [{ scale: 0.8 }] }}
-          />
-          <TouchableOpacity style={styles.ocrBtn}>
-            <Text style={styles.ocrBtnText}>{t('gallery.ocr')}</Text>
+        {(['all', 'starred', 'ocr'] as const).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, filterTab === tab && styles.tabActive]}
+            onPress={() => setFilterTab(tab)}
+          >
+            <Text style={[styles.tabText, filterTab === tab && styles.tabTextActive]}>
+              {tab === 'all' ? (t('gallery.all') || 'Todas') :
+               tab === 'starred' ? (t('gallery.starred') || 'Favoritas') : 'OCR'}
+            </Text>
           </TouchableOpacity>
-        </View>
+        ))}
+        <Text style={styles.itemCount}>{imagePhotos.length} {t('gallery.items') || 'fotos'}</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      {/* ── SUBJECT CHIPS ── */}
+      {subjects.length > 0 ? (
+        <ScrollView
+          horizontal showsHorizontalScrollIndicator={false}
+          style={{ maxHeight: 46, flexGrow: 0, minHeight: 46 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 6, gap: 6, alignItems: 'center' }}
+        >
+          <TouchableOpacity
+            onPress={() => setSelectedSubjectId(null)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, alignSelf: 'center',
+              paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
+              borderColor: selectedSubjectId === null ? theme.colors.text.primary : theme.colors.border,
+              backgroundColor: selectedSubjectId === null ? theme.colors.text.primary : 'transparent',
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: selectedSubjectId === null ? '700' : '500', color: selectedSubjectId === null ? theme.colors.white : theme.colors.text.secondary, letterSpacing: -0.1 }}>
+              {t('gallery.allSubjects') || 'Todas las materias'}
+            </Text>
+          </TouchableOpacity>
+          {subjects.map((s) => (
+            <TouchableOpacity
+              key={s.id}
+              onPress={() => setSelectedSubjectId(selectedSubjectId === s.id ? null : s.id)}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, alignSelf: 'center',
+                paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
+                borderColor: selectedSubjectId === s.id ? theme.colors.text.primary : theme.colors.border,
+                backgroundColor: selectedSubjectId === s.id ? theme.colors.text.primary : 'transparent',
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: selectedSubjectId === s.id ? '700' : '500', color: selectedSubjectId === s.id ? theme.colors.white : theme.colors.text.secondary, letterSpacing: -0.1 }}>
+                {s.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : null}
 
-        {/* ── STARRED ── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t('gallery.starred')}</Text>
-            <Text style={styles.sectionMeta}>{starred.length} {t('gallery.favorites')}</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.starredRow}>
-            {STARRED.map(item => (
-              <View key={item.id} style={styles.starredCard}>
-                <Image source={{ uri: item.uri }} style={styles.starredImage} />
-                <Text style={styles.starredSubject}>{item.subject}</Text>
-                <Text style={styles.starredDate}>{item.date}</Text>
-                <TouchableOpacity style={styles.starBtn} onPress={() => toggleStar(item.id)}>
-                  <Ionicons
-                    name={starred.includes(item.id) ? 'star' : 'star-outline'}
-                    size={16}
-                    color={starred.includes(item.id) ? '#FFD700' : theme.colors.text.secondary}
-                  />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scroll, { flexGrow: 1 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadPhotos(true)}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        {/* ── STARRED ROW ── */}
+        {filterTab === 'all' && starred.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>{t('gallery.starred') || 'Favoritas'}</Text>
+              <Text style={styles.sectionMeta}>{starred.length} {t('gallery.favorites') || 'fotos'}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.starredRow}>
+              {starred.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.starredCard}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    const idx = allImagePhotos.findIndex((p) => p.id === item.id);
+                    setViewerIndex(idx >= 0 ? idx : 0);
+                    setViewerVisible(true);
+                  }}
+                >
+                  <Image source={{ uri: item.local_uri }} style={styles.starredImage} />
+                  <Text style={styles.starredSubject} numberOfLines={1}>{item.subject_name}</Text>
+                  <Text style={styles.starredDate}>{formatDate(item.created_at)}</Text>
+                  <TouchableOpacity
+                    style={styles.starBtn}
+                    onPress={() => toggleStar(item)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="star" size={14} color="#FFD700" />
+                  </TouchableOpacity>
                 </TouchableOpacity>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* ── GALLERY GRID ── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t('gallery.gallerySection')}</Text>
-            <Text style={styles.sectionMeta}>{t('gallery.grouped')}</Text>
+              ))}
+            </ScrollView>
           </View>
+        ) : null}
 
-          <View style={styles.gridContainer}>
-            {GALLERY_ITEMS.map(item => (
-              <TouchableOpacity key={item.id} activeOpacity={0.9} style={styles.gridCard}>
-                <Image source={{ uri: item.uri }} style={styles.gridImage} />
-                {/* OCR overlay chip */}
-                <View style={styles.ocrOverlay}>
-                  <MaterialCommunityIcons name="text-recognition" size={10} color={theme.colors.primary} />
-                  <Text style={styles.ocrOverlayText}>OCR</Text>
-                </View>
-                <View style={styles.gridInfo}>
-                  <Text style={styles.gridSubject}>{t('gallery.subject')} {item.subject}</Text>
-                  <Text style={styles.gridDate}>{item.date} • {item.time}</Text>
-                  <Text style={styles.gridOcr} numberOfLines={2}>
-                    {t('gallery.ocrSnippet')} {item.ocr}
-                  </Text>
-                  <TouchableOpacity style={styles.attachBtn}>
-                    <Text style={styles.attachBtnText}>{t('gallery.attach')}</Text>
+        {/* ── GRID ── */}
+        <View style={styles.section}>
+          {imagePhotos.length > 0 && (
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>
+                {filterTab === 'starred' ? (t('gallery.starred') || 'Favoritas') :
+                 filterTab === 'ocr' ? 'Con texto OCR' :
+                 (t('gallery.gallerySection') || 'Galería')}
+              </Text>
+              <Text style={styles.sectionMeta}>{imagePhotos.length} {t('gallery.items') || 'fotos'}</Text>
+            </View>
+          )}
+
+          {imagePhotos.length === 0 ? (
+            <>
+              <EmptyState
+                icon={
+                  filterTab === 'starred' ? 'star-outline' :
+                  filterTab === 'ocr' ? 'text-outline' : 'images-outline'
+                }
+                message={
+                  filterTab === 'starred' ? (t('gallery.emptyStarred') || 'No tienes fotos favoritas') :
+                  filterTab === 'ocr' ? 'No hay fotos con texto OCR' :
+                  (t('gallery.emptyGallery') || 'Tu galería está vacía')
+                }
+                sub={filterTab === 'all' ? (t('gallery.emptyGallerySub') || 'Toma fotos o escanea documentos para empezar') : undefined}
+              />
+              {filterTab === 'all' ? (
+                <View style={[globalStyles.row, globalStyles.mt8, { gap: 12 }]}>
+                  <TouchableOpacity
+                    style={[globalStyles.flex1, globalStyles.rowCenter, globalStyles.centerVertical, { gap: 6, backgroundColor: theme.colors.primary, paddingVertical: 12, borderRadius: 12 }]}
+                    onPress={() => setIsScannerVisible(true)}
+                  >
+                    <Ionicons name="scan-outline" size={18} color={theme.colors.white} />
+                    <Text style={{ color: theme.colors.white, fontWeight: '700', fontSize: theme.typography.sizes.sm }}>{t('gallery.scan') || 'Escanear'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[globalStyles.flex1, globalStyles.rowCenter, globalStyles.centerVertical, { gap: 6, backgroundColor: theme.colors.text.primary, paddingVertical: 12, borderRadius: 12 }]}
+                    onPress={() => setIsPhotoVisible(true)}
+                  >
+                    <Ionicons name="camera-outline" size={18} color={theme.colors.white} />
+                    <Text style={{ color: theme.colors.white, fontWeight: '700', fontSize: theme.typography.sizes.sm }}>{t('gallery.takePhoto') || 'Tomar foto'}</Text>
                   </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+              ) : null}
+            </>
+          ) : (
+            <View style={styles.gridContainer}>
+              {imagePhotos.map((item) => (
+                <GridItem
+                  key={item.id}
+                  item={item}
+                  formatDate={formatDate}
+                  onPress={() => {
+                    const idx = allImagePhotos.findIndex((p) => p.id === item.id);
+                    setViewerIndex(idx >= 0 ? idx : 0);
+                    setViewerVisible(true);
+                  }}
+                  onStar={() => toggleStar(item)}
+                />
+              ))}
+            </View>
+          )}
         </View>
-
-        {/* ── SWIPE HINT ── */}
-        <View style={styles.hintRow}>
-          <Ionicons name="swap-horizontal-outline" size={14} color={theme.colors.text.secondary} />
-          <Text style={styles.hintText}>{t('gallery.swipeHint')}</Text>
-        </View>
-
       </ScrollView>
+
+      {/* ── LAZY MODALS — only rendered when needed ── */}
+      <React.Suspense fallback={null}>
+        {viewerVisible && (
+          <ImageViewerModal
+            isVisible={viewerVisible}
+            photos={allImagePhotos as any}
+            initialIndex={viewerIndex}
+            onClose={() => setViewerVisible(false)}
+            onPhotoDeleted={handlePhotoDeleted}
+            onOCRSaved={handleSave}
+          />
+        )}
+        {isScannerVisible && (
+          <DocumentScannerModal
+            isVisible={isScannerVisible}
+            onClose={() => setIsScannerVisible(false)}
+            subjects={subjects}
+            onSave={handleSave}
+          />
+        )}
+        {isPhotoVisible && (
+          <PhotoCaptureModal
+            isVisible={isPhotoVisible}
+            onClose={() => setIsPhotoVisible(false)}
+            subjects={subjects}
+            onSave={handleSave}
+          />
+        )}
+      </React.Suspense>
     </SafeAreaView>
   );
 }
-
-

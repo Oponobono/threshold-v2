@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Easing,
   StatusBar,
   TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
@@ -16,19 +15,14 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../src/styles/theme';
 import { recordingsStyles as styles } from '../src/styles/RecordingsScreen.styles';
-import { useAudioRecorder, RecordingItem } from '../src/hooks/useAudioRecorder';
+
 import { PremiumLoading } from '../src/components/PremiumLoading';
-import { RecordingsGrid, GridMediaItem, SubjectSection } from '../src/components/RecordingsGrid';
+import { RecordingsGrid, GridMediaItem } from '../src/components/RecordingsGrid';
 import { YouTubeAddModal } from '../src/components/YouTubeAddModal';
 import { FilterSortModal } from '../src/components/FilterSortModal';
 import { AudioRecorderBottomBar } from '../src/components/AudioRecorderBottomBar';
 import { useRecordingsManager } from '../src/hooks/useRecordingsManager';
-import {
-  getYouTubeVideos,
-  createYouTubeVideo,
-  YouTubeVideo,
-  deleteYouTubeVideo,
-} from '../src/services/api';
+
 
 /**
  * Pantalla principal de Grabaciones y Multimedia (RecordingsScreen)
@@ -118,20 +112,9 @@ export default function RecordingsScreen() {
       duration: 80,
       useNativeDriver: false,
     }).start();
-  }, [meteringDb]);
+  }, [meteringDb, meterAnim]);
 
-  useEffect(() => {
-    if (isRecording && !isPaused) startPulse();
-    else stopPulse();
-  }, [isRecording, isPaused]);
 
-  const prevIsRecording = useRef(isRecording);
-  useEffect(() => {
-    if (prevIsRecording.current === true && isRecording === false) {
-      setTimeout(() => loadRecordings(), 800);
-    }
-    prevIsRecording.current = isRecording;
-  }, [isRecording]);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,7 +127,7 @@ export default function RecordingsScreen() {
    * Inicia la animación de pulso infinito (agrandar y encoger) 
    * utilizada para el indicador visual rojo durante la grabación activa.
    */
-  const startPulse = () => {
+  const startPulse = useCallback(() => {
     pulseAnim.setValue(1);
     Animated.loop(
       Animated.sequence([
@@ -162,15 +145,28 @@ export default function RecordingsScreen() {
         }),
       ])
     ).start();
-  };
+  }, [pulseAnim]);
 
   /**
    * Detiene la animación de pulso y reinicia el valor a su estado inicial.
    */
-  const stopPulse = () => {
+  const stopPulse = useCallback(() => {
     pulseAnim.stopAnimation();
     pulseAnim.setValue(1);
-  };
+  }, [pulseAnim]);
+
+  useEffect(() => {
+    if (isRecording && !isPaused) startPulse();
+    else stopPulse();
+  }, [isRecording, isPaused, startPulse, stopPulse]);
+
+  const prevIsRecording = useRef(isRecording);
+  useEffect(() => {
+    if (prevIsRecording.current === true && isRecording === false) {
+      setTimeout(() => loadRecordings(), 800);
+    }
+    prevIsRecording.current = isRecording;
+  }, [isRecording, loadRecordings]);
 
   /**
    * Maneja el evento de presión sobre un ítem de la cuadrícula multimedia.

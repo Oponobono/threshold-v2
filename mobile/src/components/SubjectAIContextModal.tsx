@@ -11,6 +11,9 @@ import { BentoContextCard, CELL_W, FULL_W } from './BentoContextCard';
 import { RecordingItem } from '../hooks/useAudioRecorder';
 import { YouTubeVideo } from '../services/api/types';
 import { mapRecordings, mapPhotos, mapDocuments, mapVideos } from '../utils/aiContextMappers';
+import LottieView from 'lottie-react-native';
+
+const zyrenOrbAnimation = require('../lottieFiles/ai_orb.json');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PRIMARY   = '#7B72FF';
@@ -227,7 +230,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
           {/* Header */}
           <View style={s.header}>
             <View style={s.aiIconWrap}>
-              <MaterialCommunityIcons name="auto-fix" size={18} color={PRIMARY} />
+              <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.title}>Zyren</Text>
@@ -390,10 +393,9 @@ const s = StyleSheet.create({
     paddingHorizontal: PAD,
   },
   aiIconWrap: {
-    width: 34, height: 34, borderRadius: 11,
-    backgroundColor: `${PRIMARY}20`,
+    width: 34, height: 34,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: `${PRIMARY}30`,
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 17, fontWeight: '800', color: TXT_PRI, letterSpacing: -0.4,

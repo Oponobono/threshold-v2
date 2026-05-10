@@ -26,6 +26,9 @@ import { LLMProvider, getPreferredLLMProvider } from '../utils/llmProviderManage
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
+import LottieView from 'lottie-react-native';
+
+const zyrenOrbAnimation = require('../lottieFiles/ai_orb.json');
 
 // ─── Tokens de color (misma paleta que SubjectAIContextModal) ─────────────────
 const PRIMARY  = '#7B72FF';
@@ -92,7 +95,7 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
       {/* Ícono del asistente solo para mensajes IA */}
       {!isUser && (
         <View style={s.aiAvatar}>
-          <MaterialCommunityIcons name="auto-fix" size={14} color={PRIMARY} />
+          <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 26, height: 26 }} />
         </View>
       )}
       <View style={[s.bubble, isUser ? s.bubbleUser : s.bubbleAI]}>
@@ -138,7 +141,7 @@ const TypingIndicator: React.FC = () => {
   return (
     <View style={[s.bubbleRow, s.bubbleRowAI]}>
       <View style={s.aiAvatar}>
-        <MaterialCommunityIcons name="auto-fix" size={14} color={PRIMARY} />
+        <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 26, height: 26 }} />
       </View>
       <View style={[s.bubble, s.bubbleAI, { paddingVertical: 12, paddingHorizontal: 16 }]}>
         <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
@@ -440,7 +443,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
             {/* Encabezado */}
             <View style={s.header}>
               <View style={s.aiIconWrap}>
-                <MaterialCommunityIcons name="auto-fix" size={17} color={PRIMARY} />
+                <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.title}>Zyren</Text>
@@ -539,7 +542,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 /* Estado vacío — sugerencias iniciales */
                 <View style={s.emptyState}>
                   <View style={s.emptyIconWrap}>
-                    <MaterialCommunityIcons name="auto-fix" size={32} color={PRIMARY} />
+                    <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 64, height: 64 }} />
                   </View>
                   <Text style={s.emptyTitle}>¿Qué quieres saber?</Text>
                   <Text style={s.emptySubtitle}>
@@ -634,10 +637,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
   },
   aiIconWrap: {
-    width: 34, height: 34, borderRadius: 11,
-    backgroundColor: `${PRIMARY}20`,
+    width: 34, height: 34,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: `${PRIMARY}30`,
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 16, fontWeight: '800', color: TXT_PRI, letterSpacing: -0.3,
@@ -688,11 +690,10 @@ const s = StyleSheet.create({
     paddingTop: 40, gap: 12, paddingHorizontal: 24,
   },
   emptyIconWrap: {
-    width: 64, height: 64, borderRadius: 20,
-    backgroundColor: `${PRIMARY}18`,
+    width: 64, height: 64,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: `${PRIMARY}30`,
     marginBottom: 8,
+    backgroundColor: 'transparent',
   },
   emptyTitle: {
     fontSize: 18, fontWeight: '800', color: TXT_PRI, letterSpacing: -0.4,
@@ -719,10 +720,9 @@ const s = StyleSheet.create({
   bubbleRowUser: { justifyContent: 'flex-end' },
   bubbleRowAI:   { justifyContent: 'flex-start', gap: 8 },
   aiAvatar: {
-    width: 26, height: 26, borderRadius: 9,
-    backgroundColor: `${PRIMARY}20`,
+    width: 26, height: 26,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: `${PRIMARY}30`,
+    backgroundColor: 'transparent',
   },
   bubble: {
     maxWidth: '78%', borderRadius: 18,

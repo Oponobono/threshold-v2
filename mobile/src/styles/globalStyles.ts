@@ -1,4 +1,4 @@
-import { Platform, StatusBar, StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { theme } from './theme';
 
 export const globalStyles = StyleSheet.create({
@@ -55,4 +55,42 @@ export const globalStyles = StyleSheet.create({
     color: theme.colors.text.secondary,
     fontSize: theme.typography.sizes.sm,
   },
+  // --- New Utility Classes ---
+  // Layout
+  flex1: { flex: 1 },
+  flexShrink1: { flexShrink: 1 },
+  flexGrow1: { flexGrow: 1 },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  centerVertical: { justifyContent: 'center' },
+  centerHorizontal: { alignItems: 'center' },
+  alignStart: { alignItems: 'flex-start' },
+  alignEnd: { alignItems: 'flex-end' },
+  justifyBetween: { justifyContent: 'space-between' },
+  justifyEnd: { justifyContent: 'flex-end' },
+  
+  // Flex Direction
+  rowCenter: { flexDirection: 'row', alignItems: 'center' },
+  rowBetweenCenter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rowEnd: { flexDirection: 'row', justifyContent: 'flex-end' },
+  
+  // Margins
+  mb4: { marginBottom: 4 },
+  mb8: { marginBottom: 8 },
+  mb12: { marginBottom: 12 },
+  mb16: { marginBottom: 16 },
+  mb24: { marginBottom: 24 },
+  mb32: { marginBottom: 32 },
+  mt8: { marginTop: 8 },
+  mt16: { marginTop: 16 },
+  mr4: { marginRight: 4 },
+  mr8: { marginRight: 8 },
+  ml8: { marginLeft: 8 },
+  
+  // Text Align
+  textCenter: { textAlign: 'center' },
+  textRight: { textAlign: 'right' },
+  textLeft: { textAlign: 'left' },
+  
+  // Common visual
+  circle: { borderRadius: theme.borderRadius.full, justifyContent: 'center', alignItems: 'center' },
 });
