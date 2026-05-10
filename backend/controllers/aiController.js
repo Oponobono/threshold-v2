@@ -4,12 +4,13 @@ const fs = require('fs').promises;
 const path = require('path');
 const geminiService = require('../utils/geminiService');
 const { shieldPrompt } = require('../utils/promptShield');
-const { 
-  processDocumentWithFilesAPI, 
-  processAcademicChat, 
+const {
+  processDocumentWithFilesAPI,
+  processDocumentBuffer,
+  processAcademicChat,
   generateFlashcardsFromDocument,
-  generateFlashcardsFromText,
-  getModelInfo 
+  generateFlashcardsFromBuffer,
+  getModelInfo,
 } = geminiService;
 
 /**
@@ -722,7 +723,8 @@ exports.processDocumentUpload = async (req, res) => {
     const result = await geminiService.processDocumentBuffer(
       req.file.buffer,
       req.file.mimetype,
-      securePrompt
+      securePrompt,
+      req.file.originalname
     );
 
     res.json({
@@ -780,7 +782,8 @@ exports.generateFlashcardsUpload = async (req, res) => {
     const flashcards = await geminiService.generateFlashcardsFromBuffer(
       req.file.buffer,
       req.file.mimetype,
-      count
+      count,
+      req.file.originalname
     );
 
     res.json({
