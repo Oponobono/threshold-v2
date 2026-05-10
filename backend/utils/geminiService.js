@@ -10,8 +10,11 @@
 
 const secrets = require('../config/secrets');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleAIFileManager } = require("@google/generative-ai/server");
 const fs = require("fs").promises;
 const path = require("path");
+const os = require("os");
+const crypto = require("crypto");
 
 const genAI = new GoogleGenerativeAI(secrets.GEMINI_API_KEY);
 const MODEL_NAME = "gemini-3-flash-preview"; // Modelo recomendado (May 2026): balance ideal entre inteligencia y velocidad
@@ -138,11 +141,19 @@ async function processDocumentWithFilesAPI(filePath, mimeType = null, prompt) {
     const fileSize = (fileContent.length / 1024 / 1024).toFixed(2);
     console.log(`[Gemini Files API] Tamaño: ${fileSize}MB`);
 
-    // Crear objeto para Files API
+    // Crear objeto para Files API usando GoogleAIFileManager
+    const fileManager = new GoogleAIFileManager(secrets.GEMINI_API_KEY);
+    const uploadResult = await fileManager.uploadFile(filePath, {
+      mimeType: finalMimeType,
+      displayName: path.basename(filePath),
+    });
+    
+    console.log(`[Gemini Files API] Archivo subido exitosamente: ${uploadResult.file.uri}`);
+
     const fileData = {
-      inlineData: {
-        data: fileContent.toString("base64"),
-        mimeType: finalMimeType,
+      fileData: {
+        fileUri: uploadResult.file.uri,
+        mimeType: uploadResult.file.mimeType,
       },
     };
 
@@ -162,6 +173,14 @@ Utiliza el contexto completo del documento para dar respuestas precisas.`,
     console.log(
       `[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`
     );
+
+    // Limpieza
+    try {
+      await fileManager.deleteFile(uploadResult.file.name);
+      console.log(`[Gemini Files API] Archivo temporal eliminado de Gemini`);
+    } catch (e) {
+      console.warn(`[Gemini Files API] No se pudo eliminar archivo de Gemini:`, e.message);
+    }
 
     return responseText;
   } catch (error) {
@@ -307,7 +326,26 @@ Genera las flashcards:`;
 }
 
 /**
- * Procesa un documento desde un buffer en memoria (sin guardar en disco)
+ * Sube un buffer a Gemini Files API temporalmente
+ */
+async function uploadBufferToGemini(fileBuffer, mimeType) {
+  const fileManager = new GoogleAIFileManager(secrets.GEMINI_API_KEY);
+  const tempFilePath = path.join(os.tmpdir(), `gemini_temp_${crypto.randomBytes(8).toString('hex')}`);
+  await fs.writeFile(tempFilePath, fileBuffer);
+  
+  try {
+    const uploadResult = await fileManager.uploadFile(tempFilePath, {
+      mimeType: mimeType,
+    });
+    console.log(`[Gemini Files API] Buffer subido a Gemini: ${uploadResult.file.uri}`);
+    return { uploadResult, fileManager };
+  } finally {
+    await fs.unlink(tempFilePath).catch(e => console.warn('Error eliminando temp file:', e.message));
+  }
+}
+
+/**
+ * Procesa un documento desde un buffer en memoria (sin guardar en disco permanentemente)
  * Ideal para: Upload directo desde cliente sin almacenamiento temporal
  *
  * @param {Buffer} fileBuffer - Buffer del archivo
@@ -320,11 +358,12 @@ async function processDocumentBuffer(fileBuffer, mimeType, prompt) {
     console.log(`[Gemini Files API] Procesando buffer en memoria (${(fileBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
     console.log(`[Gemini Files API] MIME Type: ${mimeType}`);
 
-    // Crear objeto para Files API desde buffer
+    const { uploadResult, fileManager } = await uploadBufferToGemini(fileBuffer, mimeType);
+
     const fileData = {
-      inlineData: {
-        data: fileBuffer.toString("base64"),
-        mimeType: mimeType,
+      fileData: {
+        fileUri: uploadResult.file.uri,
+        mimeType: uploadResult.file.mimeType,
       },
     };
 
@@ -345,6 +384,13 @@ Utiliza el contexto completo del documento para dar respuestas precisas.`,
       `[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`
     );
 
+    // Limpieza
+    try {
+      await fileManager.deleteFile(uploadResult.file.name);
+    } catch (e) {
+      console.warn(`[Gemini Files API] No se pudo eliminar archivo:`, e.message);
+    }
+
     return responseText;
   } catch (error) {
     console.error(`[Gemini Files API] ❌ Error procesando buffer:`, error.message);
@@ -353,8 +399,7 @@ Utiliza el contexto completo del documento para dar respuestas precisas.`,
 }
 
 /**
- * Genera flashcards desde un buffer de documento en memoria (sin guardar en disco)
- * Ideal para: Upload directo desde cliente
+ * Genera flashcards desde un buffer de documento en memoria
  *
  * @param {Buffer} fileBuffer - Buffer del archivo
  * @param {string} mimeType - MIME type del archivo
@@ -378,10 +423,12 @@ REGLAS ESTRICTAS:
 
 Genera las flashcards:`;
 
+    const { uploadResult, fileManager } = await uploadBufferToGemini(fileBuffer, mimeType);
+
     const fileData = {
-      inlineData: {
-        data: fileBuffer.toString("base64"),
-        mimeType: mimeType,
+      fileData: {
+        fileUri: uploadResult.file.uri,
+        mimeType: uploadResult.file.mimeType,
       },
     };
 
@@ -392,6 +439,13 @@ Genera las flashcards:`;
 
     const result = await model.generateContent([fileData, { text: prompt }]);
     const response = result.response.text();
+
+    // Limpieza
+    try {
+      await fileManager.deleteFile(uploadResult.file.name);
+    } catch (e) {
+      console.warn(`[Gemini] No se pudo eliminar archivo:`, e.message);
+    }
 
     // Parsear respuesta JSON
     const jsonMatch = response.match(/\[[\s\S]*\]/);
@@ -412,52 +466,6 @@ Genera las flashcards:`;
   } catch (error) {
     console.error(`[Gemini] Error generando flashcards desde buffer:`, error.message);
     throw error;
-  }
-}
-
-/**
- * Procesa un documento desde un buffer en memoria (sin guardar en disco)
- * Ideal para: Upload directo desde cliente sin almacenamiento temporal
- *
- * @param {Buffer} fileBuffer - Buffer del archivo
- * @param {string} mimeType - MIME type del archivo
- * @param {string} prompt - Instrucción para Gemini
- * @returns {Promise<string>} Respuesta del modelo
- */
-async function processDocumentBuffer(fileBuffer, mimeType, prompt) {
-  try {
-    console.log(`[Gemini Files API] Procesando buffer en memoria (${(fileBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
-    console.log(`[Gemini Files API] MIME Type: ${mimeType}`);
-
-    // Crear objeto para Files API desde buffer
-    const fileData = {
-      inlineData: {
-        data: fileBuffer.toString("base64"),
-        mimeType: mimeType,
-      },
-    };
-
-    // Enviar a Gemini
-    const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
-      systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
-Responde en español. Si el documento es muy largo, organiza la respuesta de forma clara y estructurada.
-Utiliza el contexto completo del documento para dar respuestas precisas.`,
-      safetySettings: SAFETY_SETTINGS,
-    });
-
-    console.log(`[Gemini Files API] Enviando buffer a modelo ${MODEL_NAME}...`);
-    const result = await model.generateContent([fileData, { text: prompt }]);
-
-    const responseText = result.response.text();
-    console.log(
-      `[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`
-    );
-
-    return responseText;
-  } catch (error) {
-    console.error(`[Gemini Files API] ❌ Error procesando buffer:`, error.message);
-    throw new Error(`Error en Gemini Files API: ${error.message}`);
   }
 }
 
