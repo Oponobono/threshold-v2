@@ -75,7 +75,7 @@ exports.deleteScannedDocument = (req, res) => {
   const { documentId } = req.params;
   console.log(`[Backend] DELETE /scanned-documents/${documentId} recibido.`);
 
-  db.get(`SELECT local_uri, cloud_url FROM scanned_documents WHERE id = ?`, [documentId], (err, row) => {
+  db.get(`SELECT * FROM scanned_documents WHERE id = ?`, [documentId], (err, row) => {
     if (err) {
       console.error('[Backend] Error en db.get (scanned_documents):', err.message);
       return res.status(500).json({ error: err.message });
