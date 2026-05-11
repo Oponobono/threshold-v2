@@ -48,6 +48,15 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
+  const [cameraKey, setCameraKey] = useState(0);
+
+  // Forzar remounting de la cámara cuando se otorga el permiso (bug común de pantalla negra en Android)
+  React.useEffect(() => {
+    if (permission?.granted && isVisible) {
+      const timeout = setTimeout(() => setCameraKey(prev => prev + 1), 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [permission?.granted, isVisible]);
 
   // Solicitar permiso automáticamente al abrir si no está otorgado
   React.useEffect(() => {
@@ -149,7 +158,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
 
         {!capturedImage ? (
           <View style={styles.camera}>
-            <CameraView style={StyleSheet.absoluteFillObject} facing="back" ref={cameraRef} enableTorch={flashEnabled} />
+            <CameraView key={cameraKey} style={[{ flex: 1 }, StyleSheet.absoluteFillObject]} facing="back" ref={cameraRef} enableTorch={flashEnabled} />
             <View style={[styles.cameraOverlay, { position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
               <View style={styles.captureButtonContainer}>
                 
