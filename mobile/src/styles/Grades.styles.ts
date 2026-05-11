@@ -3,12 +3,8 @@ import { theme } from './theme';
 import { globalStyles } from './globalStyles';
 
 export const gradesStyles = StyleSheet.create({
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl, paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1, borderBottomColor: theme.colors.border,
-  },
-  logoText: { fontSize: theme.typography.sizes.lg, fontWeight: '800', color: theme.colors.text.primary },
+  header: globalStyles.standardHeader,
+  logoText: globalStyles.screenTitle,
   termPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: theme.colors.inputBackground,

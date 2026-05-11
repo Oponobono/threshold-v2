@@ -134,7 +134,10 @@ export default function CalendarScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       {/* ── HEADER ─────────────────────────────────────────────── */}
       <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>{t('dashboard.tabs.calendar')}</Text>
+        <View style={globalStyles.row}>
+          <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+          <Text style={styles.headerTitle}>{t('dashboard.tabs.calendar')}</Text>
+        </View>
         {!isViewingCurrentMonth && (
           <TouchableOpacity onPress={goToToday} style={styles.todayPill}>
             <Ionicons name="today-outline" size={14} color={theme.colors.primary} />
@@ -268,19 +271,10 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
+  headerContainer: globalStyles.standardHeader,
   headerTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: theme.colors.text.primary,
-    letterSpacing: -0.5,
+    ...globalStyles.screenTitle,
+    flex: 1,
   },
   todayPill: {
     flexDirection: 'row',

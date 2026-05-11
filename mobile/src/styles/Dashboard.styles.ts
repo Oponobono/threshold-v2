@@ -8,18 +8,8 @@ export const dashboardStyles = StyleSheet.create({
     paddingVertical: theme.spacing.lg,
     paddingBottom: 50,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  greetingText: {
-    fontSize: theme.typography.sizes.xxl,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    letterSpacing: -0.5,
-  },
+  header: { ...globalStyles.standardHeader, paddingHorizontal: 0, paddingVertical: 12, marginBottom: theme.spacing.lg },
+  greetingText: globalStyles.screenTitle,
   greetingSubtext: {
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,

@@ -137,8 +137,8 @@ export default function SubjectsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={globalStyles.row}>
-          <Ionicons name="school" size={22} color={theme.colors.primary} style={globalStyles.mr8} />
-          <Text style={styles.headerTitle}>Threshold</Text>
+          <Ionicons name="book-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+          <Text style={styles.headerTitle}>{t('subjects.title') || 'Materias'}</Text>
         </View>
       </View>
 

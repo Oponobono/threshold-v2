@@ -146,14 +146,14 @@ export default function GradesScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <View style={styles.header}>
         <View style={globalStyles.row}>
-          <Ionicons name="school" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
-          <Text style={styles.logoText}>Threshold</Text>
+          <Ionicons name="school-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+          <Text style={styles.logoText}>{t('grades.title') || 'Calificaciones'}</Text>
         </View>
-        <TouchableOpacity style={styles.termPill}>
-          <Text style={styles.termText}>{t('grades.activeTerm')}</Text>
-          <Ionicons name="chevron-down" size={14} color={theme.colors.text.primary} />
-        </TouchableOpacity>
         <View style={globalStyles.row}>
+          <TouchableOpacity style={styles.termPill}>
+            <Text style={styles.termText}>{t('grades.activeTerm')}</Text>
+            <Ionicons name="chevron-down" size={14} color={theme.colors.text.primary} />
+          </TouchableOpacity>
           <TouchableOpacity 
             style={{ marginLeft: 10 }}
             onPress={() => alertRef.show({ title: 'Próximamente', message: 'La descarga de reportes estará disponible pronto.', type: 'info' })}

@@ -93,4 +93,20 @@ export const globalStyles = StyleSheet.create({
   
   // Common visual
   circle: { borderRadius: theme.borderRadius.full, justifyContent: 'center', alignItems: 'center' },
+  
+  // --- Standardized App Headers ---
+  standardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: 18,
+    backgroundColor: theme.colors.background,
+  },
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: theme.colors.text.primary,
+    letterSpacing: -0.7,
+  },
 });

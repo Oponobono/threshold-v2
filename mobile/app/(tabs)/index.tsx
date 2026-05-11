@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, TextInput, FlatList, Animated, Easing } from 'react-native';
+import LottieView from 'lottie-react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -186,11 +187,24 @@ export default function HybridDashboardScreen() {
     return profile?.username?.trim() || fullName || '';
   }, [profile?.username, fullName]);
 
-  const greetingByTime = useMemo(() => {
+  const greetingData = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return t('dashboard.greetings.morning');
-    if (hour < 18) return t('dashboard.greetings.afternoon');
-    return t('dashboard.greetings.evening');
+    if (hour >= 5 && hour < 12) {
+      return { 
+        text: t('dashboard.greetings.morning'), 
+        animation: require('../../src/lottieFiles/morning.json') 
+      };
+    } else if (hour >= 12 && hour < 18) {
+      return { 
+        text: t('dashboard.greetings.afternoon'), 
+        animation: require('../../src/lottieFiles/evening.json') 
+      };
+    } else {
+      return { 
+        text: t('dashboard.greetings.evening'), 
+        animation: require('../../src/lottieFiles/night.json') 
+      };
+    }
   }, [t]);
 
   const profileSubtitle = useMemo(() => {
@@ -637,12 +651,21 @@ export default function HybridDashboardScreen() {
         
         {/* 1. HEADER */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greetingText}>
-              {greetingByTime}
-              {nickname ? `, ${nickname}` : ''} 👋
-            </Text>
-            <Text style={styles.greetingSubtext}>{profileSubtitle}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.greetingText, { flexShrink: 1 }]}>
+                  {greetingData.text}{nickname ? `, ${nickname}` : ''}
+                </Text>
+                <LottieView
+                  source={greetingData.animation}
+                  autoPlay
+                  loop
+                  style={{ width: 44, height: 44, marginLeft: 2 }}
+                />
+              </View>
+              <Text style={styles.greetingSubtext}>{profileSubtitle}</Text>
+            </View>
           </View>
           <TouchableOpacity
             onPress={() => router.push('/settings')}

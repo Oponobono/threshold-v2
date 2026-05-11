@@ -3,15 +3,11 @@ import { theme } from './theme';
 import { globalStyles } from './globalStyles';
 
 const SCREEN_W = Dimensions.get('window').width;
-const GRID_COL_W = (SCREEN_W - theme.spacing.xl * 2 - 16) / 2;
+const GRID_COL_W = (SCREEN_W - theme.spacing.xl * 2 - 16 - 1) / 2;
 
 export const galleryStyles = StyleSheet.create({
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl, paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1, borderBottomColor: theme.colors.border,
-  },
-  logoText: { fontSize: theme.typography.sizes.lg, fontWeight: '800', color: theme.colors.text.primary },
+  header: globalStyles.standardHeader,
+  logoText: globalStyles.screenTitle,
   scanBtn: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: theme.colors.inputBackground,
@@ -24,6 +20,29 @@ export const galleryStyles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xl, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: theme.colors.border,
     gap: 4,
+  },
+  searchBarContainer: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: 12,
+    backgroundColor: theme.colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  searchInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: theme.typography.sizes.md,
+    color: theme.colors.text.primary,
+    height: '100%',
   },
   tab: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,

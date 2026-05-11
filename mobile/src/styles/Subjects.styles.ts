@@ -3,12 +3,8 @@ import { theme } from './theme';
 import { globalStyles } from './globalStyles';
 
 export const subjectsStyles = StyleSheet.create({
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl, paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1, borderBottomColor: theme.colors.border,
-  },
-  headerTitle: { fontSize: theme.typography.sizes.lg, fontWeight: '800', color: theme.colors.text.primary },
+  header: globalStyles.standardHeader,
+  headerTitle: globalStyles.screenTitle,
   addBtn: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: theme.colors.text.primary,

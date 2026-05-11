@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, memo, lazy, Suspense } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Image,
-  Dimensions, ActivityIndicator, RefreshControl, TextInput,
-  InteractionManager,
+  View, Text, Dimensions, ActivityIndicator,
+  InteractionManager, FlatList, TouchableOpacity,
+  TextInput, RefreshControl, ScrollView
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -18,18 +19,18 @@ import {
 import { useDataStore } from '../../src/store/useDataStore';
 
 // ── Lazy-loaded heavy modals ──────────────────────────────────────────────────
-const ImageViewerModal = React.lazy(() =>
+const ImageViewerModal = lazy(() =>
   import('../../src/components/ImageViewerModal').then(m => ({ default: m.ImageViewerModal }))
 );
-const PhotoCaptureModal = React.lazy(() =>
+const PhotoCaptureModal = lazy(() =>
   import('../../src/components/PhotoCaptureModal').then(m => ({ default: m.PhotoCaptureModal }))
 );
-const DocumentScannerModal = React.lazy(() =>
+const DocumentScannerModal = lazy(() =>
   import('../../src/components/DocumentScannerModal').then(m => ({ default: m.DocumentScannerModal }))
 );
 
 const SCREEN_W = Dimensions.get('window').width;
-const GRID_COL_W = (SCREEN_W - 48 - 16) / 2;
+const GRID_COL_W = (SCREEN_W - theme.spacing.xl * 2 - 16 - 1) / 2;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface GalleryPhoto extends Photo {
@@ -38,7 +39,7 @@ interface GalleryPhoto extends Photo {
 }
 
 // ── Memoized grid item — prevents re-render of every card on star toggle ──────
-const GridItem = React.memo(function GridItem({
+const GridItem = memo(function GridItem({
   item,
   onPress,
   onStar,
@@ -55,7 +56,12 @@ const GridItem = React.memo(function GridItem({
       style={[styles.gridCard, { width: GRID_COL_W }]}
       onPress={onPress}
     >
-      <Image source={{ uri: item.local_uri }} style={styles.gridImage} />
+      <Image 
+        source={{ uri: item.local_uri }} 
+        style={styles.gridImage} 
+        contentFit="cover"
+        transition={200}
+      />
 
       {item.ocr_text ? (
         <View style={styles.ocrOverlay}>
@@ -148,6 +154,7 @@ export default function GalleryScreen() {
   const [viewerIndex, setViewerIndex] = useState(0);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [isPhotoVisible, setIsPhotoVisible] = useState(false);
+  const [viewerPhotos, setViewerPhotos] = useState<GalleryPhoto[]>([]);
 
   // ── Load photos ─────────────────────────────────────────────────────────────
   const loadPhotos = useCallback(async (refreshing = false) => {
@@ -200,31 +207,37 @@ export default function GalleryScreen() {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const handleSave = useCallback(() => loadPhotos(), [loadPhotos]);
+  const handleSave = useCallback(() => loadPhotos(true), [loadPhotos]);
 
   // ── Derived filtered lists — only recomputed when deps change ───────────────
-  const { imagePhotos, starred, allImagePhotos } = useMemo(() => {
+  const { imagePhotos, starred } = useMemo(() => {
     const allImgs = photos.filter((p) => !p.local_uri?.endsWith('.pdf'));
-    const filtered = allImgs
-      .filter((p) => {
-        if (filterTab === 'starred') return p.es_favorita === 1;
-        if (filterTab === 'ocr') return !!p.ocr_text;
-        return true;
-      })
-      .filter((p) => selectedSubjectId === null || p.subject_id === selectedSubjectId)
-      .filter((p) => {
-        if (!searchQuery.trim()) return true;
-        const q = searchQuery.toLowerCase();
-        return (
-          p.subject_name?.toLowerCase().includes(q) ||
-          p.ocr_text?.toLowerCase().includes(q) ||
-          p.tags?.toLowerCase().includes(q)
-        );
-      });
+    
+    // Filtramos por materia seleccionada y búsqueda
+    const filteredBySubjectAndSearch = allImgs.filter((p) => {
+      const matchesSubject = selectedSubjectId === null || p.subject_id === selectedSubjectId;
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = !q || 
+        p.subject_name?.toLowerCase().includes(q) ||
+        p.ocr_text?.toLowerCase().includes(q) ||
+        p.tags?.toLowerCase().includes(q);
+      
+      return matchesSubject && matchesSearch;
+    });
+
+    // La lista para el grid depende del tab activo (Todas, Favoritas, OCR)
+    const gridPhotos = filteredBySubjectAndSearch.filter((p) => {
+      if (filterTab === 'starred') return p.es_favorita === 1;
+      if (filterTab === 'ocr') return !!p.ocr_text;
+      return true;
+    });
+
+    // Las favoritas ahora respetan el filtro de materia
+    const starredPhotos = filteredBySubjectAndSearch.filter((p) => p.es_favorita === 1);
+
     return {
-      imagePhotos: filtered,
-      starred: allImgs.filter((p) => p.es_favorita === 1),
-      allImagePhotos: allImgs,
+      imagePhotos: gridPhotos,
+      starred: starredPhotos,
     };
   }, [photos, filterTab, selectedSubjectId, searchQuery]);
 
@@ -249,23 +262,8 @@ export default function GalleryScreen() {
           <Text style={styles.logoText}>{t('gallery.title') || 'Galería'}</Text>
         </View>
         <View style={globalStyles.row}>
-          {isSearchOpen ? (
-            <TextInput
-              autoFocus
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={t('gallery.searchPlaceholder') || 'Buscar...'}
-              placeholderTextColor={theme.colors.text.secondary}
-              style={{
-                fontSize: 13, color: theme.colors.text.primary,
-                borderBottomWidth: 1, borderBottomColor: theme.colors.primary,
-                minWidth: 150, paddingBottom: 2,
-              }}
-              onBlur={() => { if (!searchQuery) setIsSearchOpen(false); }}
-            />
-          ) : null}
           <TouchableOpacity
-            style={{ marginLeft: 8, padding: 4 }}
+            style={{ padding: 4 }}
             onPress={() => { setIsSearchOpen((v) => !v); if (isSearchOpen) setSearchQuery(''); }}
           >
             <Feather name={isSearchOpen ? 'x' : 'search'} size={18} color={theme.colors.text.secondary} />
@@ -282,6 +280,29 @@ export default function GalleryScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* ── SEARCH BAR ROW ── */}
+      {isSearchOpen && (
+        <View style={styles.searchBarContainer}>
+          <View style={styles.searchInner}>
+            <Feather name="search" size={16} color={theme.colors.text.secondary} style={{ marginRight: 8 }} />
+            <TextInput
+              autoFocus
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t('gallery.searchPlaceholder') || 'Buscar fotos, materias, OCR...'}
+              placeholderTextColor={theme.colors.text.placeholder}
+              style={styles.searchInput}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={18} color={theme.colors.text.placeholder} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* ── FILTER TABS ── */}
       <View style={styles.tabRow}>
@@ -339,9 +360,119 @@ export default function GalleryScreen() {
         </ScrollView>
       ) : null}
 
-      <ScrollView
+      <FlatList
+        data={imagePhotos}
+        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+        numColumns={2}
+        columnWrapperStyle={{ gap: 16, paddingHorizontal: theme.spacing.xl }}
+        contentContainerStyle={[styles.scroll, { flexGrow: 1, paddingHorizontal: 0 }]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { flexGrow: 1 }]}
+        ListHeaderComponent={
+          <View style={{ paddingHorizontal: theme.spacing.xl }}>
+            {/* ── STARRED ROW ── */}
+            {filterTab === 'all' && starred.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitle}>{t('gallery.starred') || 'Favoritas'}</Text>
+                  <Text style={styles.sectionMeta}>{starred.length} {t('gallery.favorites') || 'fotos'}</Text>
+                </View>
+                <FlatList
+                  horizontal
+                  data={starred}
+                  keyExtractor={(item) => `star-${item.id}`}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.starredRow}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.starredCard}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setViewerPhotos(starred);
+                        const idx = starred.findIndex((p) => p.id === item.id);
+                        setViewerIndex(idx >= 0 ? idx : 0);
+                        setViewerVisible(true);
+                      }}
+                    >
+                      <Image 
+                        source={{ uri: item.local_uri }} 
+                        style={styles.starredImage}
+                        contentFit="cover"
+                        transition={200}
+                      />
+                      <Text style={styles.starredSubject} numberOfLines={1}>{item.subject_name}</Text>
+                      <Text style={styles.starredDate}>{formatDate(item.created_at)}</Text>
+                      <TouchableOpacity
+                        style={styles.starBtn}
+                        onPress={() => toggleStar(item)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="star" size={14} color="#FFD700" />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            )}
+
+            {imagePhotos.length > 0 && (
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>
+                  {filterTab === 'starred' ? (t('gallery.starred') || 'Favoritas') :
+                   filterTab === 'ocr' ? 'Con texto OCR' :
+                   (t('gallery.gallerySection') || 'Galería')}
+                </Text>
+                <Text style={styles.sectionMeta}>{imagePhotos.length} {t('gallery.items') || 'fotos'}</Text>
+              </View>
+            )}
+          </View>
+        }
+        renderItem={({ item }) => (
+          <GridItem
+            item={item}
+            formatDate={formatDate}
+            onPress={() => {
+              setViewerPhotos(imagePhotos);
+              const idx = imagePhotos.findIndex((p) => p.id === item.id);
+              setViewerIndex(idx >= 0 ? idx : 0);
+              setViewerVisible(true);
+            }}
+            onStar={() => toggleStar(item)}
+          />
+        )}
+        ListEmptyComponent={
+          <View style={{ paddingHorizontal: theme.spacing.xl }}>
+            <EmptyState
+              icon={
+                filterTab === 'starred' ? 'star-outline' :
+                filterTab === 'ocr' ? 'text-outline' : 'images-outline'
+              }
+              message={
+                filterTab === 'starred' ? (t('gallery.emptyStarred') || 'No tienes fotos favoritas') :
+                filterTab === 'ocr' ? 'No hay fotos con texto OCR' :
+                (t('gallery.emptyGallery') || 'Tu galería está vacía')
+              }
+              sub={filterTab === 'all' ? (t('gallery.emptyGallerySub') || 'Toma fotos o escanea documentos para empezar') : undefined}
+            />
+            {filterTab === 'all' && (
+              <View style={[globalStyles.row, globalStyles.mt8, { gap: 12 }]}>
+                <TouchableOpacity
+                  style={[globalStyles.flex1, globalStyles.rowCenter, globalStyles.centerVertical, { gap: 6, backgroundColor: theme.colors.primary, paddingVertical: 12, borderRadius: 12 }]}
+                  onPress={() => setIsScannerVisible(true)}
+                >
+                  <Ionicons name="scan-outline" size={18} color={theme.colors.white} />
+                  <Text style={{ color: theme.colors.white, fontWeight: '700', fontSize: theme.typography.sizes.sm }}>{t('gallery.scan') || 'Escanear'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[globalStyles.flex1, globalStyles.rowCenter, globalStyles.centerVertical, { gap: 6, backgroundColor: theme.colors.text.primary, paddingVertical: 12, borderRadius: 12 }]}
+                  onPress={() => setIsPhotoVisible(true)}
+                >
+                  <Ionicons name="camera-outline" size={18} color={theme.colors.white} />
+                  <Text style={{ color: theme.colors.white, fontWeight: '700', fontSize: theme.typography.sizes.sm }}>{t('gallery.takePhoto') || 'Tomar foto'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        }
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -349,114 +480,14 @@ export default function GalleryScreen() {
             tintColor={theme.colors.primary}
           />
         }
-      >
-        {/* ── STARRED ROW ── */}
-        {filterTab === 'all' && starred.length > 0 ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>{t('gallery.starred') || 'Favoritas'}</Text>
-              <Text style={styles.sectionMeta}>{starred.length} {t('gallery.favorites') || 'fotos'}</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.starredRow}>
-              {starred.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.starredCard}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    const idx = allImagePhotos.findIndex((p) => p.id === item.id);
-                    setViewerIndex(idx >= 0 ? idx : 0);
-                    setViewerVisible(true);
-                  }}
-                >
-                  <Image source={{ uri: item.local_uri }} style={styles.starredImage} />
-                  <Text style={styles.starredSubject} numberOfLines={1}>{item.subject_name}</Text>
-                  <Text style={styles.starredDate}>{formatDate(item.created_at)}</Text>
-                  <TouchableOpacity
-                    style={styles.starBtn}
-                    onPress={() => toggleStar(item)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="star" size={14} color="#FFD700" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        ) : null}
-
-        {/* ── GRID ── */}
-        <View style={styles.section}>
-          {imagePhotos.length > 0 && (
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>
-                {filterTab === 'starred' ? (t('gallery.starred') || 'Favoritas') :
-                 filterTab === 'ocr' ? 'Con texto OCR' :
-                 (t('gallery.gallerySection') || 'Galería')}
-              </Text>
-              <Text style={styles.sectionMeta}>{imagePhotos.length} {t('gallery.items') || 'fotos'}</Text>
-            </View>
-          )}
-
-          {imagePhotos.length === 0 ? (
-            <>
-              <EmptyState
-                icon={
-                  filterTab === 'starred' ? 'star-outline' :
-                  filterTab === 'ocr' ? 'text-outline' : 'images-outline'
-                }
-                message={
-                  filterTab === 'starred' ? (t('gallery.emptyStarred') || 'No tienes fotos favoritas') :
-                  filterTab === 'ocr' ? 'No hay fotos con texto OCR' :
-                  (t('gallery.emptyGallery') || 'Tu galería está vacía')
-                }
-                sub={filterTab === 'all' ? (t('gallery.emptyGallerySub') || 'Toma fotos o escanea documentos para empezar') : undefined}
-              />
-              {filterTab === 'all' ? (
-                <View style={[globalStyles.row, globalStyles.mt8, { gap: 12 }]}>
-                  <TouchableOpacity
-                    style={[globalStyles.flex1, globalStyles.rowCenter, globalStyles.centerVertical, { gap: 6, backgroundColor: theme.colors.primary, paddingVertical: 12, borderRadius: 12 }]}
-                    onPress={() => setIsScannerVisible(true)}
-                  >
-                    <Ionicons name="scan-outline" size={18} color={theme.colors.white} />
-                    <Text style={{ color: theme.colors.white, fontWeight: '700', fontSize: theme.typography.sizes.sm }}>{t('gallery.scan') || 'Escanear'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[globalStyles.flex1, globalStyles.rowCenter, globalStyles.centerVertical, { gap: 6, backgroundColor: theme.colors.text.primary, paddingVertical: 12, borderRadius: 12 }]}
-                    onPress={() => setIsPhotoVisible(true)}
-                  >
-                    <Ionicons name="camera-outline" size={18} color={theme.colors.white} />
-                    <Text style={{ color: theme.colors.white, fontWeight: '700', fontSize: theme.typography.sizes.sm }}>{t('gallery.takePhoto') || 'Tomar foto'}</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </>
-          ) : (
-            <View style={styles.gridContainer}>
-              {imagePhotos.map((item) => (
-                <GridItem
-                  key={item.id}
-                  item={item}
-                  formatDate={formatDate}
-                  onPress={() => {
-                    const idx = allImagePhotos.findIndex((p) => p.id === item.id);
-                    setViewerIndex(idx >= 0 ? idx : 0);
-                    setViewerVisible(true);
-                  }}
-                  onStar={() => toggleStar(item)}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+      />
 
       {/* ── LAZY MODALS — only rendered when needed ── */}
-      <React.Suspense fallback={null}>
+      <Suspense fallback={null}>
         {viewerVisible && (
           <ImageViewerModal
             isVisible={viewerVisible}
-            photos={allImagePhotos as any}
+            photos={viewerPhotos as any}
             initialIndex={viewerIndex}
             onClose={() => setViewerVisible(false)}
             onPhotoDeleted={handlePhotoDeleted}
@@ -479,7 +510,7 @@ export default function GalleryScreen() {
             onSave={handleSave}
           />
         )}
-      </React.Suspense>
+      </Suspense>
     </SafeAreaView>
   );
 }
