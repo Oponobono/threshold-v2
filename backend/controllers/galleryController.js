@@ -222,7 +222,7 @@ exports.deletePhoto = (req, res) => {
   const { photoId } = req.params;
   console.log(`[Backend] DELETE /photos/${photoId} recibido.`);
 
-  db.get(`SELECT local_uri, cloud_url FROM photos WHERE id = ?`, [photoId], async (err, row) => {
+  db.get(`SELECT local_uri FROM photos WHERE id = ?`, [photoId], async (err, row) => {
     if (err) {
       console.error('[Backend] Error en db.get (photos):', err.message);
       return res.status(500).json({ error: err.message });
@@ -241,14 +241,6 @@ exports.deletePhoto = (req, res) => {
       }
 
       console.log(`[Backend] Foto ${photoId} borrada de la BD con éxito.`);
-      // Eliminar de Uploadthing en background
-      if (row.cloud_url) {
-        console.log(`[Backend] Intentando borrar de Uploadthing: ${row.cloud_url}`);
-        deleteFromUploadthing(row.cloud_url).catch((utErr) => {
-          console.warn('[Backend] Error (ignorado) al borrar de Uploadthing:', utErr.message);
-        });
-      }
-
       res.json({ success: true, local_uri: row.local_uri });
     });
   });
