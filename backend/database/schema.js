@@ -390,6 +390,8 @@ const tableSchema = {
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (video_id) REFERENCES youtube_videos(id) ON DELETE CASCADE
       )
@@ -401,11 +403,15 @@ const tableSchema = {
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `,
     columns: [
-      { name: 'transcript_text', type: 'TEXT' }
+      { name: 'transcript_text', type: 'TEXT' },
+      { name: 'cloud_url', type: 'TEXT' },
+      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
     ]
   },
   flashcard_decks: {

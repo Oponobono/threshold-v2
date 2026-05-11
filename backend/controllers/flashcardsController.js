@@ -103,16 +103,47 @@ exports.deleteCard = (req, res) => {
 };
 
 /**
- * Eliminar un mazo completo y sus tarjetas
+ * Eliminar un mazo completo o quitar un mazo compartido de la lista del usuario
  */
 exports.deleteDeck = (req, res) => {
   const { deckId } = req.params;
-  db.run(`DELETE FROM flashcards WHERE deck_id = ?`, [deckId], (err) => {
+  const { user_id } = req.query;
+
+  if (!user_id) return res.status(400).json({ error: 'Se requiere user_id para verificar permisos de eliminación.' });
+
+  // 1. Verificar si el usuario es el dueño del mazo
+  db.get(`SELECT user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
     if (err) return res.status(500).json({ error: err.message });
-    db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], function(err2) {
-      if (err2) return res.status(500).json({ error: err2.message });
-      res.json({ success: true });
-    });
+    if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
+
+    if (deck.user_id === Number(user_id)) {
+      // Caso A: Es el dueño -> Borrado total (tarjetas, mazo y registros compartidos)
+      db.run(`DELETE FROM flashcards WHERE deck_id = ?`, [deckId], (errCards) => {
+        if (errCards) return res.status(500).json({ error: errCards.message });
+        
+        db.run(`DELETE FROM shared_decks WHERE deck_id = ?`, [deckId], (errShared) => {
+          if (errShared) return res.status(500).json({ error: errShared.message });
+
+          db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], function(errDeck) {
+            if (errDeck) return res.status(500).json({ error: errDeck.message });
+            res.json({ success: true, message: 'Mazo y todo su contenido eliminado permanentemente.' });
+          });
+        });
+      });
+    } else {
+      // Caso B: No es el dueño -> Solo quitar de su lista (borrar de shared_decks)
+      db.run(
+        `DELETE FROM shared_decks WHERE deck_id = ? AND shared_to_user_id = ?`,
+        [deckId, user_id],
+        function(errUnshare) {
+          if (errUnshare) return res.status(500).json({ error: errUnshare.message });
+          if (this.changes === 0) {
+            return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo o no está compartido contigo.' });
+          }
+          res.json({ success: true, message: 'Mazo compartido quitado de tu lista exitosamente.' });
+        }
+      );
+    }
   });
 };
 

@@ -22,25 +22,33 @@ exports.getBackupStats = (req, res) => {
     transcripts: { total: 0, backed: 0 },
   };
 
-  // Fotos de galería
-  db.get('SELECT COUNT(*) as total FROM gallery_items WHERE user_id = ?', [userId], (err, r) => {
+  // ── Fotos: almacenadas en `photos` vinculadas via subjects.user_id ──
+  db.get(
+    `SELECT COUNT(*) as total FROM photos p
+     JOIN subjects s ON p.subject_id = s.id
+     WHERE s.user_id = ?`,
+    [userId], (err, r) => {
     if (!err && r) stats.photos.total = r.total;
-    db.get('SELECT COUNT(*) as backed FROM gallery_items WHERE user_id = ? AND is_backed_up = 1', [userId], (err, r) => {
+    db.get(
+      `SELECT COUNT(*) as backed FROM photos p
+       JOIN subjects s ON p.subject_id = s.id
+       WHERE s.user_id = ? AND p.is_backed_up = 1`,
+      [userId], (err, r) => {
       if (!err && r) stats.photos.backed = r.backed;
 
-      // Grabaciones de audio
+      // ── Grabaciones de audio ──
       db.get('SELECT COUNT(*) as total FROM audio_recordings WHERE user_id = ?', [userId], (err, r) => {
         if (!err && r) stats.audio.total = r.total;
         db.get('SELECT COUNT(*) as backed FROM audio_recordings WHERE user_id = ? AND is_backed_up = 1', [userId], (err, r) => {
           if (!err && r) stats.audio.backed = r.backed;
 
-          // Documentos escaneados
+          // ── Documentos escaneados ──
           db.get('SELECT COUNT(*) as total FROM scanned_documents WHERE user_id = ?', [userId], (err, r) => {
             if (!err && r) stats.docs.total = r.total;
             db.get('SELECT COUNT(*) as backed FROM scanned_documents WHERE user_id = ? AND is_backed_up = 1', [userId], (err, r) => {
               if (!err && r) stats.docs.backed = r.backed;
 
-              // Transcripciones (audio + youtube)
+              // ── Transcripciones de audio ──
               db.get(
                 `SELECT COUNT(*) as total FROM audio_transcripts at
                  JOIN audio_recordings ar ON ar.id = at.recording_id
@@ -54,6 +62,8 @@ exports.getBackupStats = (req, res) => {
                     [userId], (err, r) => {
                       if (!err && r) stats.transcripts.backed += r.backed;
 
+                      // ── Transcripciones de YouTube ──
+                      // NOTA: youtube_transcripts puede no tener is_backed_up; usamos COALESCE para seguridad
                       db.get(
                         `SELECT COUNT(*) as total FROM youtube_transcripts yt
                          JOIN youtube_videos yv ON yv.id = yt.video_id
@@ -63,7 +73,7 @@ exports.getBackupStats = (req, res) => {
                           db.get(
                             `SELECT COUNT(*) as backed FROM youtube_transcripts yt
                              JOIN youtube_videos yv ON yv.id = yt.video_id
-                             WHERE yv.user_id = ? AND yt.is_backed_up = 1`,
+                             WHERE yv.user_id = ? AND COALESCE(yt.is_backed_up, 0) = 1`,
                             [userId], (err, r) => {
                               if (!err && r) stats.transcripts.backed += r.backed;
                               res.json(stats);

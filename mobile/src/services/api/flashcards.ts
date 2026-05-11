@@ -123,9 +123,10 @@ export const shareDeck = async (deckId: number, recipientPin: string): Promise<{
   return data;
 };
 
-/** Elimina un mazo completo y todas sus tarjetas de forma permanente */
+/** Elimina un mazo completo o quita un mazo compartido de la lista */
 export const deleteFlashcardDeck = async (deckId: number) => {
-  const response = await fetchWithFallback(`/flashcard-decks/${deckId}`, {
+  const userId = await getUserId();
+  const response = await fetchWithFallback(`/flashcard-decks/${deckId}?user_id=${userId}`, {
     method: 'DELETE',
   });
   const data = await parseJsonSafely(response);

@@ -61,6 +61,9 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const { showAlert } = useCustomAlert();
   const [screen, setScreen] = useState<Screen>('hub');
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
+  
+  // State for deck options and study session
+  const [optionsDeck, setOptionsDeck] = useState<FlashcardDeck | null>(null);
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
@@ -120,7 +123,6 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
         showAlert({ title: t('flashcards.noCards'), message: t('flashcards.noCardsMsg'), type: 'info' });
         return;
       }
-      // Prioritise 'new' and 'learning' cards first
       const sorted = [...data].sort((a, b) => {
         const order: Record<string, number> = { new: 0, learning: 1, review: 2 };
         return (order[a.status] ?? 3) - (order[b.status] ?? 3);
@@ -139,9 +141,13 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   };
 
   const handleDeleteDeck = (deck: FlashcardDeck) => {
+    const isOwner = deck.user_id === currentUserId;
+    setOptionsDeck(null);
     showAlert({
-      title: t('modals.deleteDeck', 'Eliminar Mazo'),
-      message: t('modals.deleteDeckConfirm', { title: deck.title, defaultValue: `¿Estás seguro de que deseas eliminar el mazo "${deck.title}"? Esta acción no se puede deshacer.` }),
+      title: isOwner ? t('modals.deleteDeck', 'Eliminar Mazo') : t('flashcards.removeShared', 'Quitar Mazo'),
+      message: isOwner 
+        ? t('modals.deleteDeckConfirm', { title: deck.title, defaultValue: `¿Estás seguro de que deseas eliminar el mazo "${deck.title}"? Esta acción no se puede deshacer.` })
+        : t('flashcards.removeSharedConfirm', { title: deck.title, defaultValue: `¿Deseas quitar el mazo "${deck.title}" de tu lista?` }),
       type: 'confirm',
       buttons: [
         { text: t('common.cancel') || 'Cancelar', style: 'cancel' },
@@ -209,77 +215,55 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                     color={theme.colors.text.primary}
                   />
                 </View>
+                
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Text style={s.deckTitle}>{item.title}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={s.deckTitle} numberOfLines={1} ellipsizeMode="tail">
+                      {item.title}
+                    </Text>
                     {isShared && (
-                      <View style={{
-                        flexDirection: 'row', alignItems: 'center', gap: 3,
-                        backgroundColor: '#E8F5E9', borderRadius: 10,
-                        paddingHorizontal: 7, paddingVertical: 2,
-                      }}>
+                      <View style={s.sharedBadge}>
                         <Ionicons name="people" size={10} color="#388E3C" />
-                        <Text style={{ fontSize: 10, color: '#388E3C', fontWeight: '700' }}>{t('modals.shared', 'Compartido')}</Text>
+                        <Text style={s.sharedBadgeText}>{t('modals.shared', 'Compartido')}</Text>
                       </View>
                     )}
                   </View>
+
                   {isShared && (
-                    <Text style={{ fontSize: 11, color: '#388E3C', marginTop: 1, fontStyle: 'italic' }}>
+                    <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
                       {t('flashcards.sharedBy') || 'por'} @{item.owner_username || item.owner_name || (t('flashcards.peer') || 'compañero')}
                     </Text>
                   )}
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={s.deckMeta} numberOfLines={1}>
-                      {item.subject_name}
-                    </Text>
-                  </View>
-                  {/* Visual Breakdown */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12 }}>
-                    <Text style={{ fontSize: 11, color: theme.colors.text.secondary }}>
+
+                  <Text style={s.deckMeta} numberOfLines={1}>
+                    {item.subject_name}
+                  </Text>
+
+                  <View style={s.deckStatsRow}>
+                    <Text style={s.statLabel}>
                       {Number(item.card_count ?? 0)} {t('flashcards.cards')}
                     </Text>
-                    {(Number(item.card_count ?? 0) > 0) && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ fontSize: 11, color: '#4CAF50', fontWeight: '600' }}>
+                    {Number(item.card_count ?? 0) > 0 && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={s.statValueSuccess}>
                           ✓ {Number(item.review_count ?? 0)}
                         </Text>
-                        <Text style={{ fontSize: 11, color: '#FF9800', fontWeight: '600' }}>
+                        <Text style={s.statValuePending}>
                           💪 {Number(item.learning_count ?? 0) + Number(item.new_count ?? 0)}
                         </Text>
                       </View>
                     )}
                   </View>
                 </View>
-              {isOwner && (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <TouchableOpacity
-                    style={[s.addCardBtn, { marginRight: 2, backgroundColor: '#FFF5F5' }]}
-                    onPress={() => handleDeleteDeck(item)}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#D32F2F" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[s.addCardBtn, { marginRight: 2 }]}
-                    onPress={() => {
-                      setShareDeckTarget(item);
-                      setSharePin('');
-                    }}
-                  >
-                    <Ionicons name="share-social-outline" size={18} color={theme.colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              )}
-              <TouchableOpacity
-                style={s.addCardBtn}
-                onPress={() => {
-                  setActiveDeck(item);
-                  setScreen('newCard');
-                }}
-              >
-                <Ionicons name="add" size={18} color={theme.colors.primary} />
+
+                <TouchableOpacity
+                  style={{ padding: 8 }}
+                  onPress={() => setOptionsDeck(item)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.text.placeholder} />
+                </TouchableOpacity>
               </TouchableOpacity>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.text.placeholder} />
-            </TouchableOpacity>
             );
           }}
         />
@@ -319,6 +303,60 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
               />
             )}
           </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── DECK OPTIONS MENU (3 dots) ─── */}
+      <Modal visible={!!optionsDeck} transparent animationType="fade">
+        <Pressable style={s.optionsBackdrop} onPress={() => setOptionsDeck(null)}>
+          <View style={s.optionsContent}>
+            <Text style={s.optionsHeader} numberOfLines={1}>{optionsDeck?.title}</Text>
+            
+            <TouchableOpacity 
+              style={s.optionItem}
+              onPress={() => {
+                setActiveDeck(optionsDeck!);
+                setOptionsDeck(null);
+                setScreen('newCard');
+              }}
+            >
+              <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
+              <Text style={s.optionText}>{t('flashcards.addCard', 'Añadir Tarjeta')}</Text>
+            </TouchableOpacity>
+
+            {(optionsDeck?.user_id === currentUserId) && (
+              <TouchableOpacity 
+                style={s.optionItem}
+                onPress={() => {
+                  setShareDeckTarget(optionsDeck!);
+                  setOptionsDeck(null);
+                  setSharePin('');
+                }}
+              >
+                <Ionicons name="share-social-outline" size={20} color={theme.colors.primary} />
+                <Text style={s.optionText}>{t('modals.shareDeck', 'Compartir Mazo')}</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity 
+              style={s.optionItem}
+              onPress={() => handleDeleteDeck(optionsDeck!)}
+            >
+              <Ionicons name="trash-outline" size={20} color="#D32F2F" />
+              <Text style={[s.optionText, s.optionTextDestructive]}>
+                {optionsDeck?.user_id === currentUserId 
+                  ? t('common.delete', 'Eliminar Mazo')
+                  : t('flashcards.removeShared', 'Quitar Mazo Compartido')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[s.optionItem, { marginTop: 8, backgroundColor: 'transparent', justifyContent: 'center' }]}
+              onPress={() => setOptionsDeck(null)}
+            >
+              <Text style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>{t('common.cancel', 'Cancelar')}</Text>
+            </TouchableOpacity>
+          </View>
         </Pressable>
       </Modal>
 
