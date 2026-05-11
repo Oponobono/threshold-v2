@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Animated, Easing, FlatList, Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { Animated, FlatList, Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

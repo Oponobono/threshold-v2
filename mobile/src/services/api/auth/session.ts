@@ -24,6 +24,7 @@ export const registerUser = async (userData: {
   semester?: string;
   study_goal?: string;
   reference_language?: string;
+  profile_image?: string;  // URL pública de Firebase Storage
 }) => {
   try {
     const response = await fetchWithFallback('/register', {

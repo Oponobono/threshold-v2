@@ -164,4 +164,34 @@ router.delete('/users/:userId', userController.requestDeletion);
  */
 router.post('/users/:userId/reactivate', userController.reactivateAccount);
 
+/**
+ * @swagger
+ * /api/users/{userId}/profile-image:
+ *   patch:
+ *     summary: Actualiza la foto de perfil del usuario (URL de Firebase Storage)
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - profile_image
+ *             properties:
+ *               profile_image:
+ *                 type: string
+ *                 description: URL pública de la imagen en Firebase Storage
+ *     responses:
+ *       200:
+ *         description: Foto de perfil actualizada
+ */
+router.patch('/users/:userId/profile-image', userController.updateProfileImage);
+
 module.exports = router;

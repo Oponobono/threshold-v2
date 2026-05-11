@@ -1,6 +1,7 @@
 const secrets = require('../config/secrets');
 const { db } = require('../db');
 const pdfParse = require('pdf-parse');
+const { deleteFromUploadthing } = require('../utils/uploadthingServer');
 
 /**
  * Obtener documentos escaneados por materia
@@ -73,12 +74,18 @@ exports.saveScannedDocument = (req, res) => {
 exports.deleteScannedDocument = (req, res) => {
   const { documentId } = req.params;
 
-  db.get(`SELECT local_uri FROM scanned_documents WHERE id = ?`, [documentId], (err, row) => {
+  db.get(`SELECT local_uri, cloud_url FROM scanned_documents WHERE id = ?`, [documentId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Documento no encontrado.' });
 
-    db.run(`DELETE FROM scanned_documents WHERE id = ?`, [documentId], function(deleteErr) {
+    db.run(`DELETE FROM scanned_documents WHERE id = ?`, [documentId], function (deleteErr) {
       if (deleteErr) return res.status(500).json({ error: deleteErr.message });
+
+      // Eliminar de Uploadthing en background
+      if (row.cloud_url) {
+        deleteFromUploadthing(row.cloud_url).catch(() => {});
+      }
+
       res.json({ success: true, local_uri: row.local_uri });
     });
   });

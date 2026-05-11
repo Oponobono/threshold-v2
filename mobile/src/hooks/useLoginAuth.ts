@@ -18,6 +18,9 @@ import {
   authenticateWithBiometrics, 
   revokeBiometricToken 
 } from '../services/biometricService';
+import { getBackupPreferences, BACKUP_PREFS } from '../services/backup/backupService';
+import { downloadCloudItems } from '../services/backup/downloadService';
+import { storageService } from '../services/storageService';
 
 /**
  * Hook personalizado que maneja toda la lógica de autenticación de la pantalla de Login.
@@ -83,6 +86,22 @@ export const useLoginAuth = () => {
     ]).start();
   };
 
+  /**
+   * Dispara la descarga automática en background si el usuario la tiene habilitada.
+   * Se llama en cada login exitoso sin bloquear la navegación.
+   */
+  const triggerAutoDownloadIfEnabled = () => {
+    getBackupPreferences().then((prefs) => {
+      if (prefs.autoDownload) {
+        downloadCloudItems().then(() => {
+          storageService.saveSecure(BACKUP_PREFS.LAST_DOWNLOAD, new Date().toISOString());
+        }).catch((err) => {
+          console.warn('[Backup] Auto-descarga fallida en login:', err);
+        });
+      }
+    }).catch(() => {});
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
       alertRef.show({ title: t('common.error'), message: t('login.errors.missingCredentials'), type: 'error' });
@@ -123,6 +142,7 @@ export const useLoginAuth = () => {
                     await setItemAsync('app_user_id', loginData.user.id.toString());
                   }
                   alertRef.show({ title: t('common.success'), message: t('login.accountRecovered'), type: 'success' });
+                  triggerAutoDownloadIfEnabled();
                   router.replace('/(tabs)');
                 } catch (error: any) {
                   alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
@@ -150,7 +170,11 @@ export const useLoginAuth = () => {
           message: '¿Deseas iniciar sesión con tu huella dactilar la próxima vez?',
           type: 'confirm',
           buttons: [
-            { text: 'Ahora no', style: 'cancel', onPress: () => router.replace('/(tabs)') },
+            { text: 'Ahora no', style: 'cancel', onPress: () => {
+                triggerAutoDownloadIfEnabled();
+                router.replace('/(tabs)');
+              } 
+            },
             {
               text: 'Activar',
               onPress: async () => {
@@ -170,6 +194,7 @@ export const useLoginAuth = () => {
           ]
         });
       } else {
+        triggerAutoDownloadIfEnabled();
         router.replace('/(tabs)');
       }
     } catch (error: any) {
@@ -214,6 +239,7 @@ export const useLoginAuth = () => {
       }
 
       await biometricLogin(result.token);
+      triggerAutoDownloadIfEnabled();
       router.replace('/(tabs)');
     } catch (error: any) {
       alertRef.show({ title: 'Error', message: error.message || 'No se pudo iniciar sesión con Touch ID.', type: 'error' });

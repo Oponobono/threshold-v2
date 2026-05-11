@@ -62,3 +62,23 @@ export const updateUserPassword = async (currentPassword: string, newPassword: s
   }
   return data;
 };
+
+/**
+ * Actualiza la foto de perfil del usuario guardando la URL de Firebase Storage
+ */
+export const updateProfileImage = async (profileImageUrl: string) => {
+  const userId = await getUserId();
+  if (!userId) throw new Error('No hay sesión activa.');
+
+  const response = await fetchWithFallback(`/users/${userId}/profile-image`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_image: profileImageUrl }),
+  });
+
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error al actualizar la foto de perfil');
+  }
+  return data;
+};

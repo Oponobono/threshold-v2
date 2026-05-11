@@ -22,6 +22,8 @@ const youtubeRoutes = require('./routes/youtube');
 const scannedDocumentsRoutes = require('./routes/scanned_documents');
 const learningRoutes = require('./routes/learning');
 const aiRoutes = require('./routes/ai');
+const uploadRoutes = require('./routes/upload');
+const backupRoutes = require('./routes/backup');
 
 const app = express();
 const PORT = secrets.PORT;
@@ -82,6 +84,9 @@ app.get('/api/status', (req, res) => {
 // Registrar rutas públicas (Login, Registro)
 app.use('/api', authRoutes);
 
+// Uploadthing — ruta de subida de archivos (autenticada vía JWT, proxy al CDN)
+app.use('/api', uploadRoutes);
+
 // 🛡️ Fase 1: Escudo de Autenticación JWT
 // A partir de esta línea, TODAS las rutas requerirán un token válido
 const { authenticateToken } = require('./middlewares/authMiddleware');
@@ -100,6 +105,7 @@ app.use('/api', youtubeRoutes);
 app.use('/api', scannedDocumentsRoutes);
 app.use('/api', learningRoutes);
 app.use('/api', aiRoutes);
+app.use('/api', backupRoutes);
 
 
 

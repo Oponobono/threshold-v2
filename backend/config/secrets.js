@@ -41,7 +41,9 @@ const secrets = {
     GEMINI_API_KEY: getSecret('GEMINI_API_KEY', null, true),
     
     // Servicios de Terceros
-    SUPADATA_API_KEY: getSecret('SUPADATA_API_KEY', null, false), 
+    SUPADATA_API_KEY: getSecret('SUPADATA_API_KEY', null, false),
+    // Uploadthing: obligatorio en producción para subir archivos (fotos, audios, docs)
+    UPLOADTHING_TOKEN: getSecret('UPLOADTHING_TOKEN', null, isProd),
 };
 
 module.exports = secrets;

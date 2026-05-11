@@ -22,7 +22,8 @@ const tableSchema = {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         last_login DATETIME DEFAULT CURRENT_TIMESTAMP,
         share_pin VARCHAR(8) UNIQUE,
-        display_name TEXT
+        display_name TEXT,
+        profile_image TEXT
       )
     `,
     postgres: `
@@ -46,7 +47,8 @@ const tableSchema = {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         share_pin VARCHAR(8) UNIQUE,
-        display_name TEXT
+        display_name TEXT,
+        profile_image TEXT
       )
     `,
     columns: [
@@ -64,7 +66,8 @@ const tableSchema = {
       { name: 'status', type: "VARCHAR(20) DEFAULT 'active'" },
       { name: 'deletion_date', type: 'TIMESTAMP' },
       { name: 'share_pin', type: 'VARCHAR(8)' },
-      { name: 'display_name', type: 'TEXT' }
+      { name: 'display_name', type: 'TEXT' },
+      { name: 'profile_image', type: 'TEXT' }
     ]
   },
   deleted_users: {
@@ -222,6 +225,8 @@ const tableSchema = {
         time TEXT,
         ocr_text TEXT,
         is_starred BOOLEAN DEFAULT 0,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `,
@@ -234,7 +239,9 @@ const tableSchema = {
         date TEXT,
         time TEXT,
         ocr_text TEXT,
-        is_starred BOOLEAN DEFAULT false
+        is_starred BOOLEAN DEFAULT false,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0
       )
     `
   },
@@ -249,6 +256,8 @@ const tableSchema = {
         ocr_text TEXT,
         extracted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
       )
@@ -280,6 +289,8 @@ const tableSchema = {
         local_uri TEXT NOT NULL,
         duration INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
       )
@@ -292,11 +303,15 @@ const tableSchema = {
         name TEXT,
         local_uri TEXT NOT NULL,
         duration INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0
       )
     `,
     columns: [
       { name: 'name', type: 'TEXT' },
+      { name: 'cloud_url', type: 'TEXT' },
+      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
     ]
   },
   audio_transcripts: {
@@ -308,6 +323,8 @@ const tableSchema = {
         transcript_text TEXT,
         summary_uri TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
         FOREIGN KEY (recording_id) REFERENCES audio_recordings(id) ON DELETE CASCADE
       )
     `,
@@ -318,11 +335,15 @@ const tableSchema = {
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0
       )
     `,
     columns: [
-      { name: 'transcript_text', type: 'TEXT' }
+      { name: 'transcript_text', type: 'TEXT' },
+      { name: 'cloud_url', type: 'TEXT' },
+      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
     ]
   },
   youtube_videos: {

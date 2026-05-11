@@ -24,6 +24,7 @@ import { CustomInput } from '../src/components/CustomInput';
 import { CustomButton } from '../src/components/CustomButton';
 import { MapuviaFooter } from '../src/components/MapuviaFooter';
 import { registerUser } from '../src/services/api';
+import { uploadFileToUploadthing } from '../src/services/uploadthing/storage';
 import { alertRef } from '../src/components/CustomAlert';
 
 const TOTAL_STEPS = 2;
@@ -146,6 +147,17 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     setIsLoading(true);
     try {
+      // Subir foto de perfil a Uploadthing si el usuario eligió una
+      let profileImageUrl: string | undefined;
+      if (profilePhoto) {
+        const uploadResult = await uploadFileToUploadthing(
+          profilePhoto,
+          `profile_${Date.now()}.jpg`,
+          'image/jpeg'
+        );
+        profileImageUrl = uploadResult.url;
+      }
+
       await registerUser({
         email,
         password,
@@ -159,6 +171,7 @@ export default function RegisterScreen() {
         semester,
         study_goal: studyGoal,
         reference_language: referenceLanguage,
+        profile_image: profileImageUrl,
       });
 
       // Persist chosen language so login screen picks it up

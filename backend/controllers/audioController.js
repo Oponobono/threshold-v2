@@ -1,4 +1,5 @@
 const { db } = require('../db');
+const { deleteMultipleFromUploadthing } = require('../utils/uploadthingServer');
 
 /**
  * Obtener todas las grabaciones de un usuario
@@ -6,8 +7,10 @@ const { db } = require('../db');
 exports.getAudioRecordings = (req, res) => {
   const { userId } = req.params;
   const query = `
-    SELECT ar.*, s.name as subject_name, s.color as subject_color, s.icon as subject_icon,
-           at.transcript_uri, at.transcript_text, at.summary_uri
+    SELECT ar.*, 
+           s.name as subject_name, s.color as subject_color, s.icon as subject_icon,
+           at.transcript_uri, at.transcript_text, at.summary_uri,
+           at.cloud_url as transcript_cloud_url, at.is_backed_up as transcript_backed_up
     FROM audio_recordings ar
     LEFT JOIN subjects s ON ar.subject_id = s.id
     LEFT JOIN audio_transcripts at ON ar.id = at.recording_id
@@ -71,10 +74,28 @@ exports.updateAudioRecording = (req, res) => {
  */
 exports.deleteAudioRecording = (req, res) => {
   const { id } = req.params;
-  db.run(`DELETE FROM audio_recordings WHERE id = ?`, [id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true, changes: this.changes });
-  });
+
+  // Obtener cloud_url del audio y de su transcripción antes de eliminar
+  db.get(
+    `SELECT ar.cloud_url as audio_url, at.cloud_url as transcript_url
+     FROM audio_recordings ar
+     LEFT JOIN audio_transcripts at ON at.recording_id = ar.id
+     WHERE ar.id = ?`,
+    [id],
+    (err, row) => {
+      db.run(`DELETE FROM audio_recordings WHERE id = ?`, [id], function (deleteErr) {
+        if (deleteErr) return res.status(500).json({ error: deleteErr.message });
+
+        // Eliminar de Uploadthing en background (el CASCADE borra audio_transcripts de la BD)
+        if (row) {
+          const urls = [row.audio_url, row.transcript_url].filter(Boolean);
+          if (urls.length > 0) deleteMultipleFromUploadthing(urls).catch(() => {});
+        }
+
+        res.json({ success: true, changes: this.changes });
+      });
+    }
+  );
 };
 
 /**

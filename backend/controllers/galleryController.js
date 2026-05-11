@@ -1,4 +1,5 @@
 const { db } = require('../db');
+const { deleteFromUploadthing } = require('../utils/uploadthingServer');
 
 /**
  * Obtener todos los ítems de la galería de un usuario
@@ -17,6 +18,8 @@ exports.getGalleryItems = (req, res) => {
       p.ocr_text, 
       p.tags, 
       p.created_at,
+      p.cloud_url,
+      p.is_backed_up,
       s.name as subject_name, 
       s.color as subject_color,
       'photo' as item_type
@@ -34,6 +37,8 @@ exports.getGalleryItems = (req, res) => {
       d.ocr_text, 
       NULL as tags, 
       d.created_at,
+      d.cloud_url,
+      d.is_backed_up,
       s.name as subject_name, 
       s.color as subject_color,
       'document' as item_type
@@ -191,6 +196,12 @@ exports.updatePhoto = (req, res) => {
     updateValues.push(es_favorita ? 1 : 0);
   }
 
+  if (req.body.cloud_url !== undefined) {
+    updateFields.push('cloud_url = ?');
+    updateValues.push(req.body.cloud_url);
+    updateFields.push('is_backed_up = 1');
+  }
+
   if (updateFields.length === 0) {
     return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
   }
@@ -210,12 +221,18 @@ exports.updatePhoto = (req, res) => {
 exports.deletePhoto = (req, res) => {
   const { photoId } = req.params;
 
-  db.get(`SELECT local_uri FROM photos WHERE id = ?`, [photoId], (err, row) => {
+  db.get(`SELECT local_uri, cloud_url FROM photos WHERE id = ?`, [photoId], async (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Foto no encontrada.' });
 
-    db.run(`DELETE FROM photos WHERE id = ?`, [photoId], function (deleteErr) {
+    db.run(`DELETE FROM photos WHERE id = ?`, [photoId], async function (deleteErr) {
       if (deleteErr) return res.status(500).json({ error: deleteErr.message });
+
+      // Eliminar de Uploadthing en background (no bloquea la respuesta)
+      if (row.cloud_url) {
+        deleteFromUploadthing(row.cloud_url).catch(() => {});
+      }
+
       res.json({ success: true, local_uri: row.local_uri });
     });
   });

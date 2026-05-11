@@ -48,7 +48,7 @@ exports.updateUserProfile = (req, res) => {
   const updates = [];
   const values = [];
 
-  const fields = ['name', 'lastname', 'username', 'major', 'university', 'semester', 'study_goal', 'share_pin', 'display_name'];
+  const fields = ['name', 'lastname', 'username', 'major', 'university', 'semester', 'study_goal', 'share_pin', 'display_name', 'profile_image'];
   
   fields.forEach(field => {
     if (req.body[field] !== undefined) {
@@ -221,5 +221,22 @@ exports.reactivateAccount = (req, res) => {
         res.json({ message: 'Cuenta reactivada exitosamente.' });
       }
     );
+  });
+};
+/**
+ * Actualizar foto de perfil (URL de Firebase Storage)
+ */
+exports.updateProfileImage = (req, res) => {
+  const { userId } = req.params;
+  const { profile_image } = req.body;
+
+  if (!profile_image) {
+    return res.status(400).json({ error: 'Se requiere la URL de la imagen.' });
+  }
+
+  db.run('UPDATE users SET profile_image = ? WHERE id = ?', [profile_image, userId], function(err) {
+    if (err) return res.status(500).json({ error: 'Error interno del servidor.' });
+    if (this.changes === 0) return res.status(404).json({ error: 'Usuario no encontrado.' });
+    res.json({ message: 'Foto de perfil actualizada exitosamente.', profile_image });
   });
 };

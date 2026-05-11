@@ -9,6 +9,7 @@ import { alertRef } from '../src/components/CustomAlert';
 import * as Clipboard from 'expo-clipboard';
 
 import { useSettingsLogic } from '../src/hooks/useSettingsLogic';
+import { useBackupLogic } from '../src/hooks/useBackupLogic';
 import { EditProfileModal } from '../src/components/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/DeleteAccountModal';
@@ -145,6 +146,25 @@ export default function SettingsScreen() {
     appLanguage,
     handleChangeLanguage,
   } = useSettingsLogic();
+
+  const {
+    prefs: backupPrefs,
+    updatePref: updateBackupPref,
+    stats: backupStats,
+    cloudItemsCount,
+    isUploading,
+    uploadProgress,
+    handleBackupNow,
+    lastUploadLabel,
+    isDownloading,
+    downloadProgress,
+    handleDownloadNow,
+    lastDownloadLabel,
+    isRunning: isBackupRunning,
+    pendingCount,
+    totalCount,
+    backedCount,
+  } = useBackupLogic();
 
   return (
     <SafeAreaView style={globalStyles.safeArea}>
@@ -354,21 +374,174 @@ export default function SettingsScreen() {
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
           <SectionHeader title={t('settings.backupSync')} desc={t('settings.backupSyncDesc')} icon="cloud-outline" />
-          <Text style={styles.settingTitle}>{t('settings.cloudAccount')}</Text>
-          <Text style={[styles.settingDesc, { color: theme.colors.primary }]}>
-            {t('settings.connectedTo')} ({t('settings.backupEmail')})
-          </Text>
-          <View style={[styles.actionRow, { marginTop: 8 }]}>
-            <View style={styles.actionRowTextWrap}>
-              <Text style={styles.settingDesc}>{t('settings.lastBackup')}  {t('settings.lastBackupSample')}</Text>
-            </View>
-            <View style={styles.actionRowButtonWrap}>
-              <TouchableOpacity style={styles.darkPill}>
-                <Ionicons name="sync-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
-                <Text style={styles.darkPillText}>{t('settings.syncNow')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+
+          {/* ── Toggle principal ── */}
+          <SettingRow
+            title={t('settings.enableCloudBackup', 'Backup en la nube')}
+            desc={t('settings.enableCloudBackupDesc', 'Guarda copias de tus archivos en Uploadthing')}
+            right={
+              <Switch
+                value={backupPrefs.enabled}
+                onValueChange={(v) => updateBackupPref('enabled', v)}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                thumbColor={theme.colors.white}
+              />
+            }
+          />
+
+          {backupPrefs.enabled && (
+            <>
+              {/* ── Auto-upload toggle ── */}
+              <SettingRow
+                title={t('settings.autoUpload', 'Auto-subida al guardar')}
+                desc={t('settings.autoUploadDesc', 'Sube archivos nuevos automáticamente al guardarlos')}
+                right={
+                  <Switch
+                    value={backupPrefs.enabled}
+                    onValueChange={(v) => updateBackupPref('enabled', v)}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
+
+              {/* ── Auto-download toggle ── */}
+              <SettingRow
+                title={t('settings.autoDownload', 'Auto-descarga al iniciar sesión')}
+                desc={t('settings.autoDownloadDesc', 'Descarga tus archivos al entrar en un nuevo dispositivo')}
+                right={
+                  <Switch
+                    value={backupPrefs.autoDownload}
+                    onValueChange={(v) => updateBackupPref('autoDownload', v)}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
+
+              {/* ── Toggles por tipo ── */}
+              <View style={{ marginTop: 8, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: theme.colors.border }}>
+                <SettingRow
+                  title={t('settings.backupPhotos', 'Fotos de galería')}
+                  desc={`${backupStats.photos.backed}/${backupStats.photos.total} en la nube`}
+                  right={
+                    <Switch
+                      value={backupPrefs.includePhotos}
+                      onValueChange={(v) => updateBackupPref('includePhotos', v)}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor={theme.colors.white}
+                    />
+                  }
+                />
+                <SettingRow
+                  title={t('settings.backupAudio', 'Grabaciones de audio')}
+                  desc={`${backupStats.audio.backed}/${backupStats.audio.total} en la nube`}
+                  right={
+                    <Switch
+                      value={backupPrefs.includeAudio}
+                      onValueChange={(v) => updateBackupPref('includeAudio', v)}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor={theme.colors.white}
+                    />
+                  }
+                />
+                <SettingRow
+                  title={t('settings.backupDocs', 'Documentos')}
+                  desc={`${backupStats.docs.backed}/${backupStats.docs.total} en la nube`}
+                  right={
+                    <Switch
+                      value={backupPrefs.includeDocs}
+                      onValueChange={(v) => updateBackupPref('includeDocs', v)}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor={theme.colors.white}
+                    />
+                  }
+                />
+                <SettingRow
+                  title={t('settings.backupTranscripts', 'Transcripciones')}
+                  desc={`${backupStats.transcripts.backed}/${backupStats.transcripts.total} en la nube`}
+                  right={
+                    <Switch
+                      value={backupPrefs.includeTranscripts}
+                      onValueChange={(v) => updateBackupPref('includeTranscripts', v)}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor={theme.colors.white}
+                    />
+                  }
+                />
+              </View>
+
+              {/* ── Estado general ── */}
+              {totalCount > 0 && (
+                <Text style={[styles.settingDesc, { marginTop: 10 }]}>
+                  {backedCount}/{totalCount} ítems respaldados
+                  {pendingCount > 0 && ` • ${pendingCount} pendiente(s)`}
+                  {cloudItemsCount > 0 && ` • ${cloudItemsCount} en la nube`}
+                </Text>
+              )}
+
+              {/* ── Botones de acción: Upload + Download ── */}
+              <View style={{ gap: 8, marginTop: 12 }}>
+
+                {/* Botón Respaldar ahora */}
+                <View style={styles.actionRow}>
+                  <View style={styles.actionRowTextWrap}>
+                    <Text style={styles.settingDesc}>
+                      {isUploading
+                        ? `↑ Subiendo ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? 0}...`
+                        : `↑ Última subida: ${lastUploadLabel}`}
+                    </Text>
+                  </View>
+                  <View style={styles.actionRowButtonWrap}>
+                    <TouchableOpacity
+                      style={[styles.darkPill, (isBackupRunning) && { opacity: 0.45 }]}
+                      onPress={handleBackupNow}
+                      disabled={isBackupRunning}
+                    >
+                      <Ionicons name="cloud-upload-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                      <Text style={styles.darkPillText}>
+                        {isUploading
+                          ? t('settings.backingUp', 'Subiendo...')
+                          : t('settings.backupNow', 'Respaldar ahora')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Botón Descargar ahora */}
+                <View style={styles.actionRow}>
+                  <View style={styles.actionRowTextWrap}>
+                    <Text style={styles.settingDesc}>
+                      {isDownloading
+                        ? `↓ Descargando ${downloadProgress?.done ?? 0}/${downloadProgress?.total ?? 0}...`
+                        : `↓ Última descarga: ${lastDownloadLabel}`}
+                    </Text>
+                  </View>
+                  <View style={styles.actionRowButtonWrap}>
+                    <TouchableOpacity
+                      style={[styles.darkPill, { backgroundColor: '#2C6EEB' }, (isBackupRunning) && { opacity: 0.45 }]}
+                      onPress={handleDownloadNow}
+                      disabled={isBackupRunning}
+                    >
+                      <Ionicons name="cloud-download-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                      <Text style={styles.darkPillText}>
+                        {isDownloading
+                          ? t('settings.downloading', 'Descargando...')
+                          : t('settings.downloadNow', 'Descargar ahora')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+              </View>
+            </>
+          )}
+
+          {!backupPrefs.enabled && (
+            <Text style={[styles.settingDesc, { marginTop: 8, fontStyle: 'italic' }]}>
+              {t('settings.backupDisabled', 'Activa el backup para gestionar tus archivos en la nube.')}
+            </Text>
+          )}
         </View>
 
         {/* ─────────────────────────────────────────── */}

@@ -24,6 +24,7 @@ export type UserProfile = {
   last_login?: string | null;
   share_pin?: string | null;
   display_name?: string | null;
+  profile_image?: string | null;  // URL de Uploadthing
 };
 
 /** Materia académica del usuario (curso o asignatura) */
@@ -64,7 +65,9 @@ export type Photo = {
   created_at?: string;
   es_favorita?: number;
   ocr_text?: string | null;
-  tags?: string | null; // JSON array string de palabras clave: '["tag1", "tag2"]'
+  tags?: string | null;
+  cloud_url?: string | null;       // URL de Uploadthing (si está respaldada)
+  is_backed_up?: number;           // 0 = solo local, 1 = respaldada en la nube
 };
 
 /** Bloque de clase semanal de una materia (día, hora de inicio y fin) */
@@ -122,6 +125,8 @@ export interface AudioRecording {
   transcript_uri?: string;
   transcript_text?: string;
   summary_uri?: string;
+  cloud_url?: string | null;       // URL de Uploadthing del audio
+  is_backed_up?: number;           // 0 = solo local, 1 = respaldado
 }
 
 /** Video de YouTube enlazado con sus rutas locales de transcripción y resumen */
