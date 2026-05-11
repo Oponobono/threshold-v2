@@ -8,55 +8,54 @@ exports.getGalleryItems = (req, res) => {
   const { userId } = req.params;
   console.log('[Gallery] Fetching items for userId:', userId);
   
-  // Combinamos fotos y documentos escaneados en una sola lista para la galería
-  const query = `
+  // Usamos consultas separadas y unimos en JS para evitar fallos si una tabla
+  // tiene una estructura ligeramente distinta (ej: columnas de backup faltantes).
+  
+  const photosQuery = `
     SELECT 
-      p.id, 
-      p.subject_id, 
-      p.local_uri, 
-      p.es_favorita, 
-      p.ocr_text, 
-      p.tags, 
-      p.created_at,
-      p.cloud_url,
-      p.is_backed_up,
+      p.*, 
       s.name as subject_name, 
       s.color as subject_color,
       'photo' as item_type
     FROM photos p
     JOIN subjects s ON p.subject_id = s.id
     WHERE s.user_id = ?
-    
-    UNION ALL
-    
+  `;
+
+  const docsQuery = `
     SELECT 
-      d.id, 
-      d.subject_id, 
-      d.local_uri, 
-      0 as es_favorita, 
-      d.ocr_text, 
-      NULL as tags, 
-      d.created_at,
-      d.cloud_url,
-      d.is_backed_up,
+      d.*, 
       s.name as subject_name, 
       s.color as subject_color,
       'document' as item_type
     FROM scanned_documents d
-    JOIN subjects s ON d.subject_id = s.id
-    WHERE s.user_id = ?
-    
-    ORDER BY created_at DESC
+    LEFT JOIN subjects s ON d.subject_id = s.id
+    WHERE d.user_id = ?
   `;
 
-  db.all(query, [userId, userId], (err, rows) => {
+  db.all(photosQuery, [userId], (err, photos) => {
     if (err) {
-      console.error('[Gallery] Fetch error:', err.message);
-      return res.status(500).json({ error: 'Error al obtener elementos de la galería' });
+      console.error('[Gallery] Error al obtener fotos:', err.message);
+      // No cortamos la ejecución, intentamos traer documentos
     }
-    
-    console.log(`[Gallery] Found ${rows.length} items for user ${userId}`);
-    res.json(rows);
+
+    db.all(docsQuery, [userId], (err2, docs) => {
+      if (err2) {
+        console.error('[Gallery] Error al obtener documentos:', err2.message);
+      }
+
+      const results = [...(photos || []), ...(docs || [])];
+      
+      // Ordenar por fecha de creación descendente
+      results.sort((a, b) => {
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB - dateA;
+      });
+
+      console.log(`[Gallery] Retornando ${results.length} elementos combinados`);
+      res.json(results);
+    });
   });
 };
 
