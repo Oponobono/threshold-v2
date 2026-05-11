@@ -197,6 +197,7 @@ export const runBackup = async (
   if (prefs.includePhotos) {
     for (const photo of (pending.photos || [])) {
       tasks.push(async () => {
+        try {
           console.log(`[BackupService] Iniciando backup manual de foto ID: ${photo.id}`);
           const result = await uploadFileToUploadthing(photo.uri, `photo_${photo.id}.jpg`, 'image/jpeg');
           console.log(`[BackupService] ÉXITO: Foto subida. URL: ${result.url}`);
