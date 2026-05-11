@@ -5,8 +5,52 @@ const { db } = require('../db');
  */
 exports.getGalleryItems = (req, res) => {
   const { userId } = req.params;
-  db.all(`SELECT * FROM gallery_items WHERE user_id = ? ORDER BY date DESC, time DESC`, [userId], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+  console.log('[Gallery] Fetching items for userId:', userId);
+  
+  // Combinamos fotos y documentos escaneados en una sola lista para la galería
+  const query = `
+    SELECT 
+      p.id, 
+      p.subject_id, 
+      p.local_uri, 
+      p.es_favorita, 
+      p.ocr_text, 
+      p.tags, 
+      p.created_at,
+      s.name as subject_name, 
+      s.color as subject_color,
+      'photo' as item_type
+    FROM photos p
+    JOIN subjects s ON p.subject_id = s.id
+    WHERE s.user_id = ?
+    
+    UNION ALL
+    
+    SELECT 
+      d.id, 
+      d.subject_id, 
+      d.local_uri, 
+      0 as es_favorita, 
+      d.ocr_text, 
+      NULL as tags, 
+      d.created_at,
+      s.name as subject_name, 
+      s.color as subject_color,
+      'document' as item_type
+    FROM scanned_documents d
+    JOIN subjects s ON d.subject_id = s.id
+    WHERE s.user_id = ?
+    
+    ORDER BY created_at DESC
+  `;
+
+  db.all(query, [userId, userId], (err, rows) => {
+    if (err) {
+      console.error('[Gallery] Fetch error:', err.message);
+      return res.status(500).json({ error: 'Error al obtener elementos de la galería' });
+    }
+    
+    console.log(`[Gallery] Found ${rows.length} items for user ${userId}`);
     res.json(rows);
   });
 };
@@ -67,6 +111,7 @@ exports.searchPhotosByTag = (req, res) => {
  */
 exports.savePhoto = (req, res) => {
   const { subject_id, local_uri, es_favorita, ocr_text } = req.body;
+  console.log('[Gallery] Saving photo:', { subject_id, local_uri });
   
   if (!subject_id || !local_uri) {
     return res.status(400).json({ error: 'Faltan campos requeridos (subject_id, local_uri)' });
@@ -84,7 +129,11 @@ exports.savePhoto = (req, res) => {
   }
 
   db.run(query, [subject_id, local_uri, es_favorita || 0, ocr_text || null, tags], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      console.error('[Gallery] Save error:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log('[Gallery] Photo saved with ID:', this.lastID);
     res.status(201).json({
       id: this.lastID,
       subject_id,
