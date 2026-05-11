@@ -73,7 +73,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   // Request permissions if not granted
   if (!permission.granted && isVisible) {
     return (
-      <Modal visible={isVisible} animationType="slide">
+      <Modal visible={isVisible} animationType="slide" hardwareAccelerated={true}>
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>{t('dashboard.quickAddMenu.errors.cameraPermission')}</Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
@@ -146,7 +146,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const isSaveDisabled = !selectedSubjectId || isProcessing;
 
   return (
-    <Modal visible={isVisible} animationType="slide" onRequestClose={resetAndClose}>
+    <Modal visible={isVisible} animationType="slide" onRequestClose={resetAndClose} hardwareAccelerated={true}>
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={resetAndClose} style={styles.closeBtn}>
