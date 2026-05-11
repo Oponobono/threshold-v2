@@ -36,7 +36,9 @@ export const autoUploadIfEnabled = async (
   if (enabled !== 'true') return null;
 
   try {
+    console.log(`[BackupService] Auto-subida iniciada para ${type} ID: ${itemId} (${localUri})`);
     const result = await uploadFileToUploadthing(localUri, filename, mimeType);
+    console.log(`[BackupService] ÉXITO: Archivo subido a la nube. URL: ${result.url}`);
 
     // Marcar como respaldado en el backend
     await fetchWithFallback('/backup/mark', {
@@ -50,10 +52,12 @@ export const autoUploadIfEnabled = async (
       }),
     });
 
+    console.log(`[BackupService] ÉXITO: Registro marcado en BD como respaldado.`);
     return result.url;
   } catch (err) {
     // No propagamos el error — el archivo local ya fue guardado exitosamente
-    console.warn('[Backup] Auto-subida fallida, se respaldará en el próximo backup manual:', err);
+    console.error(`[BackupService] ERROR: Fallo al subir o marcar archivo en la nube:`, err);
+    console.warn('[BackupService] Auto-subida fallida, se respaldará en el próximo backup manual.');
     return null;
   }
 };
@@ -193,15 +197,20 @@ export const runBackup = async (
   if (prefs.includePhotos) {
     for (const photo of (pending.photos || [])) {
       tasks.push(async () => {
-        try {
+          console.log(`[BackupService] Iniciando backup manual de foto ID: ${photo.id}`);
           const result = await uploadFileToUploadthing(photo.uri, `photo_${photo.id}.jpg`, 'image/jpeg');
+          console.log(`[BackupService] ÉXITO: Foto subida. URL: ${result.url}`);
           await fetchWithFallback(`/backup/mark`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: result.url }),
           });
+          console.log(`[BackupService] ÉXITO: Foto ${photo.id} marcada como respaldada.`);
           uploaded++;
-        } catch { errors++; }
+        } catch (err) {
+          console.error(`[BackupService] ERROR: Falló el backup de foto ${photo.id}:`, err);
+          errors++;
+        }
       });
     }
   }

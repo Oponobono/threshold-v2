@@ -45,6 +45,9 @@ export const uploadFileToUploadthing = async (
     type: resolvedMime,
   } as any);
 
+  console.log(`[Uploadthing] Subiendo archivo al servidor: ${getApiUrl()}/upload`);
+  console.log(`[Uploadthing] Datos: uri=${localUri}, name=${resolvedName}, type=${resolvedMime}`);
+  
   const response = await fetch(`${getApiUrl()}/upload`, {
     method: 'POST',
     headers: {
@@ -56,10 +59,13 @@ export const uploadFileToUploadthing = async (
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    console.error(`[Uploadthing] ERROR HTTP ${response.status}:`, error);
     throw new Error(error?.error || 'Error al subir el archivo.');
   }
 
-  return await response.json();
+  const data = await response.json();
+  console.log(`[Uploadthing] ÉXITO: Respuesta del servidor:`, data);
+  return data;
 };
 
 /**
