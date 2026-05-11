@@ -76,7 +76,9 @@ exports.deleteScannedDocument = (req, res) => {
 
   db.get(`SELECT local_uri, cloud_url FROM scanned_documents WHERE id = ?`, [documentId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'Documento no encontrado.' });
+    if (!row) {
+      return res.json({ success: true, message: 'El documento ya no existía.' });
+    }
 
     db.run(`DELETE FROM scanned_documents WHERE id = ?`, [documentId], function (deleteErr) {
       if (deleteErr) return res.status(500).json({ error: deleteErr.message });

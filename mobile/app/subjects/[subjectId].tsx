@@ -232,7 +232,7 @@ export default function SubjectDetailScreen() {
   const imagePhotos = useMemo(() => photos.filter(p => !p.local_uri?.endsWith('.pdf')), [photos]);
   // Combine old pdfs saved as photos + new scanned_documents
   const pdfDocuments = useMemo(() => {
-    const oldPdfs = photos.filter(p => p.local_uri?.endsWith('.pdf'));
+    const oldPdfs = photos.filter(p => p.local_uri?.endsWith('.pdf')).map(p => ({ ...p, is_legacy_photo: true }));
     return [...scannedDocuments, ...oldPdfs];
   }, [photos, scannedDocuments]);
 

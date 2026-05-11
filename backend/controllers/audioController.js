@@ -83,6 +83,10 @@ exports.deleteAudioRecording = (req, res) => {
      WHERE ar.id = ?`,
     [id],
     (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!row) {
+        return res.json({ success: true, message: 'La grabación ya no existía.' });
+      }
       db.run(`DELETE FROM audio_recordings WHERE id = ?`, [id], function (deleteErr) {
         if (deleteErr) return res.status(500).json({ error: deleteErr.message });
 

@@ -128,7 +128,19 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
+              const photo = photos.find(p => p.id === photoId);
+              
               await deletePhoto(photoId);
+              
+              // Eliminar archivo físico para liberar espacio
+              if (photo?.local_uri) {
+                try {
+                  await FileSystem.deleteAsync(photo.local_uri);
+                } catch (fsError) {
+                  console.warn('No se pudo borrar el archivo físico (quizás ya no existía):', fsError);
+                }
+              }
+
               onPhotoDeleted(photoId);
               if (photos.length <= 1) {
                 onClose(); // Cerrar si no quedan más fotos

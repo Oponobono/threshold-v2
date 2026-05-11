@@ -223,7 +223,10 @@ exports.deletePhoto = (req, res) => {
 
   db.get(`SELECT local_uri, cloud_url FROM photos WHERE id = ?`, [photoId], async (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'Foto no encontrada.' });
+    if (!row) {
+      // Si ya no existe en la BD, respondemos con éxito para que el frontend pueda limpiar su estado
+      return res.json({ success: true, message: 'La foto ya no existía en la base de datos.' });
+    }
 
     db.run(`DELETE FROM photos WHERE id = ?`, [photoId], async function (deleteErr) {
       if (deleteErr) return res.status(500).json({ error: deleteErr.message });

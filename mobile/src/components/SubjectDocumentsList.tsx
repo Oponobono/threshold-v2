@@ -5,7 +5,7 @@ import { theme } from '../styles/theme';
 import { subjectDetailStyles as sectionStyles } from '../styles/SubjectDetail.styles';
 import { documentListStyles as styles } from '../styles/SubjectDocumentsList.styles';
 import { useCustomAlert } from './CustomAlert';
-import { deleteScannedDocument, updateScannedDocument, extractTextFromImage, extractTextFromPDF } from '../services/api';
+import { deleteScannedDocument, updateScannedDocument, extractTextFromImage, extractTextFromPDF, deletePhoto } from '../services/api';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useTranslation } from 'react-i18next';
@@ -144,7 +144,22 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
-               await deleteScannedDocument(docId);
+               const doc = documents.find(d => (d.id || documents.indexOf(d)) === docId);
+               if (doc?.is_legacy_photo) {
+                 await deletePhoto(docId as number);
+               } else {
+                 await deleteScannedDocument(docId);
+               }
+               
+               // Eliminar archivo físico para liberar espacio
+               if (doc?.local_uri) {
+                 try {
+                   await FileSystem.deleteAsync(doc.local_uri);
+                 } catch (fsError) {
+                   console.warn('No se pudo borrar el archivo físico (quizás ya no existía):', fsError);
+                 }
+               }
+               
                onDocumentDeleted?.(docId);
             } catch (e) {
                showAlert({ title: t('common.error') || 'Error', message: t('common.errors.deleteFailed') || 'No se pudo eliminar el documento.', type: 'error' });
