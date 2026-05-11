@@ -26,6 +26,9 @@ const uploadRoutes = require('./routes/upload');
 const backupRoutes = require('./routes/backup');
 
 const app = express();
+
+// Confía en el primer proxy (necesario para express-rate-limit en Render/Heroku)
+app.set('trust proxy', 1);
 const PORT = secrets.PORT;
 const HOST = secrets.HOST;
 const MAX_PORT_RETRIES = 10;
