@@ -21,7 +21,10 @@ export const updateUserProfile = async (payload: {
   name?: string;
   lastname?: string;
   username?: string;
+  major?: string;
   university?: string;
+  semester?: string;
+  study_goal?: string;
   share_pin?: string;
 }) => {
   const userId = await getUserId();

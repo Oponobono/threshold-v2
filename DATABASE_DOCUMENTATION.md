@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS users (
   approval_threshold REAL,
   major TEXT,
   university TEXT,
+  semester TEXT,              -- Período académico actual (ej: "2025-2 · 5to semestre"). Usado por analítica Big Data para comparar progreso entre semestres.
+  study_goal TEXT,            -- Objetivo principal del usuario: 'survive' | 'pass' | 'excel' | 'top'. Permite a la IA de Groq personalizar mensajes del Umbral.
+  reference_language TEXT,    -- Idioma de referencia (ej: 'en', 'es', 'pt'). Prioriza tecnicismos bilingües en flashcards generadas por IA.
   biometric_token TEXT,
   status VARCHAR(20) DEFAULT 'active',
   deletion_date DATETIME,
@@ -62,6 +65,9 @@ CREATE TABLE IF NOT EXISTS users (
   approval_threshold REAL,
   major TEXT,
   university TEXT,
+  semester TEXT,              -- Período académico actual. Usado por analítica Big Data para comparar progreso entre semestres.
+  study_goal TEXT,            -- Objetivo del usuario: 'survive' | 'pass' | 'excel' | 'top'. Personaliza mensajes IA Groq.
+  reference_language TEXT,    -- Idioma de referencia (ej: 'en', 'es'). Prioriza tecnicismos bilingües en flashcards.
   biometric_token TEXT,
   status VARCHAR(20) DEFAULT 'active',
   deletion_date TIMESTAMP,

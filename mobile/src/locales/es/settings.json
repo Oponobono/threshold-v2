@@ -135,5 +135,18 @@
     "fixed":  "Fijo",
     "pinPlaceholderJoin":  "Ingresa el PIN (ej: A1B2C3)",
     "pinPlaceholderCreate":  "Ej: MIPIN1 (mín. 4 caracteres)",
-    "logout":  "Salir"
+    "logout":  "Salir",
+    "language":  "Idioma de la aplicación",
+    "languageDesc":  "Selecciona el idioma en que se muestra la app",
+    "languageEs":  "Español",
+    "languageEn":  "English",
+    "languageSaved":  "Idioma actualizado",
+    "biometricEnabled":  "Biometría activada correctamente",
+    "biometricDisabled":  "Biometría desactivada",
+    "disableBiometric":  "Desactivar biometría",
+    "disableBiometricDesc":  "¿Deseas quitar el inicio biométrico de este dispositivo?",
+    "profileUpdated":  "Perfil actualizado correctamente",
+    "passwordUpdated":  "Contraseña actualizada correctamente",
+    "passwordsDontMatch":  "Las contraseñas no coinciden",
+    "fillAllFields":  "Por favor, completa todos los campos requeridos"
 }

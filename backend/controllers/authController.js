@@ -17,7 +17,10 @@ exports.registerUser = async (req, res) => {
     grading_scale,
     approval_threshold,
     major,
-    university 
+    university,
+    semester,
+    study_goal,
+    reference_language
   } = req.body;
 
   if (!email || !password) {
@@ -29,8 +32,8 @@ exports.registerUser = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, saltRounds);
     const sharePin = await getUniqueSharePin();
 
-    const query = `INSERT INTO users (email, password_hash, name, lastname, username, grading_scale, approval_threshold, major, university, share_pin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    db.run(query, [email, passwordHash, name, lastname, username, grading_scale, approval_threshold, major, university, sharePin], function (err) {
+    const query = `INSERT INTO users (email, password_hash, name, lastname, username, grading_scale, approval_threshold, major, university, semester, study_goal, reference_language, share_pin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    db.run(query, [email, passwordHash, name, lastname, username, grading_scale, approval_threshold, major, university, semester || null, study_goal || null, reference_language || null, sharePin], function (err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
           return res.status(409).json({ error: 'El correo ya está registrado.' });

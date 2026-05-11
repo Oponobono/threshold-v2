@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { setItemAsync } from 'expo-secure-store';
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { getUserId } from './session';
 
@@ -44,9 +44,9 @@ export const biometricLogin = async (biometricToken: string) => {
     localStorage.setItem('app_user_email', data.user.email);
     localStorage.setItem('app_user_id', data.user.id.toString());
   } else {
-    await SecureStore.setItemAsync('app_session_token', `biometric-token-${Date.now()}`);
-    await SecureStore.setItemAsync('app_user_email', data.user.email);
-    await SecureStore.setItemAsync('app_user_id', data.user.id.toString());
+    await setItemAsync('app_session_token', `biometric-token-${Date.now()}`);
+    await setItemAsync('app_user_email', data.user.email);
+    await setItemAsync('app_user_id', data.user.id.toString());
   }
 
   return data;

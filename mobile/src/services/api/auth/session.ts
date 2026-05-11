@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import { storageService } from '../../storageService';
 import { fetchWithFallback, parseJsonSafely } from '../client';
 
@@ -22,6 +21,9 @@ export const registerUser = async (userData: {
   approval_threshold?: number;
   major?: string;
   university?: string;
+  semester?: string;
+  study_goal?: string;
+  reference_language?: string;
 }) => {
   try {
     const response = await fetchWithFallback('/register', {

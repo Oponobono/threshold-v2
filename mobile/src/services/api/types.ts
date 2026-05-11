@@ -18,6 +18,8 @@ export type UserProfile = {
   approval_threshold?: number | null;
   major?: string | null;
   university?: string | null;
+  semester?: string | null;
+  study_goal?: string | null;
   created_at?: string | null;
   last_login?: string | null;
   share_pin?: string | null;

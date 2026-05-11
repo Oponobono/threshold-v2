@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Animated, Easing, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as SecureStore from 'expo-secure-store';
+import { setItemAsync, getItemAsync, deleteItemAsync } from 'expo-secure-store';
 import { alertRef } from '../components/CustomAlert';
 import { 
   loginUser, 
@@ -45,11 +45,20 @@ export const useLoginAuth = () => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        const savedEmail = await SecureStore.getItemAsync('remembered_email');
+        // Restore remembered email
+        const savedEmail = await getItemAsync('remembered_email');
         if (savedEmail) {
           setEmail(savedEmail);
           setRememberMe(true);
         }
+
+        // Restore persisted language preference
+        const savedLanguage = await getItemAsync('app_language');
+        if (savedLanguage === 'es' || savedLanguage === 'en') {
+          i18n.changeLanguage(savedLanguage);
+        }
+
+        // Check biometric availability
         const available = await isBiometricAvailable();
         const hasToken = await hasBiometricTokenStored();
         setBiometricReady(available && hasToken);
@@ -58,7 +67,7 @@ export const useLoginAuth = () => {
       }
     };
     initialize();
-  }, []);
+  }, [i18n]);
 
   const animateSloganOut = () => {
     Animated.parallel([
@@ -109,9 +118,9 @@ export const useLoginAuth = () => {
                     localStorage.setItem('app_user_email', email);
                     localStorage.setItem('app_user_id', loginData.user.id.toString());
                   } else {
-                    await SecureStore.setItemAsync('app_session_token', sessionToken);
-                    await SecureStore.setItemAsync('app_user_email', email);
-                    await SecureStore.setItemAsync('app_user_id', loginData.user.id.toString());
+                    await setItemAsync('app_session_token', sessionToken);
+                    await setItemAsync('app_user_email', email);
+                    await setItemAsync('app_user_id', loginData.user.id.toString());
                   }
                   alertRef.show({ title: t('common.success'), message: t('login.accountRecovered'), type: 'success' });
                   router.replace('/(tabs)');
@@ -126,9 +135,9 @@ export const useLoginAuth = () => {
       }
 
       if (rememberMe) {
-        await SecureStore.setItemAsync('remembered_email', email);
+        await setItemAsync('remembered_email', email);
       } else {
-        await SecureStore.deleteItemAsync('remembered_email');
+        await deleteItemAsync('remembered_email');
       }
 
       const available = await isBiometricAvailable();
@@ -150,7 +159,7 @@ export const useLoginAuth = () => {
                   try {
                     await enrollBiometric(userId, token);
                     setBiometricReady(true);
-                  } catch (e: any) {
+                  } catch {
                     await revokeBiometricToken();
                     alertRef.show({ title: 'Touch ID', message: 'Hubo un error al guardar la configuración en el servidor.', type: 'error' });
                   }

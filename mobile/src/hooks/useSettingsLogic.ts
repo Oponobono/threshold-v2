@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as Clipboard from 'expo-clipboard';
+import { setItemAsync, getItemAsync } from 'expo-secure-store';
 import { alertRef } from '../components/CustomAlert';
 import {
   getCurrentUserProfile,
@@ -38,7 +38,7 @@ type ScaleKey = 'af' | 'pct' | 'scale4' | 'custom';
  * @returns Un objeto con todos los estados y manejadores necesarios para `SettingsScreen`.
  */
 export const useSettingsLogic = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
 
   // Profile & Preferences State
@@ -51,6 +51,7 @@ export const useSettingsLogic = () => {
   const [biometric, setBiometric] = useState(false);
   const [calendarSync, setCalendarSync] = useState(false);
   const [userGroups, setUserGroups] = useState<GroupMembership[]>([]);
+  const [appLanguage, setAppLanguage] = useState<string>(i18n.language);
 
   // Modals Visibility
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
@@ -62,6 +63,9 @@ export const useSettingsLogic = () => {
   const [editLastname, setEditLastname] = useState('');
   const [editUsername, setEditUsername] = useState('');
   const [editUniversity, setEditUniversity] = useState('');
+  const [editMajor, setEditMajor] = useState('');
+  const [editSemester, setEditSemester] = useState('');
+  const [editStudyGoal, setEditStudyGoal] = useState('');
   const [editPin, setEditPin] = useState('');
 
   // Password State
@@ -91,7 +95,7 @@ export const useSettingsLogic = () => {
     { key: 'custom', label: t('settings.scaleCustom'), desc: t('settings.scaleCustomDesc') },
   ];
 
-  const LMS_ACCOUNTS = t('settings.lmsAccounts', { returnObjects: true }) as Array<{ name: string; user: string }>;
+  const LMS_ACCOUNTS = t('settings.lmsAccounts', { returnObjects: true }) as { name: string; user: string }[];
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -117,10 +121,16 @@ export const useSettingsLogic = () => {
 
       const groups = await getUserGroups();
       setUserGroups(groups || []);
+
+      // Load persisted language
+      const savedLanguage = await getItemAsync('app_language');
+      if (savedLanguage === 'es' || savedLanguage === 'en') {
+        setAppLanguage(savedLanguage);
+      }
     };
 
     loadProfile();
-  }, []);
+  }, [t, i18n]);
 
   /**
    * Cierra la sesión activa del usuario y redirige a la pantalla de login.
@@ -225,6 +235,9 @@ export const useSettingsLogic = () => {
     setEditLastname(profile?.lastname || '');
     setEditUsername(profile?.username || '');
     setEditUniversity(profile?.university || '');
+    setEditMajor(profile?.major || '');
+    setEditSemester(profile?.semester || '');
+    setEditStudyGoal(profile?.study_goal || '');
     setEditPin(profile?.share_pin || '');
     setIsEditProfileVisible(true);
   };
@@ -247,6 +260,9 @@ export const useSettingsLogic = () => {
         lastname: editLastname,
         username: editUsername,
         university: editUniversity,
+        major: editMajor,
+        semester: editSemester,
+        study_goal: editStudyGoal,
         ...(!profile?.share_pin && editPin.trim() ? { share_pin: editPin.trim().toUpperCase() } : {}),
       });
       setIsEditProfileVisible(false);
@@ -409,6 +425,23 @@ export const useSettingsLogic = () => {
     });
   };
 
+  /**
+   * Cambia el idioma de la aplicación y persiste la elección en SecureStore
+   * para que se restaure automáticamente en futuros inicios de sesión.
+   *
+   * @param {string} lang - Código del idioma ('es' | 'en').
+   */
+  const handleChangeLanguage = async (lang: string) => {
+    try {
+      await setItemAsync('app_language', lang);
+      await i18n.changeLanguage(lang);
+      setAppLanguage(lang);
+      alertRef.show({ title: t('common.success'), message: t('settings.languageSaved'), type: 'success' });
+    } catch (error: any) {
+      alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+    }
+  };
+
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
     const last = profile?.lastname?.trim() || '';
@@ -455,6 +488,12 @@ export const useSettingsLogic = () => {
     setEditUsername,
     editUniversity,
     setEditUniversity,
+    editMajor,
+    setEditMajor,
+    editSemester,
+    setEditSemester,
+    editStudyGoal,
+    setEditStudyGoal,
     editPin,
     setEditPin,
     isChangePasswordVisible,
@@ -487,6 +526,8 @@ export const useSettingsLogic = () => {
     handleConfirmDeletion,
     handleCloseDeleteModal,
     handleJoinGroup,
-    handleLeaveGroup
+    handleLeaveGroup,
+    appLanguage,
+    handleChangeLanguage,
   };
 };

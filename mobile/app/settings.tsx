@@ -1,14 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Image, TextInput, Alert, Platform, Modal } from 'react-native';
+import React from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { globalStyles } from '../src/styles/globalStyles';
 import { theme } from '../src/styles/theme';
 import { settingsStyles as styles } from '../src/styles/Settings.styles';
-import { getCurrentUserProfile, signOut, type UserProfile, updateUserProfile, updateUserPassword, disableAccount, removeBiometricToken, enrollBiometric, requestAccountDeletion, getDeletionDataCount, joinGroup, getUserGroups, leaveGroup, type GroupMembership } from '../src/services/api';
-import { enrollBiometricToken, revokeBiometricToken, hasBiometricTokenStored } from '../src/services/biometricService';
 import { alertRef } from '../src/components/CustomAlert';
 import * as Clipboard from 'expo-clipboard';
 
@@ -107,6 +103,12 @@ export default function SettingsScreen() {
     setEditUsername,
     editUniversity,
     setEditUniversity,
+    editMajor,
+    setEditMajor,
+    editSemester,
+    setEditSemester,
+    editStudyGoal,
+    setEditStudyGoal,
     editPin,
     setEditPin,
     isChangePasswordVisible,
@@ -139,7 +141,9 @@ export default function SettingsScreen() {
     handleConfirmDeletion,
     handleCloseDeleteModal,
     handleJoinGroup,
-    handleLeaveGroup
+    handleLeaveGroup,
+    appLanguage,
+    handleChangeLanguage,
   } = useSettingsLogic();
 
   return (
@@ -281,6 +285,49 @@ export default function SettingsScreen() {
           <TouchableOpacity style={[styles.darkPill, { alignSelf: 'center', marginTop: 8 }]}>
             <Text style={styles.darkPillText}>{t('settings.addCustomScale')}</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* ─────────────────────────────────────────── */}
+        {/* ── LANGUAGE ── */}
+        {/* ─────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <SectionHeader
+            title={t('settings.language')}
+            desc={t('settings.languageDesc')}
+            icon="language-outline"
+          />
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
+            {(['es', 'en'] as const).map((lang) => {
+              const isActive = appLanguage === lang;
+              return (
+                <TouchableOpacity
+                  key={lang}
+                  style={[
+                    styles.darkPill,
+                    { flex: 1, justifyContent: 'center', paddingVertical: 10 },
+                    isActive
+                      ? { backgroundColor: theme.colors.primary }
+                      : {
+                          backgroundColor: 'transparent',
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                        },
+                  ]}
+                  onPress={() => handleChangeLanguage(lang)}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.darkPillText,
+                      !isActive && { color: theme.colors.text.primary },
+                    ]}
+                  >
+                    {lang === 'es' ? t('settings.languageEs') : t('settings.languageEn')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* ─────────────────────────────────────────── */}
@@ -496,11 +543,17 @@ export default function SettingsScreen() {
         editLastname={editLastname}
         editUsername={editUsername}
         editUniversity={editUniversity}
+        editMajor={editMajor}
+        editSemester={editSemester}
+        editStudyGoal={editStudyGoal}
         editPin={editPin}
         onNameChange={setEditName}
         onLastnameChange={setEditLastname}
         onUsernameChange={setEditUsername}
         onUniversityChange={setEditUniversity}
+        onMajorChange={setEditMajor}
+        onSemesterChange={setEditSemester}
+        onStudyGoalChange={setEditStudyGoal}
         onPinChange={setEditPin}
         onClose={() => setIsEditProfileVisible(false)}
         onSave={handleSaveProfile}

@@ -135,5 +135,18 @@
     "fixed":  "Fixed",
     "pinPlaceholderJoin":  "Enter PIN (e.g., A1B2C3)",
     "pinPlaceholderCreate":  "e.g., MYPIN1 (min. 4 characters)",
-    "logout":  "Log out"
+    "logout":  "Log out",
+    "language":  "App Language",
+    "languageDesc":  "Select the language the app is displayed in",
+    "languageEs":  "Español",
+    "languageEn":  "English",
+    "languageSaved":  "Language updated",
+    "biometricEnabled":  "Biometric sign-in enabled",
+    "biometricDisabled":  "Biometric sign-in disabled",
+    "disableBiometric":  "Disable biometrics",
+    "disableBiometricDesc":  "Do you want to remove biometric sign-in from this device?",
+    "profileUpdated":  "Profile updated successfully",
+    "passwordUpdated":  "Password updated successfully",
+    "passwordsDontMatch":  "Passwords do not match",
+    "fillAllFields":  "Please fill in all required fields"
 }

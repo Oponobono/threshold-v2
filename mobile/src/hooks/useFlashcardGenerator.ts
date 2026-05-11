@@ -18,14 +18,14 @@ interface GeneratedDeck {
   title: string;
   description: string;
   card_count: number;
-  cards: Array<{
+  cards: {
     id: number;
     deck_id: number;
     front: string;
     back: string;
     status: 'new' | 'learning' | 'review';
     created_at: string;
-  }>;
+  }[];
 }
 
 /**

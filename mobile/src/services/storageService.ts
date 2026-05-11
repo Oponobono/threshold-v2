@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { setItemAsync, getItemAsync, deleteItemAsync } from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -15,7 +15,7 @@ export const storageService = {
 
   saveSecure: async (key: string, value: string) => {
     try {
-      await SecureStore.setItemAsync(key, value);
+      await setItemAsync(key, value);
     } catch (error) {
       console.error(`[SecureStore] Error guardando ${key}:`, error);
     }
@@ -23,7 +23,7 @@ export const storageService = {
 
   getSecure: async (key: string): Promise<string | null> => {
     try {
-      return await SecureStore.getItemAsync(key);
+      return await getItemAsync(key);
     } catch (error) {
       console.error(`[SecureStore] Error leyendo ${key}:`, error);
       return null;
@@ -32,7 +32,7 @@ export const storageService = {
 
   removeSecure: async (key: string) => {
     try {
-      await SecureStore.deleteItemAsync(key);
+      await deleteItemAsync(key);
     } catch (error) {
       console.error(`[SecureStore] Error eliminando ${key}:`, error);
     }

@@ -13,11 +13,17 @@ interface EditProfileModalProps {
   editLastname: string;
   editUsername: string;
   editUniversity: string;
+  editMajor: string;
+  editSemester: string;
+  editStudyGoal: string;
   editPin: string;
   onNameChange: (val: string) => void;
   onLastnameChange: (val: string) => void;
   onUsernameChange: (val: string) => void;
   onUniversityChange: (val: string) => void;
+  onMajorChange: (val: string) => void;
+  onSemesterChange: (val: string) => void;
+  onStudyGoalChange: (val: string) => void;
   onPinChange: (val: string) => void;
   onClose: () => void;
   onSave: () => void;
@@ -34,11 +40,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   editLastname,
   editUsername,
   editUniversity,
+  editMajor,
+  editSemester,
+  editStudyGoal,
   editPin,
   onNameChange,
   onLastnameChange,
   onUsernameChange,
   onUniversityChange,
+  onMajorChange,
+  onSemesterChange,
+  onStudyGoalChange,
   onPinChange,
   onClose,
   onSave
@@ -56,17 +68,32 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </TouchableOpacity>
           </View>
           <View style={styles.modalBody}>
-            <Text style={styles.modalLabel}>{t('register.firstName', 'Nombre')}</Text>
+            <Text style={styles.modalLabel}>{t('register.step1.firstNameLabel', 'Nombre')}</Text>
             <TextInput style={styles.modalInput} value={editName} onChangeText={onNameChange} />
             
-            <Text style={styles.modalLabel}>{t('register.lastName', 'Apellido')}</Text>
+            <Text style={styles.modalLabel}>{t('register.step1.lastNameLabel', 'Apellido')}</Text>
             <TextInput style={styles.modalInput} value={editLastname} onChangeText={onLastnameChange} />
             
-            <Text style={styles.modalLabel}>{t('register.username', 'Nombre de Usuario')}</Text>
+            <Text style={styles.modalLabel}>{t('register.step1.usernameLabel', 'Nombre de Usuario')}</Text>
             <TextInput style={styles.modalInput} value={editUsername} onChangeText={onUsernameChange} />
             
-            <Text style={styles.modalLabel}>{t('register.university', 'Universidad')}</Text>
+            <Text style={styles.modalLabel}>{t('register.step1.universityLabel', 'Universidad')}</Text>
             <TextInput style={styles.modalInput} value={editUniversity} onChangeText={onUniversityChange} />
+
+            <Text style={styles.modalLabel}>{t('register.step1.majorLabel', 'Carrera/Programa')}</Text>
+            <TextInput style={styles.modalInput} value={editMajor} onChangeText={onMajorChange} />
+
+            <Text style={styles.modalLabel}>{t('register.step1.semesterLabel', 'Semestre Actual')}</Text>
+            <TextInput style={styles.modalInput} value={editSemester} onChangeText={onSemesterChange} />
+
+            <Text style={styles.modalLabel}>{t('register.step1.studyGoalLabel', 'Objetivo de Estudio')}</Text>
+            <TextInput 
+              style={[styles.modalInput, { height: 80, textAlignVertical: 'top', paddingTop: 8 }]} 
+              value={editStudyGoal} 
+              onChangeText={onStudyGoalChange}
+              multiline
+              numberOfLines={3}
+            />
 
             {/* PIN de usuario: solo asignable una vez */}
             <Text style={styles.modalLabel}>{t('settings.sharePin')}</Text>

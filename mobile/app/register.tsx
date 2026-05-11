@@ -1,9 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Animated, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import { setItemAsync } from 'expo-secure-store';
+import * as ImagePicker from 'expo-image-picker';
 import { globalStyles } from '../src/styles/globalStyles';
 import { loginStyles } from '../src/styles/Login.styles';
 import { registerStyles as localStyles } from '../src/styles/Register.styles';
@@ -14,75 +26,91 @@ import { MapuviaFooter } from '../src/components/MapuviaFooter';
 import { registerUser } from '../src/services/api';
 import { alertRef } from '../src/components/CustomAlert';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 2;
 
 /**
  * Pantalla de Registro de Usuario (RegisterScreen).
- * Implementa un flujo progresivo (wizard) de 4 pasos para recolectar
- * los datos del nuevo usuario, validarlos en tiempo real y registrar la cuenta
- * mediante llamadas a la API de Threshold.
+ * Flujo de 2 pasos tipo Bento Grid ultra-minimalista.
+ * Paso 1: Perfil + Objetivos académicos (foto opcional, nombre, apellido, usuario, semestre, objetivo principal, idioma de referencia)
+ * Paso 2: Escala académica + Credenciales de acceso
  */
 export default function RegisterScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
-  
+
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Form Data
+  // Animations
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(1 / TOTAL_STEPS)).current;
+
+  // === Paso 1: Perfil ===
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [lastname, setLastname] = useState('');
   const [username, setUsername] = useState('');
-  
+  const [semester, setSemester] = useState('');
+  const [studyGoal, setStudyGoal] = useState<string>('');
+  const [referenceLanguage, setReferenceLanguage] = useState<string>('');
+
+  // === Paso 2: Escala académica + Contexto + Credenciales ===
   const [gradingScale, setGradingScale] = useState('0-5.0');
   const [approvalThreshold, setApprovalThreshold] = useState('3.0');
-
   const [major, setMajor] = useState('');
   const [university, setUniversity] = useState('');
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // Animations
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const progressAnim = useRef(new Animated.Value(1 / TOTAL_STEPS)).current;
-
   useEffect(() => {
     Animated.timing(progressAnim, {
       toValue: step / TOTAL_STEPS,
-      duration: 300,
+      duration: 350,
       useNativeDriver: false,
     }).start();
-  }, [step]);
+  }, [step, progressAnim]);
 
-  /**
-   * Cambia el paso actual del formulario de registro usando
-   * una transición de fundido cruzado (fade out/fade in).
-   *
-   * @param {number} newStep - El número del nuevo paso a renderizar.
-   */
   const changeStep = (newStep: number) => {
-    Animated.timing(fadeAnim, {
+    const direction = newStep > step ? 400 : -400;
+    slideAnim.setValue(direction);
+    setStep(newStep);
+    Animated.spring(slideAnim, {
       toValue: 0,
-      duration: 150,
       useNativeDriver: true,
-    }).start(() => {
-      setStep(newStep);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
-    });
+      tension: 70,
+      friction: 12,
+    }).start();
   };
 
-  // Validations per step
-  const isStep1Valid = name.trim().length > 0 && lastname.trim().length > 0 && username.trim().length > 0;
-  
-  const isStep2Valid = gradingScale && !isNaN(parseFloat(approvalThreshold));
+  // === Foto de perfil ===
+  const handlePickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setProfilePhoto(result.assets[0].uri);
+    }
+  };
 
-  const isStep3Valid = true; // Optional
+  // === Avatar con iniciales (fallback) ===
+  const getInitials = () => {
+    const n = name.trim().charAt(0).toUpperCase();
+    const l = lastname.trim().charAt(0).toUpperCase();
+    return n || l ? `${n}${l}` : '?';
+  };
+
+  // === Validaciones ===
+  const isStep1Valid =
+    name.trim().length > 0 &&
+    lastname.trim().length > 0 &&
+    username.trim().length > 0;
 
   const isEmailValid = (mail: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail);
   const reqs = {
@@ -92,12 +120,13 @@ export default function RegisterScreen() {
     special: /[@$!%*?&]/.test(password),
   };
   const isPasswordValid = Object.values(reqs).every(Boolean);
-  const isStep4Valid = isEmailValid(email) && isPasswordValid && password === confirmPassword;
+  const isStep2Valid =
+    gradingScale &&
+    !isNaN(parseFloat(approvalThreshold)) &&
+    isEmailValid(email) &&
+    isPasswordValid &&
+    password === confirmPassword;
 
-  /**
-   * Avanza al siguiente paso del formulario o invoca el registro final si ya se
-   * encuentra en el último paso.
-   */
   const handleNext = () => {
     if (step < TOTAL_STEPS) {
       changeStep(step + 1);
@@ -106,10 +135,6 @@ export default function RegisterScreen() {
     }
   };
 
-  /**
-   * Retrocede al paso anterior del formulario. Si el usuario se encuentra en el primer
-   * paso, devuelve la navegación a la pantalla previa (ej. login).
-   */
   const handleBack = () => {
     if (step > 1) {
       changeStep(step - 1);
@@ -118,14 +143,10 @@ export default function RegisterScreen() {
     }
   };
 
-  /**
-   * Compila todos los datos del formulario de registro y realiza la
-   * petición al backend para crear la cuenta de usuario.
-   */
   const handleRegister = async () => {
     setIsLoading(true);
     try {
-      const response = await registerUser({
+      await registerUser({
         email,
         password,
         name,
@@ -134,243 +155,358 @@ export default function RegisterScreen() {
         grading_scale: gradingScale,
         approval_threshold: parseFloat(approvalThreshold),
         major,
-        university
+        university,
+        semester,
+        study_goal: studyGoal,
+        reference_language: referenceLanguage,
       });
-      alertRef.show({ title: t('common.success'), message: t('register.success.accountCreated'), type: 'success' });
+
+      // Persist chosen language so login screen picks it up
+      const langToSave = referenceLanguage === 'en' ? 'en' : 'es';
+      await setItemAsync('app_language', langToSave);
+      i18n.changeLanguage(langToSave);
+
+      alertRef.show({
+        title: t('common.success'),
+        message: t('register.success.accountCreated'),
+        type: 'success',
+      });
       router.replace('/(tabs)');
     } catch (error: any) {
-      alertRef.show({ title: t('common.error'), message: error?.message || t('register.errors.generic'), type: 'error' });
+      alertRef.show({
+        title: t('common.error'),
+        message: error?.message || t('register.errors.generic'),
+        type: 'error',
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * Renderiza la barra de progreso animada ubicada en la cabecera.
-   */
-  const renderProgressBar = () => (
-    <View style={localStyles.progressBarContainer}>
-      <Animated.View style={[
-        localStyles.progressBarFill, 
-        { 
-          width: progressAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: ['0%', '100%']
-          })
-        }
-      ]} />
-    </View>
-  );
-
-  /**
-   * Renderiza un ítem individual de validación de requisitos de contraseña.
-   *
-   * @param {boolean} fulfilled - Indica si el requerimiento de contraseña está satisfecho.
-   * @param {string} text - El texto del requerimiento a mostrar.
-   */
+  // === Sub-componentes ===
   const RequirementItem = ({ fulfilled, text }: { fulfilled: boolean; text: string }) => (
     <View style={localStyles.reqItem}>
-      <Feather 
-        name={fulfilled ? 'check-circle' : 'circle'} 
-        size={16} 
-        color={fulfilled ? '#34C759' : theme.colors.text.placeholder} 
+      <Feather
+        name={fulfilled ? 'check-circle' : 'x-circle'}
+        size={14}
+        color={fulfilled ? theme.colors.success : theme.colors.danger}
       />
-      <Text style={[localStyles.reqText, fulfilled && localStyles.reqTextFulfilled]}>
+      <Text style={[localStyles.reqText, fulfilled ? localStyles.reqTextFulfilled : localStyles.reqTextError]}>
         {text}
       </Text>
     </View>
   );
 
+  const ScaleButton = ({ scale }: { scale: string }) => (
+    <TouchableOpacity
+      style={[localStyles.segmentButton, gradingScale === scale && localStyles.segmentButtonActive]}
+      onPress={() => {
+        setGradingScale(scale);
+        if (scale === '0-5.0') setApprovalThreshold('3.0');
+        else if (scale === '0-10') setApprovalThreshold('6.0');
+        else setApprovalThreshold('60');
+      }}
+    >
+      <Text style={[localStyles.segmentText, gradingScale === scale && localStyles.segmentTextActive]}>
+        {scale}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={globalStyles.safeArea}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView 
-          style={globalStyles.container} 
+        <ScrollView
+          style={globalStyles.container}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Header Section */}
+          {/* ── Header ── */}
           <View style={loginStyles.headerContainer}>
-            <TouchableOpacity onPress={handleBack} style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}
+            >
               <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
-            <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center', zIndex: -1 }}>
-              <Ionicons name="school-outline" size={24} color={theme.colors.primary} />
+            <View
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: -1,
+              }}
+            >
+              <Ionicons name="school-outline" size={22} color={theme.colors.primary} />
             </View>
+            <Text style={localStyles.stepIndicator}>
+              {step}/{TOTAL_STEPS}
+            </Text>
           </View>
 
-          {renderProgressBar()}
+          {/* ── Progress Bar ── */}
+          <View style={localStyles.progressBarContainer}>
+            <Animated.View
+              style={[
+                localStyles.progressBarFill,
+                {
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
+              ]}
+            />
+          </View>
 
-          <Animated.View style={{ opacity: fadeAnim, marginTop: theme.spacing.md }}>
-            
+          {/* ── Contenido animado ── */}
+          <Animated.View style={{ transform: [{ translateX: slideAnim }], marginTop: theme.spacing.md }}>
+
+            {/* ════════════════════════════════════════
+                PASO 1 — Perfil + Objetivos
+            ════════════════════════════════════════ */}
             {step === 1 && (
               <View>
                 <View style={loginStyles.formHeaderContainer}>
                   <Text style={loginStyles.formHeaderTitle}>{t('register.step1.title')}</Text>
-                  <Text style={loginStyles.formHeaderSubtitle}>
-                    {t('register.step1.subtitle')}
-                  </Text>
+                  <Text style={loginStyles.formHeaderSubtitle}>{t('register.step1.subtitle')}</Text>
                 </View>
 
-                <View style={[loginStyles.formContainer, { marginTop: theme.spacing.lg }]}>
+                {/* ── Avatar Card ── */}
+                <View style={localStyles.bentoCard}>
+                  <View style={localStyles.bentoCardHeader}>
+                    <Feather name="user" size={15} color={theme.colors.text.secondary} />
+                    <Text style={localStyles.bentoCardLabel}>{t('register.step1.profilePhoto')}</Text>
+                  </View>
+                  <View style={localStyles.avatarCenter}>
+                    <TouchableOpacity style={localStyles.avatarTouchable} onPress={handlePickPhoto}>
+                      {profilePhoto ? (
+                        <Image source={{ uri: profilePhoto }} style={localStyles.avatarImage} />
+                      ) : (
+                        <View style={localStyles.avatarInitials}>
+                          <Text style={localStyles.avatarInitialsText}>{getInitials()}</Text>
+                        </View>
+                      )}
+                      <View style={localStyles.avatarEditBadge}>
+                        <Feather name="camera" size={12} color="#fff" />
+                      </View>
+                    </TouchableOpacity>
+                    <Text
+                      style={username.trim() ? localStyles.avatarUsername : localStyles.avatarUsernamePlaceholder}
+                      numberOfLines={1}
+                    >
+                      {username.trim() || t('register.step1.usernamePlaceholder')}
+                    </Text>
+                    {profilePhoto && (
+                      <TouchableOpacity onPress={() => setProfilePhoto(null)}>
+                        <Text style={localStyles.removePhotoText}>{t('register.step1.removePhoto')}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {/* ── Identidad Card ── */}
+                <View style={localStyles.bentoCard}>
+                  <View style={localStyles.bentoCardHeader}>
+                    <Feather name="edit-3" size={15} color={theme.colors.text.secondary} />
+                    <Text style={localStyles.bentoCardLabel}>{t('register.step1.identityCard')}</Text>
+                  </View>
                   <CustomInput
                     label={t('register.step1.firstNameLabel')}
-                    placeholder={t('register.step1.firstNamePlaceholder')}
                     value={name}
                     onChangeText={setName}
                     autoCapitalize="words"
                   />
                   <CustomInput
                     label={t('register.step1.lastNameLabel')}
-                    placeholder={t('register.step1.lastNamePlaceholder')}
                     value={lastname}
                     onChangeText={setLastname}
                     autoCapitalize="words"
                   />
                   <CustomInput
                     label={t('register.step1.usernameLabel')}
-                    placeholder={t('register.step1.usernamePlaceholder')}
                     value={username}
                     onChangeText={setUsername}
                     autoCapitalize="none"
                   />
-                  
-                  <CustomButton 
-                    title={t('register.actions.continue')} 
-                    onPress={handleNext} 
-                    disabled={!isStep1Valid}
-                    style={{ marginTop: theme.spacing.md }}
+                </View>
+
+                {/* ── Contexto Académico Card ── */}
+                <View style={localStyles.bentoCard}>
+                  <View style={localStyles.bentoCardHeader}>
+                    <Feather name="book-open" size={15} color={theme.colors.text.secondary} />
+                    <Text style={localStyles.bentoCardLabel}>{t('register.step1.academicCard')}</Text>
+                  </View>
+                  <CustomInput
+                    label={t('register.step1.semesterLabel')}
+                    value={semester}
+                    onChangeText={setSemester}
+                  />
+                  <CustomInput
+                    label={t('register.step1.majorLabel')}
+                    value={major}
+                    onChangeText={setMajor}
+                  />
+                  <CustomInput
+                    label={t('register.step1.universityLabel')}
+                    value={university}
+                    onChangeText={setUniversity}
                   />
                 </View>
-              </View>
-            )}
 
-            {step === 2 && (
-              <View>
-                <View style={loginStyles.formHeaderContainer}>
-                  <Text style={loginStyles.formHeaderTitle}>{t('register.step2.title')}</Text>
-                  <Text style={loginStyles.formHeaderSubtitle}>
-                    {t('register.step2.subtitle')}
-                  </Text>
-                </View>
+                {/* ── Objetivos IA Card ── */}
+                <View style={localStyles.bentoCard}>
+                  <View style={localStyles.bentoCardHeader}>
+                    <Feather name="zap" size={15} color={theme.colors.text.secondary} />
+                    <Text style={localStyles.bentoCardLabel}>{t('register.step1.goalsCard')}</Text>
+                    <View style={localStyles.aiBadge}>
+                      <Text style={localStyles.aiBadgeText}>IA</Text>
+                    </View>
+                  </View>
 
-                <View style={[loginStyles.formContainer, { marginTop: theme.spacing.lg }]}>
-                  <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, marginBottom: theme.spacing.xs }}>{t('register.step2.gradingScaleLabel')}</Text>
-                  <View style={localStyles.segmentedControl}>
-                    {['0-5.0', '0-10', '0-100'].map((scale) => (
-                      <TouchableOpacity 
-                        key={scale}
-                        style={[localStyles.segmentButton, gradingScale === scale && localStyles.segmentButtonActive]}
-                        onPress={() => setGradingScale(scale)}
+                  <Text style={localStyles.chipSectionLabel}>{t('register.step1.studyGoalLabel')}</Text>
+                  <Text style={[localStyles.chipSectionHint, { marginBottom: theme.spacing.sm }]}>{t('register.step1.studyGoalHint')}</Text>
+                  <View style={localStyles.goalGrid}>
+                    {['survive', 'pass', 'excel', 'top'].map((goal) => (
+                      <TouchableOpacity
+                        key={goal}
+                        style={[localStyles.goalButton, studyGoal === goal && localStyles.goalButtonActive]}
+                        onPress={() => setStudyGoal(goal)}
                       >
-                        <Text style={[localStyles.segmentText, gradingScale === scale && localStyles.segmentTextActive]}>
-                          {scale}
+                        <Text style={[localStyles.goalButtonText, studyGoal === goal && localStyles.goalButtonTextActive]}>
+                          {t(`register.goals.${goal}`)}
                         </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
 
-                  <CustomInput
-                    label={t('register.step2.approvalThresholdLabel')}
-                    placeholder={`${t('register.examplePrefix')} ${gradingScale === '0-5.0' ? '3.0' : gradingScale === '0-10' ? '6.0' : '60'}`}
-                    value={approvalThreshold}
-                    onChangeText={setApprovalThreshold}
-                    keyboardType="numeric"
-                  />
-                  
-                  <CustomButton 
-                    title={t('register.actions.continue')} 
-                    onPress={handleNext} 
-                    disabled={!isStep2Valid}
-                    style={{ marginTop: theme.spacing.md }}
-                  />
-                </View>
-              </View>
-            )}
-
-            {step === 3 && (
-              <View>
-                <View style={loginStyles.formHeaderContainer}>
-                  <Text style={loginStyles.formHeaderTitle}>{t('register.step3.title')}</Text>
-                  <Text style={loginStyles.formHeaderSubtitle}>
-                    {t('register.step3.subtitle')}
-                  </Text>
-                </View>
-
-                <View style={[loginStyles.formContainer, { marginTop: theme.spacing.lg }]}>
-                  <CustomInput
-                    label={t('register.step3.majorLabel')}
-                    placeholder={t('register.step3.majorPlaceholder')}
-                    value={major}
-                    onChangeText={setMajor}
-                  />
-                  <CustomInput
-                    label={t('register.step3.universityLabel')}
-                    placeholder={t('register.step3.universityPlaceholder')}
-                    value={university}
-                    onChangeText={setUniversity}
-                  />
-                  
-                  {!major && !university && (
-                    <View style={localStyles.emptyState}>
-                      <Feather name="book-open" size={32} color={theme.colors.border} />
-                      <Text style={localStyles.emptyStateText}>
-                        {t('register.step3.emptyState')}
-                      </Text>
+                  <View style={{ marginTop: theme.spacing.lg }}>
+                    <Text style={localStyles.chipSectionLabel}>{t('register.step1.languageLabel')}</Text>
+                    <Text style={[localStyles.chipSectionHint, { marginBottom: theme.spacing.sm }]}>{t('register.step1.languageHint')}</Text>
+                    <View style={localStyles.chipContainer}>
+                      {['es', 'en', 'zh', 'pt', 'fr', 'de'].map((lang) => {
+                        const enabled = lang === 'es' || lang === 'en';
+                        return (
+                          <TouchableOpacity
+                            key={lang}
+                            style={[
+                              localStyles.chip,
+                              referenceLanguage === lang && localStyles.chipActive,
+                              !enabled && localStyles.chipDisabled,
+                            ]}
+                            onPress={() => enabled && setReferenceLanguage(lang)}
+                            activeOpacity={enabled ? 0.7 : 1}
+                          >
+                            <Text style={[
+                              localStyles.chipText,
+                              referenceLanguage === lang && localStyles.chipTextActive,
+                              !enabled && localStyles.chipTextDisabled,
+                            ]}>
+                              {t(`register.languages.${lang}`)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
-                  )}
-
-                  <CustomButton 
-                    title={major || university ? t('register.actions.continue') : t('register.actions.skipAndContinue')} 
-                    onPress={handleNext} 
-                    disabled={!isStep3Valid}
-                    style={{ marginTop: theme.spacing.xl }}
-                  />
+                  </View>
                 </View>
+
+                <CustomButton
+                  title={t('register.actions.continue')}
+                  onPress={handleNext}
+                  disabled={!isStep1Valid}
+                  style={{ marginTop: theme.spacing.sm, marginBottom: theme.spacing.md }}
+                />
               </View>
             )}
 
-            {step === 4 && (
+            {/* ════════════════════════════════════════
+                PASO 2 — Escala + Credenciales
+            ════════════════════════════════════════ */}
+            {step === 2 && (
               <View>
                 <View style={loginStyles.formHeaderContainer}>
-                  <Text style={loginStyles.formHeaderTitle}>{t('register.step4.title')}</Text>
-                  <Text style={loginStyles.formHeaderSubtitle}>
-                    {t('register.step4.subtitle')}
-                  </Text>
+                  <Text style={loginStyles.formHeaderTitle}>{t('register.step2.title')}</Text>
+                  <Text style={loginStyles.formHeaderSubtitle}>{t('register.step2.subtitle')}</Text>
                 </View>
 
-                <View style={[loginStyles.formContainer, { marginTop: theme.spacing.md }]}>
-                  <CustomInput 
-                    label={t('login.emailLabel')} 
-                    placeholder={t('login.emailPlaceholder')} 
+                {/* ── Escala académica Card ── */}
+                <View style={localStyles.bentoCard}>
+                  <View style={localStyles.bentoCardHeader}>
+                    <Feather name="bar-chart-2" size={15} color={theme.colors.text.secondary} />
+                    <Text style={localStyles.bentoCardLabel}>{t('register.step2.gradingCard')}</Text>
+                  </View>
+                  <Text style={localStyles.chipSectionLabel}>{t('register.step2.gradingScaleLabel')}</Text>
+                  <View style={localStyles.segmentedControl}>
+                    <ScaleButton scale="0-5.0" />
+                    <ScaleButton scale="0-10" />
+                    <ScaleButton scale="0-100" />
+                  </View>
+                  <View style={localStyles.thresholdRow}>
+                    <Text style={localStyles.thresholdLabel}>{t('register.step2.approvalThresholdLabel')}</Text>
+                    <TextInput
+                      style={localStyles.thresholdInput}
+                      value={approvalThreshold}
+                      onChangeText={setApprovalThreshold}
+                      keyboardType="numeric"
+                      maxLength={6}
+                      textAlign="center"
+                    />
+                  </View>
+                </View>
+
+                {/* ── Credenciales Card ── */}
+                <View style={localStyles.bentoCard}>
+                  <View style={localStyles.bentoCardHeader}>
+                    <Feather name="lock" size={15} color={theme.colors.text.secondary} />
+                    <Text style={localStyles.bentoCardLabel}>{t('register.step2.credentialsCard')}</Text>
+                  </View>
+                  <CustomInput
+                    label={t('login.emailLabel')}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={email}
                     onChangeText={setEmail}
                   />
-                  
-                  <CustomInput 
-                    label={t('login.passwordLabel')} 
-                    placeholder={t('login.passwordPlaceholder')} 
+                  <CustomInput
+                    label={t('login.passwordLabel')}
                     secureTextEntry
                     isPassword
                     value={password}
                     onChangeText={setPassword}
                   />
-
-                  <CustomInput 
-                    label={t('register.confirmPasswordLabel')} 
-                    placeholder={t('register.confirmPasswordPlaceholder')} 
+                  <CustomInput
+                    label={t('register.confirmPasswordLabel')}
                     secureTextEntry
                     isPassword
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                   />
 
-                  {/* Requirements Card */}
+                  {/* Indicador de coincidencia de contraseñas */}
+                  {confirmPassword.length > 0 && (
+                    <View style={localStyles.matchRow}>
+                      <Feather
+                        name={password === confirmPassword ? 'check-circle' : 'x-circle'}
+                        size={14}
+                        color={password === confirmPassword ? theme.colors.success : theme.colors.danger}
+                      />
+                      <Text style={[
+                        localStyles.matchText,
+                        { color: password === confirmPassword ? theme.colors.success : theme.colors.danger },
+                      ]}>
+                        {password === confirmPassword ? t('register.passwordMatch') : t('register.passwordMismatch')}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Requisitos de contraseña */}
                   <View style={localStyles.reqCard}>
                     <Text style={localStyles.reqTitle}>{t('register.reqTitle')}</Text>
                     <RequirementItem fulfilled={reqs.length} text={t('register.reqLength')} />
@@ -378,31 +514,25 @@ export default function RegisterScreen() {
                     <RequirementItem fulfilled={reqs.number} text={t('register.reqNumber')} />
                     <RequirementItem fulfilled={reqs.special} text={t('register.reqSpecial')} />
                   </View>
-
-                  <CustomButton 
-                    title={t('register.step4.finishBtn')} 
-                    onPress={handleNext} 
-                    loading={isLoading}
-                    style={{ marginTop: theme.spacing.sm, marginBottom: theme.spacing.lg }}
-                    disabled={!isStep4Valid || isLoading}
-                  />
-
                 </View>
+
+                <CustomButton
+                  title={t('register.step2.finishBtn')}
+                  onPress={handleNext}
+                  loading={isLoading}
+                  disabled={!isStep2Valid || isLoading}
+                  style={{ marginTop: theme.spacing.sm, marginBottom: theme.spacing.lg }}
+                />
               </View>
             )}
-
           </Animated.View>
 
-          {/* Footer en Registro */}
+          {/* ── Footer ── */}
           <View style={{ marginTop: theme.spacing.md }}>
             <MapuviaFooter />
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
-
-
