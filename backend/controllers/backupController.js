@@ -54,13 +54,13 @@ exports.getBackupStats = (req, res) => {
                  JOIN audio_recordings ar ON ar.id = at.recording_id
                  WHERE ar.user_id = ? AND at.transcript_text IS NOT NULL`,
                 [userId], (err, r) => {
-                  if (!err && r) stats.transcripts.total += r.total;
+                  if (!err && r) stats.transcripts.total += Number(r.total);
                   db.get(
                     `SELECT COUNT(*) as backed FROM audio_transcripts at
                      JOIN audio_recordings ar ON ar.id = at.recording_id
                      WHERE ar.user_id = ? AND at.is_backed_up = 1`,
                     [userId], (err, r) => {
-                      if (!err && r) stats.transcripts.backed += r.backed;
+                      if (!err && r) stats.transcripts.backed += Number(r.backed);
 
                       // ── Transcripciones de YouTube ──
                       // NOTA: youtube_transcripts puede no tener is_backed_up; usamos COALESCE para seguridad
@@ -69,13 +69,13 @@ exports.getBackupStats = (req, res) => {
                          JOIN youtube_videos yv ON yv.id = yt.video_id
                          WHERE yv.user_id = ? AND yt.transcript_text IS NOT NULL`,
                         [userId], (err, r) => {
-                          if (!err && r) stats.transcripts.total += r.total;
+                          if (!err && r) stats.transcripts.total += Number(r.total);
                           db.get(
                             `SELECT COUNT(*) as backed FROM youtube_transcripts yt
                              JOIN youtube_videos yv ON yv.id = yt.video_id
                              WHERE yv.user_id = ? AND COALESCE(yt.is_backed_up, 0) = 1`,
                             [userId], (err, r) => {
-                              if (!err && r) stats.transcripts.backed += r.backed;
+                              if (!err && r) stats.transcripts.backed += Number(r.backed);
                               res.json(stats);
                             }
                           );
@@ -103,8 +103,13 @@ exports.getPendingItems = (req, res) => {
 
   const result = { photos: [], audio: [], docs: [], transcripts: [] };
 
-  db.all('SELECT id, uri FROM gallery_items WHERE user_id = ? AND is_backed_up = 0', [userId], (err, rows) => {
-    if (!err && rows) result.photos = rows;
+  db.all(
+    `SELECT p.id, p.local_uri as uri 
+     FROM photos p 
+     JOIN subjects s ON p.subject_id = s.id 
+     WHERE s.user_id = ? AND p.is_backed_up = 0`,
+    [userId], (err, rows) => {
+      if (!err && rows) result.photos = rows;
 
     db.all('SELECT id, local_uri, name FROM audio_recordings WHERE user_id = ? AND is_backed_up = 0', [userId], (err, rows) => {
       if (!err && rows) result.audio = rows;
@@ -152,7 +157,7 @@ exports.markAsBackedUp = (req, res) => {
   }
 
   const tableMap = {
-    photo: 'gallery_items',
+    photo: 'photos',
     audio: 'audio_recordings',
     document: 'scanned_documents',
   };
@@ -173,10 +178,23 @@ exports.markAsBackedUp = (req, res) => {
   const table = tableMap[type];
   if (!table) return res.status(400).json({ error: `Tipo desconocido: ${type}` });
 
+  if (type === 'photo') {
+    db.run(
+      `UPDATE photos SET cloud_url = ?, is_backed_up = 1 
+       WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`,
+      [cloud_url, id, userId],
+      function (err) {
+        if (err) return res.status(500).json({ error: 'Error al marcar foto.' });
+        if (this.changes === 0) return res.status(404).json({ error: 'Foto no encontrada o sin permiso.' });
+        res.json({ ok: true });
+      }
+    );
+    return;
+  }
+
   // Verificar que el ítem pertenece al usuario antes de actualizar
-  const ownerCol = type === 'photo' ? 'user_id' : 'user_id';
   db.run(
-    `UPDATE ${table} SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND ${ownerCol} = ?`,
+    `UPDATE ${table} SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND user_id = ?`,
     [cloud_url, id, userId],
     function (err) {
       if (err) return res.status(500).json({ error: 'Error al marcar ítem.' });

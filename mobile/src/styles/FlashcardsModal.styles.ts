@@ -87,7 +87,7 @@ export const flashcardsStyles = StyleSheet.create({
     backgroundColor: theme.colors.inputBackground,
     borderRadius: 18,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 0,
     borderWidth: 1,
     borderColor: theme.colors.border,
     gap: 12,
@@ -167,45 +167,131 @@ export const flashcardsStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Options Sheet
-  optionsBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+  // Swipe-to-reveal action pill
+  swipeActionsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48, // Fixed height instead of stretch
+    alignSelf: 'center', // Center vertically in absolute container
+    backgroundColor: theme.colors.background,
+    marginRight: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  swipeActionBtn: {
+    width: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    alignSelf: 'stretch', // Fill the full height of the pill
   },
-  optionsContent: {
-    width: '90%',
+  swipeActionDivider: {
+    width: 1,
+    height: 30, // Taller divider
+    backgroundColor: theme.colors.border,
+  },
+  // \u2500\u2500\u2500 Options Bottom Sheet (unused \u2014 kept for reference) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+  optionsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  optionsSheet: {
     backgroundColor: theme.colors.background,
-    borderRadius: 24,
-    padding: 20,
-    gap: 8,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
   },
-  optionsHeader: {
+  optionsHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.border,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  optionsDeckInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 18,
+    paddingHorizontal: 4,
+  },
+  optionsDeckBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionsDeckTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.text.primary,
-    marginBottom: 12,
-    textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  optionItem: {
+  optionsDeckSubject: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    marginTop: 2,
+  },
+  optionsDivider: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginBottom: 12,
+    opacity: 0.6,
+  },
+  optionsActionsGroup: {
+    borderRadius: 18,
+    backgroundColor: theme.colors.inputBackground,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 12,
+  },
+  optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
+    gap: 14,
+    paddingVertical: 15,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: theme.colors.inputBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  optionText: {
+  optionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionRowText: {
+    flex: 1,
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
-  optionTextDestructive: {
-    color: '#D32F2F',
+  optionsCancelBtn: {
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
+  optionsCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.text.secondary,
+  },
+  // kept for potential other usages
+  optionsContent: { width: '90%', backgroundColor: theme.colors.background, borderRadius: 24, padding: 20, gap: 8 },
+  optionsHeader: { fontSize: 16, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 12, textAlign: 'center' },
+  optionItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, backgroundColor: theme.colors.inputBackground },
+  optionText: { fontSize: 15, fontWeight: '600', color: theme.colors.text.primary },
+  optionTextDestructive: { color: '#D32F2F' },
   // Study session
   studyHeader: {
     flexDirection: 'row',

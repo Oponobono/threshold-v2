@@ -189,13 +189,13 @@ export const useBackupLogic = () => {
   const lastDownloadLabel = formatRelativeTime(prefs.lastDownload);
 
   const pendingCount =
-    (stats.photos.total - stats.photos.backed) +
-    (stats.audio.total - stats.audio.backed) +
-    (stats.docs.total - stats.docs.backed) +
-    (stats.transcripts.total - stats.transcripts.backed);
+    (Number(stats.photos.total) - Number(stats.photos.backed)) +
+    (Number(stats.audio.total) - Number(stats.audio.backed)) +
+    (Number(stats.docs.total) - Number(stats.docs.backed)) +
+    (Number(stats.transcripts.total) - Number(stats.transcripts.backed));
 
-  const totalCount = stats.photos.total + stats.audio.total + stats.docs.total + stats.transcripts.total;
-  const backedCount = stats.photos.backed + stats.audio.backed + stats.docs.backed + stats.transcripts.backed;
+  const totalCount = Number(stats.photos.total) + Number(stats.audio.total) + Number(stats.docs.total) + Number(stats.transcripts.total);
+  const backedCount = Number(stats.photos.backed) + Number(stats.audio.backed) + Number(stats.docs.backed) + Number(stats.transcripts.backed);
 
   const isRunning = isUploading || isDownloading;
 
