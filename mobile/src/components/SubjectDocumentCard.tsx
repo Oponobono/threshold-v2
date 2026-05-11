@@ -93,9 +93,14 @@ export const SubjectDocumentCard: React.FC<SubjectDocumentCardProps> = ({
         <Text style={styles.docName} numberOfLines={1}>
           {doc.name || `${t('subjects.scannedDocument') || 'Documento Escaneado'} ${index + 1}`}
         </Text>
-        <Text style={styles.docDate}>
-          {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : (t('common.recent') || 'Reciente')}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          <Text style={styles.docDate}>
+            {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : (t('common.recent') || 'Reciente')}
+          </Text>
+          {(doc.cloud_url || doc.is_backed_up === 1) && (
+            <Ionicons name="cloud-done" size={14} color={theme.colors.success || '#34C759'} />
+          )}
+        </View>
         {!hasOCR && (
           <Text style={{ fontSize: 11, color: theme.colors.warning || '#FF9500', marginTop: 4 }}>
             {t('common.ocrPending') || 'Sin OCR - Extrae texto'}

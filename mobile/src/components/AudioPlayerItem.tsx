@@ -72,7 +72,12 @@ export const AudioPlayerItem: React.FC<AudioPlayerItemProps> = ({
             ⚠ Archivo no encontrado — solo registro en BD
           </Text>
         )}
-        <Text style={styles.recordingDate}>{item.date}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          <Text style={styles.recordingDate}>{item.date}</Text>
+          {(item.cloud_url || (item as any).is_backed_up === 1) && (
+            <Ionicons name="cloud-done" size={14} color={theme.colors.success || '#34C759'} />
+          )}
+        </View>
         {item.subject_name && (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
             <View style={{ 
