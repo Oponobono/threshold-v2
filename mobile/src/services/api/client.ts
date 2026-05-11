@@ -108,13 +108,10 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
 
   for (const base of candidates) {
     try {
-      console.log(`[API] Intentando: ${base}${path}`);
       const response = await fetch(`${base}${path}`, customInit);
-      console.log(`[API] Respuesta de ${base}${path}: ${response.status} ${response.statusText}`);
       activeBaseUrl = base;
       return response;
     } catch (error) {
-      console.warn(`[API] Falló conexión con ${base}:`, error);
       lastError = error;
     }
   }

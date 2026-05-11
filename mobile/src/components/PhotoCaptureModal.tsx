@@ -49,9 +49,16 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
 
+  // Solicitar permiso automáticamente al abrir si no está otorgado
+  React.useEffect(() => {
+    if (isVisible && permission && !permission.granted && permission.canAskAgain) {
+      requestPermission();
+    }
+  }, [isVisible, permission]);
+
   // If permissions are not yet determined
   if (!permission) {
-    return <View />;
+    return null;
   }
 
   // Request permissions if not granted
