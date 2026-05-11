@@ -73,19 +73,32 @@ exports.saveScannedDocument = (req, res) => {
  */
 exports.deleteScannedDocument = (req, res) => {
   const { documentId } = req.params;
+  console.log(`[Backend] DELETE /scanned-documents/${documentId} recibido.`);
 
   db.get(`SELECT local_uri, cloud_url FROM scanned_documents WHERE id = ?`, [documentId], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      console.error('[Backend] Error en db.get (scanned_documents):', err.message);
+      return res.status(500).json({ error: err.message });
+    }
     if (!row) {
+      console.log(`[Backend] Documento ${documentId} no encontrado. Respondiendo éxito.`);
       return res.json({ success: true, message: 'El documento ya no existía.' });
     }
 
+    console.log(`[Backend] Documento ${documentId} encontrado. Borrando de la BD.`);
     db.run(`DELETE FROM scanned_documents WHERE id = ?`, [documentId], function (deleteErr) {
-      if (deleteErr) return res.status(500).json({ error: deleteErr.message });
+      if (deleteErr) {
+        console.error('[Backend] Error en db.run (DELETE scanned_documents):', deleteErr.message);
+        return res.status(500).json({ error: deleteErr.message });
+      }
 
+      console.log(`[Backend] Documento ${documentId} borrado de la BD.`);
       // Eliminar de Uploadthing en background
       if (row.cloud_url) {
-        deleteFromUploadthing(row.cloud_url).catch(() => {});
+        console.log(`[Backend] Intentando borrar de Uploadthing: ${row.cloud_url}`);
+        deleteFromUploadthing(row.cloud_url).catch((utErr) => {
+           console.warn('[Backend] Error (ignorado) al borrar de Uploadthing:', utErr.message);
+        });
       }
 
       res.json({ success: true, local_uri: row.local_uri });

@@ -144,25 +144,38 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
+               console.log(`[SubjectDocumentsList] Iniciando borrado de ID: ${docId}`);
                const doc = documents.find(d => (d.id || documents.indexOf(d)) === docId);
+               
                if (doc?.is_legacy_photo) {
+                 console.log('[SubjectDocumentsList] Borrando como foto legacy...');
                  await deletePhoto(docId as number);
                } else {
+                 console.log('[SubjectDocumentsList] Borrando como documento escaneado...');
                  await deleteScannedDocument(docId);
                }
                
                // Eliminar archivo físico para liberar espacio
                if (doc?.local_uri) {
                  try {
-                   await FileSystem.deleteAsync(doc.local_uri);
+                   console.log(`[SubjectDocumentsList] Intentando borrar archivo físico: ${doc.local_uri}`);
+                   const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
+                   if (fileInfo.exists) {
+                     await FileSystem.deleteAsync(doc.local_uri);
+                     console.log('[SubjectDocumentsList] Archivo físico borrado con éxito.');
+                   } else {
+                     console.log('[SubjectDocumentsList] El archivo físico no existe, saltando borrado.');
+                   }
                  } catch (fsError) {
-                   console.warn('No se pudo borrar el archivo físico (quizás ya no existía):', fsError);
+                   console.warn('[SubjectDocumentsList] Error al borrar archivo físico:', fsError);
                  }
                }
                
+               console.log('[SubjectDocumentsList] Borrado completado con éxito, notificando a la UI.');
                onDocumentDeleted?.(docId);
-            } catch (e) {
-               showAlert({ title: t('common.error') || 'Error', message: t('common.errors.deleteFailed') || 'No se pudo eliminar el documento.', type: 'error' });
+            } catch (e: any) {
+               console.error('[SubjectDocumentsList] ERROR CRÍTICO AL BORRAR:', e);
+               showAlert({ title: t('common.error') || 'Error', message: (t('common.errors.deleteFailed') || 'No se pudo eliminar el documento.') + ` (${e.message})`, type: 'error' });
             }
           }
         }

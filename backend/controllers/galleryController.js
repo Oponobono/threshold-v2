@@ -220,20 +220,33 @@ exports.updatePhoto = (req, res) => {
  */
 exports.deletePhoto = (req, res) => {
   const { photoId } = req.params;
+  console.log(`[Backend] DELETE /photos/${photoId} recibido.`);
 
   db.get(`SELECT local_uri, cloud_url FROM photos WHERE id = ?`, [photoId], async (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      console.error('[Backend] Error en db.get (photos):', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
     if (!row) {
-      // Si ya no existe en la BD, respondemos con éxito para que el frontend pueda limpiar su estado
+      console.log(`[Backend] La foto ${photoId} no existe en la BD. Respondiendo éxito para limpieza.`);
       return res.json({ success: true, message: 'La foto ya no existía en la base de datos.' });
     }
 
+    console.log(`[Backend] Foto ${photoId} encontrada. Procediendo a borrar de la BD.`);
     db.run(`DELETE FROM photos WHERE id = ?`, [photoId], async function (deleteErr) {
-      if (deleteErr) return res.status(500).json({ error: deleteErr.message });
+      if (deleteErr) {
+        console.error('[Backend] Error en db.run (DELETE photos):', deleteErr.message);
+        return res.status(500).json({ error: deleteErr.message });
+      }
 
-      // Eliminar de Uploadthing en background (no bloquea la respuesta)
+      console.log(`[Backend] Foto ${photoId} borrada de la BD con éxito.`);
+      // Eliminar de Uploadthing en background
       if (row.cloud_url) {
-        deleteFromUploadthing(row.cloud_url).catch(() => {});
+        console.log(`[Backend] Intentando borrar de Uploadthing: ${row.cloud_url}`);
+        deleteFromUploadthing(row.cloud_url).catch((utErr) => {
+          console.warn('[Backend] Error (ignorado) al borrar de Uploadthing:', utErr.message);
+        });
       }
 
       res.json({ success: true, local_uri: row.local_uri });

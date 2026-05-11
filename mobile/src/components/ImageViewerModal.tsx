@@ -128,6 +128,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log(`[ImageViewerModal] Iniciando borrado de Foto ID: ${photoId}`);
               const photo = photos.find(p => p.id === photoId);
               
               await deletePhoto(photoId);
@@ -135,18 +136,27 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
               // Eliminar archivo físico para liberar espacio
               if (photo?.local_uri) {
                 try {
-                  await FileSystem.deleteAsync(photo.local_uri);
+                  console.log(`[ImageViewerModal] Intentando borrar archivo físico: ${photo.local_uri}`);
+                  const fileInfo = await FileSystem.getInfoAsync(photo.local_uri);
+                  if (fileInfo.exists) {
+                    await FileSystem.deleteAsync(photo.local_uri);
+                    console.log('[ImageViewerModal] Archivo físico borrado.');
+                  } else {
+                    console.log('[ImageViewerModal] Archivo físico no encontrado localmente.');
+                  }
                 } catch (fsError) {
-                  console.warn('No se pudo borrar el archivo físico (quizás ya no existía):', fsError);
+                  console.warn('[ImageViewerModal] Error al borrar archivo físico:', fsError);
                 }
               }
 
+              console.log('[ImageViewerModal] Borrado exitoso, cerrando visor si es necesario.');
               onPhotoDeleted(photoId);
               if (photos.length <= 1) {
                 onClose(); // Cerrar si no quedan más fotos
               }
-            } catch (error) {
-              showAlert({ title: t('common.error'), message: t('subjects.deletePhotoError'), type: 'error' });
+            } catch (error: any) {
+              console.error('[ImageViewerModal] ERROR AL BORRAR FOTO:', error);
+              showAlert({ title: t('common.error'), message: t('subjects.deletePhotoError') + ` (${error.message})`, type: 'error' });
             }
           }
         }
