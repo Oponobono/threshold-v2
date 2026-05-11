@@ -129,12 +129,12 @@ export default function HybridDashboardScreen() {
     ]);
 
     setProfile(userProfile);
-    setSubjects(userSubjects || []);
-    setTodaySchedules(schedulesToday || []);
-    setAllSchedules(schedulesAll || []);
+    setSubjects(Array.isArray(userSubjects) ? userSubjects : []);
+    setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
+    setAllSchedules(Array.isArray(schedulesAll) ? schedulesAll : []);
 
     // Find next assessment across all subjects
-    if (userSubjects && userSubjects.length > 0) {
+    if (Array.isArray(userSubjects) && userSubjects.length > 0) {
       try {
         const allAssessments = await Promise.all(
           userSubjects.map((s: Subject) => getAssessments(s.id))
@@ -623,7 +623,7 @@ export default function HybridDashboardScreen() {
   );
 
   const nextClass = useMemo(() => {
-    if (!todaySchedules || todaySchedules.length === 0) return null;
+    if (!Array.isArray(todaySchedules) || todaySchedules.length === 0) return null;
     const now = new Date();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     // Encuentra la primera clase que termina en el futuro (o ahora)

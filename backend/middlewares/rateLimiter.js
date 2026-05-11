@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
  */
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // Ventana de 15 minutos
-    max: 100, // Máximo 100 peticiones por IP en esos 15 minutos
+    max: 1000, // Máximo 1000 peticiones por IP en esos 15 minutos (100 era muy poco para una app moderna)
     message: { error: 'Demasiadas peticiones desde esta IP, por favor intenta de nuevo en 15 minutos.' },
     standardHeaders: true, // Informa a los clientes sobre su límite en las cabeceras HTTP
     legacyHeaders: false,
@@ -29,10 +29,11 @@ const aiLimiter = rateLimit({
  */
 const authLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // Ventana de 1 hora
-    max: 10, // Máximo 10 intentos por hora
+    max: 10, // Máximo 10 intentos fallidos por hora
     message: { error: 'Demasiados intentos de inicio de sesión. Tu cuenta está temporalmente bloqueada.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skipSuccessfulRequests: true, // ¡Clave! Solo cuenta los intentos fallidos
 });
 
 module.exports = {
