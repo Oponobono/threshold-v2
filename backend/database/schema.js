@@ -157,6 +157,8 @@ const tableSchema = {
         ocr_text TEXT,
         tags TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
     `,
@@ -168,12 +170,16 @@ const tableSchema = {
         es_favorita INTEGER DEFAULT 0,
         ocr_text TEXT,
         tags TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0
       )
     `,
     columns: [
       { name: 'ocr_text', type: 'TEXT' },
-      { name: 'tags', type: 'TEXT' }
+      { name: 'tags', type: 'TEXT' },
+      { name: 'cloud_url', type: 'TEXT' },
+      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' }
     ]
   },
   assessments: {

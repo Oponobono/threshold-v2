@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity, Image, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { useCustomAlert } from './CustomAlert';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -20,15 +21,8 @@ interface PhotoCaptureModalProps {
 /**
  * PhotoCaptureModal.tsx
  *
- * Modal que utiliza la aplicación de cámara nativa del sistema (vía ImagePicker)
- * para capturar fotografías con máxima compatibilidad y estabilidad en Android.
- * Evita los problemas de pantalla negra de CameraView al delegar la captura al OS.
- *
- * @param isVisible - Controla si el modal está montado y visible.
- * @param onClose - Callback para cerrar y limpiar el estado.
- * @param subjects - Lista de materias disponibles para asignar la foto.
- * @param onSave - Callback opcional disparado con la URI y el ID de materia tras guardar.
- * @param initialSubjectId - Materia pre-seleccionada al abrir.
+ * Interfaz de cámara integrada (Custom UI).
+ * Permite capturar fotos directamente desde la app con selector de materia y acceso a galería.
  */
 export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   isVisible,
@@ -39,49 +33,38 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<any>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  const [cameraKey, setCameraKey] = useState(0);
 
-  // Al abrir el modal, si no hay imagen, podemos intentar abrir la cámara automáticamente
-  // o mostrar una pantalla de bienvenida con el botón.
+  // Solicitar permiso automáticamente al abrir si no está otorgado
   useEffect(() => {
-    if (isVisible && !capturedImage) {
-      // Opcional: abrir cámara automáticamente
-      // takePicture();
+    if (isVisible && permission && !permission.granted && permission.canAskAgain) {
+      requestPermission();
     }
-  }, [isVisible]);
+  }, [isVisible, permission]);
+
+  // Si se otorga el permiso mientras el modal está abierto, forzamos un refresco para evitar pantalla negra
+  useEffect(() => {
+    if (permission?.granted && isVisible) {
+      setCameraKey(prev => prev + 1);
+    }
+  }, [permission?.granted]);
 
   const takePicture = async () => {
-    try {
-      // Pedir permisos de cámara explícitamente
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      
-      if (status !== 'granted') {
-        showAlert({ 
-          title: t('common.error'), 
-          message: t('dashboard.quickAddMenu.errors.cameraPermission') || 'Se requiere permiso de cámara', 
-          type: 'error' 
+    if (cameraRef.current) {
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.8,
         });
-        return;
+        setCapturedImage(photo.uri);
+      } catch (err) {
+        showAlert({ title: t('common.error'), message: t('subjects.errorTakingPhoto') || 'Error', type: 'error' });
       }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setCapturedImage(result.assets[0].uri);
-      }
-    } catch (err) {
-      console.error('[PhotoCaptureModal] Error launching camera:', err);
-      showAlert({ 
-        title: t('common.error'), 
-        message: t('subjects.errorTakingPhoto') || 'No se pudo abrir la cámara nativa.', 
-        type: 'error' 
-      });
     }
   };
 
@@ -103,11 +86,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
 
   const handleSave = async () => {
     if (!capturedImage || !selectedSubjectId) {
-      showAlert({ 
-        title: t('common.error'), 
-        message: t('dashboard.documentScannerModal.selectSubjectError') || 'Selecciona una materia', 
-        type: 'warning' 
-      });
+      showAlert({ title: t('common.error'), message: t('dashboard.documentScannerModal.selectSubjectError') || 'Error', type: 'warning' });
       return;
     }
 
@@ -118,18 +97,10 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
         local_uri: capturedImage,
       });
       if (onSave) onSave(capturedImage, selectedSubjectId);
-      showAlert({ 
-        title: t('common.success'), 
-        message: t('dashboard.quickAddMenu.takePhoto.success') || 'Foto guardada correctamente', 
-        type: 'success' 
-      });
+      showAlert({ title: t('common.success'), message: t('dashboard.quickAddMenu.takePhoto.success') || 'Éxito', type: 'success' });
       resetAndClose();
     } catch (error) {
-      showAlert({ 
-        title: t('common.error'), 
-        message: t('dashboard.quickAddMenu.takePhoto.error') || 'Error al guardar la foto', 
-        type: 'error' 
-      });
+      showAlert({ title: t('common.error'), message: t('dashboard.quickAddMenu.takePhoto.error') || 'Error', type: 'error' });
     } finally {
       setIsProcessing(false);
     }
@@ -139,10 +110,27 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     setCapturedImage(null);
     setSelectedSubjectId(initialSubjectId || null);
     setIsProcessing(false);
+    setFlashEnabled(false);
     onClose();
   };
 
-  const isSaveDisabled = !selectedSubjectId || isProcessing;
+  // UI de Permisos dentro del mismo flujo si no están otorgados
+  if (isVisible && permission && !permission.granted) {
+    return (
+      <Modal visible={isVisible} animationType="slide" hardwareAccelerated={true}>
+        <View style={styles.permissionContainer}>
+          <Ionicons name="camera-outline" size={64} color={theme.colors.primary} style={{ marginBottom: 20 }} />
+          <Text style={styles.permissionText}>{t('dashboard.quickAddMenu.errors.cameraPermission') || 'Se requiere acceso a la cámara'}</Text>
+          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+            <Text style={styles.permissionButtonText}>{t('common.grantPermission') || 'Dar Permiso'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={{ marginTop: 20 }}>
+            <Text style={{ color: theme.colors.text.secondary }}>{t('common.cancel') || 'Cancelar'}</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal visible={isVisible} animationType="slide" onRequestClose={resetAndClose} hardwareAccelerated={true}>
@@ -152,63 +140,39 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
             <Ionicons name="close" size={28} color={theme.colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
-            {capturedImage ? t('common.preview') || 'Vista Previa' : t('dashboard.quickAddMenu.takePhotoLabel') || 'Capturar'}
+            {capturedImage ? t('common.preview') || 'Vista Previa' : t('dashboard.quickAddMenu.takePhotoLabel') || 'Tomar Foto'}
           </Text>
           <View style={{ width: 44 }} />
         </View>
 
         {!capturedImage ? (
-          <View style={[styles.camera, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]}>
-            <View style={{ alignItems: 'center', paddingHorizontal: 30 }}>
-              <View style={{ 
-                width: 100, 
-                height: 100, 
-                borderRadius: 50, 
-                backgroundColor: 'rgba(255,255,255,0.1)', 
-                justifyContent: 'center', 
-                alignItems: 'center',
-                marginBottom: 24
-              }}>
-                <Ionicons name="camera" size={50} color={theme.colors.primary} />
+          <View style={styles.camera}>
+            <CameraView 
+              key={cameraKey}
+              style={StyleSheet.absoluteFillObject} 
+              facing="back" 
+              ref={cameraRef} 
+              enableTorch={flashEnabled} 
+            />
+            <View style={[styles.cameraOverlay, { position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
+              <View style={styles.captureButtonContainer}>
+                
+                {/* Botón de Galería al lado del obturador */}
+                <TouchableOpacity onPress={pickImage} style={styles.sideButton}>
+                  <Ionicons name="images-outline" size={28} color="white" />
+                </TouchableOpacity>
+
+                {/* Obturador central */}
+                <TouchableOpacity style={styles.captureButtonOuter} onPress={takePicture}>
+                  <View style={styles.captureButtonInner} />
+                </TouchableOpacity>
+
+                {/* Flash */}
+                <TouchableOpacity onPress={() => setFlashEnabled(!flashEnabled)} style={styles.sideButton}>
+                  <Ionicons name={flashEnabled ? "flash" : "flash-off"} size={24} color="white" />
+                </TouchableOpacity>
+
               </View>
-              
-              <Text style={{ 
-                color: 'white', 
-                fontSize: 22, 
-                fontWeight: '700', 
-                textAlign: 'center',
-                marginBottom: 12
-              }}>
-                {t('dashboard.quickAddMenu.takePhotoLabel') || 'Capturar Foto'}
-              </Text>
-              
-              <Text style={{ 
-                color: '#aaa', 
-                fontSize: 15, 
-                textAlign: 'center', 
-                lineHeight: 22,
-                marginBottom: 40
-              }}>
-                Usaremos la cámara nativa de tu dispositivo para asegurar la mejor calidad y estabilidad.
-              </Text>
-
-              <TouchableOpacity 
-                style={[styles.primaryBtn, { width: '100%', flex: 0 }]} 
-                onPress={takePicture}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="camera" size={20} color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.primaryBtnText}>Abrir Cámara</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.secondaryBtn, { width: '100%', flex: 0, marginTop: 16 }]} 
-                onPress={pickImage}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="images" size={20} color={theme.colors.text.primary} style={{ marginRight: 8 }} />
-                <Text style={styles.secondaryBtnText}>Elegir de la Galería</Text>
-              </TouchableOpacity>
             </View>
           </View>
         ) : (
@@ -216,7 +180,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
             <Image source={{ uri: capturedImage }} style={styles.previewImage} resizeMode="contain" />
             
             <View style={[styles.actionSheet, { paddingBottom: Platform.OS === 'ios' ? 44 : 52 }]}>
-              <Text style={styles.sheetTitle}>{t('dashboard.documentScannerModal.save') || 'Guardar en materia'}</Text>
+              <Text style={styles.sheetTitle}>{t('dashboard.documentScannerModal.save') || 'Guardar'}</Text>
               
               <View style={styles.subjectGrid}>
                 {subjects.map(s => (
@@ -246,10 +210,10 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
                 </TouchableOpacity>
                 <TouchableOpacity 
                   onPress={handleSave} 
-                  disabled={isSaveDisabled}
-                  style={[styles.primaryBtn, isSaveDisabled && styles.primaryBtnDisabled]}
+                  disabled={!selectedSubjectId || isProcessing}
+                  style={[styles.primaryBtn, (!selectedSubjectId || isProcessing) && styles.primaryBtnDisabled]}
                 >
-                  {isProcessing ? <ActivityIndicator color="white" /> : <Text style={styles.primaryBtnText}>{t('common.save') || 'Confirmar'}</Text>}
+                  {isProcessing ? <ActivityIndicator color="white" /> : <Text style={styles.primaryBtnText}>{t('common.save') || 'Guardar'}</Text>}
                 </TouchableOpacity>
               </View>
             </View>
