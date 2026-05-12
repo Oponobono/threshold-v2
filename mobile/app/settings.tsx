@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { globalStyles } from '../src/styles/globalStyles';
@@ -498,7 +498,11 @@ export default function SettingsScreen() {
                       onPress={handleBackupNow}
                       disabled={isBackupRunning}
                     >
-                      <Ionicons name="cloud-upload-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                      {isUploading ? (
+                        <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
+                      ) : (
+                        <Ionicons name="cloud-upload-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                      )}
                       <Text style={styles.darkPillText}>
                         {isUploading
                           ? t('settings.backingUp', 'Subiendo...')
@@ -523,7 +527,11 @@ export default function SettingsScreen() {
                       onPress={handleDownloadNow}
                       disabled={isBackupRunning}
                     >
-                      <Ionicons name="cloud-download-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                      {isDownloading ? (
+                        <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
+                      ) : (
+                        <Ionicons name="cloud-download-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                      )}
                       <Text style={styles.darkPillText}>
                         {isDownloading
                           ? t('settings.downloading', 'Descargando...')

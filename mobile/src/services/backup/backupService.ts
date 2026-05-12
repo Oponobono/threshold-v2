@@ -10,6 +10,7 @@ import { storageService } from '../storageService';
 import { uploadFileToUploadthing } from '../uploadthing/storage';
 import { fetchWithFallback, parseJsonSafely } from '../api/client';
 import { getUserId } from '../api/auth/session';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // ─── Auto-subida individual ──────────────────────────────────────────────────
 
@@ -199,13 +200,27 @@ export const runBackup = async (
       tasks.push(async () => {
         try {
           console.log(`[BackupService] Iniciando backup manual de foto ID: ${photo.id}`);
+          const fileInfo = await FileSystem.getInfoAsync(photo.uri);
+          if (!fileInfo.exists) {
+            console.warn(`[BackupService] Archivo fantasma detectado (foto ${photo.id}). Marcando para omitir futuros intentos.`);
+            const res = await fetchWithFallback(`/backup/mark`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: 'ghost_file' }),
+            });
+            if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            uploaded++;
+            return;
+          }
+
           const result = await uploadFileToUploadthing(photo.uri, `photo_${photo.id}.jpg`, 'image/jpeg');
           console.log(`[BackupService] ÉXITO: Foto subida. URL: ${result.url}`);
-          await fetchWithFallback(`/backup/mark`, {
+          const res2 = await fetchWithFallback(`/backup/mark`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: result.url }),
           });
+          if (!res2.ok) throw new Error(`Marcar foto falló: ${res2.status}`);
           console.log(`[BackupService] ÉXITO: Foto ${photo.id} marcada como respaldada.`);
           uploaded++;
         } catch (err) {
@@ -221,15 +236,34 @@ export const runBackup = async (
     for (const rec of (pending.audio || [])) {
       tasks.push(async () => {
         try {
+          console.log(`[BackupService] Iniciando backup manual de audio ID: ${rec.id}`);
+          const fileInfo = await FileSystem.getInfoAsync(rec.local_uri);
+          if (!fileInfo.exists) {
+            console.warn(`[BackupService] Archivo fantasma detectado (audio ${rec.id}). Marcando para omitir futuros intentos.`);
+            const res = await fetchWithFallback(`/backup/mark`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: 'ghost_file' }),
+            });
+            if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            uploaded++;
+            return;
+          }
+
           const ext = rec.local_uri.split('.').pop() || 'm4a';
           const result = await uploadFileToUploadthing(rec.local_uri, `audio_${rec.id}.${ext}`, 'audio/mp4');
-          await fetchWithFallback(`/backup/mark`, {
+          const res2 = await fetchWithFallback(`/backup/mark`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: result.url }),
           });
+          if (!res2.ok) throw new Error(`Marcar audio falló: ${res2.status}`);
+          console.log(`[BackupService] ÉXITO: Audio ${rec.id} respaldado.`);
           uploaded++;
-        } catch { errors++; }
+        } catch (err) { 
+          console.error(`[BackupService] ERROR: Falló el backup de audio ${rec.id}:`, err);
+          errors++; 
+        }
       });
     }
   }
@@ -239,16 +273,35 @@ export const runBackup = async (
     for (const doc of (pending.docs || [])) {
       tasks.push(async () => {
         try {
+          console.log(`[BackupService] Iniciando backup manual de documento ID: ${doc.id}`);
+          const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
+          if (!fileInfo.exists) {
+            console.warn(`[BackupService] Archivo fantasma detectado (documento ${doc.id}). Marcando para omitir futuros intentos.`);
+            const res = await fetchWithFallback(`/backup/mark`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: 'ghost_file' }),
+            });
+            if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            uploaded++;
+            return;
+          }
+
           const ext = doc.local_uri.split('.').pop() || 'pdf';
           const mime = ext === 'pdf' ? 'application/pdf' : 'text/plain';
           const result = await uploadFileToUploadthing(doc.local_uri, `doc_${doc.id}.${ext}`, mime);
-          await fetchWithFallback(`/backup/mark`, {
+          const res2 = await fetchWithFallback(`/backup/mark`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: result.url }),
           });
+          if (!res2.ok) throw new Error(`Marcar documento falló: ${res2.status}`);
+          console.log(`[BackupService] ÉXITO: Documento ${doc.id} respaldado.`);
           uploaded++;
-        } catch { errors++; }
+        } catch (err) { 
+          console.error(`[BackupService] ERROR: Falló el backup de documento ${doc.id}:`, err);
+          errors++; 
+        }
       });
     }
   }
@@ -258,18 +311,28 @@ export const runBackup = async (
     for (const t of (pending.transcripts || [])) {
       tasks.push(async () => {
         try {
-          // Crear Blob de texto para subirlo como archivo
-          const blob = new Blob([t.text], { type: 'text/plain' });
-          const tempUri = URL.createObjectURL(blob);
+          console.log(`[BackupService] Iniciando backup manual de transcripción ID: ${t.id}`);
+          // Escribir el texto a un archivo temporal en lugar de usar Blob (React Native no soporta createObjectURL)
+          const tempUri = `${FileSystem.cacheDirectory}transcript_${t.type}_${t.id}.txt`;
+          await FileSystem.writeAsStringAsync(tempUri, t.text || 'Sin contenido', { encoding: FileSystem.EncodingType.UTF8 });
+          
           const result = await uploadFileToUploadthing(tempUri, `transcript_${t.type}_${t.id}.txt`, 'text/plain');
-          URL.revokeObjectURL(tempUri);
-          await fetchWithFallback(`/backup/mark`, {
+          
+          // Limpiar archivo temporal
+          await FileSystem.deleteAsync(tempUri, { idempotent: true });
+
+          const res = await fetchWithFallback(`/backup/mark`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'transcript', id: t.id, transcript_type: t.type, cloud_url: result.url }),
           });
+          if (!res.ok) throw new Error(`Marcar transcripción falló: ${res.status}`);
+          console.log(`[BackupService] ÉXITO: Transcripción ${t.id} respaldada.`);
           uploaded++;
-        } catch { errors++; }
+        } catch (err) { 
+          console.error(`[BackupService] ERROR: Falló el backup de transcripción ${t.id}:`, err);
+          errors++; 
+        }
       });
     }
   }

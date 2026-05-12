@@ -12,7 +12,7 @@ const { db } = require('../db');
  * Devuelve cuántos ítems hay en total y cuántos están respaldados por tipo.
  */
 exports.getBackupStats = (req, res) => {
-  const userId = req.user?.id;
+  const userId = Number(req.user?.id);
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
   const stats = {
@@ -29,24 +29,24 @@ exports.getBackupStats = (req, res) => {
      WHERE s.user_id = ?`,
     [userId], (err, r) => {
     if (!err && r) stats.photos.total = r.total;
-    db.get(
-      `SELECT COUNT(*) as backed FROM photos p
-       JOIN subjects s ON p.subject_id = s.id
-       WHERE s.user_id = ? AND p.is_backed_up = 1`,
-      [userId], (err, r) => {
-      if (!err && r) stats.photos.backed = r.backed;
+      db.get(
+        `SELECT COUNT(*) as backed FROM photos p
+         JOIN subjects s ON p.subject_id = s.id
+         WHERE s.user_id = ? AND COALESCE(p.is_backed_up, 0) = 1`,
+        [userId], (err, r) => {
+          if (!err && r) stats.photos.backed = Number(r.backed);
 
       // ── Grabaciones de audio ──
       db.get('SELECT COUNT(*) as total FROM audio_recordings WHERE user_id = ?', [userId], (err, r) => {
         if (!err && r) stats.audio.total = r.total;
-        db.get('SELECT COUNT(*) as backed FROM audio_recordings WHERE user_id = ? AND is_backed_up = 1', [userId], (err, r) => {
-          if (!err && r) stats.audio.backed = r.backed;
+        db.get('SELECT COUNT(*) as backed FROM audio_recordings WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1', [userId], (err, r) => {
+          if (!err && r) stats.audio.backed = Number(r.backed);
 
           // ── Documentos escaneados ──
           db.get('SELECT COUNT(*) as total FROM scanned_documents WHERE user_id = ?', [userId], (err, r) => {
-            if (!err && r) stats.docs.total = r.total;
-            db.get('SELECT COUNT(*) as backed FROM scanned_documents WHERE user_id = ? AND is_backed_up = 1', [userId], (err, r) => {
-              if (!err && r) stats.docs.backed = r.backed;
+            if (!err && r) stats.docs.total = Number(r.total);
+            db.get('SELECT COUNT(*) as backed FROM scanned_documents WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1', [userId], (err, r) => {
+              if (!err && r) stats.docs.backed = Number(r.backed);
 
               // ── Transcripciones de audio ──
               db.get(
@@ -58,7 +58,7 @@ exports.getBackupStats = (req, res) => {
                   db.get(
                     `SELECT COUNT(*) as backed FROM audio_transcripts at
                      JOIN audio_recordings ar ON ar.id = at.recording_id
-                     WHERE ar.user_id = ? AND at.is_backed_up = 1`,
+                     WHERE ar.user_id = ? AND COALESCE(at.is_backed_up, 0) = 1`,
                     [userId], (err, r) => {
                       if (!err && r) stats.transcripts.backed += Number(r.backed);
 
@@ -76,6 +76,7 @@ exports.getBackupStats = (req, res) => {
                              WHERE yv.user_id = ? AND COALESCE(yt.is_backed_up, 0) = 1`,
                             [userId], (err, r) => {
                               if (!err && r) stats.transcripts.backed += Number(r.backed);
+                              console.log(`[BackupStats] User ${userId}:`, JSON.stringify(stats));
                               res.json(stats);
                             }
                           );
@@ -98,7 +99,7 @@ exports.getBackupStats = (req, res) => {
  * Devuelve todos los ítems no respaldados agrupados por tipo.
  */
 exports.getPendingItems = (req, res) => {
-  const userId = req.user?.id;
+  const userId = Number(req.user?.id);
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
   const result = { photos: [], audio: [], docs: [], transcripts: [] };
@@ -107,21 +108,21 @@ exports.getPendingItems = (req, res) => {
     `SELECT p.id, p.local_uri as uri 
      FROM photos p 
      JOIN subjects s ON p.subject_id = s.id 
-     WHERE s.user_id = ? AND p.is_backed_up = 0`,
+     WHERE s.user_id = ? AND COALESCE(p.is_backed_up, 0) = 0`,
     [userId], (err, rows) => {
       if (!err && rows) result.photos = rows;
 
-    db.all('SELECT id, local_uri, name FROM audio_recordings WHERE user_id = ? AND is_backed_up = 0', [userId], (err, rows) => {
+    db.all('SELECT id, local_uri, name FROM audio_recordings WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 0', [userId], (err, rows) => {
       if (!err && rows) result.audio = rows;
 
-      db.all('SELECT id, local_uri, name FROM scanned_documents WHERE user_id = ? AND is_backed_up = 0', [userId], (err, rows) => {
+      db.all('SELECT id, local_uri, name FROM scanned_documents WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 0', [userId], (err, rows) => {
         if (!err && rows) result.docs = rows;
 
         db.all(
           `SELECT at.id, 'audio' as type, at.transcript_text as text, at.recording_id
            FROM audio_transcripts at
            JOIN audio_recordings ar ON ar.id = at.recording_id
-           WHERE ar.user_id = ? AND at.is_backed_up = 0 AND at.transcript_text IS NOT NULL`,
+           WHERE ar.user_id = ? AND COALESCE(at.is_backed_up, 0) = 0 AND at.transcript_text IS NOT NULL`,
           [userId], (err, rows) => {
             if (!err && rows) result.transcripts = [...result.transcripts, ...rows];
 
@@ -129,9 +130,15 @@ exports.getPendingItems = (req, res) => {
               `SELECT yt.id, 'youtube' as type, yt.transcript_text as text, yt.video_id
                FROM youtube_transcripts yt
                JOIN youtube_videos yv ON yv.id = yt.video_id
-               WHERE yv.user_id = ? AND yt.is_backed_up = 0 AND yt.transcript_text IS NOT NULL`,
+               WHERE yv.user_id = ? AND COALESCE(yt.is_backed_up, 0) = 0 AND yt.transcript_text IS NOT NULL`,
               [userId], (err, rows) => {
                 if (!err && rows) result.transcripts = [...result.transcripts, ...rows];
+                console.log(`[PendingItems] User ${userId}:`, {
+                  photos: result.photos.length,
+                  audio: result.audio.length,
+                  docs: result.docs.length,
+                  transcripts: result.transcripts.length
+                });
                 res.json(result);
               }
             );
