@@ -28,24 +28,30 @@ exports.getBackupStats = (req, res) => {
      JOIN subjects s ON p.subject_id = s.id
      WHERE s.user_id = ?`,
     [userId], (err, r) => {
-    if (!err && r) stats.photos.total = r.total;
+      if (err) console.error(`[BackupStats] Error fotos total (User ${userId}):`, err);
+      if (!err && r) stats.photos.total = Number(r.total);
       db.get(
         `SELECT COUNT(*) as backed FROM photos p
          JOIN subjects s ON p.subject_id = s.id
          WHERE s.user_id = ? AND COALESCE(p.is_backed_up, 0) = 1`,
         [userId], (err, r) => {
+          if (err) console.error(`[BackupStats] Error fotos backed (User ${userId}):`, err);
           if (!err && r) stats.photos.backed = Number(r.backed);
 
       // ── Grabaciones de audio ──
       db.get('SELECT COUNT(*) as total FROM audio_recordings WHERE user_id = ?', [userId], (err, r) => {
-        if (!err && r) stats.audio.total = r.total;
+        if (err) console.error(`[BackupStats] Error audio total (User ${userId}):`, err);
+        if (!err && r) stats.audio.total = Number(r.total);
         db.get('SELECT COUNT(*) as backed FROM audio_recordings WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1', [userId], (err, r) => {
+          if (err) console.error(`[BackupStats] Error audio backed (User ${userId}):`, err);
           if (!err && r) stats.audio.backed = Number(r.backed);
 
           // ── Documentos escaneados ──
           db.get('SELECT COUNT(*) as total FROM scanned_documents WHERE user_id = ?', [userId], (err, r) => {
+            if (err) console.error(`[BackupStats] Error docs total (User ${userId}):`, err);
             if (!err && r) stats.docs.total = Number(r.total);
             db.get('SELECT COUNT(*) as backed FROM scanned_documents WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1', [userId], (err, r) => {
+              if (err) console.error(`[BackupStats] Error docs backed (User ${userId}):`, err);
               if (!err && r) stats.docs.backed = Number(r.backed);
 
               // ── Transcripciones de audio ──
@@ -110,12 +116,15 @@ exports.getPendingItems = (req, res) => {
      JOIN subjects s ON p.subject_id = s.id 
      WHERE s.user_id = ? AND COALESCE(p.is_backed_up, 0) = 0`,
     [userId], (err, rows) => {
+      if (err) console.error(`[PendingItems] Error fotos (User ${userId}):`, err);
       if (!err && rows) result.photos = rows;
 
     db.all('SELECT id, local_uri, name FROM audio_recordings WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 0', [userId], (err, rows) => {
+      if (err) console.error(`[PendingItems] Error audio (User ${userId}):`, err);
       if (!err && rows) result.audio = rows;
 
       db.all('SELECT id, local_uri, name FROM scanned_documents WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 0', [userId], (err, rows) => {
+        if (err) console.error(`[PendingItems] Error docs (User ${userId}):`, err);
         if (!err && rows) result.docs = rows;
 
         db.all(
