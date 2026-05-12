@@ -7,7 +7,7 @@ import { RecordingItem } from '../hooks/useAudioRecorder';
 import { useCustomAlert } from './CustomAlert';
 
 interface AudioPlayerItemProps {
-  item: RecordingItem & { missingFile?: boolean };
+  item: RecordingItem & { missingFile?: boolean; isStreaming?: boolean };
   isPlaying: boolean;
   onPlay: (uri: string, id: string) => void;
   onStop: () => void;
@@ -70,6 +70,11 @@ export const AudioPlayerItem: React.FC<AudioPlayerItemProps> = ({
         {isMissing && (
           <Text style={{ fontSize: 11, color: theme.colors.text.error, marginTop: 2 }}>
             ⚠ Archivo no encontrado — solo registro en BD
+          </Text>
+        )}
+        {(item as any).isStreaming && (
+          <Text style={{ fontSize: 11, color: theme.colors.primary, marginTop: 2 }}>
+            ☁️ Reproduciendo desde la nube
           </Text>
         )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>

@@ -423,6 +423,11 @@ export function SmallCard({
             {t('common.errors.fileNotFound') || '⚠ Archivo no encontrado'}
           </Text>
         )}
+        {(item as any).isStreaming && (
+          <Text style={{ fontSize: 11, color: theme.colors.primary, marginTop: 1 }}>
+            ☁️ Reproduciendo desde la nube
+          </Text>
+        )}
         <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 1 }}>
           {item.date}
         </Text>

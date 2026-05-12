@@ -91,6 +91,8 @@ function mergeLocalAndDb(
   const mergedUris = new Set(merged.map((r) => r.uri));
   for (const db of dbRecordings) {
     if (!mergedUris.has(db.local_uri)) {
+      const hasCloudBackup = db.cloud_url && db.cloud_url !== 'ghost_file';
+      
       merged.push({
         ...db,
         id_string: db.id?.toString() || db.local_uri,
@@ -99,8 +101,9 @@ function mergeLocalAndDb(
         name: db.name || t('dashboard.audioRecorderModal.fileLabel', {
           date: new Date(db.created_at || Date.now()).toLocaleDateString(),
         }),
-        missingFile: true,
-      } as RecordingItem & { missingFile: boolean });
+        missingFile: !hasCloudBackup,
+        isStreaming: !!hasCloudBackup,
+      } as RecordingItem & { missingFile: boolean; isStreaming?: boolean });
     }
   }
 
