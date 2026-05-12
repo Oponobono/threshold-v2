@@ -13,19 +13,22 @@
  * 2. Para cada ítem: File.downloadFileAsync(cloud_url, destDir)
  * 3. Reportar progreso al llamador
  */
-import { File, Directory, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { fetchWithFallback, parseJsonSafely } from '../api/client';
 import { getBackupPreferences } from './backupService';
 
 // ─── Directorios de descarga ─────────────────────────────────────────────────
 
 /** Obtiene (y crea si no existe) un subdirectorio dentro de documentDirectory */
-const getDownloadSubdir = (subdir: string): Directory => {
-  const dir = new Directory(Paths.document, 'threshold_cloud', subdir);
-  if (!dir.exists) {
-    dir.create();
+const getDownloadSubdirUri = async (subdir: string): Promise<string> => {
+  const baseDir = `${FileSystem.documentDirectory}threshold_cloud/`;
+  const fullDir = `${baseDir}${subdir}/`;
+
+  const info = await FileSystem.getInfoAsync(fullDir);
+  if (!info.exists) {
+    await FileSystem.makeDirectoryAsync(fullDir, { intermediates: true });
   }
-  return dir;
+  return fullDir;
 };
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -96,73 +99,104 @@ export const downloadCloudItems = async (
 
   // ── Fotos ──
   if (prefs.includePhotos) {
-    const photosDir = getDownloadSubdir('photos');
+    const photosDir = await getDownloadSubdirUri('photos');
     for (const item of data.photos || []) {
       tasks.push(async () => {
         const ext = item.cloud_url.split('.').pop()?.split('?')[0] || 'jpg';
         const filename = (item.name || `photo_${item.id}`).replace(/\.[^.]+$/, '') + `.${ext}`;
-        const destFile = new File(photosDir, filename);
-        if (destFile.exists) { result.skipped++; return; }
+        const localUri = `${photosDir}${filename}`;
+        
+        const info = await FileSystem.getInfoAsync(localUri);
+        if (info.exists) { result.skipped++; return; }
+        if (item.cloud_url === 'ghost_file') { result.skipped++; return; }
+
         try {
-          await File.downloadFileAsync(item.cloud_url, photosDir);
+          console.log(`[DownloadService] Descargando Foto: ${item.cloud_url} -> ${localUri}`);
+          await FileSystem.downloadAsync(item.cloud_url, localUri);
           result.downloaded++;
-        } catch { result.errors++; }
+        } catch (err) { 
+          console.error(`[DownloadService] ERROR descargando foto ${item.id}:`, err);
+          result.errors++; 
+        }
       });
     }
   }
 
   // ── Audio ──
   if (prefs.includeAudio) {
-    const audioDir = getDownloadSubdir('audio');
+    const audioDir = await getDownloadSubdirUri('audio');
     for (const item of data.audio || []) {
       tasks.push(async () => {
         const ext = item.cloud_url.split('.').pop()?.split('?')[0] || 'm4a';
         const filename = (item.name || `audio_${item.id}`).replace(/\.[^.]+$/, '') + `.${ext}`;
-        const destFile = new File(audioDir, filename);
-        if (destFile.exists) { result.skipped++; return; }
+        const localUri = `${audioDir}${filename}`;
+
+        const info = await FileSystem.getInfoAsync(localUri);
+        if (info.exists) { result.skipped++; return; }
+        if (item.cloud_url === 'ghost_file') { result.skipped++; return; }
+
         try {
-          await File.downloadFileAsync(item.cloud_url, audioDir);
+          console.log(`[DownloadService] Descargando Audio: ${item.cloud_url} -> ${localUri}`);
+          await FileSystem.downloadAsync(item.cloud_url, localUri);
           result.downloaded++;
-        } catch { result.errors++; }
+        } catch (err) { 
+          console.error(`[DownloadService] ERROR descargando audio ${item.id}:`, err);
+          result.errors++; 
+        }
       });
     }
   }
 
   // ── Documentos ──
   if (prefs.includeDocs) {
-    const docsDir = getDownloadSubdir('docs');
+    const docsDir = await getDownloadSubdirUri('docs');
     for (const item of data.docs || []) {
       tasks.push(async () => {
         const ext = item.cloud_url.split('.').pop()?.split('?')[0] || 'pdf';
         const filename = (item.name || `doc_${item.id}`).replace(/\.[^.]+$/, '') + `.${ext}`;
-        const destFile = new File(docsDir, filename);
-        if (destFile.exists) { result.skipped++; return; }
+        const localUri = `${docsDir}${filename}`;
+
+        const info = await FileSystem.getInfoAsync(localUri);
+        if (info.exists) { result.skipped++; return; }
+        if (item.cloud_url === 'ghost_file') { result.skipped++; return; }
+
         try {
-          await File.downloadFileAsync(item.cloud_url, docsDir);
+          console.log(`[DownloadService] Descargando Doc: ${item.cloud_url} -> ${localUri}`);
+          await FileSystem.downloadAsync(item.cloud_url, localUri);
           result.downloaded++;
-        } catch { result.errors++; }
+        } catch (err) { 
+          console.error(`[DownloadService] ERROR descargando doc ${item.id}:`, err);
+          result.errors++; 
+        }
       });
     }
   }
 
   // ── Transcripciones ──
   if (prefs.includeTranscripts) {
-    const transcriptsDir = getDownloadSubdir('transcripts');
+    const transcriptsDir = await getDownloadSubdirUri('transcripts');
     for (const item of data.transcripts || []) {
       tasks.push(async () => {
         const filename = `transcript_${item.transcript_type}_${item.id}.txt`;
-        const destFile = new File(transcriptsDir, filename);
-        if (destFile.exists) { result.skipped++; return; }
+        const localUri = `${transcriptsDir}${filename}`;
+
+        const info = await FileSystem.getInfoAsync(localUri);
+        if (info.exists) { result.skipped++; return; }
+        if (item.cloud_url === 'ghost_file') { result.skipped++; return; }
+
         try {
           if (item.transcript_text) {
-            // Escribir texto directamente (no necesita descargar de Uploadthing)
-            destFile.write(item.transcript_text);
+            await FileSystem.writeAsStringAsync(localUri, item.transcript_text);
             result.downloaded++;
           } else if (item.cloud_url) {
-            await File.downloadFileAsync(item.cloud_url, transcriptsDir);
+            console.log(`[DownloadService] Descargando Transcripción: ${item.cloud_url} -> ${localUri}`);
+            await FileSystem.downloadAsync(item.cloud_url, localUri);
             result.downloaded++;
           }
-        } catch { result.errors++; }
+        } catch (err) { 
+          console.error(`[DownloadService] ERROR descargando transcripción ${item.id}:`, err);
+          result.errors++; 
+        }
       });
     }
   }

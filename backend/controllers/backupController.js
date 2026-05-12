@@ -226,7 +226,7 @@ exports.markAsBackedUp = (req, res) => {
  * Usado por el móvil para descargar archivos en un dispositivo nuevo.
  */
 exports.getCloudItems = (req, res) => {
-  const userId = req.user?.id;
+  const userId = Number(req.user?.id);
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
   const result = { photos: [], audio: [], docs: [], transcripts: [] };
@@ -237,27 +237,30 @@ exports.getCloudItems = (req, res) => {
             s.name as subject_name
      FROM photos p
      JOIN subjects s ON p.subject_id = s.id
-     WHERE s.user_id = ? AND p.is_backed_up = 1 AND p.cloud_url IS NOT NULL`,
+     WHERE s.user_id = ? AND COALESCE(p.is_backed_up, 0) = 1 AND p.cloud_url IS NOT NULL`,
     [userId],
     (err, rows) => {
+      if (err) console.error(`[CloudItems] Error fotos (User ${userId}):`, err.message);
       if (!err && rows) result.photos = rows;
 
       // Grabaciones de audio
       db.all(
         `SELECT id, local_uri, cloud_url, name, subject_id, duration, created_at
          FROM audio_recordings
-         WHERE user_id = ? AND is_backed_up = 1 AND cloud_url IS NOT NULL`,
+         WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1 AND cloud_url IS NOT NULL`,
         [userId],
         (err, rows) => {
+          if (err) console.error(`[CloudItems] Error audio (User ${userId}):`, err.message);
           if (!err && rows) result.audio = rows;
 
           // Documentos escaneados
           db.all(
             `SELECT id, local_uri, cloud_url, name, subject_id, created_at
              FROM scanned_documents
-             WHERE user_id = ? AND is_backed_up = 1 AND cloud_url IS NOT NULL`,
+             WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1 AND cloud_url IS NOT NULL`,
             [userId],
             (err, rows) => {
+              if (err) console.error(`[CloudItems] Error docs (User ${userId}):`, err.message);
               if (!err && rows) result.docs = rows;
 
               // Transcripciones de audio
@@ -266,9 +269,10 @@ exports.getCloudItems = (req, res) => {
                         'audio' as transcript_type, ar.name as recording_name
                  FROM audio_transcripts at
                  JOIN audio_recordings ar ON ar.id = at.recording_id
-                 WHERE ar.user_id = ? AND at.is_backed_up = 1 AND at.cloud_url IS NOT NULL`,
+                 WHERE ar.user_id = ? AND COALESCE(at.is_backed_up, 0) = 1 AND at.cloud_url IS NOT NULL`,
                 [userId],
                 (err, rows) => {
+                  if (err) console.error(`[CloudItems] Error transcripts audio (User ${userId}):`, err.message);
                   if (!err && rows) result.transcripts = [...result.transcripts, ...rows];
 
                   // Transcripciones de YouTube
@@ -277,9 +281,10 @@ exports.getCloudItems = (req, res) => {
                             'youtube' as transcript_type, yv.title as video_title
                      FROM youtube_transcripts yt
                      JOIN youtube_videos yv ON yv.id = yt.video_id
-                     WHERE yv.user_id = ? AND yt.is_backed_up = 1 AND yt.cloud_url IS NOT NULL`,
+                     WHERE yv.user_id = ? AND COALESCE(yt.is_backed_up, 0) = 1 AND yt.cloud_url IS NOT NULL`,
                     [userId],
                     (err, rows) => {
+                      if (err) console.error(`[CloudItems] Error transcripts youtube (User ${userId}):`, err.message);
                       if (!err && rows) result.transcripts = [...result.transcripts, ...rows];
                       res.json(result);
                     }
