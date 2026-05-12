@@ -14,6 +14,7 @@ const { width, height } = Dimensions.get('window');
 interface PhotoItem {
   id?: number;
   local_uri: string;
+  cloud_url?: string | null;
 }
 
 interface ImageViewerModalProps {
@@ -165,10 +166,27 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   };
 
 
+  const ImageWithFallback = ({ item }: { item: PhotoItem }) => {
+    const [sourceUri, setSourceUri] = useState(item.local_uri || item.cloud_url || '');
+    return (
+      <View style={styles.imageContainer}>
+        <Image 
+          source={{ uri: sourceUri }} 
+          style={styles.image} 
+          resizeMode="contain" 
+          onError={() => {
+            if (sourceUri === item.local_uri && item.cloud_url) {
+              console.log(`[ImageViewerModal] Fallback a cloud_url para foto: ${item.id}`);
+              setSourceUri(item.cloud_url);
+            }
+          }}
+        />
+      </View>
+    );
+  };
+
   const renderItem = ({ item }: { item: PhotoItem }) => (
-    <View style={styles.imageContainer}>
-      <Image source={{ uri: item.local_uri }} style={styles.image} resizeMode="contain" />
-    </View>
+    <ImageWithFallback item={item} />
   );
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {

@@ -8,6 +8,7 @@ import { useCustomAlert } from './CustomAlert';
 import { deleteScannedDocument, updateScannedDocument, extractTextFromImage, extractTextFromPDF, deletePhoto } from '../services/api';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
 import { SubjectDocumentCard } from './SubjectDocumentCard';
 
@@ -46,48 +47,50 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
   const [ocrInProgress, setOcrInProgress] = useState<Set<string | number>>(new Set());
   const [isRescanningAll, setIsRescanningAll] = useState(false);
 
-  const openDocument = async (uri: string) => {
+  const openDocument = async (doc: any) => {
     try {
-      // Verificar si el archivo existe antes de intentar abrirlo
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      if (!fileInfo.exists) {
-        showAlert({
-          title: 'Archivo no disponible',
-          message: 'El archivo fue eliminado del almacenamiento local del dispositivo. ' +
-                   'Puedes volver a escanearlo desde el botón "+" de la materia.',
-          type: 'warning',
-        });
+      if (doc.local_uri) {
+        // Verificar si el archivo existe antes de intentar abrirlo
+        const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
+        if (fileInfo.exists) {
+          if (Platform.OS === 'android') {
+            // En Android: obtener content URI y usar IntentLauncher
+            const contentUri = await FileSystem.getContentUriAsync(doc.local_uri);
+            await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+              data: contentUri,
+              flags: 1,
+              type: 'application/pdf',
+            });
+          } else {
+            // En iOS: Linking puede abrir archivos locales
+            await Linking.openURL(doc.local_uri);
+          }
+          return;
+        }
+      }
+
+      // Fallback a cloud_url si el local_uri no existe
+      if (doc.cloud_url && doc.cloud_url !== 'ghost_file') {
+        await WebBrowser.openBrowserAsync(doc.cloud_url);
         return;
       }
 
-      if (Platform.OS === 'android') {
-        // En Android: obtener content URI y usar IntentLauncher
-        const contentUri = await FileSystem.getContentUriAsync(uri);
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: contentUri,
-          flags: 1,
-          type: 'application/pdf',
-        });
-      } else {
-        // En iOS: Linking puede abrir archivos locales
-        await Linking.openURL(uri);
-      }
+      showAlert({
+        title: 'Archivo no disponible',
+        message: 'El archivo fue eliminado del dispositivo y no tiene respaldo en la nube.',
+        type: 'warning',
+      });
     } catch (error: any) {
       console.error('Error opening document:', error);
-      // Detectar el error específico de directorio/cache inexistente
       const msg: string = error?.message || '';
-      if (msg.includes("doesn't exist") || msg.includes('Directory') || msg.includes('cache')) {
-        showAlert({
-          title: 'Archivo no disponible',
-          message: 'El archivo fue eliminado de la caché del dispositivo. ' +
-                   'Vuelve a escanear el documento para restaurarlo.',
-          type: 'warning',
-        });
+      
+      // Si falla al abrir localmente por alguna razón, intentar la nube
+      if (doc.cloud_url && doc.cloud_url !== 'ghost_file' && (msg.includes("doesn't exist") || msg.includes('Directory') || msg.includes('cache'))) {
+        await WebBrowser.openBrowserAsync(doc.cloud_url);
       } else {
         showAlert({
           title: 'No se pudo abrir',
-          message: t('common.errors.pdfViewerNeeded') ||
-                   'Asegúrate de tener un visor de PDF instalado.',
+          message: t('common.errors.pdfViewerNeeded') || 'Asegúrate de tener un visor de PDF instalado.',
           type: 'error',
         });
       }
@@ -358,7 +361,7 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
                 index={index}
                 isSelected={isSelected}
                 selectionMode={selectionMode}
-                onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc.local_uri)}
+                onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc)}
                 onLongPress={() => handleLongPress(docId)}
                 onDelete={() => handleDelete(docId)}
                 onExtractOCR={() => handleExtractOCR(docId)}

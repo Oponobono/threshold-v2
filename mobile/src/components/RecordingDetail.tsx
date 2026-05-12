@@ -102,9 +102,9 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // Flashcard generation
   const [showFlashcardModal, setShowFlashcardModal] = useState(false);
 
-  // Derived values
-  const audioUri = recordingData?.local_uri
-    || `${AUDIO_DIR()}${recordingId.endsWith('.m4a') ? recordingId : `${recordingId}.m4a`}`;
+  const [audioUri, setAudioUri] = useState<string>(
+    `${AUDIO_DIR()}${recordingId.endsWith('.m4a') ? recordingId : `${recordingId}.m4a`}`
+  );
 
   const recordingTitle = recordingData?.name
     || (() => {
@@ -153,10 +153,26 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         ) ?? null;
       } catch (e) { console.warn('recordings:', e); }
 
-      if (rec) { setRecordingData(rec); setSelectedSubjectId(rec.subject_id ?? null); }
+      if (rec) { 
+        setRecordingData(rec); 
+        setSelectedSubjectId(rec.subject_id ?? null); 
+        
+        // Determinar mejor URI de audio (Caché local -> Fallback a Nube)
+        let bestUri = rec.local_uri;
+        if (bestUri) {
+          try {
+            const info = await FileSystem.getInfoAsync(bestUri);
+            if (!info.exists && rec.cloud_url) {
+              console.log(`[RecordingDetail] Fallback a cloud_url para audio: ${rec.id}`);
+              bestUri = rec.cloud_url;
+            }
+          } catch {}
+        }
+        setAudioUri(bestUri || `${AUDIO_DIR()}${recordingId.endsWith('.m4a') ? recordingId : `${recordingId}.m4a`}`);
+      }
 
       const key = rec?.id?.toString() ?? recordingId.replace(/\.m4a$/, '');
-      await loadPersistedTexts(key);
+      await loadPersistedTexts(key, rec);
     } catch (e) {
       console.error('loadInitialData:', e);
     } finally {
@@ -164,15 +180,28 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
     }
   };
 
-  const loadPersistedTexts = async (key: string) => {
+  const loadPersistedTexts = async (key: string, rec: AudioRecording | null) => {
     const dir = TRANSCRIPTS_DIR();
+    let localTranscriptFound = false;
     try {
       const ti = await FileSystem.getInfoAsync(`${dir}transcript_${key}.json`);
       if (ti.exists) {
         const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}transcript_${key}.json`));
-        if (parsed.text) { setTranscription(parsed.text); setShowTutorial(false); }
+        if (parsed.text) { 
+          setTranscription(parsed.text); 
+          setShowTutorial(false); 
+          localTranscriptFound = true;
+        }
       }
     } catch (e) { console.warn('transcript file:', e); }
+
+    // Fallback a la BD del servidor si no hay caché local
+    if (!localTranscriptFound && rec?.transcript_text) {
+      console.log(`[RecordingDetail] Fallback a transcript_text del servidor para: ${rec.id}`);
+      setTranscription(rec.transcript_text);
+      setShowTutorial(false);
+    }
+
     try {
       const si = await FileSystem.getInfoAsync(`${dir}summary_${key}.json`);
       if (si.exists) {
