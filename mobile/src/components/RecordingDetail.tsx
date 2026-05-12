@@ -202,13 +202,23 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       setShowTutorial(false);
     }
 
+    let localSummaryFound = false;
     try {
       const si = await FileSystem.getInfoAsync(`${dir}summary_${key}.json`);
       if (si.exists) {
         const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}summary_${key}.json`));
-        if (parsed.text) setSummary(parsed.text);
+        if (parsed.text) { 
+          setSummary(parsed.text); 
+          localSummaryFound = true;
+        }
       }
     } catch (e) { console.warn('summary file:', e); }
+
+    // Fallback a la BD del servidor para el resumen si no hay caché local
+    if (!localSummaryFound && (rec as any)?.summary_text) {
+      console.log(`[RecordingDetail] Fallback a summary_text del servidor para audio: ${rec?.id}`);
+      setSummary((rec as any).summary_text);
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -225,10 +235,8 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       if (recordingData?.id) {
         await upsertAudioTranscript({
           recording_id: recordingData.id,
-          // Guardar la URI del archivo local para acceso offline
-          ...(type === 'transcript' ? { transcript_uri: fileUri } : { summary_uri: fileUri }),
-          // Guardar el texto inline para que el asistente IA pueda leerlo sin acceder al dispositivo
-          ...(type === 'transcript' ? { transcript_text: text } : {}),
+          ...(type === 'transcript' ? { transcript_uri: fileUri, transcript_text: text } : {}),
+          ...(type === 'summary' ? { summary_uri: fileUri, summary_text: text } : {}),
         }).catch(e => console.warn('upsert transcript DB:', e));
       }
     } catch (e) { console.error('saveTextToFile:', e); }

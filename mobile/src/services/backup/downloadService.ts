@@ -208,20 +208,34 @@ export const downloadCloudItems = async (
         if (!item.transcript_text) { result.skipped++; return; }
         if (item.cloud_url === 'ghost_file') { result.skipped++; return; }
 
-        // La clave debe coincidir con la que usa RecordingDetail: recording_id para audios
-        const key = item.recording_id?.toString() ?? item.id?.toString();
-        const localUri = `${transcriptsDir}transcript_${key}.json`;
+        let transcriptUri = '';
+        let summaryUri = '';
+        if (item.transcript_type === 'youtube') {
+          const key = item.video_id?.toString() ?? item.id?.toString();
+          transcriptUri = `${transcriptsDir}transcript_video_${key}.json`;
+          summaryUri = `${transcriptsDir}summary_video_${key}.json`;
+        } else {
+          const key = item.recording_id?.toString() ?? item.id?.toString();
+          transcriptUri = `${transcriptsDir}transcript_${key}.json`;
+          summaryUri = `${transcriptsDir}summary_${key}.json`;
+        }
 
-        const info = await FileSystem.getInfoAsync(localUri);
+        const info = await FileSystem.getInfoAsync(transcriptUri);
         if (info.exists) { result.skipped++; return; }
 
         try {
-          // Escribir en el formato JSON que espera RecordingDetail: { text, date }
-          const content = JSON.stringify({ text: item.transcript_text, date: new Date().toISOString() });
-          await FileSystem.writeAsStringAsync(localUri, content);
+          // Escribir en el formato JSON que espera RecordingDetail/VideoDetail: { text, date }
+          const transcriptContent = JSON.stringify({ text: item.transcript_text, date: new Date().toISOString() });
+          await FileSystem.writeAsStringAsync(transcriptUri, transcriptContent);
+          
+          if (item.summary_text) {
+            const summaryContent = JSON.stringify({ text: item.summary_text, date: new Date().toISOString() });
+            await FileSystem.writeAsStringAsync(summaryUri, summaryContent);
+          }
+          
           result.downloaded++;
         } catch (err) {
-          console.error(`[DownloadService] ERROR restaurando transcripción ${item.id}:`, err);
+          console.error(`[DownloadService] ERROR restaurando transcripción/resumen ${item.id}:`, err);
           result.errors++;
         }
       });

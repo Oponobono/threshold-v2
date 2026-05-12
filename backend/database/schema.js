@@ -332,6 +332,7 @@ const tableSchema = {
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
+        summary_text TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
@@ -345,6 +346,7 @@ const tableSchema = {
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
+        summary_text TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0
@@ -352,6 +354,7 @@ const tableSchema = {
     `,
     columns: [
       { name: 'transcript_text', type: 'TEXT' },
+      { name: 'summary_text', type: 'TEXT' },
       { name: 'cloud_url', type: 'TEXT' },
       { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
     ]
@@ -394,6 +397,7 @@ const tableSchema = {
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
+        summary_text TEXT,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -407,6 +411,7 @@ const tableSchema = {
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
+        summary_text TEXT,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -414,6 +419,7 @@ const tableSchema = {
     `,
     columns: [
       { name: 'transcript_text', type: 'TEXT' },
+      { name: 'summary_text', type: 'TEXT' },
       { name: 'cloud_url', type: 'TEXT' },
       { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
     ]

@@ -22,7 +22,8 @@ exports.getYoutubeVideos = (req, res) => {
       s.icon as subject_icon,
       yt.transcript_uri,
       yt.transcript_text,
-      yt.summary_uri
+      yt.summary_uri,
+      yt.summary_text
     FROM youtube_videos yv
     LEFT JOIN subjects s ON yv.subject_id = s.id
     LEFT JOIN youtube_transcripts yt ON yv.id = yt.video_id
@@ -170,7 +171,7 @@ exports.getYoutubeCaptions = async (req, res) => {
  * Upsert transcripción/resumen de YouTube
  */
 exports.upsertYoutubeTranscript = (req, res) => {
-  const { video_id, transcript_uri, transcript_text, summary_uri } = req.body;
+  const { video_id, transcript_uri, transcript_text, summary_uri, summary_text } = req.body;
   
   if (!video_id) {
     return res.status(400).json({ error: 'Falta video_id' });
@@ -196,6 +197,10 @@ exports.upsertYoutubeTranscript = (req, res) => {
         updateFields.push('summary_uri = ?');
         updateValues.push(summary_uri);
       }
+      if (summary_text !== undefined) {
+        updateFields.push('summary_text = ?');
+        updateValues.push(summary_text);
+      }
       
       if (updateFields.length === 0) {
         return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
@@ -210,10 +215,10 @@ exports.upsertYoutubeTranscript = (req, res) => {
       });
     } else {
       const insertQuery = `
-        INSERT INTO youtube_transcripts (video_id, transcript_uri, transcript_text, summary_uri)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO youtube_transcripts (video_id, transcript_uri, transcript_text, summary_uri, summary_text)
+        VALUES (?, ?, ?, ?, ?)
       `;
-      db.run(insertQuery, [video_id, transcript_uri, transcript_text || null, summary_uri], function(insertErr) {
+      db.run(insertQuery, [video_id, transcript_uri, transcript_text || null, summary_uri, summary_text || null], function(insertErr) {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
         res.status(201).json({ success: true, id: this.lastID, action: 'created' });
       });

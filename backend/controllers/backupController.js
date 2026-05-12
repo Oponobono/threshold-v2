@@ -305,7 +305,7 @@ exports.getCloudItems = (req, res) => {
 
               // Transcripciones de audio
               db.all(
-                `SELECT at.id, at.cloud_url, at.transcript_text, at.recording_id,
+                `SELECT at.id, at.cloud_url, at.transcript_text, at.summary_text, at.recording_id,
                         'audio' as transcript_type, ar.name as recording_name
                  FROM audio_transcripts at
                  JOIN audio_recordings ar ON ar.id = at.recording_id
@@ -317,7 +317,7 @@ exports.getCloudItems = (req, res) => {
 
                   // Transcripciones de YouTube
                   db.all(
-                    `SELECT yt.id, yt.cloud_url, yt.transcript_text, yt.video_id,
+                    `SELECT yt.id, yt.cloud_url, yt.transcript_text, yt.summary_text, yt.video_id,
                             'youtube' as transcript_type, yv.title as video_title
                      FROM youtube_transcripts yt
                      JOIN youtube_videos yv ON yv.id = yt.video_id

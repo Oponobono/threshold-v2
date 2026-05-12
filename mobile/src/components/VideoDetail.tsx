@@ -179,7 +179,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         setSelectedSubjectId(video.subject_id ?? null);
       }
 
-      await loadPersistedTexts(videoId);
+      await loadPersistedTexts(videoId, video);
     } catch (e) {
       console.error('loadInitialData:', e);
     } finally {
@@ -187,22 +187,49 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
     }
   };
 
-  const loadPersistedTexts = async (key: string) => {
+  const loadPersistedTexts = async (key: string, video: YouTubeVideo | null) => {
     const dir = TRANSCRIPTS_DIR();
+    let localTranscriptFound = false;
     try {
       const ti = await FileSystem.getInfoAsync(`${dir}transcript_video_${key}.json`);
       if (ti.exists) {
         const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}transcript_video_${key}.json`));
-        if (parsed.text) { setTranscription(parsed.text); setShowTutorial(false); }
+        if (parsed.text) { 
+          setTranscription(parsed.text); 
+          setShowTutorial(false); 
+          localTranscriptFound = true;
+        }
       }
     } catch (e) { console.warn('transcript file:', e); }
+
+    // Fallback a la BD del servidor si no hay caché local
+    if (!localTranscriptFound && video?.transcript_text) {
+      console.log(`[VideoDetail] Fallback a transcript_text del servidor para video: ${video.id}`);
+      setTranscription(video.transcript_text);
+      setShowTutorial(false);
+    }
+
+    let localSummaryFound = false;
     try {
       const si = await FileSystem.getInfoAsync(`${dir}summary_video_${key}.json`);
       if (si.exists) {
         const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}summary_video_${key}.json`));
-        if (parsed.text) { setSummary(parsed.text); setShowTutorial(false); setActiveTab('summary'); }
+        if (parsed.text) { 
+          setSummary(parsed.text); 
+          setShowTutorial(false); 
+          setActiveTab('summary'); 
+          localSummaryFound = true;
+        }
       }
     } catch (e) { console.warn('summary file:', e); }
+
+    // Fallback a la BD del servidor para el resumen si no hay caché local
+    if (!localSummaryFound && (video as any)?.summary_text) {
+      console.log(`[VideoDetail] Fallback a summary_text del servidor para video: ${video?.id}`);
+      setSummary((video as any).summary_text);
+      setShowTutorial(false);
+      setActiveTab('summary');
+    }
   };
 
   const saveTextToFile = async (text: string, type: 'transcript' | 'summary') => {
@@ -213,12 +240,12 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       if (!di.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify({ text, date: new Date().toISOString() }));
 
-      // Persistir el texto en la BD para que el asistente IA no tenga que releer el archivo
-      if (videoData?.id && type === 'transcript') {
+      // Persistir el texto en la BD para que el asistente IA no tenga que releer el archivo y para el backup en la nube
+      if (videoData?.id) {
         await upsertYouTubeTranscript({
           video_id: videoData.id,
-          transcript_uri: fileUri,
-          transcript_text: text,  // clave nueva — leida directamente por buildContext
+          ...(type === 'transcript' ? { transcript_uri: fileUri, transcript_text: text } : {}),
+          ...(type === 'summary' ? { summary_uri: fileUri, summary_text: text } : {}),
         }).catch(e => console.warn('upsert youtube transcript DB:', e));
       }
     } catch (e) { console.error('saveTextToFile:', e); }

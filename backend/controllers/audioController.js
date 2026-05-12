@@ -9,7 +9,7 @@ exports.getAudioRecordings = (req, res) => {
   const query = `
     SELECT ar.*, 
            s.name as subject_name, s.color as subject_color, s.icon as subject_icon,
-           at.transcript_uri, at.transcript_text, at.summary_uri,
+           at.transcript_uri, at.transcript_text, at.summary_uri, at.summary_text,
            at.cloud_url as transcript_cloud_url, at.is_backed_up as transcript_backed_up
     FROM audio_recordings ar
     LEFT JOIN subjects s ON ar.subject_id = s.id
@@ -107,7 +107,7 @@ exports.deleteAudioRecording = (req, res) => {
  */
 exports.upsertAudioTranscript = (req, res) => {
   // Acepta transcript_text (texto inline) además de las URIs de archivo
-  const { recording_id, transcript_uri, transcript_text, summary_uri } = req.body;
+  const { recording_id, transcript_uri, transcript_text, summary_uri, summary_text } = req.body;
   
   if (!recording_id) {
     return res.status(400).json({ error: 'Falta recording_id' });
@@ -133,6 +133,10 @@ exports.upsertAudioTranscript = (req, res) => {
         updateFields.push('summary_uri = ?');
         updateValues.push(summary_uri);
       }
+      if (summary_text !== undefined) {
+        updateFields.push('summary_text = ?');
+        updateValues.push(summary_text);
+      }
       
       if (updateFields.length === 0) {
         return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
@@ -147,10 +151,10 @@ exports.upsertAudioTranscript = (req, res) => {
       });
     } else {
       const insertQuery = `
-        INSERT INTO audio_transcripts (recording_id, transcript_uri, transcript_text, summary_uri)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO audio_transcripts (recording_id, transcript_uri, transcript_text, summary_uri, summary_text)
+        VALUES (?, ?, ?, ?, ?)
       `;
-      db.run(insertQuery, [recording_id, transcript_uri, transcript_text || null, summary_uri], function(insertErr) {
+      db.run(insertQuery, [recording_id, transcript_uri, transcript_text || null, summary_uri, summary_text || null], function(insertErr) {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
         res.status(201).json({ success: true, id: this.lastID, action: 'created' });
       });
