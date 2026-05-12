@@ -44,6 +44,7 @@ export interface CloudItem {
   created_at?: string;
   transcript_type?: 'audio' | 'youtube';
   transcript_text?: string;
+  summary_text?: string;
   recording_id?: number;
   video_id?: number;
   recording_name?: string;
