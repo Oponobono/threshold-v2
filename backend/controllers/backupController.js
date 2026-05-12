@@ -221,6 +221,46 @@ exports.markAsBackedUp = (req, res) => {
 };
 
 /**
+ * POST /api/backup/restore-local-uri
+ * Actualiza la local_uri de un ítem tras descargarlo en un nuevo dispositivo.
+ * Body: { type: 'photo'|'audio'|'document', id, local_uri }
+ */
+exports.restoreLocalUri = (req, res) => {
+  const userId = Number(req.user?.id);
+  if (!userId) return res.status(401).json({ error: 'No autenticado.' });
+
+  const { type, id, local_uri } = req.body;
+  if (!type || !id || !local_uri) {
+    return res.status(400).json({ error: 'Se requieren type, id y local_uri.' });
+  }
+
+  if (type === 'photo') {
+    db.run(
+      `UPDATE photos SET local_uri = ? WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`,
+      [local_uri, id, userId],
+      function (err) {
+        if (err) return res.status(500).json({ error: 'Error al restaurar URI de foto.' });
+        res.json({ ok: true, changes: this.changes });
+      }
+    );
+    return;
+  }
+
+  const tableMap = { audio: 'audio_recordings', document: 'scanned_documents' };
+  const table = tableMap[type];
+  if (!table) return res.status(400).json({ error: `Tipo desconocido: ${type}` });
+
+  db.run(
+    `UPDATE ${table} SET local_uri = ? WHERE id = ? AND user_id = ?`,
+    [local_uri, id, userId],
+    function (err) {
+      if (err) return res.status(500).json({ error: 'Error al restaurar URI.' });
+      res.json({ ok: true, changes: this.changes });
+    }
+  );
+};
+
+/**
  * GET /api/backup/cloud-items
  * Devuelve todos los ítems que tienen una copia en la nube (cloud_url definida).
  * Usado por el móvil para descargar archivos en un dispositivo nuevo.

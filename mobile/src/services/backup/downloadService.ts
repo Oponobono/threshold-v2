@@ -102,8 +102,10 @@ export const downloadCloudItems = async (
     const photosDir = await getDownloadSubdirUri('photos');
     for (const item of data.photos || []) {
       tasks.push(async () => {
-        const ext = item.cloud_url.split('.').pop()?.split('?')[0] || 'jpg';
-        const filename = (item.name || `photo_${item.id}`).replace(/\.[^.]+$/, '') + `.${ext}`;
+        const nameExt = item.name?.match(/\.([^.]+)$/)?.[1];
+        const ext = nameExt || 'jpg';
+        const baseName = (item.name || `photo_${item.id}`).replace(/\.[^.]+$/, '').replace(/[/\\:*?"<>|]/g, '_');
+        const filename = `${baseName}.${ext}`;
         const localUri = `${photosDir}${filename}`;
         
         const info = await FileSystem.getInfoAsync(localUri);
@@ -113,10 +115,16 @@ export const downloadCloudItems = async (
         try {
           console.log(`[DownloadService] Descargando Foto: ${item.cloud_url} -> ${localUri}`);
           await FileSystem.downloadAsync(item.cloud_url, localUri);
+          // Actualizar la URI local en el servidor para que la app pueda ver el archivo
+          await fetchWithFallback('/backup/restore-local-uri', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'photo', id: item.id, local_uri: localUri }),
+          });
           result.downloaded++;
-        } catch (err) { 
+        } catch (err) {
           console.error(`[DownloadService] ERROR descargando foto ${item.id}:`, err);
-          result.errors++; 
+          result.errors++;
         }
       });
     }
@@ -127,8 +135,10 @@ export const downloadCloudItems = async (
     const audioDir = await getDownloadSubdirUri('audio');
     for (const item of data.audio || []) {
       tasks.push(async () => {
-        const ext = item.cloud_url.split('.').pop()?.split('?')[0] || 'm4a';
-        const filename = (item.name || `audio_${item.id}`).replace(/\.[^.]+$/, '') + `.${ext}`;
+        const nameExt = item.name?.match(/\.([^.]+)$/)?.[1];
+        const ext = nameExt || 'm4a';
+        const baseName = (item.name || `audio_${item.id}`).replace(/\.[^.]+$/, '').replace(/[/\\:*?"<>|]/g, '_');
+        const filename = `${baseName}.${ext}`;
         const localUri = `${audioDir}${filename}`;
 
         const info = await FileSystem.getInfoAsync(localUri);
@@ -138,10 +148,15 @@ export const downloadCloudItems = async (
         try {
           console.log(`[DownloadService] Descargando Audio: ${item.cloud_url} -> ${localUri}`);
           await FileSystem.downloadAsync(item.cloud_url, localUri);
+          await fetchWithFallback('/backup/restore-local-uri', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'audio', id: item.id, local_uri: localUri }),
+          });
           result.downloaded++;
-        } catch (err) { 
+        } catch (err) {
           console.error(`[DownloadService] ERROR descargando audio ${item.id}:`, err);
-          result.errors++; 
+          result.errors++;
         }
       });
     }
@@ -152,8 +167,10 @@ export const downloadCloudItems = async (
     const docsDir = await getDownloadSubdirUri('docs');
     for (const item of data.docs || []) {
       tasks.push(async () => {
-        const ext = item.cloud_url.split('.').pop()?.split('?')[0] || 'pdf';
-        const filename = (item.name || `doc_${item.id}`).replace(/\.[^.]+$/, '') + `.${ext}`;
+        const nameExt = item.name?.match(/\.([^.]+)$/)?.[1];
+        const ext = nameExt || 'pdf';
+        const baseName = (item.name || `doc_${item.id}`).replace(/\.[^.]+$/, '').replace(/[/\\:*?"<>|]/g, '_');
+        const filename = `${baseName}.${ext}`;
         const localUri = `${docsDir}${filename}`;
 
         const info = await FileSystem.getInfoAsync(localUri);
@@ -163,10 +180,15 @@ export const downloadCloudItems = async (
         try {
           console.log(`[DownloadService] Descargando Doc: ${item.cloud_url} -> ${localUri}`);
           await FileSystem.downloadAsync(item.cloud_url, localUri);
+          await fetchWithFallback('/backup/restore-local-uri', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'document', id: item.id, local_uri: localUri }),
+          });
           result.downloaded++;
-        } catch (err) { 
+        } catch (err) {
           console.error(`[DownloadService] ERROR descargando doc ${item.id}:`, err);
-          result.errors++; 
+          result.errors++;
         }
       });
     }
@@ -178,7 +200,9 @@ export const downloadCloudItems = async (
     for (const item of data.transcripts || []) {
       tasks.push(async () => {
         const filename = `transcript_${item.transcript_type}_${item.id}.txt`;
-        const localUri = `${transcriptsDir}${filename}`;
+        // Sanitizar el nombre para evitar slashes u otros caracteres que rompen la ruta
+        const safeFilename = filename.replace(/[/\\:*?"<>|]/g, '_');
+        const localUri = `${transcriptsDir}${safeFilename}`;
 
         const info = await FileSystem.getInfoAsync(localUri);
         if (info.exists) { result.skipped++; return; }

@@ -28,4 +28,11 @@ router.post('/backup/mark', backupController.markAsBackedUp);
  */
 router.get('/backup/cloud-items', backupController.getCloudItems);
 
+/**
+ * POST /api/backup/restore-local-uri
+ * Actualiza la local_uri de un ítem tras descargarlo en un nuevo dispositivo.
+ * Body: { type, id, local_uri }
+ */
+router.post('/backup/restore-local-uri', backupController.restoreLocalUri);
+
 module.exports = router;
