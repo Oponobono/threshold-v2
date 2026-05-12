@@ -196,30 +196,33 @@ export const downloadCloudItems = async (
 
   // ── Transcripciones ──
   if (prefs.includeTranscripts) {
-    const transcriptsDir = await getDownloadSubdirUri('transcripts');
+    // Las transcripciones se guardan en la misma carpeta que usa RecordingDetail.tsx
+    const transcriptsDir = `${FileSystem.documentDirectory}Threshold/transcripts/`;
+    const transcriptsDirInfo = await FileSystem.getInfoAsync(transcriptsDir);
+    if (!transcriptsDirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(transcriptsDir, { intermediates: true });
+    }
+
     for (const item of data.transcripts || []) {
       tasks.push(async () => {
-        const filename = `transcript_${item.transcript_type}_${item.id}.txt`;
-        // Sanitizar el nombre para evitar slashes u otros caracteres que rompen la ruta
-        const safeFilename = filename.replace(/[/\\:*?"<>|]/g, '_');
-        const localUri = `${transcriptsDir}${safeFilename}`;
+        if (!item.transcript_text) { result.skipped++; return; }
+        if (item.cloud_url === 'ghost_file') { result.skipped++; return; }
+
+        // La clave debe coincidir con la que usa RecordingDetail: recording_id para audios
+        const key = item.recording_id?.toString() ?? item.id?.toString();
+        const localUri = `${transcriptsDir}transcript_${key}.json`;
 
         const info = await FileSystem.getInfoAsync(localUri);
         if (info.exists) { result.skipped++; return; }
-        if (item.cloud_url === 'ghost_file') { result.skipped++; return; }
 
         try {
-          if (item.transcript_text) {
-            await FileSystem.writeAsStringAsync(localUri, item.transcript_text);
-            result.downloaded++;
-          } else if (item.cloud_url) {
-            console.log(`[DownloadService] Descargando Transcripción: ${item.cloud_url} -> ${localUri}`);
-            await FileSystem.downloadAsync(item.cloud_url, localUri);
-            result.downloaded++;
-          }
-        } catch (err) { 
-          console.error(`[DownloadService] ERROR descargando transcripción ${item.id}:`, err);
-          result.errors++; 
+          // Escribir en el formato JSON que espera RecordingDetail: { text, date }
+          const content = JSON.stringify({ text: item.transcript_text, date: new Date().toISOString() });
+          await FileSystem.writeAsStringAsync(localUri, content);
+          result.downloaded++;
+        } catch (err) {
+          console.error(`[DownloadService] ERROR restaurando transcripción ${item.id}:`, err);
+          result.errors++;
         }
       });
     }
