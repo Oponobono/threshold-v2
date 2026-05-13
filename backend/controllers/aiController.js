@@ -1169,6 +1169,7 @@ exports.getModelInfo = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // LEARNING ENGINEERING: PREVENCIÓN DE CONFUSIÓN
 // ─────────────────────────────────────────────────────────────────────────────
