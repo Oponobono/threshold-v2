@@ -210,11 +210,13 @@ export const gradesStyles = StyleSheet.create({
   bulkCard: { borderLeftWidth: 3, borderLeftColor: theme.colors.primary },
   bulkCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   chooseFileText: { fontSize: theme.typography.sizes.sm, color: theme.colors.primary, fontWeight: '600', marginTop: 4 },
-  importBtn: {
-    backgroundColor: theme.colors.text.primary,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 10,
+  smallBadgeBtn: {
+    backgroundColor: theme.colors.primaryTransparent.light,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 5,
     borderRadius: theme.borderRadius.full,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)',
+    minWidth: 105,
   },
-  importBtnText: { color: theme.colors.text.inverse, fontWeight: '700', fontSize: theme.typography.sizes.sm },
+  smallBadgeText: { color: theme.colors.text.primary, fontWeight: '700', fontSize: 11 },
 });

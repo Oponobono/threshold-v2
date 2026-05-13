@@ -12,6 +12,8 @@ import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
 import { createSubject, getCurrentUserProfile, getSubjects, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, getAllSchedules, createStudySession, getPredictions, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
+import { SnoozeModal } from '../../src/components/SnoozeModal';
+import { useDueCardSnooze, type SnoozeOption } from '../../src/hooks/useDueCardSnooze';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const AudioRecorderModal = React.lazy(() => import('../../src/components/AudioRecorderModal').then(m => ({ default: m.AudioRecorderModal })));
 const StudyTimerModal = React.lazy(() => import('../../src/components/StudyTimerModal').then(m => ({ default: m.StudyTimerModal })));
@@ -121,6 +123,10 @@ export default function HybridDashboardScreen() {
   const [lastSessionDuration, setLastSessionDuration] = useState<number>(0);
   const [lastSessionSubjectId, setLastSessionSubjectId] = useState<number | null>(null);
   const [lastSessionMode, setLastSessionMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
+
+  // Snooze State
+  const snoozeManager = useDueCardSnooze();
+  const [isSnoozeModalVisible, setIsSnoozeModalVisible] = useState(false);
 
   const loadData = async () => {
     const [userProfile, userSubjects, schedulesToday, schedulesAll] = await Promise.all([
@@ -388,7 +394,31 @@ export default function HybridDashboardScreen() {
     }
   };
 
-
+  const handleSnoozeSelection = async (option: SnoozeOption) => {
+    try {
+      // Usar un ID único para la alerta de "Repasos Urgentes"
+      const alertId = 'due_cards_alert';
+      await snoozeManager.snoozeCard(alertId, option.minutes);
+      
+      setIsSnoozeModalVisible(false);
+      
+      // Mostrar confirmación
+      alertRef.show({
+        title: 'Aplazado',
+        message: `Revisaremos en ${option.label.toLowerCase()}`,
+        type: 'success',
+        buttons: [{ text: 'Aceptar', style: 'default' }],
+      });
+    } catch (error) {
+      console.error('Error snoozing alert:', error);
+      alertRef.show({
+        title: 'Error',
+        message: 'No se pudo aplazar la revisión',
+        type: 'error',
+        buttons: [{ text: 'Aceptar', style: 'default' }],
+      });
+    }
+  };
 
   const handleToggleScheduleSlot = (day: number, hour: number) => {
     if (!selectedSubjectId) {
@@ -740,22 +770,22 @@ export default function HybridDashboardScreen() {
 
           <Text style={styles.sectionTitle}>{t('dashboard.nextClass')}</Text>
           <View style={styles.nextClassCard}>
-            <View style={styles.nextClassInfo}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
               <View style={styles.nextClassBadge}>
                 <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
               </View>
-              <View style={globalStyles.flex1}>
+              <View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
                 {nextClass ? (
                   <>
                     <Text style={styles.nextClassTitle} numberOfLines={1}>{nextClass.name}</Text>
-                    <Text style={styles.nextClassRoom}>
+                    <Text style={styles.nextClassRoom} numberOfLines={1}>
                       {nextClass.start_time} - {nextClass.end_time}
                     </Text>
                   </>
                 ) : (
                   <>
                     <Text style={styles.nextClassTitle} numberOfLines={1}>{todaySchedules.length > 0 ? "¡Terminaste por hoy!" : t('dashboard.noClasses')}</Text>
-                    <Text style={styles.nextClassRoom}>{t('dashboard.enjoyDay')}</Text>
+                    <Text style={styles.nextClassRoom} numberOfLines={1}>{t('dashboard.enjoyDay')}</Text>
                   </>
                 )}
               </View>
@@ -775,31 +805,38 @@ export default function HybridDashboardScreen() {
             ) : null}
           </View>
 
-          {predictions && predictions.dueCount > 0 ? (
+          {predictions && predictions.dueCount > 0 && !snoozeManager.isCardSnoozed('due_cards_alert') ? (
             <View style={{ marginTop: 24 }}>
               <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
                 <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t('dashboard.urgentReviews', 'Repasos Urgentes')}</Text>
-                <View style={[styles.allChip, { backgroundColor: '#FF3B3020' }]}>
-                  <Text style={[styles.allChipText, { color: '#FF3B30', fontWeight: 'bold' }]}>{predictions.dueCount}</Text>
+                <View style={globalStyles.rowBetweenCenter}>
+                  <TouchableOpacity
+                    style={[styles.snoozeBtn, { marginRight: 10 }]}
+                    onPress={() => setIsSnoozeModalVisible(true)}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons name="pause-circle" size={18} color={theme.colors.warning} />
+                  </TouchableOpacity>
+                  <View style={[styles.allChip, { backgroundColor: theme.colors.dangerTransparent, borderWidth: 1, borderColor: theme.colors.danger + '20' }]}>
+                    <Text style={[styles.allChipText, { color: theme.colors.danger, fontWeight: '800' }]}>{predictions.dueCount}</Text>
+                  </View>
                 </View>
               </View>
-              <View style={[styles.nextClassCard, { borderColor: '#FF3B3030', borderWidth: 1, backgroundColor: '#FF3B3005' }]}>
-                <View style={styles.nextClassInfo}>
-                  <View style={[styles.nextClassBadge, { backgroundColor: '#FF3B3020' }]}>
-                    <MaterialCommunityIcons name="brain" size={24} color="#FF3B30" />
-                  </View>
-                  <View style={globalStyles.flex1}>
-                    <Text style={styles.nextClassTitle} numberOfLines={1}>{t('dashboard.attentionRequired', 'Atención Requerida')}</Text>
-                    <Text style={[styles.nextClassRoom, { color: theme.colors.text.secondary }]}>
-                      {t('dashboard.cardsToForget', 'Tienes tarjetas a punto de ser olvidadas.')}
-                    </Text>
-                  </View>
+              <View style={[styles.nextClassCard, { gap: 12 }]}>
+                <View style={[styles.nextClassBadge, { backgroundColor: theme.colors.dangerTransparent, flexShrink: 0 }]}>
+                  <MaterialCommunityIcons name="brain" size={24} color={theme.colors.danger} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.nextClassTitle} numberOfLines={1}>{t('dashboard.attentionRequired', 'Atención Requerida')}</Text>
+                  <Text style={styles.nextClassRoom} numberOfLines={1}>
+                    {t('dashboard.cardsToForget', 'Tienes tarjetas por revisar.')}
+                  </Text>
                 </View>
                 <TouchableOpacity
-                  style={[styles.openBtn, { backgroundColor: '#FF3B30' }]}
+                  style={[styles.openBtn, { borderColor: theme.colors.danger + '30', flexShrink: 0 }]}
                   onPress={() => setIsFlashcardsVisible(true)}
                 >
-                  <Text style={[styles.openBtnText, { color: '#fff' }]}>{t('dashboard.reviewBtn', 'Repasar')}</Text>
+                  <Text style={[styles.openBtnText, { color: theme.colors.danger }]}>{t('dashboard.reviewBtn', 'Repasar')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1542,6 +1579,13 @@ export default function HybridDashboardScreen() {
           />
         )}
       </React.Suspense>
+
+      {/* Snooze Modal */}
+      <SnoozeModal
+        visible={isSnoozeModalVisible}
+        onClose={() => setIsSnoozeModalVisible(false)}
+        onSelect={handleSnoozeSelection}
+      />
     </>
   );
 }

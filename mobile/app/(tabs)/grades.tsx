@@ -14,6 +14,7 @@ import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../../src/store/useDataStore';
 import { MasteryRadar } from '../../src/components/MasteryRadar';
 import { getUserId } from '../../src/services/api/auth';
+import { downloadReport } from '../../src/services/api/analytics';
 
 const GRADE_COLORS = (pct: number) => {
   if (pct >= 80) return '#34C759';
@@ -64,6 +65,8 @@ export default function GradesScreen() {
     }
   }, [filteredAssessments]);
 
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  
   useFocusEffect(
     React.useCallback(() => {
       const task = InteractionManager.runAfterInteractions(() => {
@@ -163,9 +166,21 @@ export default function GradesScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={{ marginLeft: 10 }}
-            onPress={() => alertRef.show({ title: 'Próximamente', message: 'La descarga de reportes estará disponible pronto.', type: 'info' })}
+            onPress={async () => {
+              const uid = await getUserId();
+              if (!uid || isExportingPdf) return;
+              setIsExportingPdf(true);
+              try {
+                await downloadReport(uid);
+              } catch (e: any) {
+                alertRef.show({ title: 'Error', message: e.message || 'No se pudo generar el informe', type: 'error' });
+              } finally {
+                setIsExportingPdf(false);
+              }
+            }}
+            disabled={isExportingPdf}
           >
-            <Ionicons name="download-outline" size={22} color={theme.colors.text.secondary} />
+            <Ionicons name={isExportingPdf ? "hourglass-outline" : "cloud-download-outline"} size={22} color={theme.colors.text.secondary} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={{ marginLeft: 10 }}
@@ -508,33 +523,50 @@ export default function GradesScreen() {
         </View>
 
         <View style={[styles.card, styles.bulkCard]}>
-          <View style={styles.bulkCardInner}>
-            <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'column', flex: 1, gap: 4 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={styles.sectionTitle}>{t('grades.bulkImport')}</Text>
-              <Text style={styles.descText}>{t('grades.bulkImportDesc')}</Text>
-              <TouchableOpacity>
-                <Text style={styles.chooseFileText}>{t('grades.chooseFile')}</Text>
+              <TouchableOpacity style={styles.smallBadgeBtn}>
+                <Ionicons name="cloud-upload-outline" size={14} color={theme.colors.text.primary} />
+                <Text style={styles.smallBadgeText}>{t('grades.importCsv', 'Importar CSV')}</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.importBtn}>
-              <Ionicons name="cloud-upload" size={18} color="#fff" />
-              <Text style={styles.importBtnText}>{t('grades.importCsv')}</Text>
+            <Text style={styles.descText}>{t('grades.bulkImportDesc')}</Text>
+            <TouchableOpacity>
+              <Text style={styles.chooseFileText}>{t('grades.chooseFile')}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={[styles.card, styles.bulkCard]}>
-          <View style={styles.bulkCardInner}>
-            <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'column', flex: 1, gap: 4 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={styles.sectionTitle}>{t('grades.gpaReport')}</Text>
-              <Text style={styles.descText}>{t('grades.gpaReportDesc')}</Text>
-              <TouchableOpacity>
-                <Text style={styles.chooseFileText}>{t('grades.preview')}</Text>
+              <TouchableOpacity 
+                style={styles.smallBadgeBtn}
+                disabled={isExportingPdf}
+                onPress={async () => {
+                  const uid = await getUserId();
+                  if (!uid || isExportingPdf) return;
+                  setIsExportingPdf(true);
+                  try {
+                    await downloadReport(uid);
+                  } catch (e: any) {
+                    alertRef.show({ title: 'Error', message: e.message || 'No se pudo generar el informe', type: 'error' });
+                  } finally {
+                    setIsExportingPdf(false);
+                  }
+                }}
+              >
+                <Ionicons name="cloud-download-outline" size={14} color={theme.colors.text.primary} />
+                <Text style={styles.smallBadgeText}>
+                  {isExportingPdf ? 'Generando...' : 'Exportar PDF'}
+                </Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={[styles.importBtn, { backgroundColor: '#FF9500' }]}>
-              <Ionicons name="print-outline" size={18} color="#fff" />
-              <Text style={styles.importBtnText}>{t('grades.exportPrint')}</Text>
+            <Text style={styles.descText}>{t('grades.gpaReportDesc')}</Text>
+            <TouchableOpacity>
+              <Text style={styles.chooseFileText}>{t('grades.preview')}</Text>
             </TouchableOpacity>
           </View>
         </View>

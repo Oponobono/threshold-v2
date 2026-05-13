@@ -152,7 +152,6 @@ export const dashboardStyles = StyleSheet.create({
   },
   nextClassCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
     padding: 14,
@@ -160,6 +159,7 @@ export const dashboardStyles = StyleSheet.create({
     ...globalStyles.shadow,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    overflow: 'hidden',
   },
   nextClassInfo: {
     flexDirection: 'row',
@@ -634,5 +634,22 @@ export const dashboardStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // SNOOZE BUTTON
+  snoozeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  snoozeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
   },
 });

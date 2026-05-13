@@ -20,6 +20,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 
@@ -76,6 +77,7 @@ export const CustomAlertProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [state, setState] = useState<InternalState>(INITIAL);
   const scaleAnim  = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
   const showAlert = useCallback((options: AlertOptions) => {
     setState({ ...options, visible: true });
@@ -110,7 +112,7 @@ export const CustomAlertProvider: React.FC<{ children: React.ReactNode }> = ({ c
       {children}
 
       <Modal transparent visible={state.visible} animationType="none" statusBarTranslucent>
-        <Animated.View style={[styles.overlay, { opacity: opacityAnim }]}>
+        <Animated.View style={[styles.overlay, { opacity: opacityAnim, paddingBottom: Math.max(insets.bottom + 80, 100) }]}>
           <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}>
 
             {/* Icon */}

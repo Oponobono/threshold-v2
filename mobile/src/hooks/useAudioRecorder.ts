@@ -357,8 +357,24 @@ export function useAudioRecorder() {
     try {
       if (sound) await sound.unloadAsync();
 
+      let targetUri = uri;
+      
+      // Check if it's a local path
+      if (uri.startsWith('file://') || uri.startsWith('/')) {
+        const fileInfo = await FileSystem.getInfoAsync(uri);
+        if (!fileInfo.exists) {
+          const item = recordings.find((r) => r.id_string === String(id) || r.uri === uri);
+          if (item && item.cloud_url && item.cloud_url !== 'ghost_file') {
+            targetUri = item.cloud_url;
+          } else {
+            alertRef.show({ title: 'Error', message: 'El archivo local no existe y no hay respaldo en la nube.', type: 'error' });
+            return;
+          }
+        }
+      }
+
       const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri },
+        { uri: targetUri },
         { shouldPlay: true }
       );
 
@@ -372,6 +388,7 @@ export function useAudioRecorder() {
       });
     } catch (error) {
       console.error('Error playing sound', error);
+      alertRef.show({ title: 'Error', message: 'No se pudo reproducir el audio.', type: 'error' });
     }
   }
 
