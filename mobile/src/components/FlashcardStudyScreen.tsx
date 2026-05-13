@@ -1,18 +1,18 @@
 /**
- * FlashcardStudyScreen.tsx  (refactorizado)
+ * FlashcardStudyScreen.tsx  (refactorizado v2)
  *
- * Sesión de estudio polimórfica que soporta flashcards, selección múltiple y V/F.
- * Usa QuestionRendererFactory (Factory Pattern) para renderizar el componente
- * correcto, y StrategyFactory (Strategy Pattern) para calificar cada respuesta.
- * Mantiene compatibilidad total con mazos legacy (solo front/back).
+ * Cambios clave:
+ * - Badge de tipo INLINE con el título del mazo (no ocupa fila propia).
+ * - ExplanationOverlay: la explicación aparece flotando encima del contenido,
+ *   el avance ocurre solo cuando el usuario la cierra (no con timeout fijo).
+ * - QuestionRendererFactory ya no muestra la explicación incrustada.
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/theme';
-import { FlashcardDeck } from '../services/api/types';
-import { EvaluationItem } from '../services/api/types';
+import { FlashcardDeck, EvaluationItem } from '../services/api/types';
 import {
   StrategyFactory,
   adaptFlashcardsToEvaluationItems,
@@ -20,20 +20,26 @@ import {
 import { updateFlashcardStatus, createCardLog, deleteFlashcard } from '../services/api';
 import { useCustomAlert } from './CustomAlert';
 import { QuestionRendererFactory } from './evaluation/QuestionRendererFactory';
+import { ExplanationOverlay } from './evaluation/ExplanationOverlay';
 
 interface Props {
   activeDeck: FlashcardDeck | null;
-  initialCards: any[];  // Flashcard[] or EvaluationItem[]
+  initialCards: any[];
   currentUserId: number | null;
   onBack: () => void;
 }
 
-// ─── Session Stats ────────────────────────────────────────────────────────────
 interface SessionStats {
   correct: number;
   incorrect: number;
   total: number;
 }
+
+const TYPE_BADGE: Record<string, { label: string; color: string; bg: string }> = {
+  flashcard:       { label: '🃏 Flashcard', color: '#5C6BC0', bg: '#EDE7F6' },
+  multiple_choice: { label: '🎯 ECAES',     color: '#00897B', bg: '#E0F2F1' },
+  boolean:         { label: '⚖️ V / F',     color: '#F57C00', bg: '#FFF3E0' },
+};
 
 export const FlashcardStudyScreen: React.FC<Props> = ({
   activeDeck, initialCards, currentUserId, onBack,
@@ -41,19 +47,23 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
 
-  // Normalizar a EvaluationItem[]
-  const [items, setItems] = useState<EvaluationItem[]>([]);
-  const [itemIndex, setItemIndex] = useState(0);
-  const [sessionDone, setSessionDone] = useState(false);
-  const [stats, setStats] = useState<SessionStats>({ correct: 0, incorrect: 0, total: 0 });
+  const [items, setItems]               = useState<EvaluationItem[]>([]);
+  const [itemIndex, setItemIndex]       = useState(0);
+  const [sessionDone, setSessionDone]   = useState(false);
+  const [stats, setStats]               = useState<SessionStats>({ correct: 0, incorrect: 0, total: 0 });
   const [cardStartTime, setCardStartTime] = useState<number>(Date.now());
 
-  // Estado específico por tipo
-  const [isAnswered, setIsAnswered] = useState(false);
-  const [isRevealed, setIsRevealed] = useState(false);
-  const [selectedRating, setSelectedRating] = useState<'learning' | 'review' | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  // Estado por tipo de ítem
+  const [isAnswered, setIsAnswered]           = useState(false);
+  const [isRevealed, setIsRevealed]           = useState(false);
+  const [selectedRating, setSelectedRating]   = useState<'learning' | 'review' | null>(null);
+  const [selectedIndex, setSelectedIndex]     = useState<number | null>(null);
   const [selectedBoolean, setSelectedBoolean] = useState<boolean | null>(null);
+
+  // Overlay de explicación
+  const [overlayVisible, setOverlayVisible]   = useState(false);
+  const [overlayPassed, setOverlayPassed]     = useState<boolean | null>(null);
+  const pendingAdvance = useRef<() => void>(() => {});
 
   useEffect(() => {
     setItems(adaptFlashcardsToEvaluationItems(initialCards));
@@ -70,10 +80,19 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     setSelectedRating(null);
     setSelectedIndex(null);
     setSelectedBoolean(null);
+    setOverlayVisible(false);
+    setOverlayPassed(null);
   }, []);
 
-  const handleReveal = useCallback(() => {
-    setIsRevealed(true);
+  const handleReveal = useCallback(() => setIsRevealed(true), []);
+
+  /** Cierra el overlay y ejecuta la función de avance */
+  const handleOverlayDismiss = useCallback(() => {
+    setOverlayVisible(false);
+    // Pequeño delay para que la animación de cierre se vea antes de cambiar de ítem
+    setTimeout(() => {
+      pendingAdvance.current();
+    }, 180);
   }, []);
 
   const handleAnswer = useCallback(async (answer: unknown) => {
@@ -83,37 +102,34 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     if (!item) return;
 
     const strategy = StrategyFactory.getStrategy(item.item_type);
-
-    // Para flashcard: requiere reveal primero; si no está revelado, ignora
     if (strategy.requiresReveal && !isRevealed) return;
 
     const responseTime = Date.now() - cardStartTime;
-    const result = strategy.evaluate(item, answer, responseTime);
+    const result  = strategy.evaluate(item, answer, responseTime);
     const newStatus = strategy.getStatusUpdate(result);
 
-    // Persistir estado de respuesta en UI
+    // Actualizar UI inmediatamente
     setIsAnswered(true);
-    if (item.item_type === 'flashcard') setSelectedRating(answer as 'learning' | 'review');
+    if (item.item_type === 'flashcard')       setSelectedRating(answer as 'learning' | 'review');
     if (item.item_type === 'multiple_choice') setSelectedIndex(answer as number);
-    if (item.item_type === 'boolean') setSelectedBoolean(answer as boolean);
+    if (item.item_type === 'boolean')         setSelectedBoolean(answer as boolean);
 
-    // Actualizar stats
+    // Stats
     setStats(prev => ({
       ...prev,
-      correct: prev.correct + (result.passed ? 1 : 0),
+      correct:   prev.correct   + (result.passed ? 1 : 0),
       incorrect: prev.incorrect + (result.passed ? 0 : 1),
-      total: prev.total + 1,
+      total:     prev.total     + 1,
     }));
 
-    // Persistir en BD
+    // Persistir
     try {
       await updateFlashcardStatus(item.id, newStatus);
       await createCardLog({ card_id: item.id, result: newStatus, response_time_ms: responseTime });
     } catch (_) {}
 
-    // Avanzar después de un delay (más largo para MC/Boolean para leer el feedback)
-    const delay = item.item_type === 'flashcard' ? 1100 : 1600;
-    setTimeout(() => {
+    // Preparar la función de avance (la guardamos en ref para que el overlay la llame)
+    pendingAdvance.current = () => {
       const next = itemIndex + 1;
       if (next >= items.length) {
         setSessionDone(true);
@@ -122,7 +138,17 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         resetItemState();
         setCardStartTime(Date.now());
       }
-    }, delay);
+    };
+
+    // Para flashcard: el usuario ya presionó "Difícil/Fácil" y no hay delay extra
+    // Para MC/Boolean: mostrar overlay tras breve pausa para que el feedback de color se vea
+    const overlayDelay = item.item_type === 'flashcard' ? 600 : 800;
+    setOverlayPassed(result.passed);
+    setTimeout(() => {
+      // Solo mostrar overlay si hay explicación o si queremos confirmar el resultado
+      setOverlayVisible(true);
+    }, overlayDelay);
+
   }, [isAnswered, isRevealed, items, itemIndex, cardStartTime, resetItemState]);
 
   const handleDeleteCard = (cardId: number) => {
@@ -151,7 +177,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     });
   };
 
-  // ─── Session Done screen ───────────────────────────────────────────────────
+  // ─── Session Done ──────────────────────────────────────────────────────────
   if (sessionDone) {
     const pct = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
     return (
@@ -185,22 +211,26 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   const item = items[itemIndex];
   if (!item) return null;
 
-  const itemTypeBadge: Record<string, { label: string; color: string }> = {
-    flashcard: { label: '🃏 Flashcard', color: '#5C6BC0' },
-    multiple_choice: { label: '🎯 ECAES', color: '#00897B' },
-    boolean: { label: '⚖️ V / F', color: '#F57C00' },
-  };
-  const badge = itemTypeBadge[item.item_type];
+  const badge = TYPE_BADGE[item.item_type] ?? TYPE_BADGE.flashcard;
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Header */}
+
+      {/* ── Header: flecha  |  título (badge inline)  |  contador + trash ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
         </TouchableOpacity>
-        <Text style={s.deckTitle} numberOfLines={1}>{activeDeck?.title}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+
+        {/* Título + badge en la misma línea */}
+        <View style={s.titleBlock}>
+          <Text style={s.deckTitle} numberOfLines={1}>{activeDeck?.title}</Text>
+          <View style={[s.inlineBadge, { backgroundColor: badge.bg }]}>
+            <Text style={[s.inlineBadgeText, { color: badge.color }]}>{badge.label}</Text>
+          </View>
+        </View>
+
+        <View style={s.headerRight}>
           <Text style={s.counter}>{itemIndex + 1}/{items.length}</Text>
           {activeDeck?.user_id === currentUserId && (
             <TouchableOpacity onPress={() => handleDeleteCard(item.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -210,18 +240,13 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* Progress bar */}
+      {/* ── Progress bar ── */}
       <View style={s.progressBg}>
         <View style={[s.progressFill, { width: `${((itemIndex + 1) / items.length) * 100}%` as any }]} />
       </View>
 
-      {/* Type badge */}
-      <View style={[s.typeBadge, { backgroundColor: badge.color + '18' }]}>
-        <Text style={[s.typeBadgeText, { color: badge.color }]}>{badge.label}</Text>
-      </View>
-
-      {/* Question renderer */}
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      {/* ── Question renderer (sin ScrollView envolvente: cada vista gestiona su scroll) ── */}
+      <View style={{ flex: 1 }}>
         <QuestionRendererFactory
           item={item}
           onAnswer={handleAnswer}
@@ -231,19 +256,76 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
           selectedIndex={selectedIndex}
           selectedBoolean={selectedBoolean}
         />
-      </ScrollView>
+      </View>
+
+      {/* ── Overlay flotante de explicación ── */}
+      <ExplanationOverlay
+        visible={overlayVisible}
+        explanation={item.explanation ?? null}
+        onDismiss={handleOverlayDismiss}
+      />
     </View>
   );
 };
 
 const s = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  deckTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: theme.colors.text.primary, textAlign: 'center', paddingHorizontal: 8 },
-  counter: { fontSize: 13, fontWeight: '600', color: theme.colors.text.secondary },
-  progressBg: { height: 4, borderRadius: 2, backgroundColor: theme.colors.border, marginBottom: 12, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 2 },
-  typeBadge: { alignSelf: 'center', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 14 },
-  typeBadgeText: { fontSize: 12, fontWeight: '700' },
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    gap: 8,
+  },
+  titleBlock: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  deckTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    maxWidth: '65%',
+  },
+  inlineBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  inlineBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  counter: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.text.secondary,
+  },
+  // Progress
+  progressBg: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.border,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 2,
+  },
   // Session done
   sessionDone: { alignItems: 'center', paddingVertical: 24, gap: 10 },
   doneEmoji: { fontSize: 52 },

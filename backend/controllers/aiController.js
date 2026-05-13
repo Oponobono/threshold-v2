@@ -80,38 +80,41 @@ exports.generateStudyMaterial = async (req, res) => {
   // ── Sistema prompt que le enseña a Zyren la estructura exacta ──────────────
   const modeInstructions = {
     flashcard: `Genera exactamente ${count} FLASHCARDS.
-Formato JSON de cada ítem:
-{ "type": "flashcard", "data": { "front": "Pregunta abierta", "back": "Respuesta concisa" }, "hint": "Pista sutil", "explanation": "Por qué esta es la respuesta correcta" }`,
+- Front: Pregunta conceptual desafiante.
+- Back: Respuesta precisa y técnica (máximo 2-3 oraciones).
+- Hint: Pista que active el recuerdo (ej. "Considera el factor Z"), no letras iniciales.
+- Explanation: Profundiza en el concepto con el "por qué" fundamental o un ejemplo.
+Esquema: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }`,
 
-    multiple_choice: `Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES).
-Cada pregunta tiene exactamente 4 opciones. Solo una es correcta. Los distractores deben ser plausibles.
-Formato JSON de cada ítem:
-{ "type": "multiple_choice", "data": { "question": "Pregunta precisa", "options": ["Op A", "Op B", "Op C", "Op D"], "correctIndex": 0 }, "hint": "Pista que orienta sin revelar", "explanation": "Por qué la opción correcta es correcta y por qué los demás distractores son incorrectos" }`,
+    multiple_choice: `Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES/SABER PRO).
+- Opciones: Exactamente 4 opciones con contenido semántico ÚNICO y diferenciado. PROHIBIDO que dos opciones representen el mismo concepto incluso con palabras distintas.
+- Distractores: Deben nacer de un error de razonamiento específico (fórmula mal aplicada, confusión de términos similares, etc.). No rellenes con opciones aleatorias.
+- Explanation: Explica la validez de la correcta y la falla lógica de los distractores.
+Esquema: { "type": "multiple_choice", "data": { "question": "...", "options": ["A", "B", "C", "D"], "correctIndex": N }, "hint": "...", "explanation": "..." }`,
 
     boolean: `Genera exactamente ${count} PREGUNTAS DE VERDADERO O FALSO.
-Distribuye verdaderos y falsos equilibradamente. Las afirmaciones deben ser precisas.
-Formato JSON de cada ítem:
-{ "type": "boolean", "data": { "question": "Afirmación académica precisa", "correctAnswer": true }, "hint": "Pista que orienta", "explanation": "Por qué la afirmación es verdadera o falsa" }`,
+- Question: Afirmación con matices técnicos que desafíe la comprensión obvia.
+- Explanation: Justifica la veracidad/falsedad con un argumento sólido basado en la teoría.
+Esquema: { "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }`,
 
-    mixed: `Genera exactamente ${count} ÍTEMS MIXTOS distribuidos pedagógicamente:
-- Conceptos complejos → flashcard (~40%)
-- Definiciones técnicas → multiple_choice (~40%)
-- Mitos/verdades → boolean (~20%)
-
-Cada multiple_choice tiene exactamente 4 opciones con distractores plausibles.
-Formato JSON según el tipo:
-- flashcard: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }
-- multiple_choice: { "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": N }, "hint": "...", "explanation": "..." }
-- boolean: { "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }`,
+    mixed: `Genera exactamente ${count} ÍTEMS MIXTOS (40% Flashcard, 40% Selección Múltiple, 20% V/F).
+Debes usar estrictamente estos 3 esquemas según el ítem:
+1. Flashcard: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }
+2. Selección Múltiple: { "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": N }, "hint": "...", "explanation": "..." }
+3. Verdadero/Falso: { "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }`,
   };
 
-  const systemPrompt = `Eres Zyren, tutor académico de Threshold. Tu tarea es generar material de estudio de NIVEL UNIVERSITARIO basado en el contenido proporcionado.
+  const systemPrompt = `Eres Zyren, experto en pedagogía universitaria y diseño instruccional. Tu misión es transformar contenido en material de ALTO RENDIMIENTO.
 
-INSTRUCCIONES:
-1. Analiza el contenido y extrae los conceptos más importantes.
-2. ${modeInstructions[mode] || modeInstructions.mixed}
-3. Responde ÚNICAMENTE con un JSON array válido. Sin markdown, sin texto adicional, sin bloques de código.
-4. Asegúrate de que el JSON sea válido y parseable.`;
+REGLAS DE ORO:
+1. RIGOR: Usa terminología técnica precisa del texto.
+2. NO CIRCULARIDAD: La explicación JAMÁS debe ser una paráfrasis de la pregunta. Debe explicar el "por qué" fundamental.
+3. PISTAS ESTRATÉGICAS: El 'hint' debe ser un andamiaje cognitivo (ruta de pensamiento), no una respuesta parcial.
+4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico.
+
+${modeInstructions[mode] || modeInstructions.mixed}
+
+Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.`;
 
   try {
     const trimmedContext = context_text.length > 8000

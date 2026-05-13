@@ -318,74 +318,62 @@ function insertItemsAndReturn(res, deckId, subject_id, user_id, title, descripti
  * mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed'
  */
 function buildSystemPrompt(mode, count) {
-  const base = `Actúa como un experto en pedagogía universitaria y técnicas de estudio de alto rendimiento (Active Recall y Spaced Repetition).
-Paso Previo: Analiza el texto, ignora muletillas y divagaciones. Extrae los conceptos más importantes.
-Calidad sobre Cantidad: Si el texto no da para ${count} ítems de calidad, genera solo los posibles con máximo rigor académico.`;
+  const base = `Actúa como un experto en pedagogía universitaria y diseño instruccional.
+Paso Previo: Analiza el texto, extrae los conceptos técnicos clave y descarta información irrelevante.
+
+CALIDAD ACADÉMICA Y REGLAS DE ORO:
+1. RIGOR: Usa terminología técnica precisa del texto.
+2. NO CIRCULARIDAD: La explicación JAMÁS debe ser una paráfrasis de la pregunta o respuesta. Debe aportar el "por qué" conceptual o un ejemplo de aplicación.
+3. PISTAS (HINTS): Debe ser un andamiaje cognitivo (sugerir una ruta de pensamiento), no una respuesta parcial ni letras iniciales.
+4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico (ej. mala aplicación de una fórmula, confusión de conceptos similares o generalización excesiva). No rellenes con opciones aleatorias.
+5. EXCLUSIVIDAD SEMÁNTICA: En selección múltiple, las 4 opciones deben tener contenido semántico único. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.`;
 
   if (mode === 'flashcard') {
     return `${base}
 
 Genera exactamente ${count} FLASHCARDS en formato JSON array.
-Formato de Salida ESTRICTO — responde ÚNICAMENTE con el JSON array, sin markdown:
-[
-  {
-    "type": "flashcard",
-    "data": { "front": "Pregunta abierta desafiante", "back": "Respuesta técnica en máximo 2 oraciones" },
-    "hint": "Pista sutil que guía sin revelar la respuesta",
-    "explanation": "Explicación de por qué esta es la respuesta correcta y su contexto académico"
-  }
-]`;
+- Front: Pregunta conceptual que obligue a pensar.
+- Back: Respuesta técnica y completa en máximo 3 oraciones.
+- Explanation: Profundización teórica o ejemplo de aplicación.
+Formato: [{ "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }]`;
   }
 
   if (mode === 'multiple_choice') {
     return `${base}
 
 Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES/SABER PRO) en formato JSON array.
-Cada pregunta debe tener exactamente 4 opciones. Solo una es correcta. Los distractores deben ser plausibles.
-Formato de Salida ESTRICTO — responde ÚNICAMENTE con el JSON array, sin markdown:
-[
-  {
-    "type": "multiple_choice",
-    "data": {
-      "question": "Pregunta técnica clara y precisa",
-      "options": ["Opción A", "Opción B", "Opción C", "Opción D"],
-      "correctIndex": 0
-    },
-    "hint": "Pista que orienta sin revelar la respuesta directamente",
-    "explanation": "Explicación completa de por qué la opción correcta es correcta y por qué los demás distractores son incorrectos"
-  }
-]`;
+- Opciones: Exactamente 4 opciones ÚNICAS. PROHIBIDO repetir opciones.
+- Distractores: Deben ser plausibles y basados en errores comunes.
+- Explanation: Justifica la opción correcta y explica por qué los distractores fallan.
+Formato: [{ "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": N }, "hint": "...", "explanation": "..." }]`;
   }
 
   if (mode === 'boolean') {
     return `${base}
 
 Genera exactamente ${count} PREGUNTAS DE VERDADERO O FALSO en formato JSON array.
-Las afirmaciones deben ser precisas; evita ambigüedades. Distribuye verdaderos y falsos equilibradamente.
-Formato de Salida ESTRICTO — responde ÚNICAMENTE con el JSON array, sin markdown:
-[
-  {
-    "type": "boolean",
-    "data": { "question": "Afirmación académica precisa", "correctAnswer": true },
-    "hint": "Pista que orienta al estudiante",
-    "explanation": "Explicación de por qué la afirmación es verdadera o falsa con respaldo conceptual"
-  }
-]`;
+- Question: Afirmaciones con matices técnicos que desafíen la comprensión.
+- Explanation: Argumento sólido que respalde la veracidad o falsedad basándose en el texto.
+Formato: [{ "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }]`;
   }
 
-  // mixed
+  if (mode === 'mixed') {
+    return `${base}
+
+Genera exactamente ${count} ÍTEMS MIXTOS (40% Flashcards, 40% Selección Múltiple, 20% V/F) en formato JSON array.
+Sigue estrictamente estos esquemas según el tipo:
+
+- Flashcard: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }
+- Selección Múltiple: { "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": N }, "hint": "...", "explanation": "..." }
+- Verdadero/Falso: { "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }
+
+Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.`;
+  }
+
   return `${base}
 
-Genera exactamente ${count} ÍTEMS DE EVALUACIÓN MIXTOS en formato JSON array.
-Distribuye los tipos de forma pedagógica: conceptos complejos → flashcard, definiciones técnicas → multiple_choice, mitos/verdades → boolean.
-Usa aproximadamente: 40% flashcards, 40% multiple_choice, 20% boolean.
-Cada multiple_choice debe tener exactamente 4 opciones con distractores plausibles.
-Formato de Salida ESTRICTO — responde ÚNICAMENTE con el JSON array, sin markdown:
-[
-  { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." },
-  { "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": 0 }, "hint": "...", "explanation": "..." },
-  { "type": "boolean", "data": { "question": "...", "correctAnswer": true }, "hint": "...", "explanation": "..." }
-]`;
+Genera exactamente ${count} ítems de tipo "${mode}" en formato JSON array.
+Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.`;
 }
 
 /**

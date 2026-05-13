@@ -86,13 +86,7 @@ export const FlashcardView: React.FC<Props> = ({
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={s.cardText}>{content.back}</Text>
           </ScrollView>
-          {/* Explicación siempre visible en el reverso */}
-          {item.explanation && (
-            <View style={s.explanationBox}>
-              <Ionicons name="information-circle-outline" size={13} color={theme.colors.info} />
-              <Text style={s.explanationText} numberOfLines={3}>{item.explanation}</Text>
-            </View>
-          )}
+
         </Animated.View>
       </TouchableOpacity>
 

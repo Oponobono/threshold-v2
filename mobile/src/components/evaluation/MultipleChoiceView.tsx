@@ -30,16 +30,12 @@ export const MultipleChoiceView: React.FC<Props> = ({
 }) => {
   const content = item.content as MultipleChoiceContent;
   const [hintVisible, setHintVisible] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
   const hintAnim = useRef(new Animated.Value(0)).current;
-  const explAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     setHintVisible(false);
-    setShowExplanation(false);
     hintAnim.setValue(0);
-    explAnim.setValue(0);
-  }, [item.id, hintAnim, explAnim]);
+  }, [item.id, hintAnim]);
 
   const toggleHint = () => {
     const next = !hintVisible;
@@ -47,14 +43,7 @@ export const MultipleChoiceView: React.FC<Props> = ({
     Animated.timing(hintAnim, { toValue: next ? 1 : 0, duration: 220, useNativeDriver: true }).start();
   };
 
-  useEffect(() => {
-    if (isAnswered && item.explanation) {
-      setTimeout(() => {
-        setShowExplanation(true);
-        Animated.spring(explAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
-      }, 600);
-    }
-  }, [isAnswered, item.explanation, explAnim]);
+
 
   const getOptionStyle = (index: number) => {
     if (!isAnswered) return [s.option];
@@ -126,19 +115,7 @@ export const MultipleChoiceView: React.FC<Props> = ({
         ))}
       </View>
 
-      {/* Explanation */}
-      {showExplanation && item.explanation && (
-        <Animated.View style={[s.explanationBox, {
-          opacity: explAnim,
-          transform: [{ translateY: explAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-        }]}>
-          <Ionicons name="information-circle" size={16} color={theme.colors.info} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.explanationTitle}>¿Por qué?</Text>
-            <Text style={s.explanationText}>{item.explanation}</Text>
-          </View>
-        </Animated.View>
-      )}
+
 
       <View style={{ height: 16 }} />
     </ScrollView>

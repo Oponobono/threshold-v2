@@ -14,20 +14,16 @@ interface Props {
 export const BooleanView: React.FC<Props> = ({ item, onAnswer, isAnswered, selectedAnswer }) => {
   const content = item.content as BooleanContent;
   const [hintVisible, setHintVisible] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
-  const explAnim = useRef(new Animated.Value(0)).current;
   const hintAnim = useRef(new Animated.Value(0)).current;
   const trueScale = useRef(new Animated.Value(1)).current;
   const falseScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     setHintVisible(false);
-    setShowExplanation(false);
-    explAnim.setValue(0);
     hintAnim.setValue(0);
     trueScale.setValue(1);
     falseScale.setValue(1);
-  }, [item.id, explAnim, hintAnim, trueScale, falseScale]);
+  }, [item.id, hintAnim, trueScale, falseScale]);
 
   const toggleHint = () => {
     const next = !hintVisible;
@@ -46,14 +42,7 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, isAnswered, selec
     onAnswer(answer);
   };
 
-  useEffect(() => {
-    if (isAnswered && item.explanation) {
-      setTimeout(() => {
-        setShowExplanation(true);
-        Animated.spring(explAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
-      }, 500);
-    }
-  }, [isAnswered, item.explanation, explAnim]);
+
 
   const getBtnStyle = (value: boolean) => {
     const base = [s.boolBtn, value ? s.boolBtnTrue : s.boolBtnFalse];
@@ -103,18 +92,7 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, isAnswered, selec
           </TouchableOpacity>
         </Animated.View>
       </View>
-      {showExplanation && item.explanation && (
-        <Animated.View style={[s.explanationBox, {
-          opacity: explAnim,
-          transform: [{ translateY: explAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-        }]}>
-          <Ionicons name="information-circle" size={16} color={theme.colors.info} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.explanationTitle}>¿Por qué?</Text>
-            <Text style={s.explanationText}>{item.explanation}</Text>
-          </View>
-        </Animated.View>
-      )}
+
       <View style={{ height: 16 }} />
     </ScrollView>
   );
