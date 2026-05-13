@@ -114,6 +114,12 @@ router.get('/flashcard-decks/:deckId/cards', flashcardsController.getCardsByDeck
 router.post('/flashcard-decks/:deckId/cards', flashcardsController.createCard);
 
 /**
+ * POST /api/flashcard-decks/:deckId/items
+ * Crea un ítem de evaluación polimórfico (flashcard | multiple_choice | boolean)
+ */
+router.post('/flashcard-decks/:deckId/items', flashcardsController.createEvaluationItem);
+
+/**
  * @swagger
  * /api/flashcards/{cardId}:
  *   put:

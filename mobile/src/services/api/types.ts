@@ -110,6 +110,56 @@ export interface Flashcard {
   created_at: string;
 }
 
+// ─── Motor de Evaluación Multiformato ────────────────────────────────────────
+
+export type EvaluationItemType = 'flashcard' | 'multiple_choice' | 'boolean';
+
+export interface FlashcardContent {
+  front: string;
+  back: string;
+}
+
+export interface MultipleChoiceContent {
+  question: string;
+  options: string[];       // Exactamente 4 opciones
+  correctIndex: number;   // Índice 0-based de la opción correcta
+}
+
+export interface BooleanContent {
+  question: string;
+  correctAnswer: boolean;
+}
+
+export type EvaluationContent = FlashcardContent | MultipleChoiceContent | BooleanContent;
+
+/** Ítem de evaluación genérico — reemplaza a Flashcard en la sesión de estudio */
+export interface EvaluationItem {
+  id: number;
+  deck_id: number;
+  item_type: EvaluationItemType;
+  content: EvaluationContent;
+  hint: string | null;        // Pista opcional visible antes de responder
+  explanation: string | null; // Explicación de la respuesta correcta (post-respuesta)
+  status: 'new' | 'learning' | 'review';
+  created_at: string;
+  // Campos legacy — solo presentes en item_type='flashcard'
+  front?: string;
+  back?: string;
+}
+
+/** Resultado de evaluar un ítem en la sesión de estudio */
+export interface EvaluationResult {
+  itemId: number;
+  itemType: EvaluationItemType;
+  passed: boolean;
+  responseTimeMs: number;
+  selectedAnswer?: number | boolean; // índice (MC) o bool (Boolean)
+  selfRating?: 'learning' | 'review'; // solo para flashcard
+}
+
+export type StudyMode = 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed';
+
+
 /** Grabación de audio (.m4a) con sus rutas locales de transcripción y resumen */
 export interface AudioRecording {
   id?: number;

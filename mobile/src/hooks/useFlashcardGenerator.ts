@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { generateFlashcardsFromText, generateFlashcardsFromImage } from '../services/api/flashcards';
 import { useTranslation } from 'react-i18next';
+import { StudyMode } from '../services/api/types';
 
 interface GenerateCardsParams {
   text?: string;
@@ -9,6 +10,7 @@ interface GenerateCardsParams {
   title: string;
   subjectId: number;
   userId: number;
+  mode?: StudyMode;
 }
 
 interface GeneratedDeck {
@@ -73,22 +75,22 @@ export const useFlashcardGenerator = () => {
       let result;
 
       if (params.imageBase64) {
-        // Llamar a la API de imagen
         result = await generateFlashcardsFromImage({
           image_base64: params.imageBase64,
           count: params.count,
           title: params.title,
           subject_id: params.subjectId,
           user_id: params.userId,
+          mode: params.mode || 'flashcard',
         });
       } else if (params.text) {
-        // Llamar a la API de texto
         result = await generateFlashcardsFromText({
           text: params.text,
           count: params.count,
           title: params.title,
           subject_id: params.subjectId,
           user_id: params.userId,
+          mode: params.mode || 'flashcard',
         });
       }
 

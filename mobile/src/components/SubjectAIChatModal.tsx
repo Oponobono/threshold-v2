@@ -21,12 +21,14 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { sendAIChatMessage, getChatHistory, clearChatHistory, processDocumentUpload } from '../services/api/ai';
+import { sendAIChatMessage, getChatHistory, clearChatHistory, processDocumentUpload, generateStudyMaterialFromChat } from '../services/api/ai';
 import { LLMProvider, getPreferredLLMProvider } from '../utils/llmProviderManager';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
 import LottieView from 'lottie-react-native';
+import { StudyModeSelector } from './evaluation/StudyModeSelector';
+import { StudyMode } from '../services/api/types';
 
 const zyrenOrbAnimation = require('../lottieFiles/ai_orb.json');
 
@@ -182,6 +184,78 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(-100)).current;
 
+  // ── Generate material panel ────────────────────────────────────────────────
+  const [showGenPanel, setShowGenPanel] = useState(false);
+  const [genMode, setGenMode] = useState<StudyMode>('mixed');
+  const [genCount, setGenCount] = useState('10');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const genPanelAnim = useRef(new Animated.Value(0)).current;
+
+  const openGenPanel = () => {
+    setShowGenPanel(true);
+    Animated.spring(genPanelAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
+  };
+  const closeGenPanel = () => {
+    Animated.timing(genPanelAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setShowGenPanel(false));
+  };
+
+  /**
+   * Construye el texto de contexto disponible para generación.
+   * Prioridad: contexto académico explícito → documento subido → historial de la conversación.
+   */
+  const buildGenerationContext = useCallback(() => {
+    const explicit = (localContextText || '') + (uploadedDocContext || '');
+    if (explicit.trim()) return explicit;
+    // Fallback: usar el historial de conversación como contexto
+    if (messages.length > 0) {
+      return messages
+        .filter(m => !m.isDocument)
+        .map(m => `${m.role === 'user' ? 'Estudiante' : 'Zyren'}: ${m.content}`)
+        .join('\n\n');
+    }
+    return '';
+  }, [localContextText, uploadedDocContext, messages]);
+
+  /**
+   * Ejecuta la generación del mazo con los parámetros actuales del panel.
+   * Usa buildGenerationContext() para obtener el mejor contexto disponible.
+   */
+  const handleGenerateMaterial = async (overrideMode?: StudyMode, overrideCount?: number) => {
+    if (!subjectId || !userId) return;
+    const ctx = buildGenerationContext();
+    if (!ctx.trim()) {
+      showToast('Abre una conversación o agrega contexto antes de generar.');
+      closeGenPanel();
+      return;
+    }
+    setIsGenerating(true);
+    const activeMode = overrideMode || genMode;
+    const activeCount = overrideCount || parseInt(genCount) || 10;
+    const modeLabels: Record<string, string> = { flashcard: 'Flashcards', multiple_choice: 'ECAES', boolean: 'V/F', mixed: 'Mixto' };
+    const deckTitle = `${modeLabels[activeMode] || 'Material'} — ${subjectName}`;
+    try {
+      const deck = await generateStudyMaterialFromChat({
+        contextText: ctx,
+        mode: activeMode,
+        count: activeCount,
+        title: deckTitle,
+        subjectId: subjectId!,
+        userId: userId!,
+      });
+      closeGenPanel();
+      const aiMsg: Message = {
+        role: 'assistant',
+        content: `✅ **¡Mazo creado!** Generé **"${deck.title}"** con **${deck.card_count} ítems** de tipo *${modeLabels[activeMode]}*. Encuéntralo en la sección de Flashcards ↓`,
+      };
+      setMessages(prev => [...prev, aiMsg]);
+      showToast(`Mazo "${deck.title}" listo con ${deck.card_count} ítems ✅`);
+    } catch (err: any) {
+      showToast(`Error generando: ${err.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     toastAnim.setValue(-100);
@@ -270,7 +344,6 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     const text = inputText.trim();
     if (!text || isLoading) return;
 
-    // Agregar mensaje del usuario al historial
     const userMsg: Message = { role: 'user', content: text };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -278,36 +351,49 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     setIsLoading(true);
 
     try {
-      // Enviar al backend con el contexto, historial, session_id y proveedor seleccionado
       const combinedContext = localContextText + uploadedDocContext;
       const data = await sendAIChatMessage(combinedContext, updatedMessages.filter(m => !m.isDocument), sessionId, currentProvider);
-      
-      // Verificar si el contexto fue truncado
-      if (data?.context_truncated) {
-        setIsTruncated(true);
-      }
 
-      const aiMsg: Message = {
-        role: 'assistant',
-        content: data?.reply?.content || 'Lo siento, no pude procesar tu pregunta.',
-      };
-      setMessages(prev => [...prev, aiMsg]);
+      if (data?.context_truncated) setIsTruncated(true);
+
+      let replyContent: string = data?.reply?.content || 'Lo siento, no pude procesar tu pregunta.';
+
+      // ── Interceptar señal de generación de mazo ──────────────────────────────
+      const deckSignalMatch = replyContent.match(/%%DECK_ACTION%%(\{[\s\S]*?\})%%END%%/);
+      if (deckSignalMatch) {
+        // Limpiar la señal del mensaje visible
+        replyContent = replyContent.replace(/%%DECK_ACTION%%[\s\S]*?%%END%%/g, '').trim();
+
+        // Mostrar el mensaje limpio inmediatamente
+        setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);
+        setIsLoading(false);
+
+        // Parsear parámetros y generar el mazo en segundo plano
+        try {
+          const deckParams = JSON.parse(deckSignalMatch[1]);
+          const mode: StudyMode = deckParams.mode || 'mixed';
+          const count: number = deckParams.count || 10;
+          // Ejecutar generación con los parámetros que Zyren decidió
+          await handleGenerateMaterial(mode, count);
+        } catch (_) {
+          // Si falla el parse, igual se muestra el mensaje de Zyren
+        }
+        return; // Ya añadimos el mensaje y llamamos a handleGenerateMaterial
+      }
+      // ──────────────────────────────────────────────────────────────
+
+      setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);
     } catch (err: any) {
       console.error('[AIChatTelemetry] Error crítico al enviar mensaje:', err);
-      if (err.details) {
-        console.error('[AIChatTelemetry] Detalles del error:', JSON.stringify(err.details, null, 2));
-      }
-
-      // Mostrar error como mensaje de Zyren
-      const errMsg: Message = {
+      if (err.details) console.error('[AIChatTelemetry] Detalles:', JSON.stringify(err.details, null, 2));
+      setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `⚠️ Error al conectar con Zyren (${currentProvider}): ${err.message || 'Error desconocido'}. Revisa la consola para más detalles.`,
-      };
-      setMessages(prev => [...prev, errMsg]);
+        content: `⚠️ Error al conectar con Zyren (${currentProvider}): ${err.message || 'Error desconocido'}.`,
+      }]);
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, messages, localContextText, sessionId, currentProvider]);
+  }, [inputText, isLoading, messages, localContextText, uploadedDocContext, sessionId, currentProvider, handleGenerateMaterial]);
 
   /** Limpiar la conversación actual y crear una nueva */
   const handleClearHistory = useCallback(async () => {
@@ -506,6 +592,16 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 </TouchableOpacity>
               )}
 
+              {/* 🎓 Botón Generar Material de Estudio */}
+              <TouchableOpacity
+                style={[s.clearBtn, s.genBtn]}
+                onPress={openGenPanel}
+                disabled={isLoading || isGenerating}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="school-outline" size={16} color={PRIMARY} />
+              </TouchableOpacity>
+
               {/* Cerrar */}
               <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.7}>
                 <Ionicons name="close" size={18} color={TXT_PRI} />
@@ -602,6 +698,46 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 }
               </TouchableOpacity>
             </View>
+
+          {/* ── Panel de generación de material ────────────────────────── */}
+          {showGenPanel && (
+            <Animated.View style={[
+              s.genPanel,
+              { opacity: genPanelAnim, transform: [{ translateY: genPanelAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }] }
+            ]}>
+              <View style={s.genPanelHeader}>
+                <Text style={s.genPanelTitle}>🎓 Generar material de estudio</Text>
+                <TouchableOpacity onPress={closeGenPanel}>
+                  <Ionicons name="close" size={18} color={TXT_PRI} />
+                </TouchableOpacity>
+              </View>
+              <Text style={s.genPanelSubtitle}>Zyren usará el contexto activo para crear el mazo</Text>
+
+              <StudyModeSelector selected={genMode} onSelect={setGenMode} />
+
+              <Text style={s.genCountLabel}>Cantidad de ítems</Text>
+              <TextInput
+                style={s.genCountInput}
+                value={genCount}
+                onChangeText={setGenCount}
+                keyboardType="number-pad"
+                placeholder="10"
+                placeholderTextColor={TXT_SEC}
+              />
+
+              <TouchableOpacity
+                style={[s.genConfirmBtn, isGenerating && { opacity: 0.6 }]}
+                onPress={handleGenerateMaterial}
+                disabled={isGenerating}
+                activeOpacity={0.8}
+              >
+                {isGenerating
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.genConfirmBtnText}>Generar con Zyren ✨</Text>
+                }
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
           </View>
         </View>
@@ -826,6 +962,41 @@ const s = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
+
+  // Generation panel
+  genBtn: {
+    borderColor: `${PRIMARY}40`,
+    backgroundColor: `${PRIMARY}14`,
+  },
+  genPanel: {
+    position: 'absolute',
+    bottom: 80, left: 16, right: 16,
+    backgroundColor: '#16162A',
+    borderRadius: 20, padding: 18,
+    borderWidth: 1, borderColor: `${PRIMARY}30`,
+    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 16, elevation: 12,
+    zIndex: 200,
+  },
+  genPanelHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 6,
+  },
+  genPanelTitle: { fontSize: 15, fontWeight: '800', color: TXT_PRI },
+  genPanelSubtitle: { fontSize: 12, color: TXT_SEC, marginBottom: 14 },
+  genCountLabel: { fontSize: 12, fontWeight: '600', color: TXT_PRI, marginTop: 14, marginBottom: 8 },
+  genCountInput: {
+    backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: BORDER,
+    borderRadius: 12, color: TXT_PRI, fontSize: 15,
+    paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16,
+  },
+  genConfirmBtn: {
+    backgroundColor: PRIMARY, borderRadius: 14,
+    paddingVertical: 14, alignItems: 'center',
+    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
+  },
+  genConfirmBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });
 
 const markdownStyles = StyleSheet.create({

@@ -300,4 +300,11 @@ router.post('/ai/generate-flashcards-upload', upload.single('file'), validateFil
  */
 router.get('/ai/model-info', aiController.getModelInfo);
 
+/**
+ * POST /api/ai/generate-study-material
+ * Genera un mazo de material de estudio (flashcard|multiple_choice|boolean|mixed)
+ * directamente desde el contexto del chat con Zyren.
+ */
+router.post('/ai/generate-study-material', aiController.generateStudyMaterial);
+
 module.exports = router;

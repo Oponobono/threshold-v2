@@ -461,8 +461,12 @@ const tableSchema = {
       CREATE TABLE IF NOT EXISTS flashcards (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         deck_id INTEGER NOT NULL,
-        front TEXT NOT NULL,
-        back TEXT NOT NULL,
+        front TEXT NOT NULL DEFAULT '',
+        back TEXT NOT NULL DEFAULT '',
+        item_type TEXT NOT NULL DEFAULT 'flashcard',
+        content_json TEXT,
+        hint TEXT,
+        explanation TEXT,
         status TEXT DEFAULT 'new',
         view_count INTEGER DEFAULT 0,
         success_count INTEGER DEFAULT 0,
@@ -476,8 +480,12 @@ const tableSchema = {
       CREATE TABLE IF NOT EXISTS flashcards (
         id SERIAL PRIMARY KEY,
         deck_id INTEGER NOT NULL REFERENCES flashcard_decks(id) ON DELETE CASCADE,
-        front TEXT NOT NULL,
-        back TEXT NOT NULL,
+        front TEXT NOT NULL DEFAULT '',
+        back TEXT NOT NULL DEFAULT '',
+        item_type TEXT NOT NULL DEFAULT 'flashcard',
+        content_json TEXT,
+        hint TEXT,
+        explanation TEXT,
         status TEXT DEFAULT 'new',
         view_count INTEGER DEFAULT 0,
         success_count INTEGER DEFAULT 0,
@@ -490,7 +498,11 @@ const tableSchema = {
       { name: 'view_count', type: 'INTEGER DEFAULT 0' },
       { name: 'success_count', type: 'INTEGER DEFAULT 0' },
       { name: 'failure_count', type: 'INTEGER DEFAULT 0' },
-      { name: 'last_review_timestamp', type: 'TIMESTAMP' }
+      { name: 'last_review_timestamp', type: 'TIMESTAMP' },
+      { name: 'item_type', type: "TEXT NOT NULL DEFAULT 'flashcard'" },
+      { name: 'content_json', type: 'TEXT' },
+      { name: 'hint', type: 'TEXT' },
+      { name: 'explanation', type: 'TEXT' }
     ]
   },
   schedules: {

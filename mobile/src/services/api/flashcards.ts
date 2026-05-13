@@ -74,6 +74,7 @@ export const generateFlashcardsFromText = async (payload: {
   title: string;
   subject_id: number;
   user_id: number;
+  mode?: string;
 }) => {
   const response = await fetchWithFallback('/flashcard-decks/generate-from-text', {
     method: 'POST',
@@ -95,6 +96,7 @@ export const generateFlashcardsFromImage = async (payload: {
   title: string;
   subject_id: number;
   user_id: number;
+  mode?: string;
 }) => {
   const response = await fetchWithFallback('/flashcard-decks/generate-from-image', {
     method: 'POST',

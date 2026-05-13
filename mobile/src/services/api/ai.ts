@@ -232,3 +232,42 @@ export const generateFlashcardsUpload = async (
     throw new Error(error.message || 'Error al generar flashcards del documento');
   }
 };
+/**
+ * Solicita a Zyren que genere un mazo de material de estudio directamente desde el chat.
+ * Crea el mazo en la BD y lo devuelve listo para aparecer en la lista de mazos.
+ *
+ * @param contextText - Contexto académico de la materia
+ * @param mode - Tipo de material: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed'
+ * @param count - Número de ítems a generar
+ * @param title - Título del mazo
+ * @param subjectId - ID de la materia
+ * @param userId - ID del usuario
+ */
+export const generateStudyMaterialFromChat = async (params: {
+  contextText: string;
+  mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed';
+  count: number;
+  title: string;
+  subjectId: number;
+  userId: number;
+}) => {
+  try {
+    const response = await fetchWithFallback('/ai/generate-study-material', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context_text: params.contextText,
+        mode: params.mode,
+        count: params.count,
+        title: params.title,
+        subject_id: params.subjectId,
+        user_id: params.userId,
+      }),
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al generar el material de estudio');
+    return data as { id: number; title: string; card_count: number; cards: any[] };
+  } catch (error: any) {
+    throw new Error(error.message || 'Error de red al generar material');
+  }
+};

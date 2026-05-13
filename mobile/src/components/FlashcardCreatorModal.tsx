@@ -1,19 +1,21 @@
+/**
+ * FlashcardCreatorModal.tsx  (actualizado)
+ *
+ * Modal de generación automática de ítems de evaluación usando IA.
+ * Ahora incluye el selector de modo (StudyModeSelector) para elegir
+ * el tipo de ítem antes de generar: Flashcards, ECAES, V/F o Mixto.
+ */
 import React, { useState } from 'react';
 import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
+  Modal, View, Text, TextInput, TouchableOpacity,
+  ScrollView, Alert, StyleSheet,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFlashcardGenerator } from '../hooks/useFlashcardGenerator';
 import { PremiumLoader } from './PremiumLoader';
 import { CustomButton } from './CustomButton';
+import { StudyModeSelector } from './evaluation/StudyModeSelector';
+import { StudyMode } from '../services/api/types';
 
 interface FlashcardCreatorModalProps {
   visible: boolean;
@@ -31,119 +33,72 @@ interface EditableCard {
   id?: number;
   question: string;
   answer: string;
-  isDeleted?: boolean;
+  type: string;
 }
 
-/**
- * FlashcardCreatorModal.tsx
- *
- * Modal de generación automática de flashcards usando el LLM de Groq.
- * Flujo de 3 pasos internos:
- * 1. `input`: El usuario define cuántas tarjetas desea generar.
- * 2. `preview`: Se muestran las tarjetas generadas para edición/eliminación antes de confirmar.
- * 3. `complete`: Pantalla de éxito transitoria antes de cerrar el modal.
- * Acepta contenido de tipo texto (transcripciones/resúmenes) o imagen en base64 para
- * la generación contextual de las tarjetas educativas.
- *
- * @param visible - Controla la visibilidad del modal.
- * @param onClose - Callback para cerrar y limpiar el estado.
- * @param onSuccess - Callback ejecutado con el ID del mazo creado al finalizar.
- * @param content - Texto de transcripción o resumen como fuente de contexto.
- * @param imageBase64 - Imagen codificada en base64 como fuente alternativa de contexto.
- * @param contentType - Tipo de fuente: 'recording', 'video', 'image' o 'document'.
- * @param title - Título sugerido para el mazo de flashcards.
- * @param subjectId - ID de la materia a la que pertenecerá el mazo.
- * @param userId - ID del usuario propietario del mazo.
- */
 export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
-  visible,
-  onClose,
-  onSuccess,
-  content,
-  imageBase64,
-  contentType,
-  title,
-  subjectId,
-  userId,
+  visible, onClose, onSuccess, content, imageBase64,
+  contentType, title, subjectId, userId,
 }) => {
   const { t } = useTranslation();
-  const { generate, loading, error, generatedDeck, clearGeneratedDeck } = useFlashcardGenerator();
+  const { generate, loading, generatedDeck, clearGeneratedDeck } = useFlashcardGenerator();
 
   const [step, setStep] = useState<'input' | 'preview' | 'complete'>('input');
   const [cardCount, setCardCount] = useState('10');
+  const [studyMode, setStudyMode] = useState<StudyMode>('flashcard');
   const [editableCards, setEditableCards] = useState<EditableCard[]>([]);
-  const [editingCardId, setEditingCardId] = useState<number | null>(null);
 
   const handleGenerateCards = async () => {
     if (!cardCount || parseInt(cardCount) < 1) {
-      Alert.alert(t('common.errors.fillAllFields'));
+      Alert.alert('Ingresa un número válido de ítems');
       return;
     }
-
     const count = parseInt(cardCount);
-
-    // Validar longitud mínima del contenido si es texto
     if (content && content.length < 50) {
-      Alert.alert(t('flashcards.generate.tooShort', { count, recommended: 5 }), '', [
-        {
-          text: t('flashcards.generate.cancel'),
-          onPress: () => setCardCount('5'),
-          style: 'cancel',
-        },
-        {
-          text: t('flashcards.generate.generate'),
-          onPress: async () => await startGeneration(5),
-        },
+      Alert.alert('Contenido muy corto', 'El texto es demasiado corto para generar ítems de calidad.', [
+        { text: 'Cancelar', style: 'cancel', onPress: () => setCardCount('5') },
+        { text: 'Generar de todas formas', onPress: () => startGeneration(5) },
       ]);
       return;
     }
-
     await startGeneration(count);
   };
 
   const startGeneration = async (count: number) => {
     const result = await generate({
       text: content,
-      imageBase64: imageBase64,
+      imageBase64,
       count,
       title,
       subjectId,
       userId,
+      mode: studyMode,
     });
 
     if (result.success && result.deck) {
       const cards = (result.deck.cards || []).map((card: any, index: number) => ({
         id: card.id || index,
-        question: card.front || card.question || '',
-        answer: card.back || card.answer || '',
+        question: card.content?.front || card.content?.question || card.front || card.question || '',
+        answer: card.content?.back || card.content?.correctAnswer?.toString() || card.back || card.answer || '',
+        type: card.item_type || 'flashcard',
       }));
       setEditableCards(cards);
       setStep('preview');
     } else {
-      Alert.alert(t('flashcards.generate.errors.generationFailed'), result.error);
+      Alert.alert('Error', result.error || 'No se pudieron generar los ítems');
     }
   };
 
   const handleDeleteCard = (id: number | undefined) => {
     if (id === undefined) return;
-    setEditableCards((cards) => cards.filter((c) => c.id !== id));
-  };
-
-  const handleUpdateCard = (id: number | undefined, question: string, answer: string) => {
-    if (id === undefined) return;
-    setEditableCards((cards) =>
-      cards.map((c) => (c.id === id ? { ...c, question, answer } : c))
-    );
+    setEditableCards(cards => cards.filter(c => c.id !== id));
   };
 
   const handleSaveDeck = async () => {
     if (editableCards.length === 0) {
-      Alert.alert(t('flashcards.noCardsMsg'));
+      Alert.alert('No hay ítems para guardar');
       return;
     }
-
-    // Aquí iríamos a guardar el mazo con las tarjetas editadas
-    // Por ahora, asumimos que ya está guardado desde la API
     setStep('complete');
     setTimeout(() => {
       onSuccess(generatedDeck?.id || 0);
@@ -154,10 +109,16 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
   const handleClose = () => {
     setStep('input');
     setCardCount('10');
+    setStudyMode('flashcard');
     setEditableCards([]);
-    setEditingCardId(null);
     clearGeneratedDeck();
     onClose();
+  };
+
+  const getTypeLabel = (type: string) => {
+    if (type === 'multiple_choice') return '🎯';
+    if (type === 'boolean') return '⚖️';
+    return '🃏';
   };
 
   return (
@@ -167,17 +128,22 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
           <TouchableOpacity onPress={handleClose}>
             <Text style={styles.closeBtn}>✕</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>{t('flashcards.generate.title')}</Text>
+          <Text style={styles.title}>Generar con IA</Text>
           <View style={{ width: 30 }} />
         </View>
 
-        <ScrollView style={styles.content}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {step === 'input' && (
             <View style={styles.inputSection}>
-              <Text style={styles.subtitle}>{t('flashcards.generate.subtitle')}</Text>
-              <Text style={styles.label}>{t('flashcards.generate.countLabel')}</Text>
-              <Text style={styles.hint}>{t('flashcards.generate.countHint')}</Text>
+              <Text style={styles.subtitle}>
+                La IA analizará el contenido y generará ítems de evaluación de nivel universitario.
+              </Text>
 
+              {/* Mode selector */}
+              <StudyModeSelector selected={studyMode} onSelect={setStudyMode} />
+
+              <Text style={[styles.label, { marginTop: 20 }]}>Cantidad de ítems</Text>
+              <Text style={styles.hint}>Recomendado: 5–15 por sesión</Text>
               <TextInput
                 style={styles.input}
                 placeholder="10"
@@ -187,7 +153,7 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
               />
 
               <CustomButton
-                title={t('flashcards.generate.generate')}
+                title="Generar ítems"
                 onPress={handleGenerateCards}
                 disabled={loading}
                 variant="primary"
@@ -197,188 +163,78 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
 
           {step === 'preview' && (
             <View style={styles.previewSection}>
-              <Text style={styles.previewTitle}>{t('flashcards.generate.preview')}</Text>
-              <Text style={styles.cardCountText}>
-                {editableCards.length} {t('flashcards.cards')}
-              </Text>
+              <Text style={styles.previewTitle}>Revisa los ítems generados</Text>
+              <Text style={styles.cardCountText}>{editableCards.length} ítem{editableCards.length !== 1 ? 's' : ''}</Text>
 
               {editableCards.map((card, index) => (
                 <View key={card.id} style={styles.cardPreview}>
                   <View style={styles.cardHeader}>
-                    <Text style={styles.cardIndex}>Tarjeta {index + 1}</Text>
+                    <Text style={styles.cardIndex}>{getTypeLabel(card.type)} Ítem {index + 1}</Text>
                     <TouchableOpacity onPress={() => handleDeleteCard(card.id)}>
-                      <Text style={styles.deleteBtn}>{t('flashcards.generate.delete')}</Text>
+                      <Text style={styles.deleteBtn}>Eliminar</Text>
                     </TouchableOpacity>
                   </View>
-
-                  <Text style={styles.cardLabel}>{t('flashcards.frontLabel')}</Text>
+                  <Text style={styles.cardLabel}>Pregunta / Frente</Text>
                   <TextInput
                     style={styles.cardInput}
-                    placeholder={t('flashcards.frontPlaceholder')}
                     value={card.question}
-                    onChangeText={(text) => handleUpdateCard(card.id, text, card.answer)}
+                    onChangeText={(text) => setEditableCards(cards => cards.map(c => c.id === card.id ? { ...c, question: text } : c))}
                     multiline
                   />
-
-                  <Text style={styles.cardLabel}>{t('flashcards.backLabel')}</Text>
-                  <TextInput
-                    style={styles.cardInput}
-                    placeholder={t('flashcards.backPlaceholder')}
-                    value={card.answer}
-                    onChangeText={(text) => handleUpdateCard(card.id, card.question, text)}
-                    multiline
-                  />
+                  {card.type === 'flashcard' && (
+                    <>
+                      <Text style={styles.cardLabel}>Respuesta / Reverso</Text>
+                      <TextInput
+                        style={styles.cardInput}
+                        value={card.answer}
+                        onChangeText={(text) => setEditableCards(cards => cards.map(c => c.id === card.id ? { ...c, answer: text } : c))}
+                        multiline
+                      />
+                    </>
+                  )}
                 </View>
               ))}
 
-              <CustomButton
-                title={t('flashcards.generate.accept')}
-                onPress={handleSaveDeck}
-                disabled={loading || editableCards.length === 0}
-                variant="primary"
-              />
-              <CustomButton
-                title={t('flashcards.generate.cancel')}
-                onPress={handleClose}
-                variant="outline"
-              />
+              <CustomButton title="Guardar mazo" onPress={handleSaveDeck} disabled={loading || editableCards.length === 0} variant="primary" />
+              <CustomButton title="Cancelar" onPress={handleClose} variant="outline" />
             </View>
           )}
 
           {step === 'complete' && (
             <View style={styles.completeSection}>
-              <Text style={styles.successText}>✓ {t('flashcards.generate.success')}</Text>
-              <Text style={styles.completeMessage}>
-                {t('flashcards.generate.loading')}
-              </Text>
+              <Text style={styles.successText}>✓ ¡Mazo creado!</Text>
+              <Text style={styles.completeMessage}>Abriendo tu mazo...</Text>
             </View>
           )}
         </ScrollView>
 
-        {loading && <PremiumLoader visible={loading} text={t('flashcards.generate.generating')} />}
+        {loading && <PremiumLoader visible={loading} text="Generando con IA..." />}
       </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    marginTop: 50,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  closeBtn: {
-    fontSize: 24,
-    color: '#999',
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  inputSection: {
-    marginTop: 20,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  hint: {
-    fontSize: 13,
-    color: '#999',
-    marginBottom: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  previewSection: {
-    marginTop: 20,
-  },
-  previewTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  cardCountText: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 16,
-  },
-  cardPreview: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardIndex: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#666',
-  },
-  deleteBtn: {
-    fontSize: 13,
-    color: '#ff6b6b',
-  },
-  cardLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#999',
-    marginBottom: 6,
-  },
-  cardInput: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    padding: 10,
-    fontSize: 13,
-    marginBottom: 12,
-    minHeight: 50,
-  },
-  completeSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  successText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#4CAF50',
-    marginBottom: 12,
-  },
-  completeMessage: {
-    fontSize: 14,
-    color: '#666',
-  },
+  container: { flex: 1, backgroundColor: '#fff', marginTop: 50 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  title: { fontSize: 18, fontWeight: '600' },
+  closeBtn: { fontSize: 24, color: '#999' },
+  content: { flex: 1, padding: 16 },
+  inputSection: { marginTop: 8 },
+  subtitle: { fontSize: 13, color: '#666', marginBottom: 18, lineHeight: 19 },
+  label: { fontSize: 15, fontWeight: '600', marginBottom: 6 },
+  hint: { fontSize: 12, color: '#999', marginBottom: 12 },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 16, marginBottom: 20 },
+  previewSection: { marginTop: 8 },
+  previewTitle: { fontSize: 16, fontWeight: '600', marginBottom: 6 },
+  cardCountText: { fontSize: 13, color: '#666', marginBottom: 16 },
+  cardPreview: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#eee' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  cardIndex: { fontSize: 13, fontWeight: '600', color: '#555' },
+  deleteBtn: { fontSize: 13, color: '#ff6b6b' },
+  cardLabel: { fontSize: 11, fontWeight: '600', color: '#999', marginBottom: 5 },
+  cardInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 10, minHeight: 50 },
+  completeSection: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  successText: { fontSize: 20, fontWeight: '700', color: '#4CAF50', marginBottom: 12 },
+  completeMessage: { fontSize: 14, color: '#666' },
 });

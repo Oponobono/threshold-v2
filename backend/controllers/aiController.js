@@ -61,6 +61,154 @@ async function callGroqAPI(messages, systemPrompt) {
 }
 
 /**
+ * Genera un mazo de material de estudio (flashcard|multiple_choice|boolean|mixed)
+ * directamente desde el contexto del chat de Zyren.
+ *
+ * Zyren conoce la estructura exacta de los ítems y genera JSON válido para
+ * insertar directamente en la tabla `flashcards` (polimórfica).
+ */
+exports.generateStudyMaterial = async (req, res) => {
+  const { context_text, mode = 'mixed', count = 10, title, subject_id, user_id } = req.body;
+
+  if (!context_text || !title || !subject_id || !user_id) {
+    return res.status(400).json({ error: 'Faltan campos: context_text, title, subject_id, user_id' });
+  }
+
+  const groqApiKey = secrets.GROQ_API_KEY;
+  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no está configurada' });
+
+  // ── Sistema prompt que le enseña a Zyren la estructura exacta ──────────────
+  const modeInstructions = {
+    flashcard: `Genera exactamente ${count} FLASHCARDS.
+Formato JSON de cada ítem:
+{ "type": "flashcard", "data": { "front": "Pregunta abierta", "back": "Respuesta concisa" }, "hint": "Pista sutil", "explanation": "Por qué esta es la respuesta correcta" }`,
+
+    multiple_choice: `Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES).
+Cada pregunta tiene exactamente 4 opciones. Solo una es correcta. Los distractores deben ser plausibles.
+Formato JSON de cada ítem:
+{ "type": "multiple_choice", "data": { "question": "Pregunta precisa", "options": ["Op A", "Op B", "Op C", "Op D"], "correctIndex": 0 }, "hint": "Pista que orienta sin revelar", "explanation": "Por qué la opción correcta es correcta y por qué los demás distractores son incorrectos" }`,
+
+    boolean: `Genera exactamente ${count} PREGUNTAS DE VERDADERO O FALSO.
+Distribuye verdaderos y falsos equilibradamente. Las afirmaciones deben ser precisas.
+Formato JSON de cada ítem:
+{ "type": "boolean", "data": { "question": "Afirmación académica precisa", "correctAnswer": true }, "hint": "Pista que orienta", "explanation": "Por qué la afirmación es verdadera o falsa" }`,
+
+    mixed: `Genera exactamente ${count} ÍTEMS MIXTOS distribuidos pedagógicamente:
+- Conceptos complejos → flashcard (~40%)
+- Definiciones técnicas → multiple_choice (~40%)
+- Mitos/verdades → boolean (~20%)
+
+Cada multiple_choice tiene exactamente 4 opciones con distractores plausibles.
+Formato JSON según el tipo:
+- flashcard: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }
+- multiple_choice: { "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": N }, "hint": "...", "explanation": "..." }
+- boolean: { "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }`,
+  };
+
+  const systemPrompt = `Eres Zyren, tutor académico de Threshold. Tu tarea es generar material de estudio de NIVEL UNIVERSITARIO basado en el contenido proporcionado.
+
+INSTRUCCIONES:
+1. Analiza el contenido y extrae los conceptos más importantes.
+2. ${modeInstructions[mode] || modeInstructions.mixed}
+3. Responde ÚNICAMENTE con un JSON array válido. Sin markdown, sin texto adicional, sin bloques de código.
+4. Asegúrate de que el JSON sea válido y parseable.`;
+
+  try {
+    const trimmedContext = context_text.length > 8000
+      ? context_text.substring(0, 8000) + '\n[...contexto truncado]'
+      : context_text;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Genera el material de estudio basado en este contenido académico:\n\n${trimmedContext}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 6000,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      return res.status(500).json({ error: 'Error llamando a Groq', details: err });
+    }
+
+    const groqData = await response.json();
+    const raw = groqData.choices[0].message.content.trim();
+
+    // Extraer JSON array
+    let jsonStr = raw;
+    const arrayMatch = raw.match(/\[[\s\S]*\]/);
+    if (arrayMatch) jsonStr = arrayMatch[0];
+
+    let items;
+    try { items = JSON.parse(jsonStr); }
+    catch (_) { return res.status(500).json({ error: 'Zyren no retornó JSON válido', raw: raw.substring(0, 500) }); }
+
+    if (!Array.isArray(items)) {
+      return res.status(500).json({ error: 'Zyren retornó un objeto, no un array' });
+    }
+
+    const description = `Material ${mode === 'mixed' ? 'mixto' : mode} generado por Zyren`;
+
+    // Crear el mazo en la BD
+    db.run(
+      `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
+      [subject_id, user_id, title, description],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        const deckId = this.lastID;
+
+        // Insertar todos los ítems
+        const inserts = items.map(item => new Promise((resolve, reject) => {
+          const itemType = item.type || 'flashcard';
+          const content = item.data || {};
+          const front = itemType === 'flashcard' ? (content.front || '') : '';
+          const back = itemType === 'flashcard' ? (content.back || '') : '';
+          const contentStr = JSON.stringify(content);
+          const hint = item.hint || null;
+          const explanation = item.explanation || null;
+
+          db.run(
+            `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
+            [deckId, front, back, itemType, contentStr, hint, explanation],
+            function(e) { if (e) reject(e); else resolve(); }
+          );
+        }));
+
+        Promise.all(inserts)
+          .then(() => {
+            db.all(`SELECT * FROM flashcards WHERE deck_id = ? ORDER BY created_at ASC`, [deckId], (e, cards) => {
+              if (e) return res.status(500).json({ error: e.message });
+              res.status(201).json({
+                id: deckId, title, description, subject_id, user_id,
+                card_count: cards.length,
+                mode,
+                cards: cards.map(c => {
+                  let content = null;
+                  try { content = JSON.parse(c.content_json || '{}'); } catch (_) {}
+                  return { ...c, content };
+                }),
+              });
+            });
+          })
+          .catch(e => {
+            db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], () => {});
+            res.status(500).json({ error: 'Error insertando ítems', details: e.message });
+          });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: 'Error generando material de estudio con Zyren', details: err.message });
+  }
+};
+
+
+/**
  * Helper para hacer llamadas a Google Gemini API (mejorado con Files API)
  * Ahora usa el SDK oficial de Google para mejor manejo de contextos grandes
  */
@@ -126,6 +274,27 @@ exports.aiChat = async (req, res) => {
 
   // Generar prompt dinámico según si hay contexto o no
   let systemMessage;
+
+  // Instrucciones comunes para generación de mazos (en ambos modos)
+  const deckGenerationInstructions = `
+
+---
+INSTRUCCIONES ESPECIALES PARA GENERAR MAZOS DE ESTUDIO:
+Si el estudiante pide que generes flashcards, un mazo, preguntas de estudio, un examen, o material de repaso:
+1. Responde de forma conversacional indicando qué vas a generar.
+2. AL FINAL de tu respuesta, añade EXACTAMENTE este bloque (sin espacios extra, en una sola línea):
+   %%DECK_ACTION%%{"mode":"MODE","count":COUNT}%%END%%
+   donde:
+   - MODE es uno de: "flashcard" (tarjetas frente/reverso), "multiple_choice" (4 opciones estilo ECAES), "boolean" (verdadero/falso), "mixed" (combinación pedagógica)
+   - COUNT es un número entre 5 y 20 (infiere la cantidad del contexto o usa 10 si no se especifica)
+   Ejemplos:
+   - "genera 10 flashcards" → %%DECK_ACTION%%{"mode":"flashcard","count":10}%%END%%
+   - "crea un examen" → %%DECK_ACTION%%{"mode":"multiple_choice","count":10}%%END%%
+   - "material de repaso mixto" → %%DECK_ACTION%%{"mode":"mixed","count":12}%%END%%
+   - "preguntas de verdadero/falso" → %%DECK_ACTION%%{"mode":"boolean","count":10}%%END%%
+3. NO incluyas el bloque %%DECK_ACTION%% si el usuario NO pide generar material.
+---`;
+
   if (trimmedContext) {
     // MODO CON CONTEXTO: Estricto con los archivos/materiales proporcionados
     systemMessage = `Eres "Zyren", un tutor académico personal experto y paciente.
@@ -137,12 +306,12 @@ INSTRUCCIONES:
 - Si la pregunta no puede responderse con la información en los archivos, indica claramente que esa información no está disponible en los materiales proporcionados.
 - Sé didáctico, claro y estructurado (usa viñetas si es necesario).
 - Mantén un tono alentador y profesional.
+${deckGenerationInstructions}
 
 --- CONTEXTO DE LA MATERIA ---
 ${trimmedContext}
 ------------------------------`;
   } else {
-    // MODO SIN CONTEXTO: Flexible, responde abiertamente
     systemMessage = `Eres "Zyren", un tutor académico personal experto y paciente.
 
 INSTRUCCIONES:
@@ -151,7 +320,8 @@ INSTRUCCIONES:
 - Explica los conceptos de forma clara, didáctica y estructurada (usa viñetas si es necesario).
 - Adapta el nivel de complejidad según la pregunta.
 - Mantén un tono alentador, profesional y motivador.
-- Ofrece ejemplos cuando sea apropiado para mejorar la comprensión.`;
+- Ofrece ejemplos cuando sea apropiado para mejorar la comprensión.
+${deckGenerationInstructions}`;
   }
 
   try {
