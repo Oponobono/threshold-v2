@@ -26,8 +26,8 @@ const analyticsController = require('../controllers/analyticsController');
 router.post('/track-guest', analyticsController.trackGuest);
 
 // Learning Engineering Analytics
-router.get('/mastery/:userId/:subjectId', analyticsController.getMastery);
-router.get('/predictions/:userId', analyticsController.getReviewPredictions);
-router.get('/report/:userId', analyticsController.generateReport);
+router.get('/analytics/mastery/:userId/:subjectId', analyticsController.getMastery);
+router.get('/analytics/predictions/:userId', analyticsController.getReviewPredictions);
+router.get('/analytics/report/:userId', analyticsController.generateReport);
 
 module.exports = router;
