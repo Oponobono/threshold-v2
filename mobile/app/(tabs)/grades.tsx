@@ -12,6 +12,8 @@ import { gradesStyles as styles } from '../../src/styles/Grades.styles';
 
 import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../../src/store/useDataStore';
+import { MasteryRadar } from '../../src/components/MasteryRadar';
+import { getUserId } from '../../src/services/api/auth';
 
 const GRADE_COLORS = (pct: number) => {
   if (pct >= 80) return '#34C759';
@@ -27,6 +29,11 @@ export default function GradesScreen() {
 
   const [termGpa, setTermGpa] = useState('0.00');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    getUserId().then(id => setUserId(id ? Number(id) : null));
+  }, []);
 
   const filteredAssessments = useMemo(() => {
     if (selectedSubjectId === null) return assessments;
@@ -314,6 +321,18 @@ export default function GradesScreen() {
             )}
           </View>
         </View>
+
+        {/* --- LEARNING ENGINEERING RADAR --- */}
+        {userId && (
+          <View style={styles.card}>
+            <View style={[globalStyles.rowBetweenCenter, globalStyles.mb16]}>
+              <Text style={styles.sectionTitle}>
+                {t('grades.mastery', 'Dominio de Aprendizaje')}
+              </Text>
+            </View>
+            <MasteryRadar userId={userId} subjectId={selectedSubjectId || 'all'} />
+          </View>
+        )}
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>

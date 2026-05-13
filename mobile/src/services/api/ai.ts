@@ -271,3 +271,35 @@ export const generateStudyMaterialFromChat = async (params: {
     throw new Error(error.message || 'Error de red al generar material');
   }
 };
+
+/**
+ * Analiza un mazo en busca de conceptos confundibles (Learning Engineering).
+ */
+export const analyzeDeckConfusions = async (deckId: number | string): Promise<{ suggestions: any[] }> => {
+  try {
+    const response = await fetchWithFallback(`/ai/deck/${deckId}/confusions`, { method: 'GET' });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al analizar confusiones');
+    return data as { suggestions: any[] };
+  } catch (error: any) {
+    throw new Error(error.message || 'Error de red al analizar mazo');
+  }
+};
+
+/**
+ * Genera una tarjeta de diferenciación y la añade al mazo.
+ */
+export const generateDifferentiationCard = async (deckId: number | string, conceptA: string, conceptB: string, reason: string) => {
+  try {
+    const response = await fetchWithFallback(`/ai/deck/${deckId}/differentiate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conceptA, conceptB, reason }),
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al generar la tarjeta de diferenciación');
+    return data;
+  } catch (error: any) {
+    throw new Error(error.message || 'Error de red al generar tarjeta');
+  }
+};

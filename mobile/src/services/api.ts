@@ -11,3 +11,4 @@ export * from './api/youtube';
 export * from './api/documents';
 export * from './api/learning';
 export * from './api/ai';
+export * from './api/analytics';

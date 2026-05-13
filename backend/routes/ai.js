@@ -307,4 +307,16 @@ router.get('/ai/model-info', aiController.getModelInfo);
  */
 router.post('/ai/generate-study-material', aiController.generateStudyMaterial);
 
+/**
+ * GET /api/ai/deck/:deckId/confusions
+ * Detecta conceptos confundibles en un mazo (Learning Engineering).
+ */
+router.get('/ai/deck/:deckId/confusions', aiController.analyzeDeckConfusions);
+
+/**
+ * POST /api/ai/deck/:deckId/differentiate
+ * Genera e inserta una tarjeta de diferenciación basada en una sugerencia.
+ */
+router.post('/ai/deck/:deckId/differentiate', aiController.generateDifferentiationCard);
+
 module.exports = router;

@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { createSubject, getCurrentUserProfile, getSubjects, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, getAllSchedules, createStudySession, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
+import { createSubject, getCurrentUserProfile, getSubjects, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, getAllSchedules, createStudySession, getPredictions, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const AudioRecorderModal = React.lazy(() => import('../../src/components/AudioRecorderModal').then(m => ({ default: m.AudioRecorderModal })));
@@ -100,6 +100,7 @@ export default function HybridDashboardScreen() {
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [nextAssessment, setNextAssessment] = useState<Assessment | null>(null);
+  const [predictions, setPredictions] = useState<PredictionResponse | null>(null);
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
@@ -133,6 +134,10 @@ export default function HybridDashboardScreen() {
     setSubjects(Array.isArray(userSubjects) ? userSubjects : []);
     setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
     setAllSchedules(Array.isArray(schedulesAll) ? schedulesAll : []);
+
+    if (userProfile?.id) {
+      getPredictions(userProfile.id).then(setPredictions).catch(err => console.warn('Predictions error:', err));
+    }
 
     // Find next assessment across all subjects
     if (Array.isArray(userSubjects) && userSubjects.length > 0) {
@@ -769,6 +774,36 @@ export default function HybridDashboardScreen() {
               </TouchableOpacity>
             ) : null}
           </View>
+
+          {predictions && predictions.dueCount > 0 ? (
+            <View style={{ marginTop: 24 }}>
+              <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
+                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t('dashboard.urgentReviews', 'Repasos Urgentes')}</Text>
+                <View style={[styles.allChip, { backgroundColor: '#FF3B3020' }]}>
+                  <Text style={[styles.allChipText, { color: '#FF3B30', fontWeight: 'bold' }]}>{predictions.dueCount}</Text>
+                </View>
+              </View>
+              <View style={[styles.nextClassCard, { borderColor: '#FF3B3030', borderWidth: 1, backgroundColor: '#FF3B3005' }]}>
+                <View style={styles.nextClassInfo}>
+                  <View style={[styles.nextClassBadge, { backgroundColor: '#FF3B3020' }]}>
+                    <MaterialCommunityIcons name="brain" size={24} color="#FF3B30" />
+                  </View>
+                  <View style={globalStyles.flex1}>
+                    <Text style={styles.nextClassTitle} numberOfLines={1}>{t('dashboard.attentionRequired', 'Atención Requerida')}</Text>
+                    <Text style={[styles.nextClassRoom, { color: theme.colors.text.secondary }]}>
+                      {t('dashboard.cardsToForget', 'Tienes tarjetas a punto de ser olvidadas.')}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={[styles.openBtn, { backgroundColor: '#FF3B30' }]}
+                  onPress={() => setIsFlashcardsVisible(true)}
+                >
+                  <Text style={[styles.openBtnText, { color: '#fff' }]}>{t('dashboard.reviewBtn', 'Repasar')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
         </View>
 
         {/* 4. ORIGINAL METRICS (2x2) */}

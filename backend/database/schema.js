@@ -502,8 +502,139 @@ const tableSchema = {
       { name: 'item_type', type: "TEXT NOT NULL DEFAULT 'flashcard'" },
       { name: 'content_json', type: 'TEXT' },
       { name: 'hint', type: 'TEXT' },
-      { name: 'explanation', type: 'TEXT' }
+      { name: 'explanation', type: 'TEXT' },
+      // SM-2 Spaced Repetition Fields
+      { name: 'sm2_ease_factor', type: 'REAL DEFAULT 2.5' },
+      { name: 'sm2_interval', type: 'INTEGER DEFAULT 1' },
+      { name: 'sm2_repetitions', type: 'INTEGER DEFAULT 0' },
+      { name: 'next_review_date', type: 'TIMESTAMP' },
+      // Cognitive Load & Atomicity
+      { name: 'word_count', type: 'INTEGER DEFAULT 0' },
+      { name: 'is_atomic', type: 'INTEGER DEFAULT 1' },
+      { name: 'parent_card_id', type: 'INTEGER' },
+      { name: 'atomic_index', type: 'INTEGER' }
     ]
+  },
+  card_logs: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS card_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        card_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        result VARCHAR(20),
+        response_time_ms INTEGER,
+        difficulty_deduced VARCHAR(20),
+        normalized_time_ms INTEGER,
+        text_length_words INTEGER,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (card_id) REFERENCES flashcards(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS card_logs (
+        id SERIAL PRIMARY KEY,
+        card_id INTEGER NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        result VARCHAR(20),
+        response_time_ms INTEGER,
+        difficulty_deduced VARCHAR(20),
+        normalized_time_ms INTEGER,
+        text_length_words INTEGER,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'difficulty_deduced', type: 'VARCHAR(20)' },
+      { name: 'normalized_time_ms', type: 'INTEGER' },
+      { name: 'text_length_words', type: 'INTEGER' }
+    ]
+  },
+  learning_analytics: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS learning_analytics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        subject_id INTEGER,
+        total_cards INTEGER DEFAULT 0,
+        total_reviews INTEGER DEFAULT 0,
+        correct_reviews INTEGER DEFAULT 0,
+        incorrect_reviews INTEGER DEFAULT 0,
+        avg_response_time_ms REAL DEFAULT 0,
+        mastery_percentage REAL DEFAULT 0,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        UNIQUE(user_id, subject_id)
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS learning_analytics (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+        total_cards INTEGER DEFAULT 0,
+        total_reviews INTEGER DEFAULT 0,
+        correct_reviews INTEGER DEFAULT 0,
+        incorrect_reviews INTEGER DEFAULT 0,
+        avg_response_time_ms REAL DEFAULT 0,
+        mastery_percentage REAL DEFAULT 0,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, subject_id)
+      )
+    `
+  },
+  card_difficulty_analytics: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS card_difficulty_analytics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        card_id INTEGER NOT NULL,
+        total_attempts INTEGER DEFAULT 0,
+        failure_rate REAL DEFAULT 0,
+        avg_response_time_ms REAL DEFAULT 0,
+        problem_flag INTEGER DEFAULT 0,
+        last_analyzed DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (card_id) REFERENCES flashcards(id) ON DELETE CASCADE,
+        UNIQUE(card_id)
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS card_difficulty_analytics (
+        id SERIAL PRIMARY KEY,
+        card_id INTEGER NOT NULL UNIQUE REFERENCES flashcards(id) ON DELETE CASCADE,
+        total_attempts INTEGER DEFAULT 0,
+        failure_rate REAL DEFAULT 0,
+        avg_response_time_ms REAL DEFAULT 0,
+        problem_flag INTEGER DEFAULT 0,
+        last_analyzed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+  review_predictions: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS review_predictions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        card_id INTEGER NOT NULL,
+        predicted_next_review DATETIME,
+        prediction_confidence REAL,
+        notification_sent INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (card_id) REFERENCES flashcards(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS review_predictions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        card_id INTEGER NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
+        predicted_next_review TIMESTAMP,
+        prediction_confidence REAL,
+        notification_sent INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
   },
   schedules: {
     sqlite: `
@@ -575,30 +706,7 @@ const tableSchema = {
       )
     `
   },
-  card_logs: {
-    sqlite: `
-      CREATE TABLE IF NOT EXISTS card_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        card_id INTEGER NOT NULL,
-        user_id INTEGER NOT NULL,
-        result VARCHAR(20),
-        response_time_ms INTEGER,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (card_id) REFERENCES flashcards(id) ON DELETE CASCADE,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      )
-    `,
-    postgres: `
-      CREATE TABLE IF NOT EXISTS card_logs (
-        id SERIAL PRIMARY KEY,
-        card_id INTEGER NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        result VARCHAR(20),
-        response_time_ms INTEGER,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `
-  },
+
   shared_decks: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS shared_decks (

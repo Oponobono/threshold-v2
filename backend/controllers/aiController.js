@@ -4,12 +4,15 @@ const fs = require('fs').promises;
 const path = require('path');
 const geminiService = require('../utils/geminiService');
 const { shieldPrompt } = require('../utils/promptShield');
+const { detectDeckGenerationIntent, buildDeckActionBlock, extractRequestedCount } = require('../utils/intentionDetector');
 const {
   processDocumentWithFilesAPI,
   processDocumentBuffer,
   processAcademicChat,
   generateFlashcardsFromDocument,
   generateFlashcardsFromBuffer,
+  generateFlashcardsFromText,
+  generateFlashcardsWithGroq,
   getModelInfo,
 } = geminiService;
 
@@ -283,19 +286,23 @@ exports.aiChat = async (req, res) => {
 
 ---
 INSTRUCCIONES ESPECIALES PARA GENERAR MAZOS DE ESTUDIO:
-Si el estudiante pide que generes flashcards, un mazo, preguntas de estudio, un examen, o material de repaso:
+Si el estudiante pide que generes flashcards, un mazo, preguntas de estudio, un examen, tarjetas de repaso, o material pedagógico similar:
 1. Responde de forma conversacional indicando qué vas a generar.
-2. AL FINAL de tu respuesta, añade EXACTAMENTE este bloque (sin espacios extra, en una sola línea):
+2. Detecta automáticamente si la solicitud es LEGÍTIMA:
+   ✅ GENERAR MAZO si pide: "crea flashcards", "necesito preguntas", "examen", "tarjetas", "material de repaso", etc.
+   ❌ NO GENERAR si es contexto diferente: "¿cuánto cuesta un mazo de cartas?", "el documento es para el examen", etc.
+3. Si es una solicitud legítima, AL FINAL de tu respuesta, añade EXACTAMENTE este bloque (en una sola línea):
    %%DECK_ACTION%%{"mode":"MODE","count":COUNT}%%END%%
    donde:
-   - MODE es uno de: "flashcard" (tarjetas frente/reverso), "multiple_choice" (4 opciones estilo ECAES), "boolean" (verdadero/falso), "mixed" (combinación pedagógica)
-   - COUNT es un número entre 5 y 20 (infiere la cantidad del contexto o usa 10 si no se especifica)
+   - MODE es uno de: "flashcard" (tarjetas frente/reverso), "multiple_choice" (4 opciones), "boolean" (verdadero/falso), "mixed" (combinación)
+   - COUNT es un número entre 5 y 20
    Ejemplos:
-   - "genera 10 flashcards" → %%DECK_ACTION%%{"mode":"flashcard","count":10}%%END%%
-   - "crea un examen" → %%DECK_ACTION%%{"mode":"multiple_choice","count":10}%%END%%
-   - "material de repaso mixto" → %%DECK_ACTION%%{"mode":"mixed","count":12}%%END%%
-   - "preguntas de verdadero/falso" → %%DECK_ACTION%%{"mode":"boolean","count":10}%%END%%
-3. NO incluyas el bloque %%DECK_ACTION%% si el usuario NO pide generar material.
+   - Usuario pide "10 flashcards" → %%DECK_ACTION%%{"mode":"flashcard","count":10}%%END%%
+   - Usuario pide "examen de opción múltiple" → %%DECK_ACTION%%{"mode":"multiple_choice","count":10}%%END%%
+   - Usuario pide "preguntas de repaso" → %%DECK_ACTION%%{"mode":"mixed","count":12}%%END%%
+   - Usuario pide "verdadero o falso" → %%DECK_ACTION%%{"mode":"boolean","count":10}%%END%%
+4. Infiere el modo automáticamente según las palabras clave del usuario.
+5. NO incluyas el bloque %%DECK_ACTION%% si el usuario NO pide generar material o si la intención es diferente.
 ---`;
 
   if (trimmedContext) {
@@ -346,6 +353,100 @@ ${deckGenerationInstructions}`;
     
     const context_truncated = context_text && context_text.length > MAX_CONTEXT_CHARS;
 
+    // ─── DETECCIÓN DE DECK_ACTION y GENERACIÓN AUTOMÁTICA ──────────────────
+    let deckData = null;
+    let cleanReplyContent = result.reply.content;
+    
+    const deckActionPattern = /%%DECK_ACTION%%(.+?)%%END%%/;
+    const deckMatch = result.reply.content.match(deckActionPattern);
+    
+    if (deckMatch && deckMatch[1]) {
+      try {
+        const deckAction = JSON.parse(deckMatch[1]);
+        console.log(`[DeckGeneration] Generando mazo: modo=${deckAction.mode}, count=${deckAction.count}, provider=${provider}`);
+        
+        // Limpiar la respuesta del bloque DECK_ACTION
+        cleanReplyContent = result.reply.content.replace(deckActionPattern, '').trim();
+        
+        // Generar el mazo con contexto usando el MISMO PROVIDER del chat
+        if (context_text) {
+          try {
+            let generatedDeck = [];
+            let deckProvider = provider;
+
+            // INTENTO 1: Usar el provider elegido por el usuario para el chat
+            try {
+              if (provider === 'gemini') {
+                console.log(`[DeckGeneration] Intentando con Gemini (provider elegido en chat)...`);
+                generatedDeck = await geminiService.generateFlashcardsFromText(
+                  context_text,
+                  deckAction.count || 10
+                );
+              } else {
+                console.log(`[DeckGeneration] Intentando con Groq (provider elegido en chat)...`);
+                generatedDeck = await geminiService.generateFlashcardsWithGroq(
+                  context_text,
+                  deckAction.count || 10
+                );
+              }
+            } catch (primaryErr) {
+              console.warn(`[DeckGeneration] ⚠️ ${provider.toUpperCase()} falló, intentando fallback...`, primaryErr.message);
+              
+              // FALLBACK: Intentar con el otro provider
+              const fallbackProvider = provider === 'gemini' ? 'groq' : 'gemini';
+              try {
+                if (fallbackProvider === 'gemini') {
+                  console.log(`[DeckGeneration] Fallback a Gemini...`);
+                  generatedDeck = await geminiService.generateFlashcardsFromText(
+                    context_text,
+                    deckAction.count || 10
+                  );
+                } else {
+                  console.log(`[DeckGeneration] Fallback a Groq...`);
+                  generatedDeck = await geminiService.generateFlashcardsWithGroq(
+                    context_text,
+                    deckAction.count || 10
+                  );
+                }
+                deckProvider = fallbackProvider;
+              } catch (fallbackErr) {
+                console.error(`[DeckGeneration] ❌ Ambos providers fallaron`);
+                throw fallbackErr;
+              }
+            }
+
+            deckData = {
+              success: true,
+              mode: deckAction.mode,
+              count: deckAction.count,
+              items: generatedDeck,
+              generatedAt: new Date().toISOString(),
+              provider: deckProvider,
+              fallbackUsed: deckProvider !== provider,
+              note: `Generado con ${deckProvider.toUpperCase()} desde contexto del chat`
+            };
+            
+            console.log(`[DeckGeneration] ✅ ${generatedDeck.length} ítems generados (${deckProvider})`);
+          } catch (deckErr) {
+            console.error(`[DeckGeneration] Error generando mazo:`, deckErr.message);
+            deckData = {
+              success: false,
+              error: 'No se pudo generar el mazo automáticamente',
+              details: deckErr.message
+            };
+          }
+        } else {
+          console.warn('[DeckGeneration] No hay contexto disponible para generar mazo');
+          deckData = {
+            success: false,
+            error: 'No hay material disponible para generar el mazo. Proporciona documentos o texto de contexto.'
+          };
+        }
+      } catch (parseErr) {
+        console.warn('[DeckGeneration] Error parseando DECK_ACTION:', parseErr.message);
+      }
+    }
+
     // Guardar en el historial si se proporciona session_id
     const { session_id } = req.body;
     if (session_id && messages.length > 0) {
@@ -353,14 +454,18 @@ ${deckGenerationInstructions}`;
       if (lastUserMsg.role === 'user') {
         db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'user', lastUserMsg.content]);
       }
-      db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'assistant', result.reply.content]);
+      db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'assistant', cleanReplyContent]);
     }
 
     res.json({ 
-      reply: result.reply,
+      reply: {
+        ...result.reply,
+        content: cleanReplyContent
+      },
       provider,
       context_truncated,
       duration,
+      ...(deckData && { deck: deckData }) // Incluir datos del mazo si se generó
     });
   } catch (err) {
     console.error(`💥 Error crítico en aiChat [${provider}]:`, err);
@@ -618,100 +723,67 @@ exports.buildContext = async (req, res) => {
 };
 
 /**
- * Genera flashcards estructuradas (pares pregunta/respuesta) a partir de un
- * bloque de texto de contexto académico usando Groq o Gemini.
- *
- * El modelo retorna un array JSON de objetos con { front, back } o { question, answer }
+ * Genera flashcards estructuradas de CALIDAD ACADÉMICA ALTA.
+ * Usa Taxonomía de Bloom y prompts especializados.
+ * Estrategia híbrida: Intenta Gemini → Fallback Groq
  */
 exports.generateFlashcards = async (req, res) => {
-  const { context_text, count = 10 } = req.body;
-  const provider = getLLMProvider(req);
+  const { context_text, count = 10, userRequest = '' } = req.body;
 
   if (!context_text) {
     return res.status(400).json({ error: 'Falta context_text para generar las flashcards.' });
   }
 
-  console.log(`[GenerateFlashcards] Usando proveedor: ${provider}`);
+  console.log(`[GenerateFlashcards] Iniciando generación híbrida (Gemini → Groq fallback)`);
+  console.log(`[GenerateFlashcards] Usuario solicitó: "${userRequest}"`);
 
   try {
     let flashcards = [];
     let modelUsed = '';
+    let provider = '';
 
-    if (provider === 'gemini') {
-      // ─── GEMINI PATH ───────────────────────────────────────────────
-      const geminiApiKey = secrets.GEMINI_API_KEY;
-      if (!geminiApiKey) {
-        return res.status(500).json({ error: 'Gemini API Key no está configurada' });
+    // ─── INTENTO 1: GEMINI (MÁXIMA CALIDAD) ──────────────────────────────
+    const geminiApiKey = secrets.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      try {
+        console.log(`[GenerateFlashcards] Intentando con Gemini...`);
+        flashcards = await geminiService.generateFlashcardsFromText(context_text, count);
+        modelUsed = 'gemini-3-flash-preview';
+        provider = 'gemini';
+        
+        console.log(`[GenerateFlashcards] ✅ Éxito con Gemini (${flashcards.length} ítems)`);
+      } catch (geminiErr) {
+        console.warn(`[GenerateFlashcards] ⚠️ Gemini falló, intentando Groq...`, geminiErr.message);
+        flashcards = []; // Reset para intentar Groq
       }
-
-      console.log(`[GenerateFlashcards] Llamando a Gemini...`);
-      flashcards = await geminiService.generateFlashcardsFromText(context_text, count);
-      modelUsed = 'gemini-3-flash-preview';
-
     } else {
-      // ─── GROQ PATH ────────────────────────────────────────────────
+      console.warn(`[GenerateFlashcards] Gemini API Key no disponible, usando Groq`);
+    }
+
+    // ─── FALLBACK: GROQ (si Gemini no disponible o falló) ─────────────────
+    if (!flashcards || flashcards.length === 0) {
       const groqApiKey = secrets.GROQ_API_KEY;
       if (!groqApiKey) {
-        return res.status(500).json({ error: 'Groq API Key no está configurada' });
+        return res.status(500).json({ 
+          error: 'Ningún LLM disponible (Gemini y Groq desconfigurados)',
+          details: 'Configura al menos GEMINI_API_KEY o GROQ_API_KEY en .env'
+        });
       }
 
-      // Limitar el contexto por límites de Groq (6000 TPM)
-      const trimmedContext = context_text.length > 12000
-        ? context_text.substring(0, 12000) + '\n[...contexto truncado por longitud]'
-        : context_text;
-
-      const systemPrompt = `Tu nombre es Zyren. Eres un experto pedagogo universitario. Tu tarea es generar exactamente ${count} flashcards de estudio a partir del material académico proporcionado.
-
-REGLAS ESTRICTAS:
-1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional, sin markdown, sin explicaciones.
-2. Cada elemento del array debe tener exactamente dos campos: "front" (pregunta o concepto) y "back" (respuesta o definición).
-3. Las preguntas deben ser precisas y directas. Las respuestas, concisas pero completas.
-4. Cubre los conceptos más importantes del material. Evita preguntas triviales.
-5. Formato exacto requerido: [{"front": "...", "back": "..."}, ...]
-
-Ejemplo de respuesta válida:
-[{"front": "¿Qué es la fotosíntesis?", "back": "Proceso por el cual las plantas convierten luz solar en glucosa usando CO₂ y agua."}]`;
-
-      console.log(`[GenerateFlashcards] Llamando a Groq...`);
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Genera ${count} flashcards a partir de este material:\n\n${trimmedContext}` },
-          ],
-          temperature: 0.4,
-          max_tokens: 4096,
-          response_format: { type: 'json_object' },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return res.status(500).json({ error: 'Error al llamar a Groq', details: errorData });
-      }
-
-      const groqData = await response.json();
-      const rawContent = groqData.choices?.[0]?.message?.content || '{}';
-
-      // Parsear el JSON retornado por el modelo
       try {
-        const parsed = JSON.parse(rawContent);
-        // El modelo puede retornar el array directamente o dentro de una clave
-        flashcards = Array.isArray(parsed)
-          ? parsed
-          : (parsed.flashcards || parsed.cards || parsed.data || []);
-      } catch (parseErr) {
-        console.error('Error parseando JSON de flashcards:', rawContent.substring(0, 200));
-        return res.status(500).json({ error: 'El modelo no retornó un JSON válido.', raw: rawContent.substring(0, 500) });
+        console.log(`[GenerateFlashcards] Usando Groq con prompts simplificados...`);
+        flashcards = await geminiService.generateFlashcardsWithGroq(context_text, count);
+        modelUsed = 'llama-3.1-8b-instant';
+        provider = 'groq';
+        
+        console.log(`[GenerateFlashcards] ✅ Éxito con Groq (${flashcards.length} ítems)`);
+      } catch (groqErr) {
+        console.error(`[GenerateFlashcards] ❌ Ambos fallaron:`, groqErr.message);
+        return res.status(500).json({ 
+          error: 'Error generando flashcards con ambos proveedores',
+          details: groqErr.message
+        });
       }
-
-      modelUsed = 'llama-3.1-8b-instant';
     }
 
     // Respuesta unificada
@@ -721,11 +793,19 @@ Ejemplo de respuesta válida:
       model: modelUsed,
       flashcards: flashcards,
       count: flashcards.length,
-      note: `Generadas con ${provider.toUpperCase()} - ${modelUsed}`
+      quality: 'academic',
+      fallbackUsed: provider === 'groq' ? true : false,
+      note: `Generadas con ${provider.toUpperCase()} - Calidad Académica (Bloom's Taxonomy)`,
+      features: [
+        'Nivel cognitivo: Análisis/Síntesis/Evaluación',
+        'Pistas pedagógicas (hints)',
+        'Explicaciones magistrales',
+        'Distractores académicos realistas',
+      ]
     });
 
   } catch (err) {
-    console.error(`[GenerateFlashcards] Error:`, err.message);
+    console.error(`[GenerateFlashcards] Error crítico:`, err.message);
     res.status(500).json({ error: 'Error generando flashcards', details: err.message });
   }
 };
@@ -794,7 +874,6 @@ exports.processDocumentWithGemini = async (req, res) => {
  */
 exports.generateFlashcardsFromDocument = async (req, res) => {
   const { documentPath, mimeType, count = 10 } = req.body;
-  const provider = getLLMProvider(req);
 
   if (!documentPath) {
     return res.status(400).json({ error: 'Parámetro requerido: documentPath' });
@@ -806,40 +885,59 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
     });
   }
 
-  console.log(`[GenerateFlashcards] Documento: ${documentPath}, Proveedor: ${provider}`);
+  console.log(`[GenerateFlashcards] Documento: ${documentPath}, Estrategia: Gemini → Groq`);
 
   try {
     let flashcards = [];
     let modelUsed = '';
+    let provider = '';
 
-    if (provider === 'gemini') {
-      // ─── GEMINI PATH ───────────────────────────────────────────────
-      const geminiApiKey = secrets.GEMINI_API_KEY;
-      if (!geminiApiKey) {
-        return res.status(500).json({ error: 'Gemini API Key no está configurada' });
+    // ─── INTENTO 1: GEMINI FILES API (MÁXIMA CALIDAD) ──────────────────────
+    const geminiApiKey = secrets.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      try {
+        console.log(`[GenerateFlashcards] Intentando con Gemini Files API...`);
+        flashcards = await geminiService.generateFlashcardsFromDocument(
+          documentPath,
+          mimeType,
+          count
+        );
+        modelUsed = 'gemini-3-flash-preview';
+        provider = 'gemini';
+        
+        console.log(`[GenerateFlashcards] ✅ Éxito con Gemini (${flashcards.length} ítems)`);
+      } catch (geminiErr) {
+        console.warn(`[GenerateFlashcards] ⚠️ Gemini falló:`, geminiErr.message);
+        flashcards = [];
       }
-
-      console.log(`[GenerateFlashcards] Llamando a Gemini Files API...`);
-      flashcards = await geminiService.generateFlashcardsFromDocument(
-        documentPath,
-        mimeType, // null = auto-detect
-        count
-      );
-      modelUsed = 'gemini-3-flash-preview';
-
     } else {
-      // ─── GROQ PATH (requiere convertir documento a texto primero) ───
+      console.warn(`[GenerateFlashcards] Gemini no disponible, usando Groq`);
+    }
+
+    // ─── FALLBACK: GROQ (si Gemini no disponible o falló) ─────────────────
+    if (!flashcards || flashcards.length === 0) {
       const groqApiKey = secrets.GROQ_API_KEY;
       if (!groqApiKey) {
-        return res.status(500).json({ error: 'Groq API Key no está configurada' });
+        return res.status(500).json({ 
+          error: 'Ningún LLM disponible',
+          details: 'Configura al menos GEMINI_API_KEY o GROQ_API_KEY'
+        });
       }
 
-      console.log(`[GenerateFlashcards] Groq requiere pre-procesamiento del documento`);
-      return res.status(400).json({ 
-        error: 'Para procesar documentos con Groq, primero convierte el documento a texto usando el endpoint de procesamiento.',
-        recommendation: 'Usa Gemini para documentos (endpoint: /ai/process-document) o proporciona el texto directamente (endpoint: /ai/generate-flashcards)',
-        supportedProviders: ['gemini'],
-      });
+      try {
+        console.log(`[GenerateFlashcards] Intentando con Groq (requiere leer documento primero)...`);
+        // Para Groq necesitaríamos leer el documento primero
+        // Por ahora retornamos un error informativo
+        return res.status(400).json({ 
+          error: 'Gemini no disponible y Groq requiere pre-procesamiento',
+          recommendation: 'Usa Gemini para documentos, o carga el documento como texto'
+        });
+      } catch (groqErr) {
+        return res.status(500).json({ 
+          error: 'Error procesando documento',
+          details: groqErr.message
+        });
+      }
     }
 
     // Respuesta unificada
@@ -849,8 +947,17 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
       model: modelUsed,
       flashcards: flashcards,
       count: flashcards.length,
+      quality: 'academic',
       supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md'],
-      note: `Generadas con ${provider.toUpperCase()} - ${modelUsed}`
+      fallbackUsed: provider === 'groq' ? true : false,
+      note: `Generadas con ${provider.toUpperCase()} - Calidad Académica (Bloom's Taxonomy)`,
+      features: [
+        'Ignora metadatos del documento',
+        'Nivel cognitivo: Análisis/Síntesis/Evaluación',
+        'Pistas pedagógicas',
+        'Explicaciones maestrales',
+        'Sin truncado de contexto'
+      ]
     });
 
   } catch (err) {
@@ -943,31 +1050,82 @@ exports.generateFlashcardsUpload = async (req, res) => {
     });
   }
 
-  const geminiApiKey = secrets.GEMINI_API_KEY;
-  if (!geminiApiKey) {
-    return res.status(500).json({ error: 'Gemini API Key no está configurada' });
-  }
+  console.log(`[GenerateFlashcardsUpload] Archivo: ${req.file.originalname}, Estrategia: Gemini → Groq`);
 
   try {
-    console.log(`[GenerateFlashcardsUpload] Archivo: ${req.file.originalname}, ${count} flashcards`);
+    let flashcards = [];
+    let modelUsed = '';
+    let provider = '';
 
-    // Generar flashcards desde el buffer del archivo
-    const flashcards = await geminiService.generateFlashcardsFromBuffer(
-      req.file.buffer,
-      req.file.mimetype,
-      count,
-      req.file.originalname
-    );
+    // ─── INTENTO 1: GEMINI (MÁXIMA CALIDAD) ──────────────────────────────
+    const geminiApiKey = secrets.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      try {
+        console.log(`[GenerateFlashcardsUpload] Intentando con Gemini...`);
+        flashcards = await geminiService.generateFlashcardsFromBuffer(
+          req.file.buffer,
+          req.file.mimetype,
+          count,
+          req.file.originalname
+        );
+        modelUsed = 'gemini-3-flash-preview';
+        provider = 'gemini';
+        
+        console.log(`[GenerateFlashcardsUpload] ✅ Éxito con Gemini (${flashcards.length} ítems)`);
+      } catch (geminiErr) {
+        console.warn(`[GenerateFlashcardsUpload] ⚠️ Gemini falló:`, geminiErr.message);
+        flashcards = [];
+      }
+    } else {
+      console.warn(`[GenerateFlashcardsUpload] Gemini no disponible, intentando Groq`);
+    }
+
+    // ─── FALLBACK: GROQ (si Gemini no disponible o falló) ─────────────────
+    if (!flashcards || flashcards.length === 0) {
+      const groqApiKey = secrets.GROQ_API_KEY;
+      if (!groqApiKey) {
+        return res.status(500).json({ 
+          error: 'Ningún LLM disponible',
+          details: 'Configura al menos GEMINI_API_KEY o GROQ_API_KEY'
+        });
+      }
+
+      try {
+        console.log(`[GenerateFlashcardsUpload] Usando Groq con prompts simplificados...`);
+        // Convertir buffer a texto para Groq
+        const contextText = req.file.buffer.toString('utf-8');
+        flashcards = await geminiService.generateFlashcardsWithGroq(contextText, count);
+        modelUsed = 'llama-3.1-8b-instant';
+        provider = 'groq';
+        
+        console.log(`[GenerateFlashcardsUpload] ✅ Éxito con Groq (${flashcards.length} ítems)`);
+      } catch (groqErr) {
+        console.error(`[GenerateFlashcardsUpload] ❌ Ambos fallaron:`, groqErr.message);
+        return res.status(500).json({ 
+          error: 'Error generando flashcards con ambos proveedores',
+          details: groqErr.message
+        });
+      }
+    }
 
     res.json({
       success: true,
-      provider: 'gemini',
-      model: 'gemini-3-flash-preview',
+      provider: provider,
+      model: modelUsed,
       fileName: req.file.originalname,
       flashcards: flashcards,
       count: flashcards.length,
+      quality: 'academic',
       supportedFormats: ['.pdf', '.docx', '.doc', '.txt', '.html', '.md'],
-      note: 'Flashcards generadas en tiempo real sin guardar archivo'
+      fallbackUsed: provider === 'groq' ? true : false,
+      note: `Generadas con ${provider.toUpperCase()} - Calidad Académica (Bloom's Taxonomy)`,
+      features: [
+        'Ignora metadatos del documento',
+        'Nivel cognitivo: Análisis/Síntesis/Evaluación',
+        'Pistas pedagógicas',
+        'Explicaciones magistrales',
+        'Distractores académicos realistas'
+      ]
     });
   } catch (err) {
     console.error('[GenerateFlashcardsUpload] Error:', err.message);
@@ -1010,5 +1168,151 @@ exports.getModelInfo = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+// ─────────────────────────────────────────────────────────────────────────────
+// LEARNING ENGINEERING: PREVENCIÓN DE CONFUSIÓN
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Analiza un mazo existente para encontrar conceptos semánticamente similares
+ * que el estudiante podría llegar a confundir (Cognitive Load Theory - Interleaving/Contrast).
+ */
+exports.analyzeDeckConfusions = async (req, res) => {
+  const { deckId } = req.params;
+
+  try {
+    db.all(
+      `SELECT id, front, back FROM flashcards WHERE deck_id = ? AND item_type = 'flashcard' AND is_atomic = 1`,
+      [deckId],
+      async (err, cards) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!cards || cards.length < 2) {
+          return res.json({ suggestions: [] }); // No hay suficientes cartas para comparar
+        }
+
+        const cardsJson = JSON.stringify(cards.map(c => ({ id: c.id, front: c.front, back: c.back })));
+        
+        const systemPrompt = `Eres un experto en Psicología Educativa y Diseño Instruccional.
+Tu tarea es analizar un set de flashcards y detectar conceptos que sean "confundibles" entre sí (similitud semántica o estructural).
+El objetivo es identificar pares de conceptos para los cuales se debería generar una "Tarjeta de Diferenciación" explícita que contraste ambos términos.
+
+Reglas:
+1. Encuentra máximo 3 pares de conceptos altamente confundibles.
+2. Si no hay ninguno verdaderamente confundible, devuelve un array vacío [].
+3. Responde ÚNICAMENTE con un JSON array válido.
+
+Formato esperado:
+[
+  {
+    "conceptA": "Nombre del Concepto 1",
+    "conceptB": "Nombre del Concepto 2",
+    "reason": "Explicación breve de por qué el estudiante podría confundirlos",
+    "cardIds": [ID_1, ID_2]
+  }
+]`;
+
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${secrets.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Analiza estas tarjetas:\n${cardsJson}` }
+            ],
+            temperature: 0.1,
+          }),
+        });
+
+        if (!response.ok) throw new Error('Error al llamar a Groq API para análisis de confusión');
+        
+        const data = await response.json();
+        const raw = data.choices[0].message.content.trim();
+        const jsonMatch = raw.match(/\[[\s\S]*\]/);
+        
+        const suggestions = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+        res.json({ suggestions });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ error: 'Error analizando similitudes', details: error.message });
+  }
+};
+
+/**
+ * Genera una tarjeta explícita de contraste entre dos conceptos y la guarda en el mazo.
+ */
+exports.generateDifferentiationCard = async (req, res) => {
+  const { deckId } = req.params;
+  const { conceptA, conceptB, reason } = req.body;
+
+  if (!conceptA || !conceptB) {
+    return res.status(400).json({ error: 'Faltan conceptA o conceptB' });
+  }
+
+  const systemPrompt = `Eres un experto en Pedagogía Universitaria.
+Te daré dos conceptos que los estudiantes suelen confundir y la razón.
+Tu tarea es generar UNA sola flashcard de diferenciación (Contrastive Learning).
+
+- Front: Debe plantear un escenario o pregunta que requiera diferenciar explícitamente entre [Concepto A] y [Concepto B]. (Ej: "¿Cuál es la diferencia clave entre X y Y en el contexto de Z?")
+- Back: Respuesta precisa que contraste ambos de manera directa y fácil de recordar.
+- Hint: Una regla mnemotécnica o sugerencia rápida para diferenciarlos.
+- Explanation: Profundización técnica de por qué son distintos.
+
+Formato requerido EXACTO (JSON Object):
+{
+  "type": "flashcard",
+  "data": { "front": "...", "back": "..." },
+  "hint": "...",
+  "explanation": "..."
+}`;
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${secrets.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Concepto A: ${conceptA}\nConcepto B: ${conceptB}\nRazón de confusión común: ${reason || 'Similitud teórica'}` }
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) throw new Error('Error generando tarjeta de diferenciación');
+    
+    const data = await response.json();
+    const raw = data.choices[0].message.content.trim();
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    
+    if (!jsonMatch) throw new Error('Respuesta de AI no válida');
+    const item = JSON.parse(jsonMatch[0]);
+
+    const contentStr = JSON.stringify(item.data);
+    const hint = item.hint || null;
+    const explanation = item.explanation || null;
+
+    db.run(
+      `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, is_atomic) VALUES (?, ?, ?, 'flashcard', ?, ?, ?, 'new', 1)`,
+      [deckId, item.data.front, item.data.back, contentStr, hint, explanation],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json({
+          id: this.lastID,
+          deck_id: Number(deckId),
+          front: item.data.front,
+          back: item.data.back,
+          item_type: 'flashcard',
+          content_json: contentStr,
+          hint,
+          explanation,
+          status: 'new'
+        });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ error: 'Error generando tarjeta de contraste', details: error.message });
   }
 };

@@ -8,7 +8,7 @@
  * - QuestionRendererFactory ya no muestra la explicación incrustada.
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/theme';
@@ -17,7 +17,8 @@ import {
   StrategyFactory,
   adaptFlashcardsToEvaluationItems,
 } from '../utils/evaluationStrategies';
-import { updateFlashcardStatus, createCardLog, deleteFlashcard } from '../services/api';
+import { updateFlashcardStatus, deleteFlashcard, analyzeDeckConfusions, generateDifferentiationCard } from '../services/api';
+import { createCardLogWithFallback } from '../services/offlineQueue';
 import { useCustomAlert } from './CustomAlert';
 import { QuestionRendererFactory } from './evaluation/QuestionRendererFactory';
 import { ExplanationOverlay } from './evaluation/ExplanationOverlay';
@@ -53,6 +54,11 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   const [stats, setStats]               = useState<SessionStats>({ correct: 0, incorrect: 0, total: 0 });
   const [cardStartTime, setCardStartTime] = useState<number>(Date.now());
 
+  // Confusion Detection (Learning Engineering)
+  const [confusionSuggestions, setConfusionSuggestions] = useState<any[]>([]);
+  const [isAnalyzingConfusions, setIsAnalyzingConfusions] = useState(false);
+  const [generatingDiff, setGeneratingDiff] = useState<string | null>(null); // stores conceptA key being generated
+
   // Estado por tipo de ítem
   const [isAnswered, setIsAnswered]           = useState(false);
   const [isRevealed, setIsRevealed]           = useState(false);
@@ -62,17 +68,10 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
 
   // Overlay de explicación
   const [overlayVisible, setOverlayVisible]   = useState(false);
-  const [overlayPassed, setOverlayPassed]     = useState<boolean | null>(null);
   const pendingAdvance = useRef<() => void>(() => {});
 
-  useEffect(() => {
-    setItems(adaptFlashcardsToEvaluationItems(initialCards));
-    resetItemState();
-    setItemIndex(0);
-    setSessionDone(false);
-    setStats({ correct: 0, incorrect: 0, total: 0 });
-    setCardStartTime(Date.now());
-  }, [initialCards]);
+  // Learning Engineering Feedback
+  const [learningFeedback, setLearningFeedback] = useState<{ emoji: string, message: string, color?: string } | null>(null);
 
   const resetItemState = useCallback(() => {
     setIsAnswered(false);
@@ -81,8 +80,16 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     setSelectedIndex(null);
     setSelectedBoolean(null);
     setOverlayVisible(false);
-    setOverlayPassed(null);
   }, []);
+
+  useEffect(() => {
+    setItems(adaptFlashcardsToEvaluationItems(initialCards));
+    resetItemState();
+    setItemIndex(0);
+    setSessionDone(false);
+    setStats({ correct: 0, incorrect: 0, total: 0 });
+    setCardStartTime(Date.now());
+  }, [initialCards, resetItemState]);
 
   const handleReveal = useCallback(() => setIsRevealed(true), []);
 
@@ -125,8 +132,28 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     // Persistir
     try {
       await updateFlashcardStatus(item.id, newStatus);
-      await createCardLog({ card_id: item.id, result: newStatus, response_time_ms: responseTime });
-    } catch (_) {}
+      
+      const textToCount = item.front || (item as any).question || '';
+      const wordCount = textToCount.trim() ? textToCount.trim().split(/\s+/).length : 20;
+
+      const logResponse = await createCardLogWithFallback({ 
+        card_id: item.id, 
+        result: newStatus, 
+        response_time_ms: responseTime,
+        question_word_count: wordCount 
+      });
+
+      if (logResponse?.feedback) {
+        setLearningFeedback({
+          emoji: logResponse.feedback.emoji,
+          message: logResponse.feedback.message,
+          color: logResponse.microInteraction?.color || theme.colors.primary,
+        });
+
+        // Ocultar el feedback después de 2 segundos
+        setTimeout(() => setLearningFeedback(null), 2000);
+      }
+    } catch {}
 
     // Preparar la función de avance (la guardamos en ref para que el overlay la llame)
     pendingAdvance.current = () => {
@@ -143,7 +170,6 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     // Para flashcard: el usuario ya presionó "Difícil/Fácil" y no hay delay extra
     // Para MC/Boolean: mostrar overlay tras breve pausa para que el feedback de color se vea
     const overlayDelay = item.item_type === 'flashcard' ? 600 : 800;
-    setOverlayPassed(result.passed);
     setTimeout(() => {
       // Solo mostrar overlay si hay explicación o si queremos confirmar el resultado
       setOverlayVisible(true);
@@ -177,11 +203,41 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     });
   };
 
+  // ─── Session Done: trigger confusion analysis once ──────────────────────────
+  useEffect(() => {
+    if (!sessionDone || !activeDeck?.id || isAnalyzingConfusions) return;
+    setIsAnalyzingConfusions(true);
+    analyzeDeckConfusions(activeDeck.id)
+      .then(r => setConfusionSuggestions(r?.suggestions ?? []))
+      .catch(() => {})
+      .finally(() => setIsAnalyzingConfusions(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionDone]);
+
+  const handleGenerateDiff = async (suggestion: any) => {
+    if (!activeDeck?.id) return;
+    const key = suggestion.conceptA;
+    setGeneratingDiff(key);
+    try {
+      await generateDifferentiationCard(activeDeck.id, suggestion.conceptA, suggestion.conceptB, suggestion.reason);
+      // Remove suggestion once card is created
+      setConfusionSuggestions(prev => prev.filter(s => s.conceptA !== key));
+      showAlert({ title: '✅ Tarjeta creada', message: `Se añadió una tarjeta de contraste entre "${suggestion.conceptA}" y "${suggestion.conceptB}" a tu mazo.`, type: 'success' });
+    } catch (e: any) {
+      showAlert({ title: 'Error', message: e.message || 'No se pudo generar la tarjeta', type: 'error' });
+    } finally {
+      setGeneratingDiff(null);
+    }
+  };
+
   // ─── Session Done ──────────────────────────────────────────────────────────
   if (sessionDone) {
     const pct = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
     return (
-      <View style={s.sessionDone}>
+      <ScrollView
+        contentContainerStyle={[s.sessionDone, { flexGrow: 1, paddingHorizontal: 4, paddingBottom: 32 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={s.doneEmoji}>{pct >= 80 ? '🌟' : pct >= 50 ? '👍' : '💪'}</Text>
         <Text style={s.doneTitle}>¡Sesión completada!</Text>
         <Text style={s.doneSubtitle}>{items.length} ítem{items.length !== 1 ? 's' : ''} revisados</Text>
@@ -201,10 +257,44 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
             </View>
           </View>
         )}
+
+        {/* ── Confusion Detection Panel ── */}
+        {isAnalyzingConfusions && (
+          <View style={confusionStyles.banner}>
+            <Text style={confusionStyles.bannerTitle}>🧠 Analizando tu mazo...</Text>
+            <Text style={confusionStyles.bannerSubtitle}>Buscando conceptos que podrías confundir.</Text>
+          </View>
+        )}
+        {!isAnalyzingConfusions && confusionSuggestions.length > 0 && (
+          <View style={confusionStyles.banner}>
+            <Text style={confusionStyles.bannerTitle}>⚠️ Conceptos Confundibles Detectados</Text>
+            <Text style={confusionStyles.bannerSubtitle}>El análisis encontró {confusionSuggestions.length} par{confusionSuggestions.length > 1 ? 'es' : ''} que suelen confundirse. Genera una tarjeta de contraste para fijar la diferencia.</Text>
+            {confusionSuggestions.map((s, i) => (
+              <View key={i} style={confusionStyles.suggestionRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={confusionStyles.suggestionConcepts} numberOfLines={1}>
+                    {s.conceptA} <Text style={{ color: '#9E9E9E' }}>vs</Text> {s.conceptB}
+                  </Text>
+                  <Text style={confusionStyles.suggestionReason} numberOfLines={2}>{s.reason}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[confusionStyles.generateBtn, generatingDiff === s.conceptA && { opacity: 0.5 }]}
+                  onPress={() => handleGenerateDiff(s)}
+                  disabled={generatingDiff !== null}
+                >
+                  <Text style={confusionStyles.generateBtnText}>
+                    {generatingDiff === s.conceptA ? '...' : '+ Diferenciar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
         <TouchableOpacity style={s.backBtn} onPress={onBack}>
           <Text style={s.backBtnText}>Volver a mazos</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -264,6 +354,14 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         explanation={item.explanation ?? null}
         onDismiss={handleOverlayDismiss}
       />
+
+      {/* ── Micro-Interacción / Feedback de Learning Engineering ── */}
+      {learningFeedback && (
+        <View style={[s.feedbackToast, { borderColor: learningFeedback.color }]}>
+          <Text style={s.feedbackEmoji}>{learningFeedback.emoji}</Text>
+          <Text style={s.feedbackMessage}>{learningFeedback.message}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -337,4 +435,84 @@ const s = StyleSheet.create({
   statChipLabel: { fontSize: 11, fontWeight: '600' },
   backBtn: { backgroundColor: theme.colors.primary, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 32, marginTop: 8 },
   backBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  // Feedback Toast
+  feedbackToast: {
+    position: 'absolute',
+    bottom: 80,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    gap: 8,
+  },
+  feedbackEmoji: { fontSize: 20 },
+  feedbackMessage: { fontSize: 14, fontWeight: '600', color: '#333' },
+});
+
+const confusionStyles = StyleSheet.create({
+  banner: {
+    width: '100%',
+    backgroundColor: '#FFFBF0',
+    borderWidth: 1.5,
+    borderColor: '#FFB300',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 8,
+    gap: 6,
+  },
+  bannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#E65100',
+  },
+  bannerSubtitle: {
+    fontSize: 12,
+    color: '#795548',
+    lineHeight: 17,
+    marginBottom: 4,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  suggestionConcepts: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4A2F00',
+    marginBottom: 2,
+  },
+  suggestionReason: {
+    fontSize: 11,
+    color: '#795548',
+    lineHeight: 15,
+  },
+  generateBtn: {
+    backgroundColor: '#FF8F00',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minWidth: 90,
+    alignItems: 'center',
+  },
+  generateBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 11,
+  },
 });

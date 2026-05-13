@@ -727,7 +727,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
               <TouchableOpacity
                 style={[s.genConfirmBtn, isGenerating && { opacity: 0.6 }]}
-                onPress={handleGenerateMaterial}
+                onPress={() => handleGenerateMaterial()}
                 disabled={isGenerating}
                 activeOpacity={0.8}
               >

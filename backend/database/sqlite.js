@@ -47,6 +47,32 @@ const initializeSqliteDb = (db) => {
           }
         }
 
+        // ── Migración de Legacy Cards (SM-2 Bootstrapping) ────────────────────
+        // Garantiza que todas las tarjetas legacy entren al ciclo SM-2.
+        // Las tarjetas creadas antes del sistema de repetición espaciada tienen
+        // next_review_date = NULL, lo que las hace invisibles para el predictor.
+        await new Promise((res) => {
+          db.run(
+            `UPDATE flashcards
+             SET
+               next_review_date  = CURRENT_TIMESTAMP,
+               is_atomic         = COALESCE(is_atomic, 1),
+               sm2_ease_factor   = COALESCE(sm2_ease_factor, 2.5),
+               sm2_interval      = COALESCE(sm2_interval, 1),
+               sm2_repetitions   = COALESCE(sm2_repetitions, 0)
+             WHERE next_review_date IS NULL`,
+            function (err) {
+              if (err) {
+                console.error('❌ Error en migración de legacy cards:', err.message);
+              } else if (this.changes > 0) {
+                console.log(`✅ [Migración SM-2] ${this.changes} tarjeta(s) legacy inicializadas con next_review_date = NOW.`);
+              }
+              res();
+            }
+          );
+        });
+        // ─────────────────────────────────────────────────────────────────────
+
         // Crear usuario por defecto
         db.get(`SELECT id FROM users WHERE email = ?`, ['user'], (err, existingUser) => {
           if (err) {

@@ -12,6 +12,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../src/locales/i18n';
 import { useColorScheme } from '@/src/hooks/use-color-scheme';
 import { CustomAlertProvider } from '../src/components/CustomAlert';
+import NetInfo from '@react-native-community/netinfo';
+import { flushOfflineQueue } from '../src/services/offlineQueue';
 
 // Mantener el Splash Screen visible hasta que decidamos ocultarlo
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -50,6 +52,23 @@ export default function RootLayout() {
 
     prepare();
   }, []);
+
+  // ── Offline Queue: flush card_logs when connectivity is restored ─────────────
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (state.isConnected) {
+        flushOfflineQueue()
+          .then(({ sent, remaining }) => {
+            if (sent > 0) {
+              console.log(`[RootLayout] 🔁 Offline queue flushed: ${sent} log(s) synced, ${remaining} remaining.`);
+            }
+          })
+          .catch(e => console.warn('[RootLayout] Flush error:', e));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
 
   useEffect(() => {
     if (appIsReady) {

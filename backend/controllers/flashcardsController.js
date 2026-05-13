@@ -1,5 +1,6 @@
 const secrets = require('../config/secrets');
 const { db } = require('../db');
+const { analyzeCardDensity, fragmentCard } = require('../utils/atomicCardGenerator');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -271,46 +272,79 @@ exports.shareDeck = (req, res) => {
 // ─── AI Generation ────────────────────────────────────────────────────────────
 
 /**
- * Helper: Inserta un array de items en la BD y devuelve el mazo completo
+ * Helper: Inserta un card en la BD de forma asíncrona
  */
-function insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items) {
-  const insertPromises = items.map((item) => {
-    return new Promise((resolve, reject) => {
+function insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, is_atomic, parent_card_id, word_count) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)`,
+      [deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count],
+      function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+/**
+ * Helper: Inserta un array de items en la BD y devuelve el mazo completo
+ * ¡AHORA CON FRAGMENTACIÓN ATÓMICA AUTOMÁTICA!
+ */
+async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items) {
+  try {
+    for (const item of items) {
       const itemType = item.type || item.item_type || 'flashcard';
       const content = item.data || item.content || {};
       const front = itemType === 'flashcard' ? (content.front || item.question || '') : '';
       const back = itemType === 'flashcard' ? (content.back || item.answer || '') : '';
-      const contentStr = JSON.stringify(content);
       const hint = item.hint || content.hint || null;
       const explanation = item.explanation || content.explanation || null;
 
-      db.run(
-        `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
-        [deckId, front, back, itemType, contentStr, hint, explanation],
-        function(err) {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
-  });
+      if (itemType === 'flashcard') {
+        const density = analyzeCardDensity({ front, back });
 
-  Promise.all(insertPromises)
-    .then(() => {
-      db.all(`SELECT * FROM flashcards WHERE deck_id = ? ORDER BY created_at ASC`, [deckId], (err, cards) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.status(201).json({
-          id: deckId, subject_id, user_id, title, description,
-          card_count: cards.length,
-          cards: cards.map(normalizeCard),
-        });
-      });
-    })
-    .catch((err) => {
-      db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], () => {
-        res.status(500).json({ error: 'Error al insertar ítems, mazo revertido', details: err.message });
+        if (density.isDense) {
+          console.log(`[Atomic] Fragmentando tarjeta densa: ${front.substring(0, 30)}...`);
+          const parentContentStr = JSON.stringify(content);
+          // Insertar padre (contenedor)
+          const parentId = await insertSingleCard(deckId, front, back, itemType, parentContentStr, hint, explanation, 0, null, density.wordCount);
+          
+          // Generar e insertar hijas
+          const atomicCards = fragmentCard({ front, back });
+          for (let i = 0; i < atomicCards.length; i++) {
+            const atomic = atomicCards[i];
+            const childContentStr = JSON.stringify({ front: atomic.front, back: atomic.back });
+            const childWordCount = atomic.back.split(/\s+/).length;
+            // Se asume is_atomic = 1
+            await insertSingleCard(deckId, atomic.front, atomic.back, itemType, childContentStr, hint, explanation, 1, parentId, childWordCount);
+          }
+        } else {
+          // Tarjeta normal
+          const contentStr = JSON.stringify(content);
+          await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, density.wordCount);
+        }
+      } else {
+        // multiple_choice o boolean, no las fragmentamos por ahora
+        const contentStr = JSON.stringify(content);
+        await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, 20);
+      }
+    }
+
+    db.all(`SELECT * FROM flashcards WHERE deck_id = ? ORDER BY created_at ASC`, [deckId], (err, cards) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.status(201).json({
+        id: deckId, subject_id, user_id, title, description,
+        card_count: cards.length,
+        cards: cards.map(normalizeCard),
       });
     });
+
+  } catch (err) {
+    db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], () => {
+      res.status(500).json({ error: 'Error al insertar ítems, mazo revertido', details: err.message });
+    });
+  }
 }
 
 /**

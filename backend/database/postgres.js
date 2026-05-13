@@ -34,6 +34,26 @@ const initializePostgresDb = async (pool) => {
       ON flashcard_decks(user_id, created_at)
     `);
 
+    // ── Migración de Legacy Cards (SM-2 Bootstrapping) ──────────────────────
+    try {
+      const legacyResult = await pool.query(`
+        UPDATE flashcards
+        SET
+          next_review_date  = NOW(),
+          is_atomic         = COALESCE(is_atomic, 1),
+          sm2_ease_factor   = COALESCE(sm2_ease_factor, 2.5),
+          sm2_interval      = COALESCE(sm2_interval, 1),
+          sm2_repetitions   = COALESCE(sm2_repetitions, 0)
+        WHERE next_review_date IS NULL
+      `);
+      if (legacyResult.rowCount > 0) {
+        console.log(`✅ [Migración SM-2] ${legacyResult.rowCount} tarjeta(s) legacy inicializadas con next_review_date = NOW.`);
+      }
+    } catch (migErr) {
+      console.warn('⚠️ Migración de legacy cards omitida (posiblemente columna no existe aún):', migErr.message);
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     // Crear usuario por defecto
     const { rows: existingUser } = await pool.query(
       `SELECT id FROM users WHERE email = $1`,

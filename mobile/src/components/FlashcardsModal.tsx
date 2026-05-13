@@ -25,6 +25,7 @@ import {
   getUserId,
   shareDeck,
   deleteFlashcardDeck,
+  downloadReport,
 } from '../services/api';
 
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
@@ -62,6 +63,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const activeCloseRef = useRef<(() => void) | null>(null);
 
   // Share deck modal state
@@ -218,6 +220,27 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
       <TouchableOpacity style={s.newDeckBtn} onPress={() => setScreen('newDeck')}>
         <Ionicons name="add-circle-outline" size={18} color={theme.colors.white} />
         <Text style={s.newDeckBtnText}>{t('flashcards.newDeck')}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[s.newDeckBtn, { backgroundColor: '#1A1A2E', marginTop: 8 }]}
+        onPress={async () => {
+          if (!currentUserId || isExportingPdf) return;
+          setIsExportingPdf(true);
+          try {
+            await downloadReport(currentUserId);
+          } catch (e: any) {
+            showAlert({ title: t('common.error', 'Error'), message: e.message || 'No se pudo generar el informe', type: 'error' });
+          } finally {
+            setIsExportingPdf(false);
+          }
+        }}
+        disabled={isExportingPdf}
+      >
+        <Ionicons name="document-text-outline" size={18} color={theme.colors.white} />
+        <Text style={s.newDeckBtnText}>
+          {isExportingPdf ? 'Generando PDF...' : t('flashcards.exportPdf', 'Exportar Informe PDF')}
+        </Text>
       </TouchableOpacity>
 
       {decks.length === 0 ? (

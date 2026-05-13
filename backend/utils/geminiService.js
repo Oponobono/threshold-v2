@@ -27,6 +27,12 @@ const crypto = require("crypto");
 // Módulo de conversión de formatos no soportados (DOCX/DOC → text/plain)
 const { prepareBufferForGemini, prepareFilePathForGemini } = require('./documentConverter');
 
+// Módulo de fragmentación atómica (Cognitive Load Theory)
+const { analyzeCardDensity, fragmentCard } = require('./atomicCardGenerator');
+
+// Módulo de construcción de prompts académicos de calidad (Taxonomía de Bloom)
+const { buildAdaptivePrompt, buildSystemPrompt } = require('./academicPromptBuilder');
+
 const genAI = new GoogleGenerativeAI(secrets.GEMINI_API_KEY);
 const MODEL_NAME = "gemini-3-flash-preview"; // Modelo recomendado (May 2026)
 
@@ -332,38 +338,42 @@ async function processAcademicChat(contextText, messages, systemPrompt) {
 
 /**
  * Genera flashcards estructuradas desde un documento.
- * Retorna JSON válido para Active Recall.
+ * Retorna JSON válido para Active Recall con estructura pedagógica alta calidad.
+ * Incluye: tipo, contenido, pista (hint) y explicación profunda.
  *
  * @param {string} filePath - Ruta del PDF o documento
  * @param {string} mimeType - MIME type del archivo
  * @param {number} count - Número de flashcards a generar
- * @returns {Promise<Array>} Array de { question, answer }
+ * @returns {Promise<Array>} Array de { type, data: { front, back }, hint, explanation }
  */
 async function generateFlashcardsFromDocument(filePath, mimeType, count = 10) {
   try {
     console.log(`[Gemini] Generando ${count} flashcards desde ${path.basename(filePath)}`);
 
-    const prompt = `Eres un experto pedagogo. Analiza este documento y genera exactamente ${count} flashcards de estudio.
+    // Construir prompt con estándares académicos de Taxonomía de Bloom
+    const systemPrompt = buildSystemPrompt('flashcard', count, 'General', 'posgrado');
+    
+    // Agregar instrucción específica para documentos
+    const finalPrompt = `${systemPrompt}
 
-REGLAS ESTRICTAS:
-1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional.
-2. Cada elemento: { "question": "...", "answer": "..." }
-3. Preguntas precisas y directas. Respuestas concisas pero completas.
-4. Cubre conceptos clave. Evita trivialidades.
-5. Formato exacto: [{"question": "...", "answer": "..."}, ...]
+DOCUMENTO A ANALIZAR:
+[documento adjunto]
 
-Genera las flashcards:`;
+Basándote ÚNICAMENTE en el contenido del documento, genera los ${count} flashcards.
+Asegura que cada flashcard sea de NIVEL COGNITIVO ALTO (Análisis/Síntesis/Evaluación).`;
 
-    const response = await processDocumentWithFilesAPI(filePath, mimeType, prompt);
+    const response = await processDocumentWithFilesAPI(filePath, mimeType, finalPrompt);
 
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error("Gemini no retornó un array JSON válido");
 
-    const flashcards = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(flashcards)) throw new Error("Respuesta no es un array");
+    const items = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(items)) throw new Error("Respuesta no es un array");
 
-    console.log(`[Gemini] ${flashcards.length} flashcards generadas exitosamente`);
-    return flashcards;
+    const atomicItems = processAtomicFlashcards(items);
+
+    console.log(`[Gemini] ✅ ${atomicItems.length} flashcards generadas exitosamente (Originales: ${items.length})`);
+    return atomicItems;
   } catch (error) {
     console.error(`[Gemini] Error generando flashcards:`, error.message);
     throw error;
@@ -438,12 +448,13 @@ Utiliza el contexto completo del documento para dar respuestas precisas.`,
 /**
  * Genera flashcards desde un buffer de documento en memoria.
  * Aplica conversión automática para DOCX/DOC.
+ * Usa prompts de calidad académica con estructura pedagógica.
  *
  * @param {Buffer} fileBuffer
  * @param {string} mimeType
  * @param {number} count
  * @param {string} [filename='']
- * @returns {Promise<Array>} Array de { front, back }
+ * @returns {Promise<Array>} Array de { type, data, hint, explanation }
  */
 async function generateFlashcardsFromBuffer(fileBuffer, mimeType, count = 10, filename = '') {
   try {
@@ -451,16 +462,17 @@ async function generateFlashcardsFromBuffer(fileBuffer, mimeType, count = 10, fi
       `[Gemini] Generando ${count} flashcards desde buffer (${(fileBuffer.length / 1024 / 1024).toFixed(2)}MB)`
     );
 
-    const prompt = `Eres un experto pedagogo. Analiza este documento y genera exactamente ${count} flashcards de estudio.
+    // Construir prompt con estándares académicos de Taxonomía de Bloom
+    const systemPrompt = buildSystemPrompt('mixed', count, 'General', 'posgrado');
+    
+    const finalPrompt = `${systemPrompt}
 
-REGLAS ESTRICTAS:
-1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional.
-2. Cada elemento: { "front": "...", "back": "..." }
-3. Preguntas precisas y directas. Respuestas concisas pero completas.
-4. Cubre conceptos clave. Evita trivialidades.
-5. Formato exacto: [{"front": "...", "back": "..."}, ...]
+DOCUMENTO A ANALIZAR:
+[documento adjunto]
 
-Genera las flashcards:`;
+Genera exactamente ${count} ítems mezclados (40% MC, 40% Flashcard, 20% V/F).
+Cada ítem debe incluir: type, data, hint, explanation.
+CERO meta-datos. CERO trivialidades. TODO análisis/síntesis/evaluación.`;
 
     const { uploadResult, fileManager, wasConverted, finalMimeType } =
       await uploadBufferToGemini(fileBuffer, mimeType, filename);
@@ -481,7 +493,7 @@ Genera las flashcards:`;
       safetySettings: SAFETY_SETTINGS,
     });
 
-    const result = await model.generateContent([fileData, { text: prompt }]);
+    const result = await model.generateContent([fileData, { text: finalPrompt }]);
     const response = result.response.text();
 
     // Limpieza
@@ -495,11 +507,13 @@ Genera las flashcards:`;
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error("Gemini no retornó un array JSON válido");
 
-    const flashcards = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(flashcards)) throw new Error("Respuesta no es un array");
+    const items = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(items)) throw new Error("Respuesta no es un array");
 
-    console.log(`[Gemini] ${flashcards.length} flashcards generadas exitosamente desde buffer`);
-    return flashcards;
+    const atomicItems = processAtomicFlashcards(items);
+
+    console.log(`[Gemini] ✅ ${atomicItems.length} ítems generados exitosamente desde buffer (Originales: ${items.length})`);
+    return atomicItems;
   } catch (error) {
     console.error(`[Gemini] Error generando flashcards desde buffer:`, error.message);
     throw error;
@@ -512,12 +526,13 @@ Genera las flashcards:`;
 
 /**
  * Genera flashcards estructuradas desde un bloque de texto (sin necesidad de archivo).
- * Usa processTextInline (sin Files API) para máxima velocidad.
+ * Usa prompts de CALIDAD ACADÉMICA ALTA con Taxonomía de Bloom.
+ * Incluye: pistas pedagógicas (hints) y explicaciones magistrales.
  * Llamado por el endpoint /api/ai/generate-flashcards cuando provider=gemini.
  *
  * @param {string} contextText - Texto de contexto académico
  * @param {number} count - Número de flashcards a generar
- * @returns {Promise<Array>} Array de { front, back }
+ * @returns {Promise<Array>} Array de { type, data: { front/back o question/options }, hint, explanation }
  */
 async function generateFlashcardsFromText(contextText, count = 10) {
   try {
@@ -528,32 +543,60 @@ async function generateFlashcardsFromText(contextText, count = 10) {
       safetySettings: SAFETY_SETTINGS,
     });
 
-    const prompt = `Eres un experto pedagogo universitario. Analiza el siguiente material académico y genera exactamente ${count} flashcards de estudio.
+    // Auto-detectar disciplina y usar prompt especializado
+    const systemPrompt = buildAdaptivePrompt('mixed', count, contextText, 'posgrado');
 
-REGLAS ESTRICTAS:
-1. Responde ÚNICAMENTE con un array JSON válido. Sin texto adicional, sin markdown, sin explicaciones.
-2. Cada elemento debe tener exactamente dos campos: "front" (pregunta o concepto) y "back" (respuesta o definición).
-3. Preguntas precisas y directas. Respuestas concisas pero completas.
-4. Cubre los conceptos más importantes del material. Evita preguntas triviales.
-5. Formato exacto: [{"front": "...", "back": "..."}, ...]
+    const finalPrompt = `${systemPrompt}
 
-MATERIAL ACADÉMICO:
+═══════════════════════════════════════════════════════════════════════════════
+MATERIAL ACADÉMICO A ANALIZAR:
+═══════════════════════════════════════════════════════════════════════════════
+
 ${contextText}
 
-Genera las ${count} flashcards:`;
+═══════════════════════════════════════════════════════════════════════════════
+ACCIÓN:
+═══════════════════════════════════════════════════════════════════════════════
 
-    const result = await model.generateContent([{ text: prompt }]);
+Genera exactamente ${count} ítems de evaluación.
+Distribución: 40% Opción Múltiple + 40% Flashcard + 20% Verdadero/Falso
+
+REQUISITOS OBLIGATORIOS:
+✅ CADA ítem tiene: "type", "data" (con sus propios campos), "hint", "explanation"
+✅ CERO preguntas sobre metadatos del documento
+✅ TODA pregunta es de nivel Análisis/Síntesis/Evaluación (Bloom 4-6)
+✅ Distractores son errores conceptuales REALES de la disciplina
+✅ Pistas son empujones al razonamiento (NO respuestas disfrazadas)
+✅ Explicaciones son lecciones magistrales que ENSEÑAN, no solo confirman
+
+Responde ÚNICAMENTE el array JSON. CERO texto adicional.`;
+
+    const result = await model.generateContent([{ text: finalPrompt }]);
     const response = result.response.text();
 
     // Parsear respuesta JSON
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('Gemini no retornó un array JSON válido');
 
-    const flashcards = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(flashcards)) throw new Error('Respuesta no es un array');
+    const items = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(items)) throw new Error('Respuesta no es un array');
 
-    console.log(`[Gemini] ✅ ${flashcards.length} flashcards generadas desde texto`);
-    return flashcards;
+    // Validar estructura de cada ítem
+    const validItems = items.filter(item => {
+      if (!item.type || !item.data) {
+        console.warn('[Gemini] Ítem ignorado: estructura incompleta', item);
+        return false;
+      }
+      if (!item.hint || !item.explanation) {
+        console.warn('[Gemini] Ítem sin pista o explicación:', item.type);
+      }
+      return true;
+    });
+
+    const atomicItems = processAtomicFlashcards(validItems);
+
+    console.log(`[Gemini] ✅ ${atomicItems.length} ítems generados desde texto (calidad académica verificada)`);
+    return atomicItems;
   } catch (error) {
     console.error(`[Gemini] Error generando flashcards desde texto:`, error.message);
     throw error;
@@ -561,8 +604,115 @@ Genera las ${count} flashcards:`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INFO
+// generateFlashcardsWithGroq — fallback para Groq con prompts simplificados
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Genera flashcards usando Groq (fallback o alternativa a Gemini)
+ * Usa prompts simplificados que Groq maneja mejor
+ * 
+ * @param {string} contextText - Texto académico
+ * @param {number} count - Cantidad de ítems
+ * @returns {Promise<Array>} Items con estructura { type, data, hint, explanation }
+ */
+async function generateFlashcardsWithGroq(contextText, count = 10) {
+  const { buildGroqPrompt } = require('./academicPromptBuilder');
+  
+  try {
+    console.log(`[Groq] Generando ${count} flashcards con prompts académicos simplificados...`);
+    
+    const groqApiKey = secrets.GROQ_API_KEY;
+    if (!groqApiKey) throw new Error('Groq API Key no está configurada');
+
+    const systemPrompt = buildGroqPrompt('mixed', count);
+    
+    // Limitar contexto para Groq
+    const trimmedContext = contextText.length > 8000
+      ? contextText.substring(0, 8000) + '\n[...truncado]'
+      : contextText;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Contexto académico:\n${trimmedContext}` },
+        ],
+        temperature: 0.5,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Groq API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const groqData = await response.json();
+    const rawContent = groqData.choices?.[0]?.message?.content || '{}';
+
+    // Parsear JSON
+    const jsonMatch = rawContent.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('Groq no retornó array JSON válido');
+
+    const items = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(items)) throw new Error('Respuesta no es un array');
+
+    const atomicItems = processAtomicFlashcards(items);
+
+    console.log(`[Groq] ✅ ${atomicItems.length} ítems generados exitosamente (Originales: ${items.length})`);
+    return atomicItems;
+  } catch (error) {
+    console.error(`[Groq] Error generando flashcards:`, error.message);
+    throw error;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INFO & UTILS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Intercepta los items generados por la IA y aplica fragmentación atómica
+ * a las tarjetas de tipo 'flashcard' que sean demasiado densas.
+ */
+function processAtomicFlashcards(items) {
+  const finalItems = [];
+  for (const item of items) {
+    if (item.type !== 'flashcard' || !item.data) {
+      finalItems.push(item);
+      continue;
+    }
+    
+    // Legacy support para flashcards antiguas que podrían venir sin 'front'
+    const front = item.data.front || item.data.question || '';
+    const back = item.data.back || item.data.answer || '';
+    
+    const density = analyzeCardDensity({ front, back });
+    
+    if (density.isDense) {
+      console.log(`[Atomic] Fragmentando flashcard densa generada por IA: ${front.substring(0, 30)}...`);
+      const atomicCards = fragmentCard({ front, back });
+      for (const atomic of atomicCards) {
+        finalItems.push({
+          type: 'flashcard',
+          data: { front: atomic.front, back: atomic.back },
+          hint: item.hint,
+          explanation: item.explanation,
+          is_atomic: 1
+        });
+      }
+    } else {
+      finalItems.push(item);
+    }
+  }
+  return finalItems;
+}
 
 /**
  * Obtiene información sobre límites y disponibilidad del modelo.
@@ -591,6 +741,7 @@ module.exports = {
   generateFlashcardsFromDocument,
   generateFlashcardsFromBuffer,
   generateFlashcardsFromText,
+  generateFlashcardsWithGroq,
   getModelInfo,
   MODEL_NAME,
 };
