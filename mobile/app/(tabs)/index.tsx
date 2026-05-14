@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { createSubject, getCurrentUserProfile, getSubjects, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, getAllSchedules, createStudySession, getPredictions, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
+import { createSubject, getCurrentUserProfile, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, getPredictions, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
 import { useDataStore } from '../../src/store/useDataStore';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/SnoozeModal';
@@ -63,7 +63,7 @@ export default function HybridDashboardScreen() {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   // ── Usar store global para subjects, assessments, schedules ──────────────
-  const { subjects, assessments, schedules: storeSchedules, loadAllData } = useDataStore();
+  const { subjects, schedules: storeSchedules, loadAllData, refreshSchedules, refreshSubjects } = useDataStore();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const [isSavingSubject, setIsSavingSubject] = useState(false);
   const [subjectName, setSubjectName] = useState('');
@@ -181,7 +181,7 @@ export default function HybridDashboardScreen() {
         console.warn('Error fetching next assessments:', err);
       }
     }
-  }, [loadAllData]);
+  }, [loadAllData, subjects]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -291,7 +291,7 @@ export default function HybridDashboardScreen() {
 
     try {
       setIsSavingSubject(true);
-      const created = await createSubject({
+      await createSubject({
         name: subjectName.trim(),
         professor: subjectProfessor.trim() || undefined,
         color: selectedColor,
@@ -478,9 +478,9 @@ export default function HybridDashboardScreen() {
         ...toCreate.map((payload) => createSchedule(payload)),
       ]);
 
-      const [today, all] = await Promise.all([getTodaySchedules(), getAllSchedules()]);
+      const today = await getTodaySchedules();
       setTodaySchedules(today || []);
-      setAllSchedules(all || []);
+      await refreshSchedules();
       showToast(t('dashboard.scheduleSuccess'));
       handleCloseSchedulePlanner();
     } catch (error: any) {
@@ -518,8 +518,7 @@ export default function HybridDashboardScreen() {
       setSelectedSubjectId(null);
       
       // Refresh subjects to update averages
-      const userSubjects = await getSubjects();
-      setSubjects(userSubjects || []);
+      await refreshSubjects();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.quickAddMenu.grade.errorSave'), type: 'error' });
     } finally {
