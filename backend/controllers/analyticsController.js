@@ -57,24 +57,35 @@ exports.getMastery = (req, res) => {
 exports.getReviewPredictions = (req, res) => {
   const { userId } = req.params;
 
+  if (!userId) {
+    return res.status(400).json({ error: 'userId es requerido' });
+  }
+
   db.all(
-    `SELECT fc.*, la.mastery_percentage, fd.subject_id
+    `SELECT fc.id, fc.front, fc.next_review_date, fd.subject_id, la.mastery_percentage
      FROM flashcards fc
      JOIN flashcard_decks fd ON fc.deck_id = fd.id
      LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
-     WHERE fc.next_review_date <= CURRENT_TIMESTAMP
+     WHERE fc.next_review_date <= datetime('now')
      AND fd.user_id = ?
      ORDER BY fc.next_review_date ASC
      LIMIT 20`,
     [userId, userId],
     (err, rows) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) {
+        console.error(`[Analytics] Error en getReviewPredictions para userId=${userId}:`, err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      if (!rows || rows.length === 0) {
+        return res.json({ dueCount: 0, cards: [] });
+      }
 
       const predictions = rows.map(card => ({
         cardId: card.id,
         question: card.front,
-        subjectId: card.subject_id,
-        mastery: card.mastery_percentage,
+        subjectId: card.subject_id || 0,
+        mastery: card.mastery_percentage || 0,
         urgency: (card.mastery_percentage || 0) < 50 ? 'HIGH' : 'MEDIUM',
       }));
 

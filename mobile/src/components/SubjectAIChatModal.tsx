@@ -13,13 +13,13 @@
  * - Botón de upload de documentos directo a Gemini.
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, StyleSheet,
   Animated, ActivityIndicator,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { sendAIChatMessage, getChatHistory, clearChatHistory, processDocumentUpload, generateStudyMaterialFromChat } from '../services/api/ai';
 import { LLMProvider, getPreferredLLMProvider } from '../utils/llmProviderManager';
@@ -118,11 +118,10 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
 // ─── Indicador de escritura animado ──────────────────────────────────────────
 const TypingIndicator: React.FC = () => {
   // Tres puntos que pulsan en secuencia
-  const anims = [
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-  ];
+  const anim1 = useRef(new Animated.Value(0)).current;
+  const anim2 = useRef(new Animated.Value(0)).current;
+  const anim3 = useRef(new Animated.Value(0)).current;
+  const anims = useMemo(() => [anim1, anim2, anim3], [anim1, anim2, anim3]);
 
   useEffect(() => {
     const sequence = anims.map((anim, i) =>
@@ -138,7 +137,7 @@ const TypingIndicator: React.FC = () => {
     );
     Animated.parallel(sequence).start();
     return () => anims.forEach(a => a.stopAnimation());
-  }, []);
+  }, [anims]);
 
   return (
     <View style={[s.bubbleRow, s.bubbleRowAI]}>
@@ -184,6 +183,16 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(-100)).current;
 
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    toastAnim.setValue(-100);
+    Animated.sequence([
+      Animated.timing(toastAnim, { toValue: 20, duration: 300, useNativeDriver: true }),
+      Animated.delay(5000),
+      Animated.timing(toastAnim, { toValue: -100, duration: 300, useNativeDriver: true })
+    ]).start(() => setToastMessage(null));
+  }, [toastAnim]);
+
   // ── Generate material panel ────────────────────────────────────────────────
   const [showGenPanel, setShowGenPanel] = useState(false);
   const [genMode, setGenMode] = useState<StudyMode>('mixed');
@@ -191,13 +200,13 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const genPanelAnim = useRef(new Animated.Value(0)).current;
 
-  const openGenPanel = () => {
+  const openGenPanel = useCallback(() => {
     setShowGenPanel(true);
     Animated.spring(genPanelAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
-  };
-  const closeGenPanel = () => {
+  }, [genPanelAnim]);
+  const closeGenPanel = useCallback(() => {
     Animated.timing(genPanelAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setShowGenPanel(false));
-  };
+  }, [genPanelAnim]);
 
   /**
    * Construye el texto de contexto disponible para generación.
@@ -220,7 +229,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
    * Ejecuta la generación del mazo con los parámetros actuales del panel.
    * Usa buildGenerationContext() para obtener el mejor contexto disponible.
    */
-  const handleGenerateMaterial = async (overrideMode?: StudyMode, overrideCount?: number) => {
+  const handleGenerateMaterial = useCallback(async (overrideMode?: StudyMode, overrideCount?: number) => {
     if (!subjectId || !userId) return;
     const ctx = buildGenerationContext();
     if (!ctx.trim()) {
@@ -254,17 +263,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const showToast = useCallback((message: string) => {
-    setToastMessage(message);
-    toastAnim.setValue(-100);
-    Animated.sequence([
-      Animated.timing(toastAnim, { toValue: 20, duration: 300, useNativeDriver: true }),
-      Animated.delay(5000),
-      Animated.timing(toastAnim, { toValue: -100, duration: 300, useNativeDriver: true })
-    ]).start(() => setToastMessage(null));
-  }, [toastAnim]);
+  }, [subjectId, userId, buildGenerationContext, showToast, closeGenPanel, genMode, genCount, subjectName]);
 
   useEffect(() => {
     setLocalContextText(contextText);
@@ -298,7 +297,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
               });
             }
           }
-        } catch (err) {}
+        } catch {}
       };
       loadSavedDoc();
     }
@@ -330,7 +329,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
   useEffect(() => {
     if (messages.length > 0) scrollToBottom();
-  }, [messages, isLoading]);
+  }, [messages, isLoading, scrollToBottom]);
 
   /** Limpiar historial al cerrar */
   const handleClose = useCallback(() => {
@@ -390,7 +389,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
             const count: number = deckParams.count || 10;
             // Ejecutar generación con los parámetros que Zyren decidió
             await handleGenerateMaterial(mode, count);
-          } catch (_) {
+          } catch {
             // Si falla el parse, igual se muestra el mensaje de Zyren
           }
         } else {
@@ -512,7 +511,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     } finally {
       setIsUploadingDocument(false);
     }
-  }, []);
+  }, [subjectId, showToast]);
 
   return (
     <Modal

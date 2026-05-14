@@ -18,10 +18,20 @@ const globalLimiter = rateLimit({
  */
 const aiLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // Ventana de 1 hora
-    max: 15, // Máximo 15 peticiones por IP por hora (ajusta este número según tu plan)
-    message: { error: 'Has superado el límite de uso de la Inteligencia Artificial por hora. Intenta más tarde.' },
+    max: 200, // DEV: 200 req/hora por IP — bajar a 30-50 antes de producción
+              // Groq free: ~1,800/h · Gemini Flash free: ~900/h → 200 es seguro para ambos
     standardHeaders: true,
     legacyHeaders: false,
+    // Handler personalizado para enviar Retry-After con el tiempo exacto en segundos
+    handler: (req, res, next, options) => {
+        const resetTimeMs = req.rateLimit?.resetTime?.getTime?.() ?? (Date.now() + options.windowMs);
+        const retryAfterSeconds = Math.ceil((resetTimeMs - Date.now()) / 1000);
+        res.setHeader('Retry-After', retryAfterSeconds);
+        res.status(options.statusCode).json({
+            error: 'Has superado el límite de uso de la Inteligencia Artificial por hora. Intenta más tarde.',
+            retryAfter: retryAfterSeconds,
+        });
+    },
 });
 
 /**
@@ -29,7 +39,7 @@ const aiLimiter = rateLimit({
  */
 const authLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // Ventana de 1 hora
-    max: 10, // Máximo 10 intentos fallidos por hora
+    max: 200, // DEV: 200 intentos fallidos por hora
     message: { error: 'Demasiados intentos de inicio de sesión. Tu cuenta está temporalmente bloqueada.' },
     standardHeaders: true,
     legacyHeaders: false,

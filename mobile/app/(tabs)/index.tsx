@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { createSubject, getCurrentUserProfile, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, getPredictions, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
+import { createSubject, getCurrentUserProfile, createAssessment, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
 import { useDataStore } from '../../src/store/useDataStore';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/SnoozeModal';
@@ -63,7 +63,7 @@ export default function HybridDashboardScreen() {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   // ── Usar store global para subjects, assessments, schedules ──────────────
-  const { subjects, schedules: storeSchedules, loadAllData, refreshSchedules, refreshSubjects } = useDataStore();
+  const { subjects, assessments, schedules: storeSchedules, loadAllData, refreshSchedules, refreshSubjects } = useDataStore();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const [isSavingSubject, setIsSavingSubject] = useState(false);
   const [subjectName, setSubjectName] = useState('');
@@ -103,8 +103,7 @@ export default function HybridDashboardScreen() {
 
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [nextAssessment, setNextAssessment] = useState<Assessment | null>(null);
-  const [predictions, setPredictions] = useState<PredictionResponse | null>(null);
+  const [predictions /*, setPredictions */] = useState<PredictionResponse | null>(null);
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
@@ -132,62 +131,71 @@ export default function HybridDashboardScreen() {
   const [isSnoozeModalVisible, setIsSnoozeModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [userProfile, schedulesToday] = await Promise.all([
-      getCurrentUserProfile(),
-      getTodaySchedules(),
-    ]);
+    try {
+      const [userProfile, schedulesToday] = await Promise.all([
+        getCurrentUserProfile(),
+        getTodaySchedules(),
+      ]);
 
-    setProfile(userProfile);
-    setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
-    // ── Los subjects, assessments, schedules se cargan del store ──────────────
-    await loadAllData(true); // forceRefresh=true para traer datos frescos
-
-    if (userProfile?.id) {
-      getPredictions(userProfile.id).then(setPredictions).catch(err => console.warn('Predictions error:', err));
+      setProfile(userProfile);
+      setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
+      
+      // ── Cargar datos globales del store (subjects, assessments, schedules) ──
+      await loadAllData(true); 
+    } catch (err) {
+      console.warn('Error loading dashboard data:', err);
     }
+  }, [loadAllData]);
 
-    // Find next assessment across all subjects
-    if (Array.isArray(subjects) && subjects.length > 0) {
+  // Derivar el próximo examen directamente de los datos del store
+  const nextAssessment = useMemo(() => {
+    if (!Array.isArray(assessments) || assessments.length === 0) return null;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const upcoming = assessments.filter((a: Assessment) => {
+      if (a.is_completed || !a.date) return false;
       try {
-        const allAssessments = await Promise.all(
-          subjects.map((s: Subject) => getAssessments(s.id))
-        );
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        
-        const upcoming = allAssessments.flat().filter((a: Assessment) => {
-          if (a.is_completed || !a.date) return false;
-          try {
-            const [d, m, y] = a.date.split('-').map(Number);
-            const taskDate = new Date(y, m - 1, d);
-            return taskDate.getTime() >= today.getTime();
-          } catch {
-            return false;
-          }
-        });
-        
-        const sorted = upcoming.sort((a: any, b: any) => {
-          try {
-            const [da, ma, ya] = a.date.split('-').map(Number);
-            const [db, mb, yb] = b.date.split('-').map(Number);
-            if (ya && ma && da && yb && mb && db) {
-              return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
-            }
-          } catch {}
-          return 0;
-        });
-        setNextAssessment(sorted[0] || null);
-      } catch (err) {
-        console.warn('Error fetching next assessments:', err);
+        const [d, m, y] = a.date.split('-').map(Number);
+        const taskDate = new Date(y, m - 1, d);
+        return taskDate.getTime() >= today.getTime();
+      } catch {
+        return false;
       }
-    }
-  }, [loadAllData, subjects]);
+    });
+    
+    const sorted = upcoming.sort((a: Assessment, b: Assessment) => {
+      try {
+        if (!a.date || !b.date) return 0;
+        const [da, ma, ya] = a.date.split('-').map(Number);
+        const [db, mb, yb] = b.date.split('-').map(Number);
+        return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+      } catch {
+        return 0;
+      }
+    });
+
+    return sorted[0] || null;
+  }, [assessments]);
 
   useFocusEffect(
     React.useCallback(() => {
       loadData();
     }, [loadData])
   );
+
+  // TODO: Arreglar endpoint /analytics/predictions - deshabilitado temporalmente
+  // useEffect(() => {
+  //   if (profile?.id) {
+  //     getPredictions(profile.id)
+  //       .then(setPredictions)
+  //       .catch(err => {
+  //         console.warn('Predictions error:', err);
+  //         setPredictions(null);
+  //       });
+  //   }
+  // }, [profile?.id]);
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
@@ -318,13 +326,13 @@ export default function HybridDashboardScreen() {
   const buildScheduleKey = (day: number, startTime: string) => `${day}-${startTime}`;
 
   const selectedScheduleSubject = useMemo(
-    () => subjects.find((s) => s.id === selectedSubjectId) || null,
+    () => Array.isArray(subjects) ? subjects.find((s) => s.id === selectedSubjectId) || null : null,
     [selectedSubjectId, subjects],
   );
 
   const existingScheduleRowsForSelectedSubject = useMemo(() => {
     if (!selectedSubjectId) return [] as any[];
-    return allSchedules.filter((s) => s.subject_id === selectedSubjectId);
+    return Array.isArray(allSchedules) ? allSchedules.filter((s) => s.subject_id === selectedSubjectId) : [];
   }, [allSchedules, selectedSubjectId]);
 
   const existingScheduleKeysForSelectedSubject = useMemo(
@@ -507,7 +515,7 @@ export default function HybridDashboardScreen() {
         type: 'grade',
       });
 
-      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || '';
+      const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       showToast(t('dashboard.quickAddMenu.grade.success', { subject: subjectName }));
       setIsGradeModalVisible(false);
       
@@ -1130,7 +1138,7 @@ export default function HybridDashboardScreen() {
                   !selectedSubjectId && styles.dropdownPlaceholder
                 ]}>
                   {selectedSubjectId 
-                    ? subjects.find(s => s.id === selectedSubjectId)?.name 
+                    ? Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name : undefined
                     : t('dashboard.quickAddMenu.grade.subjectPlaceholder')}
                 </Text>
                 <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
@@ -1212,7 +1220,7 @@ export default function HybridDashboardScreen() {
                   !selectedSubjectId && styles.dropdownPlaceholder
                 ]}>
                   {selectedSubjectId 
-                    ? subjects.find(s => s.id === selectedSubjectId)?.name 
+                    ? Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name : undefined
                     : t('dashboard.quickAddMenu.grade.subjectPlaceholder')}
                 </Text>
                 <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
@@ -1316,11 +1324,11 @@ export default function HybridDashboardScreen() {
             >
               <View style={[globalStyles.rowCenter, globalStyles.flex1]}>
                 {selectedSubjectId ? (
-                  <View style={[styles.dot, { backgroundColor: subjects.find(s => s.id === selectedSubjectId)?.color || theme.colors.primary, marginRight: 8 }]} />
+                  <View style={[styles.dot, { backgroundColor: Array.isArray(subjects) ? (subjects.find(s => s.id === selectedSubjectId)?.color || theme.colors.primary) : theme.colors.primary, marginRight: 8 }]} />
                 ) : null}
                 <Text style={[styles.dropdownSelectorText, !selectedSubjectId && styles.dropdownPlaceholder, { flex: 1 }]} numberOfLines={1}>
                   {selectedSubjectId 
-                    ? subjects.find(s => s.id === selectedSubjectId)?.name 
+                    ? Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name : undefined
                     : t('dashboard.quickAddMenu.grade.subjectPlaceholder')}
                 </Text>
               </View>
@@ -1364,14 +1372,14 @@ export default function HybridDashboardScreen() {
 
                       const isActive = selectedSubjectId
                         ? scheduleDraftKeys.has(key)
-                        : allSchedules.some(s => buildScheduleKey(s.day_of_week, s.start_time) === key);
+                        : Array.isArray(allSchedules) && allSchedules.some(s => buildScheduleKey(s.day_of_week, s.start_time) === key);
 
                       const matchingEntry = !selectedSubjectId
-                        ? allSchedules.find(s => buildScheduleKey(s.day_of_week, s.start_time) === key)
+                        ? Array.isArray(allSchedules) ? allSchedules.find(s => buildScheduleKey(s.day_of_week, s.start_time) === key) : null
                         : null;
                       const slotColor = selectedSubjectId
                         ? (selectedScheduleSubject?.color || theme.colors.primary)
-                        : (subjects.find(s => s.id === matchingEntry?.subject_id)?.color || theme.colors.primary);
+                        : (Array.isArray(subjects) ? subjects.find(s => s.id === matchingEntry?.subject_id)?.color : undefined) || theme.colors.primary;
 
                       return (
                         <TouchableOpacity 
