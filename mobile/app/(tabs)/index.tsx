@@ -11,6 +11,7 @@ import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
 import { createSubject, getCurrentUserProfile, getSubjects, createAssessment, getAssessments, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, getAllSchedules, createStudySession, getPredictions, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
+import { useDataStore } from '../../src/store/useDataStore';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/SnoozeModal';
 import { useDueCardSnooze, type SnoozeOption } from '../../src/hooks/useDueCardSnooze';
@@ -61,7 +62,8 @@ export default function HybridDashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  // ── Usar store global para subjects, assessments, schedules ──────────────
+  const { subjects, assessments, schedules: storeSchedules, loadAllData } = useDataStore();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const [isSavingSubject, setIsSavingSubject] = useState(false);
   const [subjectName, setSubjectName] = useState('');
@@ -107,7 +109,8 @@ export default function HybridDashboardScreen() {
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [scheduleDraftKeys, setScheduleDraftKeys] = useState<Set<string>>(new Set());
-  const [allSchedules, setAllSchedules] = useState<any[]>([]);
+  // ── allSchedules viene del store ahora ─────────────────────────────────
+  const allSchedules = storeSchedules;
   const scheduleSheetAnim = useRef(new Animated.Value(500)).current;
 
   // States
@@ -128,28 +131,26 @@ export default function HybridDashboardScreen() {
   const snoozeManager = useDueCardSnooze();
   const [isSnoozeModalVisible, setIsSnoozeModalVisible] = useState(false);
 
-  const loadData = async () => {
-    const [userProfile, userSubjects, schedulesToday, schedulesAll] = await Promise.all([
+  const loadData = useCallback(async () => {
+    const [userProfile, schedulesToday] = await Promise.all([
       getCurrentUserProfile(),
-      getSubjects(),
       getTodaySchedules(),
-      getAllSchedules(),
     ]);
 
     setProfile(userProfile);
-    setSubjects(Array.isArray(userSubjects) ? userSubjects : []);
     setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
-    setAllSchedules(Array.isArray(schedulesAll) ? schedulesAll : []);
+    // ── Los subjects, assessments, schedules se cargan del store ──────────────
+    await loadAllData(true); // forceRefresh=true para traer datos frescos
 
     if (userProfile?.id) {
       getPredictions(userProfile.id).then(setPredictions).catch(err => console.warn('Predictions error:', err));
     }
 
     // Find next assessment across all subjects
-    if (Array.isArray(userSubjects) && userSubjects.length > 0) {
+    if (Array.isArray(subjects) && subjects.length > 0) {
       try {
         const allAssessments = await Promise.all(
-          userSubjects.map((s: Subject) => getAssessments(s.id))
+          subjects.map((s: Subject) => getAssessments(s.id))
         );
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -180,12 +181,12 @@ export default function HybridDashboardScreen() {
         console.warn('Error fetching next assessments:', err);
       }
     }
-  };
+  }, [loadAllData]);
 
   useFocusEffect(
     React.useCallback(() => {
       loadData();
-    }, [])
+    }, [loadData])
   );
 
   const fullName = useMemo(() => {
@@ -298,7 +299,8 @@ export default function HybridDashboardScreen() {
         target_grade: subjectTarget ? Number(subjectTarget) : undefined,
       });
 
-      setSubjects((prev) => [...prev, { ...created, avg_score: 0, completion_percent: 0 }]);
+      // Refrescar los subjects del store después de crear uno nuevo
+      await loadAllData(true);
       setIsSubjectModalVisible(false);
       resetSubjectForm();
     } catch (error: any) {
