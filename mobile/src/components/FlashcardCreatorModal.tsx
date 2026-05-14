@@ -101,8 +101,13 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
     }
     setStep('complete');
     setTimeout(() => {
-      onSuccess(generatedDeck?.id || 0);
-      handleClose();
+      const deckId = generatedDeck?.id || 0;
+      if (deckId > 0) {
+        onSuccess(deckId);
+      } else {
+        Alert.alert('Error', 'No se pudo obtener el ID del mazo creado');
+        handleClose();
+      }
     }, 1500);
   };
 

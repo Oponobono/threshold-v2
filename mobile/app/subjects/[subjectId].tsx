@@ -441,9 +441,19 @@ export default function SubjectDetailScreen() {
       {subjectId && profile?.id && (
         <FlashcardCreatorModal
           visible={isFlashcardModalVisible}
-          onClose={() => setIsFlashcardModalVisible(false)}
-          onSuccess={() => {
+          onClose={() => {
             setIsFlashcardModalVisible(false);
+            setFlashcardContextText('');
+            setFlashcardBase64('');
+          }}
+          onSuccess={(deckId: number) => {
+            setIsFlashcardModalVisible(false);
+            setFlashcardContextText('');
+            setFlashcardBase64('');
+            // Navegar al módulo de flashcards para que vea el mazo creado
+            if (deckId) {
+              router.push(`/flashcards?deckId=${deckId}`);
+            }
           }}
           // Pasar el texto construido por el backend o la imagen base64
           content={flashcardContextText}

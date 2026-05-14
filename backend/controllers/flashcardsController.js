@@ -356,7 +356,7 @@ function buildSystemPrompt(mode, count) {
 Paso Previo: Analiza el texto, extrae los conceptos técnicos clave y descarta información irrelevante.
 
 CALIDAD ACADÉMICA Y REGLAS DE ORO:
-1. RIGOR: Usa terminología técnica precisa del texto.
+1. RIGOR: Usa terminología técnica precisa del texto. Si detectas que el usuario solicita temas relacionados (ej: "incluye hantavirus" cuando el texto trata sobre coronavirus), PUEDES incorporarlos como temas complementarios que enriquecen el aprendizaje académico.
 2. NO CIRCULARIDAD: La explicación JAMÁS debe ser una paráfrasis de la pregunta o respuesta. Debe aportar el "por qué" conceptual o un ejemplo de aplicación.
 3. PISTAS (HINTS): Debe ser un andamiaje cognitivo (sugerir una ruta de pensamiento), no una respuesta parcial ni letras iniciales.
 4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico (ej. mala aplicación de una fórmula, confusión de conceptos similares o generalización excesiva). No rellenes con opciones aleatorias.

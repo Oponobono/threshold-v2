@@ -110,10 +110,11 @@ Debes usar estrictamente estos 3 esquemas según el ítem:
   const systemPrompt = `Eres Zyren, experto en pedagogía universitaria y diseño instruccional. Tu misión es transformar contenido en material de ALTO RENDIMIENTO.
 
 REGLAS DE ORO:
-1. RIGOR: Usa terminología técnica precisa del texto.
+1. RIGOR: Usa terminología técnica precisa del texto. Si el usuario solicita incluir conceptos relacionados que no están en el texto, PUEDES incorporarlos para enriquecer el contexto académico (ej: si pide coronavirus + hantavirus, ambos son virus respiratorios relacionados).
 2. NO CIRCULARIDAD: La explicación JAMÁS debe ser una paráfrasis de la pregunta. Debe explicar el "por qué" fundamental.
 3. PISTAS ESTRATÉGICAS: El 'hint' debe ser un andamiaje cognitivo (ruta de pensamiento), no una respuesta parcial.
 4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico.
+5. CONTENIDO RELACIONADO: Si detectas que el usuario solicita temas relacionados (ej: "incluye hantavirus" cuando el documento menciona coronavirus), incorpora esos temas SIEMPRE, priorizando el contenido del documento como base pero enriqueciendo con conocimiento académico general sobre temas conexos.
 
 ${modeInstructions[mode] || modeInstructions.mixed}
 
@@ -415,15 +416,82 @@ ${deckGenerationInstructions}`;
               }
             }
 
+            // Obtener user_id y subject_id de la sesión para persistir el mazo
+            const { session_id: sessionId } = req.body;
+            let persistedDeck = null;
+            
+            if (sessionId && generatedDeck.length > 0) {
+              try {
+                // Obtener info de la sesión
+                const session = await new Promise((resolve, reject) => {
+                  db.get(
+                    'SELECT user_id, subject_id FROM ai_chat_sessions WHERE id = ?',
+                    [sessionId],
+                    (err, row) => err ? reject(err) : resolve(row)
+                  );
+                });
+
+                if (session && session.user_id && session.subject_id) {
+                  // Crear el mazo
+                  const deckTitle = `Mazo ${deckAction.mode === 'mixed' ? 'Mixto' : deckAction.mode} - ${new Date().toLocaleDateString('es-ES')}`;
+                  const deckDesc = `Mazo generado automáticamente desde chat con Zyren (${deckProvider})`;
+
+                  persistedDeck = await new Promise((resolve, reject) => {
+                    db.run(
+                      `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
+                      [session.subject_id, session.user_id, deckTitle, deckDesc],
+                      function(err) {
+                        if (err) reject(err);
+                        else resolve({ id: this.lastID, title: deckTitle, description: deckDesc });
+                      }
+                    );
+                  });
+
+                  // Insertar los ítems generados
+                  const insertPromises = generatedDeck.map(item => {
+                    return new Promise((resolve, reject) => {
+                      const itemType = item.type || 'flashcard';
+                      const content = item.data || {};
+                      const front = itemType === 'flashcard' ? (content.front || '') : '';
+                      const back = itemType === 'flashcard' ? (content.back || '') : '';
+                      const contentStr = JSON.stringify(content);
+                      const hint = item.hint || null;
+                      const explanation = item.explanation || null;
+
+                      db.run(
+                        `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
+                        [persistedDeck.id, front, back, itemType, contentStr, hint, explanation],
+                        (err) => {
+                          if (err) reject(err);
+                          else resolve();
+                        }
+                      );
+                    });
+                  });
+
+                  await Promise.all(insertPromises);
+                  console.log(`[DeckGeneration] ✅ Mazo guardado con ID=${persistedDeck.id} (${generatedDeck.length} ítems)`);
+                } else {
+                  console.warn('[DeckGeneration] ⚠️ No se pudo obtener sesión para persistencia');
+                }
+              } catch (persistErr) {
+                console.error('[DeckGeneration] Error persistiendo mazo:', persistErr.message);
+              }
+            }
+
             deckData = {
               success: true,
               mode: deckAction.mode,
               count: deckAction.count,
               items: generatedDeck,
+              persisted: !!persistedDeck,
+              ...(persistedDeck && { deckId: persistedDeck.id, deckTitle: persistedDeck.title }),
               generatedAt: new Date().toISOString(),
               provider: deckProvider,
               fallbackUsed: deckProvider !== provider,
-              note: `Generado con ${deckProvider.toUpperCase()} desde contexto del chat`
+              note: persistedDeck 
+                ? `✅ Mazo creado en la lista (ID: ${persistedDeck.id})`
+                : `⚠️ Ítems generados pero no guardados. Usa "Crear mazo" en el panel.`
             };
             
             console.log(`[DeckGeneration] ✅ ${generatedDeck.length} ítems generados (${deckProvider})`);

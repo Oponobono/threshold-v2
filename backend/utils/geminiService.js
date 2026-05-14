@@ -359,7 +359,9 @@ async function generateFlashcardsFromDocument(filePath, mimeType, count = 10) {
 DOCUMENTO A ANALIZAR:
 [documento adjunto]
 
-Basándote ÚNICAMENTE en el contenido del documento, genera los ${count} flashcards.
+Basándote primariamente en el contenido del documento. Si el usuario solicita incluir temas relacionados o conexos (ej: "incluye hantavirus" cuando el documento trata coronavirus), PUEDES incorporarlos como contexto académico complementario que enriquece el aprendizaje.
+
+Genera los ${count} flashcards.
 Asegura que cada flashcard sea de NIVEL COGNITIVO ALTO (Análisis/Síntesis/Evaluación).`;
 
     const response = await processDocumentWithFilesAPI(filePath, mimeType, finalPrompt);

@@ -358,34 +358,48 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
       let replyContent: string = data?.reply?.content || 'Lo siento, no pude procesar tu pregunta.';
 
-      // ── Interceptar señal de generación de mazo ──────────────────────────────
-      const deckSignalMatch = replyContent.match(/%%DECK_ACTION%%(\{[\s\S]*?\})%%END%%/);
-      if (deckSignalMatch) {
-        // Limpiar la señal del mensaje visible
+      // ── Verificar si el mazo fue creado automáticamente por el backend ─────────
+      if (data?.deck && data.deck.persisted) {
+        // El backend ya creó el mazo automáticamente
         replyContent = replyContent.replace(/%%DECK_ACTION%%[\s\S]*?%%END%%/g, '').trim();
-
-        // Mostrar el mensaje limpio inmediatamente
-        setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);
+        
+        const deckMsg = `✅ **¡Mazo creado exitosamente!**\n\n📚 **${data.deck.deckTitle}**\nÍtems: ${data.deck.count}\nTipo: ${data.deck.mode === 'mixed' ? 'Mixto' : data.deck.mode}\n\nEncuéntralo en tu sección de Flashcards → `;
+        
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: replyContent || '✨' },
+          { role: 'assistant', content: deckMsg, isSystemMessage: true }
+        ]);
         setIsLoading(false);
+        showToast(`¡Mazo "${data.deck.deckTitle}" listo con ${data.deck.count} ítems! 🎉`);
+      } else {
+        // ── Interceptar señal de generación de mazo (fallback si backend no lo creó) ──
+        const deckSignalMatch = replyContent.match(/%%DECK_ACTION%%(\{[\s\S]*?\})%%END%%/);
+        if (deckSignalMatch) {
+          // Limpiar la señal del mensaje visible
+          replyContent = replyContent.replace(/%%DECK_ACTION%%[\s\S]*?%%END%%/g, '').trim();
 
-        // Parsear parámetros y generar el mazo en segundo plano
-        try {
-          const deckParams = JSON.parse(deckSignalMatch[1]);
-          const mode: StudyMode = deckParams.mode || 'mixed';
-          const count: number = deckParams.count || 10;
-          // Ejecutar generación con los parámetros que Zyren decidió
-          await handleGenerateMaterial(mode, count);
-        } catch (_) {
-          // Si falla el parse, igual se muestra el mensaje de Zyren
+          // Mostrar el mensaje limpio inmediatamente
+          setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);
+          setIsLoading(false);
+
+          // Parsear parámetros y generar el mazo en segundo plano
+          try {
+            const deckParams = JSON.parse(deckSignalMatch[1]);
+            const mode: StudyMode = deckParams.mode || 'mixed';
+            const count: number = deckParams.count || 10;
+            // Ejecutar generación con los parámetros que Zyren decidió
+            await handleGenerateMaterial(mode, count);
+          } catch (_) {
+            // Si falla el parse, igual se muestra el mensaje de Zyren
+          }
+        } else {
+          // Respuesta normal del chat sin generación de mazo
+          setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);
+          setIsLoading(false);
         }
-        return; // Ya añadimos el mensaje y llamamos a handleGenerateMaterial
       }
-      // ──────────────────────────────────────────────────────────────
-
-      setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);
     } catch (err: any) {
-      console.error('[AIChatTelemetry] Error crítico al enviar mensaje:', err);
-      if (err.details) console.error('[AIChatTelemetry] Detalles:', JSON.stringify(err.details, null, 2));
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: `⚠️ Error al conectar con Zyren (${currentProvider}): ${err.message || 'Error desconocido'}.`,
@@ -393,7 +407,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, messages, localContextText, uploadedDocContext, sessionId, currentProvider, handleGenerateMaterial]);
+  }, [inputText, isLoading, messages, localContextText, uploadedDocContext, sessionId, currentProvider, handleGenerateMaterial, showToast]);
 
   /** Limpiar la conversación actual y crear una nueva */
   const handleClearHistory = useCallback(async () => {
