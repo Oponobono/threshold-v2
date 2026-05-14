@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/theme';
 import { dashboardStyles } from '../styles/Dashboard.styles';
 import { Subject, createPhoto } from '../services/api';
+import { autoUploadIfEnabled } from '../services/backup/backupService';
 import { styles } from '../styles/PhotoCaptureModal.styles';
 
 interface PhotoCaptureModalProps {
@@ -92,10 +93,22 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
 
     try {
       setIsProcessing(true);
-      await createPhoto({
+      const photoData = await createPhoto({
         subject_id: selectedSubjectId,
         local_uri: capturedImage,
       });
+      
+      // Auto subida si está habilitada
+      if (photoData?.id) {
+        await autoUploadIfEnabled(
+          capturedImage,
+          'photo',
+          photoData.id,
+          `photo_${photoData.id}.jpg`,
+          'image/jpeg'
+        ).catch(err => console.warn('[PhotoCaptureModal] Auto-upload error:', err));
+      }
+      
       if (onSave) onSave(capturedImage, selectedSubjectId);
       showAlert({ title: t('common.success'), message: t('dashboard.quickAddMenu.takePhoto.success') || 'Éxito', type: 'success' });
       resetAndClose();

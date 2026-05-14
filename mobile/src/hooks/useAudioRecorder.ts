@@ -9,6 +9,7 @@ import {
   deleteAudioRecording,
   AudioRecording,
 } from '../services/api';
+import { autoUploadIfEnabled } from '../services/backup/backupService';
 
 export interface RecordingItem extends AudioRecording {
   // Aliases for compatibility
@@ -335,12 +336,24 @@ export function useAudioRecorder() {
 
         // Persist to DB in background
         try {
-          await createAudioRecording({
+          const audioData = await createAudioRecording({
             local_uri: permanentUri,
             duration: currentDuration,
             name: defaultName,
             subject_id: null,
           });
+          
+          // Auto subida si está habilitada
+          if (audioData?.id) {
+            await autoUploadIfEnabled(
+              permanentUri,
+              'audio',
+              audioData.id,
+              `audio_${audioData.id}.m4a`,
+              'audio/mp4'
+            ).catch(err => console.warn('[useAudioRecorder] Auto-upload error:', err));
+          }
+          
           // Refresh to get the DB id and any extra metadata
           await loadRecordings();
         } catch (dbErr) {

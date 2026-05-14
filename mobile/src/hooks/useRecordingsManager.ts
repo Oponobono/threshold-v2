@@ -138,8 +138,23 @@ export const useRecordingsManager = () => {
         if (!passesDateFilter(rec.created_at || rec.date)) return;
         const subjectName = rec.subject_name || UNCLASSIFIED;
         const section = getOrCreate(subjectName, rec.subject_color || undefined);
+        
+        // DEBUG: Log recording color
+        if (process.env.NODE_ENV !== 'production' && rec.name) {
+          console.log(`[useRecordingsManager] Recording "${rec.name}": subject_color="${rec.subject_color}" (id=${rec.id}, subject_id=${rec.subject_id})`);
+        }
+        
+        // Garantizar que siempre hay un ID válido (nunca vacío)
+        // Fallback: id_string → id → local_uri filename → uri
+        const recordingId = 
+          rec.id_string || 
+          rec.id?.toString() || 
+          (rec.uri ? rec.uri.split('/').pop()?.replace(/\.m4a$/, '') : '') ||
+          (rec.local_uri ? rec.local_uri.split('/').pop()?.replace(/\.m4a$/, '') : '') ||
+          '';
+        
         section.items.push({
-          id: rec.id_string || rec.id?.toString() || '',
+          id: recordingId,
           name: rec.name || 'Grabación',
           type: 'recording',
           date: rec.date,

@@ -17,6 +17,7 @@ import {
   type Photo,
 } from '../../src/services/api';
 import { useDataStore } from '../../src/store/useDataStore';
+import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
 
 // ── Lazy-loaded heavy modals ──────────────────────────────────────────────────
 const ImageViewerModal = lazy(() =>
@@ -305,20 +306,26 @@ export default function GalleryScreen() {
       )}
 
       {/* ── FILTER TABS ── */}
-      <View style={styles.tabRow}>
-        {(['all', 'starred', 'ocr'] as const).map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, filterTab === tab && styles.tabActive]}
-            onPress={() => setFilterTab(tab)}
-          >
-            <Text style={[styles.tabText, filterTab === tab && styles.tabTextActive]}>
-              {tab === 'all' ? (t('gallery.all') || 'Todas') :
-               tab === 'starred' ? (t('gallery.starred') || 'Favoritas') : 'OCR'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        <Text style={styles.itemCount}>{imagePhotos.length} {t('gallery.items') || 'fotos'}</Text>
+      <View style={[styles.tabRow, { alignItems: 'center' }]}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {(['all', 'starred', 'ocr'] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, filterTab === tab && styles.tabActive]}
+              onPress={() => setFilterTab(tab)}
+            >
+              <Text style={[styles.tabText, filterTab === tab && styles.tabTextActive]}>
+                {tab === 'all' ? (t('gallery.all') || 'Todas') :
+                 tab === 'starred' ? (t('gallery.starred') || 'Favoritas') : 'OCR'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={{ flex: 1 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={styles.itemCount}>{imagePhotos.length} {t('gallery.items') || 'fotos'}</Text>
+          <AutoUploadIndicator size={18} />
+        </View>
       </View>
 
       {/* ── SUBJECT CHIPS ── */}

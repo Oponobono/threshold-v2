@@ -9,11 +9,18 @@ const upload = multer({
   limits: { fileSize: 64 * 1024 * 1024 }, // 64 MB
   fileFilter: (req, file, cb) => {
     const allowed = [
-      'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-      'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg',
+      // Imágenes
+      'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic',
+      // Audio — Expo y Android pueden reportar cualquiera de estos para .m4a
+      'audio/mpeg', 'audio/mp4', 'audio/m4a', 'audio/x-m4a',
+      'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac',
+      'audio/3gpp', 'audio/3gpp2',
+      // Documentos
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
+      // Fallback genérico (cuando el tipo no puede determinarse)
+      'application/octet-stream',
     ];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);

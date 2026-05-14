@@ -84,6 +84,33 @@ export const settingsStyles = StyleSheet.create({
   actionRowButtonWrap: {
     marginLeft: 'auto',
   },
+  // Action Row Grid (50/50)
+  actionRowGrid: {
+    flexDirection: 'row',
+    gap: 0,
+    marginTop: 12,
+  },
+  actionGridColumn: {
+    flex: 1,
+    gap: 6,
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+  },
+  actionGridColumnLeft: {
+    borderRightWidth: 1,
+    borderRightColor: theme.colors.border + '40',
+    paddingRight: 12,
+  },
+  actionGridColumnRight: {
+    paddingLeft: 12,
+  },
+  actionLabel: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    maxHeight: 44,
+    overflow: 'hidden',
+    textAlign: 'center',
+  },
   settingTitle: { fontSize: theme.typography.sizes.sm, fontWeight: '600', color: theme.colors.text.primary, marginBottom: 2 },
   settingDesc: { fontSize: 11, color: theme.colors.text.secondary },
   thresholdRow: {
@@ -124,9 +151,9 @@ export const settingsStyles = StyleSheet.create({
   openText: { fontSize: 12, color: theme.colors.primary, fontWeight: '700' },
   versionText: { fontSize: 11, color: theme.colors.text.secondary },
   darkPill: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: theme.colors.text.primary,
-    paddingHorizontal: 14, paddingVertical: 7,
+    paddingHorizontal: 14, paddingVertical: 12,
     borderRadius: theme.borderRadius.full,
   },
   darkPillText: { color: '#fff', fontWeight: '700', fontSize: 12 },

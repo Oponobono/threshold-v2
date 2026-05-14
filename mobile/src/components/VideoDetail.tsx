@@ -33,6 +33,9 @@ import {
   updateYouTubeVideo,
   getYouTubeSubtitles,
 } from '../services/api';
+import { AutoUploadIndicator } from './AutoUploadIndicator';
+import { autoUploadIfEnabled } from '../services/backup/backupService';
+import { formatTranscription } from '../utils/transcriptionFormatter';
 
 // ---------------------------------------------------------------------------
 // Constants & Directories
@@ -247,6 +250,16 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
           ...(type === 'transcript' ? { transcript_uri: fileUri, transcript_text: text } : {}),
           ...(type === 'summary' ? { summary_uri: fileUri, summary_text: text } : {}),
         }).catch(e => console.warn('upsert youtube transcript DB:', e));
+        
+        // Auto subida de transcripciones y resúmenes de videos si está habilitada
+        await autoUploadIfEnabled(
+          fileUri,
+          'transcript',
+          videoData.id,
+          `${type}_video_${videoData.id}.json`,
+          'application/json',
+          'youtube'
+        ).catch(err => console.warn('[VideoDetail] Auto-upload error:', err));
       }
     } catch (e) { console.error('saveTextToFile:', e); }
   };
@@ -282,10 +295,13 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         return;
       }
 
-      setTranscription(text);
+      // Formatear la transcripción para mejorar presentación
+      const formattedText = formatTranscription(text);
+      
+      setTranscription(formattedText);
       setShowTutorial(false);
       // saveTextToFile ya persiste en BD mediante upsertYouTubeTranscript
-      await saveTextToFile(text, 'transcript');
+      await saveTextToFile(formattedText, 'transcript');
     } catch (e) {
       console.error('ERROR EN TRANSCRIPCIÓN:', e);
       const errorMsg = e instanceof Error ? e.message : String(e);
@@ -360,13 +376,16 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         <TouchableOpacity style={styles.backBtn} onPress={onBack}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text.primary} />
         </TouchableOpacity>
-        <Text 
-          style={[styles.headerTitle, { flex: 1, textAlign: 'center', fontSize: 16 }]} 
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {videoTitle}
-        </Text>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          <Text 
+            style={[styles.headerTitle, { flex: 1, textAlign: 'center', fontSize: 16 }]} 
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            YouTube
+          </Text>
+          <AutoUploadIndicator size={16} />
+        </View>
         <View style={{ width: 32 }} />
       </View>
 
@@ -377,11 +396,12 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       >
         {/* YouTube Video Player */}
         {videoData?.video_id && (
-          <View style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' }}>
-            <YoutubePlayer
-              height={Dimensions.get('window').width * 9 / 16}
-              play={false}
-              videoId={videoData.video_id}
+          <View style={{ alignItems: 'center', marginBottom: 12 }}>
+            <View style={{ width: '100%', borderRadius: 12, overflow: 'hidden', aspectRatio: 16/9 }}>
+              <YoutubePlayer
+                height={Dimensions.get('window').width * 9 / 16}
+                play={false}
+                videoId={videoData.video_id}
               onChangeState={(event: string) => {
                 console.log('YouTube player state:', event);
               }}
@@ -396,6 +416,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
                 allowsFullscreenVideo: true,
               }}
             />
+          </View>
           </View>
         )}
 

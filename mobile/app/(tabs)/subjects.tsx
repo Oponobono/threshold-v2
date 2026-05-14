@@ -12,6 +12,7 @@ import { updateSubject } from '../../src/services/api';
 import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
 import { Subject } from '../../src/services/api/types';
 import { useDataStore } from '../../src/store/useDataStore';
+import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
 
 
 
@@ -139,6 +140,7 @@ export default function SubjectsScreen() {
         <View style={globalStyles.row}>
           <Ionicons name="book-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
           <Text style={styles.headerTitle}>{t('subjects.title') || 'Materias'}</Text>
+          <AutoUploadIndicator size={18} />
         </View>
       </View>
 

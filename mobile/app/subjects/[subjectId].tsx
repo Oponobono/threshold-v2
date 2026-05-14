@@ -46,6 +46,7 @@ import { SubjectInsights } from '../../src/components/SubjectInsights';
 import { SubjectAIFab } from '../../src/components/SubjectAIFab';
 import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
 import { useAudioRecorder } from '../../src/hooks/useAudioRecorder';
+import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { subjectDetailStyles as styles } from '../../src/styles/SubjectDetail.styles';
 import { useCustomAlert } from '../../src/components/CustomAlert';
@@ -272,7 +273,8 @@ export default function SubjectDetailScreen() {
             <TouchableOpacity style={styles.headerAction} onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={18} color={theme.colors.text.primary} />
             </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <AutoUploadIndicator size={16} />
               <View style={styles.headerBadge}>
                 <Ionicons name="book-outline" size={18} color={theme.colors.primary} />
               </View>

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/theme';
 import { documentScannerStyles as localStyles } from '../styles/DocumentScannerModal.styles';
 import { Subject, createPhoto, createScannedDocument, extractTextFromImage } from '../services/api';
+import { autoUploadIfEnabled } from '../services/backup/backupService';
 import { AdvancedImageEnhancer, AdvancedImageEnhancerRef } from './AdvancedImageEnhancer';
 import * as Print from 'expo-print';
 import * as Clipboard from 'expo-clipboard';
@@ -155,12 +156,23 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
           }
         }
         
-        await createScannedDocument({
+        const docData = await createScannedDocument({
           subject_id: selectedSubjectId,
           local_uri: pdfUri,
           name: `Documento Escaneado ${new Date().toLocaleDateString()}`,
           ocr_text: ocrText,   // null si el OCR falló — el backend lo acepta
         });
+        
+        // Auto subida si está habilitada
+        if (docData?.id) {
+          await autoUploadIfEnabled(
+            pdfUri,
+            'document',
+            docData.id,
+            `document_${docData.id}.pdf`,
+            'application/pdf'
+          ).catch(err => console.warn('[DocumentScannerModal] Auto-upload error:', err));
+        }
         
         finalImageUri = pdfUri;
       } else {

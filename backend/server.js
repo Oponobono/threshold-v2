@@ -112,6 +112,27 @@ app.use('/api', backupRoutes);
 
 
 
+// ─── Global JSON Error Handler ────────────────────────────────────────────────
+// MUST be registered AFTER all routes.
+// Express 5 catches async errors automatically; this ensures they always return
+// JSON instead of the default HTML 500 page.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, _next) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || 'Error interno del servidor.';
+
+  // Multer errors (file type rejection, size limit, etc.)
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: 'El archivo supera el tamaño máximo permitido.' });
+  }
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({ error: 'Campo de archivo inesperado.' });
+  }
+
+  console.error(`[Server] Error ${status}:`, message);
+  return res.status(status).json({ error: message });
+});
+
 function startServer(port, retriesLeft) {
   const server = app.listen(port, HOST, () => {
     console.log(`Servidor corriendo en http://localhost:${port}`);

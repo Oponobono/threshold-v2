@@ -13,6 +13,42 @@ const MEDIUM_SIZE = (SCREEN_WIDTH - 20 * 2 - 8) / 2; // two columns with gap
 const RADIUS = 24;
 
 /**
+ * Calcula la luminancia relativa de un color hexadecimal.
+ * Retorna true si el color es claro (luminancia > 0.5)
+ */
+function isLightColor(hexColor: string): boolean {
+  if (!hexColor || !hexColor.startsWith('#')) return false;
+  
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  // Luminancia relativa: (0.299 * R + 0.587 * G + 0.114 * B) / 255
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5;
+}
+
+/**
+ * Obtiene un color con buen contraste para iconos.
+ * Si el color proporcionado es muy claro, retorna un color oscuro.
+ */
+function getIconColor(subjectColor: string | undefined): string {
+  const defaultColor = theme.colors.primary; // #000000
+  
+  if (!subjectColor || !subjectColor.trim()) {
+    return defaultColor;
+  }
+  
+  // Si el color es muy claro, usar negro para contraste
+  if (isLightColor(subjectColor)) {
+    return defaultColor; // #000000 tiene buen contraste sobre colores claros
+  }
+  
+  return subjectColor;
+}
+
+/**
  * RecordingGridCards.tsx
  *
  * Agrupa los componentes visuales de las tarjetas utilizadas en la cuadrícula
@@ -42,8 +78,14 @@ export function HeroCard({
 }) {
   const { t } = useTranslation();
   const accent = subjectColor || theme.colors.primary;
+  const iconColor = getIconColor(subjectColor);
   const isVideo = item.type === 'video';
   const [isInlinePlaying, setIsInlinePlaying] = useState(false);
+
+  // DEBUG: Log accent color
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[HeroCard] "${item.name}": subjectColor="${subjectColor}" → iconColor="${iconColor}" (isLight=${isLightColor(subjectColor || '')})`);
+  }
 
   // If inline playing, show just the video player
   if (isVideo && isInlinePlaying && item.video_id) {
@@ -181,7 +223,7 @@ export function HeroCard({
                   alignItems: 'center',
                 }}
               >
-                <Ionicons name="play" size={22} color={accent} style={{ marginLeft: 2 }} />
+                <Ionicons name="play" size={22} color={iconColor} style={{ marginLeft: 2 }} />
               </TouchableOpacity>
             </View>
           )}
@@ -206,7 +248,7 @@ export function HeroCard({
               <Ionicons
                 name={isPlaying ? 'pause' : 'play'}
                 size={18}
-                color={accent}
+                color={iconColor}
                 style={!isPlaying ? { marginLeft: 2 } : undefined}
               />
             </TouchableOpacity>
@@ -243,7 +285,16 @@ export function MediumCard({
   onPress: (item: GridMediaItem) => void;
 }) {
   const accent = subjectColor || theme.colors.primary;
+  const iconColor = getIconColor(subjectColor);
   const isVideo = item.type === 'video';
+
+  // Ensure accent is always valid
+  const bgColor = accent && accent.trim() ? accent : theme.colors.primary;
+
+  // DEBUG: Log accent color
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[MediumCard] "${item.name}": subjectColor="${subjectColor}" → iconColor="${iconColor}" (isLight=${isLightColor(subjectColor || '')})`);
+  }
 
   return (
     <TouchableOpacity
@@ -287,15 +338,15 @@ export function MediumCard({
               width: 38,
               height: 38,
               borderRadius: 12,
-              backgroundColor: isVideo && item.thumbnail_url ? 'rgba(255,255,255,0.2)' : `${accent}18`,
+              backgroundColor: isVideo && item.thumbnail_url ? 'rgba(255,255,255,0.2)' : `${bgColor}18`,
               justifyContent: 'center',
               alignItems: 'center',
             }}
           >
             {isVideo ? (
-              <Ionicons name="play-circle" size={22} color={isVideo && item.thumbnail_url ? '#fff' : accent} />
+              <Ionicons name="play-circle" size={22} color={isVideo && item.thumbnail_url ? '#fff' : iconColor} />
             ) : (
-              <Ionicons name="mic" size={20} color={accent} />
+              <Ionicons name="mic" size={20} color={iconColor} />
             )}
           </View>
 
@@ -314,6 +365,11 @@ export function MediumCard({
         {/* Bottom: name + date */}
         <View>
           {!isVideo && (
+            <View style={{ marginBottom: 6 }}>
+              <AnimatedWaveform color={`${iconColor}40`} height={24} />
+            </View>
+          )}
+          {!isVideo && (
             <TouchableOpacity
               onPress={() => {
                 if (isPlaying) onStop();
@@ -324,7 +380,7 @@ export function MediumCard({
               <Ionicons
                 name={isPlaying ? 'pause-circle' : 'play-circle'}
                 size={28}
-                color={accent}
+                color={iconColor}
               />
             </TouchableOpacity>
           )}
@@ -375,8 +431,17 @@ export function SmallCard({
 }) {
   const { t } = useTranslation();
   const accent = subjectColor || theme.colors.primary;
+  const iconColor = getIconColor(subjectColor);
   const isVideo = item.type === 'video';
   const isMissing = item.missingFile;
+
+  // Ensure accent is always valid
+  const bgColor = accent && accent.trim() ? accent : theme.colors.primary;
+
+  // DEBUG: Log accent color
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[SmallCard] "${item.name}": subjectColor="${subjectColor}" → iconColor="${iconColor}" (isLight=${isLightColor(subjectColor || '')})`);
+  }
 
   return (
     <TouchableOpacity
@@ -397,16 +462,16 @@ export function SmallCard({
           width: 40,
           height: 40,
           borderRadius: 12,
-          backgroundColor: `${accent}15`,
+          backgroundColor: `${bgColor}15`,
           justifyContent: 'center',
           alignItems: 'center',
           marginRight: 12,
         }}
       >
         {isVideo ? (
-          <Ionicons name="play-circle" size={22} color={accent} />
+          <Ionicons name="play-circle" size={22} color={iconColor} />
         ) : (
-          <Ionicons name="mic" size={20} color={accent} />
+          <Ionicons name="mic" size={20} color={iconColor} />
         )}
       </View>
 
@@ -418,6 +483,11 @@ export function SmallCard({
         >
           {item.name}
         </Text>
+        {!isVideo && (
+          <View style={{ marginTop: 2, marginBottom: 4, height: 16 }}>
+            <AnimatedWaveform color={`${iconColor}40`} height={16} />
+          </View>
+        )}
         {isMissing && (
           <Text style={{ fontSize: 11, color: theme.colors.text.error, marginTop: 1 }}>
             {t('common.errors.fileNotFound') || '⚠ Archivo no encontrado'}
@@ -446,7 +516,7 @@ export function SmallCard({
             <Ionicons
               name={isPlaying ? 'pause-circle' : 'play-circle'}
               size={26}
-              color={accent}
+              color={iconColor}
             />
           </TouchableOpacity>
         )}

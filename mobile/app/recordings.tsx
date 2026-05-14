@@ -22,6 +22,7 @@ import { YouTubeAddModal } from '../src/components/YouTubeAddModal';
 import { FilterSortModal } from '../src/components/FilterSortModal';
 import { AudioRecorderBottomBar } from '../src/components/AudioRecorderBottomBar';
 import { useRecordingsManager } from '../src/hooks/useRecordingsManager';
+import { AutoUploadIndicator } from '../src/components/AutoUploadIndicator';
 
 
 /**
@@ -176,6 +177,11 @@ export default function RecordingsScreen() {
    */
   const handlePressItem = useCallback(
     (item: GridMediaItem) => {
+      if (!item.id) {
+        console.warn('[recordings.tsx] Item sin ID válido:', item);
+        return;
+      }
+
       if (item.type === 'video') {
         router.push(`/recordings/${item.id}?type=video` as any);
       } else {
@@ -326,34 +332,36 @@ export default function RecordingsScreen() {
           gap: 8,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
+          alignItems: 'center',
         }}
       >
-        {(['all', 'recording', 'video'] as const).map((f) => {
-          const labels = {
-            all:       t('recordings.filterAll'),
-            recording: t('recordings.filterAudio'),
-            video:     t('recordings.filterVideo'),
-          };
-          const icons = {
-            all:       'layers-outline'       as const,
-            recording: 'mic-outline'          as const,
-            video:     'logo-youtube'         as const,
-          };
-          const isActive = activeFilter === f;
-          return (
-            <TouchableOpacity
-              key={f}
-              onPress={() => setActiveFilter(f)}
-              activeOpacity={0.72}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5,
-                paddingHorizontal: 13,
-                paddingVertical: 7,
-                borderRadius: 20,
-                borderWidth: 1.5,
-                borderColor: isActive
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {(['all', 'recording', 'video'] as const).map((f) => {
+            const labels = {
+              all:       t('recordings.filterAll'),
+              recording: t('recordings.filterAudio'),
+              video:     t('recordings.filterVideo'),
+            };
+            const icons = {
+              all:       'layers-outline'       as const,
+              recording: 'mic-outline'          as const,
+              video:     'logo-youtube'         as const,
+            };
+            const isActive = activeFilter === f;
+            return (
+              <TouchableOpacity
+                key={f}
+                onPress={() => setActiveFilter(f)}
+                activeOpacity={0.72}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  paddingHorizontal: 13,
+                  paddingVertical: 7,
+                  borderRadius: 20,
+                  borderWidth: 1.5,
+                  borderColor: isActive
                   ? theme.colors.text.primary
                   : theme.colors.border,
                 backgroundColor: isActive
@@ -379,6 +387,9 @@ export default function RecordingsScreen() {
             </TouchableOpacity>
           );
         })}
+        </View>
+        <View style={{ flex: 1 }} />
+        <AutoUploadIndicator size={18} />
       </View>
 
 

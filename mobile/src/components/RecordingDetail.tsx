@@ -35,11 +35,14 @@ import {
   upsertAudioTranscript,
   updateAudioRecording,
 } from '../services/api';
+import { autoUploadIfEnabled } from '../services/backup/backupService';
 
 import { SubjectPickerModal } from './SubjectPickerModal';
 import { AnimatedSubjectSelector } from './AnimatedSubjectSelector';
 import { WaveformBars } from './WaveformBars';
+import { AutoUploadIndicator } from './AutoUploadIndicator';
 import { transcribeWithWhisper, summarizeWithGroq } from '../utils/groqHelpers';
+import { formatTranscription } from '../utils/transcriptionFormatter';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -148,8 +151,13 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         const all = await getAudioRecordings();
         rec = all.find(r =>
           r.id?.toString() === recordingId ||
+          r.id_string === recordingId ||
           r.local_uri.endsWith(recordingId) ||
-          r.local_uri.endsWith(`${recordingId}.m4a`)
+          r.local_uri.endsWith(`${recordingId}.m4a`) ||
+          r.uri?.endsWith(recordingId) ||
+          r.uri?.endsWith(`${recordingId}.m4a`) ||
+          (r.local_uri ? r.local_uri.split('/').pop()?.replace(/\.m4a$/, '') === recordingId : false) ||
+          (r.uri ? r.uri.split('/').pop()?.replace(/\.m4a$/, '') === recordingId : false)
         ) ?? null;
       } catch (e) { console.warn('recordings:', e); }
 
@@ -238,6 +246,16 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
           ...(type === 'transcript' ? { transcript_uri: fileUri, transcript_text: text } : {}),
           ...(type === 'summary' ? { summary_uri: fileUri, summary_text: text } : {}),
         }).catch(e => console.warn('upsert transcript DB:', e));
+        
+        // Auto subida de transcripciones y resúmenes si está habilitada
+        await autoUploadIfEnabled(
+          fileUri,
+          'transcript',
+          recordingData.id,
+          `${type}_${recordingData.id}.json`,
+          'application/json',
+          'audio'
+        ).catch(err => console.warn('[RecordingDetail] Auto-upload error:', err));
       }
     } catch (e) { console.error('saveTextToFile:', e); }
   };
@@ -353,9 +371,12 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         return;
       }
 
-      setTranscription(text);
+      // Formatear la transcripción para mejorar presentación
+      const formattedText = formatTranscription(text);
+      
+      setTranscription(formattedText);
       setShowTutorial(false);
-      await saveTextToFile(text, 'transcript');
+      await saveTextToFile(formattedText, 'transcript');
     } catch (e) {
       console.error('ERROR EN TRANSCRIPCIÓN:', e);
       alertRef.show({ title: t('common.error') || 'Error', message: e instanceof Error ? e.message : t('recordings.errors.transcriptionFailed'), type: 'error' });
@@ -419,9 +440,12 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         <TouchableOpacity style={styles.backBtn} onPress={onBack}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { flex: 1, textAlign: 'center' }]} numberOfLines={1}>
-          {recordingTitle}
-        </Text>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={[styles.headerTitle, { flex: 1, textAlign: 'center' }]} numberOfLines={1}>
+            {recordingTitle}
+          </Text>
+          <AutoUploadIndicator size={16} />
+        </View>
         <View style={{ width: 32 }} />
       </View>
 

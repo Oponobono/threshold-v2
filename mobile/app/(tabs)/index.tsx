@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, TextInput, FlatList, Animated, Easing } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { alertRef } from '../../src/components/CustomAlert';

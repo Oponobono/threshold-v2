@@ -397,8 +397,8 @@ export default function SettingsScreen() {
                 desc={t('settings.autoUploadDesc', 'Sube archivos nuevos automáticamente al guardarlos')}
                 right={
                   <Switch
-                    value={backupPrefs.enabled}
-                    onValueChange={(v) => updateBackupPref('enabled', v)}
+                    value={backupPrefs.autoUpload}
+                    onValueChange={(v) => updateBackupPref('autoUpload', v)}
                     trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                     thumbColor={theme.colors.white}
                   />
@@ -420,127 +420,117 @@ export default function SettingsScreen() {
               />
 
               {/* ── Toggles por tipo ── */}
-              <View style={{ marginTop: 8, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: theme.colors.border }}>
-                <SettingRow
-                  title={t('settings.backupPhotos', 'Fotos de galería')}
-                  desc={`${backupStats.photos.backed}/${backupStats.photos.total} en la nube`}
-                  right={
-                    <Switch
-                      value={backupPrefs.includePhotos}
-                      onValueChange={(v) => updateBackupPref('includePhotos', v)}
-                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                      thumbColor={theme.colors.white}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('settings.backupAudio', 'Grabaciones de audio')}
-                  desc={`${backupStats.audio.backed}/${backupStats.audio.total} en la nube`}
-                  right={
-                    <Switch
-                      value={backupPrefs.includeAudio}
-                      onValueChange={(v) => updateBackupPref('includeAudio', v)}
-                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                      thumbColor={theme.colors.white}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('settings.backupDocs', 'Documentos')}
-                  desc={`${backupStats.docs.backed}/${backupStats.docs.total} en la nube`}
-                  right={
-                    <Switch
-                      value={backupPrefs.includeDocs}
-                      onValueChange={(v) => updateBackupPref('includeDocs', v)}
-                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                      thumbColor={theme.colors.white}
-                    />
-                  }
-                />
-                <SettingRow
-                  title={t('settings.backupTranscripts', 'Transcripciones')}
-                  desc={`${backupStats.transcripts.backed}/${backupStats.transcripts.total} en la nube`}
-                  right={
-                    <Switch
-                      value={backupPrefs.includeTranscripts}
-                      onValueChange={(v) => updateBackupPref('includeTranscripts', v)}
-                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                      thumbColor={theme.colors.white}
-                    />
-                  }
-                />
-              </View>
+              <SettingRow
+                title={t('settings.backupPhotos', 'Fotos de galería')}
+                desc={`${backupStats.photos.backed}/${backupStats.photos.total} en la nube`}
+                right={
+                  <Switch
+                    value={backupPrefs.includePhotos}
+                    onValueChange={(v) => updateBackupPref('includePhotos', v)}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.backupAudio', 'Grabaciones de audio')}
+                desc={`${backupStats.audio.backed}/${backupStats.audio.total} en la nube`}
+                right={
+                  <Switch
+                    value={backupPrefs.includeAudio}
+                    onValueChange={(v) => updateBackupPref('includeAudio', v)}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.backupDocs', 'Documentos')}
+                desc={`${backupStats.docs.backed}/${backupStats.docs.total} en la nube`}
+                right={
+                  <Switch
+                    value={backupPrefs.includeDocs}
+                    onValueChange={(v) => updateBackupPref('includeDocs', v)}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.backupTranscripts', 'Transcripciones')}
+                desc={`${backupStats.transcripts.backed}/${backupStats.transcripts.total} en la nube`}
+                right={
+                  <Switch
+                    value={backupPrefs.includeTranscripts}
+                    onValueChange={(v) => updateBackupPref('includeTranscripts', v)}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
 
               {/* ── Estado general ── */}
               {totalCount > 0 && (
-                <Text style={[styles.settingDesc, { marginTop: 10 }]}>
-                  {backedCount}/{totalCount} ítems respaldados
-                  {pendingCount > 0 && ` • ${pendingCount} pendiente(s)`}
-                  {cloudItemsCount > 0 && ` • ${cloudItemsCount} en la nube`}
-                </Text>
+                <View style={{ paddingVertical: 12, marginTop: 8 }}>
+                  <Text style={[styles.settingDesc, { fontWeight: '600', textAlign: 'center' }]}>
+                    {backedCount}/{totalCount} ítems respaldados
+                    {pendingCount > 0 && ` • ${pendingCount} pendiente(s)`}
+                    {cloudItemsCount > 0 && ` • ${cloudItemsCount} en la nube`}
+                  </Text>
+                </View>
               )}
 
-              {/* ── Botones de acción: Upload + Download ── */}
-              <View style={{ gap: 8, marginTop: 12 }}>
-
-                {/* Botón Respaldar ahora */}
-                <View style={styles.actionRow}>
-                  <View style={styles.actionRowTextWrap}>
-                    <Text style={styles.settingDesc}>
+              {/* ── Botones de acción: Upload + Download (50/50) ── */}
+              <View style={styles.actionRowGrid}>
+                {/* Columna Izquierda: Respaldar */}
+                <View style={[styles.actionGridColumn, styles.actionGridColumnLeft]}>
+                  <Text style={styles.actionLabel} numberOfLines={2}>
+                    {isUploading
+                      ? `↑ Subiendo ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? 0}...`
+                      : `↑ Última subida: ${lastUploadLabel}`}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.darkPill, (isBackupRunning) && { opacity: 0.45 }]}
+                    onPress={handleBackupNow}
+                    disabled={isBackupRunning}
+                  >
+                    {isUploading ? (
+                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
+                    ) : (
+                      <Ionicons name="cloud-upload-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                    )}
+                    <Text style={styles.darkPillText}>
                       {isUploading
-                        ? `↑ Subiendo ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? 0}...`
-                        : `↑ Última subida: ${lastUploadLabel}`}
+                        ? t('settings.backingUp', 'Subiendo...')
+                        : t('settings.backup', 'Respaldar')}
                     </Text>
-                  </View>
-                  <View style={styles.actionRowButtonWrap}>
-                    <TouchableOpacity
-                      style={[styles.darkPill, (isBackupRunning) && { opacity: 0.45 }]}
-                      onPress={handleBackupNow}
-                      disabled={isBackupRunning}
-                    >
-                      {isUploading ? (
-                        <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
-                      ) : (
-                        <Ionicons name="cloud-upload-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
-                      )}
-                      <Text style={styles.darkPillText}>
-                        {isUploading
-                          ? t('settings.backingUp', 'Subiendo...')
-                          : t('settings.backupNow', 'Respaldar ahora')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 </View>
 
-                {/* Botón Descargar ahora */}
-                <View style={styles.actionRow}>
-                  <View style={styles.actionRowTextWrap}>
-                    <Text style={styles.settingDesc}>
+                {/* Columna Derecha: Descargar */}
+                <View style={[styles.actionGridColumn, styles.actionGridColumnRight]}>
+                  <Text style={styles.actionLabel} numberOfLines={2}>
+                    {isDownloading
+                      ? `↓ Descargando ${downloadProgress?.done ?? 0}/${downloadProgress?.total ?? 0}...`
+                      : `↓ Última descarga: ${lastDownloadLabel}`}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.darkPill, { backgroundColor: '#2C6EEB' }, (isBackupRunning) && { opacity: 0.45 }]}
+                    onPress={handleDownloadNow}
+                    disabled={isBackupRunning}
+                  >
+                    {isDownloading ? (
+                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
+                    ) : (
+                      <Ionicons name="cloud-download-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                    )}
+                    <Text style={styles.darkPillText}>
                       {isDownloading
-                        ? `↓ Descargando ${downloadProgress?.done ?? 0}/${downloadProgress?.total ?? 0}...`
-                        : `↓ Última descarga: ${lastDownloadLabel}`}
+                        ? t('settings.downloading', 'Descargando...')
+                        : t('settings.download', 'Descargar')}
                     </Text>
-                  </View>
-                  <View style={styles.actionRowButtonWrap}>
-                    <TouchableOpacity
-                      style={[styles.darkPill, { backgroundColor: '#2C6EEB' }, (isBackupRunning) && { opacity: 0.45 }]}
-                      onPress={handleDownloadNow}
-                      disabled={isBackupRunning}
-                    >
-                      {isDownloading ? (
-                        <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
-                      ) : (
-                        <Ionicons name="cloud-download-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
-                      )}
-                      <Text style={styles.darkPillText}>
-                        {isDownloading
-                          ? t('settings.downloading', 'Descargando...')
-                          : t('settings.downloadNow', 'Descargar ahora')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 </View>
-
               </View>
             </>
           )}

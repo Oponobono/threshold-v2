@@ -16,6 +16,7 @@ import { theme } from '../styles/theme';
 import { pdfImportStyles as s } from '../styles/PDFImportModal.styles';
 import { useCustomAlert } from './CustomAlert';
 import { createScannedDocument, extractTextFromPDF } from '../services/api';
+import { autoUploadIfEnabled } from '../services/backup/backupService';
 
 export interface PDFImportModalProps {
   isVisible: boolean;
@@ -125,6 +126,17 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
         name: file.name,
         ocr_text: ocrText || null,
       });
+      
+      // Auto subida si está habilitada
+      if (savedDoc?.id) {
+        await autoUploadIfEnabled(
+          localPdfUri,
+          'document',
+          savedDoc.id,
+          `document_${savedDoc.id}.pdf`,
+          'application/pdf'
+        ).catch(err => console.warn('[PDFImportModal] Auto-upload error:', err));
+      }
 
       showAlert({
         title: t('common.success') || 'Éxito',

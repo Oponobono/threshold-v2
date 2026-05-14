@@ -48,6 +48,11 @@ export function SubjectSectionView({
   const rest = sorted.slice(3);
 
   const accentColor = section.subjectColor || theme.colors.primary;
+  
+  // DEBUG: Log color information
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[SubjectSectionView] ${section.subjectName}: subjectColor="${section.subjectColor}" → accentColor="${accentColor}"`);
+  }
 
   return (
     <View style={{ marginBottom: 28 }}>

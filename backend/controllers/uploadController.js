@@ -5,8 +5,13 @@
  */
 const { UTApi } = require('uploadthing/server');
 
-// UTApi lee UPLOADTHING_TOKEN automáticamente del entorno
-const utapi = new UTApi();
+// Lazy singleton: se inicializa en la primera petición para garantizar
+// que process.env.UPLOADTHING_TOKEN ya ha sido inyectado por dotenv.
+let _utapi = null;
+function getUtapi() {
+  if (!_utapi) _utapi = new UTApi();
+  return _utapi;
+}
 
 /**
  * POST /api/upload
@@ -19,27 +24,34 @@ exports.uploadFile = async (req, res) => {
   }
 
   try {
+    const utapi = getUtapi();
+
     // Convertir el Buffer de multer en un objeto File (compatible con UTApi)
     const file = new File([req.file.buffer], req.file.originalname, {
       type: req.file.mimetype,
     });
 
+    console.log(`[Uploadthing] Subiendo archivo: ${req.file.originalname} (${req.file.mimetype}, ${req.file.size} bytes)`);
     const response = await utapi.uploadFiles(file);
 
     if (response.error) {
+      // Exponer el error real de UploadThing para facilitar el diagnóstico
+      const detail = response.error?.message || JSON.stringify(response.error);
       console.error('[Uploadthing] Error al subir:', response.error);
-      return res.status(500).json({ error: 'Error al subir el archivo a Uploadthing.' });
+      return res.status(500).json({ error: `Error de Uploadthing: ${detail}` });
     }
 
+    const fileData = response.data;
+    console.log(`[Uploadthing] ÉXITO: ${fileData.name} → ${fileData.ufsUrl}`);
     return res.json({
-      url: response.data.ufsUrl,
-      key: response.data.key,
-      name: response.data.name,
-      size: response.data.size,
+      url: fileData.ufsUrl,
+      key: fileData.key,
+      name: fileData.name,
+      size: fileData.size,
     });
   } catch (error) {
-    console.error('[Uploadthing] Error inesperado:', error.message);
-    return res.status(500).json({ error: 'Error interno al procesar la subida.' });
+    console.error('[Uploadthing] Error inesperado:', error);
+    return res.status(500).json({ error: `Error interno: ${error.message}` });
   }
 };
 
