@@ -41,6 +41,7 @@ const formatRelativeTime = (isoDate: string | null): string => {
 export const useBackupLogic = () => {
   const [prefs, setPrefs] = useState<BackupPreferences>({
     enabled: false,
+    autoUpload: false,
     autoDownload: false,
     includePhotos: true,
     includeAudio: true,

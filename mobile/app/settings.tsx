@@ -193,32 +193,40 @@ export default function SettingsScreen() {
             style={styles.profileAvatar}
           />
           <View style={{ flex: 1 }}>
-            <Text style={styles.profileName}>{profileName}</Text>
-            <Text style={styles.profileEmail}>{profileEmail}</Text>
-            {!!profile?.university && <Text style={styles.profileEmail}>{profile.university}</Text>}
-            {!!profile?.share_pin && (
-              <TouchableOpacity 
-                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}
-                onPress={async () => {
-                  await Clipboard.setStringAsync(profile.share_pin!);
-                  alertRef.show({ title: t('common.success'), message: 'PIN copiado al portapapeles', type: 'success' });
-                }}
-              >
-                <MaterialCommunityIcons name="link-variant" size={14} color={theme.colors.primary} />
-                <Text style={[styles.profileEmail, { color: theme.colors.primary, marginLeft: 4, fontWeight: '600' }]}>
-                  PIN: {profile.share_pin}
-                </Text>
-                <Ionicons name="copy-outline" size={12} color={theme.colors.primary} style={{ marginLeft: 6 }} />
+            {/* Fila Superior: Nombre/Email y Botón Editar */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.profileName}>{profileName}</Text>
+                <Text style={styles.profileEmail}>{profileEmail}</Text>
+                {!!profile?.university && <Text style={styles.profileEmail}>{profile.university}</Text>}
+              </View>
+              <TouchableOpacity style={styles.editBtn} onPress={handleOpenEditProfile}>
+                <Text style={styles.editBtnText}>{t('settings.edit')}</Text>
               </TouchableOpacity>
-            )}
-          </View>
-          <View style={{ gap: 6, alignItems: 'flex-end' }}>
-            <TouchableOpacity style={styles.editBtn} onPress={handleOpenEditProfile}>
-              <Text style={styles.editBtnText}>{t('settings.edit')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setIsChangePasswordVisible(true)}>
-              <Text style={styles.changePwText}>{t('settings.changePass')}</Text>
-            </TouchableOpacity>
+            </View>
+
+            {/* Fila Inferior: PIN y Cambiar Contraseña (Alineados) */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+              {!!profile?.share_pin ? (
+                <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(profile.share_pin!);
+                    alertRef.show({ title: t('common.success'), message: 'PIN copiado al portapapeles', type: 'success' });
+                  }}
+                >
+                  <MaterialCommunityIcons name="link-variant" size={14} color={theme.colors.primary} />
+                  <Text style={[styles.profileEmail, { color: theme.colors.primary, marginLeft: 4, fontWeight: '600' }]}>
+                    PIN: {profile.share_pin}
+                  </Text>
+                  <Ionicons name="copy-outline" size={12} color={theme.colors.primary} style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+              ) : <View />}
+
+              <TouchableOpacity onPress={() => setIsChangePasswordVisible(true)}>
+                <Text style={styles.changePwText}>{t('settings.changePass')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 

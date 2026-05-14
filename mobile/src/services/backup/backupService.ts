@@ -33,8 +33,12 @@ export const autoUploadIfEnabled = async (
   mimeType?: string,
   transcriptType?: 'audio' | 'youtube'
 ): Promise<string | null> => {
-  const enabled = await storageService.getSecure(BACKUP_PREFS.ENABLED);
-  if (enabled !== 'true') return null;
+  const [enabled, autoUpload] = await Promise.all([
+    storageService.getSecure(BACKUP_PREFS.ENABLED),
+    storageService.getSecure(BACKUP_PREFS.AUTO_UPLOAD),
+  ]);
+  
+  if (enabled !== 'true' || autoUpload !== 'true') return null;
 
   try {
     console.log(`[BackupService] Auto-subida iniciada para ${type} ID: ${itemId} (${localUri})`);
@@ -68,6 +72,7 @@ export const autoUploadIfEnabled = async (
 
 export const BACKUP_PREFS = {
   ENABLED: 'backup_enabled',
+  AUTO_UPLOAD: 'backup_auto_upload',
   AUTO_DOWNLOAD: 'backup_auto_download',
   INCLUDE_PHOTOS: 'backup_include_photos',
   INCLUDE_AUDIO: 'backup_include_audio',
@@ -81,6 +86,7 @@ export const BACKUP_PREFS = {
 
 export interface BackupPreferences {
   enabled: boolean;
+  autoUpload: boolean;
   autoDownload: boolean;
   includePhotos: boolean;
   includeAudio: boolean;
@@ -107,8 +113,9 @@ export interface BackupProgress {
 // ─── Leer / Escribir preferencias ───────────────────────────────────────────
 
 export const getBackupPreferences = async (): Promise<BackupPreferences> => {
-  const [enabled, autoDownload, photos, audio, docs, transcripts, lastRun, lastDownload] = await Promise.all([
+  const [enabled, autoUpload, autoDownload, photos, audio, docs, transcripts, lastRun, lastDownload] = await Promise.all([
     storageService.getSecure(BACKUP_PREFS.ENABLED),
+    storageService.getSecure(BACKUP_PREFS.AUTO_UPLOAD),
     storageService.getSecure(BACKUP_PREFS.AUTO_DOWNLOAD),
     storageService.getSecure(BACKUP_PREFS.INCLUDE_PHOTOS),
     storageService.getSecure(BACKUP_PREFS.INCLUDE_AUDIO),
@@ -120,6 +127,7 @@ export const getBackupPreferences = async (): Promise<BackupPreferences> => {
 
   return {
     enabled: enabled === 'true',
+    autoUpload: autoUpload === 'true',
     autoDownload: autoDownload === 'true',
     includePhotos: photos !== 'false',
     includeAudio: audio !== 'false',
@@ -134,6 +142,8 @@ export const saveBackupPreferences = async (prefs: Partial<BackupPreferences>): 
   const promises: Promise<void>[] = [];
   if (prefs.enabled !== undefined)
     promises.push(storageService.saveSecure(BACKUP_PREFS.ENABLED, String(prefs.enabled)));
+  if (prefs.autoUpload !== undefined)
+    promises.push(storageService.saveSecure(BACKUP_PREFS.AUTO_UPLOAD, String(prefs.autoUpload)));
   if (prefs.autoDownload !== undefined)
     promises.push(storageService.saveSecure(BACKUP_PREFS.AUTO_DOWNLOAD, String(prefs.autoDownload)));
   if (prefs.includePhotos !== undefined)
