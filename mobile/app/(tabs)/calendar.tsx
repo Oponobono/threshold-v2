@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: theme.spacing.lg,
     paddingBottom: 40,
   },
   calendarCard: {

@@ -5,7 +5,7 @@ import { globalStyles } from './globalStyles';
 export const settingsStyles = StyleSheet.create({
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl, paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md,
     borderBottomWidth: 1, borderBottomColor: theme.colors.border,
   },
   logoText: { fontSize: theme.typography.sizes.lg, fontWeight: '800', color: theme.colors.text.primary },
@@ -17,7 +17,7 @@ export const settingsStyles = StyleSheet.create({
     borderRadius: theme.borderRadius.full,
   },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  scroll: { padding: theme.spacing.xl, paddingBottom: 40 },
+  scroll: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.lg, paddingBottom: 40 },
   profileCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: theme.colors.background,

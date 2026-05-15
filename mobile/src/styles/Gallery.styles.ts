@@ -3,7 +3,7 @@ import { theme } from './theme';
 import { globalStyles } from './globalStyles';
 
 const SCREEN_W = Dimensions.get('window').width;
-const GRID_COL_W = (SCREEN_W - theme.spacing.xl * 2 - 16 - 1) / 2;
+const GRID_COL_W = (SCREEN_W - theme.spacing.lg * 2 - 16 - 1) / 2;
 
 export const galleryStyles = StyleSheet.create({
   header: globalStyles.standardHeader,
@@ -17,12 +17,12 @@ export const galleryStyles = StyleSheet.create({
   scanText: { fontSize: theme.typography.sizes.sm, fontWeight: '600', color: theme.colors.text.primary },
   tabRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl, paddingVertical: 8,
+    paddingHorizontal: theme.spacing.lg, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: theme.colors.border,
     gap: 4,
   },
   searchBarContainer: {
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
     paddingVertical: 12,
     backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
@@ -58,7 +58,7 @@ export const galleryStyles = StyleSheet.create({
   itemCount: { marginLeft: 'auto', fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary },
   settingsBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl, paddingVertical: 10,
+    paddingHorizontal: theme.spacing.lg, paddingVertical: 10,
     backgroundColor: theme.colors.inputBackground,
     borderBottomWidth: 1, borderBottomColor: theme.colors.border,
   },
@@ -75,7 +75,7 @@ export const galleryStyles = StyleSheet.create({
     borderRadius: theme.borderRadius.full, marginLeft: 8,
   },
   ocrBtnText: { fontSize: theme.typography.sizes.xs, fontWeight: '700', color: theme.colors.primary },
-  scroll: { padding: theme.spacing.xl, paddingBottom: 40 },
+  scroll: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.lg, paddingBottom: 40 },
   section: { marginBottom: theme.spacing.xl },
   sectionHeaderRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,

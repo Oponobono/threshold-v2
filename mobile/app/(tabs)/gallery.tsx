@@ -31,7 +31,7 @@ const DocumentScannerModal = lazy(() =>
 );
 
 const SCREEN_W = Dimensions.get('window').width;
-const GRID_COL_W = (SCREEN_W - theme.spacing.xl * 2 - 16 - 1) / 2;
+const GRID_COL_W = (SCREEN_W - theme.spacing.lg * 2 - 16 - 1) / 2;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface GalleryPhoto extends Photo {
@@ -111,7 +111,7 @@ const EmptyState = React.memo(function EmptyState({
   icon: string; message: string; sub?: string;
 }) {
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 32 }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: theme.spacing.lg }}>
       <View style={{
         width: 72, height: 72, borderRadius: 36,
         backgroundColor: theme.colors.primary + '15',
@@ -371,11 +371,11 @@ export default function GalleryScreen() {
         data={imagePhotos}
         keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
         numColumns={2}
-        columnWrapperStyle={{ gap: 16, paddingHorizontal: theme.spacing.xl }}
+        columnWrapperStyle={{ gap: 16, paddingHorizontal: theme.spacing.lg }}
         contentContainerStyle={[styles.scroll, { flexGrow: 1, paddingHorizontal: 0 }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <View style={{ paddingHorizontal: theme.spacing.xl }}>
+          <View style={{ paddingHorizontal: theme.spacing.lg }}>
             {/* ── STARRED ROW ── */}
             {filterTab === 'all' && starred.length > 0 && (
               <View style={styles.section}>
@@ -447,7 +447,7 @@ export default function GalleryScreen() {
           />
         )}
         ListEmptyComponent={
-          <View style={{ paddingHorizontal: theme.spacing.xl }}>
+          <View style={{ paddingHorizontal: theme.spacing.lg }}>
             <EmptyState
               icon={
                 filterTab === 'starred' ? 'star-outline' :

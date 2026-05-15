@@ -138,7 +138,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
 
       const logResponse = await createCardLogWithFallback({ 
         card_id: item.id, 
-        result: newStatus, 
+        result: result.passed ? 'correct' : 'incorrect', 
         response_time_ms: responseTime,
         question_word_count: wordCount 
       });
@@ -355,13 +355,15 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         onDismiss={handleOverlayDismiss}
       />
 
-      {/* ── Micro-Interacción / Feedback de Learning Engineering ── */}
+      {/* ── Micro-Interacción / Feedback de Learning Engineering (Interno - no mostrar en UI) ── */}
+      {/* Comentado: El feedback se recopila pero no se muestra visualmente
       {learningFeedback && (
         <View style={[s.feedbackToast, { borderColor: learningFeedback.color }]}>
           <Text style={s.feedbackEmoji}>{learningFeedback.emoji}</Text>
           <Text style={s.feedbackMessage}>{learningFeedback.message}</Text>
         </View>
       )}
+      */}
     </View>
   );
 };

@@ -24,7 +24,7 @@ const GRADE_COLORS = (pct: number) => {
 
 export default function GradesScreen() {
   const { t } = useTranslation();
-  const chartWidth = Math.max(240, Dimensions.get('window').width - theme.spacing.xl * 2 - theme.spacing.lg * 2 - 2);
+  const chartWidth = Math.max(240, Dimensions.get('window').width - theme.spacing.lg * 2 - theme.spacing.lg * 2 - 2);
 
   const { subjects, assessments, loadAllData } = useDataStore();
 

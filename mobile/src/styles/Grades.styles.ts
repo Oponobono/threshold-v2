@@ -27,7 +27,7 @@ export const gradesStyles = StyleSheet.create({
     borderRadius: theme.borderRadius.full,
   },
   applyBtnText: { color: theme.colors.text.inverse, fontWeight: '700', fontSize: theme.typography.sizes.sm },
-  scroll: { padding: theme.spacing.xl, gap: 16, paddingBottom: 40 },
+  scroll: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.lg, gap: 16, paddingBottom: 40 },
   card: {
     backgroundColor: theme.colors.background,
     borderRadius: theme.borderRadius.lg, padding: theme.spacing.lg,

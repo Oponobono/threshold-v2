@@ -17,7 +17,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, StyleSheet,
-  Animated, ActivityIndicator,
+  Animated, ActivityIndicator, FlatList, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,6 +41,73 @@ const TXT_PRI  = '#F0F0F8';
 const TXT_SEC  = 'rgba(240,240,248,0.45)';
 const USER_BG  = '#1E1E30';
 const AI_BG    = `${PRIMARY}18`;
+
+// ─── Componente para tablas desplazables ───────────────────────────────────────
+interface TableCellProps {
+  content: string;
+  isHeader?: boolean;
+}
+
+const TableCell: React.FC<TableCellProps> = ({ content, isHeader }) => (
+  <View style={[
+    tableStyles.cell,
+    isHeader && tableStyles.headerCell,
+  ]}>
+    <Text style={[
+      tableStyles.cellText,
+      isHeader && tableStyles.headerText,
+    ]} numberOfLines={3}>
+      {content}
+    </Text>
+  </View>
+);
+
+interface ScrollableTableProps {
+  headers: string[];
+  rows: string[][];
+}
+
+const ScrollableTable: React.FC<ScrollableTableProps> = ({ headers, rows }) => {
+  const screenWidth = Dimensions.get('window').width;
+  const contentWidth = Math.max(screenWidth - 80, headers.length * 80);
+
+  return (
+    <View style={tableStyles.container}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={true}
+        scrollEventThrottle={16}
+        style={tableStyles.scrollView}
+      >
+        <View style={tableStyles.table}>
+          {/* Encabezado */}
+          <View style={tableStyles.row}>
+            {headers.map((header, i) => (
+              <TableCell
+                key={`header-${i}`}
+                content={header}
+                isHeader={true}
+              />
+            ))}
+          </View>
+
+          {/* Filas */}
+          {rows.map((row, rowIdx) => (
+            <View key={`row-${rowIdx}`} style={tableStyles.row}>
+              {row.map((cell, cellIdx) => (
+                <TableCell
+                  key={`cell-${rowIdx}-${cellIdx}`}
+                  content={cell}
+                  isHeader={false}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Message {
@@ -68,6 +135,53 @@ export interface SubjectAIChatModalProps {
   /** Número de archivos que alimentan el contexto */
   contextItemCount: number;
 }
+
+// ─── Utilidad para parsear tablas ─────────────────────────────────────────────
+const parseMarkdownTable = (text: string) => {
+  const lines = text.split('\n');
+  if (lines.length < 3) return null;
+
+  // Función auxiliar para parsear una línea de tabla
+  const parseLine = (line: string) => {
+    return line
+      .split('|')
+      .slice(1, -1) // Remover el primer y último elemento (siempre vacíos)
+      .map(cell => cell.trim());
+  };
+
+  try {
+    // Parsear header
+    const headers = parseLine(lines[0]);
+    if (headers.length === 0) return null;
+
+    // Validar separador
+    const separator = lines[1];
+    if (!separator.includes('-') || !separator.includes('|')) return null;
+
+    // Parsear filas de datos (desde la línea 2 en adelante)
+    const rows: string[][] = [];
+    for (let i = 2; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.length === 0) continue; // Saltar líneas vacías
+      
+      const cells = parseLine(line);
+      if (cells.length > 0) {
+        // Asegurar que tiene el mismo número de columnas
+        while (cells.length < headers.length) {
+          cells.push('');
+        }
+        if (cells.length > headers.length) {
+          cells.length = headers.length;
+        }
+        rows.push(cells);
+      }
+    }
+
+    return rows.length > 0 ? { headers, rows } : null;
+  } catch (error) {
+    return null;
+  }
+};
 
 // ─── Burbuja de mensaje ───────────────────────────────────────────────────────
 const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
@@ -102,9 +216,91 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
       )}
       <View style={[s.bubble, isUser ? s.bubbleUser : s.bubbleAI]}>
         {!isUser ? (
-          <Markdown style={markdownStyles}>
-            {msg.content}
-          </Markdown>
+          <View>
+            {(() => {
+              // Función para encontrar y extraer tablas
+              const extractTables = (content: string) => {
+                const parts: { type: 'text' | 'table'; content: string; data?: { headers: string[]; rows: string[][] } }[] = [];
+                const lines = content.split('\n');
+                let currentText = '';
+                let i = 0;
+
+                while (i < lines.length) {
+                  const line = lines[i];
+                  
+                  // Detectar si esta línea comienza una tabla
+                  if (line.trim().startsWith('|') && i + 1 < lines.length) {
+                    const nextLine = lines[i + 1];
+                    if (nextLine.includes('|') && nextLine.includes('-')) {
+                      // Esto podría ser una tabla, coleccionar todas las líneas
+                      const tableLines = [line, nextLine];
+                      let j = i + 2;
+                      
+                      // Coleccionar filas de datos
+                      while (j < lines.length && lines[j].trim().startsWith('|')) {
+                        tableLines.push(lines[j]);
+                        j++;
+                      }
+
+                      // Intentar parsear como tabla
+                      const tableText = tableLines.join('\n');
+                      const parsed = parseMarkdownTable(tableText);
+                      
+                      if (parsed && parsed.headers.length > 0 && parsed.rows.length > 0) {
+                        // Es una tabla válida, guardar el texto acumulado y la tabla
+                        if (currentText.trim()) {
+                          parts.push({ type: 'text', content: currentText });
+                          currentText = '';
+                        }
+                        parts.push({ type: 'table', content: tableText, data: parsed });
+                        i = j;
+                        continue;
+                      }
+                    }
+                  }
+
+                  // No es tabla, acumular como texto
+                  currentText += (currentText ? '\n' : '') + line;
+                  i++;
+                }
+
+                // Agregar el texto restante
+                if (currentText.trim()) {
+                  parts.push({ type: 'text', content: currentText });
+                }
+
+                return parts;
+              };
+
+              const parts = extractTables(msg.content);
+              
+              if (parts.some(p => p.type === 'table')) {
+                return (
+                  <View>
+                    {parts.map((part, idx) => 
+                      part.type === 'text' ? (
+                        <Markdown key={`text-${idx}`} style={markdownStyles}>
+                          {part.content}
+                        </Markdown>
+                      ) : (
+                        <ScrollableTable
+                          key={`table-${idx}`}
+                          headers={part.data!.headers}
+                          rows={part.data!.rows}
+                        />
+                      )
+                    )}
+                  </View>
+                );
+              } else {
+                return (
+                  <Markdown style={markdownStyles}>
+                    {msg.content}
+                  </Markdown>
+                );
+              }
+            })()}
+          </View>
         ) : (
           <Text style={[s.bubbleText, s.bubbleTextUser]}>
             {msg.content}
@@ -1037,4 +1233,56 @@ const markdownStyles = StyleSheet.create({
   paragraph: { marginTop: 4, marginBottom: 4 },
   code_inline: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 4, borderRadius: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   code_block: { backgroundColor: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginVertical: 6 },
+  table: { marginVertical: 10 },
+  thead: { display: 'none' },
+  tbody: { display: 'none' },
+  tr: { display: 'none' },
+  th: { display: 'none' },
+  td: { display: 'none' },
+});
+
+// ─── Estilos para tablas desplazables ──────────────────────────────────────────
+const tableStyles = StyleSheet.create({
+  container: {
+    marginVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: `${PRIMARY}25`,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    overflow: 'hidden',
+  } as any,
+  scrollView: {
+    flexGrow: 0,
+  } as any,
+  table: {
+    // borderCollapse no existe en React Native
+  } as any,
+  row: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: `${PRIMARY}15`,
+  } as any,
+  cell: {
+    width: 120,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRightWidth: 1,
+    borderRightColor: `${PRIMARY}15`,
+    justifyContent: 'center',
+  } as any,
+  headerCell: {
+    backgroundColor: `${PRIMARY}20`,
+    borderBottomWidth: 2,
+    borderBottomColor: `${PRIMARY}40`,
+  } as any,
+  cellText: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: TXT_PRI,
+  } as any,
+  headerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: PRIMARY,
+  } as any,
 });

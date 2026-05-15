@@ -12,7 +12,7 @@ export const subjectsStyles = StyleSheet.create({
   },
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: theme.spacing.xl, paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.sm,
   },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
@@ -28,7 +28,7 @@ export const subjectsStyles = StyleSheet.create({
     borderWidth: 1, borderColor: theme.colors.border,
   },
   pillsScroll: {
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     maxHeight: 54,
   },
@@ -51,7 +51,7 @@ export const subjectsStyles = StyleSheet.create({
   pillTextActive: {
     color: '#fff',
   },
-  scroll: { paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.sm, paddingBottom: 40 },
+  scroll: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.sm, paddingBottom: 40 },
   section: { marginBottom: 12 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: theme.typography.sizes.md, fontWeight: '800', color: theme.colors.text.primary },

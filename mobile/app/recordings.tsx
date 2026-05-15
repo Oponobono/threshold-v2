@@ -286,7 +286,7 @@ export default function RecordingsScreen() {
           backgroundColor: theme.colors.card,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
-          paddingHorizontal: 16,
+          paddingHorizontal: theme.spacing.lg,
           justifyContent: 'center',
         }}
       >
@@ -327,7 +327,7 @@ export default function RecordingsScreen() {
         style={{
           flexDirection: 'row',
           backgroundColor: theme.colors.card,
-          paddingHorizontal: 16,
+          paddingHorizontal: theme.spacing.lg,
           paddingVertical: 10,
           gap: 8,
           borderBottomWidth: 1,
