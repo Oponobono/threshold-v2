@@ -42,13 +42,29 @@ exports.registerUser = async (req, res) => {
         return res.status(500).json({ error: 'Error interno del servidor.' });
       }
 
-      // Firmar token JWT
-      const token = jwt.sign({ id: this.lastID, email }, JWT_SECRET, { expiresIn: '30d' });
+      const newUserId = this.lastID;
 
-      res.status(201).json({ 
-        message: 'Usuario registrado exitosamente', 
-        userId: this.lastID,
-        token
+      // ── Insertar registro por defecto en learning_analytics ────────────────
+      const analyticsQuery = `
+        INSERT INTO learning_analytics (user_id, subject_id, total_cards, total_reviews, correct_reviews, incorrect_reviews, avg_response_time_ms, mastery_percentage)
+        VALUES (?, ?, 0, 0, 0, 0, 0, 0)
+      `;
+      db.run(analyticsQuery, [newUserId, null], (analyticsErr) => {
+        if (analyticsErr) {
+          console.warn(`[Analytics] Advertencia: No se pudo crear registro de analytics para userId=${newUserId}:`, analyticsErr.message);
+          // No interrumpir el registro si falla analytics
+        } else {
+          console.log(`[Analytics] ✅ Registro de analytics creado para userId=${newUserId}`);
+        }
+
+        // Firmar token JWT
+        const token = jwt.sign({ id: newUserId, email }, JWT_SECRET, { expiresIn: '30d' });
+
+        res.status(201).json({ 
+          message: 'Usuario registrado exitosamente', 
+          userId: newUserId,
+          token
+        });
       });
     });
   } catch (error) {

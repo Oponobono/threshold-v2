@@ -1,6 +1,7 @@
 const secrets = require('../config/secrets');
 const { db } = require('../db');
 const { analyzeCardDensity, fragmentCard } = require('../utils/atomicCardGenerator');
+const { calculateSM2, calculateFSRS } = require('../utils/sm2Algorithm');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,16 @@ function normalizeCard(row) {
     explanation: row.explanation || null,
     status: row.status || 'new',
     created_at: row.created_at,
+    // SM-2 Spaced Repetition fields
+    next_review_date: row.next_review_date || null,
+    sm2_ease_factor: row.sm2_ease_factor || 2.5,
+    sm2_interval: row.sm2_interval || 1,
+    sm2_repetitions: row.sm2_repetitions || 0,
+    // FSRS (Free Spaced Repetition Scheduler) fields
+    fsrs_stability: row.fsrs_stability || 1,
+    fsrs_difficulty: row.fsrs_difficulty || 0.5,
+    fsrs_repetitions: row.fsrs_repetitions || 0,
+    last_review_timestamp: row.last_review_timestamp || null,
     // Legacy fields kept for backward compat
     front: row.front,
     back: row.back,
@@ -75,6 +86,60 @@ exports.getFlashcardDecks = (req, res) => {
 };
 
 /**
+ * Obtiene mazos con métricas de prioridad (tarjetas vencidas, promedio dominio)
+ * Retorna mazos ordenados por urgencia
+ */
+exports.getFlashcardDecksWithMetrics = (req, res) => {
+  const userId = req.query.user_id;
+  if (!userId) return res.status(400).json({ error: 'Se requiere user_id' });
+  
+  const query = `
+    SELECT 
+      fd.*,
+      s.name as subject_name,
+      s.color as subject_color,
+      s.icon as subject_icon,
+      u.username as owner_username,
+      u.name as owner_name,
+      fd.user_id as user_id,
+      CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id) AS INTEGER) as card_count,
+      CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.status = 'review') AS INTEGER) as review_count,
+      CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.status = 'learning') AS INTEGER) as learning_count,
+      CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.status = 'new') AS INTEGER) as new_count,
+      CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND (fc.item_type = 'multiple_choice' OR fc.item_type IS NULL AND 0=1)) AS INTEGER) as mc_count,
+      CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.item_type = 'boolean') AS INTEGER) as boolean_count,
+      COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= datetime('now')), 0) as due_count,
+      COALESCE(la.mastery_percentage, 0) as deck_mastery
+    FROM flashcard_decks fd
+    JOIN subjects s ON fd.subject_id = s.id
+    JOIN users u ON fd.user_id = u.id
+    LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
+    WHERE s.user_id = ? 
+       OR s.user_id IN (
+         SELECT u2.id FROM users u2
+         JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
+         WHERE gm.user_id = ?
+       )
+       OR fd.id IN (
+         SELECT sd.deck_id FROM shared_decks sd
+         WHERE sd.shared_to_user_id = ?
+       )
+    ORDER BY 
+      (COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= datetime('now')), 0)) DESC,
+      COALESCE(la.mastery_percentage, 0) ASC,
+      fd.created_at DESC
+  `;
+  
+  db.all(query, [userId, userId, userId, userId], (err, rows) => {
+    if (err) {
+      console.error('[FlashcardMetrics] Error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows || []);
+  });
+};
+
+/**
  * Crear un nuevo mazo de flashcards
  */
 exports.createFlashcardDeck = (req, res) => {
@@ -104,6 +169,60 @@ exports.getCardsByDeck = (req, res) => {
 };
 
 /**
+ * Obtiene una tarjeta específica por su ID
+ */
+exports.getCardById = (req, res) => {
+  const { cardId } = req.params;
+  db.get(`SELECT * FROM flashcards WHERE id = ?`, [cardId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Tarjeta no encontrada' });
+    res.json(normalizeCard(row));
+  });
+};
+
+/**
+ * Obtiene todas las tarjetas de un mazo ordenadas por prioridad de repaso
+ * Prioridad: tarjetas vencidas, dominio bajo, tasa de fallos alta
+ */
+exports.getCardsByDeckPrioritized = (req, res) => {
+  const { deckId } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Se requiere userId' });
+  }
+
+  db.all(
+    `SELECT 
+       fc.*,
+       CASE 
+         WHEN COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) > 0
+         THEN CAST(COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) AS FLOAT) / 
+              CAST(COALESCE(COUNT(cl.id), 1) AS FLOAT)
+         ELSE 0
+       END as failure_rate,
+       CAST(COUNT(cl.id) AS INTEGER) as total_attempts
+     FROM flashcards fc
+     LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
+     WHERE fc.deck_id = ?
+     GROUP BY fc.id
+     ORDER BY 
+       CASE WHEN fc.next_review_date <= datetime('now') THEN 0 ELSE 1 END ASC,
+       fc.next_review_date ASC,
+       failure_rate DESC,
+       fc.created_at ASC`,
+    [userId, deckId],
+    (err, rows) => {
+      if (err) {
+        console.error('[CardsPrioritized] Error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json(rows.map(normalizeCard));
+    }
+  );
+};
+
+/**
  * Crear una tarjeta legacy (front/back) — mantiene compatibilidad con FlashcardNewCardScreen
  */
 exports.createCard = (req, res) => {
@@ -112,9 +231,15 @@ exports.createCard = (req, res) => {
   if (!front || !back) return res.status(400).json({ error: 'Faltan campos requeridos (front, back).' });
 
   const contentJson = JSON.stringify({ front, back });
+  
+  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
+  const nextReviewDate = new Date();
+  nextReviewDate.setDate(nextReviewDate.getDate() + 7);
+  const nextReviewDateStr = nextReviewDate.toISOString();
+  
   db.run(
-    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, status) VALUES (?, ?, ?, 'flashcard', ?, 'new')`,
-    [deckId, front, back, contentJson],
+    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
+    [deckId, front, back, contentJson, nextReviewDateStr],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json(normalizeCard({
@@ -149,15 +274,127 @@ exports.createEvaluationItem = (req, res) => {
   const front = item_type === 'flashcard' ? (parsed.front || '') : '';
   const back = item_type === 'flashcard' ? (parsed.back || '') : '';
 
+  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
+  const nextReviewDate = new Date();
+  nextReviewDate.setDate(nextReviewDate.getDate() + 7);
+  const nextReviewDateStr = nextReviewDate.toISOString();
+
   db.run(
-    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
-    [deckId, front, back, item_type, contentStr, hint || null, explanation || null],
+    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
+    [deckId, front, back, item_type, contentStr, hint || null, explanation || null, nextReviewDateStr],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json(normalizeCard({
         id: this.lastID, deck_id: Number(deckId), front, back,
         item_type, content_json: contentStr, hint: hint || null, explanation: explanation || null, status: 'new',
       }));
+    }
+  );
+};
+
+/**
+ * Registrar una revisión de tarjeta con SM-2 Algorithm
+ * Body: { userId, result: 'correct'|'incorrect', responseTimeMs: number }
+ */
+exports.recordCardReview = (req, res) => {
+  const { cardId } = req.params;
+  const { userId, result, responseTimeMs } = req.body;
+
+  if (!userId || !result || typeof responseTimeMs !== 'number') {
+    return res.status(400).json({ error: 'Se requieren: userId, result (correct|incorrect), responseTimeMs' });
+  }
+
+  if (!['correct', 'incorrect'].includes(result)) {
+    return res.status(400).json({ error: 'result debe ser "correct" o "incorrect"' });
+  }
+
+  // Obtener FSRS actual de la tarjeta
+  db.get(
+    `SELECT fc.id, fc.deck_id, fc.fsrs_stability, fc.fsrs_difficulty, fc.fsrs_repetitions, fd.subject_id 
+     FROM flashcards fc
+     LEFT JOIN flashcard_decks fd ON fc.deck_id = fd.id
+     WHERE fc.id = ?`,
+    [cardId],
+    (err, card) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!card) return res.status(404).json({ error: 'Tarjeta no encontrada' });
+
+      // ── Mapear resultado a calidad FSRS (0-5) ────────────────────────────
+      // result === 'correct' se mapea a quality (3-5 según tiempo)
+      // result === 'incorrect' se mapea a quality < 3
+      let quality = 1;
+      if (result === 'correct') {
+        if (responseTimeMs < 3000) quality = 5;        // Perfecto
+        else if (responseTimeMs < 8000) quality = 4;   // Bueno
+        else quality = 3;                              // Aceptable
+      } else {
+        quality = 1;                                   // Malo/Olvidado
+      }
+
+      // ── Calcular nuevo intervalo con FSRS ────────────────────────────────
+      const fsrsResult = calculateFSRS({
+        quality,
+        stability: card.fsrs_stability || 1,
+        difficulty: card.fsrs_difficulty || 0.5,
+        repetitions: card.fsrs_repetitions || 0,
+        interval: 1,  // Simplificado: se calcula dentro de calculateFSRS
+      });
+
+      const nextReviewDateStr = fsrsResult.nextReviewDate.toISOString();
+
+      // ── Actualizar flashcard con nuevos valores FSRS ────────────────────
+      db.run(
+        `UPDATE flashcards 
+         SET fsrs_stability = ?, fsrs_difficulty = ?, fsrs_repetitions = ?, 
+             next_review_date = ?, status = 'review', last_review_timestamp = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [fsrsResult.newStability, fsrsResult.newDifficulty, fsrsResult.newRepetitions, nextReviewDateStr, cardId],
+        (updateErr) => {
+          if (updateErr) return res.status(500).json({ error: updateErr.message });
+
+          // ── Registrar en card_logs para análisis ───────────────────────
+          db.run(
+            `INSERT INTO card_logs (card_id, user_id, result, response_time_ms, difficulty_deduced)
+             VALUES (?, ?, ?, ?, ?)`,
+            [cardId, userId, result, responseTimeMs, quality >= 4 ? 'easy' : quality === 3 ? 'moderate' : 'difficult'],
+            (logErr) => {
+              if (logErr) console.warn('[CardLogs] Error registrando revisión:', logErr);
+            }
+          );
+
+          // ── Actualizar learning_analytics ──────────────────────────────
+          const isCorrect = result === 'correct' ? 1 : 0;
+          db.run(
+            `UPDATE learning_analytics 
+             SET total_reviews = total_reviews + 1,
+                 correct_reviews = correct_reviews + ?,
+                 incorrect_reviews = incorrect_reviews + ?,
+                 mastery_percentage = CASE 
+                   WHEN total_reviews + 1 > 0 THEN ROUND((correct_reviews + ?) * 100.0 / (total_reviews + 1), 1)
+                   ELSE 0
+                 END,
+                 last_updated = CURRENT_TIMESTAMP
+             WHERE user_id = ? AND subject_id = ?`,
+            [isCorrect, 1 - isCorrect, isCorrect, userId, card.subject_id || null],
+            (analyticsErr) => {
+              if (analyticsErr) console.warn('[Analytics] Error actualizando estadísticas:', analyticsErr);
+            }
+          );
+
+          // ── Retornar resultado con métricas FSRS ────────────────────────
+          res.json({
+            success: true,
+            cardId,
+            quality,
+            nextReviewDate: nextReviewDateStr,
+            newStability: fsrsResult.newStability,
+            newDifficulty: fsrsResult.newDifficulty,
+            newRepetitions: fsrsResult.newRepetitions,
+            retention: fsrsResult.retention,
+            message: `Revisión registrada (FSRS). Próxima revisión en ${fsrsResult.newInterval} días. Retención esperada: ${fsrsResult.retention}%.`,
+          });
+        }
+      );
     }
   );
 };
@@ -550,4 +787,477 @@ exports.generateDeckFromImage = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Error al generar ítems con OCR', details: err.message });
   }
+};
+
+/**
+ * Analiza confusiones en un mazo: detecta tarjetas que frecuentemente generan errores similares
+ * Retorna sugerencias de diferenciación entre conceptos
+ */
+exports.analyzeDeckConfusions = (req, res) => {
+  const { deckId } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Se requiere userId' });
+  }
+
+  // Paso 1: Obtener todas las tarjetas del mazo con su tasa de fallos
+  db.all(
+    `SELECT 
+       fc.id,
+       fc.deck_id,
+       fc.front,
+       fc.back,
+       fc.content_json,
+       CASE 
+         WHEN COUNT(cl.id) > 0
+         THEN CAST(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(cl.id)
+         ELSE 0
+       END as failure_rate,
+       COUNT(cl.id) as attempts
+     FROM flashcards fc
+     LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
+     WHERE fc.deck_id = ?
+     GROUP BY fc.id
+     HAVING attempts > 0
+     ORDER BY failure_rate DESC`,
+    [userId, deckId],
+    (err, cards) => {
+      if (err) {
+        console.error('[AnalyzeConfusions] Error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      if (!cards || cards.length < 2) {
+        return res.json({ confusions: [], message: 'No hay suficientes tarjetas con intentos para analizar confusiones' });
+      }
+
+      // Paso 2: Detectar tarjetas problemáticas (failure_rate > 0.3)
+      const problematicCards = cards.filter(c => c.failure_rate > 0.3);
+
+      if (problematicCards.length < 2) {
+        return res.json({ confusions: [], message: 'No hay suficientes tarjetas problemáticas' });
+      }
+
+      // Paso 3: Para cada par de tarjetas problemáticas, calcular correlación de errores
+      const confusions = [];
+
+      for (let i = 0; i < problematicCards.length; i++) {
+        for (let j = i + 1; j < problematicCards.length; j++) {
+          const card1 = problematicCards[i];
+          const card2 = problematicCards[j];
+
+          // Buscar usuarios que cometieron errores en ambas tarjetas
+          db.all(
+            `SELECT 
+               cl1.user_id,
+               SUM(CASE WHEN cl1.result = 'incorrect' THEN 1 ELSE 0 END) as errors_card1,
+               SUM(CASE WHEN cl2.result = 'incorrect' THEN 1 ELSE 0 END) as errors_card2,
+               COUNT(DISTINCT cl1.user_id) as shared_users
+             FROM card_logs cl1
+             INNER JOIN card_logs cl2 ON cl1.user_id = cl2.user_id
+             WHERE cl1.card_id = ? AND cl2.card_id = ? AND cl1.user_id = ?
+             GROUP BY cl1.user_id`,
+            [card1.id, card2.id, userId],
+            (correlErr, correlation) => {
+              if (!correlErr && correlation && correlation.length > 0) {
+                const corr = correlation[0];
+                if (corr.errors_card1 >= 2 && corr.errors_card2 >= 2) {
+                  // Hay correlación: este usuario falla en ambas
+                  confusions.push({
+                    card1_id: card1.id,
+                    card1_preview: card1.front || (card1.content_json ? JSON.parse(card1.content_json).front : ''),
+                    card1_failure_rate: card1.failure_rate,
+                    card2_id: card2.id,
+                    card2_preview: card2.front || (card2.content_json ? JSON.parse(card2.content_json).front : ''),
+                    card2_failure_rate: card2.failure_rate,
+                    common_errors: corr.errors_card1 + corr.errors_card2,
+                    confidence: (corr.errors_card1 + corr.errors_card2) / (card1.attempts + card2.attempts),
+                  });
+                }
+              }
+            }
+          );
+        }
+      }
+
+      // Enviar respuesta con un pequeño delay para que las queries correlacionadas se completen
+      setTimeout(() => {
+        res.json({
+          confusions: confusions.slice(0, 5), // Top 5 confusiones
+          total_problematic: problematicCards.length,
+          message: `Detectadas ${confusions.length} pares de tarjetas con confusiones potenciales`,
+        });
+      }, 500);
+    }
+  );
+};
+
+/**
+ * Genera una tarjeta de diferenciación entre dos conceptos
+ * Requiere Groq API para generar contenido
+ */
+exports.generateDifferentiationCard = (req, res) => {
+  const { deckId } = req.params;
+  const { card1_id, card2_id, userId } = req.body;
+
+  if (!card1_id || !card2_id || !userId) {
+    return res.status(400).json({ error: 'Se requieren: card1_id, card2_id, userId' });
+  }
+
+  // Obtener ambas tarjetas
+  db.all(
+    `SELECT id, front, back, content_json, item_type FROM flashcards WHERE id IN (?, ?)`,
+    [card1_id, card2_id],
+    async (err, cards) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!cards || cards.length !== 2) {
+        return res.status(404).json({ error: 'Una o ambas tarjetas no fueron encontradas' });
+      }
+
+      const card1 = cards[0];
+      const card2 = cards[1];
+
+      // Extraer front/back para ambas tarjetas
+      let content1 = { front: card1.front || '', back: card1.back || '' };
+      let content2 = { front: card2.front || '', back: card2.back || '' };
+
+      if (card1.content_json) {
+        try { content1 = JSON.parse(card1.content_json); } catch (_) {}
+      }
+      if (card2.content_json) {
+        try { content2 = JSON.parse(card2.content_json); } catch (_) {}
+      }
+
+      const groqApiKey = secrets.GROQ_API_KEY;
+      if (!groqApiKey) {
+        return res.status(500).json({ error: 'Groq API Key no está configurada' });
+      }
+
+      try {
+        const prompt = `Eres un experto en pedagogía y diferenciación conceptual.
+
+El usuario está confundiendo dos conceptos en sus estudios:
+
+**Concepto A:**
+Pregunta: ${content1.front}
+Respuesta: ${content1.back}
+
+**Concepto B:**
+Pregunta: ${content2.front}
+Respuesta: ${content2.back}
+
+Genera UNA tarjeta de diferenciación clara que ayude al usuario a distinguir estos dos conceptos.
+La tarjeta debe:
+1. Resaltar las diferencias clave
+2. Usar ejemplos contrastantes
+3. Ser memorable y concisa
+
+Responde SOLO con un JSON válido en este formato:
+{
+  "front": "pregunta de diferenciación",
+  "back": "explicación que destaca diferencias"
+}`;
+
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${groqApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'mixtral-8x7b-32768',
+            messages: [{
+              role: 'user',
+              content: prompt,
+            }],
+            temperature: 0.7,
+            max_tokens: 1000,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          return res.status(500).json({
+            error: 'Error al llamar a Groq API',
+            details: errorData,
+          });
+        }
+
+        const groqData = await response.json();
+        const raw = groqData.choices[0].message.content.trim();
+
+        let diffCard;
+        try {
+          const jsonMatch = raw.match(/\{[\s\S]*\}/);
+          const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+          diffCard = JSON.parse(jsonStr);
+        } catch (_) {
+          return res.status(500).json({
+            error: 'Respuesta de Groq no es JSON válido',
+            details: raw,
+          });
+        }
+
+        if (!diffCard.front || !diffCard.back) {
+          return res.status(500).json({ error: 'Tarjeta generada incompleta' });
+        }
+
+        // Crear la tarjeta de diferenciación en el mazo
+        db.get(
+          `SELECT deck_id FROM flashcards WHERE id = ?`,
+          [card1_id],
+          (getErr, card) => {
+            if (getErr) return res.status(500).json({ error: getErr.message });
+
+            const nextReviewDate = new Date();
+            nextReviewDate.setDate(nextReviewDate.getDate() + 3); // Revisión en 3 días
+            const nextReviewDateStr = nextReviewDate.toISOString();
+
+            const contentJson = JSON.stringify(diffCard);
+
+            db.run(
+              `INSERT INTO flashcards (
+                deck_id, front, back, item_type, content_json, hint, explanation,
+                status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions,
+                fsrs_stability, fsrs_difficulty, fsrs_repetitions
+              ) VALUES (?, ?, ?, 'flashcard', ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
+              [
+                card.deck_id,
+                diffCard.front,
+                diffCard.back,
+                contentJson,
+                `Diferenciación entre tarjetas ${card1_id} y ${card2_id}`,
+                'Estudia esta tarjeta para evitar confundir estos conceptos',
+                nextReviewDateStr,
+              ],
+              function(insertErr) {
+                if (insertErr) {
+                  return res.status(500).json({ error: insertErr.message });
+                }
+
+                res.status(201).json({
+                  success: true,
+                  newCardId: this.lastID,
+                  front: diffCard.front,
+                  back: diffCard.back,
+                  message: 'Tarjeta de diferenciación creada exitosamente',
+                });
+              }
+            );
+          }
+        );
+      } catch (err) {
+        res.status(500).json({
+          error: 'Error generando tarjeta de diferenciación',
+          details: err.message,
+        });
+      }
+    }
+  );
+};
+
+// ─── Snooze Management ─────────────────────────────────────────────────────────
+
+/**
+ * POST /api/flashcards/:cardId/snooze
+ * Snooze a single card for a specified duration (in minutes)
+ * Body: { userId, durationMinutes, reason? }
+ */
+exports.snoozeCard = (req, res) => {
+  const { cardId } = req.params;
+  const { userId, durationMinutes, reason } = req.body;
+
+  if (!userId || !durationMinutes || durationMinutes <= 0) {
+    return res.status(400).json({ error: 'Se requieren: userId, durationMinutes (> 0)' });
+  }
+
+  // Calculate resume time
+  const now = new Date();
+  const resumeAt = new Date(now.getTime() + durationMinutes * 60000);
+  const resumeAtStr = resumeAt.toISOString();
+
+  // Insert or replace snooze record
+  db.run(
+    `INSERT INTO card_snoozes (card_id, user_id, snoozed_at, resume_at, snooze_duration_minutes, reason)
+     VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+     ON CONFLICT(card_id) DO UPDATE SET
+       user_id = ?,
+       snoozed_at = CURRENT_TIMESTAMP,
+       resume_at = ?,
+       snooze_duration_minutes = ?,
+       reason = ?`,
+    [cardId, userId, resumeAtStr, durationMinutes, reason || null, userId, resumeAtStr, durationMinutes, reason || null],
+    function(err) {
+      if (err) {
+        console.error('[Snooze] Error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({
+        success: true,
+        cardId,
+        snoozedUntil: resumeAtStr,
+        durationMinutes,
+        message: `Tarjeta snoozed por ${durationMinutes} minutos`,
+      });
+    }
+  );
+};
+
+/**
+ * DELETE /api/flashcards/:cardId/snooze
+ * Resume a snoozed card (remove snooze)
+ */
+exports.unsnoozeCard = (req, res) => {
+  const { cardId } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Se requiere userId' });
+  }
+
+  db.run(
+    `DELETE FROM card_snoozes WHERE card_id = ? AND user_id = ?`,
+    [cardId, userId],
+    function(err) {
+      if (err) {
+        console.error('[Unsnooze] Error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Snooze no encontrado para esta tarjeta' });
+      }
+      res.json({
+        success: true,
+        cardId,
+        message: 'Tarjeta reanudada',
+      });
+    }
+  );
+};
+
+/**
+ * GET /api/flashcards/:cardId/snooze-status
+ * Check if a card is snoozed and when it will resume
+ */
+exports.getSnoozeStatus = (req, res) => {
+  const { cardId } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Se requiere userId' });
+  }
+
+  const now = new Date().toISOString();
+
+  db.get(
+    `SELECT 
+       id, card_id, resume_at, snooze_duration_minutes, reason,
+       CASE WHEN resume_at <= ? THEN 1 ELSE 0 END as is_expired
+     FROM card_snoozes
+     WHERE card_id = ? AND user_id = ?`,
+    [now, cardId, userId],
+    (err, row) => {
+      if (err) {
+        console.error('[SnoozeStatus] Error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      if (!row) {
+        return res.json({ isSnoozed: false, cardId });
+      }
+
+      // If snooze expired, delete it
+      if (row.is_expired) {
+        db.run(`DELETE FROM card_snoozes WHERE id = ?`, [row.id], (deleteErr) => {
+          if (deleteErr) console.warn('[SnoozeStatus] Error deleting expired snooze:', deleteErr);
+        });
+        return res.json({ isSnoozed: false, cardId, wasExpired: true });
+      }
+
+      res.json({
+        isSnoozed: true,
+        cardId,
+        resumeAt: row.resume_at,
+        durationMinutes: row.snooze_duration_minutes,
+        reason: row.reason,
+        timeUntilResume: Math.max(0, Math.ceil((new Date(row.resume_at) - new Date()) / 60000)), // minutes
+      });
+    }
+  );
+};
+
+/**
+ * GET /api/flashcard-decks/:deckId/cards/not-snoozed
+ * Get all cards in a deck, excluding snoozed cards
+ */
+exports.getCardsNotSnoozed = (req, res) => {
+  const { deckId } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Se requiere userId' });
+  }
+
+  const now = new Date().toISOString();
+
+  db.all(
+    `SELECT 
+       fc.*,
+       CASE 
+         WHEN COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) > 0
+         THEN CAST(COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) AS FLOAT) / 
+              CAST(COALESCE(COUNT(cl.id), 1) AS FLOAT)
+         ELSE 0
+       END as failure_rate,
+       CAST(COUNT(cl.id) AS INTEGER) as total_attempts
+     FROM flashcards fc
+     LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
+     LEFT JOIN card_snoozes cs ON fc.id = cs.card_id AND cs.user_id = ? AND cs.resume_at > ?
+     WHERE fc.deck_id = ? AND cs.id IS NULL
+     GROUP BY fc.id
+     ORDER BY 
+       CASE WHEN fc.next_review_date <= ? THEN 0 ELSE 1 END ASC,
+       fc.next_review_date ASC,
+       failure_rate DESC,
+       fc.created_at ASC`,
+    [userId, userId, now, deckId, now],
+    (err, rows) => {
+      if (err) {
+        console.error('[CardsNotSnoozed] Error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json(rows.map(normalizeCard));
+    }
+  );
+};
+
+/**
+ * POST /api/flashcards/auto-unsnooza
+ * Auto-resume all expired snoozed cards for a user
+ */
+exports.autoUnsnoozeExpired = (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Se requiere userId' });
+  }
+
+  const now = new Date().toISOString();
+
+  db.run(
+    `DELETE FROM card_snoozes WHERE user_id = ? AND resume_at <= ?`,
+    [userId, now],
+    function(err) {
+      if (err) {
+        console.error('[AutoUnsnoozed] Error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({
+        success: true,
+        message: `${this.changes} tarjetas snoozed han sido reanudadas automáticamente`,
+        resumedCount: this.changes,
+      });
+    }
+  );
 };

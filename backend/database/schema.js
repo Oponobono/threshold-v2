@@ -508,6 +508,10 @@ const tableSchema = {
       { name: 'sm2_interval', type: 'INTEGER DEFAULT 1' },
       { name: 'sm2_repetitions', type: 'INTEGER DEFAULT 0' },
       { name: 'next_review_date', type: 'TIMESTAMP' },
+      // FSRS (Free Spaced Repetition Scheduler) Fields - Modern alternative to SM-2
+      { name: 'fsrs_stability', type: 'REAL DEFAULT 1' },
+      { name: 'fsrs_difficulty', type: 'REAL DEFAULT 0.5' },
+      { name: 'fsrs_repetitions', type: 'INTEGER DEFAULT 0' },
       // Cognitive Load & Atomicity
       { name: 'word_count', type: 'INTEGER DEFAULT 0' },
       { name: 'is_atomic', type: 'INTEGER DEFAULT 1' },
@@ -633,6 +637,32 @@ const tableSchema = {
         prediction_confidence REAL,
         notification_sent INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+  card_snoozes: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS card_snoozes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        card_id INTEGER NOT NULL UNIQUE,
+        user_id INTEGER NOT NULL,
+        snoozed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        resume_at DATETIME NOT NULL,
+        snooze_duration_minutes INTEGER NOT NULL,
+        reason TEXT,
+        FOREIGN KEY (card_id) REFERENCES flashcards(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS card_snoozes (
+        id SERIAL PRIMARY KEY,
+        card_id INTEGER NOT NULL UNIQUE REFERENCES flashcards(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        snoozed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resume_at TIMESTAMP NOT NULL,
+        snooze_duration_minutes INTEGER NOT NULL,
+        reason TEXT
       )
     `
   },

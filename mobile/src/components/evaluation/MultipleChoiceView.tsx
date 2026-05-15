@@ -111,6 +111,9 @@ export const MultipleChoiceView: React.FC<Props> = ({
             {isAnswered && index === selectedIndex && index !== content.correctIndex && (
               <Ionicons name="close-circle" size={16} color="#C62828" style={s.optionIcon} />
             )}
+            {isAnswered && index !== content.correctIndex && index !== selectedIndex && (
+              <Ionicons name="close-circle" size={16} color="#9E9E9E" style={s.optionIcon} />
+            )}
           </TouchableOpacity>
         ))}
       </View>

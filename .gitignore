@@ -84,3 +84,9 @@ Thumbs.db
 .tmp/
 temp/
 *.log
+
+# ==================== PRIVATE ANALYSIS ====================
+analysis/
+private_docs/
+*_ANALYSIS.md
+*.analysis.md

@@ -20,8 +20,9 @@ import {
   type Subject,
   type FlashcardDeck,
   type Flashcard,
-  getFlashcardDecks,
+  getFlashcardDecksWithMetrics,
   getFlashcards,
+  getFlashcardsPrioritized,
   getUserId,
   shareDeck,
   deleteFlashcardDeck,
@@ -89,7 +90,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
 
   const loadDecks = async () => {
     try {
-      const data = await getFlashcardDecks();
+      const data = await getFlashcardDecksWithMetrics();
       setDecks(data || []);
     } catch (e) {
       console.warn('Error loading decks:', e);
@@ -114,16 +115,12 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
 
   const openStudySession = async (deck: FlashcardDeck) => {
     try {
-      const data = await getFlashcards(deck.id);
+      const data = await getFlashcardsPrioritized(deck.id);
       if (!data || data.length === 0) {
         showAlert({ title: t('flashcards.noCards'), message: t('flashcards.noCardsMsg'), type: 'info' });
         return;
       }
-      const sorted = [...data].sort((a, b) => {
-        const order: Record<string, number> = { new: 0, learning: 1, review: 2 };
-        return (order[a.status] ?? 3) - (order[b.status] ?? 3);
-      });
-      setCards(sorted);
+      setCards(data);
       setActiveDeck(deck);
       setScreen('study');
     } catch (e) {

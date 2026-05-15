@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { VictoryPolarAxis, VictoryChart, VictoryLine, VictoryTheme, VictoryArea } from 'victory-native';
+import { VictoryPolarAxis, VictoryChart, VictoryTheme, VictoryArea } from 'victory-native';
 import { theme } from '../styles/theme';
 import { fetchWithFallback, parseJsonSafely } from '../services/api/client';
 
@@ -103,7 +103,7 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId })
 
       {masteryData.recommendation && (
         <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 12, textAlign: 'center', paddingHorizontal: 20, fontStyle: 'italic' }}>
-          "{masteryData.recommendation}"
+          {'"'}{masteryData.recommendation}{'"'}
         </Text>
       )}
     </View>

@@ -30,4 +30,76 @@ router.get('/analytics/mastery/:userId/:subjectId', analyticsController.getMaste
 router.get('/analytics/predictions/:userId', analyticsController.getReviewPredictions);
 router.get('/analytics/report/:userId', analyticsController.generateReport);
 
+/**
+ * @swagger
+ * /api/analytics/user-stats/{userId}:
+ *   get:
+ *     summary: Obtiene estadísticas globales del usuario
+ *     tags: [Analytics]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del usuario
+ *     responses:
+ *       200:
+ *         description: Estadísticas globales incluye mastery, decks, cards, actividad reciente
+ *       400:
+ *         description: userId requerido
+ */
+router.get('/analytics/user-stats/:userId', analyticsController.getUserStats);
+
+/**
+ * @swagger
+ * /api/analytics/deck-stats/{deckId}/{userId}:
+ *   get:
+ *     summary: Obtiene estadísticas detalladas de un mazo
+ *     tags: [Analytics]
+ *     parameters:
+ *       - in: path
+ *         name: deckId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Estadísticas del mazo con tarjetas difíciles y tendencia
+ *       400:
+ *         description: Parámetros requeridos
+ */
+router.get('/analytics/deck-stats/:deckId/:userId', analyticsController.getDeckStats);
+
+/**
+ * @swagger
+ * /api/analytics/progress-trends/{userId}:
+ *   get:
+ *     summary: Obtiene tendencia de progreso temporal del usuario
+ *     tags: [Analytics]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           default: 30
+ *         description: Número de días a analizar (7-365)
+ *     responses:
+ *       200:
+ *         description: Tendencia diaria, timeline de tarjetas, progreso por sujeto
+ *       400:
+ *         description: userId requerido
+ */
+router.get('/analytics/progress-trends/:userId', analyticsController.getProgressTrends);
+
 module.exports = router;

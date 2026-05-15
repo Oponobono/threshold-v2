@@ -103,7 +103,7 @@ export default function HybridDashboardScreen() {
 
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [predictions /*, setPredictions */] = useState<PredictionResponse | null>(null);
+  const [predictions, setPredictions] = useState<PredictionResponse | null>(null);
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
@@ -129,6 +129,12 @@ export default function HybridDashboardScreen() {
   // Snooze State
   const snoozeManager = useDueCardSnooze();
   const [isSnoozeModalVisible, setIsSnoozeModalVisible] = useState(false);
+  const [snoozeRefreshTrigger, setSnoozeRefreshTrigger] = useState(0); // Trigger para re-render cuando cambia snooze
+
+  // Escuchar cambios en snoozedCards y actualizar trigger
+  useEffect(() => {
+    setSnoozeRefreshTrigger(prev => prev + 1);
+  }, [snoozeManager.snoozedCards]);
 
   const loadData = useCallback(async () => {
     try {
@@ -185,17 +191,37 @@ export default function HybridDashboardScreen() {
     }, [loadData])
   );
 
-  // TODO: Arreglar endpoint /analytics/predictions - deshabilitado temporalmente
-  // useEffect(() => {
-  //   if (profile?.id) {
-  //     getPredictions(profile.id)
-  //       .then(setPredictions)
-  //       .catch(err => {
-  //         console.warn('Predictions error:', err);
-  //         setPredictions(null);
-  //       });
-  //   }
-  // }, [profile?.id]);
+  // ── Cargar predicciones UNA SOLA VEZ al montar el componente ───────────────
+  const predictionsLoadedRef = useRef(false);
+
+  useEffect(() => {
+    // Solo ejecutar una vez
+    if (predictionsLoadedRef.current || !profile?.id) return;
+    predictionsLoadedRef.current = true;
+
+    const loadPredictions = async () => {
+      try {
+        console.log(`[Analytics] Iniciando carga de predicciones para userId=${profile.id}`);
+        const data = await getPredictions(profile.id);
+        console.log(`[Analytics] ✅ Predicciones cargadas exitosamente:`, data);
+        setPredictions(data);
+      } catch (error: any) {
+        console.error(
+          `[Analytics] ❌ Error cargando predicciones para userId=${profile.id}:`,
+          error.message || error
+        );
+        console.warn(
+          `[Analytics] ⚠️ La función getPredictions se ha detenido. ` +
+          `Error: ${error.message || 'Error desconocido'}. ` +
+          `Usando datos por defecto.`
+        );
+        // Fallback: mostrar datos vacíos (no debería ocurrir normalmente)
+        setPredictions({ dueCount: 0, cards: [] });
+      }
+    };
+
+    loadPredictions();
+  }, []); // ✅ Array vacío: ejecutar UNA SOLA VEZ
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
@@ -409,6 +435,9 @@ export default function HybridDashboardScreen() {
       // Usar un ID único para la alerta de "Repasos Urgentes"
       const alertId = 'due_cards_alert';
       await snoozeManager.snoozeCard(alertId, option.minutes);
+      
+      // Fuerza un re-render inmediato del dashboard
+      setSnoozeRefreshTrigger(prev => prev + 1);
       
       setIsSnoozeModalVisible(false);
       

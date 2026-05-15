@@ -95,22 +95,27 @@ function calculateSM2(params) {
  * Más moderno que SM-2, considera múltiples factores
  */
 function calculateFSRS(params) {
-  const { quality = 3, stability = 1, difficulty = 0.5, interval = 1, daysSinceReview = 0 } = params;
+  const { quality = 3, stability = 1, difficulty = 0.5, interval = 1, repetitions = 0, daysSinceReview = 0 } = params;
 
   // Factor de retención basado en días desde el último repaso
   const retention = Math.exp(-interval / 36); // Modelo exponencial
 
   let newDifficulty = Math.max(0.1, Math.min(10, difficulty + 0.1 - quality * 0.02));
   let newStability;
+  let newRepetitions = repetitions;
 
   if (quality < 3) {
     newStability = stability * 0.72;
+    newRepetitions = 0; // Reiniciar contador si falló
   } else if (quality === 3) {
     newStability = stability * 1.26;
+    newRepetitions += 1;
   } else if (quality === 4) {
     newStability = stability * 1.77;
+    newRepetitions += 1;
   } else {
     newStability = stability * 2.36;
+    newRepetitions += 1;
   }
 
   // Nuevo intervalo en días
@@ -122,6 +127,7 @@ function calculateFSRS(params) {
   return {
     newStability: Math.round(newStability * 100) / 100,
     newDifficulty: Math.round(newDifficulty * 100) / 100,
+    newRepetitions,
     newInterval: Math.max(1, newInterval),
     nextReviewDate,
     retention: Math.round(retention * 100), // % de retención esperada

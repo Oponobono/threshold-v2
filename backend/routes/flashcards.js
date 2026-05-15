@@ -27,6 +27,29 @@ router.get('/flashcard-decks', flashcardsController.getFlashcardDecks);
 
 /**
  * @swagger
+ * /api/flashcard-decks/with-metrics:
+ *   get:
+ *     summary: Obtiene mazos ordenados por prioridad de repaso (tarjetas vencidas, dominio bajo)
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: query
+ *         name: user_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del usuario
+ *     responses:
+ *       200:
+ *         description: Lista de mazos con métricas de prioridad
+ *       400:
+ *         description: Falta el user_id
+ *       500:
+ *         description: Error interno
+ */
+router.get('/flashcard-decks/with-metrics', flashcardsController.getFlashcardDecksWithMetrics);
+
+/**
+ * @swagger
  * /api/flashcard-decks:
  *   post:
  *     summary: Crea un nuevo mazo de flashcards
@@ -78,6 +101,58 @@ router.post('/flashcard-decks', flashcardsController.createFlashcardDeck);
  *         description: Error interno
  */
 router.get('/flashcard-decks/:deckId/cards', flashcardsController.getCardsByDeck);
+
+/**
+ * @swagger
+ * /api/flashcard-decks/{deckId}/cards/prioritized:
+ *   get:
+ *     summary: Obtiene tarjetas de un mazo ordenadas por prioridad de repaso
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: deckId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del mazo
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del usuario (para calcular tasa de fallos)
+ *     responses:
+ *       200:
+ *         description: Lista de tarjetas ordenadas por prioridad
+ *       400:
+ *         description: Faltan parámetros requeridos
+ *       500:
+ *         description: Error interno
+ */
+router.get('/flashcard-decks/:deckId/cards/prioritized', flashcardsController.getCardsByDeckPrioritized);
+
+/**
+ * @swagger
+ * /api/flashcards/{cardId}:
+ *   get:
+ *     summary: Obtiene una tarjeta específica por su ID
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: cardId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la tarjeta
+ *     responses:
+ *       200:
+ *         description: Datos de la tarjeta
+ *       404:
+ *         description: Tarjeta no encontrada
+ *       500:
+ *         description: Error interno
+ */
+router.get('/flashcards/:cardId', flashcardsController.getCardById);
 
 /**
  * @swagger
@@ -145,6 +220,78 @@ router.post('/flashcard-decks/:deckId/items', flashcardsController.createEvaluat
  *         description: Estado actualizado
  */
 router.put('/flashcards/:cardId', flashcardsController.updateCardStatus);
+
+/**
+ * @swagger
+ * /api/flashcards/{cardId}/review:
+ *   post:
+ *     summary: Registra una revisión de tarjeta con FSRS (Free Spaced Repetition Scheduler)
+ *     description: Procesa la revisión de una tarjeta y calcula la próxima fecha de repaso usando FSRS, más avanzado que SM-2. Actualiza estadísticas del usuario.
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: cardId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - result
+ *               - responseTimeMs
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *                 description: ID del usuario que revisó la tarjeta
+ *               result:
+ *                 type: string
+ *                 enum: [correct, incorrect]
+ *                 description: Resultado de la revisión
+ *               responseTimeMs:
+ *                 type: number
+ *                 description: Tiempo de respuesta en milisegundos
+ *     responses:
+ *       200:
+ *         description: Revisión registrada correctamente con FSRS
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 cardId:
+ *                   type: integer
+ *                 quality:
+ *                   type: integer
+ *                   description: Calidad calculada (1-5)
+ *                 nextReviewDate:
+ *                   type: string
+ *                   format: date-time
+ *                 newStability:
+ *                   type: number
+ *                   description: Nueva estabilidad FSRS
+ *                 newDifficulty:
+ *                   type: number
+ *                   description: Nueva dificultad FSRS (0-10)
+ *                 newRepetitions:
+ *                   type: integer
+ *                 retention:
+ *                   type: number
+ *                   description: Retención esperada (%)
+ *       400:
+ *         description: Falta de parámetros requeridos
+ *       404:
+ *         description: Tarjeta no encontrada
+ *       500:
+ *         description: Error interno
+ */
+router.post('/flashcards/:cardId/review', flashcardsController.recordCardReview);
 
 /**
  * @swagger
@@ -294,5 +441,200 @@ router.post('/flashcard-decks/generate-from-text', flashcardsController.generate
  *         description: Error interno o de la IA
  */
 router.post('/flashcard-decks/generate-from-image', flashcardsController.generateDeckFromImage);
+
+/**
+ * @swagger
+ * /api/flashcard-decks/{deckId}/analyze-confusions:
+ *   get:
+ *     summary: Analiza confusiones en un mazo (tarjetas que se confunden frecuentemente)
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: deckId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del mazo
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del usuario
+ *     responses:
+ *       200:
+ *         description: Lista de confusiones detectadas
+ *       400:
+ *         description: Faltan parámetros requeridos
+ *       500:
+ *         description: Error interno
+ */
+router.get('/flashcard-decks/:deckId/analyze-confusions', flashcardsController.analyzeDeckConfusions);
+
+/**
+ * @swagger
+ * /api/flashcard-decks/{deckId}/generate-differentiation:
+ *   post:
+ *     summary: Genera una tarjeta de diferenciación entre dos conceptos confusos
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: deckId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del mazo donde se agregará la nueva tarjeta
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - card1_id
+ *               - card2_id
+ *               - userId
+ *             properties:
+ *               card1_id:
+ *                 type: integer
+ *               card2_id:
+ *                 type: integer
+ *               userId:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Tarjeta de diferenciación creada
+ *       400:
+ *         description: Parámetros faltantes o inválidos
+ *       500:
+ *         description: Error interno o de la IA
+ */
+router.post('/flashcard-decks/:deckId/generate-differentiation', flashcardsController.generateDifferentiationCard);
+
+/**
+ * @swagger
+ * /api/flashcards/{cardId}/snooze:
+ *   post:
+ *     summary: Snooze una tarjeta por un tiempo especificado
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: cardId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - durationMinutes
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *               durationMinutes:
+ *                 type: integer
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Tarjeta snoozed exitosamente
+ */
+router.post('/flashcards/:cardId/snooze', flashcardsController.snoozeCard);
+
+/**
+ * @swagger
+ * /api/flashcards/{cardId}/snooze:
+ *   delete:
+ *     summary: Reanuda una tarjeta snoozed
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: cardId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Tarjeta reanudada
+ */
+router.delete('/flashcards/:cardId/snooze', flashcardsController.unsnoozeCard);
+
+/**
+ * @swagger
+ * /api/flashcards/{cardId}/snooze-status:
+ *   get:
+ *     summary: Obtiene el estado de snooze de una tarjeta
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: cardId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Estado de snooze (isSnoozed, resumeAt, timeUntilResume)
+ */
+router.get('/flashcards/:cardId/snooze-status', flashcardsController.getSnoozeStatus);
+
+/**
+ * @swagger
+ * /api/flashcard-decks/{deckId}/cards/not-snoozed:
+ *   get:
+ *     summary: Obtiene tarjetas de un mazo excluyendo las snoozed
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: deckId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Lista de tarjetas sin snooze, ordenadas por prioridad
+ */
+router.get('/flashcard-decks/:deckId/cards/not-snoozed', flashcardsController.getCardsNotSnoozed);
+
+/**
+ * @swagger
+ * /api/flashcards/auto-unsnoozed:
+ *   post:
+ *     summary: Reanuda automáticamente todas las tarjetas snoozed expiradas
+ *     tags: [Flashcards]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Tarjetas snoozed expiradas reanudadas
+ */
+router.post('/flashcards/auto-unsnoozed', flashcardsController.autoUnsnoozeExpired);
 
 module.exports = router;

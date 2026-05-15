@@ -62,15 +62,31 @@ exports.getReviewPredictions = (req, res) => {
   }
 
   db.all(
-    `SELECT fc.id, fc.front, fc.next_review_date, fd.subject_id, la.mastery_percentage
+    `SELECT 
+       fc.id, 
+       fc.front, 
+       fc.next_review_date, 
+       fd.subject_id, 
+       la.mastery_percentage,
+       CASE 
+         WHEN COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) > 0
+         THEN CAST(COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) AS FLOAT) / 
+              CAST(COALESCE(COUNT(cl.id), 1) AS FLOAT)
+         ELSE 0
+       END as failure_rate
      FROM flashcards fc
      JOIN flashcard_decks fd ON fc.deck_id = fd.id
      LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
+     LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
      WHERE fc.next_review_date <= datetime('now')
      AND fd.user_id = ?
-     ORDER BY fc.next_review_date ASC
+     GROUP BY fc.id, fc.front, fc.next_review_date, fd.subject_id, la.mastery_percentage
+     ORDER BY 
+       la.mastery_percentage ASC,
+       fc.next_review_date ASC,
+       failure_rate DESC
      LIMIT 20`,
-    [userId, userId],
+    [userId, userId, userId],
     (err, rows) => {
       if (err) {
         console.error(`[Analytics] Error en getReviewPredictions para userId=${userId}:`, err);
@@ -87,6 +103,7 @@ exports.getReviewPredictions = (req, res) => {
         subjectId: card.subject_id || 0,
         mastery: card.mastery_percentage || 0,
         urgency: (card.mastery_percentage || 0) < 50 ? 'HIGH' : 'MEDIUM',
+        failureRate: Math.round(card.failure_rate * 100),
       }));
 
       res.json({ dueCount: predictions.length, cards: predictions });
@@ -335,4 +352,291 @@ exports.generateReport = async (req, res) => {
       res.status(500).json({ error: 'Error generando el informe PDF', details: err.message });
     }
   }
+};
+
+/**
+ * GET /api/analytics/user-stats/:userId
+ *
+ * Retorna estadísticas globales del usuario:
+ * - Total de mazos, tarjetas, dominio general
+ * - Estadísticas por materia
+ * - Tarjetas vencidas, en aprendizaje, nuevas
+ */
+exports.getUserStats = (req, res) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId es requerido' });
+  }
+
+  Promise.all([
+    // Total stats
+    new Promise((resolve) =>
+      db.get(
+        `SELECT 
+           CAST(COUNT(DISTINCT fd.id) AS INTEGER) as total_decks,
+           CAST(COUNT(DISTINCT fc.id) AS INTEGER) as total_cards,
+           CAST(SUM(CASE WHEN fc.status = 'review' THEN 1 ELSE 0 END) AS INTEGER) as mastered_cards,
+           CAST(SUM(CASE WHEN fc.status = 'learning' THEN 1 ELSE 0 END) AS INTEGER) as learning_cards,
+           CAST(SUM(CASE WHEN fc.status = 'new' THEN 1 ELSE 0 END) AS INTEGER) as new_cards,
+           CAST(COUNT(CASE WHEN fc.next_review_date <= datetime('now') THEN 1 END) AS INTEGER) as due_cards
+         FROM flashcard_decks fd
+         LEFT JOIN flashcards fc ON fc.deck_id = fd.id
+         WHERE fd.user_id = ?`,
+        [userId],
+        (err, row) => resolve(row || {})
+      )
+    ),
+    // Subject mastery
+    new Promise((resolve) =>
+      db.all(
+        `SELECT 
+           la.subject_id,
+           s.name as subject_name,
+           ROUND(la.mastery_percentage, 1) as mastery_percentage,
+           la.total_reviews,
+           la.correct_reviews
+         FROM learning_analytics la
+         LEFT JOIN subjects s ON la.subject_id = s.id
+         WHERE la.user_id = ?
+         ORDER BY la.mastery_percentage DESC`,
+        [userId],
+        (err, rows) => resolve(rows || [])
+      )
+    ),
+    // Recent activity
+    new Promise((resolve) =>
+      db.all(
+        `SELECT 
+           DATE(cl.timestamp) as review_date,
+           COUNT(*) as total_attempts,
+           SUM(CASE WHEN cl.result = 'correct' THEN 1 ELSE 0 END) as correct_attempts
+         FROM card_logs cl
+         WHERE cl.user_id = ?
+         GROUP BY DATE(cl.timestamp)
+         ORDER BY review_date DESC
+         LIMIT 7`,
+        [userId],
+        (err, rows) => resolve(rows || [])
+      )
+    ),
+  ])
+    .then(([totalStats, subjectStats, recentActivity]) => {
+      const globalMastery = totalStats.total_cards > 0
+        ? Math.round((totalStats.mastered_cards / totalStats.total_cards) * 100)
+        : 0;
+
+      res.json({
+        user_id: userId,
+        global_mastery: globalMastery,
+        total_decks: totalStats.total_decks || 0,
+        total_cards: totalStats.total_cards || 0,
+        mastered_cards: totalStats.mastered_cards || 0,
+        learning_cards: totalStats.learning_cards || 0,
+        new_cards: totalStats.new_cards || 0,
+        due_cards: totalStats.due_cards || 0,
+        subjects: subjectStats,
+        recent_activity: recentActivity,
+      });
+    })
+    .catch(err => {
+      console.error('[getUserStats] Error:', err);
+      res.status(500).json({ error: err.message });
+    });
+};
+
+/**
+ * GET /api/analytics/deck-stats/:deckId/:userId
+ *
+ * Retorna estadísticas detalladas de un mazo específico:
+ * - Total de tarjetas y distribución de estados
+ * - Tarjetas más difíciles (failure_rate)
+ * - Progreso y dominio
+ */
+exports.getDeckStats = (req, res) => {
+  const { deckId, userId } = req.params;
+
+  if (!deckId || !userId) {
+    return res.status(400).json({ error: 'deckId y userId son requeridos' });
+  }
+
+  Promise.all([
+    // Deck info and distribution
+    new Promise((resolve) =>
+      db.get(
+        `SELECT 
+           fd.id,
+           fd.title,
+           fd.description,
+           s.name as subject_name,
+           CAST(COUNT(fc.id) AS INTEGER) as total_cards,
+           CAST(SUM(CASE WHEN fc.status = 'review' THEN 1 ELSE 0 END) AS INTEGER) as mastered_count,
+           CAST(SUM(CASE WHEN fc.status = 'learning' THEN 1 ELSE 0 END) AS INTEGER) as learning_count,
+           CAST(SUM(CASE WHEN fc.status = 'new' THEN 1 ELSE 0 END) AS INTEGER) as new_count,
+           CAST(COUNT(CASE WHEN fc.next_review_date <= datetime('now') THEN 1 END) AS INTEGER) as due_count,
+           CAST(COUNT(DISTINCT cl.user_id) AS INTEGER) as total_reviews
+         FROM flashcard_decks fd
+         LEFT JOIN subjects s ON fd.subject_id = s.id
+         LEFT JOIN flashcards fc ON fc.deck_id = fd.id
+         LEFT JOIN card_logs cl ON fc.id = cl.card_id
+         WHERE fd.id = ? AND fd.user_id = ?
+         GROUP BY fd.id`,
+        [deckId, userId],
+        (err, row) => resolve(row || {})
+      )
+    ),
+    // Difficult cards (high failure rate)
+    new Promise((resolve) =>
+      db.all(
+        `SELECT 
+           fc.id,
+           fc.front,
+           CAST(COUNT(cl.id) AS INTEGER) as total_attempts,
+           CAST(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END) AS INTEGER) as error_count,
+           ROUND(
+             CAST(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END) AS FLOAT) / 
+             CAST(COUNT(cl.id) AS FLOAT) * 100,
+             1
+           ) as failure_rate,
+           fc.fsrs_stability,
+           fc.fsrs_difficulty
+         FROM flashcards fc
+         LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
+         WHERE fc.deck_id = ? AND COUNT(cl.id) > 0
+         GROUP BY fc.id
+         ORDER BY failure_rate DESC
+         LIMIT 10`,
+        [userId, deckId],
+        (err, rows) => resolve(rows || [])
+      )
+    ),
+    // Mastery trend for this deck
+    new Promise((resolve) =>
+      db.all(
+        `SELECT 
+           DATE(cl.timestamp) as review_date,
+           COUNT(*) as total_attempts,
+           SUM(CASE WHEN cl.result = 'correct' THEN 1 ELSE 0 END) as correct_attempts
+         FROM card_logs cl
+         JOIN flashcards fc ON cl.card_id = fc.id
+         WHERE fc.deck_id = ? AND cl.user_id = ?
+         GROUP BY DATE(cl.timestamp)
+         ORDER BY review_date ASC
+         LIMIT 30`,
+        [deckId, userId],
+        (err, rows) => resolve(rows || [])
+      )
+    ),
+  ])
+    .then(([deckInfo, difficultCards, masteryTrend]) => {
+      const deckMastery = deckInfo.total_cards > 0
+        ? Math.round((deckInfo.mastered_count / deckInfo.total_cards) * 100)
+        : 0;
+
+      res.json({
+        deck_id: deckId,
+        title: deckInfo.title || 'N/A',
+        description: deckInfo.description || '',
+        subject_name: deckInfo.subject_name || 'N/A',
+        mastery_percentage: deckMastery,
+        total_cards: deckInfo.total_cards || 0,
+        mastered_cards: deckInfo.mastered_count || 0,
+        learning_cards: deckInfo.learning_count || 0,
+        new_cards: deckInfo.new_count || 0,
+        due_cards: deckInfo.due_count || 0,
+        total_reviews: deckInfo.total_reviews || 0,
+        difficult_cards: difficultCards,
+        mastery_trend: masteryTrend,
+      });
+    })
+    .catch(err => {
+      console.error('[getDeckStats] Error:', err);
+      res.status(500).json({ error: err.message });
+    });
+};
+
+/**
+ * GET /api/analytics/progress-trends/:userId
+ *
+ * Retorna tendencia de progreso temporal del usuario:
+ * - Dominio global por día/semana
+ * - Actividad de estudio (intentos por día)
+ * - Tasa de acierto temporal
+ */
+exports.getProgressTrends = (req, res) => {
+  const { userId } = req.params;
+  const { days = 30 } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId es requerido' });
+  }
+
+  const numDays = Math.max(7, Math.min(365, parseInt(days) || 30));
+
+  Promise.all([
+    // Daily mastery
+    new Promise((resolve) =>
+      db.all(
+        `SELECT 
+           DATE(cl.timestamp) as date,
+           COUNT(*) as total_attempts,
+           SUM(CASE WHEN cl.result = 'correct' THEN 1 ELSE 0 END) as correct_attempts,
+           ROUND(
+             SUM(CASE WHEN cl.result = 'correct' THEN 1 ELSE 0 END) * 100.0 / COUNT(*),
+             1
+           ) as daily_accuracy
+         FROM card_logs cl
+         WHERE cl.user_id = ? AND DATE(cl.timestamp) >= DATE('now', '-' || ? || ' days')
+         GROUP BY DATE(cl.timestamp)
+         ORDER BY date ASC`,
+        [userId, numDays],
+        (err, rows) => resolve(rows || [])
+      )
+    ),
+    // Cards created/reviewed timeline
+    new Promise((resolve) =>
+      db.all(
+        `SELECT 
+           DATE(cl.timestamp) as date,
+           COUNT(DISTINCT fc.id) as cards_reviewed,
+           COUNT(DISTINCT CASE WHEN cl.result = 'correct' THEN fc.id END) as cards_mastered
+         FROM card_logs cl
+         JOIN flashcards fc ON cl.card_id = fc.id
+         WHERE cl.user_id = ? AND DATE(cl.timestamp) >= DATE('now', '-' || ? || ' days')
+         GROUP BY DATE(cl.timestamp)
+         ORDER BY date ASC`,
+        [userId, numDays],
+        (err, rows) => resolve(rows || [])
+      )
+    ),
+    // Subject progress
+    new Promise((resolve) =>
+      db.all(
+        `SELECT 
+           s.name as subject_name,
+           ROUND(la.mastery_percentage, 1) as mastery_percentage,
+           la.total_reviews,
+           la.correct_reviews
+         FROM learning_analytics la
+         LEFT JOIN subjects s ON la.subject_id = s.id
+         WHERE la.user_id = ?
+         ORDER BY mastery_percentage DESC`,
+        [userId],
+        (err, rows) => resolve(rows || [])
+      )
+    ),
+  ])
+    .then(([dailyMastery, cardsTimeline, subjectProgress]) => {
+      res.json({
+        user_id: userId,
+        period_days: numDays,
+        daily_mastery: dailyMastery,
+        cards_timeline: cardsTimeline,
+        subject_progress: subjectProgress,
+      });
+    })
+    .catch(err => {
+      console.error('[getProgressTrends] Error:', err);
+      res.status(500).json({ error: err.message });
+    });
 };

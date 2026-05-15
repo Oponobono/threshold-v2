@@ -6,6 +6,7 @@
  * - ExplanationOverlay: la explicación aparece flotando encima del contenido,
  *   el avance ocurre solo cuando el usuario la cierra (no con timeout fijo).
  * - QuestionRendererFactory ya no muestra la explicación incrustada.
+ * - Integración de Sistema de Snooze con useDueCardSnooze y SnoozeModal
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
@@ -17,11 +18,14 @@ import {
   StrategyFactory,
   adaptFlashcardsToEvaluationItems,
 } from '../utils/evaluationStrategies';
-import { updateFlashcardStatus, deleteFlashcard, analyzeDeckConfusions, generateDifferentiationCard } from '../services/api';
+import { updateFlashcardStatus, deleteFlashcard, analyzeDeckConfusions, generateDifferentiationCard, snoozeCard } from '../services/api';
+import { recordCardReview } from '../services/api/analytics';
 import { createCardLogWithFallback } from '../services/offlineQueue';
 import { useCustomAlert } from './CustomAlert';
 import { QuestionRendererFactory } from './evaluation/QuestionRendererFactory';
 import { ExplanationOverlay } from './evaluation/ExplanationOverlay';
+import { SnoozeModal } from './SnoozeModal';
+import { useDueCardSnooze, SnoozeOption } from '../hooks/useDueCardSnooze';
 
 interface Props {
   activeDeck: FlashcardDeck | null;
@@ -47,12 +51,17 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
+  const { snoozeCard: snoozeCardLocal } = useDueCardSnooze();
 
   const [items, setItems]               = useState<EvaluationItem[]>([]);
   const [itemIndex, setItemIndex]       = useState(0);
   const [sessionDone, setSessionDone]   = useState(false);
   const [stats, setStats]               = useState<SessionStats>({ correct: 0, incorrect: 0, total: 0 });
   const [cardStartTime, setCardStartTime] = useState<number>(Date.now());
+
+  // Snooze Management
+  const [showSnoozeModal, setShowSnoozeModal] = useState(false);
+  const [isSnoozing, setIsSnoozing] = useState(false);
 
   // Confusion Detection (Learning Engineering)
   const [confusionSuggestions, setConfusionSuggestions] = useState<any[]>([]);
@@ -129,6 +138,26 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
       total:     prev.total     + 1,
     }));
 
+    // ── Enviar revisión al backend discretamente (FSRS) ──────────────────
+    if (currentUserId && item.id) {
+      try {
+        const reviewResult = await recordCardReview(
+          item.id,
+          currentUserId,
+          result.passed ? 'correct' : 'incorrect',
+          responseTime
+        );
+        console.log('[FlashcardReview] FSRS metrics:', {
+          quality: reviewResult.quality,
+          retention: reviewResult.retention,
+          nextReview: reviewResult.nextReviewDate,
+        });
+      } catch (error) {
+        console.warn('[FlashcardReview] Error sending review:', error);
+        // No interrumpir la sesión si hay error
+      }
+    }
+
     // Persistir
     try {
       await updateFlashcardStatus(item.id, newStatus);
@@ -175,7 +204,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
       setOverlayVisible(true);
     }, overlayDelay);
 
-  }, [isAnswered, isRevealed, items, itemIndex, cardStartTime, resetItemState]);
+  }, [isAnswered, isRevealed, items, itemIndex, cardStartTime, currentUserId, resetItemState]);
 
   const handleDeleteCard = (cardId: number) => {
     showAlert({
@@ -201,6 +230,53 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         },
       ],
     });
+  };
+
+  // ─── Snooze Card Handler ──────────────────────────────────────────────────────
+  const handleSnoozeSelect = async (option: SnoozeOption) => {
+    const currentItem = items[itemIndex];
+    if (!currentItem) return;
+
+    setIsSnoozing(true);
+    try {
+      // Enviar al backend
+      await snoozeCard(currentItem.id, option.minutes, option.label);
+      
+      // Actualizar localmente con el hook
+      snoozeCardLocal(currentItem.id, option.minutes);
+      
+      // Mostrar confirmación
+      showAlert({
+        title: '✅ Tarjeta aplazada',
+        message: `La revisión reaparecerá en ${option.label.toLowerCase()}`,
+        type: 'success',
+        buttons: [
+          {
+            text: 'Continuar',
+            onPress: () => {
+              setShowSnoozeModal(false);
+              // Avanzar a la siguiente tarjeta
+              const next = itemIndex + 1;
+              if (next >= items.length) {
+                setSessionDone(true);
+              } else {
+                setItemIndex(next);
+                resetItemState();
+                setCardStartTime(Date.now());
+              }
+            },
+          },
+        ],
+      });
+    } catch (error: any) {
+      showAlert({
+        title: 'Error al aplazar',
+        message: error.message || 'No se pudo aplazar la tarjeta',
+        type: 'error',
+      });
+    } finally {
+      setIsSnoozing(false);
+    }
   };
 
   // ─── Session Done: trigger confusion analysis once ──────────────────────────
@@ -306,7 +382,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   return (
     <View style={{ flex: 1 }}>
 
-      {/* ── Header: flecha  |  título (badge inline)  |  contador + trash ── */}
+      {/* ── Header: flecha  |  título (badge inline)  |  snooze + contador + trash ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
@@ -321,6 +397,15 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         </View>
 
         <View style={s.headerRight}>
+          {/* Botón Snooze (disponible durante la sesión) */}
+          <TouchableOpacity 
+            onPress={() => setShowSnoozeModal(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            disabled={isAnswered && !overlayVisible}
+          >
+            <Ionicons name="time-outline" size={18} color={theme.colors.primary} />
+          </TouchableOpacity>
+          
           <Text style={s.counter}>{itemIndex + 1}/{items.length}</Text>
           {activeDeck?.user_id === currentUserId && (
             <TouchableOpacity onPress={() => handleDeleteCard(item.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -353,6 +438,14 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         visible={overlayVisible}
         explanation={item.explanation ?? null}
         onDismiss={handleOverlayDismiss}
+      />
+
+      {/* ── Modal de Snooze ── */}
+      <SnoozeModal
+        visible={showSnoozeModal}
+        onClose={() => setShowSnoozeModal(false)}
+        onSelect={handleSnoozeSelect}
+        isLoading={isSnoozing}
       />
 
       {/* ── Micro-Interacción / Feedback de Learning Engineering (Interno - no mostrar en UI) ── */}

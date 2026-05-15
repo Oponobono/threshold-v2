@@ -8,6 +8,7 @@ export interface PredictionItem {
   subjectId: number;
   mastery: number;
   urgency: 'HIGH' | 'MEDIUM';
+  failureRate?: number;
 }
 
 export interface PredictionResponse {
@@ -15,8 +16,20 @@ export interface PredictionResponse {
   cards: PredictionItem[];
 }
 
+export interface CardReviewResponse {
+  success: boolean;
+  cardId: number;
+  quality: number;
+  nextReviewDate: string;
+  newStability: number;
+  newDifficulty: number;
+  newRepetitions: number;
+  retention: number;
+  message: string;
+}
+
 /**
- * Obtiene las tarjetas de mayor urgencia para revisión predictiva (SM-2)
+ * Obtiene las tarjetas de mayor urgencia para revisión predictiva (FSRS)
  */
 export const getPredictions = async (userId: string | number): Promise<PredictionResponse> => {
   const response = await fetchWithFallback(`/analytics/predictions/${userId}`, {
@@ -24,6 +37,29 @@ export const getPredictions = async (userId: string | number): Promise<Predictio
     headers: { 'Content-Type': 'application/json' },
   });
   if (!response.ok) throw new Error('Error al obtener predicciones');
+  const data = await parseJsonSafely(response);
+  return data;
+};
+
+/**
+ * Registra la revisión de una tarjeta y retorna nuevas métricas FSRS
+ * @param cardId ID de la tarjeta a revisar
+ * @param userId ID del usuario
+ * @param result 'correct' o 'incorrect'
+ * @param responseTimeMs Tiempo de respuesta en milisegundos
+ */
+export const recordCardReview = async (
+  cardId: number,
+  userId: number,
+  result: 'correct' | 'incorrect',
+  responseTimeMs: number
+): Promise<CardReviewResponse> => {
+  const response = await fetchWithFallback(`/api/flashcards/${cardId}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, result, responseTimeMs }),
+  });
+  if (!response.ok) throw new Error('Error al registrar revisión de tarjeta');
   const data = await parseJsonSafely(response);
   return data;
 };
@@ -55,4 +91,123 @@ export const downloadReport = async (userId: string | number): Promise<void> => 
     dialogTitle: 'Informe de Dominio · Threshold',
     UTI: 'com.adobe.pdf',
   });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard Statistics
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface UserStats {
+  user_id: number;
+  global_mastery: number;
+  total_decks: number;
+  total_cards: number;
+  mastered_cards: number;
+  learning_cards: number;
+  new_cards: number;
+  due_cards: number;
+  subjects: Array<{
+    subject_id: number;
+    subject_name: string;
+    mastery_percentage: number;
+    total_reviews: number;
+    correct_reviews: number;
+  }>;
+  recent_activity: Array<{
+    review_date: string;
+    total_attempts: number;
+    correct_attempts: number;
+  }>;
+}
+
+export interface DeckStats {
+  deck_id: number;
+  title: string;
+  description: string;
+  subject_name: string;
+  mastery_percentage: number;
+  total_cards: number;
+  mastered_cards: number;
+  learning_cards: number;
+  new_cards: number;
+  due_cards: number;
+  total_reviews: number;
+  difficult_cards: Array<{
+    id: number;
+    front: string;
+    total_attempts: number;
+    error_count: number;
+    failure_rate: number;
+    fsrs_stability: number;
+    fsrs_difficulty: number;
+  }>;
+  mastery_trend: Array<{
+    review_date: string;
+    total_attempts: number;
+    correct_attempts: number;
+  }>;
+}
+
+export interface ProgressTrends {
+  user_id: number;
+  period_days: number;
+  daily_mastery: Array<{
+    date: string;
+    total_attempts: number;
+    correct_attempts: number;
+    daily_accuracy: number;
+  }>;
+  cards_timeline: Array<{
+    date: string;
+    cards_reviewed: number;
+    cards_mastered: number;
+  }>;
+  subject_progress: Array<{
+    subject_name: string;
+    mastery_percentage: number;
+    total_reviews: number;
+    correct_reviews: number;
+  }>;
+}
+
+/**
+ * Obtiene estadísticas globales del usuario
+ */
+export const getUserStats = async (userId: number): Promise<UserStats> => {
+  const response = await fetchWithFallback(`/analytics/user-stats/${userId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Error al obtener estadísticas del usuario');
+  const data = await parseJsonSafely(response);
+  return data;
+};
+
+/**
+ * Obtiene estadísticas detalladas de un mazo específico
+ */
+export const getDeckStats = async (deckId: number, userId: number): Promise<DeckStats> => {
+  const response = await fetchWithFallback(`/analytics/deck-stats/${deckId}/${userId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Error al obtener estadísticas del mazo');
+  const data = await parseJsonSafely(response);
+  return data;
+};
+
+/**
+ * Obtiene tendencia de progreso temporal del usuario
+ * @param userId ID del usuario
+ * @param days Número de días a analizar (7-365, default 30)
+ */
+export const getProgressTrends = async (userId: number, days?: number): Promise<ProgressTrends> => {
+  const query = days ? `?days=${days}` : '';
+  const response = await fetchWithFallback(`/analytics/progress-trends/${userId}${query}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Error al obtener tendencias de progreso');
+  const data = await parseJsonSafely(response);
+  return data;
 };
