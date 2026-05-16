@@ -78,7 +78,7 @@ exports.getReviewPredictions = (req, res) => {
      JOIN flashcard_decks fd ON fc.deck_id = fd.id
      LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
      LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
-     WHERE fc.next_review_date <= datetime('now')
+     WHERE fc.next_review_date <= CURRENT_TIMESTAMP
      AND fd.user_id = ?
      GROUP BY fc.id, fc.front, fc.next_review_date, fd.subject_id, la.mastery_percentage
      ORDER BY 
@@ -379,7 +379,7 @@ exports.getUserStats = (req, res) => {
            CAST(SUM(CASE WHEN fc.status = 'review' THEN 1 ELSE 0 END) AS INTEGER) as mastered_cards,
            CAST(SUM(CASE WHEN fc.status = 'learning' THEN 1 ELSE 0 END) AS INTEGER) as learning_cards,
            CAST(SUM(CASE WHEN fc.status = 'new' THEN 1 ELSE 0 END) AS INTEGER) as new_cards,
-           CAST(COUNT(CASE WHEN fc.next_review_date <= datetime('now') THEN 1 END) AS INTEGER) as due_cards
+           CAST(COUNT(CASE WHEN fc.next_review_date <= CURRENT_TIMESTAMP THEN 1 END) AS INTEGER) as due_cards
          FROM flashcard_decks fd
          LEFT JOIN flashcards fc ON fc.deck_id = fd.id
          WHERE fd.user_id = ?`,
@@ -473,7 +473,7 @@ exports.getDeckStats = (req, res) => {
            CAST(SUM(CASE WHEN fc.status = 'review' THEN 1 ELSE 0 END) AS INTEGER) as mastered_count,
            CAST(SUM(CASE WHEN fc.status = 'learning' THEN 1 ELSE 0 END) AS INTEGER) as learning_count,
            CAST(SUM(CASE WHEN fc.status = 'new' THEN 1 ELSE 0 END) AS INTEGER) as new_count,
-           CAST(COUNT(CASE WHEN fc.next_review_date <= datetime('now') THEN 1 END) AS INTEGER) as due_count,
+           CAST(COUNT(CASE WHEN fc.next_review_date <= CURRENT_TIMESTAMP THEN 1 END) AS INTEGER) as due_count,
            CAST(COUNT(DISTINCT cl.user_id) AS INTEGER) as total_reviews
          FROM flashcard_decks fd
          LEFT JOIN subjects s ON fd.subject_id = s.id

@@ -112,7 +112,7 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
       CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.status = 'new') AS INTEGER) as new_count,
       CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND (fc.item_type = 'multiple_choice' OR fc.item_type IS NULL AND 0=1)) AS INTEGER) as mc_count,
       CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.item_type = 'boolean') AS INTEGER) as boolean_count,
-      COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= datetime('now')), 0) as due_count,
+      COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= CURRENT_TIMESTAMP), 0) as due_count,
       COALESCE(la.mastery_percentage, 0) as deck_mastery
     FROM flashcard_decks fd
     JOIN users u ON fd.user_id = u.id
@@ -133,7 +133,7 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
          )
        )
     ORDER BY 
-      (COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= datetime('now')), 0)) DESC,
+      (COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= CURRENT_TIMESTAMP), 0)) DESC,
       COALESCE(la.mastery_percentage, 0) ASC,
       fd.created_at DESC
   `;
@@ -255,7 +255,7 @@ exports.getCardsByDeckPrioritized = (req, res) => {
      WHERE fc.deck_id = ?
      GROUP BY fc.id
      ORDER BY 
-       CASE WHEN fc.next_review_date <= datetime('now') THEN 0 ELSE 1 END ASC,
+       CASE WHEN fc.next_review_date <= CURRENT_TIMESTAMP THEN 0 ELSE 1 END ASC,
        fc.next_review_date ASC,
        failure_rate DESC,
        fc.created_at ASC`,
