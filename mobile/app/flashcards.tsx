@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import LottieView from 'lottie-react-native';
 import { theme } from '../src/styles/theme';
 import { recordingsStyles as styles } from '../src/styles/RecordingsScreen.styles';
 import { flashcardsStyles as flashcardStyles } from '../src/styles/FlashcardsModal.styles';
@@ -24,8 +26,12 @@ import { flashcardsStyles as flashcardStyles } from '../src/styles/FlashcardsMod
 import { PremiumLoading } from '../src/components/PremiumLoading';
 import { FlashcardNewDeckScreen } from '../src/components/FlashcardNewDeckScreen';
 import { FlashcardImportModal } from '../src/components/FlashcardImportModal';
+import { SwipeableCard } from '../src/components/SwipeableCard';
+import { useCustomAlert } from '../src/components/CustomAlert';
+import { FlashcardNewCardScreen } from '../src/components/FlashcardNewCardScreen';
+import { FlashcardStudyScreen } from '../src/components/FlashcardStudyScreen';
 import { useFlashcardsManager } from '../src/hooks/useFlashcardsManager';
-import { getSubjects, type Subject } from '../src/services/api';
+import { getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck } from '../src/services/api';
 
 /**
  * Pantalla de Mazos de Flashcards
@@ -37,12 +43,22 @@ export default function FlashcardsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { showAlert } = useCustomAlert();
 
   const [showSearch, setShowSearch] = useState(false);
   const [showNewDeckModal, setShowNewDeckModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showMenuModal, setShowMenuModal] = useState(false);
+  const [showNewCardModal, setShowNewCardModal] = useState(false);
+  const [showStudyModal, setShowStudyModal] = useState(false);
+  const [showEditDeckModal, setShowEditDeckModal] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
+  const [editingDeck, setEditingDeck] = useState<FlashcardDeck | null>(null);
+  const [studyDeckCards, setStudyDeckCards] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
+  const activeCloseRef = useRef<(() => void) | null>(null);
 
   const searchAnim = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<TextInput>(null);
@@ -66,6 +82,69 @@ export default function FlashcardsScreen() {
       // Android: mostrar modal personalizado con opciones
       setShowMenuModal(true);
     }
+  };
+
+  const handleOpenStudy = async (deck: FlashcardDeck) => {
+    try {
+      setActiveDeck(deck);
+      const cards = await getFlashcardsPrioritized(deck.id);
+      setStudyDeckCards(Array.isArray(cards) ? cards : []);
+      setShowStudyModal(true);
+    } catch (e: any) {
+      showAlert({ title: t('common.error', 'Error'), message: e.message || 'Error al cargar las tarjetas', type: 'error' });
+    }
+  };
+
+  const handleOpenEditDeck = (deck: FlashcardDeck) => {
+    setEditingDeck(deck);
+    setShowEditDeckModal(true);
+  };
+
+  const handleDeleteDeck = (deck: FlashcardDeck) => {
+    showAlert({
+      title: t('modals.deleteDeck', 'Eliminar Mazo'),
+      message: t('modals.deleteDeckConfirm', { title: deck.title, defaultValue: `¿Estás seguro de que deseas eliminar el mazo "${deck.title}"? Esta acción no se puede deshacer.` }),
+      type: 'confirm',
+      buttons: [
+        { text: t('common.cancel', 'Cancelar'), style: 'cancel' },
+        {
+          text: t('common.delete', 'Eliminar'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteFlashcardDeck(deck.id);
+              await loadDecks();
+            } catch (e: any) {
+              showAlert({ title: t('common.error', 'Error'), message: e.message || 'Error al eliminar el mazo', type: 'error' });
+            }
+          },
+        },
+      ],
+    });
+  };
+
+  const renderSwipeActions = (deck: FlashcardDeck, close: () => void) => {
+    const pillWidth = 101; // 50 (add btn) + 1 (divider) + 50 (delete btn)
+    return (
+      <View style={[flashcardStyles.swipeActionsPill, { width: pillWidth }]}>
+        <TouchableOpacity
+          style={flashcardStyles.swipeActionBtn}
+          onPress={() => { close(); setActiveDeck(deck); setShowNewCardModal(true); }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="add" size={18} color={theme.colors.text.secondary} />
+        </TouchableOpacity>
+
+        <View style={flashcardStyles.swipeActionDivider} />
+        <TouchableOpacity
+          style={flashcardStyles.swipeActionBtn}
+          onPress={() => { close(); handleDeleteDeck(deck); }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="trash-outline" size={17} color={theme.colors.danger} />
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const {
@@ -101,6 +180,8 @@ export default function FlashcardsScreen() {
     useCallback(() => {
       const loadAll = async () => {
         try {
+          const userId = await getUserId();
+          setCurrentUserId(userId);
           const subs = await getSubjects();
           setSubjects(subs || []);
         } catch (e) {
@@ -119,8 +200,10 @@ export default function FlashcardsScreen() {
   const isEmpty = filteredDecks.length === 0;
 
   return (
-    <View style={[styles.container, { flex: 1 }]}>
-      <Stack.Screen options={{ headerShown: false }} />
+    <GestureHandlerRootView style={[styles.container, { flex: 1 }]}>
+      {/* ── Main Content ─────────────────────────────────── */}
+      <View style={[styles.container, { flex: 1 }]}>
+        <Stack.Screen options={{ headerShown: false }} />
       <StatusBar
         barStyle="dark-content"
         backgroundColor={theme.colors.card}
@@ -315,11 +398,11 @@ export default function FlashcardsScreen() {
       </View>
 
       {/* Main scrollable content */}
-      <ScrollView
-        contentContainerStyle={[styles.listContent, { paddingBottom: 120 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {isEmpty ? (
+      {isEmpty ? (
+        <ScrollView
+          contentContainerStyle={[styles.listContent, { paddingBottom: 120 }]}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.emptyState}>
             <MaterialCommunityIcons
               name="cards-outline"
@@ -330,91 +413,120 @@ export default function FlashcardsScreen() {
               {t('flashcards.emptyDecks')}
             </Text>
           </View>
-        ) : (
-          <FlatList
-            data={filteredDecks}
-            keyExtractor={(deck) => deck.id.toString()}
-            scrollEnabled={false}
-            contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, gap: 12 }}
-            renderItem={({ item: deck }) => (
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: theme.colors.inputBackground,
-                  borderRadius: 18,
-                  padding: 14,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  gap: 12,
-                }}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 21,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: (deck as any).subject_color || '#DDE7FF',
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={filteredDecks}
+          keyExtractor={(deck) => deck.id.toString()}
+          scrollEnabled={true}
+          contentContainerStyle={[styles.listContent, { gap: 12, paddingBottom: 120 }]}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item: deck }) => {
+            const isShared = deck.user_id != null && Number(deck.user_id) !== Number(currentUserId);
+            return (
+                <SwipeableCard
+                  onOpen={(closeFn) => {
+                    if (activeCloseRef.current && activeCloseRef.current !== closeFn) {
+                      activeCloseRef.current();
+                    }
+                    activeCloseRef.current = closeFn;
                   }}
+                  renderActions={(close) => renderSwipeActions(deck, close)}
                 >
-                  <MaterialCommunityIcons
-                    name={(((deck as any).subject_icon as any) || 'cards-outline')}
-                    size={20}
-                    color={theme.colors.text.primary}
-                  />
-                </View>
+                  <Pressable
+                    onPress={() => handleOpenStudy(deck)}
+                    onLongPress={() => handleOpenEditDeck(deck)}
+                    delayLongPress={500}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: pressed ? theme.colors.inputBackground + '80' : theme.colors.inputBackground,
+                      borderRadius: 18,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                      gap: 12,
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <View
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 21,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: (deck as any).subject_color || '#DDE7FF',
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name={isShared ? 'account-group-outline' : (((deck as any).subject_icon as any) || 'cards-outline')}
+                        size={20}
+                        color={theme.colors.text.primary}
+                      />
+                    </View>
 
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: '700',
-                      color: theme.colors.text.primary,
-                    }}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {deck.title}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.colors.text.secondary,
-                      marginTop: 1,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {(deck as any).subject_name}
-                  </Text>
-                </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: '700',
+                          color: theme.colors.text.primary,
+                        }}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {deck.title}
+                      </Text>
+                      {isShared && (
+                        <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2, marginTop: 2 }}>
+                          <Ionicons name="people" size={10} color="#388E3C" />
+                          {' '}{t('modals.shared', 'Compartido')} {t('flashcards.sharedBy', 'por')} @{(deck as any).owner_username || (deck as any).owner_name || t('flashcards.peer', 'compañero')}
+                        </Text>
+                      )}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.colors.text.secondary,
+                          marginTop: 1,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {(deck as any).subject_name || t('flashcards.noSubject', 'Sin materia')}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                          {Number(deck.card_count ?? 0)} {t('flashcards.cards')}
+                        </Text>
+                        {Number(deck.card_count ?? 0) > 0 && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={{ fontSize: 11, color: '#388E3C', fontWeight: '600' }}>
+                              ✓ {Number((deck as any).review_count ?? 0)}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>
+                              💪 {Number((deck as any).learning_count ?? 0) + Number((deck as any).new_count ?? 0)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
 
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '600',
-                      color: theme.colors.primary,
-                    }}
-                  >
-                    {(deck as any).card_count || 0}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: theme.colors.text.secondary,
-                    }}
-                  >
-                    {t('flashcards.cards')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          />
-        )}
-      </ScrollView>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <View style={{ width: 40, height: 40, marginRight: -6, transform: [{ rotate: '90deg' }] }}>
+                        <LottieView
+                          source={require('../src/lottieFiles/arrow.json')}
+                          autoPlay
+                          loop
+                          style={{ width: '100%', height: '100%' }}
+                        />
+                      </View>
+                    </View>
+                    </Pressable>
+                </SwipeableCard>
+            );
+          }}
+            />
+      )}
 
       {/* ── Floating Add Deck Button ─────────────────────────── */}
       <View
@@ -459,7 +571,9 @@ export default function FlashcardsScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+      </View>
 
+      {/* ── Modals ─────────────────────────────────── */}
       {/* ── New Deck Modal ────────────────────────────────────── */}
       <Modal
         visible={showNewDeckModal}
@@ -501,6 +615,204 @@ export default function FlashcardsScreen() {
         subjects={subjects}
         onImportSuccess={() => loadDecks()}
       />
+
+      {/* ── New Card Modal ────────────────────────────────────── */}
+      <Modal
+        visible={showNewCardModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowNewCardModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.28)' }}>
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={() => setShowNewCardModal(false)}
+          />
+          <View
+            style={{
+              backgroundColor: theme.colors.background,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+              paddingBottom: 28,
+              maxHeight: '80%',
+            }}
+          >
+            {activeDeck && (
+              <FlashcardNewCardScreen
+                activeDeck={activeDeck}
+                onBack={() => setShowNewCardModal(false)}
+                onCardCreated={() => {
+                  setShowNewCardModal(false);
+                  loadDecks();
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Edit Deck Modal ────────────────────────────────────── */}
+      <Modal
+        visible={showEditDeckModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditDeckModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }}>
+          {/* Pressable overlay para cerrar */}
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={() => setShowEditDeckModal(false)}
+          />
+          
+          {/* Modal content sheet */}
+          <View
+            style={{
+              backgroundColor: theme.colors.background,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingHorizontal: 24,
+              paddingTop: 20,
+              paddingBottom: Math.max(insets.bottom + 24, 60),
+              minHeight: 300,
+            }}
+          >
+            {editingDeck && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
+                    Editar Mazo
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowEditDeckModal(false)}>
+                    <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Deck Name Input */}
+                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary, marginBottom: 8 }}>
+                  Nombre del mazo
+                </Text>
+                <TextInput
+                  value={editingDeck.title}
+                  onChangeText={(text) => setEditingDeck({ ...editingDeck, title: text })}
+                  style={{
+                    backgroundColor: theme.colors.inputBackground,
+                    borderRadius: 12,
+                    padding: 12,
+                    fontSize: 14,
+                    color: theme.colors.text.primary,
+                    marginBottom: 20,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                  placeholder="Nombre del mazo"
+                  placeholderTextColor={theme.colors.text.placeholder}
+                />
+
+                {/* Subject Selection */}
+                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary, marginBottom: 12 }}>
+                  Materia
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginBottom: 24 }}
+                  contentContainerStyle={{ gap: 8 }}
+                >
+                  {/* Sin materia option */}
+                  <TouchableOpacity
+                    onPress={() => setEditingDeck({ ...editingDeck, subject_id: null })}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 20,
+                      borderWidth: 1.5,
+                      backgroundColor: editingDeck.subject_id === null ? theme.colors.primary + '20' : 'transparent',
+                      borderColor: editingDeck.subject_id === null ? theme.colors.primary : theme.colors.border,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: editingDeck.subject_id === null ? theme.colors.primary : theme.colors.text.secondary,
+                        fontWeight: editingDeck.subject_id === null ? '700' : '500',
+                        fontSize: 12,
+                      }}
+                    >
+                      Sin materia
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Subject options */}
+                  {subjects.map((sub) => (
+                    <TouchableOpacity
+                      key={sub.id}
+                      onPress={() => setEditingDeck({ ...editingDeck, subject_id: sub.id })}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 20,
+                        borderWidth: 1.5,
+                        backgroundColor: editingDeck.subject_id === sub.id ? (sub.color || theme.colors.primary) + '20' : 'transparent',
+                        borderColor: editingDeck.subject_id === sub.id ? sub.color || theme.colors.primary : theme.colors.border,
+                        gap: 6,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: 8,
+                          backgroundColor: sub.color || '#999',
+                        }}
+                      />
+                      <Text
+                        style={{
+                          color: editingDeck.subject_id === sub.id ? sub.color || theme.colors.primary : theme.colors.text.secondary,
+                          fontWeight: editingDeck.subject_id === sub.id ? '700' : '500',
+                          fontSize: 12,
+                        }}
+                      >
+                        {sub.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Save Button */}
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      await updateFlashcardDeck(editingDeck.id, {
+                        subject_id: editingDeck.subject_id || undefined,
+                        title: editingDeck.title,
+                      });
+                      setShowEditDeckModal(false);
+                      setEditingDeck(null);
+                      loadDecks();
+                      showAlert({ title: t('common.success'), message: 'Mazo actualizado', type: 'success' });
+                    } catch (e: any) {
+                      showAlert({ title: t('common.error'), message: e.message, type: 'error' });
+                    }
+                  }}
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: 24,
+                    paddingVertical: 14,
+                    paddingHorizontal: 24,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>Guardar</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Menu Modal (Android fallback) ────────────────────────────────────── */}
       <Modal
@@ -590,6 +902,28 @@ export default function FlashcardsScreen() {
           </View>
         </Pressable>
       </Modal>
-    </View>
+
+      {/* ── Study Modal ────────────────────────────────────── */}
+      <Modal
+        visible={showStudyModal}
+        animationType="slide"
+        onRequestClose={() => setShowStudyModal(false)}
+      >
+        <View style={{ flex: 1 }}>
+          {activeDeck && (
+            <FlashcardStudyScreen
+              activeDeck={activeDeck}
+              initialCards={studyDeckCards}
+              currentUserId={currentUserId}
+              onBack={() => {
+                setShowStudyModal(false);
+                setActiveDeck(null);
+                setStudyDeckCards([]);
+              }}
+            />
+          )}
+        </View>
+      </Modal>
+    </GestureHandlerRootView>
   );
 }

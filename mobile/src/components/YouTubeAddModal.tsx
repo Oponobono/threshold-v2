@@ -28,7 +28,9 @@ export const YouTubeAddModal: React.FC<YouTubeAddModalProps> = ({
   if (!visible) return null;
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={onCancel}
       style={{
         position: 'absolute',
         top: 0,
@@ -41,7 +43,9 @@ export const YouTubeAddModal: React.FC<YouTubeAddModalProps> = ({
         zIndex: 100,
       }}
     >
-      <View
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={(e) => e.stopPropagation()}
         style={{
           backgroundColor: theme.colors.card,
           width: '85%',
@@ -111,7 +115,7 @@ export const YouTubeAddModal: React.FC<YouTubeAddModalProps> = ({
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
-    </View>
+      </TouchableOpacity>
+    </TouchableOpacity>
   );
 };

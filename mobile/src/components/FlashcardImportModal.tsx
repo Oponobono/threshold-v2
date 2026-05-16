@@ -13,6 +13,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { theme } from '../styles/theme';
 import { flashcardImportStyles as s } from '../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from './CustomAlert';
@@ -85,6 +86,74 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       showAlert({
         title: t('common.error') || 'Error',
         message: 'No se pudo abrir el selector de archivos',
+        type: 'error',
+      });
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    const templateDeck: DeckJSON = {
+      title: 'Mi Mazo Ejemplo',
+      description: 'Descripción del mazo (opcional)',
+      subject_id: 1, // ID de la materia (opcional)
+      cards: [
+        {
+          type: 'flashcard',
+          data: {
+            front: 'Frente de la tarjeta',
+            back: 'Reverso de la tarjeta',
+          },
+          hint: 'Pista (opcional)',
+          explanation: 'Explicación (opcional)',
+        },
+        {
+          type: 'multiple_choice',
+          data: {
+            question: '¿Cuál es la capital de Francia?',
+            options: ['París', 'Londres', 'Berlín', 'Madrid'],
+            correct_index: 0,
+          },
+          explanation: 'París es la capital de Francia',
+        },
+        {
+          type: 'boolean',
+          data: {
+            question: '¿2 + 2 = 4?',
+            correct_answer: true,
+          },
+          explanation: 'Matemáticas básicas',
+        },
+      ],
+    };
+
+    try {
+      const jsonString = JSON.stringify(templateDeck, null, 2);
+      const fileName = `plantilla_mazo_threshold.json`;
+      const tempFilePath = `${FileSystem.cacheDirectory}${fileName}`;
+      
+      // Guardar el archivo temporalmente
+      await FileSystem.writeAsStringAsync(tempFilePath, jsonString, {
+        encoding: 'utf8',
+      });
+
+      // Compartir el archivo
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(tempFilePath, {
+          mimeType: 'application/json',
+          dialogTitle: 'Compartir plantilla de mazo',
+        });
+      } else {
+        showAlert({
+          title: t('common.error') || 'Error',
+          message: 'Compartir no está disponible en tu dispositivo',
+          type: 'error',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error compartiendo plantilla:', error);
+      showAlert({
+        title: t('common.error') || 'Error',
+        message: 'No se pudo compartir la plantilla',
         type: 'error',
       });
     }
@@ -331,6 +400,36 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
                     </Text>
                   </>
                 )}
+              </TouchableOpacity>
+
+              {/* Download Template Button */}
+              <TouchableOpacity
+                onPress={handleDownloadTemplate}
+                disabled={isProcessing}
+                style={{
+                  marginTop: 12,
+                  backgroundColor: '#E3F2FD',
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 11,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  opacity: isProcessing ? 0.6 : 1,
+                  alignSelf: 'center',
+                }}
+              >
+                <Ionicons name="download-outline" size={18} color="#2196F3" />
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '700',
+                    color: '#2196F3',
+                  }}
+                >
+                  {t('flashcards.downloadTemplate')}
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (

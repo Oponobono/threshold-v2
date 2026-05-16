@@ -57,5 +57,6 @@
     "peer":  "compañero",
     "importDeck":  "Importar Mazo",
     "importDeckDescription":  "¡Sube tu mazo en JSON y comienza a estudiar! 🚀",
-    "selectFile":  "Seleccionar Archivo JSON"
+    "selectFile":  "Seleccionar Archivo JSON",
+    "downloadTemplate":  "Descargar Plantilla"
 }

@@ -57,5 +57,6 @@
     "peer":  "peer",
     "importDeck":  "Import Deck",
     "importDeckDescription":  "Upload your deck and start studying! 🚀",
-    "selectFile":  "Select JSON File"
+    "selectFile":  "Select JSON File",
+    "downloadTemplate":  "Download Template"
 }

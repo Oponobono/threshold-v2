@@ -53,7 +53,7 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, isAnswered, selec
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
       {/* Hint banner — solo cuando el usuario lo pide */}
       {item.hint && hintVisible && !isAnswered && (
         <Animated.View style={[s.hintBadge, { opacity: hintAnim, transform: [{ translateY: hintAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }] }]}>

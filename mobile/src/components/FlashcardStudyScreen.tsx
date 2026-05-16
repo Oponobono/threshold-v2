@@ -10,6 +10,7 @@
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/theme';
@@ -52,6 +53,8 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const { snoozeCard: snoozeCardLocal } = useDueCardSnooze();
+  const insets = useSafeAreaInsets();
+  const horizontalPadding = 8;
 
   const [items, setItems]               = useState<EvaluationItem[]>([]);
   const [itemIndex, setItemIndex]       = useState(0);
@@ -311,7 +314,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     const pct = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
     return (
       <ScrollView
-        contentContainerStyle={[s.sessionDone, { flexGrow: 1, paddingHorizontal: 4, paddingBottom: 32 }]}
+        contentContainerStyle={[s.sessionDone, { flexGrow: 1, paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingBottom: Math.max(insets.bottom, 32) }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={s.doneEmoji}>{pct >= 80 ? '🌟' : pct >= 50 ? '👍' : '💪'}</Text>
@@ -380,10 +383,10 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   const badge = TYPE_BADGE[item.item_type] ?? TYPE_BADGE.flashcard;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={[{ flex: 1 }, { paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingTop: 0, paddingBottom: Math.max(insets.bottom + 12, 20) }]}>
 
       {/* ── Header: flecha  |  título (badge inline)  |  snooze + contador + trash ── */}
-      <View style={s.header}>
+      <View style={[s.header, { marginBottom: 6 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
         </TouchableOpacity>
@@ -416,12 +419,12 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
       </View>
 
       {/* ── Progress bar ── */}
-      <View style={s.progressBg}>
+      <View style={[s.progressBg, { marginHorizontal: -horizontalPadding, marginLeft: -Math.max(insets.left, horizontalPadding), marginRight: -Math.max(insets.right, horizontalPadding) }]}>
         <View style={[s.progressFill, { width: `${((itemIndex + 1) / items.length) * 100}%` as any }]} />
       </View>
 
       {/* ── Question renderer (sin ScrollView envolvente: cada vista gestiona su scroll) ── */}
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, marginHorizontal: -8, marginLeft: -Math.max(insets.left, 8), marginRight: -Math.max(insets.right, 8) }}>
         <QuestionRendererFactory
           item={item}
           onAnswer={handleAnswer}

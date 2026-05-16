@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Modal, TouchableOpacity, Animated, FlatList, Easing } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, Animated, FlatList, Easing, Pressable } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -138,8 +138,8 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ isVisibl
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.sheetBackdrop}>
-        <View style={[styles.sheetContent, { height: '80%' }]}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <View style={[styles.sheetContent, { height: '80%' }]} onStartShouldSetResponder={() => true}>
           <View style={styles.sheetHandle} />
           
           <View style={localStyles.header}>
@@ -268,7 +268,7 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ isVisibl
             }
           />
         </View>
-      </View>
+      </Pressable>
     </Modal>
   );
 };

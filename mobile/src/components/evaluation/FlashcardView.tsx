@@ -53,7 +53,7 @@ export const FlashcardView: React.FC<Props> = ({
   const cardScale = flipAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.94, 1] });
 
   return (
-    <View>
+    <View style={{ marginTop: -12 }}>
       {/* Hint banner — solo visible cuando el usuario lo pide */}
       {item.hint && hintVisible && (
         <Animated.View style={[s.hintBanner, { opacity: hintAnim, transform: [{ translateY: hintAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }] }]}>
@@ -66,7 +66,7 @@ export const FlashcardView: React.FC<Props> = ({
       <TouchableOpacity activeOpacity={0.95} onPress={handleFlip} style={s.flipWrapper} disabled={isFlipped}>
         <Animated.View style={[s.card, s.cardFront, { opacity: frontOpacity, transform: [{ perspective: 1000 }, { rotateY: frontRotate }, { scale: cardScale }] }]}>
           <Text style={s.sideLabel}>Pregunta</Text>
-          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 20 }}>
             <Text style={s.cardText}>{content.front}</Text>
           </ScrollView>
           {/* Botón pista (bombillo) — solo si hay hint */}
@@ -83,7 +83,7 @@ export const FlashcardView: React.FC<Props> = ({
 
         <Animated.View style={[s.card, s.cardBack, { opacity: backOpacity, transform: [{ perspective: 1000 }, { rotateY: backRotate }, { scale: cardScale }] }]}>
           <Text style={s.sideLabel}>Respuesta</Text>
-          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 20 }}>
             <Text style={s.cardText}>{content.back}</Text>
           </ScrollView>
 
