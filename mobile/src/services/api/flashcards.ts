@@ -93,7 +93,7 @@ export const createEvaluationItem = async (payload: {
   hint?: string;
   explanation?: string;
 }) => {
-  const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/cards`, {
+  const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/items`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
