@@ -165,16 +165,22 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         }
       }
 
-      // Mostrar selector de materia
-      setImportedDeck({
-        id: newDeck.id,
-        title: deckData.title,
-        description: deckData.description,
-        cardCount: successCount,
+      // Importación exitosa - cerrar modal
+      setIsProcessing(false);
+      
+      // Recarga la lista de mazos ANTES de cerrar
+      await onImportSuccess?.();
+      
+      showAlert({
+        title: t('common.success') || 'Éxito',
+        message: `Mazo "${deckData.title}" importado exitosamente con ${successCount} tarjeta(s)`,
+        type: 'success',
       });
       
-      setSelectedSubjectId(subjects.length > 0 ? subjects[0].id : null);
-      setIsProcessing(false);
+      // Reset state y cerrar
+      setImportedDeck(null);
+      setSelectedSubjectId(null);
+      onClose();
     } catch (error: any) {
       console.error('[FlashcardImportModal] Error importando:', error);
 

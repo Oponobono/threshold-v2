@@ -30,16 +30,18 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
     setIsLoading(true);
     try {
       const data = await getFlashcardDecksWithMetrics();
-      setDecks(data || []);
+      setDecks(Array.isArray(data) ? data : []);
     } catch (e) {
       console.warn('Error loading decks:', e);
+      setDecks([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   const filteredDecks = useMemo(() => {
-    let result = [...decks];
+    const safeDecks = Array.isArray(decks) ? decks : [];
+    let result = [...safeDecks];
 
     // Filter by search query
     const q = searchQuery.trim().toLowerCase();

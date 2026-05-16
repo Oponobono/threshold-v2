@@ -65,17 +65,21 @@ exports.getFlashcardDecks = (req, res) => {
     CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND (fc.item_type = 'multiple_choice' OR fc.item_type IS NULL AND 0=1)) AS INTEGER) as mc_count,
     CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.item_type = 'boolean') AS INTEGER) as boolean_count
     FROM flashcard_decks fd
-    JOIN subjects s ON fd.subject_id = s.id
     JOIN users u ON fd.user_id = u.id
-    WHERE s.user_id = ? 
-       OR s.user_id IN (
-         SELECT u2.id FROM users u2
-         JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
-         WHERE gm.user_id = ?
-       )
+    LEFT JOIN subjects s ON fd.subject_id = s.id
+    WHERE fd.user_id = ? 
        OR fd.id IN (
          SELECT sd.deck_id FROM shared_decks sd
          WHERE sd.shared_to_user_id = ?
+       )
+       OR fd.id IN (
+         SELECT fd2.id FROM flashcard_decks fd2
+         JOIN subjects s2 ON fd2.subject_id = s2.id
+         WHERE s2.user_id IN (
+           SELECT u2.id FROM users u2
+           JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
+           WHERE gm.user_id = ?
+         )
        )
     ORDER BY fd.created_at DESC
   `;
@@ -111,18 +115,22 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
       COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= datetime('now')), 0) as due_count,
       COALESCE(la.mastery_percentage, 0) as deck_mastery
     FROM flashcard_decks fd
-    JOIN subjects s ON fd.subject_id = s.id
     JOIN users u ON fd.user_id = u.id
+    LEFT JOIN subjects s ON fd.subject_id = s.id
     LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
-    WHERE s.user_id = ? 
-       OR s.user_id IN (
-         SELECT u2.id FROM users u2
-         JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
-         WHERE gm.user_id = ?
-       )
+    WHERE fd.user_id = ? 
        OR fd.id IN (
          SELECT sd.deck_id FROM shared_decks sd
          WHERE sd.shared_to_user_id = ?
+       )
+       OR fd.id IN (
+         SELECT fd2.id FROM flashcard_decks fd2
+         JOIN subjects s2 ON fd2.subject_id = s2.id
+         WHERE s2.user_id IN (
+           SELECT u2.id FROM users u2
+           JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
+           WHERE gm.user_id = ?
+         )
        )
     ORDER BY 
       (COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= datetime('now')), 0)) DESC,
