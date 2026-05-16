@@ -880,7 +880,7 @@ exports.analyzeDeckConfusions = (req, res) => {
      LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
      WHERE fc.deck_id = ?
      GROUP BY fc.id
-     HAVING attempts > 0
+     HAVING COUNT(cl.id) > 0
      ORDER BY failure_rate DESC`,
     [userId, deckId],
     (err, cards) => {
