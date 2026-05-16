@@ -9,6 +9,7 @@ import {
   View,
   RefreshControl,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useCustomAlert } from './CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -57,6 +58,7 @@ interface Props {
 export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
+  const router = useRouter();
   const [screen, setScreen] = useState<Screen>('hub');
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
 
@@ -207,10 +209,23 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
     <View style={{ flex: 1 }}>
       <View style={s.modalHeader}>
         <Text style={s.modalTitle}>{t('flashcards.title')}</Text>
-        <TouchableOpacity onPress={onClose} style={s.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="close" size={22} color={theme.colors.text.secondary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity 
+            onPress={() => {
+              onClose();
+              router.push('/flashcards' as any);
+            }}
+            style={s.closeBtn} 
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="list" size={22} color={theme.colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={s.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={22} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+        </View>
       </View>
+
       <Text style={s.modalSubtitle}>{t('flashcards.subtitle')}</Text>
 
       <TouchableOpacity style={s.newDeckBtn} onPress={() => setScreen('newDeck')}>

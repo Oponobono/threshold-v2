@@ -55,12 +55,11 @@ export const FlashcardNewDeckScreen: React.FC<Props> = ({ subjects, onBack, onDe
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={s.modalHeader}>
+      <View style={[s.modalHeader, { justifyContent: 'space-between' }]}>
+        <Text style={[s.modalTitle, { flex: 1, textAlign: 'left' }]}>{t('flashcards.newDeck')}</Text>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
+          <Ionicons name="close" size={24} color={theme.colors.text.primary} />
         </TouchableOpacity>
-        <Text style={s.modalTitle}>{t('flashcards.newDeck')}</Text>
-        <View style={{ width: 22 }} />
       </View>
 
       <Text style={s.formLabel}>{t('flashcards.deckName')}</Text>

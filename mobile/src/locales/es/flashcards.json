@@ -54,5 +54,8 @@
                  },
     "deckDeleteError":  "Error al eliminar el mazo.",
     "sharedBy":  "por",
-    "peer":  "compañero"
+    "peer":  "compañero",
+    "importDeck":  "Importar Mazo",
+    "importDeckDescription":  "¡Sube tu mazo en JSON y comienza a estudiar! 🚀",
+    "selectFile":  "Seleccionar Archivo JSON"
 }

@@ -7,13 +7,12 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { theme } from '../styles/theme';
-import { pdfImportStyles as s } from '../styles/PDFImportModal.styles';
+import { flashcardImportStyles as s } from '../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from './CustomAlert';
 import { createScannedDocument, extractTextFromPDF } from '../services/api';
 import { autoUploadIfEnabled } from '../services/backup/backupService';
@@ -39,7 +38,6 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
   selectedSubjectId,
   onImportSuccess,
 }) => {
-  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -166,23 +164,29 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
       onRequestClose={onClose}
     >
       <Pressable style={s.backdrop} onPress={onClose}>
-        <Pressable style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 24) }]} onPress={() => null}>
-          <View style={s.handle} />
-
+        <Pressable style={s.modal} onPress={() => null}>
           {/* Header */}
           <View style={s.header}>
             <View style={s.headerLeft}>
-              <Text style={s.headerTitle}>Importar Documento PDF</Text>
+              <Text style={s.headerTitle}>Importar PDF</Text>
             </View>
             <TouchableOpacity onPress={onClose} disabled={isProcessing} style={s.closeBtn}>
-              <Ionicons name="close" size={18} color={theme.colors.text.secondary} />
+              <Ionicons name="close" size={16} color={theme.colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
           {/* Body */}
-          <View style={{ paddingHorizontal: 24, paddingTop: 16 }}>
-            <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginBottom: 24, lineHeight: 20 }}>
-              Utiliza el explorador nativo de tu dispositivo para buscar y seleccionar el archivo PDF que deseas importar a esta materia.
+          <View>
+            <Text
+              style={{
+                fontSize: 13,
+                color: theme.colors.text.secondary,
+                marginBottom: 16,
+                lineHeight: 18,
+                textAlign: 'center',
+              }}
+            >
+              Sube tu PDF y extrae el texto con IA 🚀
             </Text>
 
             {/* OCR Toggle */}
@@ -193,9 +197,9 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
                 flexDirection: 'row',
                 alignItems: 'center',
                 backgroundColor: theme.colors.inputBackground,
-                padding: 16,
-                borderRadius: 12,
-                marginBottom: 24,
+                padding: 11,
+                borderRadius: 10,
+                marginBottom: 14,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
               }}
@@ -203,15 +207,15 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
             >
               <Ionicons
                 name={extractOCR ? 'checkbox' : 'square-outline'}
-                size={22}
+                size={18}
                 color={extractOCR ? theme.colors.primary : theme.colors.text.secondary}
               />
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>
-                  Extraer texto nativo
+              <View style={{ marginLeft: 10, flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.text.primary }}>
+                  Extraer texto
                 </Text>
-                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginTop: 4 }}>
-                  Permite a la IA leer el contenido de este PDF.
+                <Text style={{ fontSize: 11, color: theme.colors.text.secondary, marginTop: 2 }}>
+                  La IA podrá leer el contenido
                 </Text>
               </View>
             </TouchableOpacity>
@@ -222,30 +226,34 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
               disabled={isProcessing}
               style={{
                 backgroundColor: theme.colors.primary,
-                borderRadius: 16,
-                paddingVertical: 18,
+                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 16,
                 flexDirection: 'row',
                 justifyContent: 'center',
                 alignItems: 'center',
+                gap: 8,
+                opacity: isProcessing ? 0.6 : 1,
               }}
               activeOpacity={0.8}
             >
-              <Ionicons name="folder-open-outline" size={20} color="white" />
-              <Text style={{ color: 'white', fontSize: 16, fontWeight: '700', marginLeft: 10 }}>
-                Abrir explorador de archivos
-              </Text>
+              {isProcessing ? (
+                <>
+                  <ActivityIndicator color={theme.colors.white} size="small" />
+                  <Text style={{ color: theme.colors.white, fontSize: 14, fontWeight: '700' }}>
+                    {t('common.loading')}...
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="folder-outline" size={18} color={theme.colors.white} />
+                  <Text style={{ color: theme.colors.white, fontSize: 14, fontWeight: '700' }}>
+                    Seleccionar PDF
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
-
-          {/* Processing Overlay */}
-          {isProcessing && (
-            <View style={s.processingOverlay}>
-              <View style={s.processingBox}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={s.processingText}>Importando archivo...</Text>
-              </View>
-            </View>
-          )}
         </Pressable>
       </Pressable>
     </Modal>

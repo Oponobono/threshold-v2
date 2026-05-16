@@ -37,12 +37,12 @@ export const flashcardsStyles = StyleSheet.create({
     color: theme.colors.text.primary,
     letterSpacing: -0.4,
     flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   modalSubtitle: {
     fontSize: 13,
     color: theme.colors.text.secondary,
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 20,
   },
   closeBtn: {

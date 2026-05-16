@@ -228,11 +228,8 @@ export default function RecordingsScreen() {
       <View style={{ height: insets.top, backgroundColor: theme.colors.card }} />
 
       {/* Header */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color={theme.colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
+      <View style={[styles.headerRow, { paddingLeft: theme.spacing.lg, justifyContent: 'space-between' }]}>
+        <Text style={[styles.headerTitle, { flex: 1, textAlign: 'left' }]}>
           {t('recordings.multimedia')}
         </Text>
         {/* Right actions: Search · YouTube */}

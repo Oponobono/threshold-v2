@@ -54,5 +54,8 @@
                  },
     "deckDeleteError":  "Error deleting the deck.",
     "sharedBy":  "by",
-    "peer":  "peer"
+    "peer":  "peer",
+    "importDeck":  "Import Deck",
+    "importDeckDescription":  "Upload your deck and start studying! 🚀",
+    "selectFile":  "Select JSON File"
 }

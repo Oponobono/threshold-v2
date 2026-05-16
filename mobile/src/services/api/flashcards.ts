@@ -25,8 +25,8 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
   return (await parseJsonSafely(response)) || [];
 };
 
-/** Crea un nuevo mazo vacío vinculado a una materia. Inyecta automáticamente el `user_id` */
-export const createFlashcardDeck = async (payload: { subject_id: number; title: string; description?: string }) => {
+/** Crea un nuevo mazo vacío vinculado a una materia (opcional). Inyecta automáticamente el `user_id` */
+export const createFlashcardDeck = async (payload: { subject_id?: number; title: string; description?: string }) => {
   const userId = await getUserId();
   const payloadWithUser = { ...payload, user_id: userId };
   
@@ -37,6 +37,18 @@ export const createFlashcardDeck = async (payload: { subject_id: number; title: 
   });
   const data = await parseJsonSafely(response);
   if (!response.ok) throw new Error(data?.error || 'Error al crear el mazo');
+  return data;
+};
+
+/** Actualiza un mazo de flashcards (subject_id, title, description) */
+export const updateFlashcardDeck = async (deckId: number, payload: { subject_id?: number; title?: string; description?: string }) => {
+  const response = await fetchWithFallback(`/flashcard-decks/${deckId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJsonSafely(response);
+  if (!response.ok) throw new Error(data?.error || 'Error al actualizar el mazo');
   return data;
 };
 
@@ -70,6 +82,24 @@ export const createFlashcard = async (payload: { deck_id: number; front: string;
   });
   const data = await parseJsonSafely(response);
   if (!response.ok) throw new Error(data?.error || 'Error al crear tarjeta');
+  return data;
+};
+
+/** Crea un evaluation item (flashcard, multiple_choice, o boolean) con estructura polimórfica */
+export const createEvaluationItem = async (payload: { 
+  deck_id: number; 
+  item_type: 'flashcard' | 'multiple_choice' | 'boolean'; 
+  content_json: any;
+  hint?: string;
+  explanation?: string;
+}) => {
+  const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/cards`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJsonSafely(response);
+  if (!response.ok) throw new Error(data?.error || 'Error al crear ítem');
   return data;
 };
 

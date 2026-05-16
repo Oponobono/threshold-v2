@@ -144,13 +144,53 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
  */
 exports.createFlashcardDeck = (req, res) => {
   const { subject_id, user_id, title, description } = req.body;
-  if (!subject_id || !title || !user_id) return res.status(400).json({ error: 'Faltan campos requeridos (subject_id, user_id, title).' });
+  if (!title || !user_id) return res.status(400).json({ error: 'Faltan campos requeridos (user_id, title).' });
   db.run(
     `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
-    [subject_id, user_id, title, description || ''],
+    [subject_id || null, user_id, title, description || ''],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: this.lastID, subject_id, user_id, title, description: description || '', card_count: 0 });
+      res.status(201).json({ id: this.lastID, subject_id: subject_id || null, user_id, title, description: description || '', card_count: 0 });
+    }
+  );
+};
+
+/**
+ * Actualiza un mazo de flashcards (subject_id, title, description)
+ */
+exports.updateFlashcardDeck = (req, res) => {
+  const { deckId } = req.params;
+  const { subject_id, title, description } = req.body;
+
+  const updateFields = [];
+  const params = [];
+
+  if (subject_id !== undefined) {
+    updateFields.push('subject_id = ?');
+    params.push(subject_id);
+  }
+  if (title !== undefined) {
+    updateFields.push('title = ?');
+    params.push(title);
+  }
+  if (description !== undefined) {
+    updateFields.push('description = ?');
+    params.push(description);
+  }
+
+  if (updateFields.length === 0) {
+    return res.status(400).json({ error: 'No hay campos para actualizar' });
+  }
+
+  params.push(deckId);
+
+  db.run(
+    `UPDATE flashcard_decks SET ${updateFields.join(', ')} WHERE id = ?`,
+    params,
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (this.changes === 0) return res.status(404).json({ error: 'Mazo no encontrado' });
+      res.json({ success: true, message: 'Mazo actualizado' });
     }
   );
 };

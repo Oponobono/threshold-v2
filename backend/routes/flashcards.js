@@ -83,6 +83,37 @@ router.post('/flashcard-decks', flashcardsController.createFlashcardDeck);
 
 /**
  * @swagger
+ * /api/flashcard-decks/{deckId}:
+ *   put:
+ *     summary: Actualiza un mazo de flashcards
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: deckId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               subject_id:
+ *                 type: integer
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Mazo actualizado exitosamente
+ */
+router.put('/flashcard-decks/:deckId', flashcardsController.updateFlashcardDeck);
+
+/**
+ * @swagger
  * /api/flashcard-decks/{deckId}/cards:
  *   get:
  *     summary: Obtiene todas las tarjetas de un mazo

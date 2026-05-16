@@ -1,0 +1,87 @@
+{
+  "title": "Ingeniería de Software y Ciberseguridad Pro",
+  "description": "Nivelación Integral: Arquitectura, Backend, Bases de Datos y Seguridad OWASP",
+  "cards": [
+    {
+      "type": "multiple_choice",
+      "data": {
+        "question": "¿Cuál es el beneficio táctico principal de un API Gateway en microservicios?",
+        "options": [
+          "Sustituir la lógica de negocio de los servicios",
+          "Almacenar la base de datos global",
+          "Centralizar políticas transversales (Auth, Rate Limiting) y abstraer la topología",
+          "Compilar el código fuente en tiempo de ejecución"
+        ],
+        "correctIndex": 2
+      },
+      "hint": "Piensa en el 'Cross-Cutting Concerns': cosas que todos los servicios necesitan pero no deberían programar individualmente.",
+      "explanation": "El Gateway actúa como fachada única. Permite que el backend evolucione internamente sin afectar al cliente y centraliza la seguridad (JWT, CORS) para evitar duplicar código en cada microservicio."
+    },
+    {
+      "type": "flashcard",
+      "data": {
+        "front": "¿Qué es la Deuda Técnica?",
+        "back": "El costo futuro de retrabajo causado por elegir soluciones rápidas pero subóptimas hoy."
+      },
+      "hint": "Es un préstamo de tiempo que pides al futuro de tu proyecto.",
+      "explanation": "Es un compromiso entre velocidad y calidad. No es necesariamente mala si se gestiona, pero si se acumula, los 'intereses' (dificultad de mantenimiento) pueden hacer que el proyecto sea inmanejable."
+    },
+    {
+      "type": "boolean",
+      "data": {
+        "question": "Los índices en una base de datos relacional aceleran tanto las lecturas como las escrituras.",
+        "correctAnswer": false
+      },
+      "hint": "Recuerda qué sucede con el 'libro' cuando añades una página nueva.",
+      "explanation": "Los índices aceleran las lecturas (SELECT), pero ralentizan las escrituras (INSERT/UPDATE) porque el motor de la base de datos debe actualizar la estructura del índice cada vez que los datos cambian."
+    },
+    {
+      "type": "multiple_choice",
+      "data": {
+        "question": "¿Por qué las 'Prepared Statements' previenen la Inyección SQL?",
+        "options": [
+          "Porque encriptan la base de datos automáticamente",
+          "Porque separan el comando SQL de los datos del usuario mediante pre-compilación",
+          "Porque limitan el número de caracteres que el usuario puede escribir",
+          "Porque bloquean el uso de la palabra 'OR' en los formularios"
+        ],
+        "correctIndex": 1
+      },
+      "hint": "Se trata de cómo el motor de la DB interpreta lo que recibe.",
+      "explanation": "Al usar consultas preparadas, el motor compila la estructura de la consulta antes de recibir los datos. Así, cualquier entrada del usuario se trata como un valor literal y nunca como código ejecutable."
+    },
+    {
+      "type": "flashcard",
+      "data": {
+        "front": "Diferencia entre Autenticación y Autorización",
+        "back": "La Autenticación confirma identidad (¿Quién eres?); la Autorización confirma permisos (¿Qué puedes hacer?)."
+      },
+      "hint": "Pasaporte vs. Visa.",
+      "explanation": "Son etapas distintas del control de acceso. Primero identificamos al sujeto (AuthN) y luego verificamos si tiene privilegios sobre el recurso solicitado (AuthZ)."
+    },
+    {
+      "type": "boolean",
+      "data": {
+        "question": "El Hashing es un proceso bidireccional que permite recuperar la contraseña original si se tiene la llave correcta.",
+        "correctAnswer": false
+      },
+      "hint": "Piensa en 'huella digital' vs. 'caja fuerte'.",
+      "explanation": "El Hashing es unidireccional (one-way). Está diseñado para que sea computacionalmente imposible revertirlo. Para recuperar datos, se usa Encriptación; para validar credenciales, se usa Hashing."
+    },
+    {
+      "type": "multiple_choice",
+      "data": {
+        "question": "¿Qué garantiza la propiedad de 'Atomicidad' en ACID?",
+        "options": [
+          "Que los datos se guarden en discos SSD",
+          "Que la transacción sea invisible para otros usuarios",
+          "Que la operación se realice completamente o no se realice en absoluto",
+          "Que los datos no cambien su tipo (string a int)"
+        ],
+        "correctIndex": 2
+      },
+      "hint": "Viene del griego 'átomos', que significa indivisible.",
+      "explanation": "La atomicidad asegura que, si una transacción bancaria falla a mitad de camino, el sistema hace un 'rollback' para evitar que el dinero desaparezca de una cuenta sin llegar a la otra."
+    }
+  ]
+}
