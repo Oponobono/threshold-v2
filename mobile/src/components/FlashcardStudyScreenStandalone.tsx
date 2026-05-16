@@ -76,7 +76,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
 
   // Overlay de explicación
   const [overlayVisible, setOverlayVisible]   = useState(false);
-  const pendingAdvance = useRef<() => void>(() => {});
+  const [isProcessing, setIsProcessing]       = useState(false); // Previene race conditions
 
   // Learning Engineering Feedback
   const [learningFeedback, setLearningFeedback] = useState<{ emoji: string, message: string, color?: string } | null>(null);
@@ -88,7 +88,23 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
     setSelectedIndex(null);
     setSelectedBoolean(null);
     setOverlayVisible(false);
+    setIsProcessing(false);
   }, []);
+
+  /**
+   * Función para avanzar a la siguiente tarjeta.
+   * Se llamará tanto desde el tap como desde el overlay dismiss.
+   */
+  const advanceToNextCard = useCallback(() => {
+    const next = itemIndex + 1;
+    if (next >= items.length) {
+      setSessionDone(true);
+    } else {
+      setItemIndex(next);
+      resetItemState();
+      setCardStartTime(Date.now());
+    }
+  }, [itemIndex, items.length, resetItemState]);
 
   useEffect(() => {
     setItems(adaptFlashcardsToEvaluationItems(initialCards));
@@ -108,18 +124,20 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
     setOverlayVisible(false);
     // Pequeño delay para que la animación de cierre se vea antes de cambiar de ítem
     setTimeout(() => {
-      pendingAdvance.current();
+      advanceToNextCard();
     }, 180);
-  }, []);
+  }, [advanceToNextCard]);
 
   const handleAnswer = useCallback(async (answer: unknown) => {
-    if (isAnswered) return;
+    if (isAnswered || isProcessing) return; // Evita múltiples llamadas simultáneas
 
     const item = items[itemIndex];
     if (!item) return;
 
     const strategy = StrategyFactory.getStrategy(item.item_type);
     if (strategy.requiresReveal && !isRevealed) return;
+
+    setIsProcessing(true); // Marcar inicio de procesamiento
 
     const responseTime = Date.now() - cardStartTime;
     const result  = strategy.evaluate(item, answer, responseTime);
@@ -193,22 +211,9 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       }
     } catch {}
 
-    // Preparar la función de avance (la guardamos en ref para que el overlay la llame)
-    pendingAdvance.current = () => {
-      const next = itemIndex + 1;
-      if (next >= items.length) {
-        setSessionDone(true);
-      } else {
-        setItemIndex(next);
-        resetItemState();
-        setCardStartTime(Date.now());
-      }
-    };
+    setIsProcessing(false); // Marcar fin de procesamiento
 
-    // No mostrar overlay automáticamente
-    // El usuario lo activará presionando el icono de explicación
-
-  }, [isAnswered, isRevealed, items, itemIndex, cardStartTime, currentUserId, resetItemState]);
+  }, [isAnswered, isProcessing, isRevealed, items, itemIndex, cardStartTime, currentUserId, resetItemState]);
 
   const handleDeleteCard = (cardId: number) => {
     showAlert({
@@ -287,9 +292,17 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
   useEffect(() => {
     if (!sessionDone || !activeDeck?.id || isAnalyzingConfusions) return;
     setIsAnalyzingConfusions(true);
-    analyzeDeckConfusions(activeDeck.id)
-      .then(r => setConfusionSuggestions(r?.suggestions ?? []))
-      .catch(() => {})
+    
+    // Garantizar mínimo 2.5 segundos de visualización del banner
+    const minTimerPromise = new Promise<void>(resolve => {
+      setTimeout(() => resolve(), 2500);
+    });
+    
+    Promise.all([
+      analyzeDeckConfusions(activeDeck.id).catch(() => null),
+      minTimerPromise
+    ])
+      .then(([result]) => setConfusionSuggestions(result?.suggestions ?? []))
       .finally(() => setIsAnalyzingConfusions(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionDone]);
@@ -428,8 +441,9 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       <TouchableOpacity 
         style={{ flex: 1, marginTop: 10 }}
         onPress={() => {
-          if (isAnswered && !overlayVisible) {
-            pendingAdvance.current();
+          // Solo avanza si: respondió + no está procesando + overlay no visible
+          if (isAnswered && !isProcessing && !overlayVisible) {
+            advanceToNextCard();
           }
         }}
         activeOpacity={1}

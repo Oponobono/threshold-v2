@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { createSubject, getCurrentUserProfile, createAssessment, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
+import { createSubject, getCurrentUserProfile, createAssessment, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, getPredictions, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
 import { useDataStore } from '../../src/store/useDataStore';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/SnoozeModal';

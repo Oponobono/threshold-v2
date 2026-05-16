@@ -54,7 +54,7 @@ export const recordCardReview = async (
   result: 'correct' | 'incorrect',
   responseTimeMs: number
 ): Promise<CardReviewResponse> => {
-  const response = await fetchWithFallback(`/api/flashcards/${cardId}/review`, {
+  const response = await fetchWithFallback(`/flashcards/${cardId}/review`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, result, responseTimeMs }),
