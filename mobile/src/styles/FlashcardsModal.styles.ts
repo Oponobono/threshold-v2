@@ -1,7 +1,5 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, Platform } from 'react-native';
 import { theme } from './theme';
-
-const SHEET_HEIGHT = Math.min(506, Dimensions.get('window').height * 0.80);
 
 export const flashcardsStyles = StyleSheet.create({
   backdrop: {
@@ -14,8 +12,9 @@ export const flashcardsStyles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 24,
-    paddingBottom: 28,
-    height: SHEET_HEIGHT,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 52,
+    maxHeight: Dimensions.get('window').height * 0.80,
+    flex: 1,
   },
   handle: {
     width: 42,

@@ -348,12 +348,18 @@ exports.recordCardReview = (req, res) => {
   const { cardId } = req.params;
   const { userId, result, responseTimeMs } = req.body;
 
+  console.log('[recordCardReview] Recibido:', { cardId, userId, result, responseTimeMs });
+
   if (!userId || !result || typeof responseTimeMs !== 'number') {
-    return res.status(400).json({ error: 'Se requieren: userId, result (correct|incorrect), responseTimeMs' });
+    const error = 'Se requieren: userId, result (correct|incorrect), responseTimeMs';
+    console.error('[recordCardReview] Validación fallida:', { userId, result, responseTimeMs }, error);
+    return res.status(400).json({ error });
   }
 
   if (!['correct', 'incorrect'].includes(result)) {
-    return res.status(400).json({ error: 'result debe ser "correct" o "incorrect"' });
+    const error = 'result debe ser "correct" o "incorrect"';
+    console.error('[recordCardReview] Resultado inválido:', result, error);
+    return res.status(400).json({ error });
   }
 
   // Obtener FSRS actual de la tarjeta
@@ -390,6 +396,8 @@ exports.recordCardReview = (req, res) => {
 
       const nextReviewDateStr = fsrsResult.nextReviewDate.toISOString();
 
+      console.log('[recordCardReview] FSRS calculado:', { quality, fsrsResult, nextReviewDateStr });
+
       // ── Actualizar flashcard con nuevos valores FSRS ────────────────────
       db.run(
         `UPDATE flashcards 
@@ -398,7 +406,12 @@ exports.recordCardReview = (req, res) => {
          WHERE id = ?`,
         [fsrsResult.newStability, fsrsResult.newDifficulty, fsrsResult.newRepetitions, nextReviewDateStr, cardId],
         (updateErr) => {
-          if (updateErr) return res.status(500).json({ error: updateErr.message });
+          if (updateErr) {
+            console.error('[recordCardReview] Error actualizando flashcard:', updateErr);
+            return res.status(500).json({ error: updateErr.message });
+          }
+
+          console.log('[recordCardReview] Flashcard actualizada exitosamente');
 
           // ── Registrar en card_logs para análisis ───────────────────────
           db.run(

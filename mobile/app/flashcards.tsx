@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Pressable,
   ActionSheetIOS,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
@@ -29,9 +30,126 @@ import { FlashcardImportModal } from '../src/components/FlashcardImportModal';
 import { SwipeableCard } from '../src/components/SwipeableCard';
 import { useCustomAlert } from '../src/components/CustomAlert';
 import { FlashcardNewCardScreen } from '../src/components/FlashcardNewCardScreen';
-import { FlashcardStudyScreen } from '../src/components/FlashcardStudyScreen';
+import { FlashcardStudyScreenStandalone } from '../src/components/FlashcardStudyScreenStandalone';
 import { useFlashcardsManager } from '../src/hooks/useFlashcardsManager';
 import { getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck } from '../src/services/api';
+
+/**
+ * Componente memoizado del arrow animado para optimizar rendimiento
+ */
+const AnimatedArrow = React.memo(() => (
+  <View style={{ width: 40, height: 40, marginRight: -6, transform: [{ rotate: '90deg' }] }}>
+    <LottieView
+      source={require('../src/lottieFiles/arrow.json')}
+      autoPlay
+      loop
+      style={{ width: '100%', height: '100%' }}
+    />
+  </View>
+));
+
+/**
+ * Componente memoizado para cada tarjeta de mazo
+ * Solo re-renderiza cuando los datos del mazo realmente cambian
+ */
+const DeckCard = React.memo(({ 
+  deck, 
+  isShared, 
+  currentUserId,
+  onPress, 
+  onLongPress,
+  t 
+}: {
+  deck: FlashcardDeck;
+  isShared: boolean;
+  currentUserId: number | null;
+  onPress: () => void;
+  onLongPress: () => void;
+  t: any;
+}) => (
+  <Pressable
+    onPress={onPress}
+    onLongPress={onLongPress}
+    delayLongPress={500}
+    style={({ pressed }) => ({
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: pressed ? flashcardStyles.deckCard.backgroundColor + '80' : flashcardStyles.deckCard.backgroundColor,
+      borderRadius: 18,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: flashcardStyles.deckCard.borderColor,
+      gap: 12,
+      opacity: pressed ? 0.7 : 1,
+    })}
+  >
+    <View
+      style={{
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: (deck as any).subject_color || '#DDE7FF',
+      }}
+    >
+      <MaterialCommunityIcons
+        name={isShared ? 'account-group-outline' : (((deck as any).subject_icon as any) || 'cards-outline')}
+        size={20}
+        color={theme.colors.text.primary}
+      />
+    </View>
+
+    <View style={{ flex: 1 }}>
+      <Text
+        style={{
+          fontSize: 15,
+          fontWeight: '700',
+          color: theme.colors.text.primary,
+        }}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {deck.title}
+      </Text>
+      {isShared && (
+        <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2, marginTop: 2 }}>
+          <Ionicons name="people" size={10} color="#388E3C" />
+          {' '}{t('modals.shared', 'Compartido')} {t('flashcards.sharedBy', 'por')} @{(deck as any).owner_username || (deck as any).owner_name || t('flashcards.peer', 'compañero')}
+        </Text>
+      )}
+      <Text
+        style={{
+          fontSize: 12,
+          color: theme.colors.text.secondary,
+          marginTop: 1,
+        }}
+        numberOfLines={1}
+      >
+        {(deck as any).subject_name || t('flashcards.noSubject', 'Sin materia')}
+      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+        <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+          {Number(deck.card_count ?? 0)} {t('flashcards.cards')}
+        </Text>
+        {Number(deck.card_count ?? 0) > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ fontSize: 11, color: '#388E3C', fontWeight: '600' }}>
+              ✓ {Number((deck as any).review_count ?? 0)}
+            </Text>
+            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>
+              💪 {Number((deck as any).learning_count ?? 0) + Number((deck as any).new_count ?? 0)}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <AnimatedArrow />
+    </View>
+  </Pressable>
+));
 
 /**
  * Pantalla de Mazos de Flashcards
@@ -57,13 +175,14 @@ export default function FlashcardsScreen() {
   const [editingDeck, setEditingDeck] = useState<FlashcardDeck | null>(null);
   const [studyDeckCards, setStudyDeckCards] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const activeCloseRef = useRef<(() => void) | null>(null);
 
   const searchAnim = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<TextInput>(null);
 
-  const handleOpenMenu = () => {
+  const handleOpenMenu = useCallback(() => {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -82,9 +201,9 @@ export default function FlashcardsScreen() {
       // Android: mostrar modal personalizado con opciones
       setShowMenuModal(true);
     }
-  };
+  }, [t]);
 
-  const handleOpenStudy = async (deck: FlashcardDeck) => {
+  const handleOpenStudy = useCallback(async (deck: FlashcardDeck) => {
     try {
       setActiveDeck(deck);
       const cards = await getFlashcardsPrioritized(deck.id);
@@ -93,14 +212,14 @@ export default function FlashcardsScreen() {
     } catch (e: any) {
       showAlert({ title: t('common.error', 'Error'), message: e.message || 'Error al cargar las tarjetas', type: 'error' });
     }
-  };
+  }, [t, showAlert]);
 
-  const handleOpenEditDeck = (deck: FlashcardDeck) => {
+  const handleOpenEditDeck = useCallback((deck: FlashcardDeck) => {
     setEditingDeck(deck);
     setShowEditDeckModal(true);
-  };
+  }, []);
 
-  const handleDeleteDeck = (deck: FlashcardDeck) => {
+  const handleDeleteDeck = useCallback((deck: FlashcardDeck) => {
     showAlert({
       title: t('modals.deleteDeck', 'Eliminar Mazo'),
       message: t('modals.deleteDeckConfirm', { title: deck.title, defaultValue: `¿Estás seguro de que deseas eliminar el mazo "${deck.title}"? Esta acción no se puede deshacer.` }),
@@ -121,9 +240,9 @@ export default function FlashcardsScreen() {
         },
       ],
     });
-  };
+  }, [t, showAlert, loadDecks]);
 
-  const renderSwipeActions = (deck: FlashcardDeck, close: () => void) => {
+  const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
     const pillWidth = 101; // 50 (add btn) + 1 (divider) + 50 (delete btn)
     return (
       <View style={[flashcardStyles.swipeActionsPill, { width: pillWidth }]}>
@@ -145,7 +264,19 @@ export default function FlashcardsScreen() {
         </TouchableOpacity>
       </View>
     );
-  };
+  }, [handleDeleteDeck]);
+
+  // Refresh handler
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadDecks();
+    } catch (e) {
+      console.warn('Error refreshing decks:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [loadDecks]);
 
   const {
     isLoading,
@@ -421,6 +552,18 @@ export default function FlashcardsScreen() {
           scrollEnabled={true}
           contentContainerStyle={[styles.listContent, { gap: 12, paddingBottom: 120 }]}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={10}
+          refreshControl={
+            <RefreshControl 
+              refreshing={isRefreshing} 
+              onRefresh={handleRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
+          }
           renderItem={({ item: deck }) => {
             const isShared = deck.user_id != null && Number(deck.user_id) !== Number(currentUserId);
             return (
@@ -433,95 +576,14 @@ export default function FlashcardsScreen() {
                   }}
                   renderActions={(close) => renderSwipeActions(deck, close)}
                 >
-                  <Pressable
+                  <DeckCard
+                    deck={deck}
+                    isShared={isShared}
+                    currentUserId={currentUserId}
                     onPress={() => handleOpenStudy(deck)}
                     onLongPress={() => handleOpenEditDeck(deck)}
-                    delayLongPress={500}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: pressed ? theme.colors.inputBackground + '80' : theme.colors.inputBackground,
-                      borderRadius: 18,
-                      padding: 14,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      gap: 12,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
-                  >
-                    <View
-                      style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: (deck as any).subject_color || '#DDE7FF',
-                      }}
-                    >
-                      <MaterialCommunityIcons
-                        name={isShared ? 'account-group-outline' : (((deck as any).subject_icon as any) || 'cards-outline')}
-                        size={20}
-                        color={theme.colors.text.primary}
-                      />
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          fontSize: 15,
-                          fontWeight: '700',
-                          color: theme.colors.text.primary,
-                        }}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {deck.title}
-                      </Text>
-                      {isShared && (
-                        <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2, marginTop: 2 }}>
-                          <Ionicons name="people" size={10} color="#388E3C" />
-                          {' '}{t('modals.shared', 'Compartido')} {t('flashcards.sharedBy', 'por')} @{(deck as any).owner_username || (deck as any).owner_name || t('flashcards.peer', 'compañero')}
-                        </Text>
-                      )}
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: theme.colors.text.secondary,
-                          marginTop: 1,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {(deck as any).subject_name || t('flashcards.noSubject', 'Sin materia')}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                        <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
-                          {Number(deck.card_count ?? 0)} {t('flashcards.cards')}
-                        </Text>
-                        {Number(deck.card_count ?? 0) > 0 && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Text style={{ fontSize: 11, color: '#388E3C', fontWeight: '600' }}>
-                              ✓ {Number((deck as any).review_count ?? 0)}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>
-                              💪 {Number((deck as any).learning_count ?? 0) + Number((deck as any).new_count ?? 0)}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 40, height: 40, marginRight: -6, transform: [{ rotate: '90deg' }] }}>
-                        <LottieView
-                          source={require('../src/lottieFiles/arrow.json')}
-                          autoPlay
-                          loop
-                          style={{ width: '100%', height: '100%' }}
-                        />
-                      </View>
-                    </View>
-                    </Pressable>
+                    t={t}
+                  />
                 </SwipeableCard>
             );
           }}
@@ -911,7 +973,7 @@ export default function FlashcardsScreen() {
       >
         <View style={{ flex: 1 }}>
           {activeDeck && (
-            <FlashcardStudyScreen
+            <FlashcardStudyScreenStandalone
               activeDeck={activeDeck}
               initialCards={studyDeckCards}
               currentUserId={currentUserId}

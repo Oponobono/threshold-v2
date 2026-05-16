@@ -19,6 +19,7 @@ import { EvaluationItem, MultipleChoiceContent } from '../../services/api/types'
 interface Props {
   item: EvaluationItem;
   onAnswer: (selectedIndex: number) => void;
+  onShowExplanation: () => void;
   isAnswered: boolean;
   selectedIndex: number | null;
 }
@@ -26,7 +27,7 @@ interface Props {
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 export const MultipleChoiceView: React.FC<Props> = ({
-  item, onAnswer, isAnswered, selectedIndex,
+  item, onAnswer, onShowExplanation, isAnswered, selectedIndex,
 }) => {
   const content = item.content as MultipleChoiceContent;
   const [hintVisible, setHintVisible] = useState(false);
@@ -83,11 +84,18 @@ export const MultipleChoiceView: React.FC<Props> = ({
             <Text style={s.questionLabel}>Pregunta</Text>
             <Text style={s.questionText}>{content.question}</Text>
           </View>
-          {item.hint && !isAnswered && (
-            <TouchableOpacity style={[s.hintBtn, hintVisible && s.hintBtnActive]} onPress={toggleHint} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name={hintVisible ? 'bulb' : 'bulb-outline'} size={15} color={hintVisible ? '#FF9500' : '#999'} />
-            </TouchableOpacity>
-          )}
+          <View style={{ gap: 8, flexShrink: 0 }}>
+            {item.hint && !isAnswered && (
+              <TouchableOpacity style={[s.hintBtn, hintVisible && s.hintBtnActive]} onPress={toggleHint} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name={hintVisible ? 'bulb' : 'bulb-outline'} size={15} color={hintVisible ? '#FF9500' : '#999'} />
+              </TouchableOpacity>
+            )}
+            {item.explanation && isAnswered && (
+              <TouchableOpacity style={s.explanationBtn} onPress={onShowExplanation} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="help-circle-outline" size={15} color={theme.colors.info} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 
@@ -135,6 +143,7 @@ const s = StyleSheet.create({
   hintText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 17 },
   hintBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: '#E0E0E0', marginLeft: 8, flexShrink: 0 },
   hintBtnActive: { backgroundColor: 'rgba(255,149,0,0.12)', borderColor: '#FF9500' },
+  explanationBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,122,255,0.08)', borderWidth: 1, borderColor: 'rgba(0,122,255,0.3)', flexShrink: 0 },
   questionCard: {
     backgroundColor: theme.colors.background, borderRadius: 20, padding: 18,
     marginBottom: 14, borderWidth: 1, borderColor: theme.colors.border,

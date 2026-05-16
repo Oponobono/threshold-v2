@@ -9,6 +9,7 @@ import {
   View,
   RefreshControl,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import { useRouter } from 'expo-router';
 import { useCustomAlert } from './CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -228,11 +229,6 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
 
       <Text style={s.modalSubtitle}>{t('flashcards.subtitle')}</Text>
 
-      <TouchableOpacity style={s.newDeckBtn} onPress={() => setScreen('newDeck')}>
-        <Ionicons name="add-circle-outline" size={18} color={theme.colors.white} />
-        <Text style={s.newDeckBtnText}>{t('flashcards.newDeck')}</Text>
-      </TouchableOpacity>
-
       {decks.length === 0 ? (
         <View style={s.emptyState}>
           <MaterialCommunityIcons name="cards-outline" size={48} color={theme.colors.text.placeholder} />
@@ -242,7 +238,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
         <FlatList
           data={decks}
           keyExtractor={(d) => d.id.toString()}
-          style={{ maxHeight: 280 }}
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 8 }}
           refreshControl={
             <RefreshControl
@@ -305,18 +301,25 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                   </View>
 
                   {/* Swipe hint indicator */}
-                  <Ionicons 
-                    name="chevron-back-outline" 
-                    size={16} 
-                    color={theme.colors.text.placeholder} 
-                    style={{ opacity: 0.6, marginLeft: 2 }} 
-                  />
+                  <View style={{ width: 40, height: 40, marginRight: -6, transform: [{ rotate: '90deg' }] }}>
+                    <LottieView
+                      source={require('../../src/lottieFiles/arrow.json')}
+                      autoPlay
+                      loop
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  </View>
                 </TouchableOpacity>
               </SwipeableCard>
             );
           }}
         />
       )}
+
+      <TouchableOpacity style={s.newDeckBtn} onPress={() => setScreen('newDeck')}>
+        <Ionicons name="add-circle-outline" size={18} color={theme.colors.white} />
+        <Text style={s.newDeckBtnText}>{t('flashcards.newDeck')}</Text>
+      </TouchableOpacity>
     </View>
   );
 

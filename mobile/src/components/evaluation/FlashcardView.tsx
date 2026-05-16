@@ -10,12 +10,13 @@ interface Props {
   item: EvaluationItem;
   onReveal: () => void;
   onAnswer: (rating: 'learning' | 'review') => void;
+  onShowExplanation: () => void;
   isAnswered: boolean;
   selectedRating: 'learning' | 'review' | null;
 }
 
 export const FlashcardView: React.FC<Props> = ({
-  item, onReveal, onAnswer, isAnswered, selectedRating,
+  item, onReveal, onAnswer, onShowExplanation, isAnswered, selectedRating,
 }) => {
   const content = item.content as FlashcardContent;
   const [isFlipped, setIsFlipped] = useState(false);
@@ -70,11 +71,19 @@ export const FlashcardView: React.FC<Props> = ({
             <Text style={s.cardText}>{content.front}</Text>
           </ScrollView>
           {/* Botón pista (bombillo) — solo si hay hint */}
-          {item.hint && (
+          {item.hint && !isAnswered && (
             <TouchableOpacity style={[s.hintBtn, hintVisible && s.hintBtnActive]} onPress={toggleHint} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name={hintVisible ? 'bulb' : 'bulb-outline'} size={16} color={hintVisible ? '#FF9500' : theme.colors.text.placeholder} />
             </TouchableOpacity>
           )}
+          
+          {/* Botón explicación — solo si hay explicación y la pregunta fue respondida */}
+          {item.explanation && isAnswered && (
+            <TouchableOpacity style={[s.explanationBtn]} onPress={onShowExplanation} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="help-circle-outline" size={16} color={theme.colors.info} />
+            </TouchableOpacity>
+          )}
+          
           <View style={s.tapHint}>
             <Ionicons name="sync-outline" size={13} color={theme.colors.text.placeholder} />
             <Text style={s.tapHintText}>Toca para revelar</Text>
@@ -86,6 +95,13 @@ export const FlashcardView: React.FC<Props> = ({
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 20 }}>
             <Text style={s.cardText}>{content.back}</Text>
           </ScrollView>
+
+          {/* Botón explicación en el back — solo si hay explicación y la pregunta fue respondida */}
+          {item.explanation && isAnswered && (
+            <TouchableOpacity style={[s.explanationBtn]} onPress={onShowExplanation} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="help-circle-outline" size={16} color={theme.colors.info} />
+            </TouchableOpacity>
+          )}
 
         </Animated.View>
       </TouchableOpacity>
@@ -124,9 +140,10 @@ const s = StyleSheet.create({
   cardFront: { backgroundColor: theme.colors.background, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
   cardBack: { backgroundColor: theme.colors.primary + '08' },
   sideLabel: { position: 'absolute', top: 12, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: theme.colors.text.placeholder },
-  cardText: { fontSize: 18, fontWeight: '600', color: theme.colors.text.primary, textAlign: 'center', lineHeight: 26 },
+  cardText: { fontSize: 16, fontWeight: '600', color: theme.colors.text.primary, textAlign: 'center', lineHeight: 24 },
   hintBtn: { position: 'absolute', bottom: 36, right: 14, width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.inputBackground, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border },
   hintBtnActive: { backgroundColor: 'rgba(255,149,0,0.12)', borderColor: '#FF9500' },
+  explanationBtn: { position: 'absolute', bottom: 36, right: 14, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,122,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,122,255,0.3)' },
   tapHint: { position: 'absolute', bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },
   tapHintText: { fontSize: 11, color: theme.colors.text.placeholder },
   explanationBox: { position: 'absolute', bottom: 12, left: 14, right: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: 'rgba(0,122,255,0.07)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },

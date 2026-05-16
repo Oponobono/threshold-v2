@@ -1,8 +1,8 @@
 /**
- * FlashcardStudyScreen.tsx
+ * FlashcardStudyScreenStandalone.tsx
  * 
- * Versión para MODAL (sin márgenes horizontales significativos)
- * Usado en: FlashcardsModal (index)
+ * Versión para INTERFAZ MAZOS (con márgenes horizontales de 24)
+ * Usado en: flashcards.tsx (pantalla dedicada)
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
@@ -43,14 +43,14 @@ const TYPE_BADGE: Record<string, { label: string; color: string; bg: string }> =
   boolean:         { label: '⚖️ V / F',     color: '#F57C00', bg: '#FFF3E0' },
 };
 
-export const FlashcardStudyScreen: React.FC<Props> = ({
+export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
   activeDeck, initialCards, currentUserId, onBack,
 }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const { snoozeCard: snoozeCardLocal } = useDueCardSnooze();
   const insets = useSafeAreaInsets();
-  const horizontalPadding = 0;
+  const horizontalPadding = 24;
 
   const [items, setItems]               = useState<EvaluationItem[]>([]);
   const [itemIndex, setItemIndex]       = useState(0);
@@ -384,7 +384,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   const badge = TYPE_BADGE[item.item_type] ?? TYPE_BADGE.flashcard;
 
   return (
-    <View style={[{ flex: 1 }, { paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingBottom: Math.max(insets.bottom + 12, 20) }]}>
+    <View style={[{ flex: 1, paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingTop: insets.top, marginTop: 8, paddingBottom: Math.max(insets.bottom + 12, 20) }]}>
 
       {/* ── Header: flecha  |  título (badge inline)  |  snooze + contador + trash ── */}
       <View style={[s.header, { marginBottom: 6 }]}>
@@ -420,13 +420,13 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
       </View>
 
       {/* ── Progress bar ── */}
-      <View style={[s.progressBg, { marginHorizontal: -horizontalPadding, marginLeft: -Math.max(insets.left, horizontalPadding), marginRight: -Math.max(insets.right, horizontalPadding) }]}>
+      <View style={s.progressBg}>
         <View style={[s.progressFill, { width: `${((itemIndex + 1) / items.length) * 100}%` as any }]} />
       </View>
 
       {/* ── Question renderer (sin ScrollView envolvente: cada vista gestiona su scroll) ── */}
       <TouchableOpacity 
-        style={{ flex: 1, marginHorizontal: -8, marginLeft: -Math.max(insets.left, 8), marginRight: -Math.max(insets.right, 8) }}
+        style={{ flex: 1, marginTop: 10 }}
         onPress={() => {
           if (isAnswered && !overlayVisible) {
             pendingAdvance.current();

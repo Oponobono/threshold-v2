@@ -7,11 +7,12 @@ import { EvaluationItem, BooleanContent } from '../../services/api/types';
 interface Props {
   item: EvaluationItem;
   onAnswer: (answer: boolean) => void;
+  onShowExplanation: () => void;
   isAnswered: boolean;
   selectedAnswer: boolean | null;
 }
 
-export const BooleanView: React.FC<Props> = ({ item, onAnswer, isAnswered, selectedAnswer }) => {
+export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation, isAnswered, selectedAnswer }) => {
   const content = item.content as BooleanContent;
   const [hintVisible, setHintVisible] = useState(false);
   const hintAnim = useRef(new Animated.Value(0)).current;
@@ -67,11 +68,18 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, isAnswered, selec
             <Text style={s.questionLabel}>¿Verdadero o Falso?</Text>
             <Text style={s.questionText}>{content.question}</Text>
           </View>
-          {item.hint && !isAnswered && (
-            <TouchableOpacity style={[s.hintBtn, hintVisible && s.hintBtnActive]} onPress={toggleHint} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name={hintVisible ? 'bulb' : 'bulb-outline'} size={15} color={hintVisible ? '#FF9500' : '#999'} />
-            </TouchableOpacity>
-          )}
+          <View style={{ gap: 8, flexShrink: 0 }}>
+            {item.hint && !isAnswered && (
+              <TouchableOpacity style={[s.hintBtn, hintVisible && s.hintBtnActive]} onPress={toggleHint} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name={hintVisible ? 'bulb' : 'bulb-outline'} size={15} color={hintVisible ? '#FF9500' : '#999'} />
+              </TouchableOpacity>
+            )}
+            {item.explanation && isAnswered && (
+              <TouchableOpacity style={s.explanationBtn} onPress={onShowExplanation} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="help-circle-outline" size={15} color={theme.colors.info} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
       <View style={s.btnRow}>
@@ -103,9 +111,10 @@ const s = StyleSheet.create({
   hintText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 17 },
   hintBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: '#E0E0E0', marginLeft: 8, flexShrink: 0 },
   hintBtnActive: { backgroundColor: 'rgba(255,149,0,0.12)', borderColor: '#FF9500' },
+  explanationBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,122,255,0.08)', borderWidth: 1, borderColor: 'rgba(0,122,255,0.3)', flexShrink: 0 },
   questionCard: { backgroundColor: theme.colors.background, borderRadius: 20, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: theme.colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   questionLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: theme.colors.text.placeholder, marginBottom: 10 },
-  questionText: { fontSize: 17, fontWeight: '600', color: theme.colors.text.primary, lineHeight: 25 },
+  questionText: { fontSize: 16, fontWeight: '600', color: theme.colors.text.primary, lineHeight: 24 },
   btnRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   boolBtn: { flex: 1, borderRadius: 20, paddingVertical: 22, alignItems: 'center', borderWidth: 2, gap: 8, justifyContent: 'center' },
   boolBtnTrue: { backgroundColor: '#E8F5E9', borderColor: '#81C784' },

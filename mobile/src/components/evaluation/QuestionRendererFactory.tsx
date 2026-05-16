@@ -16,6 +16,7 @@ interface Props {
   item: EvaluationItem;
   onAnswer: (answer: unknown) => void;
   onReveal: () => void;
+  onShowExplanation: () => void;
   isAnswered: boolean;
   // Para flashcard
   selectedRating: 'learning' | 'review' | null;
@@ -26,7 +27,7 @@ interface Props {
 }
 
 export const QuestionRendererFactory: React.FC<Props> = ({
-  item, onAnswer, onReveal, isAnswered,
+  item, onAnswer, onReveal, onShowExplanation, isAnswered,
   selectedRating, selectedIndex, selectedBoolean,
 }) => {
   switch (item.item_type) {
@@ -36,6 +37,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
           item={item}
           onReveal={onReveal}
           onAnswer={(rating) => onAnswer(rating)}
+          onShowExplanation={onShowExplanation}
           isAnswered={isAnswered}
           selectedRating={selectedRating}
         />
@@ -46,6 +48,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
         <MultipleChoiceView
           item={item}
           onAnswer={(idx) => onAnswer(idx)}
+          onShowExplanation={onShowExplanation}
           isAnswered={isAnswered}
           selectedIndex={selectedIndex}
         />
@@ -56,6 +59,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
         <BooleanView
           item={item}
           onAnswer={(val) => onAnswer(val)}
+          onShowExplanation={onShowExplanation}
           isAnswered={isAnswered}
           selectedAnswer={selectedBoolean}
         />
