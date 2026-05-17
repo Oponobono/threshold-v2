@@ -10,7 +10,6 @@ import {
   Modal, View, Text, TextInput, TouchableOpacity,
   ScrollView, Alert, StyleSheet,
 } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFlashcardGenerator } from '../hooks/useFlashcardGenerator';
 import { PremiumLoader } from './PremiumLoader';
@@ -44,7 +43,6 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
   contentType, title, subjectId, userId,
 }) => {
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
   const { generate, loading, generatedDeck, clearGeneratedDeck } = useFlashcardGenerator();
 
   const [step, setStep] = useState<'input' | 'preview' | 'complete'>('input');
