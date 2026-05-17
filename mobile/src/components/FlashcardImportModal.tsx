@@ -8,7 +8,6 @@ import {
   Pressable,
   ScrollView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as DocumentPicker from 'expo-document-picker';
@@ -47,8 +46,6 @@ interface ImportedDeck {
   cardCount: number;
 }
 
-const DECKS_DIR = () => `${FileSystem.documentDirectory}Threshold/decks/`;
-
 /**
  * FlashcardImportModal.tsx
  *
@@ -61,7 +58,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   subjects,
   onImportSuccess,
 }) => {
-  const insets = useSafeAreaInsets();
+
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -242,7 +239,9 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       
       showAlert({
         title: t('common.success') || 'Éxito',
-        message: `Mazo "${deckData.title}" importado exitosamente con ${successCount} tarjeta(s)`,
+        message: errorCount > 0
+          ? `Mazo "${deckData.title}" importado con ${successCount} tarjeta(s) exitosas y ${errorCount} error(es)`
+          : `Mazo "${deckData.title}" importado exitosamente con ${successCount} tarjeta(s)`,
         type: 'success',
       });
       

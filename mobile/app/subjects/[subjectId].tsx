@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,6 +88,7 @@ export default function SubjectDetailScreen() {
   const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
@@ -209,8 +211,15 @@ export default function SubjectDetailScreen() {
       }
     };
 
-    loadAllData();
-    return () => { mounted = false; };
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+      loadAllData();
+    });
+
+    return () => { 
+      mounted = false; 
+      task.cancel();
+    };
   }, [subjectId]);
 
   // Cleanup: detener la reproducción de audio cuando se desmonta el componente o se sale de la pantalla
@@ -378,6 +387,8 @@ export default function SubjectDetailScreen() {
         </ScrollView>
       </SafeAreaView>
 
+      {isReady && (
+      <>
       <DocumentScannerModal
         isVisible={isScannerVisible}
         onClose={() => setIsScannerVisible(false)}
@@ -493,6 +504,7 @@ export default function SubjectDetailScreen() {
           }}
         />
       )}
+      </>)}
     </>
   );
 }

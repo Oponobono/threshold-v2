@@ -658,54 +658,70 @@ CALIDAD ACADÉMICA Y REGLAS DE ORO:
 2. NO CIRCULARIDAD: La explicación JAMÁS debe ser una paráfrasis de la pregunta o respuesta. Debe aportar el "por qué" conceptual o un ejemplo de aplicación.
 3. PISTAS (HINTS): Debe ser un andamiaje cognitivo (sugerir una ruta de pensamiento), no una respuesta parcial ni letras iniciales.
 4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico (ej. mala aplicación de una fórmula, confusión de conceptos similares o generalización excesiva). No rellenes con opciones aleatorias.
-5. EXCLUSIVIDAD SEMÁNTICA: En selección múltiple, las 4 opciones deben tener contenido semántico único. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.`;
+5. EXCLUSIVIDAD SEMÁNTICA: En selección múltiple, las 4 opciones deben tener contenido semántico único. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.
+
+IMPORTANTE: Debes responder EXCLUSIVAMENTE con un objeto JSON válido que contenga la clave "items", cuyo valor sea un array de objetos con los ítems generados según el formato indicado a continuación.
+No agregues ningún texto introductorio ni explicaciones fuera del JSON. La respuesta debe comenzar con { y terminar con }.`;
 
   if (mode === 'flashcard') {
     return `${base}
 
-Genera exactamente ${count} FLASHCARDS en formato JSON array.
-- Front: Pregunta conceptual que obligue a pensar.
-- Back: Respuesta técnica y completa en máximo 3 oraciones.
-- Explanation: Profundización teórica o ejemplo de aplicación.
-Formato: [{ "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }]`;
+Genera exactamente ${count} FLASHCARDS.
+Formato del objeto JSON esperado:
+{
+  "items": [
+    { "type": "flashcard", "data": { "front": "Pregunta conceptual que obligue a pensar.", "back": "Respuesta técnica y completa en máximo 3 oraciones." }, "hint": "Pista o andamiaje cognitivo.", "explanation": "Profundización teórica o ejemplo de aplicación." }
+  ]
+}`;
   }
 
   if (mode === 'multiple_choice') {
     return `${base}
 
-Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES/SABER PRO) en formato JSON array.
-- Opciones: Exactamente 4 opciones ÚNICAS. PROHIBIDO repetir opciones.
-- Distractores: Deben ser plausibles y basados en errores comunes.
-- Explanation: Justifica la opción correcta y explica por qué los distractores fallan.
-Formato: [{ "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": N }, "hint": "...", "explanation": "..." }]`;
+Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES/SABER PRO).
+Formato del objeto JSON esperado:
+{
+  "items": [
+    { "type": "multiple_choice", "data": { "question": "Pregunta del problema.", "options": ["Opción A","Opción B","Opción C","Opción D"], "correctIndex": 0 }, "hint": "Pista para razonar.", "explanation": "Justificación de por qué la opción correcta lo es y por qué las otras no." }
+  ]
+}`;
   }
 
   if (mode === 'boolean') {
     return `${base}
 
-Genera exactamente ${count} PREGUNTAS DE VERDADERO O FALSO en formato JSON array.
-- Question: Afirmaciones con matices técnicos que desafíen la comprensión.
-- Explanation: Argumento sólido que respalde la veracidad o falsedad basándose en el texto.
-Formato: [{ "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }]`;
+Genera exactamente ${count} PREGUNTAS DE VERDADERO O FALSO.
+Formato del objeto JSON esperado:
+{
+  "items": [
+    { "type": "boolean", "data": { "question": "Afirmación con matiz técnico.", "correctAnswer": true }, "hint": "Pista o empujón cognitivo.", "explanation": "Argumento sólido que respalde la veracidad o falsedad." }
+  ]
+}`;
   }
 
   if (mode === 'mixed') {
     return `${base}
 
-Genera exactamente ${count} ÍTEMS MIXTOS (40% Flashcards, 40% Selección Múltiple, 20% V/F) en formato JSON array.
-Sigue estrictamente estos esquemas según el tipo:
-
-- Flashcard: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }
-- Selección Múltiple: { "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": N }, "hint": "...", "explanation": "..." }
-- Verdadero/Falso: { "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }
-
-Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.`;
+Genera exactamente ${count} ÍTEMS MIXTOS (40% Flashcards, 40% Selección Múltiple, 20% V/F).
+Formato del objeto JSON esperado:
+{
+  "items": [
+    { "type": "flashcard", "data": { "front": "Pregunta conceptual...", "back": "Respuesta completa..." }, "hint": "Pista...", "explanation": "Explicación..." },
+    { "type": "multiple_choice", "data": { "question": "Pregunta...", "options": ["A","B","C","D"], "correctIndex": 0 }, "hint": "Pista...", "explanation": "Explicación..." },
+    { "type": "boolean", "data": { "question": "Afirmación...", "correctAnswer": true }, "hint": "Pista...", "explanation": "Explicación..." }
+  ]
+}`;
   }
 
   return `${base}
 
-Genera exactamente ${count} ítems de tipo "${mode}" en formato JSON array.
-Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.`;
+Genera exactamente ${count} ítems de tipo "${mode}".
+Formato del objeto JSON esperado:
+{
+  "items": [
+    { "type": "${mode}", "data": {}, "hint": "...", "explanation": "..." }
+  ]
+}`;
 }
 
 /**
@@ -722,44 +738,106 @@ exports.generateDeckFromText = async (req, res) => {
   const groqApiKey = secrets.GROQ_API_KEY;
   if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no está configurada' });
 
+  // 1. Blindaje de longitud: truncar transcripciones largas para evitar rate limits (TPM)
+  const trimmedText = text.length > 8000
+    ? text.substring(0, 8000) + '\n[...texto truncado por límite de tamaño de contexto...]'
+    : text;
+
+  let response;
+  let modelUsed = 'llama-3.3-70b-versatile';
+
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    console.log(`[Groq] Intentando generar ${count} ítems usando modelo principal: ${modelUsed}`);
+    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: modelUsed,
+        response_format: { type: "json_object" }, // Enforce JSON mode
         messages: [
           { role: 'system', content: buildSystemPrompt(mode, count) },
-          { role: 'user', content: `Genera exactamente ${count} ítems basados en este contenido:\n\n${text}` }
+          { role: 'user', content: `Genera exactamente ${count} ítems basados en este contenido:\n\n${trimmedText}` }
         ],
         temperature: 0.2,
-        max_tokens: 6000,
+        max_tokens: 4000,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(500).json({ error: 'Error al llamar a Groq API', details: errorData });
+      const errText = await response.text();
+      throw new Error(`Groq API returned ${response.status}: ${errText}`);
     }
+  } catch (primaryError) {
+    console.warn(`[Groq] Modelo principal ${modelUsed} falló o superó límites de tasa:`, primaryError.message);
+    
+    // 2. Fallback de seguridad: usar el modelo veloz con menor uso de recursos
+    modelUsed = 'llama-3.1-8b-instant';
+    console.log(`[Groq] Reintentando con modelo secundario de fallback: ${modelUsed}`);
+    
+    try {
+      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelUsed,
+          response_format: { type: "json_object" }, // Enforce JSON mode
+          messages: [
+            { role: 'system', content: buildSystemPrompt(mode, count) },
+            { role: 'user', content: `Genera exactamente ${count} ítems basados en este contenido:\n\n${trimmedText}` }
+          ],
+          temperature: 0.2,
+          max_tokens: 4000,
+        }),
+      });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[Groq] Modelo secundario de fallback también falló:', errorData);
+        return res.status(500).json({ 
+          error: 'Error al llamar a Groq API', 
+          details: errorData,
+          primaryError: primaryError.message 
+        });
+      }
+    } catch (fallbackError) {
+      console.error('[Groq] Falló conexión con Groq:', fallbackError);
+      return res.status(500).json({ 
+        error: 'Error de red o conexión con Groq API', 
+        details: fallbackError.message,
+        primaryError: primaryError.message
+      });
+    }
+  }
+
+  try {
     const groqData = await response.json();
     const raw = groqData.choices[0].message.content.trim();
 
-    // Extraer el JSON array de la respuesta
+    // Extraer el JSON del contenido de forma ultra robusta
     let jsonString = raw;
+    const objectMatch = raw.match(/\{[\s\S]*\}/);
     const arrayMatch = raw.match(/\[[\s\S]*\]/);
-    if (arrayMatch) jsonString = arrayMatch[0];
+    if (objectMatch) jsonString = objectMatch[0];
+    else if (arrayMatch) jsonString = arrayMatch[0];
 
-    let items;
-    try { items = JSON.parse(jsonString); }
-    catch (parseError) {
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error('[Groq] Error parseando JSON de Groq. Contenido crudo:', raw);
       return res.status(500).json({ error: 'Respuesta de Groq no es JSON válido', details: raw });
     }
 
-    if (!Array.isArray(items)) {
-      // Compatibilidad con respuesta antigua tipo { flashcards: [...] }
-      if (items.flashcards) items = items.flashcards.map(c => ({ type: 'flashcard', data: { front: c.question || c.front, back: c.answer || c.back } }));
-      else return res.status(500).json({ error: 'Estructura de respuesta inválida' });
+    let items;
+    if (Array.isArray(parsed)) {
+      items = parsed;
+    } else if (parsed && Array.isArray(parsed.items)) {
+      items = parsed.items;
+    } else if (parsed && parsed.flashcards) {
+      items = parsed.flashcards.map(c => ({ type: 'flashcard', data: { front: c.question || c.front, back: c.answer || c.back } }));
+    } else {
+      console.error('[Groq] Estructura inesperada en JSON:', parsed);
+      return res.status(500).json({ error: 'Estructura de respuesta inválida en JSON', details: parsed });
     }
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con IA`;
@@ -767,11 +845,15 @@ exports.generateDeckFromText = async (req, res) => {
       `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
       [subject_id, user_id, title, description],
       function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+          console.error('[Database] Error al insertar mazo:', err);
+          return res.status(500).json({ error: err.message });
+        }
         insertItemsAndReturn(res, this.lastID, subject_id, user_id, title, description, items);
       }
     );
   } catch (err) {
+    console.error('[Backend] Error procesando generación:', err);
     res.status(500).json({ error: 'Error al generar ítems', details: err.message });
   }
 };
@@ -796,11 +878,13 @@ exports.generateDeckFromImage = async (req, res) => {
   }
 
   try {
+    console.log(`[Groq Vision] Intentando generar ${count} ítems basados en imagen con JSON mode...`);
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama-3.2-11b-vision-preview',
+        response_format: { type: "json_object" }, // Enforce JSON mode
         messages: [{
           role: 'user',
           content: [
@@ -809,31 +893,43 @@ exports.generateDeckFromImage = async (req, res) => {
           ]
         }],
         temperature: 0.2,
-        max_tokens: 6000,
+        max_tokens: 4000,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[Groq Vision] Falló petición a API:', errorData);
       return res.status(500).json({ error: 'Error al llamar a Groq Vision API', details: errorData });
     }
 
     const groqData = await response.json();
     const raw = groqData.choices[0].message.content.trim();
 
+    // Extraer JSON robustamente
     let jsonString = raw;
+    const objectMatch = raw.match(/\{[\s\S]*\}/);
     const arrayMatch = raw.match(/\[[\s\S]*\]/);
-    if (arrayMatch) jsonString = arrayMatch[0];
+    if (objectMatch) jsonString = objectMatch[0];
+    else if (arrayMatch) jsonString = arrayMatch[0];
 
-    let items;
-    try { items = JSON.parse(jsonString); }
+    let parsed;
+    try { parsed = JSON.parse(jsonString); }
     catch (_) {
+      console.error('[Groq Vision] JSON inválido devuelto por vision:', raw);
       return res.status(500).json({ error: 'Respuesta de Groq Vision no es JSON válido', details: raw });
     }
 
-    if (!Array.isArray(items)) {
-      if (items.flashcards) items = items.flashcards.map(c => ({ type: 'flashcard', data: { front: c.question || c.front, back: c.answer || c.back } }));
-      else return res.status(500).json({ error: 'Estructura de respuesta inválida' });
+    let items;
+    if (Array.isArray(parsed)) {
+      items = parsed;
+    } else if (parsed && Array.isArray(parsed.items)) {
+      items = parsed.items;
+    } else if (parsed && parsed.flashcards) {
+      items = parsed.flashcards.map(c => ({ type: 'flashcard', data: { front: c.question || c.front, back: c.answer || c.back } }));
+    } else {
+      console.error('[Groq Vision] Estructura inesperada en JSON:', parsed);
+      return res.status(500).json({ error: 'Estructura de respuesta inválida en JSON', details: parsed });
     }
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con OCR + IA`;
@@ -841,11 +937,15 @@ exports.generateDeckFromImage = async (req, res) => {
       `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
       [subject_id, user_id, title, description],
       function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+          console.error('[Database] Error guardando mazo de imagen:', err);
+          return res.status(500).json({ error: err.message });
+        }
         insertItemsAndReturn(res, this.lastID, subject_id, user_id, title, description, items);
       }
     );
   } catch (err) {
+    console.error('[Backend] Error procesando imagen OCR:', err);
     res.status(500).json({ error: 'Error al generar ítems con OCR', details: err.message });
   }
 };

@@ -221,7 +221,7 @@ export default function HybridDashboardScreen() {
     };
 
     loadPredictions();
-  }, []); // ✅ Array vacío: ejecutar UNA SOLA VEZ
+  }, [profile?.id]); // ✅ Ejecutar cuando el perfil esté disponible y cargado
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
@@ -1609,17 +1609,16 @@ export default function HybridDashboardScreen() {
           />
         )}
 
-        {isFlashcardsVisible && (
-          <FlashcardsModal
-            isVisible={isFlashcardsVisible}
-            onClose={() => setIsFlashcardsVisible(false)}
-            subjects={subjects}
-          />
-        )}
+        <FlashcardsModal
+          isVisible={isFlashcardsVisible}
+          onClose={() => setIsFlashcardsVisible(false)}
+          subjects={subjects}
+        />
       </React.Suspense>
 
       {/* Snooze Modal */}
       <SnoozeModal
+        key={`snooze-modal-${snoozeRefreshTrigger}`}
         visible={isSnoozeModalVisible}
         onClose={() => setIsSnoozeModalVisible(false)}
         onSelect={handleSnoozeSelection}

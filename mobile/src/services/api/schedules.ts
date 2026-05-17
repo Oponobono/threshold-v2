@@ -59,7 +59,12 @@ export const getSchedulesBySubject = async (subjectId: number): Promise<any[]> =
  */
 export const getAllSchedules = async (): Promise<any[]> => {
   const userId = await getUserId();
-  if (!userId) return [];
+  if (!userId) throw new Error('No hay sesión activa.');
   const response = await fetchWithFallback(`/schedules/user/${userId}`);
-  return (await parseJsonSafely(response)) || [];
+  if (!response.ok) {
+    const errorData = await parseJsonSafely(response);
+    throw new Error(errorData?.error || 'Error al obtener horarios.');
+  }
+  const data = await parseJsonSafely(response);
+  return Array.isArray(data) ? data : [];
 };

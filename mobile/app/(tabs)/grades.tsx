@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, Dimensions, TextInput, TouchableOpacity, InteractionManager, FlatList } from 'react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -68,7 +68,7 @@ export default function GradesScreen() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       const task = InteractionManager.runAfterInteractions(() => {
         loadAllData();
       });

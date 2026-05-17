@@ -24,9 +24,14 @@ export const getSubjectById = async (subjectId: number | string): Promise<Subjec
  */
 export const getSubjects = async () => {
   const userId = await getUserId();
-  if (!userId) return [];
+  if (!userId) throw new Error('No hay sesión activa.');
   const response = await fetchWithFallback(`/subjects/${userId}`);
-  return (await parseJsonSafely(response)) || [];
+  if (!response.ok) {
+    const errorData = await parseJsonSafely(response);
+    throw new Error(errorData?.error || 'Error al obtener materias.');
+  }
+  const data = await parseJsonSafely(response);
+  return Array.isArray(data) ? data : [];
 };
 
 /**

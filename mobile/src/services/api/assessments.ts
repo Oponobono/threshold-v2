@@ -23,9 +23,14 @@ export const getAssessments = async (subjectId: number) => {
  */
 export const getAllAssessments = async (): Promise<any[]> => {
   const userId = await getUserId();
-  if (!userId) return [];
+  if (!userId) throw new Error('No hay sesión activa.');
   const response = await fetchWithFallback(`/assessments/user/${userId}`);
-  return (await parseJsonSafely(response)) || [];
+  if (!response.ok) {
+    const errorData = await parseJsonSafely(response);
+    throw new Error(errorData?.error || 'Error al obtener evaluaciones.');
+  }
+  const data = await parseJsonSafely(response);
+  return Array.isArray(data) ? data : [];
 };
 
 /**

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, InteractionManager, FlatList } from 'react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -53,7 +53,7 @@ export default function SubjectsScreen() {
 
   // Request a background refresh when returning to this tab
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       InteractionManager.runAfterInteractions(() => {
         loadAllData(); // Will quickly return if already loaded, but triggers state update if needed
       });
