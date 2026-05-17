@@ -13,6 +13,7 @@ import {
   ActionSheetIOS,
   Platform,
   RefreshControl,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
@@ -32,7 +33,8 @@ import { useCustomAlert } from '../src/components/CustomAlert';
 import { FlashcardNewCardScreen } from '../src/components/FlashcardNewCardScreen';
 import { FlashcardStudyScreenStandalone } from '../src/components/FlashcardStudyScreenStandalone';
 import { useFlashcardsManager } from '../src/hooks/useFlashcardsManager';
-import { getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck } from '../src/services/api';
+import { type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck } from '../src/services/api';
+import { useDataStore } from '../src/store/useDataStore';
 
 /**
  * Componente memoizado del arrow animado para optimizar rendimiento
@@ -170,7 +172,8 @@ export default function FlashcardsScreen() {
   const [showNewCardModal, setShowNewCardModal] = useState(false);
   const [showStudyModal, setShowStudyModal] = useState(false);
   const [showEditDeckModal, setShowEditDeckModal] = useState(false);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  // Subjects come from the persisted Zustand store — available in 0ms, no network call needed
+  const { subjects } = useDataStore();
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [editingDeck, setEditingDeck] = useState<FlashcardDeck | null>(null);
   const [studyDeckCards, setStudyDeckCards] = useState<any[]>([]);
@@ -306,27 +309,24 @@ export default function FlashcardsScreen() {
     }
   };
 
-  // Load subjects and decks on mount
+  // Defer heavy work until tab transition animation finishes (keeps 60fps during navigation)
   useFocusEffect(
     useCallback(() => {
-      const loadAll = async () => {
+      const task = InteractionManager.runAfterInteractions(async () => {
         try {
           const userId = await getUserId();
           setCurrentUserId(userId);
-          const subs = await getSubjects();
-          setSubjects(subs || []);
         } catch (e) {
-          console.warn('Error loading subjects:', e);
+          console.warn('Error loading userId:', e);
         }
         await loadDecks();
-      };
-      loadAll();
+      });
+      return () => task.cancel();
     }, [loadDecks])
   );
 
-  if (isLoading && filteredDecks.length === 0) {
-    return <PremiumLoading text={t('common.loading') || 'CARGANDO'} />;
-  }
+  // No blocking full-screen spinner — the empty state renders instantly
+  // and the list populates as data arrives from the store or network
 
   const isEmpty = filteredDecks.length === 0;
 

@@ -230,7 +230,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
           {/* Header */}
           <View style={s.header}>
             <View style={s.aiIconWrap}>
-              <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
+              <LottieView source={zyrenOrbAnimation} autoPlay loop renderMode="HARDWARE" style={{ width: 34, height: 34 }} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.title}>Zyren</Text>

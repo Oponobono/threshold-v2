@@ -8,6 +8,7 @@ import {
   Easing,
   StatusBar,
   TextInput,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
@@ -117,10 +118,14 @@ export default function RecordingsScreen() {
 
 
 
+  // Defer load until tab transition animation finishes to maintain 60fps
   useFocusEffect(
     useCallback(() => {
-      loadYouTubeVideos();
-      loadRecordings();
+      const task = InteractionManager.runAfterInteractions(() => {
+        loadYouTubeVideos();
+        loadRecordings();
+      });
+      return () => task.cancel();
     }, [loadRecordings, loadYouTubeVideos])
   );
 

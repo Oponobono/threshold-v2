@@ -61,6 +61,7 @@ const GridItem = memo(function GridItem({
         source={{ uri: item.local_uri }} 
         style={styles.gridImage} 
         contentFit="cover"
+        cachePolicy="memory-disk"
         transition={200}
       />
 
@@ -143,7 +144,7 @@ export default function GalleryScreen() {
   const { subjects, loadAllData } = useDataStore();
 
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterTab, setFilterTab] = useState<'all' | 'starred' | 'ocr'>('all');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
@@ -372,8 +373,13 @@ export default function GalleryScreen() {
         keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
         numColumns={2}
         columnWrapperStyle={{ gap: 16, paddingHorizontal: theme.spacing.lg }}
-        contentContainerStyle={[styles.scroll, { flexGrow: 1, paddingHorizontal: 0 }]}
+        contentContainerStyle={[styles.scroll, { flexGrow: 1, paddingHorizontal: 0, paddingBottom: 120 }]}
         showsVerticalScrollIndicator={false}
+        // 🟢 Optimizaciones de rendimiento (Capa 4)
+        removeClippedSubviews={Platform.OS === 'android'}
+        maxToRenderPerBatch={6}
+        windowSize={5}
+        initialNumToRender={8}
         ListHeaderComponent={
           <View style={{ paddingHorizontal: theme.spacing.lg }}>
             {/* ── STARRED ROW ── */}
@@ -404,6 +410,7 @@ export default function GalleryScreen() {
                         source={{ uri: item.local_uri }} 
                         style={styles.starredImage}
                         contentFit="cover"
+                        cachePolicy="memory-disk"
                         transition={200}
                       />
                       <Text style={styles.starredSubject} numberOfLines={1}>{item.subject_name}</Text>

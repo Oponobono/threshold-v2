@@ -68,7 +68,7 @@ export default function GradesScreen() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       const task = InteractionManager.runAfterInteractions(() => {
         loadAllData();
       });

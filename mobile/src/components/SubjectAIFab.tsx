@@ -200,7 +200,7 @@ export const SubjectAIFab: React.FC<SubjectAIFabProps> = ({
       <View style={[styles.fabContainer, { bottom: Math.max(24, 24 + insets.bottom - 10) }]}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => setIsContextModalVisible(true)}>
           <Animated.View style={[styles.fabButton, { backgroundColor: 'transparent', elevation: 0, shadowOpacity: 0, transform: [{ scale: pulseAnim }] }]}>
-            <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 72, height: 72 }} />
+            <LottieView source={zyrenOrbAnimation} autoPlay loop renderMode="HARDWARE" style={{ width: 72, height: 72 }} />
           </Animated.View>
         </TouchableOpacity>
       </View>

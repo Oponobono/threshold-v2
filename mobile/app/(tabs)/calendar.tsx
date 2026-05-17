@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, FlatList, InteractionManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -27,7 +27,10 @@ export default function CalendarScreen() {
   const { schedules: allSchedules, assessments: allAssessments, loadAllData } = useDataStore();
 
   useEffect(() => {
-    loadAllData();
+    const task = InteractionManager.runAfterInteractions(() => {
+      loadAllData();
+    });
+    return () => task.cancel();
   }, [loadAllData]);
 
   // ── Cálculos del mes en vista ─────────────────────────────────

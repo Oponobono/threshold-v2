@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Modal, TouchableOpacity, Image, FlatList, Dimensions, Share, ActionSheetIOS, Platform, ActivityIndicator, Text, ScrollView, TextInput } from 'react-native';
+import { View, Modal, TouchableOpacity, FlatList, Dimensions, Share, Platform, ActivityIndicator, Text, TextInput } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useCustomAlert } from './CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -167,19 +168,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
 
   const ImageWithFallback = ({ item }: { item: PhotoItem }) => {
-    const [sourceUri, setSourceUri] = useState(item.local_uri || item.cloud_url || '');
     return (
       <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: sourceUri }} 
+        <ExpoImage 
+          source={{ uri: item.local_uri }} 
           style={styles.image} 
-          resizeMode="contain" 
-          onError={() => {
-            if (sourceUri === item.local_uri && item.cloud_url) {
-              console.log(`[ImageViewerModal] Fallback a cloud_url para foto: ${item.id}`);
-              setSourceUri(item.cloud_url);
-            }
-          }}
+          contentFit="contain"
+          cachePolicy="memory-disk"
         />
       </View>
     );
@@ -230,6 +225,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
           getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+          windowSize={3}
+          maxToRenderPerBatch={2}
+          initialNumToRender={2}
+          removeClippedSubviews={Platform.OS === 'android'}
           onScrollToIndexFailed={(info) => {
             setTimeout(() => {
               flatListRef.current?.scrollToIndex({ index: info.index, animated: false });

@@ -53,10 +53,11 @@ export default function SubjectsScreen() {
 
   // Request a background refresh when returning to this tab
   useFocusEffect(
-    React.useCallback(() => {
-      InteractionManager.runAfterInteractions(() => {
-        loadAllData(); // Will quickly return if already loaded, but triggers state update if needed
+    useCallback(() => {
+      const task = InteractionManager.runAfterInteractions(() => {
+        loadAllData();
       });
+      return () => task.cancel();
     }, [loadAllData])
   );
 

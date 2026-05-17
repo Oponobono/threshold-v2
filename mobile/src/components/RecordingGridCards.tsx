@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import YoutubeIframe from 'react-native-youtube-iframe';
@@ -142,10 +143,11 @@ export function HeroCard({
     >
       {/* Background: video thumbnail or gradient overlay */}
       {isVideo && item.thumbnail_url ? (
-        <Image
+        <ExpoImage
           source={{ uri: item.thumbnail_url }}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
         />
       ) : null}
 
@@ -312,10 +314,11 @@ export function MediumCard({
     >
       {isVideo && item.thumbnail_url ? (
         <>
-          <Image
+          <ExpoImage
             source={{ uri: item.thumbnail_url }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
           />
           <View
             style={{

@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, router } from 'expo-router';
+import { storageService } from '../src/services/storageService';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-gesture-handler';
@@ -41,8 +42,14 @@ export default function RootLayout() {
     async function prepare() {
       try {
         console.log('[RootLayout] Starting preparation...');
-        // Aquí podrías cargar fuentes o hacer checks mínimos
-        // Pero no bloqueamos más de lo necesario
+        
+        // 🚀 Capa 5: Lectura síncrona/rápida de sesión
+        // Antes de que el Splash Screen desaparezca, validamos si hay token.
+        // Si lo hay, saltamos el WelcomeScreen directo al Dashboard (0ms percibido)
+        const token = await storageService.getSecure('auth_token');
+        if (token) {
+          router.replace('/(tabs)');
+        }
       } catch (e) {
         console.warn(e);
       } finally {

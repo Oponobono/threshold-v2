@@ -211,7 +211,7 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
       {/* Ícono del asistente solo para mensajes IA */}
       {!isUser && (
         <View style={s.aiAvatar}>
-          <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 26, height: 26 }} />
+          <LottieView source={zyrenOrbAnimation} autoPlay loop renderMode="HARDWARE" style={{ width: 26, height: 26 }} />
         </View>
       )}
       <View style={[s.bubble, isUser ? s.bubbleUser : s.bubbleAI]}>
@@ -338,7 +338,7 @@ const TypingIndicator: React.FC = () => {
   return (
     <View style={[s.bubbleRow, s.bubbleRowAI]}>
       <View style={s.aiAvatar}>
-        <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 26, height: 26 }} />
+        <LottieView source={zyrenOrbAnimation} autoPlay loop renderMode="HARDWARE" style={{ width: 26, height: 26 }} />
       </View>
       <View style={[s.bubble, s.bubbleAI, { paddingVertical: 12, paddingHorizontal: 16 }]}>
         <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
@@ -738,7 +738,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
             {/* Encabezado */}
             <View style={s.header}>
               <View style={s.aiIconWrap}>
-                <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
+                <LottieView source={zyrenOrbAnimation} autoPlay loop renderMode="HARDWARE" style={{ width: 34, height: 34 }} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.title}>Zyren</Text>
@@ -847,7 +847,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 /* Estado vacío — sugerencias iniciales */
                 <View style={s.emptyState}>
                   <View style={s.emptyIconWrap}>
-                    <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 64, height: 64 }} />
+                    <LottieView source={zyrenOrbAnimation} autoPlay loop renderMode="HARDWARE" style={{ width: 64, height: 64 }} />
                   </View>
                   <Text style={s.emptyTitle}>¿Qué quieres saber?</Text>
                   <Text style={s.emptySubtitle}>

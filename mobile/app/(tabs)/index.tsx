@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, TextInput, FlatList, Animated, Easing } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, TextInput, FlatList, Animated, Easing, InteractionManager } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import LottieView from 'lottie-react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -187,7 +188,10 @@ export default function HybridDashboardScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadData();
+      const task = InteractionManager.runAfterInteractions(() => {
+        loadData();
+      });
+      return () => task.cancel();
     }, [loadData])
   );
 
@@ -222,6 +226,17 @@ export default function HybridDashboardScreen() {
 
     loadPredictions();
   }, []); // ✅ Array vacío: ejecutar UNA SOLA VEZ
+
+  // 🚀 Precarga agresiva de Modales en segundo plano
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      // Forzamos el parseo de JS en background de los modales más usados
+      import('../../src/components/FlashcardsModal');
+      import('../../src/components/StudyTimerModal');
+      import('../../src/components/AudioRecorderModal');
+    });
+    return () => task.cancel();
+  }, []);
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
@@ -734,6 +749,7 @@ export default function HybridDashboardScreen() {
                   source={greetingData.animation}
                   autoPlay
                   loop
+                  renderMode="HARDWARE"
                   style={{ width: 44, height: 44, marginLeft: 2 }}
                 />
               </View>
@@ -746,9 +762,11 @@ export default function HybridDashboardScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('dashboard.openSettings')}
           >
-            <Image 
+            <ExpoImage 
               source={{ uri: profileAvatarUri }} 
-              style={styles.avatar} 
+              style={styles.avatar}
+              cachePolicy="memory-disk"
+              contentFit="cover"
             />
           </TouchableOpacity>
         </View>
@@ -775,6 +793,11 @@ export default function HybridDashboardScreen() {
               keyExtractor={(item) => item.__key}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.subjectsCarousel}
+              // 🟢 Optimización de reciclaje para el carrusel infinito (Capa 4)
+              removeClippedSubviews={Platform.OS === 'android'}
+              initialNumToRender={5}
+              maxToRenderPerBatch={3}
+              windowSize={5}
               renderItem={({ item }) => <SubjectTile subject={item} />}
               ItemSeparatorComponent={() => <View style={{ width: SUBJECT_CARD_GAP }} />}
               initialScrollIndex={initialScrollIndex}

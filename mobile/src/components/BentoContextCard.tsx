@@ -1,8 +1,9 @@
 import React from 'react';
 import {
-  View, Text, TouchableOpacity, Image,
+  View, Text, TouchableOpacity,
   StyleSheet, Dimensions,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AIContextItemData } from './AIContextItem';
 import { AnimatedWaveform } from './AnimatedWaveform';
@@ -67,7 +68,7 @@ export const BentoContextCard: React.FC<BentoContextCardProps> = ({
         style={[s.card, { width: cardW, height: cardH, borderColor: isSelected ? PRIMARY : 'rgba(255,255,255,0.08)' },
           isSelected && s.cardSelected]}
       >
-        <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+        <ExpoImage source={{ uri: item.uri }} style={StyleSheet.absoluteFillObject} contentFit="cover" cachePolicy="memory-disk" />
         <View style={s.mediaGradient}>
           <TypeBadge type="photo" />
           <Text numberOfLines={1} style={s.mediaTitle}>{item.label}</Text>
@@ -86,7 +87,7 @@ export const BentoContextCard: React.FC<BentoContextCardProps> = ({
         style={[s.card, { width: cardW, height: cardH, borderColor: isSelected ? PRIMARY : 'rgba(255,255,255,0.08)' },
           isSelected && s.cardSelected]}
       >
-        <Image source={{ uri: item.thumbnailUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+        <ExpoImage source={{ uri: item.thumbnailUrl }} style={StyleSheet.absoluteFillObject} contentFit="cover" cachePolicy="memory-disk" />
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.36)', alignItems: 'center', justifyContent: 'center' }]}>
           <View style={s.playBtn}>
             <Ionicons name="play" size={14} color="#fff" style={{ marginLeft: 1 }} />

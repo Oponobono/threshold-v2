@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -64,28 +65,28 @@ export const SubjectGalleryGrid: React.FC<SubjectGalleryGridProps> = ({
         ) : photos.length === 1 ? (
           <View style={styles.galleryGridSingle}>
             <TouchableOpacity style={{ flex: 1 }} onPress={() => onOpenViewer(0)}>
-              <Image source={{ uri: photos[0].local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+              <ExpoImage source={{ uri: photos[0].local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
             </TouchableOpacity>
           </View>
         ) : photos.length === 2 ? (
           <View style={styles.galleryGridTwo}>
             {photos.slice(0, 2).map((p, i) => (
               <TouchableOpacity key={i} style={styles.galleryImageHalf} onPress={() => onOpenViewer(i)}>
-                <Image source={{ uri: p.local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+                <ExpoImage source={{ uri: p.local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
               </TouchableOpacity>
             ))}
           </View>
         ) : photos.length === 3 ? (
           <View style={styles.galleryGridThree}>
             <TouchableOpacity style={styles.galleryImageLeft} onPress={() => onOpenViewer(0)}>
-              <Image source={{ uri: photos[0].local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+              <ExpoImage source={{ uri: photos[0].local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
             </TouchableOpacity>
             <View style={styles.galleryGridThreeRight}>
               <TouchableOpacity style={styles.galleryImageQuarter} onPress={() => onOpenViewer(1)}>
-                <Image source={{ uri: photos[1].local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+                <ExpoImage source={{ uri: photos[1].local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.galleryImageQuarter} onPress={() => onOpenViewer(2)}>
-                <Image source={{ uri: photos[2].local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+                <ExpoImage source={{ uri: photos[2].local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
               </TouchableOpacity>
             </View>
           </View>
@@ -93,18 +94,18 @@ export const SubjectGalleryGrid: React.FC<SubjectGalleryGridProps> = ({
           <View style={styles.galleryGridFour}>
             <View style={styles.galleryGridFourRow}>
               <TouchableOpacity style={styles.galleryImageQuad} onPress={() => onOpenViewer(0)}>
-                <Image source={{ uri: photos[0].local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+                <ExpoImage source={{ uri: photos[0].local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.galleryImageQuad} onPress={() => onOpenViewer(1)}>
-                <Image source={{ uri: photos[1].local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+                <ExpoImage source={{ uri: photos[1].local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
               </TouchableOpacity>
             </View>
             <View style={styles.galleryGridFourRow}>
               <TouchableOpacity style={styles.galleryImageQuad} onPress={() => onOpenViewer(2)}>
-                <Image source={{ uri: photos[2].local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+                <ExpoImage source={{ uri: photos[2].local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.galleryImageQuad} onPress={() => onOpenViewer(3)}>
-                <Image source={{ uri: photos[3].local_uri }} style={styles.galleryImageFull} resizeMode="cover" />
+                <ExpoImage source={{ uri: photos[3].local_uri }} style={styles.galleryImageFull} contentFit="cover" cachePolicy="memory-disk" />
               </TouchableOpacity>
             </View>
           </View>
