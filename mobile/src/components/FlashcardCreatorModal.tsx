@@ -11,6 +11,7 @@ import {
   ScrollView, Alert, StyleSheet,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFlashcardGenerator } from '../hooks/useFlashcardGenerator';
 import { PremiumLoader } from './PremiumLoader';
 import { CustomButton } from './CustomButton';
@@ -42,6 +43,7 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
   visible, onClose, onSuccess, content, imageBase64,
   contentType, title, subjectId, userId,
 }) => {
+  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { generate, loading, generatedDeck, clearGeneratedDeck } = useFlashcardGenerator();
 
@@ -184,7 +186,7 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose}>
             <Text style={styles.closeBtn}>✕</Text>
@@ -193,7 +195,11 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
           <View style={{ width: 30 }} />
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.content} 
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 40 }}
+          showsVerticalScrollIndicator={false}
+        >
           {step === 'input' && (
             <View style={styles.inputSection}>
               <Text style={styles.subtitle}>
@@ -338,7 +344,7 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', marginTop: 50 },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   title: { fontSize: 18, fontWeight: '600' },
   closeBtn: { fontSize: 24, color: '#999' },
