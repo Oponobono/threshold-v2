@@ -34,7 +34,13 @@ async function callGroqAPI(messages, systemPrompt) {
     throw new Error('Groq API Key no está configurada');
   }
 
-  const apiMessages = [{ role: 'system', content: systemPrompt }, ...messages];
+  // Limitar historial para evitar Rate Limits (TPM excedido en Groq)
+  const maxHistoryMessages = 6;
+  const recentMessages = messages.length > maxHistoryMessages 
+    ? messages.slice(-maxHistoryMessages) 
+    : messages;
+
+  const apiMessages = [{ role: 'system', content: systemPrompt }, ...recentMessages];
   
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -43,7 +49,7 @@ async function callGroqAPI(messages, systemPrompt) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       messages: apiMessages,
       temperature: 0.3,
       max_tokens: 2048,
