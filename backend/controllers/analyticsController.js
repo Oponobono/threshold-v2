@@ -61,52 +61,84 @@ exports.getReviewPredictions = (req, res) => {
     return res.status(400).json({ error: 'userId es requerido' });
   }
 
-  db.all(
-    `SELECT 
-       fc.id, 
-       fc.front, 
-       fc.next_review_date, 
-       fd.subject_id, 
-       la.mastery_percentage,
-       CASE 
-         WHEN COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) > 0
-         THEN CAST(COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) AS FLOAT) / 
-              CAST(COALESCE(COUNT(cl.id), 1) AS FLOAT)
-         ELSE 0
-       END as failure_rate
+  // Primero: contar cuántos MAZOS tienen tarjetas vencidas (no el total de tarjetas).
+  // Esto evita mostrar números grandes (ej: 30 tarjetas) cuando lo que importa
+  // es cuántos mazos hay que repasar (ej: 3 mazos).
+  db.get(
+    `SELECT COUNT(DISTINCT fc.deck_id) as due_deck_count
      FROM flashcards fc
      JOIN flashcard_decks fd ON fc.deck_id = fd.id
-     LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
-     LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
      WHERE fc.next_review_date <= CURRENT_TIMESTAMP
-     AND fd.user_id = ?
-     GROUP BY fc.id, fc.front, fc.next_review_date, fd.subject_id, la.mastery_percentage
-     ORDER BY 
-       la.mastery_percentage ASC,
-       fc.next_review_date ASC,
-       failure_rate DESC
-     LIMIT 20`,
-    [userId, userId, userId],
-    (err, rows) => {
-      if (err) {
-        console.error(`[Analytics] Error en getReviewPredictions para userId=${userId}:`, err);
-        return res.status(500).json({ error: err.message });
+     AND fd.user_id = ?`,
+    [userId],
+    (countErr, countRow) => {
+      if (countErr) {
+        console.error(`[Analytics] Error contando mazos vencidos para userId=${userId}:`, countErr);
+        return res.status(500).json({ error: countErr.message });
       }
 
-      if (!rows || rows.length === 0) {
-        return res.json({ dueCount: 0, cards: [] });
+      const dueDeckCount = (countRow && countRow.due_deck_count) || 0;
+
+      // Si no hay mazos con tarjetas vencidas, retornar inmediatamente
+      if (dueDeckCount === 0) {
+        return res.json({ dueCount: 0, deckCount: 0, cards: [] });
       }
 
-      const predictions = rows.map(card => ({
-        cardId: card.id,
-        question: card.front,
-        subjectId: card.subject_id || 0,
-        mastery: card.mastery_percentage || 0,
-        urgency: (card.mastery_percentage || 0) < 50 ? 'HIGH' : 'MEDIUM',
-        failureRate: Math.round(card.failure_rate * 100),
-      }));
+      // Segundo: obtener una muestra representativa de las tarjetas más urgentes
+      // (para uso futuro / detalle) — limitada para no saturar la respuesta.
+      db.all(
+        `SELECT
+           fc.id,
+           fc.front,
+           fc.next_review_date,
+           fd.id as deck_id,
+           fd.title as deck_title,
+           fd.subject_id,
+           la.mastery_percentage,
+           CASE
+             WHEN COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) > 0
+             THEN CAST(COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) AS FLOAT) /
+                  CAST(COALESCE(COUNT(cl.id), 1) AS FLOAT)
+             ELSE 0
+           END as failure_rate
+         FROM flashcards fc
+         JOIN flashcard_decks fd ON fc.deck_id = fd.id
+         LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
+         LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
+         WHERE fc.next_review_date <= CURRENT_TIMESTAMP
+         AND fd.user_id = ?
+         GROUP BY fc.id, fc.front, fc.next_review_date, fd.id, fd.title, fd.subject_id, la.mastery_percentage
+         ORDER BY
+           la.mastery_percentage ASC,
+           fc.next_review_date ASC,
+           failure_rate DESC
+         LIMIT 20`,
+        [userId, userId, userId],
+        (err, rows) => {
+          if (err) {
+            console.error(`[Analytics] Error en getReviewPredictions para userId=${userId}:`, err);
+            return res.status(500).json({ error: err.message });
+          }
 
-      res.json({ dueCount: predictions.length, cards: predictions });
+          const predictions = (rows || []).map(card => ({
+            cardId: card.id,
+            question: card.front,
+            deckId: card.deck_id,
+            deckTitle: card.deck_title,
+            subjectId: card.subject_id || 0,
+            mastery: card.mastery_percentage || 0,
+            urgency: (card.mastery_percentage || 0) < 50 ? 'HIGH' : 'MEDIUM',
+            failureRate: Math.round(card.failure_rate * 100),
+          }));
+
+          // dueCount = número de MAZOS con tarjetas vencidas (no tarjetas individuales)
+          res.json({
+            dueCount: dueDeckCount,
+            deckCount: dueDeckCount,
+            cards: predictions,
+          });
+        }
+      );
     }
   );
 };

@@ -97,9 +97,13 @@ exports.getFlashcardDecks = (req, res) => {
 exports.getFlashcardDecksWithMetrics = (req, res) => {
   const userId = req.query.user_id;
   if (!userId) return res.status(400).json({ error: 'Se requiere user_id' });
-  
+
+  // NOTA: Todas las métricas de conteo se calculan como subconsultas escalares
+  // para evitar conflictos de GROUP BY con el LEFT JOIN de learning_analytics.
+  // COALESCE(MAX(...)) en ORDER BY fue reemplazado por el alias 'deck_mastery'
+  // ya calculado en el SELECT para evitar que SQLite descarte filas silenciosamente.
   const query = `
-    SELECT 
+    SELECT
       fd.*,
       s.name as subject_name,
       s.color as subject_color,
@@ -111,15 +115,14 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
       CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.status = 'review') AS INTEGER) as review_count,
       CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.status = 'learning') AS INTEGER) as learning_count,
       CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.status = 'new') AS INTEGER) as new_count,
-      CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND (fc.item_type = 'multiple_choice' OR fc.item_type IS NULL AND 0=1)) AS INTEGER) as mc_count,
+      CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.item_type = 'multiple_choice') AS INTEGER) as mc_count,
       CAST((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.item_type = 'boolean') AS INTEGER) as boolean_count,
       COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= CURRENT_TIMESTAMP), 0) as due_count,
-      COALESCE(la.mastery_percentage, 0) as deck_mastery
+      COALESCE((SELECT la.mastery_percentage FROM learning_analytics la WHERE la.subject_id = fd.subject_id AND la.user_id = ? LIMIT 1), 0) as deck_mastery
     FROM flashcard_decks fd
     JOIN users u ON fd.user_id = u.id
     LEFT JOIN subjects s ON fd.subject_id = s.id
-    LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
-    WHERE fd.user_id = ? 
+    WHERE fd.user_id = ?
        OR fd.id IN (
          SELECT sd.deck_id FROM shared_decks sd
          WHERE sd.shared_to_user_id = ?
@@ -133,18 +136,20 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
            WHERE gm.user_id = ?
          )
        )
-    GROUP BY fd.id
-    ORDER BY 
-      (COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= CURRENT_TIMESTAMP), 0)) DESC,
-      COALESCE(MAX(la.mastery_percentage), 0) ASC,
+    ORDER BY
+      due_count DESC,
+      learning_count DESC,
+      new_count DESC,
+      deck_mastery ASC,
       fd.created_at DESC
   `;
-  
+
   db.all(query, [userId, userId, userId, userId], (err, rows) => {
     if (err) {
       console.error('[FlashcardMetrics] Error:', err);
       return res.status(500).json({ error: err.message });
     }
+    console.log(`[FlashcardMetrics] userId=${userId} → ${(rows || []).length} mazos devueltos`);
     res.json(rows || []);
   });
 };
@@ -258,8 +263,15 @@ exports.getCardsByDeckPrioritized = (req, res) => {
      GROUP BY fc.id
      ORDER BY 
        CASE WHEN fc.next_review_date <= CURRENT_TIMESTAMP THEN 0 ELSE 1 END ASC,
-       fc.next_review_date ASC,
+       CASE fc.status 
+         WHEN 'learning' THEN 0 
+         WHEN 'new' THEN 1 
+         WHEN 'review' THEN 2 
+         ELSE 3 
+       END ASC,
+       fc.fsrs_difficulty DESC,
        failure_rate DESC,
+       fc.next_review_date ASC,
        fc.created_at ASC`,
     [userId, deckId],
     (err, rows) => {
@@ -486,7 +498,13 @@ exports.deleteCard = (req, res) => {
 };
 
 /**
- * Eliminar un mazo completo o quitar un mazo compartido de la lista del usuario
+ * Eliminar un mazo completo o quitar un mazo compartido de la lista del usuario.
+ *
+ * FIX: La eliminación en cascada manual (flashcards → shared_decks → flashcard_decks)
+ * fue reemplazada por un único DELETE en flashcard_decks, confiando en las
+ * constraints ON DELETE CASCADE del schema. Esto es atómico y evita estados
+ * inconsistentes si una eliminación intermedia fallaba silenciosamente.
+ * Se requiere PRAGMA foreign_keys = ON (habilitado en la inicialización de la DB).
  */
 exports.deleteDeck = (req, res) => {
   const { deckId } = req.params;
@@ -499,15 +517,18 @@ exports.deleteDeck = (req, res) => {
     if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
 
     if (deck.user_id === Number(user_id)) {
-      db.run(`DELETE FROM flashcards WHERE deck_id = ?`, [deckId], (errCards) => {
-        if (errCards) return res.status(500).json({ error: errCards.message });
-        db.run(`DELETE FROM shared_decks WHERE deck_id = ?`, [deckId], (errShared) => {
-          if (errShared) return res.status(500).json({ error: errShared.message });
-          db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], function(errDeck) {
-            if (errDeck) return res.status(500).json({ error: errDeck.message });
-            res.json({ success: true, message: 'Mazo y todo su contenido eliminado permanentemente.' });
-          });
-        });
+      // Eliminar el mazo directamente — flashcards, shared_decks, card_logs,
+      // review_predictions y card_snoozes se eliminan en cascada por el schema.
+      db.run(`DELETE FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], function(errDeck) {
+        if (errDeck) {
+          console.error('[DeleteDeck] Error eliminando mazo:', errDeck);
+          return res.status(500).json({ error: errDeck.message });
+        }
+        if (this.changes === 0) {
+          return res.status(404).json({ error: 'Mazo no encontrado o sin permisos.' });
+        }
+        console.log(`[DeleteDeck] Mazo ${deckId} eliminado por usuario ${user_id}`);
+        res.json({ success: true, message: 'Mazo y todo su contenido eliminado permanentemente.' });
       });
     } else {
       db.run(

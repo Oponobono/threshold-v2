@@ -5,6 +5,9 @@ const { migrateColumnsSqlite } = require('./migrations');
 const initializeSqliteDb = (db) => {
   return new Promise((resolve) => {
     db.serialize(async () => {
+      // Asegurar que foreign keys estén ON para esta sesión
+      db.run('PRAGMA foreign_keys = ON');
+
       // Crear todas las tablas
       for (const [tableName, schema] of Object.entries(tableSchema)) {
         db.run(schema.sqlite, (err) => {

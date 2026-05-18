@@ -853,8 +853,9 @@ export default function HybridDashboardScreen() {
                   >
                     <MaterialCommunityIcons name="pause-circle" size={18} color={theme.colors.warning} />
                   </TouchableOpacity>
-                  <View style={[styles.allChip, { backgroundColor: theme.colors.dangerTransparent, borderWidth: 1, borderColor: theme.colors.danger + '20' }]}>
+                  <View style={[styles.allChip, { backgroundColor: theme.colors.dangerTransparent, borderWidth: 1, borderColor: theme.colors.danger + '20', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                     <Text style={[styles.allChipText, { color: theme.colors.danger, fontWeight: '800' }]}>{predictions.dueCount}</Text>
+                    <Text style={[styles.allChipText, { color: theme.colors.danger, fontWeight: '500', fontSize: 10 }]}>{t('dashboard.decks', 'mazos')}</Text>
                   </View>
                 </View>
               </View>
@@ -865,7 +866,9 @@ export default function HybridDashboardScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.nextClassTitle} numberOfLines={1}>{t('dashboard.attentionRequired', 'Atención Requerida')}</Text>
                   <Text style={styles.nextClassRoom} numberOfLines={1}>
-                    {t('dashboard.cardsToForget', 'Tienes tarjetas por revisar.')}
+                    {predictions.dueCount === 1
+                      ? t('dashboard.deckToReview', '1 mazo listo para repasar.')
+                      : t('dashboard.decksToReview', `${predictions.dueCount} mazos listos para repasar.`, { count: predictions.dueCount })}
                   </Text>
                 </View>
                 <TouchableOpacity

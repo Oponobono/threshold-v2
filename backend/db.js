@@ -76,6 +76,17 @@ if (isProduction) {
       console.error('❌ Error al conectar con SQLite:', err.message);
     } else {
       console.log('✓ Conectado a SQLite.');
+      // CRITICAL: Habilitar foreign keys en SQLite.
+      // Sin esto, ON DELETE CASCADE es completamente ignorado,
+      // causando que al eliminar un deck NO se eliminen sus flashcards,
+      // card_logs, review_predictions, card_snoozes, etc.
+      db.run('PRAGMA foreign_keys = ON', (pragmaErr) => {
+        if (pragmaErr) {
+          console.error('❌ Error habilitando foreign_keys:', pragmaErr.message);
+        } else {
+          console.log('✓ PRAGMA foreign_keys = ON habilitado.');
+        }
+      });
     }
   });
 }
