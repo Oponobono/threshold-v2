@@ -403,6 +403,7 @@ export function useAudioRecorder() {
             targetUri = item.cloud_url;
           } else {
             alertRef.show({ title: 'Error', message: 'El archivo local no existe y no hay respaldo en la nube.', type: 'error' });
+            isPlayingRef.current = false;
             return;
           }
         }
@@ -415,18 +416,19 @@ export function useAudioRecorder() {
 
       setSound(newSound);
       setPlayingId(id);
+      // isPlayingRef.current se mantiene en true hasta que termina la reproducción
 
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
           setPlayingId(null);
-          isPlayingRef.current = false;
+          setSound(null);
+          isPlayingRef.current = false; // Solo reset cuando termina la reproducción
         }
       });
     } catch (error) {
       console.error('Error playing sound', error);
       alertRef.show({ title: 'Error', message: 'No se pudo reproducir el audio.', type: 'error' });
-    } finally {
-      isPlayingRef.current = false;
+      isPlayingRef.current = false; // Reset en caso de error
     }
   }
 
@@ -440,8 +442,8 @@ export function useAudioRecorder() {
       }
       setSound(null);
       setPlayingId(null);
-      isPlayingRef.current = false;
     }
+    isPlayingRef.current = false; // Reset siempre después de detener
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
@@ -511,7 +513,7 @@ export function useAudioRecorder() {
   }
 
   // ── Cleanup helper ─────────────────────────────────────────────────────────
-  async function cleanupAudio() {
+  const cleanupAudio = useCallback(async () => {
     isPlayingRef.current = false;
     if (sound) {
       try {
@@ -523,7 +525,7 @@ export function useAudioRecorder() {
       setSound(null);
       setPlayingId(null);
     }
-  }
+  }, [sound]);
 
   return {
     recording,

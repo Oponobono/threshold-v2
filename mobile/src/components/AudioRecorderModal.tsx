@@ -55,6 +55,13 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ isVisibl
       cleanupAudio();
     }
   }, [isVisible, cleanupAudio]);
+
+  // Safety cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      cleanupAudio();
+    };
+  }, [cleanupAudio]);
   const meterAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     // Map dBFS to 0-1: silence=-160 → 0, loud=0 → 1 (clamped)
