@@ -46,23 +46,25 @@ export const MultipleChoiceView: React.FC<Props> = ({
 
 
 
+  const correctIdx = Number(content.correctIndex);
+
   const getOptionStyle = (index: number) => {
     if (!isAnswered) return [s.option];
-    if (index === content.correctIndex) return [s.option, s.optionCorrect];
+    if (index === correctIdx) return [s.option, s.optionCorrect];
     if (index === selectedIndex) return [s.option, s.optionWrong];
     return [s.option, s.optionDimmed];
   };
 
   const getOptionTextStyle = (index: number) => {
     if (!isAnswered) return s.optionText;
-    if (index === content.correctIndex) return [s.optionText, { color: '#2E7D32' }];
+    if (index === correctIdx) return [s.optionText, { color: '#2E7D32' }];
     if (index === selectedIndex) return [s.optionText, { color: '#C62828' }];
     return [s.optionText, { color: theme.colors.text.placeholder }];
   };
 
   const getLabelStyle = (index: number) => {
     if (!isAnswered) return [s.optionLabel];
-    if (index === content.correctIndex) return [s.optionLabel, s.optionLabelCorrect];
+    if (index === correctIdx) return [s.optionLabel, s.optionLabelCorrect];
     if (index === selectedIndex) return [s.optionLabel, s.optionLabelWrong];
     return [s.optionLabel, s.optionLabelDimmed];
   };
@@ -113,20 +115,18 @@ export const MultipleChoiceView: React.FC<Props> = ({
               <Text style={s.optionLabelText}>{OPTION_LABELS[index]}</Text>
             </View>
             <Text style={getOptionTextStyle(index)}>{option}</Text>
-            {isAnswered && index === content.correctIndex && (
-              <Ionicons name="checkmark-circle" size={16} color="#2E7D32" style={s.optionIcon} />
+            
+            {/* Íconos en la esquina superior derecha */}
+            {isAnswered && index === correctIdx && (
+              <Ionicons name="checkmark-circle" size={20} color="#2E7D32" style={s.resultIcon} />
             )}
-            {isAnswered && index === selectedIndex && index !== content.correctIndex && (
-              <Ionicons name="close-circle" size={16} color="#C62828" style={s.optionIcon} />
+            {isAnswered && index === selectedIndex && index !== correctIdx && (
+              <Ionicons name="close-circle" size={20} color="#C62828" style={s.resultIcon} />
             )}
-            {isAnswered && index !== content.correctIndex && index !== selectedIndex && (
-              <Ionicons name="close-circle" size={16} color="#9E9E9E" style={s.optionIcon} />
-            )}
+            {/* Opcional: mostrar un icono gris si no fue seleccionada ni es correcta (comentado para mantenerlo limpio como pide el usuario) */}
           </TouchableOpacity>
         ))}
       </View>
-
-
 
       <View style={{ height: 16 }} />
     </ScrollView>
@@ -160,9 +160,9 @@ const s = StyleSheet.create({
   optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   option: {
     width: '47.5%', backgroundColor: theme.colors.inputBackground,
-    borderRadius: 16, padding: 14, borderWidth: 1.5,
+    borderRadius: 16, padding: 14, paddingRight: 28, borderWidth: 2,
     borderColor: theme.colors.border, flexDirection: 'row',
-    alignItems: 'center', gap: 10, minHeight: 64,
+    alignItems: 'center', gap: 10, minHeight: 74,
   },
   optionCorrect: {
     backgroundColor: '#E8F5E9', borderColor: '#4CAF50',
@@ -183,7 +183,7 @@ const s = StyleSheet.create({
     flex: 1, fontSize: 13, fontWeight: '500',
     color: theme.colors.text.primary, lineHeight: 18,
   },
-  optionIcon: { marginLeft: 'auto' as any },
+  resultIcon: { position: 'absolute' as any, top: 10, right: 10 },
   explanationBox: {
     flexDirection: 'row', gap: 10, alignItems: 'flex-start',
     backgroundColor: 'rgba(0,122,255,0.07)', borderRadius: 14,

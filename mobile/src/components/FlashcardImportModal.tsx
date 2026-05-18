@@ -89,7 +89,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   };
 
   const handleDownloadTemplate = async () => {
-    const templateDeck: DeckJSON = {
+    const templateDeck: any = {
+      _INSTRUCCIONES_: "IMPORTANTE: Para 'multiple_choice', las opciones se numeran desde 0 (0=Opción1, 1=Opción2, 2=Opción3, 3=Opción4). Para 'boolean', usa true o false sin comillas.",
       title: 'Mi Mazo Ejemplo',
       description: 'Descripción del mazo (opcional)',
       subject_id: 1, // ID de la materia (opcional)
@@ -107,17 +108,19 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
           type: 'multiple_choice',
           data: {
             question: '¿Cuál es la capital de Francia?',
-            options: ['París', 'Londres', 'Berlín', 'Madrid'],
-            correct_index: 0,
+            options: ['París (Índice 0)', 'Londres (Índice 1)', 'Berlín (Índice 2)', 'Madrid (Índice 3)'],
+            correctIndex: 0,
           },
+          hint: 'Tiene la Torre Eiffel',
           explanation: 'París es la capital de Francia',
         },
         {
           type: 'boolean',
           data: {
             question: '¿2 + 2 = 4?',
-            correct_answer: true,
+            correctAnswer: true,
           },
+          hint: 'Es una suma aritmética simple',
           explanation: 'Matemáticas básicas',
         },
       ],
@@ -215,10 +218,21 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
               continue;
             }
 
+            // Normalizar las llaves del JSON si vienen en snake_case
+            const normalizedData = { ...card.data };
+            if (normalizedData.correct_index !== undefined) {
+              normalizedData.correctIndex = normalizedData.correct_index;
+              delete normalizedData.correct_index;
+            }
+            if (normalizedData.correct_answer !== undefined) {
+              normalizedData.correctAnswer = normalizedData.correct_answer;
+              delete normalizedData.correct_answer;
+            }
+
             await createEvaluationItem({
               deck_id: newDeck.id,
               item_type: itemType as 'flashcard' | 'multiple_choice' | 'boolean',
-              content_json: card.data,
+              content_json: normalizedData,
               hint: card.hint,
               explanation: card.explanation,
             });

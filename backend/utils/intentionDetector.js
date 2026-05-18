@@ -170,7 +170,7 @@ function buildDeckActionBlock(mode, count) {
 function parseDeckActionBlock(response) {
   if (!response) return { hasAction: false, deckAction: null, cleanResponse: response };
 
-  const pattern = /%%DECK_ACTION%%(.+?)%%END%%/;
+  const pattern = /%+DECK_ACTION%+([\s\S]+?)%+END%+/;
   const match = response.match(pattern);
 
   if (!match || !match[1]) {

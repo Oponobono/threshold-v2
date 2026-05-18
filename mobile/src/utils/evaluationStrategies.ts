@@ -132,7 +132,18 @@ export function adaptFlashcardsToEvaluationItems(cards: any[]): EvaluationItem[]
       if (itemType === 'flashcard') {
         content = { front: card.front || '', back: card.back || '' };
       } else {
-        try { content = JSON.parse(card.content_json || '{}'); } catch (_) { content = {}; }
+        try { 
+          content = JSON.parse(card.content_json || '{}'); 
+          // Normalizar llaves para datos existentes importados con snake_case
+          if (content.correct_index !== undefined) {
+            content.correctIndex = content.correct_index;
+          }
+          if (content.correct_answer !== undefined) {
+            content.correctAnswer = content.correct_answer;
+          }
+        } catch { 
+          content = {}; 
+        }
       }
     }
 

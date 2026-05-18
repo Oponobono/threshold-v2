@@ -56,7 +56,7 @@ export const dashboardStyles = StyleSheet.create({
     paddingRight: 4,
   },
   subjectTile: {
-    width: 208,
+    width: 160,
     backgroundColor: theme.colors.background,
     borderRadius: theme.borderRadius.lg,
     padding: 14,

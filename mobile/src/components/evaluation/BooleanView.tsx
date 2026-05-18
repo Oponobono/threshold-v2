@@ -42,13 +42,16 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation
     ]).start();
     onAnswer(answer);
   };
-
-
+  // Normalizamos a string para evitar evasión de tipos 'as any' y tolerar 1/0 o strings de la base de datos
+  const normalizedCorrect = String(content.correctAnswer).toLowerCase().trim();
+  const isCorrectTrue = normalizedCorrect === 'true' || normalizedCorrect === '1';
+  const isCorrectFalse = normalizedCorrect === 'false' || normalizedCorrect === '0';
 
   const getBtnStyle = (value: boolean) => {
     const base = [s.boolBtn, value ? s.boolBtnTrue : s.boolBtnFalse];
     if (!isAnswered) return base;
-    if (value === content.correctAnswer) return [...base, s.boolBtnSuccess];
+    const isThisCorrect = value ? isCorrectTrue : isCorrectFalse;
+    if (isThisCorrect) return [...base, s.boolBtnSuccess];
     if (value === selectedAnswer) return [...base, s.boolBtnError];
     return [...base, { opacity: 0.35 }];
   };
@@ -87,16 +90,16 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation
           <TouchableOpacity style={getBtnStyle(true)} onPress={() => handleAnswer(true)} disabled={isAnswered} activeOpacity={0.8}>
             <Text style={s.boolIcon}>✅</Text>
             <Text style={s.boolLabel}>Verdadero</Text>
-            {isAnswered && content.correctAnswer === true && <Ionicons name="checkmark-circle" size={20} color="#2E7D32" style={s.resultIcon} />}
-            {isAnswered && selectedAnswer === true && content.correctAnswer !== true && <Ionicons name="close-circle" size={20} color="#C62828" style={s.resultIcon} />}
+            {isAnswered && isCorrectTrue && <Ionicons name="checkmark-circle" size={24} color="#2E7D32" style={s.resultIcon} />}
+            {isAnswered && selectedAnswer === true && !isCorrectTrue && <Ionicons name="close-circle" size={24} color="#C62828" style={s.resultIcon} />}
           </TouchableOpacity>
         </Animated.View>
         <Animated.View style={[{ flex: 1 }, { transform: [{ scale: falseScale }] }]}>
           <TouchableOpacity style={getBtnStyle(false)} onPress={() => handleAnswer(false)} disabled={isAnswered} activeOpacity={0.8}>
             <Text style={s.boolIcon}>❌</Text>
             <Text style={s.boolLabel}>Falso</Text>
-            {isAnswered && content.correctAnswer === false && <Ionicons name="checkmark-circle" size={20} color="#2E7D32" style={s.resultIcon} />}
-            {isAnswered && selectedAnswer === false && content.correctAnswer !== false && <Ionicons name="close-circle" size={20} color="#C62828" style={s.resultIcon} />}
+            {isAnswered && isCorrectFalse && <Ionicons name="checkmark-circle" size={24} color="#2E7D32" style={s.resultIcon} />}
+            {isAnswered && selectedAnswer === false && !isCorrectFalse && <Ionicons name="close-circle" size={24} color="#C62828" style={s.resultIcon} />}
           </TouchableOpacity>
         </Animated.View>
       </View>

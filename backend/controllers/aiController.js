@@ -358,7 +358,7 @@ ${deckGenerationInstructions}`;
     let deckData = null;
     let cleanReplyContent = result.reply.content;
     
-    const deckActionPattern = /%%DECK_ACTION%%(.+?)%%END%%/;
+    const deckActionPattern = /%+DECK_ACTION%+([\s\S]+?)%+END%+/;
     const deckMatch = result.reply.content.match(deckActionPattern);
     
     if (deckMatch && deckMatch[1]) {

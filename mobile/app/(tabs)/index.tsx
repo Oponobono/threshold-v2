@@ -54,7 +54,7 @@ const SUBJECT_ICONS = [
 
 const SUBJECT_LOOP_THRESHOLD = 4;
 const SUBJECT_LOOP_MULTIPLIER = 16;
-const SUBJECT_CARD_WIDTH = 208;
+const SUBJECT_CARD_WIDTH = 160;
 const SUBJECT_CARD_GAP = 12;
 
 export default function HybridDashboardScreen() {
@@ -191,37 +191,35 @@ export default function HybridDashboardScreen() {
     }, [loadData])
   );
 
-  // ── Cargar predicciones UNA SOLA VEZ al montar el componente ───────────────
-  const predictionsLoadedRef = useRef(false);
+  // ── Cargar predicciones al enfocar la pantalla ───────────────
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile?.id) return;
 
-  useEffect(() => {
-    // Solo ejecutar una vez
-    if (predictionsLoadedRef.current || !profile?.id) return;
-    predictionsLoadedRef.current = true;
+      const loadPredictions = async () => {
+        try {
+          console.log(`[Analytics] Iniciando carga de predicciones para userId=${profile.id}`);
+          const data = await getPredictions(profile.id);
+          console.log(`[Analytics] ✅ Predicciones cargadas exitosamente:`, data);
+          setPredictions(data);
+        } catch (error: any) {
+          console.error(
+            `[Analytics] ❌ Error cargando predicciones para userId=${profile.id}:`,
+            error.message || error
+          );
+          console.warn(
+            `[Analytics] ⚠️ La función getPredictions se ha detenido. ` +
+            `Error: ${error.message || 'Error desconocido'}. ` +
+            `Usando datos por defecto.`
+          );
+          // Fallback: mostrar datos vacíos
+          setPredictions({ dueCount: 0, cards: [] });
+        }
+      };
 
-    const loadPredictions = async () => {
-      try {
-        console.log(`[Analytics] Iniciando carga de predicciones para userId=${profile.id}`);
-        const data = await getPredictions(profile.id);
-        console.log(`[Analytics] ✅ Predicciones cargadas exitosamente:`, data);
-        setPredictions(data);
-      } catch (error: any) {
-        console.error(
-          `[Analytics] ❌ Error cargando predicciones para userId=${profile.id}:`,
-          error.message || error
-        );
-        console.warn(
-          `[Analytics] ⚠️ La función getPredictions se ha detenido. ` +
-          `Error: ${error.message || 'Error desconocido'}. ` +
-          `Usando datos por defecto.`
-        );
-        // Fallback: mostrar datos vacíos (no debería ocurrir normalmente)
-        setPredictions({ dueCount: 0, cards: [] });
-      }
-    };
-
-    loadPredictions();
-  }, [profile?.id]); // ✅ Ejecutar cuando el perfil esté disponible y cargado
+      loadPredictions();
+    }, [profile?.id])
+  );
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';

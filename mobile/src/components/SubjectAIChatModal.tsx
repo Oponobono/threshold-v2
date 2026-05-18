@@ -556,7 +556,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       // ── Verificar si el mazo fue creado automáticamente por el backend ─────────
       if (data?.deck && data.deck.persisted) {
         // El backend ya creó el mazo automáticamente
-        replyContent = replyContent.replace(/%%DECK_ACTION%%[\s\S]*?%%END%%/g, '').trim();
+        replyContent = replyContent.replace(/%+DECK_ACTION%+[\s\S]*?%+END%+/g, '').trim();
         
         const deckMsg = `✅ **¡Mazo creado exitosamente!**\n\n📚 **${data.deck.deckTitle}**\nÍtems: ${data.deck.count}\nTipo: ${data.deck.mode === 'mixed' ? 'Mixto' : data.deck.mode}\n\nEncuéntralo en tu sección de Flashcards → `;
         
@@ -569,10 +569,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         showToast(`¡Mazo "${data.deck.deckTitle}" listo con ${data.deck.count} ítems! 🎉`);
       } else {
         // ── Interceptar señal de generación de mazo (fallback si backend no lo creó) ──
-        const deckSignalMatch = replyContent.match(/%%DECK_ACTION%%(\{[\s\S]*?\})%%END%%/);
+        const deckSignalMatch = replyContent.match(/%+DECK_ACTION%+(\{[\s\S]*?\})%+END%+/);
         if (deckSignalMatch) {
           // Limpiar la señal del mensaje visible
-          replyContent = replyContent.replace(/%%DECK_ACTION%%[\s\S]*?%%END%%/g, '').trim();
+          replyContent = replyContent.replace(/%+DECK_ACTION%+[\s\S]*?%+END%+/g, '').trim();
 
           // Mostrar el mensaje limpio inmediatamente
           setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);

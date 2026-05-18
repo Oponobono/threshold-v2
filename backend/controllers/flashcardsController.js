@@ -81,6 +81,7 @@ exports.getFlashcardDecks = (req, res) => {
            WHERE gm.user_id = ?
          )
        )
+    GROUP BY fd.id
     ORDER BY fd.created_at DESC
   `;
   db.all(query, [userId, userId, userId], (err, rows) => {
@@ -132,9 +133,10 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
            WHERE gm.user_id = ?
          )
        )
+    GROUP BY fd.id
     ORDER BY 
       (COALESCE((SELECT COUNT(*) FROM flashcards fc WHERE fc.deck_id = fd.id AND fc.next_review_date <= CURRENT_TIMESTAMP), 0)) DESC,
-      COALESCE(la.mastery_percentage, 0) ASC,
+      COALESCE(MAX(la.mastery_percentage), 0) ASC,
       fd.created_at DESC
   `;
   
