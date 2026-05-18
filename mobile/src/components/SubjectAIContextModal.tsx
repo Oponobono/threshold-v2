@@ -220,7 +220,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   }, [allItems, selectedIds, onGenerateFlashcards, checkTextReadiness, getToastMessage, showToast]);
 
   return (
-    <Modal visible={isVisible} animationType="slide" transparent onRequestClose={handleClose}>
+    <Modal visible={isVisible} animationType="slide" transparent statusBarTranslucent onRequestClose={handleClose}>
       <View style={s.backdrop}>
         <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
 

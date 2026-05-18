@@ -17,7 +17,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, StyleSheet,
-  Animated, ActivityIndicator, FlatList, Dimensions,
+  Animated, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,9 +68,6 @@ interface ScrollableTableProps {
 }
 
 const ScrollableTable: React.FC<ScrollableTableProps> = ({ headers, rows }) => {
-  const screenWidth = Dimensions.get('window').width;
-  const contentWidth = Math.max(screenWidth - 80, headers.length * 80);
-
   return (
     <View style={tableStyles.container}>
       <ScrollView
@@ -178,7 +175,7 @@ const parseMarkdownTable = (text: string) => {
     }
 
     return rows.length > 0 ? { headers, rows } : null;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
@@ -595,9 +592,23 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         }
       }
     } catch (err: any) {
+      const isGroqLimit = currentProvider === 'groq' && (
+        err.message?.toLowerCase().includes('limit') ||
+        err.message?.toLowerCase().includes('groq') ||
+        err.message?.toLowerCase().includes('too large') ||
+        err.message?.toLowerCase().includes('rate') ||
+        err.message?.toLowerCase().includes('tpm') ||
+        err.message?.toLowerCase().includes('429') ||
+        err.message?.toLowerCase().includes('500')
+      );
+
+      const errorMessage = isGroqLimit
+        ? `⚠️ **Límite de procesamiento alcanzado en el Modelo Rápido ⚡**\n\nHemos superado temporalmente la capacidad de tokens permitida para el motor ultrarrápido de Zyren.\n\n**¿Cómo deseas continuar?**\n\n• **Usa el Modelo de Razonamiento Avanzado 🧠:** Cambia de motor pulsando el ícono del cerebro en la cabecera del chat para seguir estudiando sin interrupciones.\n• **Espera un momento ⏳:** En aproximadamente 1 minuto el canal rápido estará libre nuevamente y podrás seguir conversando.`
+        : `⚠️ **Inconveniente de conexión con Zyren (${currentProvider === 'groq' ? 'Modelo Rápido ⚡' : 'Modelo Avanzado 🧠'})**\n\nNo pudimos procesar tu mensaje debido al siguiente inconveniente:\n*${err.message || 'Error de red o del servidor desconectado'}*.\n\nPor favor, intenta de nuevo en unos instantes o cambia de modelo en la parte superior.`;
+
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `⚠️ Error al conectar con Zyren (${currentProvider}): ${err.message || 'Error desconocido'}.`,
+        content: errorMessage,
       }]);
     } finally {
       setIsLoading(false);
@@ -714,14 +725,15 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       visible={isVisible}
       animationType="slide"
       transparent
+      statusBarTranslucent
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
-        <View style={s.backdrop}>
+      <View style={s.backdrop}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, width: '100%', justifyContent: 'flex-end' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
           <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}>
 
             {/* Asa de arrastre */}
@@ -949,8 +961,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           )}
 
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
@@ -966,6 +978,7 @@ const s = StyleSheet.create({
     backgroundColor: BG_SHEET,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+    overflow: 'hidden',
     height: '92%',
     paddingTop: 12,
     borderTopWidth: 1,
