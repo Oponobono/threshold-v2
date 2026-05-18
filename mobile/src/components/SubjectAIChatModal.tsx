@@ -423,19 +423,43 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
    * Usa buildGenerationContext() para obtener el mejor contexto disponible.
    */
   const handleGenerateMaterial = useCallback(async (overrideMode?: StudyMode, overrideCount?: number) => {
-    if (!subjectId || !userId) return;
+    console.log('[AIChatModal] 🎓 Iniciando handleGenerateMaterial:', {
+      overrideMode,
+      overrideCount,
+      subjectId,
+      userId,
+    });
+
+    if (!subjectId || !userId) {
+      console.warn('[AIChatModal] ⚠️ subjectId o userId faltantes en handleGenerateMaterial!');
+      return;
+    }
+
     const ctx = buildGenerationContext();
+    console.log('[AIChatModal] Contexto de generación obtenido:', {
+      length: ctx?.length || 0,
+      preview: ctx ? ctx.substring(0, 150) : 'vacio',
+    });
+
     if (!ctx.trim()) {
       showToast('Abre una conversación o agrega contexto antes de generar.');
       closeGenPanel();
       return;
     }
+
     setIsGenerating(true);
     const activeMode = overrideMode || genMode;
     const activeCount = overrideCount || parseInt(genCount) || 10;
     const modeLabels: Record<string, string> = { flashcard: 'Flashcards', multiple_choice: 'ECAES', boolean: 'V/F', mixed: 'Mixto' };
     const deckTitle = `${modeLabels[activeMode] || 'Material'} — ${subjectName}`;
+    
     try {
+      console.log('[AIChatModal] 📡 Enviando petición a generateStudyMaterialFromChat:', {
+        mode: activeMode,
+        count: activeCount,
+        title: deckTitle,
+      });
+
       const deck = await generateStudyMaterialFromChat({
         contextText: ctx,
         mode: activeMode,
@@ -444,6 +468,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         subjectId: subjectId!,
         userId: userId!,
       });
+
+      console.log('[AIChatModal] ✅ Respuesta exitosa de generateStudyMaterialFromChat:', deck);
+
       closeGenPanel();
       const aiMsg: Message = {
         role: 'assistant',
@@ -452,6 +479,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       setMessages(prev => [...prev, aiMsg]);
       showToast(`Mazo "${deck.title}" listo con ${deck.card_count} ítems ✅`);
     } catch (err: any) {
+      console.error('[AIChatModal] ❌ Error en generateStudyMaterialFromChat:', {
+        message: err.message,
+        err,
+      });
       showToast(`Error generando: ${err.message}`);
     } finally {
       setIsGenerating(false);
@@ -550,8 +581,17 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
       let replyContent: string = data?.reply?.content || 'Lo siento, no pude procesar tu pregunta.';
 
+      console.log('[AIChatModal] 📥 Respuesta recibida del backend:', {
+        hasData: !!data,
+        hasDeck: !!data?.deck,
+        deckPersisted: data?.deck?.persisted,
+        deckData: data?.deck,
+        replyLength: replyContent?.length,
+      });
+
       // ── Verificar si el mazo fue creado automáticamente por el backend ─────────
       if (data?.deck && data.deck.persisted) {
+        console.log('[AIChatModal] 🎉 Mazo persistido automáticamente por el backend:', data.deck);
         // El backend ya creó el mazo automáticamente
         replyContent = replyContent.replace(/%+DECK_ACTION%+[\s\S]*?%+END%+/g, '').trim();
         
@@ -567,6 +607,11 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       } else {
         // ── Interceptar señal de generación de mazo (fallback si backend no lo creó) ──
         const deckSignalMatch = replyContent.match(/%+DECK_ACTION%+(\{[\s\S]*?\})%+END%+/);
+        console.log('[AIChatModal] 🎯 Chequeo de señal %%DECK_ACTION%% en fallback:', {
+          matched: !!deckSignalMatch,
+          rawSignal: deckSignalMatch ? deckSignalMatch[1] : null,
+        });
+
         if (deckSignalMatch) {
           // Limpiar la señal del mensaje visible
           replyContent = replyContent.replace(/%+DECK_ACTION%+[\s\S]*?%+END%+/g, '').trim();
@@ -580,10 +625,11 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
             const deckParams = JSON.parse(deckSignalMatch[1]);
             const mode: StudyMode = deckParams.mode || 'mixed';
             const count: number = deckParams.count || 10;
+            console.log('[AIChatModal] 🧠 Parse de parámetros %%DECK_ACTION%% exitoso:', { mode, count });
             // Ejecutar generación con los parámetros que Zyren decidió
             await handleGenerateMaterial(mode, count);
-          } catch {
-            // Si falla el parse, igual se muestra el mensaje de Zyren
+          } catch (parseErr: any) {
+            console.error('[AIChatModal] ❌ Error parseando parámetros JSON de la señal:', parseErr.message);
           }
         } else {
           // Respuesta normal del chat sin generación de mazo

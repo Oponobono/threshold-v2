@@ -168,16 +168,28 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
 
     const description = `Material ${mode === 'mixed' ? 'mixto' : mode} generado por Zyren`;
 
+    console.log('[aiController] 🎲 Creando el mazo en la base de datos:', {
+      subject_id,
+      user_id,
+      title,
+      item_count: items.length,
+    });
+
     // Crear el mazo en la BD
     db.run(
       `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
       [subject_id, user_id, title, description],
       function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+          console.error('[aiController] ❌ Error insertando flashcard_deck:', err.message);
+          return res.status(500).json({ error: err.message });
+        }
+        
         const deckId = this.lastID;
+        console.log('[aiController] ✅ Mazo creado en BD con ID:', deckId);
 
         // Insertar todos los ítems
-        const inserts = items.map(item => new Promise((resolve, reject) => {
+        const inserts = items.map((item, idx) => new Promise((resolve, reject) => {
           const itemType = item.type || 'flashcard';
           const content = item.data || {};
           const front = itemType === 'flashcard' ? (content.front || '') : '';
@@ -189,14 +201,28 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
           db.run(
             `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
             [deckId, front, back, itemType, contentStr, hint, explanation],
-            function(e) { if (e) reject(e); else resolve(); }
+            function(e) { 
+              if (e) {
+                console.error(`[aiController] ❌ Error al insertar tarjeta #${idx} en el mazo ${deckId}:`, e.message);
+                reject(e); 
+              } else { 
+                resolve(); 
+              } 
+            }
           );
         }));
 
         Promise.all(inserts)
           .then(() => {
+            console.log(`[aiController] ✅ Insertados con éxito ${inserts.length} ítems en el mazo ${deckId}`);
+            
             db.all(`SELECT * FROM flashcards WHERE deck_id = ? ORDER BY created_at ASC`, [deckId], (e, cards) => {
-              if (e) return res.status(500).json({ error: e.message });
+              if (e) {
+                console.error('[aiController] ❌ Error al recuperar tarjetas recién creadas:', e.message);
+                return res.status(500).json({ error: e.message });
+              }
+              
+              console.log(`[aiController] 📤 Respondiendo exitosamente con ${cards.length} tarjetas.`);
               res.status(201).json({
                 id: deckId, title, description, subject_id, user_id,
                 card_count: cards.length,
@@ -210,12 +236,14 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
             });
           })
           .catch(e => {
+            console.error('[aiController] ❌ Error masivo insertando ítems. Eliminando mazo huérfano:', deckId);
             db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], () => {});
             res.status(500).json({ error: 'Error insertando ítems', details: e.message });
           });
       }
     );
   } catch (err) {
+    console.error('💥 [aiController] Error crítico en generateStudyMaterial:', err);
     res.status(500).json({ error: 'Error generando material de estudio con Zyren', details: err.message });
   }
 };
