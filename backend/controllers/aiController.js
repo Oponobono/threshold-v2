@@ -370,16 +370,22 @@ ${deckGenerationInstructions}`;
   }
 
   try {
+    // Limpiar todos los mensajes para enviar solo { role, content } sin propiedades extra que la API de Groq/Gemini rechazarían
+    const cleanMessages = (messages || []).map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content || ''
+    }));
+
     console.log(`🤖 [${provider.toUpperCase()}Telemetry] Llamando a ${provider.toUpperCase()} API...`);
-    console.log('📋 [Telemetry] Total mensajes en contexto:', messages.length + 1);
+    console.log('📋 [Telemetry] Total mensajes en contexto:', cleanMessages.length + 1);
     
     const startTime = Date.now();
     
     let result;
     if (provider === 'gemini') {
-      result = await callGeminiAPI(messages, systemMessage);
+      result = await callGeminiAPI(cleanMessages, systemMessage);
     } else {
-      result = await callGroqAPI(messages, systemMessage);
+      result = await callGroqAPI(cleanMessages, systemMessage);
     }
 
     const duration = Date.now() - startTime;

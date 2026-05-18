@@ -639,14 +639,19 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         }
       }
     } catch (err: any) {
+      console.warn('[AIChatModal] ❌ Capturado error en handleSend:', {
+        message: err.message,
+        provider: currentProvider,
+        err,
+      });
+
       const isGroqLimit = currentProvider === 'groq' && (
         err.message?.toLowerCase().includes('limit') ||
-        err.message?.toLowerCase().includes('groq') ||
         err.message?.toLowerCase().includes('too large') ||
         err.message?.toLowerCase().includes('rate') ||
         err.message?.toLowerCase().includes('tpm') ||
         err.message?.toLowerCase().includes('429') ||
-        err.message?.toLowerCase().includes('500')
+        err.message?.toLowerCase().includes('exhausted')
       );
 
       const errorMessage = isGroqLimit
