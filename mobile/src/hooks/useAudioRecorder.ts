@@ -145,12 +145,17 @@ export function useAudioRecorder() {
   const [meteringDb, setMeteringDb] = useState<number>(-160);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const isPlayingRef = useRef(false);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   useEffect(() => {
     loadRecordings();
     return () => {
-      if (sound) sound.unloadAsync();
+      if (sound) {
+        sound.unloadAsync().catch(() => {});
+        setSound(null);
+        setPlayingId(null);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -367,8 +372,25 @@ export function useAudioRecorder() {
 
   // ── Playback ───────────────────────────────────────────────────────────────
   async function playSound(uri: string, id: string) {
+    // Prevenir múltiples clicks simultáneos (idempotencia)
+    if (isPlayingRef.current) {
+      console.warn('[useAudioRecorder] Reproducción ya en progreso, ignorando click');
+      return;
+    }
+    isPlayingRef.current = true;
+
     try {
-      if (sound) await sound.unloadAsync();
+      // Detener reproducción anterior ANTES de crear una nueva
+      if (sound) {
+        try {
+          await sound.stopAsync();
+          await sound.unloadAsync();
+        } catch (stopErr) {
+          console.warn('[useAudioRecorder] Error deteniendo audio anterior:', stopErr);
+        }
+        setSound(null);
+        setPlayingId(null);
+      }
 
       let targetUri = uri;
       
@@ -397,18 +419,28 @@ export function useAudioRecorder() {
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
           setPlayingId(null);
+          isPlayingRef.current = false;
         }
       });
     } catch (error) {
       console.error('Error playing sound', error);
       alertRef.show({ title: 'Error', message: 'No se pudo reproducir el audio.', type: 'error' });
+    } finally {
+      isPlayingRef.current = false;
     }
   }
 
   async function stopSound() {
     if (sound) {
-      await sound.stopAsync();
+      try {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+      } catch (err) {
+        console.warn('[useAudioRecorder] Error stopping sound:', err);
+      }
+      setSound(null);
       setPlayingId(null);
+      isPlayingRef.current = false;
     }
   }
 
@@ -478,6 +510,21 @@ export function useAudioRecorder() {
     });
   }
 
+  // ── Cleanup helper ─────────────────────────────────────────────────────────
+  async function cleanupAudio() {
+    isPlayingRef.current = false;
+    if (sound) {
+      try {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+      } catch (err) {
+        console.warn('[useAudioRecorder] Cleanup error:', err);
+      }
+      setSound(null);
+      setPlayingId(null);
+    }
+  }
+
   return {
     recording,
     isRecording,
@@ -496,5 +543,6 @@ export function useAudioRecorder() {
     deleteRecordingConfirmed,
     formatDuration,
     loadRecordings,
+    cleanupAudio,
   };
 }

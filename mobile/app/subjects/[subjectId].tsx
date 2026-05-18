@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { globalStyles } from '../../src/styles/globalStyles';
@@ -99,7 +99,16 @@ export default function SubjectDetailScreen() {
   const [recentVideos, setRecentVideos] = useState<YouTubeVideo[]>([]);
   const [allSubjectVideos, setAllSubjectVideos] = useState<YouTubeVideo[]>([]);
 
-  const { playSound, stopSound, playingId, deleteRecordingConfirmed, recordings } = useAudioRecorder();
+  const { playSound, stopSound, playingId, deleteRecordingConfirmed, recordings, cleanupAudio } = useAudioRecorder();
+
+  // Stop audio when leaving the subject screen
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        cleanupAudio();
+      };
+    }, [cleanupAudio])
+  );
 
   // All recordings for this subject (used by the AI context modal — not sliced)
   const allSubjectRecordings = useMemo(() => {

@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { View, Text, Modal, TouchableOpacity, Animated, FlatList, Easing, Pressable } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/theme';
 import { dashboardStyles as styles } from '../styles/Dashboard.styles';
@@ -46,9 +46,15 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ isVisibl
     deleteRecordingConfirmed,
     formatDuration,
     loadRecordings,
+    cleanupAudio,
   } = useAudioRecorder();
 
-  // Smooth metering animation: dBFS (-160…0) → normalised 0…1
+  // Stop audio playback when modal closes
+  useEffect(() => {
+    if (!isVisible) {
+      cleanupAudio();
+    }
+  }, [isVisible, cleanupAudio]);
   const meterAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     // Map dBFS to 0-1: silence=-160 → 0, loud=0 → 1 (clamped)

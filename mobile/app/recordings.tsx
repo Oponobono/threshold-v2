@@ -80,7 +80,17 @@ export default function RecordingsScreen() {
     playSound,
     stopSound,
     formatDuration,
+    cleanupAudio,
   } = audioContext;
+
+  // Stop audio when leaving the screen
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        cleanupAudio();
+      };
+    }, [cleanupAudio])
+  );
 
   /**
    * Alterna la visibilidad de la barra de búsqueda con una animación de rebote (spring).

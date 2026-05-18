@@ -132,8 +132,17 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // ---------------------------------------------------------------------------
   useEffect(() => {
     return () => {
-      soundRef.current?.unloadAsync().catch(() => {});
-      soundRef.current = null;
+      // Stop playback and cleanup
+      if (soundRef.current) {
+        try {
+          soundRef.current.stopAsync().catch(() => {});
+          soundRef.current.unloadAsync().catch(() => {});
+        } catch (err) {
+          console.warn('[RecordingDetail] Cleanup error:', err);
+        }
+        soundRef.current = null;
+      }
+      setIsPlaying(false);
     };
   }, []);
 
