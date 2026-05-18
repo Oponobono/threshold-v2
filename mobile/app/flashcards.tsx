@@ -32,6 +32,9 @@ import { useCustomAlert } from '../src/components/CustomAlert';
 import { FlashcardNewCardScreen } from '../src/components/FlashcardNewCardScreen';
 import { FlashcardStudyScreenStandalone } from '../src/components/FlashcardStudyScreenStandalone';
 import { useFlashcardsManager } from '../src/hooks/useFlashcardsManager';
+import { useDataStore } from '../src/store/useDataStore';
+import { AnimatedDueBorder } from '../src/components/AnimatedDueBorder';
+import { AnimatedMarchingAntsBorder } from '../src/components/AnimatedMarchingAntsBorder';
 import { getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck } from '../src/services/api';
 
 /**
@@ -56,6 +59,7 @@ const DeckCard = React.memo(({
   deck, 
   isShared, 
   currentUserId,
+  isDue,
   onPress, 
   onLongPress,
   t 
@@ -63,93 +67,108 @@ const DeckCard = React.memo(({
   deck: FlashcardDeck;
   isShared: boolean;
   currentUserId: number | null;
+  isDue: boolean;
   onPress: () => void;
   onLongPress: () => void;
   t: any;
-}) => (
-  <Pressable
-    onPress={onPress}
-    onLongPress={onLongPress}
-    delayLongPress={500}
-    style={({ pressed }) => ({
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: pressed ? flashcardStyles.deckCard.backgroundColor + '80' : flashcardStyles.deckCard.backgroundColor,
-      borderRadius: 18,
-      padding: 14,
-      borderWidth: 1,
-      borderColor: flashcardStyles.deckCard.borderColor,
-      gap: 12,
-      opacity: pressed ? 0.7 : 1,
-    })}
-  >
-    <View
-      style={{
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: (deck as any).subject_color || '#DDE7FF',
-      }}
+}) => {
+  const [deckCardSize, setDeckCardSize] = useState({ width: 0, height: 0 });
+
+  return (
+    <AnimatedMarchingAntsBorder
+      width={deckCardSize.width}
+      height={deckCardSize.height}
+      borderRadius={18}
+      strokeColor={theme.colors.danger}
+      strokeWidth={1}
+      always={isDue}
     >
-      <MaterialCommunityIcons
-        name={isShared ? 'account-group-outline' : (((deck as any).subject_icon as any) || 'cards-outline')}
-        size={20}
-        color={theme.colors.text.primary}
-      />
-    </View>
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        onLayout={(e) => setDeckCardSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+        delayLongPress={500}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: pressed ? flashcardStyles.deckCard.backgroundColor + '80' : flashcardStyles.deckCard.backgroundColor,
+          borderRadius: 18,
+          padding: 14,
+          borderWidth: isDue ? 0 : 1,
+          borderColor: isDue ? 'transparent' : flashcardStyles.deckCard.borderColor,
+          gap: 12,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <View
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: (deck as any).subject_color || '#DDE7FF',
+          }}
+        >
+          <MaterialCommunityIcons
+            name={isShared ? 'account-group-outline' : (((deck as any).subject_icon as any) || 'cards-outline')}
+            size={20}
+            color={theme.colors.text.primary}
+          />
+        </View>
 
-    <View style={{ flex: 1 }}>
-      <Text
-        style={{
-          fontSize: 15,
-          fontWeight: '700',
-          color: theme.colors.text.primary,
-        }}
-        numberOfLines={1}
-        ellipsizeMode="tail"
-      >
-        {deck.title}
-      </Text>
-      {isShared && (
-        <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2, marginTop: 2 }}>
-          <Ionicons name="people" size={10} color="#388E3C" />
-          {' '}{t('modals.shared', 'Compartido')} {t('flashcards.sharedBy', 'por')} @{(deck as any).owner_username || (deck as any).owner_name || t('flashcards.peer', 'compañero')}
-        </Text>
-      )}
-      <Text
-        style={{
-          fontSize: 12,
-          color: theme.colors.text.secondary,
-          marginTop: 1,
-        }}
-        numberOfLines={1}
-      >
-        {(deck as any).subject_name || t('flashcards.noSubject', 'Sin materia')}
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
-        <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
-          {Number(deck.card_count ?? 0)} {t('flashcards.cards')}
-        </Text>
-        {Number(deck.card_count ?? 0) > 0 && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 11, color: '#388E3C', fontWeight: '600' }}>
-              ✓ {Number((deck as any).review_count ?? 0)}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: '700',
+              color: theme.colors.text.primary,
+            }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {deck.title}
+          </Text>
+          {isShared && (
+            <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2, marginTop: 2 }}>
+              <Ionicons name="people" size={10} color="#388E3C" />
+              {' '}{t('modals.shared', 'Compartido')} {t('flashcards.sharedBy', 'por')} @{(deck as any).owner_username || (deck as any).owner_name || t('flashcards.peer', 'compañero')}
             </Text>
-            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>
-              💪 {Number((deck as any).learning_count ?? 0) + Number((deck as any).new_count ?? 0)}
+          )}
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.colors.text.secondary,
+              marginTop: 1,
+            }}
+            numberOfLines={1}
+          >
+            {(deck as any).subject_name || t('flashcards.noSubject', 'Sin materia')}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+              {Number(deck.card_count ?? 0)} {t('flashcards.cards')}
             </Text>
+            {Number(deck.card_count ?? 0) > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 11, color: '#388E3C', fontWeight: '600' }}>
+                  ✓ {Number((deck as any).review_count ?? 0)}
+                </Text>
+                <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>
+                  💪 {Number((deck as any).learning_count ?? 0) + Number((deck as any).new_count ?? 0)}
+                </Text>
+              </View>
+            )}
           </View>
-        )}
-      </View>
-    </View>
+        </View>
 
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      <AnimatedArrow />
-    </View>
-  </Pressable>
-));
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <AnimatedArrow />
+        </View>
+      </Pressable>
+    </AnimatedMarchingAntsBorder>
+  );
+});
 
 /**
  * Pantalla de Mazos de Flashcards
@@ -162,6 +181,7 @@ export default function FlashcardsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { showAlert } = useCustomAlert();
+  const { refreshPredictions, getDuedeckIds } = useDataStore();
 
   const [showSearch, setShowSearch] = useState(false);
   const [showNewDeckModal, setShowNewDeckModal] = useState(false);
@@ -233,6 +253,11 @@ export default function FlashcardsScreen() {
             try {
               await deleteFlashcardDeck(deck.id);
               await loadDecks();
+              // Refrescar predicciones después de eliminar el mazo
+              const userId = await getUserId();
+              if (userId) {
+                await refreshPredictions(userId);
+              }
             } catch (e: any) {
               showAlert({ title: t('common.error', 'Error'), message: e.message || 'Error al eliminar el mazo', type: 'error' });
             }
@@ -240,7 +265,7 @@ export default function FlashcardsScreen() {
         },
       ],
     });
-  }, [t, showAlert, loadDecks]);
+  }, [t, showAlert, loadDecks, refreshPredictions]);
 
   const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
     const pillWidth = 101; // 50 (add btn) + 1 (divider) + 50 (delete btn)
@@ -566,6 +591,8 @@ export default function FlashcardsScreen() {
           }
           renderItem={({ item: deck }) => {
             const isShared = deck.user_id != null && Number(deck.user_id) !== Number(currentUserId);
+            const duedeckIds = getDuedeckIds();
+            const isDue = duedeckIds.has(deck.id);
             return (
                 <SwipeableCard
                   onOpen={(closeFn) => {
@@ -580,6 +607,7 @@ export default function FlashcardsScreen() {
                     deck={deck}
                     isShared={isShared}
                     currentUserId={currentUserId}
+                    isDue={isDue}
                     onPress={() => handleOpenStudy(deck)}
                     onLongPress={() => handleOpenEditDeck(deck)}
                     t={t}

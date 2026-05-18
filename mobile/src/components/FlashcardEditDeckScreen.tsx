@@ -6,6 +6,7 @@ import { theme } from '../styles/theme';
 import { flashcardsStyles as s } from '../styles/FlashcardsModal.styles';
 import { Subject, updateFlashcardDeck, type FlashcardDeck } from '../services/api';
 import { useCustomAlert } from './CustomAlert';
+import { AnimatedMarchingAntsBorder } from './AnimatedMarchingAntsBorder';
 
 interface Props {
   deck: FlashcardDeck;
@@ -32,6 +33,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
   const [deckTitle, setDeckTitle] = useState(deck.title);
   const [deckSubjectId, setDeckSubjectId] = useState<number | null>(deck.subject_id || null);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
+  const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
 
   const handleSaveDeck = async () => {
     if (!deckTitle.trim()) {
@@ -54,79 +56,91 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-      <View style={[s.modalHeader, { justifyContent: 'space-between', marginBottom: 16 }]}>
-        <Text style={[s.modalTitle, { flex: 1, textAlign: 'left' }]}>{t('flashcards.editDeck', 'Editar Mazo')}</Text>
-        <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="close" size={24} color={theme.colors.text.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <Text style={s.formLabel}>{t('flashcards.deckName')}</Text>
-      <TextInput
-        style={s.input}
-        value={deckTitle}
-        onChangeText={setDeckTitle}
-        placeholder={t('flashcards.deckNamePlaceholder')}
-        placeholderTextColor={theme.colors.text.placeholder}
-      />
-
-      <Text style={[s.formLabel, { marginTop: 16 }]}>{t('flashcards.subject')}</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.subjectScrollContainer}
+      <AnimatedMarchingAntsBorder
+        width={contentSize.width}
+        height={contentSize.height}
+        borderRadius={16}
+        strokeColor={theme.colors.primary}
+        strokeWidth={1}
       >
-        <TouchableOpacity
-          style={[
-            styles.subjectItem,
-            deckSubjectId === null && {
-              backgroundColor: theme.colors.primary + '20',
-              borderColor: theme.colors.primary,
-              borderWidth: 1.5,
-            },
-          ]}
-          onPress={() => setDeckSubjectId(null)}
+        <View
+          onLayout={(e) => setContentSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
         >
-          <Text style={[styles.subjectName, deckSubjectId === null && { color: theme.colors.primary, fontWeight: '700' }]}>
-            {t('flashcards.noSubject', 'Sin materia')}
-          </Text>
-          {deckSubjectId === null && (
-            <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} style={{ marginLeft: 6 }} />
-          )}
-        </TouchableOpacity>
-        {subjects.map((sub) => (
-          <TouchableOpacity
-            key={sub.id}
-            style={[
-              styles.subjectItem,
-              deckSubjectId === sub.id && {
-                backgroundColor: (sub.color || theme.colors.primary) + '20',
-                borderColor: sub.color || theme.colors.primary,
-                borderWidth: 1.5,
-              },
-            ]}
-            onPress={() => setDeckSubjectId(sub.id)}
-          >
-            <View style={[styles.subjectBadge, { backgroundColor: sub.color || '#CCC' }]}>
-              <MaterialCommunityIcons name={(sub.icon as any) || 'book-outline'} size={14} color="white" />
-            </View>
-            <Text style={[styles.subjectName, deckSubjectId === sub.id && { color: sub.color || theme.colors.primary, fontWeight: '700' }]}>
-              {sub.name}
-            </Text>
-            {deckSubjectId === sub.id && (
-              <Ionicons name="checkmark-circle" size={16} color={sub.color || theme.colors.primary} style={{ marginLeft: 6 }} />
-            )}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+          <View style={[s.modalHeader, { justifyContent: 'space-between', marginBottom: 16 }]}>
+            <Text style={[s.modalTitle, { flex: 1, textAlign: 'left' }]}>{t('flashcards.editDeck', 'Editar Mazo')}</Text>
+            <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+            </TouchableOpacity>
+          </View>
 
-      <TouchableOpacity
-        style={[styles.submitBtn, isSavingDeck && { opacity: 0.6 }, { marginTop: 24 }]}
-        onPress={handleSaveDeck}
-        disabled={isSavingDeck}
-      >
-        <Text style={styles.submitBtnText}>{isSavingDeck ? '...' : t('common.save', 'Guardar')}</Text>
-      </TouchableOpacity>
+          <Text style={s.formLabel}>{t('flashcards.deckName')}</Text>
+          <TextInput
+            style={s.input}
+            value={deckTitle}
+            onChangeText={setDeckTitle}
+            placeholder={t('flashcards.deckNamePlaceholder')}
+            placeholderTextColor={theme.colors.text.placeholder}
+          />
+
+          <Text style={[s.formLabel, { marginTop: 16 }]}>{t('flashcards.subject')}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.subjectScrollContainer}
+          >
+            <TouchableOpacity
+              style={[
+                styles.subjectItem,
+                deckSubjectId === null && {
+                  backgroundColor: theme.colors.primary + '20',
+                  borderColor: theme.colors.primary,
+                  borderWidth: 1.5,
+                },
+              ]}
+              onPress={() => setDeckSubjectId(null)}
+            >
+              <Text style={[styles.subjectName, deckSubjectId === null && { color: theme.colors.primary, fontWeight: '700' }]}>
+                {t('flashcards.noSubject', 'Sin materia')}
+              </Text>
+              {deckSubjectId === null && (
+                <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} style={{ marginLeft: 6 }} />
+              )}
+            </TouchableOpacity>
+            {subjects.map((sub) => (
+              <TouchableOpacity
+                key={sub.id}
+                style={[
+                  styles.subjectItem,
+                  deckSubjectId === sub.id && {
+                    backgroundColor: (sub.color || theme.colors.primary) + '20',
+                    borderColor: sub.color || theme.colors.primary,
+                    borderWidth: 1.5,
+                  },
+                ]}
+                onPress={() => setDeckSubjectId(sub.id)}
+              >
+                <View style={[styles.subjectBadge, { backgroundColor: sub.color || '#CCC' }]}>
+                  <MaterialCommunityIcons name={(sub.icon as any) || 'book-outline'} size={14} color="white" />
+                </View>
+                <Text style={[styles.subjectName, deckSubjectId === sub.id && { color: sub.color || theme.colors.primary, fontWeight: '700' }]}>
+                  {sub.name}
+                </Text>
+                {deckSubjectId === sub.id && (
+                  <Ionicons name="checkmark-circle" size={16} color={sub.color || theme.colors.primary} style={{ marginLeft: 6 }} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[styles.submitBtn, isSavingDeck && { opacity: 0.6 }, { marginTop: 24 }]}
+            onPress={handleSaveDeck}
+            disabled={isSavingDeck}
+          >
+            <Text style={styles.submitBtnText}>{isSavingDeck ? '...' : t('common.save', 'Guardar')}</Text>
+          </TouchableOpacity>
+        </View>
+      </AnimatedMarchingAntsBorder>
     </ScrollView>
   );
 };

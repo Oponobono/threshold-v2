@@ -5,6 +5,8 @@ import * as Sharing from 'expo-sharing';
 export interface PredictionItem {
   cardId: number;
   question: string;
+  deckId?: number;
+  deckTitle?: string;
   subjectId: number;
   mastery: number;
   urgency: 'HIGH' | 'MEDIUM';
@@ -13,6 +15,7 @@ export interface PredictionItem {
 
 export interface PredictionResponse {
   dueCount: number;
+  deckCount?: number;
   cards: PredictionItem[];
 }
 

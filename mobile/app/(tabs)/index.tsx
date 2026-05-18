@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, TextInput, FlatList, Animated, Easing } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, TextInput, FlatList, Animated, Easing, RefreshControl } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { alertRef } from '../../src/components/CustomAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,18 +10,18 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { createSubject, getCurrentUserProfile, createAssessment, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, getPredictions, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
+import { createSubject, getCurrentUserProfile, createAssessment, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
 import { useDataStore } from '../../src/store/useDataStore';
+import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/SnoozeModal';
 import { useDueCardSnooze, type SnoozeOption } from '../../src/hooks/useDueCardSnooze';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const AudioRecorderModal = React.lazy(() => import('../../src/components/AudioRecorderModal').then(m => ({ default: m.AudioRecorderModal })));
-const StudyTimerModal = React.lazy(() => import('../../src/components/StudyTimerModal').then(m => ({ default: m.StudyTimerModal })));
-// Lazy load DocumentScannerModal to prevent native module load errors
-const DocumentScannerModal = React.lazy(() => import('../../src/components/DocumentScannerModal').then(m => ({ default: m.DocumentScannerModal })));
-const PhotoCaptureModal = React.lazy(() => import('../../src/components/PhotoCaptureModal').then(m => ({ default: m.PhotoCaptureModal })));
-const FlashcardsModal = React.lazy(() => import('../../src/components/FlashcardsModal').then(m => ({ default: m.FlashcardsModal })));
+import { AudioRecorderModal } from '../../src/components/AudioRecorderModal';
+import { StudyTimerModal } from '../../src/components/StudyTimerModal';
+import { DocumentScannerModal } from '../../src/components/DocumentScannerModal';
+import { PhotoCaptureModal } from '../../src/components/PhotoCaptureModal';
+import { FlashcardsModal } from '../../src/components/FlashcardsModal';
 
 
 const SUBJECT_COLORS = [
@@ -62,8 +62,8 @@ export default function HybridDashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  // ── Usar store global para subjects, assessments, schedules ──────────────
-  const { subjects, assessments, schedules: storeSchedules, loadAllData, refreshSchedules, refreshSubjects } = useDataStore();
+  // ── Usar store global para subjects, assessments, schedules y predicciones ──
+  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshSchedules, refreshSubjects, refreshPredictions, loadCachedPredictions, getDuedeckIds } = useDataStore();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const [isSavingSubject, setIsSavingSubject] = useState(false);
   const [subjectName, setSubjectName] = useState('');
@@ -103,7 +103,6 @@ export default function HybridDashboardScreen() {
 
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [predictions, setPredictions] = useState<PredictionResponse | null>(null);
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
@@ -125,6 +124,7 @@ export default function HybridDashboardScreen() {
   const [lastSessionDuration, setLastSessionDuration] = useState<number>(0);
   const [lastSessionSubjectId, setLastSessionSubjectId] = useState<number | null>(null);
   const [lastSessionMode, setLastSessionMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Snooze State
   const snoozeManager = useDueCardSnooze();
@@ -152,6 +152,21 @@ export default function HybridDashboardScreen() {
       console.warn('Error loading dashboard data:', err);
     }
   }, [loadAllData]);
+
+  // Handle pull-to-refresh: actualizar datos y predicciones
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        loadData(),
+        profile?.id ? refreshPredictions(profile.id) : Promise.resolve(),
+      ]);
+    } catch (err) {
+      console.warn('Error refreshing dashboard:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [loadData, profile?.id, refreshPredictions]);
 
   // Derivar el próximo examen directamente de los datos del store
   const nextAssessment = useMemo(() => {
@@ -191,35 +206,17 @@ export default function HybridDashboardScreen() {
     }, [loadData])
   );
 
-  // ── Cargar predicciones al enfocar la pantalla ───────────────
+  // ── Cargar predicciones al enfocar: primero del cache, luego actualizar con polling ───
   useFocusEffect(
     useCallback(() => {
       if (!profile?.id) return;
-
-      const loadPredictions = async () => {
-        try {
-          console.log(`[Analytics] Iniciando carga de predicciones para userId=${profile.id}`);
-          const data = await getPredictions(profile.id);
-          console.log(`[Analytics] ✅ Predicciones cargadas exitosamente:`, data);
-          setPredictions(data);
-        } catch (error: any) {
-          console.error(
-            `[Analytics] ❌ Error cargando predicciones para userId=${profile.id}:`,
-            error.message || error
-          );
-          console.warn(
-            `[Analytics] ⚠️ La función getPredictions se ha detenido. ` +
-            `Error: ${error.message || 'Error desconocido'}. ` +
-            `Usando datos por defecto.`
-          );
-          // Fallback: mostrar datos vacíos
-          setPredictions({ dueCount: 0, cards: [] });
-        }
-      };
-
-      loadPredictions();
-    }, [profile?.id])
+      // Solo cargar del cache al enfocar
+      loadCachedPredictions?.();
+    }, [profile?.id, loadCachedPredictions])
   );
+
+  // ── Polling de predicciones cada 15 minutos ───────────────────────────────
+  usePredictionPolling(profile?.id, true);
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
@@ -718,7 +715,18 @@ export default function HybridDashboardScreen() {
   return (
     <>
       <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
         
         {/* 1. HEADER */}
         <View style={styles.header}>
@@ -1532,90 +1540,87 @@ export default function HybridDashboardScreen() {
           </View>
         </Pressable>
       </Modal>
-      {/* FAB - BOTÓN MAESTRO */}
-              <TouchableOpacity 
+      <TouchableOpacity 
         style={styles.fab} 
         onPress={handleOpenQuickAdd}
       >
         <Ionicons name="add" size={32} color={theme.colors.white} />
       </TouchableOpacity>
 
-      <React.Suspense fallback={null}>
-        {isAudioModalVisible && (
-          <AudioRecorderModal isVisible={true} onClose={() => setIsAudioModalVisible(false)} />
-        )}
+      {isAudioModalVisible && (
+        <AudioRecorderModal isVisible={true} onClose={() => setIsAudioModalVisible(false)} />
+      )}
 
-        {isTimerModalVisible && (
-          <StudyTimerModal
-            isVisible={true}
-            onClose={() => setIsTimerModalVisible(false)}
-            subjects={subjects}
-            viewState={timerViewState}
-            onStart={(config) => {
-              const initialRemaining = config.mode === 'threshold' ? 0 : config.duration;
-              AsyncStorage.setItem('@threshold_timer_state', JSON.stringify({
-                isActive: true,
-                isPaused: false,
-                mode: config.mode,
-                totalSeconds: config.duration,
-                remainingSeconds: initialRemaining,
-                subjectId: config.subjectId,
-                lastSyncTime: Date.now(),
-              })).then(() => {
-                setTimerRefreshTrigger(prev => prev + 1);
-                setIsTimerModalVisible(false);
-              });
-            }}
-            onSaveFeedback={async (feedback) => {
-              try {
-                // Mapping string feedback to number rating (MVP)
-                const ratingMap: Record<string, number> = {
-                  [t('dashboard.studyTimerModal.advanceOptions.great')]: 5,
-                  [t('dashboard.studyTimerModal.advanceOptions.good')]: 4,
-                  [t('dashboard.studyTimerModal.advanceOptions.ok')]: 3,
-                  [t('dashboard.studyTimerModal.advanceOptions.bad')]: 2,
-                  [t('dashboard.studyTimerModal.advanceOptions.terrible')]: 1,
-                };
-                const rating = ratingMap[feedback] || 3;
-
-                await createStudySession({
-                  subject_id: lastSessionSubjectId,
-                  session_type: lastSessionMode === 'pomodoro' ? 'Pomodoro' : 'Threshold',
-                  duration_seconds: lastSessionDuration,
-                  performance_rating: rating,
-                });
-                showToast(t('common.success') + ': Progreso guardado');
-              } catch {
-                showToast('Error al guardar sesión de estudio');
-              }
-            }}
-          />
-        )}
-
-        {isScannerVisible && (
-          <DocumentScannerModal
-            isVisible={isScannerVisible}
-            onClose={() => setIsScannerVisible(false)}
-            subjects={subjects}
-            onSave={() => loadData()}
-          />
-        )}
-
-        {isPhotoModalVisible && (
-          <PhotoCaptureModal
-            isVisible={isPhotoModalVisible}
-            onClose={() => setIsPhotoModalVisible(false)}
-            subjects={subjects}
-            onSave={() => loadData()}
-          />
-        )}
-
-        <FlashcardsModal
-          isVisible={isFlashcardsVisible}
-          onClose={() => setIsFlashcardsVisible(false)}
+      {isTimerModalVisible && (
+        <StudyTimerModal
+          isVisible={true}
+          onClose={() => setIsTimerModalVisible(false)}
           subjects={subjects}
+          viewState={timerViewState}
+          onStart={(config) => {
+            const initialRemaining = config.mode === 'threshold' ? 0 : config.duration;
+            AsyncStorage.setItem('@threshold_timer_state', JSON.stringify({
+              isActive: true,
+              isPaused: false,
+              mode: config.mode,
+              totalSeconds: config.duration,
+              remainingSeconds: initialRemaining,
+              subjectId: config.subjectId,
+              lastSyncTime: Date.now(),
+            })).then(() => {
+              setTimerRefreshTrigger(prev => prev + 1);
+              setIsTimerModalVisible(false);
+            });
+          }}
+          onSaveFeedback={async (feedback) => {
+            try {
+              // Mapping string feedback to number rating (MVP)
+              const ratingMap: Record<string, number> = {
+                [t('dashboard.studyTimerModal.advanceOptions.great')]: 5,
+                [t('dashboard.studyTimerModal.advanceOptions.good')]: 4,
+                [t('dashboard.studyTimerModal.advanceOptions.ok')]: 3,
+                [t('dashboard.studyTimerModal.advanceOptions.bad')]: 2,
+                [t('dashboard.studyTimerModal.advanceOptions.terrible')]: 1,
+              };
+              const rating = ratingMap[feedback] || 3;
+
+              await createStudySession({
+                subject_id: lastSessionSubjectId,
+                session_type: lastSessionMode === 'pomodoro' ? 'Pomodoro' : 'Threshold',
+                duration_seconds: lastSessionDuration,
+                performance_rating: rating,
+              });
+              showToast(t('common.success') + ': Progreso guardado');
+            } catch {
+              showToast('Error al guardar sesión de estudio');
+            }
+          }}
         />
-      </React.Suspense>
+      )}
+
+      {isScannerVisible && (
+        <DocumentScannerModal
+          isVisible={isScannerVisible}
+          onClose={() => setIsScannerVisible(false)}
+          subjects={subjects}
+          onSave={() => loadData()}
+        />
+      )}
+
+      {isPhotoModalVisible && (
+        <PhotoCaptureModal
+          isVisible={isPhotoModalVisible}
+          onClose={() => setIsPhotoModalVisible(false)}
+          subjects={subjects}
+          onSave={() => loadData()}
+        />
+      )}
+
+      <FlashcardsModal
+        isVisible={isFlashcardsVisible}
+        onClose={() => setIsFlashcardsVisible(false)}
+        subjects={subjects}
+      />
 
       {/* Snooze Modal */}
       <SnoozeModal

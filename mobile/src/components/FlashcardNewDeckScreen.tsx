@@ -6,6 +6,7 @@ import { theme } from '../styles/theme';
 import { flashcardsStyles as s } from '../styles/FlashcardsModal.styles';
 import { Subject, createFlashcardDeck } from '../services/api';
 import { useCustomAlert } from './CustomAlert';
+import { AnimatedMarchingAntsBorder } from './AnimatedMarchingAntsBorder';
 
 interface Props {
   subjects: Subject[];
@@ -33,6 +34,7 @@ export const FlashcardNewDeckScreen: React.FC<Props> = ({ subjects, onBack, onDe
   const [deckDesc, setDeckDesc] = useState('');
   const [deckSubjectId, setDeckSubjectId] = useState<number | null>(null);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
+  const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
 
   const handleSaveDeck = async () => {
     if (!deckTitle.trim() || !deckSubjectId) {
@@ -55,56 +57,67 @@ export const FlashcardNewDeckScreen: React.FC<Props> = ({ subjects, onBack, onDe
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={[s.modalHeader, { justifyContent: 'space-between' }]}>
-        <Text style={[s.modalTitle, { flex: 1, textAlign: 'left' }]}>{t('flashcards.newDeck')}</Text>
-        <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="close" size={24} color={theme.colors.text.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <Text style={s.formLabel}>{t('flashcards.deckName')}</Text>
-      <TextInput
-        style={s.input}
-        value={deckTitle}
-        onChangeText={setDeckTitle}
-        placeholder={t('flashcards.deckNamePlaceholder')}
-        placeholderTextColor={theme.colors.text.placeholder}
-      />
-
-      <Text style={s.formLabel}>{t('flashcards.deckDesc')}</Text>
-      <TextInput
-        style={[s.input, { height: 72, textAlignVertical: 'top' }]}
-        value={deckDesc}
-        onChangeText={setDeckDesc}
-        multiline
-        placeholder={t('flashcards.deckDescPlaceholder')}
-        placeholderTextColor={theme.colors.text.placeholder}
-      />
-
-      <Text style={s.formLabel}>{t('flashcards.subject')}</Text>
-      <View style={s.subjectsWrap}>
-        {subjects.map((sub) => (
-          <TouchableOpacity
-            key={sub.id}
-            style={[s.subjectChip, deckSubjectId === sub.id && s.subjectChipActive]}
-            onPress={() => setDeckSubjectId(sub.id)}
-          >
-            <View style={[s.subjectChipDot, { backgroundColor: sub.color || '#CCC' }]} />
-            <Text style={[s.subjectChipText, deckSubjectId === sub.id && { color: theme.colors.primary, fontWeight: '600' }]}>
-              {sub.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity
-        style={[s.newDeckBtn, { marginTop: 28 }, isSavingDeck && { opacity: 0.6 }]}
-        onPress={handleSaveDeck}
-        disabled={isSavingDeck}
+      <AnimatedMarchingAntsBorder
+        width={contentSize.width}
+        height={contentSize.height}
+        borderRadius={16}
+        strokeColor={theme.colors.primary}
+        strokeWidth={1}
       >
-        <Text style={s.newDeckBtnText}>{isSavingDeck ? t('common.saving') : t('flashcards.createDeck')}</Text>
-      </TouchableOpacity>
-      <View style={{ height: 40 }} />
+        <View
+          onLayout={(e) => setContentSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+          style={[s.modalHeader, { justifyContent: 'space-between' }]}
+        >
+          <Text style={[s.modalTitle, { flex: 1, textAlign: 'left' }]}>{t('flashcards.newDeck')}</Text>
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={s.formLabel}>{t('flashcards.deckName')}</Text>
+        <TextInput
+          style={s.input}
+          value={deckTitle}
+          onChangeText={setDeckTitle}
+          placeholder={t('flashcards.deckNamePlaceholder')}
+          placeholderTextColor={theme.colors.text.placeholder}
+        />
+
+        <Text style={s.formLabel}>{t('flashcards.deckDesc')}</Text>
+        <TextInput
+          style={[s.input, { height: 72, textAlignVertical: 'top' }]}
+          value={deckDesc}
+          onChangeText={setDeckDesc}
+          multiline
+          placeholder={t('flashcards.deckDescPlaceholder')}
+          placeholderTextColor={theme.colors.text.placeholder}
+        />
+
+        <Text style={s.formLabel}>{t('flashcards.subject')}</Text>
+        <View style={s.subjectsWrap}>
+          {subjects.map((sub) => (
+            <TouchableOpacity
+              key={sub.id}
+              style={[s.subjectChip, deckSubjectId === sub.id && s.subjectChipActive]}
+              onPress={() => setDeckSubjectId(sub.id)}
+            >
+              <View style={[s.subjectChipDot, { backgroundColor: sub.color || '#CCC' }]} />
+              <Text style={[s.subjectChipText, deckSubjectId === sub.id && { color: theme.colors.primary, fontWeight: '600' }]}>
+                {sub.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={[s.newDeckBtn, { marginTop: 28 }, isSavingDeck && { opacity: 0.6 }]}
+          onPress={handleSaveDeck}
+          disabled={isSavingDeck}
+        >
+          <Text style={s.newDeckBtnText}>{isSavingDeck ? t('common.saving') : t('flashcards.createDeck')}</Text>
+        </TouchableOpacity>
+        <View style={{ height: 40 }} />
+      </AnimatedMarchingAntsBorder>
     </ScrollView>
   );
 };

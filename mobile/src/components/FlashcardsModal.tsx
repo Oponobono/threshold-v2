@@ -30,6 +30,7 @@ import {
   deleteFlashcardDeck,
   downloadReport,
 } from '../services/api';
+import { useDataStore } from '../store/useDataStore';
 
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
 import { FlashcardNewDeckScreen } from './FlashcardNewDeckScreen';
@@ -60,6 +61,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const router = useRouter();
+  const { refreshPredictions, getDuedeckIds } = useDataStore();
   const [screen, setScreen] = useState<Screen>('hub');
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
 
@@ -153,6 +155,11 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
             try {
               await deleteFlashcardDeck(deck.id);
               await loadDecks();
+              // Refrescar predicciones después de eliminar el mazo
+              const userId = await getUserId();
+              if (userId) {
+                await refreshPredictions(userId);
+              }
             } catch (e: any) {
               showAlert({ title: t('common.error', 'Error'), message: e.message || 'Error al eliminar el mazo', type: 'error' });
             }
@@ -250,6 +257,8 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           }
           renderItem={({ item }) => {
             const isShared = item.user_id != null && item.user_id !== currentUserId;
+            const duedeckIds = getDuedeckIds();
+            const isDue = duedeckIds.has(item.id);
             return (
               <SwipeableCard
                 onOpen={(closeFn) => {
@@ -261,7 +270,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 renderActions={(close) => renderSwipeActions(item, close)}
               >
                 <TouchableOpacity
-                  style={[s.deckCard, { marginBottom: 0 }]}
+                  style={[s.deckCard, { marginBottom: 0, borderWidth: isDue ? 2 : 1, borderColor: isDue ? theme.colors.danger : '#E0E0E0' }]}
                   activeOpacity={0.85}
                   onPress={() => openStudySession(item)}
                 >
