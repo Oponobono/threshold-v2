@@ -404,7 +404,11 @@ ${deckGenerationInstructions}`;
         cleanReplyContent = result.reply.content.replace(deckActionPattern, '').trim();
         
         // Generar el mazo con contexto usando el MISMO PROVIDER del chat
-        if (context_text) {
+        const activeContext = context_text || (messages && messages.length > 0 
+          ? messages.map(m => `${m.role === 'user' ? 'Estudiante' : 'Zyren'}: ${m.content}`).join('\n\n')
+          : '');
+
+        if (activeContext && activeContext.trim()) {
           try {
             let generatedDeck = [];
             let deckProvider = provider;
@@ -414,13 +418,13 @@ ${deckGenerationInstructions}`;
               if (provider === 'gemini') {
                 console.log(`[DeckGeneration] Intentando con Gemini (provider elegido en chat)...`);
                 generatedDeck = await geminiService.generateFlashcardsFromText(
-                  context_text,
+                  activeContext,
                   deckAction.count || 10
                 );
               } else {
                 console.log(`[DeckGeneration] Intentando con Groq (provider elegido en chat)...`);
                 generatedDeck = await geminiService.generateFlashcardsWithGroq(
-                  context_text,
+                  activeContext,
                   deckAction.count || 10
                 );
               }
@@ -433,13 +437,13 @@ ${deckGenerationInstructions}`;
                 if (fallbackProvider === 'gemini') {
                   console.log(`[DeckGeneration] Fallback a Gemini...`);
                   generatedDeck = await geminiService.generateFlashcardsFromText(
-                    context_text,
+                    activeContext,
                     deckAction.count || 10
                   );
                 } else {
                   console.log(`[DeckGeneration] Fallback a Groq...`);
                   generatedDeck = await geminiService.generateFlashcardsWithGroq(
-                    context_text,
+                    activeContext,
                     deckAction.count || 10
                   );
                 }
@@ -567,7 +571,8 @@ ${deckGenerationInstructions}`;
       provider,
       context_truncated,
       duration,
-      ...(deckData && { deck: deckData }) // Incluir datos del mazo si se generó
+      ...(deckData && { deck: deckData }), // Incluir datos del mazo si se generó
+      deckActionSignal: deckMatch ? deckMatch[1] : null
     });
   } catch (err) {
     console.error(`💥 Error crítico en aiChat [${provider}]:`, err);

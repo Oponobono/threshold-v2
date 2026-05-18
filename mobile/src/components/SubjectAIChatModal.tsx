@@ -606,14 +606,15 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         showToast(`¡Mazo "${data.deck.deckTitle}" listo con ${data.deck.count} ítems! 🎉`);
       } else {
         // ── Interceptar señal de generación de mazo (fallback si backend no lo creó) ──
-        const deckSignalMatch = replyContent.match(/%+DECK_ACTION%+(\{[\s\S]*?\})%+END%+/);
+        const rawSignal = data?.deckActionSignal || replyContent.match(/%+DECK_ACTION%+(\{[\s\S]*?\})%+END%+/)?.[1];
+        
         console.log('[AIChatModal] 🎯 Chequeo de señal %%DECK_ACTION%% en fallback:', {
-          matched: !!deckSignalMatch,
-          rawSignal: deckSignalMatch ? deckSignalMatch[1] : null,
+          matched: !!rawSignal,
+          rawSignal: rawSignal,
         });
 
-        if (deckSignalMatch) {
-          // Limpiar la señal del mensaje visible
+        if (rawSignal) {
+          // Limpiar la señal del mensaje visible si aún existe en replyContent
           replyContent = replyContent.replace(/%+DECK_ACTION%+[\s\S]*?%+END%+/g, '').trim();
 
           // Mostrar el mensaje limpio inmediatamente
@@ -622,7 +623,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
           // Parsear parámetros y generar el mazo en segundo plano
           try {
-            const deckParams = JSON.parse(deckSignalMatch[1]);
+            const deckParams = JSON.parse(rawSignal);
             const mode: StudyMode = deckParams.mode || 'mixed';
             const count: number = deckParams.count || 10;
             console.log('[AIChatModal] 🧠 Parse de parámetros %%DECK_ACTION%% exitoso:', { mode, count });
