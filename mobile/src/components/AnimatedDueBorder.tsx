@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { theme } from '../styles/theme';
@@ -7,8 +7,8 @@ interface AnimatedDueBorderProps {
   children: React.ReactNode;
   isDue: boolean;
   borderRadius?: number;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 }
 
 // Crear componente Rect animado
@@ -23,10 +23,11 @@ export const AnimatedDueBorder: React.FC<AnimatedDueBorderProps> = ({
   children,
   isDue,
   borderRadius = 12,
-  width,
-  height,
+  width: propWidth,
+  height: propHeight,
 }) => {
   const dashOffsetAnim = useRef(new Animated.Value(0)).current;
+  const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     if (!isDue) {
@@ -44,37 +45,48 @@ export const AnimatedDueBorder: React.FC<AnimatedDueBorderProps> = ({
     ).start();
   }, [isDue, dashOffsetAnim]);
 
-  if (!isDue) {
-    return <View style={{ width, height }}>{children}</View>;
-  }
+  // Si se pasan por props dimensiones válidas y mayores que 0, las usamos.
+  // De lo contrario, usamos las dimensiones obtenidas dinámicamente mediante onLayout.
+  const finalWidth = (propWidth && propWidth > 0) ? propWidth : layoutSize.width;
+  const finalHeight = (propHeight && propHeight > 0) ? propHeight : layoutSize.height;
 
   return (
-    <View style={{ width, height, position: 'relative' }}>
-      {/* SVG overlay con borde animado */}
-      <Svg
-        width={width}
-        height={height}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          pointerEvents: 'none',
-        }}
-      >
-        <AnimatedRect
-          x={0.5}
-          y={0.5}
-          width={width - 1}
-          height={height - 1}
-          fill="none"
-          stroke={theme.colors.danger}
-          strokeWidth="1"
-          rx={borderRadius}
-          ry={borderRadius}
-          strokeDasharray="4,4"
-          strokeDashoffset={dashOffsetAnim as any}
-        />
-      </Svg>
+    <View
+      onLayout={(e) => {
+        const { width: w, height: h } = e.nativeEvent.layout;
+        if (Math.abs(layoutSize.width - w) > 0.1 || Math.abs(layoutSize.height - h) > 0.1) {
+          setLayoutSize({ width: w, height: h });
+        }
+      }}
+      style={{ position: 'relative' }}
+    >
+      {isDue && finalWidth > 0 && finalHeight > 0 && (
+        <Svg
+          width={finalWidth}
+          height={finalHeight}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        >
+          <AnimatedRect
+            x={0.5}
+            y={0.5}
+            width={finalWidth - 1}
+            height={finalHeight - 1}
+            fill="none"
+            stroke={theme.colors.danger}
+            strokeWidth="1"
+            rx={borderRadius}
+            ry={borderRadius}
+            strokeDasharray="4,4"
+            strokeDashoffset={dashOffsetAnim as any}
+          />
+        </Svg>
+      )}
 
       {/* Contenido */}
       {children}

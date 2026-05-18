@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Platform, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -6,7 +6,7 @@ import { theme } from '../styles/theme';
 import { flashcardsStyles as s } from '../styles/FlashcardsModal.styles';
 import { Subject, updateFlashcardDeck, type FlashcardDeck } from '../services/api';
 import { useCustomAlert } from './CustomAlert';
-import { AnimatedMarchingAntsBorder } from './AnimatedMarchingAntsBorder';
+
 
 interface Props {
   deck: FlashcardDeck;
@@ -33,7 +33,6 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
   const [deckTitle, setDeckTitle] = useState(deck.title);
   const [deckSubjectId, setDeckSubjectId] = useState<number | null>(deck.subject_id || null);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
-  const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
 
   const handleSaveDeck = async () => {
     if (!deckTitle.trim()) {
@@ -56,16 +55,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-      <AnimatedMarchingAntsBorder
-        width={contentSize.width}
-        height={contentSize.height}
-        borderRadius={16}
-        strokeColor={theme.colors.primary}
-        strokeWidth={1}
-      >
-        <View
-          onLayout={(e) => setContentSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-        >
+      <View>
           <View style={[s.modalHeader, { justifyContent: 'space-between', marginBottom: 16 }]}>
             <Text style={[s.modalTitle, { flex: 1, textAlign: 'left' }]}>{t('flashcards.editDeck', 'Editar Mazo')}</Text>
             <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -139,8 +129,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
           >
             <Text style={styles.submitBtnText}>{isSavingDeck ? '...' : t('common.save', 'Guardar')}</Text>
           </TouchableOpacity>
-        </View>
-      </AnimatedMarchingAntsBorder>
+      </View>
     </ScrollView>
   );
 };

@@ -85,7 +85,7 @@ export type Schedule = {
 export interface FlashcardDeck {
   id: number;
   user_id?: number;
-  subject_id: number;
+  subject_id?: number | null;
   title: string;
   description: string;
   created_at: string;

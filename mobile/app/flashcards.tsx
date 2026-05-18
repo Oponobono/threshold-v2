@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { Stack, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -33,29 +33,30 @@ import { FlashcardNewCardScreen } from '../src/components/FlashcardNewCardScreen
 import { FlashcardStudyScreenStandalone } from '../src/components/FlashcardStudyScreenStandalone';
 import { useFlashcardsManager } from '../src/hooks/useFlashcardsManager';
 import { useDataStore } from '../src/store/useDataStore';
-import { AnimatedDueBorder } from '../src/components/AnimatedDueBorder';
 import { AnimatedMarchingAntsBorder } from '../src/components/AnimatedMarchingAntsBorder';
 import { getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck } from '../src/services/api';
 
 /**
  * Componente memoizado del arrow animado para optimizar rendimiento
  */
-const AnimatedArrow = React.memo(() => (
-  <View style={{ width: 40, height: 40, marginRight: -6, transform: [{ rotate: '90deg' }] }}>
-    <LottieView
-      source={require('../src/lottieFiles/arrow.json')}
-      autoPlay
-      loop
-      style={{ width: '100%', height: '100%' }}
-    />
-  </View>
-));
+const AnimatedArrow = React.memo(function AnimatedArrow() {
+  return (
+    <View style={{ width: 40, height: 40, marginRight: -6, transform: [{ rotate: '90deg' }] }}>
+      <LottieView
+        source={require('../src/lottieFiles/arrow.json')}
+        autoPlay
+        loop
+        style={{ width: '100%', height: '100%' }}
+      />
+    </View>
+  );
+});
 
 /**
  * Componente memoizado para cada tarjeta de mazo
  * Solo re-renderiza cuando los datos del mazo realmente cambian
  */
-const DeckCard = React.memo(({ 
+const DeckCard = React.memo(function DeckCard({ 
   deck, 
   isShared, 
   currentUserId,
@@ -71,13 +72,9 @@ const DeckCard = React.memo(({
   onPress: () => void;
   onLongPress: () => void;
   t: any;
-}) => {
-  const [deckCardSize, setDeckCardSize] = useState({ width: 0, height: 0 });
-
+}) {
   return (
     <AnimatedMarchingAntsBorder
-      width={deckCardSize.width}
-      height={deckCardSize.height}
       borderRadius={18}
       strokeColor={theme.colors.danger}
       strokeWidth={1}
@@ -86,7 +83,6 @@ const DeckCard = React.memo(({
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
-        onLayout={(e) => setDeckCardSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
         delayLongPress={500}
         style={({ pressed }) => ({
           flexDirection: 'row',
@@ -178,7 +174,6 @@ const DeckCard = React.memo(({
  */
 export default function FlashcardsScreen() {
   const { t } = useTranslation();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { showAlert } = useCustomAlert();
   const { refreshPredictions, getDuedeckIds } = useDataStore();
@@ -201,6 +196,16 @@ export default function FlashcardsScreen() {
 
   const searchAnim = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<TextInput>(null);
+
+  const {
+    isLoading,
+    searchQuery,
+    setSearchQuery,
+    activeSubjectId,
+    setActiveSubjectId,
+    filteredDecks,
+    loadDecks,
+  } = useFlashcardsManager(subjects);
 
   const handleOpenMenu = useCallback(() => {
     if (Platform.OS === 'ios') {
@@ -303,15 +308,7 @@ export default function FlashcardsScreen() {
     }
   }, [loadDecks]);
 
-  const {
-    isLoading,
-    searchQuery,
-    setSearchQuery,
-    activeSubjectId,
-    setActiveSubjectId,
-    filteredDecks,
-    loadDecks,
-  } = useFlashcardsManager(subjects);
+
 
   /**
    * Alterna la visibilidad de la barra de búsqueda con animación
@@ -337,7 +334,7 @@ export default function FlashcardsScreen() {
       const loadAll = async () => {
         try {
           const userId = await getUserId();
-          setCurrentUserId(userId);
+          setCurrentUserId(userId ? Number(userId) : null);
           const subs = await getSubjects();
           setSubjects(subs || []);
         } catch (e) {
