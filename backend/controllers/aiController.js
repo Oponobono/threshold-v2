@@ -35,7 +35,7 @@ async function callGroqAPI(messages, systemPrompt) {
   }
 
   // Limitar historial para evitar Rate Limits (TPM excedido en Groq)
-  const maxHistoryMessages = 6;
+  const maxHistoryMessages = 3;
   const recentMessages = messages.length > maxHistoryMessages 
     ? messages.slice(-maxHistoryMessages) 
     : messages;
