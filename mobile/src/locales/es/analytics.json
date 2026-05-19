@@ -1,0 +1,12 @@
+{
+  "noMasteryData": "No hay datos suficientes para mostrar el dominio.",
+  "totalMastery": "Dominio Total:",
+  "strength": "Fortaleza:",
+  "needsAttention": "Necesita atención:",
+  "insightsTitle": "Análisis de notas",
+  "insightsHint": "Últimos resultados con barras de progreso.",
+  "emptyInsightsTitle": "Aún no hay notas registradas",
+  "emptyInsightsText": "Cuando agregues evaluaciones, aquí verás barras de progreso y el comportamiento de cada entrega.",
+  "statsTitle": "Estadísticas de la materia",
+  "academicTracking": "Seguimiento académico"
+}

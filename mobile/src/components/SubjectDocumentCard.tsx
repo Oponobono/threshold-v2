@@ -91,7 +91,7 @@ export const SubjectDocumentCard: React.FC<SubjectDocumentCardProps> = ({
       </View>
       <View style={styles.infoContainer}>
         <Text style={styles.docName} numberOfLines={1}>
-          {doc.name || `${t('subjects.scannedDocument') || 'Documento Escaneado'} ${index + 1}`}
+          {doc.name || `${t('documents.item') || 'Documento Escaneado'} ${index + 1}`}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
           <Text style={styles.docDate}>

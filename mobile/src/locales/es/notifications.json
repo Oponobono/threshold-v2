@@ -1,0 +1,10 @@
+{
+  "title": "Notificaciones",
+  "desc": "Mantente al día con tus fechas importantes",
+  "deadlineAlerts": "Alertas de fechas límite",
+  "deadlineAlertsDesc": "Notificaciones push para entregas",
+  "weeklyDigest": "Resumen semanal",
+  "weeklyDigestDesc": "Resumen cada lunes por la mañana",
+  "emailNotif": "Notificaciones por correo",
+  "emailNotifDesc": "Recibe recordatorios por email"
+}

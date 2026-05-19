@@ -1,0 +1,17 @@
+{
+  "generationError": "Error al generar PDF: {{message}}",
+  "title": "Documentos Escaneados",
+  "hint": "PDFs e imágenes escaneadas de esta materia",
+  "item": "Documento Escaneado",
+  "pdf": "PDF",
+  "aiReadable": "La IA podrá leer el contenido",
+  "pickerError": "No se pudo abrir el selector de archivos",
+  "tooLarge": "El archivo es demasiado grande (máx. 50MB)",
+  "importedFile": "{{file}} importado",
+  "importError": "Error al importar el archivo",
+  "importTitle": "Importar PDF",
+  "uploadPrompt": "Sube tu PDF y extrae el texto con IA 🚀",
+  "extractText": "Extraer texto",
+  "selectPdf": "Seleccionar PDF",
+  "emptyState": "Aún no hay documentos guardados. Usa el botón '+' para importar archivos PDF."
+}

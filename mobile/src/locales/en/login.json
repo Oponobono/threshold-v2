@@ -1,34 +1,34 @@
 {
-    "formTitle":  "Log in",
-    "formSubtitle":  "Access your account to continue with your academic progress.",
-    "welcomeTitle":  "Welcome to Threshold",
-    "welcomeSubtitle":  "Organize classes, track GPA, and snap quick whiteboard notes â€” all in one place.",
-    "emailLabel":  "Email",
-    "emailPlaceholder":  "yourname@university.edu",
-    "passwordLabel":  "Password",
-    "passwordPlaceholder":  "Enter your password",
-    "rememberMe":  "Remember me",
-    "forgot":  "Forgot?",
-    "enterDashboard":  "Enter Home",
-    "or":  "or",
-    "useTouchId":  "Use Touch ID",
-    "touchId":  "Fingerprint",
-    "continueGuest":  "Continue as guest",
-    "guestSubtitle":  "Try Threshold without signing in",
-    "createAccount":  "Create account",
-    "resetPassword":  "Reset password",
-    "success":  {
-                    "loggedIn":  "Signed in successfully"
-                },
-    "errors":  {
-                   "missingCredentials":  "Please enter email and password",
-                   "loginTitle":  "Login Error"
-               },
-    "accountPendingDeletion":  "Account Pending Deletion",
-    "pendingDeletionMsg":  "Your account is scheduled to be deleted in {{days}} day(s) ({{date}}). Would you like to recover your account?",
-    "recoverBtn":  "Recover Account",
-    "cancelBtn":  "Cancel",
-    "accountRecovered":  "Your account has been successfully recovered.",
-    "footerText":  "Students at over 1,200 campuses trust Threshold for smarter studying",
-    "copyright":  "Â© 2026 Threshold Inc."
+  "formTitle": "Log in",
+  "formSubtitle": "Access your account to continue with your academic progress.",
+  "welcomeTitle": "Welcome to Threshold",
+  "welcomeSubtitle": "Organize classes, track GPA, and snap quick whiteboard notes â€” all in one place.",
+  "emailLabel": "Email",
+  "emailPlaceholder": "yourname@university.edu",
+  "passwordLabel": "Password",
+  "passwordPlaceholder": "Enter your password",
+  "rememberMe": "Remember me",
+  "forgot": "Forgot?",
+  "enterDashboard": "Enter Home",
+  "or": "or",
+  "useTouchId": "Use Touch ID",
+  "touchId": "Fingerprint",
+  "continueGuest": "Continue as guest",
+  "guestSubtitle": "Try Threshold without signing in",
+  "createAccount": "Create account",
+  "resetPassword": "Reset password",
+  "success": {
+    "loggedIn": "Signed in successfully"
+  },
+  "errors": {
+    "missingCredentials": "Please enter email and password",
+    "loginTitle": "Login Error"
+  },
+  "accountPendingDeletion": "Account Pending Deletion",
+  "pendingDeletionMsg": "Your account is scheduled to be deleted in {{days}} day(s) ({{date}}). Would you like to recover your account?",
+  "recoverBtn": "Recover Account",
+  "cancelBtn": "Cancel",
+  "accountRecovered": "Your account has been successfully recovered.",
+  "footerText": "Students at over 1,200 campuses trust Threshold for smarter studying",
+  "copyright": "Â© 2026 Threshold Inc."
 }

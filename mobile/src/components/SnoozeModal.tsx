@@ -21,6 +21,7 @@ import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 import { globalStyles } from '../styles/globalStyles';
 import { SNOOZE_OPTIONS, SnoozeOption } from '../hooks/useDueCardSnooze';
+import { useTranslation } from 'react-i18next';
 
 interface SnoozeModalProps {
   visible: boolean;
@@ -37,6 +38,7 @@ export const SnoozeModal: React.FC<SnoozeModalProps> = ({
   onSelect,
   isLoading = false,
 }) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(height)).current;
 
@@ -94,7 +96,7 @@ export const SnoozeModal: React.FC<SnoozeModalProps> = ({
           >
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>¿Aplazar la revisión?</Text>
+              <Text style={styles.title}>{t('flashcards.snoozeTitle', '¿Aplazar la revisión?')}</Text>
               <TouchableOpacity
                 onPress={onClose}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -105,7 +107,7 @@ export const SnoozeModal: React.FC<SnoozeModalProps> = ({
 
             {/* Descripción */}
             <Text style={styles.description}>
-              Elige cuándo quieres que aparezca la revisión nuevamente. Esto mantiene tu momentum de aprendizaje.
+              {t('flashcards.snoozeDescription', 'Elige cuándo quieres que aparezca la revisión nuevamente. Esto mantiene tu momentum de aprendizaje.')}
             </Text>
 
             {/* Opciones de snooze */}
@@ -151,7 +153,7 @@ export const SnoozeModal: React.FC<SnoozeModalProps> = ({
               color={theme.colors.warning}
             />
             <Text style={styles.footerText}>
-              Los períodos están diseñados según ciencia del aprendizaje espaciado.
+              {t('flashcards.snoozeScience', 'Los períodos están diseñados según ciencia del aprendizaje espaciado.')}
             </Text>
           </View>
         </View>

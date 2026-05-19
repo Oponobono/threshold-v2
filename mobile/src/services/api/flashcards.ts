@@ -188,42 +188,7 @@ export const deleteFlashcardDeck = async (deckId: number) => {
   return data;
 };
 
-/**
- * Analiza confusiones en un mazo: detecta tarjetas que se confunden frecuentemente
- * Retorna pares de tarjetas con correlación de errores
- */
-export const analyzeDeckConfusions = async (deckId: number) => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(
-    `/flashcard-decks/${deckId}/analyze-confusions?userId=${userId}`
-  );
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al analizar confusiones');
-  return data;
-};
 
-/**
- * Genera una tarjeta de diferenciación entre dos conceptos confusos
- * Utiliza Groq para generar contenido pedagógico
- */
-export const generateDifferentiationCard = async (
-  deckId: number,
-  card1_id: number,
-  card2_id: number
-) => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(
-    `/flashcard-decks/${deckId}/generate-differentiation`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ card1_id, card2_id, userId }),
-    }
-  );
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error generando tarjeta de diferenciación');
-  return data;
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Snooze Management

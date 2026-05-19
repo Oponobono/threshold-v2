@@ -1,0 +1,12 @@
+{
+  "noMasteryData": "Not enough data to display mastery.",
+  "totalMastery": "Total Mastery:",
+  "strength": "Strength:",
+  "needsAttention": "Needs attention:",
+  "insightsTitle": "Grade insights",
+  "insightsHint": "Recent results with progress bars.",
+  "emptyInsightsTitle": "No grades recorded yet",
+  "emptyInsightsText": "Once assessments are added, you will see progress bars and performance trends here.",
+  "statsTitle": "Subject statistics",
+  "academicTracking": "Academic tracking"
+}

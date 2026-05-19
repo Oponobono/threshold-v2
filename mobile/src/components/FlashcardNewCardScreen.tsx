@@ -18,7 +18,6 @@ import { FlashcardDeck } from '../services/api';
 import { EvaluationItemType } from '../services/api/types';
 import { useCustomAlert } from './CustomAlert';
 import { fetchWithFallback, parseJsonSafely } from '../services/api/client';
-import { getUserId } from '../services/api/auth';
 
 interface Props {
   activeDeck: FlashcardDeck | null;
@@ -28,10 +27,10 @@ interface Props {
 
 type Step = 'selectType' | 'fillForm';
 
-const TYPE_OPTIONS: { type: EvaluationItemType; icon: string; label: string; desc: string; color: string; bg: string }[] = [
-  { type: 'flashcard', icon: '🃏', label: 'Flashcard', desc: 'Frente y reverso clásico', color: '#5C6BC0', bg: '#EDE7F6' },
-  { type: 'multiple_choice', icon: '🎯', label: 'ECAES', desc: '4 opciones, 1 correcta', color: '#00897B', bg: '#E0F2F1' },
-  { type: 'boolean', icon: '⚖️', label: 'V / F', desc: 'Verdadero o Falso', color: '#F57C00', bg: '#FFF3E0' },
+const TYPE_OPTIONS = [
+  { type: 'flashcard' as EvaluationItemType, icon: '🃏', labelKey: 'flashcards.title', label: 'Flashcard', descKey: 'flashcards.typeFlashcardDesc', color: '#5C6BC0', bg: '#EDE7F6' },
+  { type: 'multiple_choice' as EvaluationItemType, icon: '🎯', label: 'ECAES', descKey: 'flashcards.typeMCDesc', color: '#00897B', bg: '#E0F2F1' },
+  { type: 'boolean' as EvaluationItemType, icon: '⚖️', label: 'V / F', descKey: 'flashcards.typeBoolDesc', color: '#F57C00', bg: '#FFF3E0' },
 ];
 
 export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, onCardCreated }) => {
@@ -67,24 +66,24 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
 
       if (selectedType === 'flashcard') {
         if (!front.trim() || !back.trim()) {
-          showAlert({ title: 'Campos requeridos', message: 'Completa el frente y el reverso.', type: 'warning' });
+          showAlert({ title: t('flashcards.fieldsRequired'), message: t('flashcards.frontBackRequired'), type: 'warning' });
           return;
         }
         contentJson = { front: front.trim(), back: back.trim() };
       } else if (selectedType === 'multiple_choice') {
         if (!mcQuestion.trim()) {
-          showAlert({ title: 'Pregunta requerida', message: 'Escribe la pregunta.', type: 'warning' });
+          showAlert({ title: t('flashcards.questionRequired'), message: t('flashcards.questionRequiredMsg'), type: 'warning' });
           return;
         }
         const filledOptions = mcOptions.filter(o => o.trim());
         if (filledOptions.length < 2) {
-          showAlert({ title: 'Opciones requeridas', message: 'Agrega al menos 2 opciones.', type: 'warning' });
+          showAlert({ title: t('flashcards.optionsRequired'), message: t('flashcards.optionsRequiredMsg'), type: 'warning' });
           return;
         }
         contentJson = { question: mcQuestion.trim(), options: mcOptions.map(o => o.trim()), correctIndex: mcCorrectIndex };
       } else {
         if (!boolQuestion.trim()) {
-          showAlert({ title: 'Afirmación requerida', message: 'Escribe la afirmación.', type: 'warning' });
+          showAlert({ title: t('flashcards.statementRequired'), message: t('flashcards.statementRequiredMsg'), type: 'warning' });
           return;
         }
         contentJson = { question: boolQuestion.trim(), correctAnswer: boolAnswer };
@@ -101,7 +100,7 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
         }),
       });
       const data = await parseJsonSafely(response);
-      if (!response.ok) throw new Error(data?.error || 'Error al crear el ítem');
+      if (!response.ok) throw new Error(data?.error || t('flashcards.createItemError'));
       onCardCreated();
     } catch (e: any) {
       showAlert({ title: t('common.error'), message: e.message, type: 'error' });
@@ -118,11 +117,11 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
           <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
           </TouchableOpacity>
-          <Text style={s.modalTitle}>Nueva pregunta</Text>
+          <Text style={s.modalTitle}>{t('flashcards.newQuestion')}</Text>
           <View style={{ width: 22 }} />
         </View>
         <Text style={s.deckSubMeta}>{activeDeck?.title}</Text>
-        <Text style={ls.sectionLabel}>¿Qué tipo de ítem quieres crear?</Text>
+        <Text style={ls.sectionLabel}>{t('flashcards.selectItemType')}</Text>
         <View style={ls.typeGrid}>
           {TYPE_OPTIONS.map(opt => (
             <TouchableOpacity
@@ -133,7 +132,7 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
             >
               <Text style={ls.typeIcon}>{opt.icon}</Text>
               <Text style={[ls.typeLabel, { color: opt.color }]}>{opt.label}</Text>
-              <Text style={ls.typeDesc}>{opt.desc}</Text>
+              <Text style={ls.typeDesc}>{t(opt.descKey)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -159,19 +158,19 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
       {/* ── Flashcard ── */}
       {selectedType === 'flashcard' && (
         <>
-          <Text style={s.formLabel}>Frente (Pregunta)</Text>
-          <TextInput style={[s.input, ls.textarea]} value={front} onChangeText={setFront} multiline placeholder="¿Qué es...?" placeholderTextColor={theme.colors.text.placeholder} />
-          <Text style={s.formLabel}>Reverso (Respuesta)</Text>
-          <TextInput style={[s.input, ls.textarea]} value={back} onChangeText={setBack} multiline placeholder="Es..." placeholderTextColor={theme.colors.text.placeholder} />
+          <Text style={s.formLabel}>{t('flashcards.frontLabel')}</Text>
+          <TextInput style={[s.input, ls.textarea]} value={front} onChangeText={setFront} multiline placeholder={t('flashcards.frontPlaceholder')} placeholderTextColor={theme.colors.text.placeholder} />
+          <Text style={s.formLabel}>{t('flashcards.backLabel')}</Text>
+          <TextInput style={[s.input, ls.textarea]} value={back} onChangeText={setBack} multiline placeholder={t('flashcards.backPlaceholder')} placeholderTextColor={theme.colors.text.placeholder} />
         </>
       )}
 
       {/* ── Multiple choice ── */}
       {selectedType === 'multiple_choice' && (
         <>
-          <Text style={s.formLabel}>Pregunta</Text>
-          <TextInput style={[s.input, ls.textarea]} value={mcQuestion} onChangeText={setMcQuestion} multiline placeholder="Escribe la pregunta..." placeholderTextColor={theme.colors.text.placeholder} />
-          <Text style={s.formLabel}>Opciones (selecciona la correcta)</Text>
+          <Text style={s.formLabel}>{t('flashcards.questionLabel')}</Text>
+          <TextInput style={[s.input, ls.textarea]} value={mcQuestion} onChangeText={setMcQuestion} multiline placeholder={t('flashcards.questionPlaceholder')} placeholderTextColor={theme.colors.text.placeholder} />
+          <Text style={s.formLabel}>{t('flashcards.optionsLabel')}</Text>
           {mcOptions.map((opt, i) => (
             <TouchableOpacity key={i} style={[ls.optionRow, mcCorrectIndex === i && ls.optionRowActive]} onPress={() => setMcCorrectIndex(i)} activeOpacity={0.8}>
               <View style={[ls.optionLabel, mcCorrectIndex === i && { backgroundColor: '#00897B' }]}>
@@ -181,7 +180,7 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
                 style={ls.optionInput}
                 value={opt}
                 onChangeText={(text) => { const arr = [...mcOptions]; arr[i] = text; setMcOptions(arr); }}
-                placeholder={`Opción ${String.fromCharCode(65 + i)}`}
+                placeholder={`${t('flashcards.optionPlaceholder')} ${String.fromCharCode(65 + i)}`}
                 placeholderTextColor={theme.colors.text.placeholder}
               />
               {mcCorrectIndex === i && <Ionicons name="checkmark-circle" size={20} color="#00897B" />}
@@ -193,30 +192,30 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
       {/* ── Boolean ── */}
       {selectedType === 'boolean' && (
         <>
-          <Text style={s.formLabel}>Afirmación</Text>
-          <TextInput style={[s.input, ls.textarea]} value={boolQuestion} onChangeText={setBoolQuestion} multiline placeholder="El agua hierve a 100°C a nivel del mar..." placeholderTextColor={theme.colors.text.placeholder} />
-          <Text style={s.formLabel}>Respuesta correcta</Text>
+          <Text style={s.formLabel}>{t('flashcards.statementLabel')}</Text>
+          <TextInput style={[s.input, ls.textarea]} value={boolQuestion} onChangeText={setBoolQuestion} multiline placeholder={t('flashcards.statementPlaceholder')} placeholderTextColor={theme.colors.text.placeholder} />
+          <Text style={s.formLabel}>{t('flashcards.correctAnswerLabel')}</Text>
           <View style={ls.switchRow}>
-            <Text style={[ls.switchLabel, !boolAnswer && { opacity: 0.4 }]}>✅ Verdadero</Text>
+            <Text style={[ls.switchLabel, !boolAnswer && { opacity: 0.4 }]}>✅ {t('flashcards.trueLabel')}</Text>
             <Switch value={boolAnswer} onValueChange={setBoolAnswer} trackColor={{ false: '#EF9A9A', true: '#81C784' }} />
-            <Text style={[ls.switchLabel, boolAnswer && { opacity: 0.4 }]}>❌ Falso</Text>
+            <Text style={[ls.switchLabel, boolAnswer && { opacity: 0.4 }]}>❌ {t('flashcards.falseLabel')}</Text>
           </View>
         </>
       )}
 
       {/* ── Shared optional fields ── */}
-      <Text style={[s.formLabel, { marginTop: 20 }]}>Pista (opcional)</Text>
-      <TextInput style={[s.input, { height: 72, textAlignVertical: 'top' }]} value={hint} onChangeText={setHint} multiline placeholder="Una pista sutil para orientar al estudiante..." placeholderTextColor={theme.colors.text.placeholder} />
+      <Text style={[s.formLabel, { marginTop: 20 }]}>{t('flashcards.hintLabel')}</Text>
+      <TextInput style={[s.input, { height: 72, textAlignVertical: 'top' }]} value={hint} onChangeText={setHint} multiline placeholder={t('flashcards.hintPlaceholder')} placeholderTextColor={theme.colors.text.placeholder} />
 
-      <Text style={s.formLabel}>Explicación (opcional)</Text>
-      <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]} value={explanation} onChangeText={setExplanation} multiline placeholder="¿Por qué esta es la respuesta correcta?" placeholderTextColor={theme.colors.text.placeholder} />
+      <Text style={s.formLabel}>{t('flashcards.explanationLabel')}</Text>
+      <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]} value={explanation} onChangeText={setExplanation} multiline placeholder={t('flashcards.explanationPlaceholder')} placeholderTextColor={theme.colors.text.placeholder} />
 
       <TouchableOpacity
         style={[s.newDeckBtn, { marginTop: 24 }, isSaving && { opacity: 0.6 }]}
         onPress={handleSave}
         disabled={isSaving}
       >
-        <Text style={s.newDeckBtnText}>{isSaving ? 'Guardando...' : 'Guardar ítem'}</Text>
+        <Text style={s.newDeckBtnText}>{isSaving ? t('flashcards.saving') : t('flashcards.saveItem')}</Text>
       </TouchableOpacity>
       <View style={{ height: 40 }} />
     </ScrollView>

@@ -1,0 +1,30 @@
+{
+  "title": "Academic Preferences",
+  "desc": "Terms, pass thresholds & grading scales",
+  "termsSemesters": "Terms / Semesters",
+  "termOptions": [
+    "Fall 2025",
+    "Spring 2026",
+    "Summer 2026"
+  ],
+  "manageTerms": "Manage terms and active semester",
+  "addTerm": "Add Term",
+  "minGrade": "Minimum grade to pass (per subject)",
+  "defaultThreshold": "Default pass threshold",
+  "perSubject": "Per-subject overrides",
+  "manageOverrides": "Manage Overrides",
+  "resetThreshold": "Reset default pass threshold",
+  "resetTo50": "Reset to 50%",
+  "gradingScales": "Grading Scales",
+  "scaleAF": "Standard A-F",
+  "scaleAFDesc": "A: 90-100 â€¢ B: 80-89 â€¢ C: 70-79",
+  "scalePct": "Percentage (0-100)",
+  "scalePctDesc": "Numeric scale for GPA",
+  "scale4": "4.0 Scale",
+  "scale4Desc": "A=4.0, B=3.0, C=2.0",
+  "scaleCustom": "Custom: Honors",
+  "scaleCustomDesc": "A+: 97-100, A: 93-96...",
+  "active": "Active",
+  "select": "Select",
+  "addCustomScale": "Add Custom Scale"
+}

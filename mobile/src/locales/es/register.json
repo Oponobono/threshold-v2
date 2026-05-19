@@ -1,81 +1,81 @@
 {
-    "title": "Crear cuenta",
-    "subtitle": "Únete a Threshold para organizar mejor tu vida académica.",
-    "confirmPasswordLabel": "Confirmar contraseña",
-    "confirmPasswordPlaceholder": "Reingresa tu contraseña",
-    "createAccountBtn": "Registrarse",
-    "alreadyHaveAccount": "¿Ya tienes una cuenta?",
-    "login": "Iniciar sesión",
-    "passwordRequirements": "La contraseña no cumple los criterios.",
-    "passwordValid": "La contraseña cumple los requisitos.",
-    "passwordMismatch": "Las contraseñas no coinciden.",
-    "passwordMatch": "Las contraseñas coinciden.",
-    "invalidCharacters": "Contiene caracteres inválidos.",
-    "invalidEmail": "Por favor, ingresa un correo válido.",
-    "reqTitle": "La contraseña debe contener:",
-    "reqLength": "Al menos 8 caracteres",
-    "reqUpper": "Una letra mayúscula",
-    "reqNumber": "Un número",
-    "reqSpecial": "Un carácter especial (@$!%*?&)",
-    "errors": {
-        "registerTitle": "Error de registro",
-        "generic": "No pudimos crear tu cuenta ahora. Inténtalo de nuevo."
-    },
-    "success": {
-        "accountCreated": "Tu cuenta está lista. ¡Bienvenido a Threshold!"
-    },
-    "examplePrefix": "Ej:",
-    "actions": {
-        "continue": "Continuar",
-        "skipAndContinue": "Omitir y continuar"
-    },
-    "goals": {
-        "survive": "🫠 Sobrevivir",
-        "pass": "✅ Aprobar",
-        "excel": "🎯 Destacar",
-        "top": "🏆 Ser el mejor"
-    },
-    "languages": {
-        "es": "🇪🇸 Español",
-        "en": "🇺🇸 Inglés",
-        "zh": "🇨🇳 Chino",
-        "pt": "🇧🇷 Portugués",
-        "fr": "🇫🇷 Francés",
-        "de": "🇩🇪 Alemán"
-    },
-    "step1": {
-        "title": "Configura tu perfil",
-        "subtitle": "Cuéntanos un poco sobre ti para personalizar tu experiencia académica.",
-        "profilePhoto": "Foto de perfil",
-        "photoHint": "Opcional. Si no subes foto, mostraremos tus iniciales.",
-        "removePhoto": "Quitar foto",
-        "identityCard": "Identidad",
-        "firstNameLabel": "Nombre(s)",
-        "firstNamePlaceholder": "Ej: María",
-        "lastNameLabel": "Apellido(s)",
-        "lastNamePlaceholder": "Ej: Sánchez",
-        "usernameLabel": "Usuario o apodo",
-        "usernamePlaceholder": "Ej: marias99",
-        "academicCard": "Contexto académico",
-        "semesterLabel": "Semestre / Período (opcional)",
-        "semesterPlaceholder": "Ej: 2025-2 · 5to semestre",
-        "majorLabel": "Carrera / especialidad (opcional)",
-        "majorPlaceholder": "Ej: Ingeniería de Software",
-        "universityLabel": "Universidad / institución (opcional)",
-        "universityPlaceholder": "Ej: Universidad Nacional",
-        "goalsCard": "Objetivos de estudio",
-        "studyGoalLabel": "¿Cuál es tu objetivo principal?",
-        "studyGoalHint": "La IA personalizará sus mensajes según tu meta.",
-        "languageLabel": "Idioma de referencia",
-        "languageHint": "Priorizaremos tecnicismos bilingües en tus flashcards."
-    },
-    "step2": {
-        "title": "Escala y acceso",
-        "subtitle": "Dinos cómo califica tu institución y crea tus credenciales de ingreso.",
-        "gradingCard": "Preferencias de calificación",
-        "gradingScaleLabel": "Escala de calificación",
-        "approvalThresholdLabel": "¿Cuál es la nota mínima para aprobar?",
-        "credentialsCard": "Credenciales de acceso",
-        "finishBtn": "Crear cuenta"
-    }
+  "title": "Crear cuenta",
+  "subtitle": "Únete a Threshold para organizar mejor tu vida académica.",
+  "confirmPasswordLabel": "Confirmar contraseña",
+  "confirmPasswordPlaceholder": "Reingresa tu contraseña",
+  "createAccountBtn": "Registrarse",
+  "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+  "login": "Iniciar sesión",
+  "passwordRequirements": "La contraseña no cumple los criterios.",
+  "passwordValid": "La contraseña cumple los requisitos.",
+  "passwordMismatch": "Las contraseñas no coinciden.",
+  "passwordMatch": "Las contraseñas coinciden.",
+  "invalidCharacters": "Contiene caracteres inválidos.",
+  "invalidEmail": "Por favor, ingresa un correo válido.",
+  "reqTitle": "La contraseña debe contener:",
+  "reqLength": "Al menos 8 caracteres",
+  "reqUpper": "Una letra mayúscula",
+  "reqNumber": "Un número",
+  "reqSpecial": "Un carácter especial (@$!%*?&)",
+  "errors": {
+    "registerTitle": "Error de registro",
+    "generic": "No pudimos crear tu cuenta ahora. Inténtalo de nuevo."
+  },
+  "success": {
+    "accountCreated": "Tu cuenta está lista. ¡Bienvenido a Threshold!"
+  },
+  "examplePrefix": "Ej:",
+  "actions": {
+    "continue": "Continuar",
+    "skipAndContinue": "Omitir y continuar"
+  },
+  "goals": {
+    "survive": "🫠 Sobrevivir",
+    "pass": "✅ Aprobar",
+    "excel": "🎯 Destacar",
+    "top": "🏆 Ser el mejor"
+  },
+  "languages": {
+    "es": "🇪🇸 Español",
+    "en": "🇺🇸 Inglés",
+    "zh": "🇨🇳 Chino",
+    "pt": "🇧🇷 Portugués",
+    "fr": "🇫🇷 Francés",
+    "de": "🇩🇪 Alemán"
+  },
+  "step1": {
+    "title": "Configura tu perfil",
+    "subtitle": "Cuéntanos un poco sobre ti para personalizar tu experiencia académica.",
+    "profilePhoto": "Foto de perfil",
+    "photoHint": "Opcional. Si no subes foto, mostraremos tus iniciales.",
+    "removePhoto": "Quitar foto",
+    "identityCard": "Identidad",
+    "firstNameLabel": "Nombre(s)",
+    "firstNamePlaceholder": "Ej: María",
+    "lastNameLabel": "Apellido(s)",
+    "lastNamePlaceholder": "Ej: Sánchez",
+    "usernameLabel": "Usuario o apodo",
+    "usernamePlaceholder": "Ej: marias99",
+    "academicCard": "Contexto académico",
+    "semesterLabel": "Semestre / Período (opcional)",
+    "semesterPlaceholder": "Ej: 2025-2 · 5to semestre",
+    "majorLabel": "Carrera / especialidad (opcional)",
+    "majorPlaceholder": "Ej: Ingeniería de Software",
+    "universityLabel": "Universidad / institución (opcional)",
+    "universityPlaceholder": "Ej: Universidad Nacional",
+    "goalsCard": "Objetivos de estudio",
+    "studyGoalLabel": "¿Cuál es tu objetivo principal?",
+    "studyGoalHint": "La IA personalizará sus mensajes según tu meta.",
+    "languageLabel": "Idioma de referencia",
+    "languageHint": "Priorizaremos tecnicismos bilingües en tus flashcards."
+  },
+  "step2": {
+    "title": "Escala y acceso",
+    "subtitle": "Dinos cómo califica tu institución y crea tus credenciales de ingreso.",
+    "gradingCard": "Preferencias de calificación",
+    "gradingScaleLabel": "Escala de calificación",
+    "approvalThresholdLabel": "¿Cuál es la nota mínima para aprobar?",
+    "credentialsCard": "Credenciales de acceso",
+    "finishBtn": "Crear cuenta"
+  }
 }

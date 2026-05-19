@@ -1,0 +1,22 @@
+{
+  "title": "Respaldo y sincronización",
+  "desc": "Copias en la nube y conexión de cuenta",
+  "lastBackup": "Último respaldo",
+  "lastBackupSample": "12 Abr 2026 • 09:14 AM",
+  "syncNow": "Sincronizar ahora",
+  "enableCloud": "Backup en la nube",
+  "enableCloudDesc": "Guarda copias de tus archivos en Uploadthing",
+  "photos": "Fotos de galería",
+  "audio": "Grabaciones de audio",
+  "docs": "Documentos escaneados",
+  "transcripts": "Transcripciones y resúmenes",
+  "disabled": "Backup desactivado",
+  "backingUp": "Respaldando...",
+  "backupNow": "Respaldar ahora",
+  "autoUpload": "Auto-subida al guardar",
+  "autoUploadDesc": "Sube archivos nuevos automáticamente al crearlos",
+  "autoDownload": "Auto-descarga al iniciar sesión",
+  "autoDownloadDesc": "Descarga tus archivos al entrar desde un dispositivo nuevo",
+  "downloading": "Descargando...",
+  "downloadNow": "Descargar ahora"
+}

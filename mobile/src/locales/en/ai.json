@@ -1,11 +1,40 @@
-﻿{
-    "tutorTitle":  "AI Tutor",
-    "refs":  "refs",
-    "readingContext":  "Reading and consolidating context...",
-    "processingFiles":  "Processing {{count}} files to answer your questions.",
-    "placeholderChat":  "Write your question...",
-    "chatWelcome":  "Hello! I have analyzed the {{count}} context files from **{{subject}}**.\n\nWhat would you like to know or review?",
-    "errors":  {
-                   "processFailed":  "Error: Could not process your question. {{error}}"
-               }
+{
+  "tutorTitle": "AI Tutor",
+  "refs": "refs",
+  "readingContext": "Reading and consolidating context...",
+  "processingFiles": "Processing {{count}} files to answer your questions.",
+  "placeholderChat": "Write your question...",
+  "chatWelcome": "Hello! I have analyzed the {{count}} context files from **{{subject}}**.\n\nWhat would you like to know or review?",
+  "errors": {
+    "processFailed": "Error: Could not process your question. {{error}}"
+  },
+  "emptyTitle": "What do you want to know?",
+  "questionSuggestion1": "What are the most important concepts?",
+  "questionSuggestion2": "Can you summarize the topics?",
+  "questionSuggestion3": "Explain the main topic with examples.",
+  "deckReadySubtitle": "Zyren will use the active context to create the deck",
+  "itemsCount": "Number of items",
+  "addContext": "Add context to your session",
+  "filterAll": "All",
+  "filterAudio": "Audio",
+  "filterVideos": "Videos",
+  "filterDocs": "Docs",
+  "filterPhotos": "Photos",
+  "toastMediaAndDoc": "⚠️ Transcribe the audios/videos and run OCR on documents/photos before continuing.",
+  "toastMedia": "⚠️ You must transcribe the audio or video files before using them as context.",
+  "toastDoc": "⚠️ You must analyze the documents or photos with OCR before using them as context.",
+  "chatOpenFree": "💬 Opening free chat. You can ask questions without context.",
+  "emptyNoResources": "No resources",
+  "emptyNoResourcesText": "Add recordings, photos, documents or videos to this subject to use the AI.",
+  "emptyNoResults": "No results",
+  "emptyNoResultsText": "There are no files of this type.",
+  "filesSelected": "{{count}} file selected",
+  "filesSelected_plural": "{{count}} files selected",
+  "talkWithZyren": "Talk with Zyren",
+  "flashcardsBtn": "Flashcards",
+  "deckGeneratedToast": "Deck \"{{title}}\" ready with {{count}} items ✅",
+  "deckGeneratedAiMsg": "✅ **Deck created!** I generated **\"{{title}}\"** with **{{count}} items** of type *{{mode}}*. Find it in the Flashcards section ↓",
+  "deckSuccessMsg": "✅ **Deck successfully created!**\n\n📚 **{{title}}**\nItems: {{count}}\nType: {{mode}}\n\nFind it in your Flashcards section → ",
+  "groqLimitError": "⚠️ **Processing limit reached on Fast Model ⚡**\n\nWe have temporarily exceeded the token capacity allowed for Zyren's ultra-fast engine.\n\n**How would you like to proceed?**\n\n• **Use the Advanced Reasoning Model 🧠:** Switch engine by tapping the brain icon in the chat header to continue studying without interruptions.\n• **Wait a moment ⏳:** In about 1 minute the fast channel will be free again and you can continue chatting.",
+  "connectionError": "⚠️ **Connection issue with Zyren ({{provider}})**\n\nWe couldn't process your message due to the following issue:\n*{{error}}*.\n\nPlease try again in a moment or switch the model at the top."
 }

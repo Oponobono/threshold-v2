@@ -20,7 +20,8 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import {
   LLMProvider,
   getPreferredLLMProvider,
@@ -32,7 +33,6 @@ import {
 const PRIMARY = '#7B72FF';
 const ACCENT_GROQ = '#00C896';
 const ACCENT_GEMINI = '#4285F4';
-const BG_SHEET = '#0E0E18';
 const BORDER = 'rgba(255,255,255,0.08)';
 const TXT_PRI = '#F0F0F8';
 const TXT_SEC = 'rgba(240,240,248,0.45)';
@@ -50,6 +50,7 @@ export const LLMProviderSelector: React.FC<LLMProviderSelectorProps> = ({
   showDescription = true,
   compact = false,
 }) => {
+  const { t } = useTranslation();
   const [selectedProvider, setSelectedProvider] = useState<LLMProvider>('groq');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,9 +76,9 @@ export const LLMProviderSelector: React.FC<LLMProviderSelectorProps> = ({
       await setPreferredLLMProvider(provider);
       setSelectedProvider(provider);
       onProviderChange?.(provider);
-      Alert.alert('✅ Cambio guardado', `Usando ${LLM_PROVIDERS[provider].label}`);
-    } catch (error) {
-      Alert.alert('❌ Error', 'No se pudo cambiar el proveedor');
+      Alert.alert(t('settings.savingChange', '✅ Cambio guardado'), `${t('settings.usingProvider', 'Usando')} ${LLM_PROVIDERS[provider].label}`);
+    } catch {
+      Alert.alert(t('settings.errorChange', '❌ Error'), t('settings.errorChangeMsg', 'No se pudo cambiar el proveedor'));
     } finally {
       setSaving(false);
     }
@@ -87,7 +88,7 @@ export const LLMProviderSelector: React.FC<LLMProviderSelectorProps> = ({
     return (
       <View style={s.loadingContainer}>
         <ActivityIndicator size="small" color={PRIMARY} />
-        <Text style={s.loadingText}>Cargando preferencias...</Text>
+        <Text style={s.loadingText}>{t('common.loading', 'Cargando...')}</Text>
       </View>
     );
   }
@@ -96,7 +97,7 @@ export const LLMProviderSelector: React.FC<LLMProviderSelectorProps> = ({
     // Modo compacto: solo muestra selector horizontal
     return (
       <View style={s.compactContainer}>
-        <Text style={s.compactLabel}>Proveedor de IA:</Text>
+        <Text style={s.compactLabel}>{t('settings.llmProvider', 'Proveedor de IA:')}</Text>
         <View style={s.compactButtons}>
           {(['groq', 'gemini'] as LLMProvider[]).map((provider) => (
             <TouchableOpacity
@@ -126,9 +127,9 @@ export const LLMProviderSelector: React.FC<LLMProviderSelectorProps> = ({
   // Modo expandido: tarjetas con detalles
   return (
     <View style={s.container}>
-      <Text style={s.title}>Elige tu Proveedor de IA</Text>
+      <Text style={s.title}>{t('settings.llmSelectorTitle', 'Elige tu Proveedor de IA')}</Text>
       <Text style={s.subtitle}>
-        Selecciona según tus preferencias de velocidad o capacidad
+        {t('settings.llmSelectorSubtitle', 'Selecciona según tus preferencias de velocidad o capacidad')}
       </Text>
 
       <ScrollView
@@ -173,7 +174,7 @@ export const LLMProviderSelector: React.FC<LLMProviderSelectorProps> = ({
               {showDescription && (
                 <View style={s.cardContent}>
                   <View style={s.advantagesSection}>
-                    <Text style={s.sectionLabel}>Ventajas:</Text>
+                    <Text style={s.sectionLabel}>{t('settings.llmAdvantages', 'Ventajas:')}</Text>
                     {config.advantages.map((adv, idx) => (
                       <View key={idx} style={s.advantageItem}>
                         <Text style={s.bulletPoint}>•</Text>

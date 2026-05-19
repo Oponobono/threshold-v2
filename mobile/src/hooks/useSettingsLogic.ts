@@ -85,17 +85,17 @@ export const useSettingsLogic = () => {
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
 
   // Constants
-  const TERMS = t('settings.termOptions', { returnObjects: true }) as string[];
+  const TERMS = t('academic.termOptions', { returnObjects: true }) as string[];
   const [activeTermIndex, setActiveTermIndex] = useState(0);
 
   const SCALES: { key: ScaleKey; label: string; desc: string }[] = [
-    { key: 'af', label: t('settings.scaleAF'), desc: t('settings.scaleAFDesc') },
-    { key: 'pct', label: t('settings.scalePct'), desc: t('settings.scalePctDesc') },
-    { key: 'scale4', label: t('settings.scale4'), desc: t('settings.scale4Desc') },
-    { key: 'custom', label: t('settings.scaleCustom'), desc: t('settings.scaleCustomDesc') },
+    { key: 'af', label: t('academic.scaleAF'), desc: t('academic.scaleAFDesc') },
+    { key: 'pct', label: t('academic.scalePct'), desc: t('academic.scalePctDesc') },
+    { key: 'scale4', label: t('academic.scale4'), desc: t('academic.scale4Desc') },
+    { key: 'custom', label: t('academic.scaleCustom'), desc: t('academic.scaleCustomDesc') },
   ];
 
-  const LMS_ACCOUNTS = t('settings.lmsAccounts', { returnObjects: true }) as { name: string; user: string }[];
+  const LMS_ACCOUNTS = t('integrations.lmsAccounts', { returnObjects: true }) as { name: string; user: string }[];
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -143,17 +143,17 @@ export const useSettingsLogic = () => {
     };
 
     if (Platform.OS === 'web') {
-      if (confirm(t('settings.signOutDesc'))) {
+      if (confirm(t('account.signOutDesc'))) {
         onConfirm();
       }
     } else {
       alertRef.show({
-        title: t('settings.signOut'),
-        message: t('settings.signOutDesc'),
+        title: t('account.signOut'),
+        message: t('account.signOutDesc'),
         type: 'confirm',
         buttons: [
           { text: t('settings.cancel'), style: 'cancel' },
-          { text: t('settings.signOutBtn'), style: 'destructive', onPress: onConfirm },
+          { text: t('account.signOutBtn'), style: 'destructive', onPress: onConfirm },
         ]
       });
     }
@@ -189,7 +189,7 @@ export const useSettingsLogic = () => {
         buttons: [
           { text: t('settings.cancel'), style: 'cancel', onPress: () => setBiometric(true) },
           { 
-            text: t('settings.deleteBtn'), 
+            text: t('account.deleteBtn'), 
             style: 'destructive', 
             onPress: async () => {
               try {
@@ -213,13 +213,13 @@ export const useSettingsLogic = () => {
    */
   const handleDeleteAccount = () => {
     alertRef.show({
-      title: t('settings.deleteAccount'),
-      message: t('settings.deleteAccountDesc'),
+      title: t('account.deleteAccount'),
+      message: t('account.deleteAccountDesc'),
       type: 'confirm',
       buttons: [
         { text: t('settings.cancel'), style: 'cancel' },
         { 
-          text: t('settings.deleteBtn'), 
+          text: t('account.deleteBtn'), 
           style: 'destructive', 
           onPress: () => setIsDeleteAccountVisible(true)
         },
@@ -266,7 +266,7 @@ export const useSettingsLogic = () => {
         ...(!profile?.share_pin && editPin.trim() ? { share_pin: editPin.trim().toUpperCase() } : {}),
       });
       setIsEditProfileVisible(false);
-      alertRef.show({ title: t('common.success'), message: t('settings.profileUpdated'), type: 'success' });
+      alertRef.show({ title: t('common.success'), message: t('account.profileUpdated'), type: 'success' });
       const userProfile = await getCurrentUserProfile();
       setProfile(userProfile);
     } catch (error: any) {
@@ -279,11 +279,11 @@ export const useSettingsLogic = () => {
    */
   const handleSavePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      alertRef.show({ title: t('common.error'), message: t('settings.fillAllFields'), type: 'warning' });
+      alertRef.show({ title: t('common.error'), message: t('account.fillAllFields'), type: 'warning' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      alertRef.show({ title: t('common.error'), message: t('settings.passwordsDontMatch'), type: 'warning' });
+      alertRef.show({ title: t('common.error'), message: t('account.passwordsDontMatch'), type: 'warning' });
       return;
     }
     try {
@@ -292,7 +292,7 @@ export const useSettingsLogic = () => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      alertRef.show({ title: t('common.success'), message: t('settings.passwordUpdated'), type: 'success' });
+      alertRef.show({ title: t('common.success'), message: t('account.passwordUpdated'), type: 'success' });
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error.message || t('settings.errors.passwordUpdateFailed'), type: 'error' });
     }
@@ -448,8 +448,8 @@ export const useSettingsLogic = () => {
     return `${first} ${last}`.trim();
   }, [profile]);
 
-  const profileName = fullName || profile?.username || t('settings.profileName');
-  const profileEmail = profile?.email || t('settings.profileEmail');
+  const profileName = fullName || profile?.username || t('account.profileName');
+  const profileEmail = profile?.email || t('account.profileEmail');
   const profileAvatarUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileName)}&background=EDEEF2&color=111111&bold=true`;
 
   return {

@@ -1,0 +1,12 @@
+{
+  "assessment": "Assessment",
+  "assessments": "Assessments",
+  "nextQuiz": "Next: Quiz",
+  "nextMidterm": "Next: Midterm",
+  "nextEssay": "Next: Essay",
+  "score": "Score:",
+  "dueDate": "Due:",
+  "weight": "Weight:",
+  "deleteConfirm": "Are you sure you want to delete this grade/assessment?",
+  "emptyState": "No assessments yet"
+}

@@ -310,8 +310,8 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
     <View style={sectionStyles.sectionBlock}>
       <View style={sectionStyles.sectionHeaderRow}>
         <View>
-          <Text style={sectionStyles.sectionTitle}>{t('subjects.scannedDocuments')}</Text>
-          <Text style={sectionStyles.sectionHint}>{t('subjects.scannedDocumentsHint')}</Text>
+          <Text style={sectionStyles.sectionTitle}>{t('documents.title')}</Text>
+          <Text style={sectionStyles.sectionHint}>{t('documents.hint')}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
           {documents.length > 0 && (
@@ -345,8 +345,8 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
         {documents.length === 0 ? (
           <View style={sectionStyles.emptyStateCard}>
             <Ionicons name="document-text-outline" size={24} color={theme.colors.text.secondary} />
-            <Text style={sectionStyles.emptyStateTitle}>{t('subjects.scannedDocuments')}</Text>
-            <Text style={sectionStyles.emptyStateText}>{t('subjects.scannedDocumentsEmpty')}</Text>
+            <Text style={sectionStyles.emptyStateTitle}>{t('documents.title')}</Text>
+            <Text style={sectionStyles.emptyStateText}>{t('documents.emptyState')}</Text>
           </View>
         ) : (
           documents.map((doc, index) => {

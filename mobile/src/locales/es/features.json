@@ -1,40 +1,40 @@
 {
-    "swipeToExplore":  "Desliza para explorar",
-    "swipeToStart":  "Volver al inicio",
-    "bento":  {
-                  "title":  "Panel de materias",
-                  "desc":  "Organiza todas tus materias en un panel visual."
-              },
-    "gpa":  {
-                "title":  "Seguimiento de promedio",
-                "desc":  "Mantén un registro exacto de tu rendimiento."
-            },
-    "photo":  {
-                  "title":  "Fotos rápidas",
-                  "desc":  "Guarda apuntes en fotos con un clic."
-              },
-    "schedule":  {
-                     "title":  "Horario Semanal",
-                     "desc":  "Planifica tus clases y tiempo de estudio."
-                 },
-    "tasks":  {
-                  "title":  "Gestión de Tareas",
-                  "desc":  "Administra fechas de entrega y exámenes."
-              },
-    "gallery":  {
-                    "title":  "Galería Organizada",
-                    "desc":  "Encuentra tus apuntes agrupados por materia."
-                },
-    "cloud":  {
-                  "title":  "Sincronización Cloud",
-                  "desc":  "Accede a tus datos de forma segura."
-              },
-    "security":  {
-                     "title":  "Privacidad Total",
-                     "desc":  "Tus notas están encriptadas y protegidas."
-                 },
-    "custom":  {
-                   "title":  "Personalización",
-                   "desc":  "Temas visuales y avatares a tu gusto."
-               }
+  "swipeToExplore": "Desliza para explorar",
+  "swipeToStart": "Volver al inicio",
+  "bento": {
+    "title": "Panel de materias",
+    "desc": "Organiza todas tus materias en un panel visual."
+  },
+  "gpa": {
+    "title": "Seguimiento de promedio",
+    "desc": "Mantén un registro exacto de tu rendimiento."
+  },
+  "photo": {
+    "title": "Fotos rápidas",
+    "desc": "Guarda apuntes en fotos con un clic."
+  },
+  "schedule": {
+    "title": "Horario Semanal",
+    "desc": "Planifica tus clases y tiempo de estudio."
+  },
+  "tasks": {
+    "title": "Gestión de Tareas",
+    "desc": "Administra fechas de entrega y exámenes."
+  },
+  "gallery": {
+    "title": "Galería Organizada",
+    "desc": "Encuentra tus apuntes agrupados por materia."
+  },
+  "cloud": {
+    "title": "Sincronización Cloud",
+    "desc": "Accede a tus datos de forma segura."
+  },
+  "security": {
+    "title": "Privacidad Total",
+    "desc": "Tus notas están encriptadas y protegidas."
+  },
+  "custom": {
+    "title": "Personalización",
+    "desc": "Temas visuales y avatares a tu gusto."
+  }
 }

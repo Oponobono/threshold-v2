@@ -135,8 +135,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
   const handleDelete = async (photoId: number) => {
     showAlert({
-      title: t('subjects.deletePhotoTitle'),
-      message: t('subjects.deletePhotoConfirm'),
+      title: t('gallery.deletePhotoTitle'),
+      message: t('gallery.deletePhotoConfirm'),
       type: 'confirm',
       buttons: [
         { text: t('common.cancel') || 'Cancelar', style: 'cancel' },
@@ -173,7 +173,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
               }
             } catch (error: any) {
               console.error('[ImageViewerModal] ERROR AL BORRAR FOTO:', error);
-              showAlert({ title: t('common.error'), message: t('subjects.deletePhotoError') + ` (${error.message})`, type: 'error' });
+              showAlert({ title: t('common.error'), message: t('gallery.deletePhotoError') + ` (${error.message})`, type: 'error' });
             }
           }
         }

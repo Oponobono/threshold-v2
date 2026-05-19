@@ -26,8 +26,8 @@ export const SubjectYouTubeVideos: React.FC<SubjectYouTubeVideosProps> = ({ vide
     <View style={styles.sectionBlock}>
       <View style={styles.sectionHeaderRow}>
         <View>
-          <Text style={styles.sectionTitle}>{t('subjects.youtubeVideos')}</Text>
-          <Text style={styles.sectionHint}>{t('subjects.savedVideos')}</Text>
+          <Text style={styles.sectionTitle}>{t('youtube.subjectVideos')}</Text>
+          <Text style={styles.sectionHint}>{t('youtube.savedVideos')}</Text>
         </View>
       </View>
       <View style={{ gap: 12 }}>
@@ -46,12 +46,12 @@ export const SubjectYouTubeVideos: React.FC<SubjectYouTubeVideosProps> = ({ vide
             <MaterialCommunityIcons name="youtube" size={40} color={theme.colors.text.error} style={{ marginRight: 12 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.colors.text.primary, fontWeight: '600', fontSize: 15 }} numberOfLines={2}>
-                {video.title || t('subjects.youtubeVideoDefault')}
+                {video.title || t('youtube.videoDefault')}
               </Text>
               <Text style={{ color: theme.colors.text.secondary, fontSize: 13, marginTop: 2 }}>
                 {video.created_at
                   ? new Date(video.created_at).toLocaleDateString()
-                  : t('subjects.unknownDate')}
+                  : t('youtube.unknownDate')}
               </Text>
             </View>
             <TouchableOpacity

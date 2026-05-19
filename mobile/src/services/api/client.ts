@@ -84,10 +84,23 @@ export const buildApiError = (message: string): Error => new Error(message);
 
 /**
  * Realiza la petición HTTP probándolas todas las URLs base en orden.
- * Si la URL activa falla, prueba las alternativas y actualiza `activeBaseUrl`
- * con la que responda para que las siguientes peticiones usen esa directamente.
+ * Implementa una estrategia "Network First, Fallback to Cache" para offline.
  */
 export const fetchWithFallback = async (path: string, init?: RequestInit): Promise<Response> => {
+  const method = init?.method?.toUpperCase() || 'GET';
+  
+  // 🛡️ Rutas excluidas de cache (IA, OCR, etc.)
+  const isExcluded = path.includes('/ocr') || 
+                     path.includes('/ai') || 
+                     path.includes('/transcribe') || 
+                     path.includes('/generate') ||
+                     path.includes('/analyze') ||
+                     path.includes('/youtube') ||
+                     path.includes('/pdf-extract');
+                     
+  const isCacheable = method === 'GET' && !isExcluded;
+  const cacheKey = `api_cache_${path}`;
+
   const candidates = [
     activeBaseUrl,
     ...API_BASE_URLS.filter((base) => base !== activeBaseUrl),
@@ -99,7 +112,6 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
   const token = await storageService.getSecure('jwt_token');
   const headers = new Headers(init?.headers || {});
   
-  // Si hay un token guardado, lo adjuntamos como un Bearer token
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
@@ -110,9 +122,38 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
     try {
       const response = await fetch(`${base}${path}`, customInit);
       activeBaseUrl = base;
+      
+      // ✅ Guardar en cache si es exitosa y cacheable
+      if (response.ok && isCacheable) {
+        try {
+          const clone = response.clone();
+          const text = await clone.text();
+          await storageService.saveLocal(cacheKey, text);
+        } catch (e) {
+          console.error('[Cache] Error guardando cache para', path, e);
+        }
+      }
+      
       return response;
     } catch (error) {
       lastError = error;
+    }
+  }
+
+  // 🛡️ Fallback: Si no hay conexión (fallaron las URLs) y es cacheable, devolvemos del cache local
+  if (isCacheable) {
+    try {
+      const cachedText = await storageService.getLocal(cacheKey);
+      if (cachedText) {
+        console.log(`[Cache Fallback] Modo Offline. Sirviendo desde cache: ${path}`);
+        return new Response(cachedText, {
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers({ 'Content-Type': 'application/json' })
+        });
+      }
+    } catch (cacheError) {
+      console.error('[Cache Fallback] Error leyendo de cache', cacheError);
     }
   }
 

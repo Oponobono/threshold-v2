@@ -41,8 +41,8 @@ export const SubjectGalleryGrid: React.FC<SubjectGalleryGridProps> = ({
     <View style={styles.sectionBlock}>
       <View style={styles.sectionHeaderRow}>
         <View>
-          <Text style={styles.sectionTitle}>{t('subjects.galleryTitle')}</Text>
-          <Text style={styles.sectionHint}>{t('subjects.galleryHint')}</Text>
+          <Text style={styles.sectionTitle}>{t('gallery.subjectGalleryTitle')}</Text>
+          <Text style={styles.sectionHint}>{t('gallery.subjectGalleryHint')}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity style={styles.galleryIconBtn} onPress={onOpenScanner}>
@@ -58,8 +58,8 @@ export const SubjectGalleryGrid: React.FC<SubjectGalleryGridProps> = ({
         {photos.length === 0 ? (
           <View style={styles.emptyStateCard}>
             <Ionicons name="camera-outline" size={28} color={theme.colors.text.secondary} />
-            <Text style={styles.emptyStateTitle}>{t('subjects.galleryEmptyTitle')}</Text>
-            <Text style={styles.emptyStateText}>{t('subjects.galleryEmptyText')}</Text>
+            <Text style={styles.emptyStateTitle}>{t('gallery.subjectEmptyTitle')}</Text>
+            <Text style={styles.emptyStateText}>{t('gallery.subjectEmptyText')}</Text>
           </View>
         ) : photos.length === 1 ? (
           <View style={styles.galleryGridSingle}>
@@ -112,13 +112,13 @@ export const SubjectGalleryGrid: React.FC<SubjectGalleryGridProps> = ({
 
         <View style={styles.galleryFooter}>
           <View>
-            <Text style={styles.galleryFooterTitle}>{subjectName || t('subjects.galleryFallbackSubject')}</Text>
+            <Text style={styles.galleryFooterTitle}>{subjectName || t('gallery.fallbackSubject')}</Text>
             <Text style={styles.galleryFooterText}>
               {photos.length === 0 
-                ? t('subjects.photoCount_zero') 
+                ? t('gallery.photoCount_zero') 
                 : photos.length === 1 
-                  ? t('subjects.photoCount_one') 
-                  : t('subjects.photoCount', { count: photos.length })}
+                  ? t('gallery.photoCount_one') 
+                  : t('gallery.photoCount', { count: photos.length })}
             </Text>
           </View>
           <TouchableOpacity style={styles.galleryFooterAction} onPress={onTakePhoto}>

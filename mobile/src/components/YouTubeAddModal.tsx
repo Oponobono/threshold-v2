@@ -111,7 +111,7 @@ export const YouTubeAddModal: React.FC<YouTubeAddModalProps> = ({
           >
             {isAdding && <ActivityIndicator size="small" color="white" />}
             <Text style={{ color: 'white', fontWeight: 'bold' }}>
-              {isAdding ? 'Añadiendo...' : 'Añadir'}
+              {isAdding ? t('recordings.adding', 'Añadiendo...') : t('recordings.add', 'Añadir')}
             </Text>
           </TouchableOpacity>
         </View>

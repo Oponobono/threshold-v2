@@ -1,12 +1,21 @@
 {
-    "title":  "Videos",
-    "loadingList":  "Cargando videos...",
-    "loading":  "Cargando video...",
-    "errors":  {
-                   "groqApiKeyMissing":  "Falta la API Key de Groq en el archivo .env.local",
-                   "videoIdNotFound":  "No se encontró el ID del video. Por favor intenta recargar.",
-                   "captionsFetchFailed":  "No se pudieron obtener los subtítulos del video. Es posible que:\n• El video no tenga subtítulos disponibles\n• El video sea privado o no exista\n• Hay problemas de conectividad",
-                   "summaryFailed":  "Error al generar el resumen.",
-                   "videoLoadFailed":  "No se pudo cargar el video. Intenta abrirlo directamente en YouTube."
-               }
+  "title": "Videos",
+  "loadingList": "Cargando videos...",
+  "loading": "Cargando video...",
+  "errors": {
+    "groqApiKeyMissing": "Falta la API Key de Groq en el archivo .env.local",
+    "videoIdNotFound": "No se encontró el ID del video. Por favor intenta recargar.",
+    "captionsFetchFailed": "No se pudieron obtener los subtítulos del video. Es posible que:\n• El video no tenga subtítulos disponibles\n• El video sea privado o no exista\n• Hay problemas de conectividad",
+    "summaryFailed": "Error al generar el resumen.",
+    "videoLoadFailed": "No se pudo cargar el video. Intenta abrirlo directamente en YouTube.",
+    "networkError": "Problema de conexión. Verifica tu conexión a internet o el servidor.",
+    "noSubtitlesFound": "Este video no tiene subtítulos disponibles en YouTube."
+  },
+  "subjectVideos": "Videos de YouTube",
+  "savedVideos": "Videos guardados de esta materia",
+  "videoDefault": "Video de YouTube",
+  "unknownDate": "Fecha desconocida",
+  "deleteVideo": "Eliminar video",
+  "deleteVideoConfirm": "¿Estás seguro de que quieres eliminar este video?",
+  "deleteVideoError": "No se pudo eliminar el video."
 }

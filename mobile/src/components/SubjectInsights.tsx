@@ -44,7 +44,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
   const handleDelete = (id: number) => {
     showAlert({
       title: t('common.deleteItem') || 'Eliminar',
-      message: t('subjects.deleteAssessmentConfirm') || '¿Estás seguro de que quieres eliminar esta nota/evaluación?',
+      message: t('assessments.deleteConfirm') || '¿Estás seguro de que quieres eliminar esta nota/evaluación?',
       type: 'confirm',
       buttons: [
         { text: t('common.cancel') || 'Cancelar', style: 'cancel' },
@@ -68,8 +68,8 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
     <View style={styles.sectionBlock}>
       <View style={styles.sectionHeaderRow}>
         <View>
-          <Text style={styles.sectionTitle}>{t('subjects.insightsTitle')}</Text>
-          <Text style={styles.sectionHint}>{t('subjects.insightsHint')}</Text>
+          <Text style={styles.sectionTitle}>{t('analytics.insightsTitle')}</Text>
+          <Text style={styles.sectionHint}>{t('analytics.insightsHint')}</Text>
         </View>
         <Text style={styles.sectionChip}>{recentAssessments.length} {t('subjects.notes')}</Text>
       </View>
@@ -120,8 +120,8 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
         ) : (
           <View style={styles.emptyStateCard}>
             <Ionicons name="stats-chart-outline" size={24} color={theme.colors.text.secondary} />
-            <Text style={styles.emptyStateTitle}>{t('subjects.emptyInsightsTitle')}</Text>
-            <Text style={styles.emptyStateText}>{t('subjects.emptyInsightsText')}</Text>
+            <Text style={styles.emptyStateTitle}>{t('analytics.emptyInsightsTitle')}</Text>
+            <Text style={styles.emptyStateText}>{t('analytics.emptyInsightsText')}</Text>
           </View>
         )}
       </View>

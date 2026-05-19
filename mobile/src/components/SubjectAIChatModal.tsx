@@ -27,6 +27,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
 import LottieView from 'lottie-react-native';
+import { useTranslation } from 'react-i18next';
 import { StudyModeSelector } from './evaluation/StudyModeSelector';
 import { StudyMode } from '../services/api/types';
 
@@ -360,6 +361,7 @@ const TypingIndicator: React.FC = () => {
 export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   isVisible, onClose, subjectName, subjectId, userId, contextText, contextItemCount,
 }) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -474,10 +476,15 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       closeGenPanel();
       const aiMsg: Message = {
         role: 'assistant',
-        content: `✅ **¡Mazo creado!** Generé **"${deck.title}"** con **${deck.card_count} ítems** de tipo *${modeLabels[activeMode]}*. Encuéntralo en la sección de Flashcards ↓`,
+        content: t('ai.deckGeneratedAiMsg', {
+          title: deck.title,
+          count: deck.card_count,
+          mode: modeLabels[activeMode],
+          defaultValue: `✅ **¡Mazo creado!** Generé **"${deck.title}"** con **${deck.card_count} ítems** de tipo *${modeLabels[activeMode]}*. Encuéntralo en la sección de Flashcards ↓`
+        }),
       };
       setMessages(prev => [...prev, aiMsg]);
-      showToast(`Mazo "${deck.title}" listo con ${deck.card_count} ítems ✅`);
+      showToast(t('ai.deckGeneratedToast', { title: deck.title, count: deck.card_count, defaultValue: `Mazo "${deck.title}" listo con ${deck.card_count} ítems ✅` }));
     } catch (err: any) {
       console.error('[AIChatModal] ❌ Error en generateStudyMaterialFromChat:', {
         message: err.message,
@@ -595,7 +602,12 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         // El backend ya creó el mazo automáticamente
         replyContent = replyContent.replace(/%+DECK_ACTION%+[\s\S]*?%+END%+/g, '').trim();
         
-        const deckMsg = `✅ **¡Mazo creado exitosamente!**\n\n📚 **${data.deck.deckTitle}**\nÍtems: ${data.deck.count}\nTipo: ${data.deck.mode === 'mixed' ? 'Mixto' : data.deck.mode}\n\nEncuéntralo en tu sección de Flashcards → `;
+        const deckMsg = t('ai.deckSuccessMsg', {
+          title: data.deck.deckTitle,
+          count: data.deck.count,
+          mode: data.deck.mode === 'mixed' ? 'Mixto' : data.deck.mode,
+          defaultValue: `✅ **¡Mazo creado exitosamente!**\n\n📚 **${data.deck.deckTitle}**\nÍtems: ${data.deck.count}\nTipo: ${data.deck.mode === 'mixed' ? 'Mixto' : data.deck.mode}\n\nEncuéntralo en tu sección de Flashcards → `
+        });
         
         setMessages(prev => [
           ...prev,
@@ -603,7 +615,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           { role: 'assistant', content: deckMsg, isSystemMessage: true }
         ]);
         setIsLoading(false);
-        showToast(`¡Mazo "${data.deck.deckTitle}" listo con ${data.deck.count} ítems! 🎉`);
+        showToast(t('ai.deckGeneratedToast', { title: data.deck.deckTitle, count: data.deck.count, defaultValue: `¡Mazo "${data.deck.deckTitle}" listo con ${data.deck.count} ítems! 🎉` }));
       } else {
         // ── Interceptar señal de generación de mazo (fallback si backend no lo creó) ──
         const rawSignal = data?.deckActionSignal || replyContent.match(/%+DECK_ACTION%+(\{[\s\S]*?\})%+END%+/)?.[1];
@@ -655,8 +667,12 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       );
 
       const errorMessage = isGroqLimit
-        ? `⚠️ **Límite de procesamiento alcanzado en el Modelo Rápido ⚡**\n\nHemos superado temporalmente la capacidad de tokens permitida para el motor ultrarrápido de Zyren.\n\n**¿Cómo deseas continuar?**\n\n• **Usa el Modelo de Razonamiento Avanzado 🧠:** Cambia de motor pulsando el ícono del cerebro en la cabecera del chat para seguir estudiando sin interrupciones.\n• **Espera un momento ⏳:** En aproximadamente 1 minuto el canal rápido estará libre nuevamente y podrás seguir conversando.`
-        : `⚠️ **Inconveniente de conexión con Zyren (${currentProvider === 'groq' ? 'Modelo Rápido ⚡' : 'Modelo Avanzado 🧠'})**\n\nNo pudimos procesar tu mensaje debido al siguiente inconveniente:\n*${err.message || 'Error de red o del servidor desconectado'}*.\n\nPor favor, intenta de nuevo en unos instantes o cambia de modelo en la parte superior.`;
+        ? t('ai.groqLimitError', `⚠️ **Límite de procesamiento alcanzado en el Modelo Rápido ⚡**\n\nHemos superado temporalmente la capacidad de tokens permitida para el motor ultrarrápido de Zyren.\n\n**¿Cómo deseas continuar?**\n\n• **Usa el Modelo de Razonamiento Avanzado 🧠:** Cambia de motor pulsando el ícono del cerebro en la cabecera del chat para seguir estudiando sin interrupciones.\n• **Espera un momento ⏳:** En aproximadamente 1 minuto el canal rápido estará libre nuevamente y podrás seguir conversando.`)
+        : t('ai.connectionError', {
+            provider: currentProvider === 'groq' ? 'Modelo Rápido ⚡' : 'Modelo Avanzado 🧠',
+            error: err.message || 'Error de red o del servidor desconectado',
+            defaultValue: `⚠️ **Inconveniente de conexión con Zyren (${currentProvider === 'groq' ? 'Modelo Rápido ⚡' : 'Modelo Avanzado 🧠'})**\n\nNo pudimos procesar tu mensaje debido al siguiente inconveniente:\n*${err.message || 'Error de red o del servidor desconectado'}*.\n\nPor favor, intenta de nuevo en unos instantes o cambia de modelo en la parte superior.`
+          });
 
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -904,7 +920,6 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 </Text>
               </View>
 
-              {/* Aviso de documento truncado */}
               {isTruncated && (
                 <View style={[s.infoBanner, { backgroundColor: 'rgba(255, 149, 0, 0.12)', borderColor: 'rgba(255, 149, 0, 0.25)', borderWidth: 1, paddingVertical: 10 }]}>
                   <Ionicons name="warning-outline" size={16} color="#FF9500" />
@@ -920,16 +935,16 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                   <View style={s.emptyIconWrap}>
                     <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 64, height: 64 }} />
                   </View>
-                  <Text style={s.emptyTitle}>¿Qué quieres saber?</Text>
+                  <Text style={s.emptyTitle}>{t('ai.emptyTitle', '¿Qué quieres saber?')}</Text>
                   <Text style={s.emptySubtitle}>
                     Tengo acceso a {contextItemCount > 0 ? `${contextItemCount} archivo${contextItemCount > 1 ? 's' : ''}` : 'tus materiales'} de {subjectName}.
                   </Text>
 
                   {/* Sugerencias de preguntas */}
                   {[
-                    '¿Cuáles son los conceptos más importantes?',
-                    '¿Puedes hacer un resumen de los temas?',
-                    'Explícame el tema principal con ejemplos.',
+                    t('ai.questionSuggestion1', '¿Cuáles son los conceptos más importantes?'),
+                    t('ai.questionSuggestion2', '¿Puedes hacer un resumen de los temas?'),
+                    t('ai.questionSuggestion3', 'Explícame el tema principal con ejemplos.'),
                   ].map((q, i) => (
                     <TouchableOpacity
                       key={i}
@@ -991,11 +1006,11 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                   <Ionicons name="close" size={18} color={TXT_PRI} />
                 </TouchableOpacity>
               </View>
-              <Text style={s.genPanelSubtitle}>Zyren usará el contexto activo para crear el mazo</Text>
+              <Text style={s.genPanelSubtitle}>{t('ai.deckReadySubtitle', 'Zyren usará el contexto activo para crear el mazo')}</Text>
 
               <StudyModeSelector selected={genMode} onSelect={setGenMode} />
 
-              <Text style={s.genCountLabel}>Cantidad de ítems</Text>
+              <Text style={s.genCountLabel}>{t('ai.itemsCount', 'Cantidad de ítems')}</Text>
               <TextInput
                 style={s.genCountInput}
                 value={genCount}

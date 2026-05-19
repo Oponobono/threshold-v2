@@ -27,12 +27,12 @@ const GAP       = 10;
 const PAD       = 20;
 
 type FilterKey = 'all' | 'audio' | 'videos' | 'docs' | 'photos';
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all',    label: 'Todo'   },
-  { key: 'audio',  label: 'Audio'  },
-  { key: 'videos', label: 'Videos' },
-  { key: 'docs',   label: 'Docs'   },
-  { key: 'photos', label: 'Fotos'  },
+const getFilters = (t: any): { key: FilterKey; label: string }[] => [
+  { key: 'all',    label: t('ai.filterAll', 'Todo')   },
+  { key: 'audio',  label: t('ai.filterAudio', 'Audio')  },
+  { key: 'videos', label: t('ai.filterVideos', 'Videos') },
+  { key: 'docs',   label: t('ai.filterDocs', 'Docs')   },
+  { key: 'photos', label: t('ai.filterPhotos', 'Fotos')  },
 ];
 
 const FILTER_TYPE_MAP: Partial<Record<FilterKey, AIContextItemType>> = {
@@ -183,18 +183,18 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     const hasAudioVideo = items.some(i => i.type === 'recording' || i.type === 'video');
     const hasDocPhoto   = items.some(i => i.type === 'document'  || i.type === 'photo');
     if (hasAudioVideo && hasDocPhoto)
-      return '⚠️ Transcribe los audios/videos y analiza con OCR los documentos/fotos antes de continuar.';
+      return t('ai.toastMediaAndDoc', '⚠️ Transcribe los audios/videos y analiza con OCR los documentos/fotos antes de continuar.');
     if (hasAudioVideo)
-      return '⚠️ Primero debes transcribir los archivos de audio o video antes de usarlos como contexto.';
-    return '⚠️ Primero debes analizar los documentos o fotos con OCR antes de usarlos como contexto.';
-  }, []);
+      return t('ai.toastMedia', '⚠️ Primero debes transcribir los archivos de audio o video antes de usarlos como contexto.');
+    return t('ai.toastDoc', '⚠️ Primero debes analizar los documentos o fotos con OCR antes de usarlos como contexto.');
+  }, [t]);
 
   const handleAsk = useCallback(() => {
     const selected = allItems.filter(i => selectedIds.has(i.id));
     
     // Si no hay nada seleccionado, abrir chat sin contexto (Zyren responderá abiertamente)
     if (selected.length === 0) {
-      showToast('💬 Abriendo chat libre. Puedes hacer preguntas sin contexto.');
+      showToast(t('ai.chatOpenFree', '💬 Abriendo chat libre. Puedes hacer preguntas sin contexto.'));
       onAskQuestions?.(selected);
       return;
     }
@@ -235,7 +235,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={s.title}>Zyren</Text>
               <Text style={s.subtitle} numberOfLines={1}>
-                Añade contexto a tu sesión
+                {t('ai.addContext', 'Añade contexto a tu sesión')}
               </Text>
             </View>
             <TouchableOpacity onPress={handleClose} style={s.closeBtn}>
@@ -244,13 +244,13 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
           </View>
 
           {/* Smart Filter chips */}
-          <ScrollView
+            <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={s.filterRow}
             style={{ flexGrow: 0 }}
           >
-            {FILTERS.map(f => {
+            {getFilters(t).map(f => {
               const active = activeFilter === f.key;
               const count = f.key === 'all'
                 ? allItems.length
@@ -283,16 +283,16 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             {!hasContent ? (
               <View style={s.emptyState}>
                 <MaterialCommunityIcons name="folder-open-outline" size={52} color="rgba(255,255,255,0.1)" />
-                <Text style={s.emptyTitle}>Sin recursos</Text>
+                <Text style={s.emptyTitle}>{t('ai.emptyNoResources', 'Sin recursos')}</Text>
                 <Text style={s.emptyText}>
-                  Agrega grabaciones, fotos, documentos o videos a esta materia para usar la IA.
+                  {t('ai.emptyNoResourcesText', 'Agrega grabaciones, fotos, documentos o videos a esta materia para usar la IA.')}
                 </Text>
               </View>
             ) : filteredItems.length === 0 ? (
               <View style={s.emptyState}>
                 <MaterialCommunityIcons name="filter-outline" size={42} color="rgba(255,255,255,0.1)" />
-                <Text style={s.emptyTitle}>Sin resultados</Text>
-                <Text style={s.emptyText}>No hay archivos de este tipo.</Text>
+                <Text style={s.emptyTitle}>{t('ai.emptyNoResults', 'Sin resultados')}</Text>
+                <Text style={s.emptyText}>{t('ai.emptyNoResultsText', 'No hay archivos de este tipo.')}</Text>
               </View>
             ) : (
               rows.map((row, ri) => (
@@ -318,7 +318,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
               <Animated.View style={[s.counterBadge, { transform: [{ scale: badgeScale }] }]}>
                 <Ionicons name="checkmark-circle" size={13} color={PRIMARY} />
                 <Text style={s.counterText}>
-                  {totalSelected} {totalSelected === 1 ? 'archivo' : 'archivos'} seleccionados
+                  {t('ai.filesSelected', { count: totalSelected, plural: totalSelected !== 1 ? 's' : '', defaultValue: `${totalSelected} archivo${totalSelected !== 1 ? 's' : ''} seleccionado${totalSelected !== 1 ? 's' : ''}` })}
                 </Text>
               </Animated.View>
             )}
@@ -333,7 +333,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
                 ]}
               >
                 <MaterialCommunityIcons name="chat-processing-outline" size={18} color="#fff" />
-                <Text style={s.btnPrimaryText}>Habla con Zyren</Text>
+                <Text style={s.btnPrimaryText}>{t('ai.talkWithZyren', 'Habla con Zyren')}</Text>
               </TouchableOpacity>
 
               {/* Secondary: Flashcards — REQUIERE archivos con contenido */}
@@ -348,7 +348,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
               >
                 <MaterialCommunityIcons name="cards-outline" size={18} color={totalSelected > 0 ? TXT_PRI : TXT_SEC} />
                 <Text style={[s.btnSecondaryText, totalSelected === 0 && { color: TXT_SEC }]}>
-                  Flashcards
+                  {t('ai.flashcardsBtn', 'Flashcards')}
                 </Text>
               </TouchableOpacity>
             </View>

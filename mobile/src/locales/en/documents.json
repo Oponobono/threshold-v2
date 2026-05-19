@@ -1,0 +1,17 @@
+{
+  "generationError": "Error generating PDF: {{message}}",
+  "title": "Scanned Documents",
+  "hint": "Scanned PDFs and images for this subject",
+  "item": "Scanned Document",
+  "pdf": "PDF",
+  "aiReadable": "The AI will be able to read the content",
+  "pickerError": "Could not open the file selector",
+  "tooLarge": "The file is too large (max 50MB)",
+  "importedFile": "{{file}} imported",
+  "importError": "Error importing the file",
+  "importTitle": "Import PDF",
+  "uploadPrompt": "Upload your PDF and extract text with AI 🚀",
+  "extractText": "Extract text",
+  "selectPdf": "Select PDF",
+  "emptyState": "No documents saved yet. Use the '+' button to import PDF files."
+}

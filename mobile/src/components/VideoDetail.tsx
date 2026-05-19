@@ -347,11 +347,11 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       const errorMsg = e instanceof Error ? e.message : String(e);
       
       // Better error messages
-      let userMessage = '⚠️ Error al obtener subtítulos:\n\n';
+      let userMessage = t('youtube.errors.captionsFetchFailed') + ':\n\n';
       if (errorMsg.includes('Network')) {
-        userMessage += 'Problema de conexión. Verifica que:\n• Tu backend esté corriendo en puerto 3000\n• Tengas conexión a internet\n• El servidor Render sea accesible';
+        userMessage += t('youtube.errors.networkError');
       } else if (errorMsg.includes('No se encontraron subtítulos')) {
-        userMessage += 'Este video no tiene subtítulos disponibles en YouTube';
+        userMessage += t('youtube.errors.noSubtitlesFound');
       } else {
         userMessage += errorMsg;
       }
@@ -476,7 +476,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         {videoTitle.length > 50 && (
           <View style={{ paddingHorizontal: 12, marginBottom: 12, paddingVertical: 8, backgroundColor: `${theme.colors.primary}08`, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: theme.colors.primary }}>
             <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontStyle: 'italic' }}>
-              Título: {videoTitle}
+              {t('common.title', { defaultValue: 'Title' })}: {videoTitle}
             </Text>
           </View>
         )}

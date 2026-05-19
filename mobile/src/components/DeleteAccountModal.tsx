@@ -56,19 +56,19 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
           {step === 'confirm' && (
             <>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{t('settings.deleteAccountConfirm', 'Eliminar Cuenta')}</Text>
+                <Text style={styles.modalTitle}>{t('account.deleteAccountConfirm', 'Eliminar Cuenta')}</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons name="close" size={24} color={theme.colors.text.secondary} />
                 </TouchableOpacity>
               </View>
               <View style={styles.modalBody}>
-                <Text style={styles.modalLabel}>{t('settings.deleteWarning', 'Advertencia importante')}</Text>
+                <Text style={styles.modalLabel}>{t('account.deleteWarning', 'Advertencia importante')}</Text>
                 <Text style={styles.modalDesc}>
-                  {t('settings.deleteWarningMsg', 'Esta acción deshabilitará tu cuenta permanentemente. Tienes 14 días para recuperarla antes de que se borre todo definitivamente.')}
+                  {t('account.deleteWarningMsg', 'Esta acción deshabilitará tu cuenta permanentemente. Tienes 14 días para recuperarla antes de que se borre todo definitivamente.')}
                 </Text>
                 <View style={{ marginTop: 12, padding: 12, backgroundColor: '#FFE5E5', borderRadius: 8 }}>
                   <Text style={{ fontSize: 12, color: '#8B0000' }}>
-                    {t('settings.deleteIrreversible', '⚠️ Después de 14 días, no podremos recuperar tus datos.')}
+                    {t('account.deleteIrreversible', '⚠️ Después de 14 días, no podremos recuperar tus datos.')}
                   </Text>
                 </View>
               </View>
@@ -80,7 +80,7 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
                   style={[styles.modalBtnPrimary, { backgroundColor: '#FF2D55' }]}
                   onPress={() => onStepChange('password')}
                 >
-                  <Text style={styles.modalBtnPrimaryText}>{t('settings.continueBtn', 'Continuar')}</Text>
+                  <Text style={styles.modalBtnPrimaryText}>{t('account.continueBtn', 'Continuar')}</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -90,13 +90,13 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
           {step === 'password' && (
             <>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{t('settings.verifyPassword', 'Verificar Contraseña')}</Text>
+                <Text style={styles.modalTitle}>{t('account.verifyPassword', 'Verificar Contraseña')}</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons name="close" size={24} color={theme.colors.text.secondary} />
                 </TouchableOpacity>
               </View>
               <View style={styles.modalBody}>
-                <Text style={styles.modalLabel}>{t('settings.passwordVerifyMsg', 'Para confirmar, ingresa tu contraseña')}</Text>
+                <Text style={styles.modalLabel}>{t('account.passwordVerifyMsg', 'Para confirmar, ingresa tu contraseña')}</Text>
                 <TextInput 
                   style={styles.modalInput} 
                   value={passwordValue} 
@@ -107,7 +107,7 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
               </View>
               <View style={styles.modalFooter}>
                 <TouchableOpacity style={styles.modalBtnSecondary} onPress={() => onStepChange('confirm')}>
-                  <Text style={styles.modalBtnSecondaryText}>{t('settings.backBtn', 'Atrás')}</Text>
+                  <Text style={styles.modalBtnSecondaryText}>{t('account.backBtn', 'Atrás')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.modalBtnPrimary, { backgroundColor: '#FF2D55' }]}
@@ -115,7 +115,7 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
                   disabled={isLoading}
                 >
                   <Text style={styles.modalBtnPrimaryText}>
-                    {isLoading ? t('common.loading', 'Cargando...') : t('settings.continueBtn')}
+                    {isLoading ? t('common.loading', 'Cargando...') : t('account.continueBtn')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -126,14 +126,14 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
           {step === 'data' && deletionDataCount && (
             <>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{t('settings.whatWillBeLost', 'Datos que se perderán')}</Text>
+                <Text style={styles.modalTitle}>{t('account.whatWillBeLost', 'Datos que se perderán')}</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons name="close" size={24} color={theme.colors.text.secondary} />
                 </TouchableOpacity>
               </View>
               <View style={styles.modalBody}>
                 <Text style={styles.modalDesc}>
-                  {t('settings.deletionDataWarning', 'Estos datos serán eliminados permanentemente después de 14 días:')}
+                  {t('account.deletionDataWarning', 'Estos datos serán eliminados permanentemente después de 14 días:')}
                 </Text>
                 <View style={{ marginTop: 12, gap: 8 }}>
                   {deletionDataCount.subjects > 0 && (
@@ -154,19 +154,19 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
                 </View>
                 <View style={{ marginTop: 16, padding: 12, backgroundColor: '#E3F2FD', borderRadius: 8 }}>
                   <Text style={{ fontSize: 12, color: '#1976D2' }}>
-                    {t('settings.recoveryInfo', 'ℹ️ Puedes recuperar tu cuenta iniciando sesión con tus credenciales en cualquier momento dentro de 14 días.')}
+                    {t('account.recoveryInfo', 'ℹ️ Puedes recuperar tu cuenta iniciando sesión con tus credenciales en cualquier momento dentro de 14 días.')}
                   </Text>
                 </View>
               </View>
               <View style={styles.modalFooter}>
                 <TouchableOpacity style={styles.modalBtnSecondary} onPress={() => onStepChange('password')}>
-                  <Text style={styles.modalBtnSecondaryText}>{t('settings.backBtn')}</Text>
+                  <Text style={styles.modalBtnSecondaryText}>{t('account.backBtn')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.modalBtnPrimary, { backgroundColor: '#FF2D55' }]}
                   onPress={() => onStepChange('final')}
                 >
-                  <Text style={styles.modalBtnPrimaryText}>{t('settings.continueBtn')}</Text>
+                  <Text style={styles.modalBtnPrimaryText}>{t('account.continueBtn')}</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -176,14 +176,14 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
           {step === 'final' && (
             <>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{t('settings.confirmDeletion', 'Confirmación Final')}</Text>
+                <Text style={styles.modalTitle}>{t('account.confirmDeletion', 'Confirmación Final')}</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons name="close" size={24} color={theme.colors.text.secondary} />
                 </TouchableOpacity>
               </View>
               <View style={styles.modalBody}>
                 <Text style={styles.modalLabel}>
-                  {t('settings.typeToConfirm', `Escribe "${expectedConfirmText}" para confirmar`)}
+                  {t('account.typeToConfirm', `Escribe "${expectedConfirmText}" para confirmar`)}
                 </Text>
                 <TextInput 
                   style={[styles.modalInput, confirmTextValue === expectedConfirmText ? { borderColor: '#34C759' } : {}]}
@@ -192,12 +192,12 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
                   placeholder={expectedConfirmText}
                 />
                 <Text style={{ fontSize: 11, color: theme.colors.text.secondary, marginTop: 8 }}>
-                  {t('settings.oneWayRoad', '⚠️ Esta es la última oportunidad para cambiar de idea.')}
+                  {t('account.oneWayRoad', '⚠️ Esta es la última oportunidad para cambiar de idea.')}
                 </Text>
               </View>
               <View style={styles.modalFooter}>
                 <TouchableOpacity style={styles.modalBtnSecondary} onPress={() => onStepChange('data')}>
-                  <Text style={styles.modalBtnSecondaryText}>{t('settings.backBtn')}</Text>
+                  <Text style={styles.modalBtnSecondaryText}>{t('account.backBtn')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[
@@ -210,7 +210,7 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
                   disabled={isLoading || confirmTextValue !== expectedConfirmText}
                 >
                   <Text style={styles.modalBtnPrimaryText}>
-                    {isLoading ? t('common.loading') : t('settings.deleteBtn')}
+                    {isLoading ? t('common.loading') : t('account.deleteBtn')}
                   </Text>
                 </TouchableOpacity>
               </View>

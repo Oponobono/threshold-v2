@@ -1,4 +1,25 @@
-﻿{
-    "startTranscription":  "Start transcription",
-    "startSummary":  "Start summary"
+{
+  "title": "Recordings",
+  "multimedia": "Multimedia",
+  "loadingList": "Loading recordings...",
+  "loading": "Loading recording...",
+  "errors": {
+    "playbackFailed": "Could not play audio.",
+    "groqApiKeyMissing": "Groq API Key is missing in .env.local file",
+    "noVoiceDetected": "Whisper did not detect voice in the audio.",
+    "transcriptionFailed": "Error transcribing audio.",
+    "summaryFailed": "Error generating summary."
+  },
+  "addYoutubeVideo": "Add YouTube Video",
+  "youtubeLinkPrompt": "Paste the video link to transcribe it.",
+  "youtubePlaceholder": "https://www.youtube.com/watch?v=...",
+  "cancel": "Cancel",
+  "startTranscription": "Start transcription",
+  "startSummary": "Start summary",
+  "searchPlaceholder": "Search recordings or videos...",
+  "filterAll": "All",
+  "filterAudio": "Audio",
+  "filterVideo": "Video",
+  "adding": "Adding...",
+  "add": "Add"
 }

@@ -1,41 +1,57 @@
-import login from './login.json';
-import welcome from './welcome.json';
-import common from './common.json';
-import features from './features.json';
-import register from './register.json';
-import dashboard from './dashboard.json';
+import about from './about.json';
+import account from './account.json';
+import ai from './ai.json';
+import analytics from './analytics.json';
+import backup from './backup.json';
+import biometric from './biometric.json';
 import calendar from './calendar.json';
-import subjects from './subjects.json';
-import grades from './grades.json';
+import common from './common.json';
+import dashboard from './dashboard.json';
+import documents from './documents.json';
+import features from './features.json';
+import flashcards from './flashcards.json';
 import gallery from './gallery.json';
-import settings from './settings.json';
+import grades from './grades.json';
+import login from './login.json';
 import modals from './modals.json';
 import recordings from './recordings.json';
+import register from './register.json';
+import settings from './settings.json';
+import subjects from './subjects.json';
+import welcome from './welcome.json';
 import youtube from './youtube.json';
-import flashcards from './flashcards.json';
-import biometric from './biometric.json';
-import about from './about.json';
-import ai from './ai.json';
+import academic from './academic.json';
+import notifications from './notifications.json';
+import integrations from './integrations.json';
+import assessments from './assessments.json';
 
 const es = {
-  login,
-  welcome,
-  common,
-  features,
-  register,
-  dashboard,
+  about,
+  account,
+  ai,
+  analytics,
+  backup,
+  biometric,
   calendar,
-  subjects,
-  grades,
+  common,
+  dashboard,
+  documents,
+  features,
+  flashcards,
   gallery,
-  settings,
+  grades,
+  login,
   modals,
   recordings,
+  register,
+  settings,
+  subjects,
+  welcome,
   youtube,
-  flashcards,
-  biometric,
-  about,
-  ai,
+  academic,
+  notifications,
+  integrations,
+  assessments,
 };
 
 export default es;

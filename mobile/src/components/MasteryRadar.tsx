@@ -3,6 +3,7 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import { VictoryPolarAxis, VictoryChart, VictoryTheme, VictoryArea } from 'victory-native';
 import { theme } from '../styles/theme';
 import { fetchWithFallback, parseJsonSafely } from '../services/api/client';
+import { useTranslation } from 'react-i18next';
 
 interface MasteryRadarProps {
   userId: number;
@@ -10,6 +11,7 @@ interface MasteryRadarProps {
 }
 
 export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId }) => {
+  const { t } = useTranslation();
   const [masteryData, setMasteryData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +40,7 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId })
   if (!masteryData || !masteryData.radar || masteryData.radar.length === 0) {
     return (
       <View style={{ padding: 20, alignItems: 'center' }}>
-        <Text style={{ color: theme.colors.text.secondary }}>No hay datos suficientes para mostrar el dominio.</Text>
+        <Text style={{ color: theme.colors.text.secondary }}>{t('analytics.noMasteryData', 'No hay datos suficientes para mostrar el dominio.')}</Text>
       </View>
     );
   }
@@ -60,7 +62,7 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId })
   return (
     <View style={{ alignItems: 'center' }}>
       <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.text.primary, marginBottom: 8 }}>
-        Dominio Total: {Math.round(masteryData.averageMastery)}%
+        {t('analytics.totalMastery', 'Dominio Total:')} {Math.round(masteryData.averageMastery)}%
       </Text>
 
       <View pointerEvents="none">
@@ -91,13 +93,13 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId })
 
       {masteryData.strongestArea && (
         <Text style={{ fontSize: 13, color: theme.colors.text.primary, marginTop: 4 }}>
-          💪 <Text style={{ fontWeight: 'bold' }}>Fortaleza:</Text> {masteryData.strongestArea.name} ({Math.round(masteryData.strongestArea.value)}%)
+          💪 <Text style={{ fontWeight: 'bold' }}>{t('analytics.strength', 'Fortaleza:')}</Text> {masteryData.strongestArea.name} ({Math.round(masteryData.strongestArea.value)}%)
         </Text>
       )}
       
       {masteryData.weakestArea && (
         <Text style={{ fontSize: 13, color: theme.colors.text.primary, marginTop: 4 }}>
-          📚 <Text style={{ fontWeight: 'bold' }}>Necesita atención:</Text> {masteryData.weakestArea.name} ({Math.round(masteryData.weakestArea.value)}%)
+          📚 <Text style={{ fontWeight: 'bold' }}>{t('analytics.needsAttention', 'Necesita atención:')}</Text> {masteryData.weakestArea.name} ({Math.round(masteryData.weakestArea.value)}%)
         </Text>
       )}
 

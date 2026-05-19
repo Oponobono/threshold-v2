@@ -39,7 +39,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('settings.changePass', 'Cambiar Contraseña')}</Text>
+            <Text style={styles.modalTitle}>{t('account.changePass', 'Cambiar Contraseña')}</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={theme.colors.text.secondary} />
             </TouchableOpacity>

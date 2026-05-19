@@ -47,7 +47,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
     if (!selectedSubjectId) {
       showAlert({
         title: t('common.error') || 'Error',
-        message: 'Selecciona una materia primero',
+        message: t('subjects.selectSubjectFirst', 'Selecciona una materia primero'),
         type: 'error',
       });
       return;
@@ -68,8 +68,8 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
     } catch (error: any) {
       console.error('[PDFImportModal] DocumentPicker error:', error);
       showAlert({
-        title: 'Error',
-        message: 'No se pudo abrir el selector de archivos',
+        title: t('common.error') || 'Error',
+        message: t('documents.pickerError', 'No se pudo abrir el selector de archivos'),
         type: 'error',
       });
     }
@@ -83,7 +83,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
       if (file.size && file.size > maxSize) {
         showAlert({
           title: t('common.error') || 'Error',
-          message: 'El archivo es demasiado grande (máx. 50MB)',
+          message: t('documents.tooLarge', 'El archivo es demasiado grande (máx. 50MB)'),
           type: 'error',
         });
         setIsProcessing(false);
@@ -138,7 +138,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
 
       showAlert({
         title: t('common.success') || 'Éxito',
-        message: `${file.name} importado`,
+        message: t('documents.importedFile', { file: file.name, defaultValue: `${file.name} importado` }),
         type: 'success',
       });
 
@@ -148,7 +148,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
       console.error('[PDFImportModal] Error importando:', error);
       showAlert({
         title: t('common.error') || 'Error',
-        message: error?.message || 'Error al importar el archivo',
+        message: error?.message || t('documents.importError', 'Error al importar el archivo'),
         type: 'error',
       });
     } finally {
@@ -168,7 +168,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
           {/* Header */}
           <View style={s.header}>
             <View style={s.headerLeft}>
-              <Text style={s.headerTitle}>Importar PDF</Text>
+              <Text style={s.headerTitle}>{t('documents.importTitle', 'Importar PDF')}</Text>
             </View>
             <TouchableOpacity onPress={onClose} disabled={isProcessing} style={s.closeBtn}>
               <Ionicons name="close" size={16} color={theme.colors.text.secondary} />
@@ -186,7 +186,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
                 textAlign: 'center',
               }}
             >
-              Sube tu PDF y extrae el texto con IA 🚀
+              {t('documents.uploadPrompt', 'Sube tu PDF y extrae el texto con IA 🚀')}
             </Text>
 
             {/* OCR Toggle */}
@@ -212,10 +212,10 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
               />
               <View style={{ marginLeft: 10, flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.text.primary }}>
-                  Extraer texto
+                  {t('documents.extractText', 'Extraer texto')}
                 </Text>
                 <Text style={{ fontSize: 11, color: theme.colors.text.secondary, marginTop: 2 }}>
-                  La IA podrá leer el contenido
+                  {t('documents.aiReadable', 'La IA podrá leer el contenido')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -248,7 +248,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
                 <>
                   <Ionicons name="folder-outline" size={18} color={theme.colors.white} />
                   <Text style={{ color: theme.colors.white, fontSize: 14, fontWeight: '700' }}>
-                    Seleccionar PDF
+                    {t('documents.selectPdf', 'Seleccionar PDF')}
                   </Text>
                 </>
               )}

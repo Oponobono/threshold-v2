@@ -1,0 +1,27 @@
+{
+  "title": "Integrations",
+  "desc": "Calendar sync, LMS links and external tools",
+  "calendarSync": "Calendar Sync (Google Calendar)",
+  "calendarSyncDesc": "Two-way sync with your academic calendar",
+  "linkedLms": "Linked LMS Accounts",
+  "lmsAccounts": [
+    {
+      "name": "Canvas â€¢ University of State",
+      "user": "maya.reyes"
+    },
+    {
+      "name": "Moodle â€¢ Evening Courses",
+      "user": "mr.reyes"
+    },
+    {
+      "name": "Blackboard â€¢ College Partner",
+      "user": "mayare"
+    }
+  ],
+  "remove": "Remove",
+  "addLms": "Add LMS Link",
+  "dataExport": "Data Export & Reset",
+  "dataExportDesc": "Export your data or reset academic records",
+  "exportCsv": "Export CSV",
+  "exportPdf": "Export PDF"
+}

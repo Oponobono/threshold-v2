@@ -1,12 +1,21 @@
 {
-    "title":  "Videos",
-    "loadingList":  "Loading videos...",
-    "loading":  "Loading video...",
-    "errors":  {
-                   "groqApiKeyMissing":  "Groq API Key is missing from .env.local file",
-                   "videoIdNotFound":  "Video ID not found. Please try refreshing.",
-                   "captionsFetchFailed":  "Could not fetch video captions. It\u0027s possible that:\nâ€¢ The video has no captions available\nâ€¢ The video is private or does not exist\nâ€¢ There are connectivity issues",
-                   "summaryFailed":  "Error generating summary.",
-                   "videoLoadFailed":  "Could not load video. Try opening it directly on YouTube."
-               }
+  "title": "Videos",
+  "loadingList": "Loading videos...",
+  "loading": "Loading video...",
+  "errors": {
+    "groqApiKeyMissing": "Groq API Key is missing from .env.local file",
+    "videoIdNotFound": "Video ID not found. Please try refreshing.",
+    "captionsFetchFailed": "Could not fetch video captions. It's possible that:\nâ€¢ The video has no captions available\nâ€¢ The video is private or does not exist\nâ€¢ There are connectivity issues",
+    "summaryFailed": "Error generating summary.",
+    "videoLoadFailed": "Could not load video. Try opening it directly on YouTube.",
+    "networkError": "Connection problem. Check your internet connection or the server.",
+    "noSubtitlesFound": "This video does not have subtitles available on YouTube."
+  },
+  "subjectVideos": "YouTube Videos",
+  "savedVideos": "Saved videos for this subject",
+  "videoDefault": "YouTube Video",
+  "unknownDate": "Unknown date",
+  "deleteVideo": "Delete video",
+  "deleteVideoConfirm": "Are you sure you want to delete this video?",
+  "deleteVideoError": "Could not delete the video."
 }

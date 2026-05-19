@@ -1,0 +1,30 @@
+{
+  "title": "Preferencias académicas",
+  "desc": "Semestres, umbrales de aprobación y escalas",
+  "termsSemesters": "Períodos / semestres",
+  "termOptions": [
+    "Otoño 2025",
+    "Primavera 2026",
+    "Verano 2026"
+  ],
+  "manageTerms": "Gestiona períodos y el semestre activo",
+  "addTerm": "Añadir período",
+  "minGrade": "Nota mínima para aprobar (por materia)",
+  "defaultThreshold": "Umbral predeterminado",
+  "perSubject": "Excepciones por materia",
+  "manageOverrides": "Gestionar excepciones",
+  "resetThreshold": "Restablecer umbral predeterminado",
+  "resetTo50": "Restablecer a 50%",
+  "gradingScales": "Escalas de calificación",
+  "scaleAF": "Estándar A-F",
+  "scaleAFDesc": "A: 90-100 • B: 80-89 • C: 70-79",
+  "scalePct": "Porcentaje (0-100)",
+  "scalePctDesc": "Escala numérica para promedio",
+  "scale4": "Escala 4.0",
+  "scale4Desc": "A=4.0, B=3.0, C=2.0",
+  "scaleCustom": "Personalizada: Honores",
+  "scaleCustomDesc": "A+: 97-100, A: 93-96...",
+  "active": "Activa",
+  "select": "Seleccionar",
+  "addCustomScale": "Añadir escala personalizada"
+}

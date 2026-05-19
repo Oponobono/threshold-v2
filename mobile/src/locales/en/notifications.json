@@ -1,0 +1,10 @@
+{
+  "title": "Notifications",
+  "desc": "Stay informed about upcoming deadlines",
+  "deadlineAlerts": "Upcoming deadline alerts",
+  "deadlineAlertsDesc": "Get push notifications for due dates",
+  "weeklyDigest": "Weekly digest",
+  "weeklyDigestDesc": "Summary every Monday morning",
+  "emailNotif": "Email notifications",
+  "emailNotifDesc": "Receive reminders by email"
+}

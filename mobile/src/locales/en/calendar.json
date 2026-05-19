@@ -1,8 +1,8 @@
-﻿{
-    "weekOverview":  "Weekly Overview",
-    "today":  "Today",
-    "defaultClassTitle":  "Class",
-    "allDay":  "All day",
-    "defaultAssessmentTitle":  "Assessment",
-    "emptyEvents":  "No events for this day"
+{
+  "weekOverview": "Weekly Overview",
+  "today": "Today",
+  "defaultClassTitle": "Class",
+  "allDay": "All day",
+  "defaultAssessmentTitle": "Assessment",
+  "emptyEvents": "No events for this day"
 }

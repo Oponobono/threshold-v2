@@ -1,0 +1,27 @@
+{
+  "title": "Integraciones",
+  "desc": "Sincronización de calendario y herramientas externas",
+  "calendarSync": "Sincronización con Google Calendar",
+  "calendarSyncDesc": "Sincronización bidireccional con tu calendario académico",
+  "linkedLms": "Plataformas LMS vinculadas",
+  "lmsAccounts": [
+    {
+      "name": "Canvas • Universidad del Estado",
+      "user": "maya.reyes"
+    },
+    {
+      "name": "Moodle • Cursos nocturnos",
+      "user": "mr.reyes"
+    },
+    {
+      "name": "Blackboard • Instituto asociado",
+      "user": "mayare"
+    }
+  ],
+  "remove": "Quitar",
+  "addLms": "Añadir LMS",
+  "dataExport": "Exportar y restablecer datos",
+  "dataExportDesc": "Exporta tus datos o restablece tus registros académicos",
+  "exportCsv": "Exportar CSV",
+  "exportPdf": "Exportar PDF"
+}

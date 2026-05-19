@@ -1,34 +1,34 @@
 {
-    "formTitle":  "Inicia sesión",
-    "formSubtitle":  "Accede a tu cuenta para continuar con tu progreso académico.",
-    "welcomeTitle":  "Bienvenido a Threshold",
-    "welcomeSubtitle":  "Organiza tus clases, sigue tu promedio y guarda fotos de tus apuntes en un solo lugar.",
-    "emailLabel":  "Correo electrónico",
-    "emailPlaceholder":  "tunombre@universidad.edu",
-    "passwordLabel":  "Contraseña",
-    "passwordPlaceholder":  "Ingresa tu contraseña",
-    "rememberMe":  "Recordarme",
-    "forgot":  "¿Olvidaste tu contraseña?",
-    "enterDashboard":  "Ir al inicio",
-    "or":  "o",
-    "useTouchId":  "Usar Touch ID",
-    "touchId":  "Huella digital",
-    "continueGuest":  "Continuar como invitado",
-    "guestSubtitle":  "Prueba Threshold sin iniciar sesión",
-    "createAccount":  "Crear cuenta",
-    "resetPassword":  "Restablecer contraseña",
-    "success":  {
-                    "loggedIn":  "Sesión iniciada correctamente"
-                },
-    "errors":  {
-                   "missingCredentials":  "Por favor, ingresa correo y contraseña",
-                   "loginTitle":  "Error de inicio de sesión"
-               },
-    "accountPendingDeletion":  "Cuenta Pendiente de Eliminación",
-    "pendingDeletionMsg":  "Tu cuenta está programada para eliminarse en {{days}} día(s) ({{date}}). ¿Deseas recuperar tu cuenta?",
-    "recoverBtn":  "Recuperar Cuenta",
-    "cancelBtn":  "Cancelar",
-    "accountRecovered":  "Tu cuenta ha sido recuperada exitosamente.",
-    "footerText":  "Estudiantes en más de 1,200 campus confían en Threshold para estudiar mejor",
-    "copyright":  "© 2026 Threshold Inc."
+  "formTitle": "Inicia sesión",
+  "formSubtitle": "Accede a tu cuenta para continuar con tu progreso académico.",
+  "welcomeTitle": "Bienvenido a Threshold",
+  "welcomeSubtitle": "Organiza tus clases, sigue tu promedio y guarda fotos de tus apuntes en un solo lugar.",
+  "emailLabel": "Correo electrónico",
+  "emailPlaceholder": "tunombre@universidad.edu",
+  "passwordLabel": "Contraseña",
+  "passwordPlaceholder": "Ingresa tu contraseña",
+  "rememberMe": "Recordarme",
+  "forgot": "¿Olvidaste tu contraseña?",
+  "enterDashboard": "Ir al inicio",
+  "or": "o",
+  "useTouchId": "Usar Touch ID",
+  "touchId": "Huella digital",
+  "continueGuest": "Continuar como invitado",
+  "guestSubtitle": "Prueba Threshold sin iniciar sesión",
+  "createAccount": "Crear cuenta",
+  "resetPassword": "Restablecer contraseña",
+  "success": {
+    "loggedIn": "Sesión iniciada correctamente"
+  },
+  "errors": {
+    "missingCredentials": "Por favor, ingresa correo y contraseña",
+    "loginTitle": "Error de inicio de sesión"
+  },
+  "accountPendingDeletion": "Cuenta Pendiente de Eliminación",
+  "pendingDeletionMsg": "Tu cuenta está programada para eliminarse en {{days}} día(s) ({{date}}). ¿Deseas recuperar tu cuenta?",
+  "recoverBtn": "Recuperar Cuenta",
+  "cancelBtn": "Cancelar",
+  "accountRecovered": "Tu cuenta ha sido recuperada exitosamente.",
+  "footerText": "Estudiantes en más de 1,200 campus confían en Threshold para estudiar mejor",
+  "copyright": "© 2026 Threshold Inc."
 }

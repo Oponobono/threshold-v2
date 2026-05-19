@@ -369,7 +369,7 @@ export default function FlashcardsScreen() {
       {/* Header */}
       <View style={[styles.headerRow, { paddingLeft: theme.spacing.lg, justifyContent: 'space-between' }]}>
         <Text style={[styles.headerTitle, { flex: 1, textAlign: 'left' }]}>
-          Mazos
+          {t('flashcards.decks', 'Mazos')}
         </Text>
         {/* Right actions: Search · Add */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -490,17 +490,17 @@ export default function FlashcardsScreen() {
               size={13}
               color={activeSubjectId === null ? theme.colors.white : theme.colors.text.secondary}
             />
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: activeSubjectId === null ? '700' : '500',
-                color: activeSubjectId === null ? theme.colors.white : theme.colors.text.secondary,
-                letterSpacing: -0.1,
-              }}
-            >
-              Todos
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: activeSubjectId === null ? '700' : '500',
+                  color: activeSubjectId === null ? theme.colors.white : theme.colors.text.secondary,
+                  letterSpacing: -0.1,
+                }}
+              >
+                {t('common.all', 'Todos')}
+              </Text>
+            </TouchableOpacity>
 
           {/* Subject pills */}
           {subjects.map((subject) => {
@@ -770,7 +770,7 @@ export default function FlashcardsScreen() {
                 {/* Header */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                   <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
-                    Editar Mazo
+                    {t('flashcards.editDeck', 'Editar Mazo')}
                   </Text>
                   <TouchableOpacity onPress={() => setShowEditDeckModal(false)}>
                     <Ionicons name="close" size={24} color={theme.colors.text.primary} />
@@ -779,7 +779,7 @@ export default function FlashcardsScreen() {
 
                 {/* Deck Name Input */}
                 <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary, marginBottom: 8 }}>
-                  Nombre del mazo
+                  {t('flashcards.deckName', 'Nombre del mazo')}
                 </Text>
                 <TextInput
                   value={editingDeck.title}
@@ -794,13 +794,13 @@ export default function FlashcardsScreen() {
                     borderWidth: 1,
                     borderColor: theme.colors.border,
                   }}
-                  placeholder="Nombre del mazo"
+                  placeholder={t('flashcards.deckNamePlaceholder', 'Nombre del mazo')}
                   placeholderTextColor={theme.colors.text.placeholder}
                 />
 
                 {/* Subject Selection */}
                 <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary, marginBottom: 12 }}>
-                  Materia
+                  {t('flashcards.subject')}
                 </Text>
                 <ScrollView
                   horizontal
@@ -827,7 +827,7 @@ export default function FlashcardsScreen() {
                         fontSize: 12,
                       }}
                     >
-                      Sin materia
+                      {t('flashcards.noSubject', 'Sin materia')}
                     </Text>
                   </TouchableOpacity>
 
@@ -880,7 +880,7 @@ export default function FlashcardsScreen() {
                       setShowEditDeckModal(false);
                       setEditingDeck(null);
                       loadDecks();
-                      showAlert({ title: t('common.success'), message: 'Mazo actualizado', type: 'success' });
+                      showAlert({ title: t('common.success'), message: t('flashcards.deckUpdated', 'Mazo actualizado'), type: 'success' });
                     } catch (e: any) {
                       showAlert({ title: t('common.error'), message: e.message, type: 'error' });
                     }
@@ -893,7 +893,7 @@ export default function FlashcardsScreen() {
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>Guardar</Text>
+                  <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>{t('common.save', 'Guardar')}</Text>
                 </TouchableOpacity>
               </ScrollView>
             )}

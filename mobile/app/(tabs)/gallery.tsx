@@ -263,7 +263,7 @@ export default function GalleryScreen() {
   }, []);
 
   // ── Derived filtered lists — only recomputed when deps change ───────────────
-  const { imagePhotos, starred } = useMemo(() => {
+  const { imagePhotos, starred, totalPhotoCount } = useMemo(() => {
     const allImgs = photos.filter((p) => !p.local_uri?.endsWith('.pdf'));
     
     // Filtramos por materia seleccionada y búsqueda
@@ -313,9 +313,13 @@ export default function GalleryScreen() {
     // Las favoritas ahora respetan el filtro de materia
     const starredPhotos = filteredBySubjectAndSearch.filter((p) => p.es_favorita === 1);
 
+    // Calcular el total de fotos sumando todas dentro de los grupos
+    const totalPhotos = groupedPhotos.reduce((sum, group) => sum + group.length, 0);
+
     return {
       imagePhotos: groupedPhotos,
       starred: starredPhotos,
+      totalPhotoCount: totalPhotos,
     };
   }, [photos, filterTab, selectedSubjectId, searchQuery]);
 
@@ -400,7 +404,7 @@ export default function GalleryScreen() {
         </View>
         <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={styles.itemCount}>{imagePhotos.length} {t('gallery.items') || 'fotos'}</Text>
+          <Text style={styles.itemCount}>{totalPhotoCount} {t('gallery.items') || 'fotos'}</Text>
           <AutoUploadIndicator size={18} />
         </View>
       </View>
@@ -505,7 +509,7 @@ export default function GalleryScreen() {
                    filterTab === 'ocr' ? 'Con texto OCR' :
                    (t('gallery.gallerySection') || 'Galería')}
                 </Text>
-                <Text style={styles.sectionMeta}>{imagePhotos.length} {t('gallery.items') || 'fotos'}</Text>
+                <Text style={styles.sectionMeta}>{totalPhotoCount} {t('gallery.items') || 'fotos'}</Text>
               </View>
             )}
           </View>

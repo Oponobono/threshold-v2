@@ -1,0 +1,12 @@
+{
+  "assessment": "Evaluación",
+  "assessments": "Evaluaciones",
+  "nextQuiz": "Próx: Quiz",
+  "nextMidterm": "Próx: Parcial",
+  "nextEssay": "Próx: Ensayo",
+  "score": "Puntaje:",
+  "dueDate": "Fecha:",
+  "weight": "Peso:",
+  "deleteConfirm": "¿Estás seguro de que quieres eliminar esta nota/evaluación?",
+  "emptyState": "Sin evaluaciones aún"
+}

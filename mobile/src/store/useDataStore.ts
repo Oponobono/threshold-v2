@@ -1,5 +1,13 @@
 import { create } from 'zustand';
-import { Subject, Assessment, Schedule, getSubjects, getAllAssessments, getAllSchedules, getPredictions, PredictionResponse } from '../services/api';
+import { 
+  Subject, Assessment, Schedule, 
+  getSubjects, getAllAssessments, getAllSchedules, 
+  getPredictions, PredictionResponse,
+  getGalleryItems, getPhotosBySubject,
+  getAudioRecordings,
+  getFlashcardDecks, getFlashcardDecksWithMetrics, getFlashcards, getFlashcardsPrioritized, getCardsNotSnoozed,
+  getScannedDocumentsBySubject
+} from '../services/api';
 import { loadPredictionsFromCache, savePredictionsToCache } from '../hooks/usePredictionPolling';
 
 interface DataState {
@@ -21,6 +29,7 @@ interface DataState {
   refreshSchedules: () => Promise<void>;
   refreshPredictions: (userId: string | number) => Promise<void>;
   loadCachedPredictions: () => Promise<void>;
+  preloadOfflineCache: () => Promise<void>;
   
   // Selectores
   getDuedeckIds: () => Set<number>;
@@ -63,6 +72,10 @@ export const useDataStore = create<DataState>((set, get) => ({
         schedules: schedulesData || [],
         hasLoadedOnce: true,
       });
+
+      // Disparar en background la pre-descarga de la caché global
+      get().preloadOfflineCache();
+      
     } catch (error) {
       console.error('Error in DataStore loadAllData:', error);
     } finally {
@@ -126,6 +139,52 @@ export const useDataStore = create<DataState>((set, get) => ({
     } catch (error) {
       console.error('[DataStore] Error cargando cache:', error);
       set({ predictions: { dueCount: 0, cards: [] } });
+    }
+  },
+
+  preloadOfflineCache: async () => {
+    try {
+      console.log('[Cache] Iniciando pre-descarga de datos offline en segundo plano...');
+      const state = get();
+      
+      // Asegurarnos de que tenemos los subjects
+      let subjectsToProcess = state.subjects;
+      if (!subjectsToProcess || subjectsToProcess.length === 0) {
+        subjectsToProcess = await getSubjects().catch(() => []);
+      }
+
+      // Descargar galerías, audios y mazos
+      const [decks] = await Promise.all([
+        getFlashcardDecks().catch(() => []),
+        getFlashcardDecksWithMetrics().catch(() => []),
+        getGalleryItems().catch(() => []),
+        getAudioRecordings().catch(() => [])
+      ]);
+
+      // Descargar dependencias de subjects (Fotos por materia y Documentos)
+      if (subjectsToProcess && subjectsToProcess.length > 0) {
+        for (const sub of subjectsToProcess) {
+          await Promise.all([
+            getPhotosBySubject(sub.id).catch(() => []),
+            getScannedDocumentsBySubject(sub.id).catch(() => [])
+          ]);
+        }
+      }
+
+      // Descargar dependencias de mazos (Flashcards)
+      if (decks && decks.length > 0) {
+        for (const deck of decks) {
+          await Promise.all([
+            getFlashcards(deck.id).catch(() => []),
+            getFlashcardsPrioritized(deck.id).catch(() => []),
+            getCardsNotSnoozed(deck.id).catch(() => [])
+          ]);
+        }
+      }
+
+      console.log('[Cache] ✅ Pre-descarga de datos completada exitosamente.');
+    } catch (error) {
+      console.error('[Cache] ❌ Error durante la pre-descarga:', error);
     }
   },
 

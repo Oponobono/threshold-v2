@@ -31,7 +31,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
 
   return (
     <View style={styles.sectionBlock}>
-      <Text style={styles.sectionTitle}>{t('subjects.statsTitle')}</Text>
+      <Text style={styles.sectionTitle}>{t('analytics.statsTitle')}</Text>
       <View style={styles.statsGrid}>
         <SubjectStatCard
           icon="calculator-outline"

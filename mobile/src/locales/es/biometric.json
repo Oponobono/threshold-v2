@@ -1,5 +1,5 @@
 {
-    "promptEnroll":  "Confirma tu identidad para activar Touch ID",
-    "cancel":  "Cancelar",
-    "promptLogin":  "Usa Touch ID para iniciar sesión en Threshold"
+  "promptEnroll": "Confirma tu identidad para activar Touch ID",
+  "cancel": "Cancelar",
+  "promptLogin": "Usa Touch ID para iniciar sesión en Threshold"
 }

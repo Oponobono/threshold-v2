@@ -1,0 +1,22 @@
+{
+  "title": "Backup & Sync",
+  "desc": "Cloud backups and account connection",
+  "lastBackup": "Last backup",
+  "lastBackupSample": "Apr 12, 2026 â€¢ 09:14 AM",
+  "syncNow": "Sync Now",
+  "enableCloud": "Cloud Backup",
+  "enableCloudDesc": "Save copies of your files to Uploadthing",
+  "photos": "Gallery photos",
+  "audio": "Audio recordings",
+  "docs": "Scanned documents",
+  "transcripts": "Transcripts & summaries",
+  "disabled": "Backup disabled",
+  "backingUp": "Backing up...",
+  "backupNow": "Backup now",
+  "autoUpload": "Auto-upload on save",
+  "autoUploadDesc": "Automatically upload new files when you create them",
+  "autoDownload": "Auto-download on login",
+  "autoDownloadDesc": "Download your files when signing in on a new device",
+  "downloading": "Downloading...",
+  "downloadNow": "Download now"
+}
