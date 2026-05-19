@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Modal, TouchableOpacity, Image, FlatList, Dimensions, Share, ActionSheetIOS, Platform, ActivityIndicator, Text, ScrollView, TextInput } from 'react-native';
+import { View, Modal, TouchableOpacity, Image, FlatList, Dimensions, Share, Platform, ActivityIndicator, Text, TextInput } from 'react-native';
 import { useCustomAlert } from './CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import { theme } from '../styles/theme';
 import { styles } from '../styles/ImageViewerModal.styles';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface PhotoItem {
   id?: number;
@@ -68,7 +68,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         });
       }, 100);
     }
-  }, [isVisible, initialIndex]);
+  }, [isVisible, initialIndex, photos.length]);
 
   // Si la longitud de fotos cambia (por ejemplo, se borró una foto)
   useEffect(() => {
@@ -84,7 +84,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         }, 100);
       }
     }
-  }, [photos.length]);
+  }, [photos.length, currentIndex, isVisible]);
 
   const handleShare = async (uri: string) => {
     try {

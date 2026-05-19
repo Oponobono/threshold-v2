@@ -293,7 +293,8 @@ export default function GalleryScreen() {
         if (!groupMap.has(p.group_id)) {
           groupMap.set(p.group_id, []);
         }
-        groupMap.get(p.group_id).push(p);
+        const group = groupMap.get(p.group_id)!;
+        group.push(p);
       } else {
         groupedPhotos.push([p]); // sin grupo, va solo
       }
@@ -333,7 +334,7 @@ export default function GalleryScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
 
       {/* ── HEADER ── */}
-      <View style={styles.header}>
+      <View style={[styles.header, isSearchOpen && { paddingBottom: 8 }]}>
         <View style={globalStyles.row}>
           <Ionicons name="images-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
           <Text style={styles.logoText}>{t('gallery.title') || 'Galería'}</Text>
@@ -666,7 +667,7 @@ export default function GalleryScreen() {
                         message: t('common.copiedToClipboard') || 'Texto copiado al portapapeles',
                         type: 'success',
                       });
-                    } catch (error) {
+                    } catch {
                       showAlert({
                         title: t('common.error') || 'Error',
                         message: t('common.errors.copyFailed') || 'No se pudo copiar el texto',

@@ -23,7 +23,8 @@ export const galleryStyles = StyleSheet.create({
   },
   searchBarContainer: {
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: 12,
+    paddingTop: 2,
+    paddingBottom: 10,
     backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
