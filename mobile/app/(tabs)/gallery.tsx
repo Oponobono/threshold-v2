@@ -2,11 +2,12 @@ import React, { useState, useCallback, useMemo, memo, lazy, Suspense } from 'rea
 import {
   View, Text, Dimensions, ActivityIndicator,
   InteractionManager, FlatList, TouchableOpacity,
-  TextInput, RefreshControl, ScrollView
+  TextInput, RefreshControl, ScrollView, Modal
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
@@ -18,6 +19,7 @@ import {
 } from '../../src/services/api';
 import { useDataStore } from '../../src/store/useDataStore';
 import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
+import { useCustomAlert } from '../../src/components/CustomAlert';
 
 // ── Lazy-loaded heavy modals ──────────────────────────────────────────────────
 const ImageViewerModal = lazy(() =>
@@ -34,73 +36,116 @@ const SCREEN_W = Dimensions.get('window').width;
 const GRID_COL_W = (SCREEN_W - theme.spacing.lg * 2 - 16 - 1) / 2;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface GalleryPhoto extends Photo {
+export interface GalleryPhoto extends Photo {
   subject_name?: string;
   subject_color?: string;
 }
 
-// ── Memoized grid item — prevents re-render of every card on star toggle ──────
 const GridItem = memo(function GridItem({
   item,
   onPress,
   onStar,
+  onOcrPress,
   formatDate,
 }: {
-  item: GalleryPhoto;
-  onPress: () => void;
-  onStar: () => void;
+  item: GalleryPhoto[];
+  onPress: (photo: GalleryPhoto, group: GalleryPhoto[]) => void;
+  onStar: (photo: GalleryPhoto) => void;
+  onOcrPress?: (ocrText: string) => void;
   formatDate: (d?: string) => string;
 }) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.88}
-      style={[styles.gridCard, { width: GRID_COL_W }]}
-      onPress={onPress}
-    >
-      <Image 
-        source={{ uri: item.local_uri }} 
-        style={styles.gridImage} 
-        contentFit="cover"
-        transition={200}
-      />
+  const firstItem = item[0];
+  const [activeIndex, setActiveIndex] = useState(0);
+  
+  const handleScroll = (event: any) => {
+    const slideSize = event.nativeEvent.layoutMeasurement.width;
+    const index = event.nativeEvent.contentOffset.x / slideSize;
+    setActiveIndex(Math.round(index));
+  };
 
-      {item.ocr_text ? (
-        <View style={styles.ocrOverlay}>
-          <MaterialCommunityIcons name="text-recognition" size={10} color={theme.colors.primary} />
-          <Text style={styles.ocrOverlayText}>OCR</Text>
-        </View>
-      ) : null}
+  return (
+    <View style={[styles.gridCard, { width: GRID_COL_W }]}>
+      <View style={{ height: 110, position: 'relative' }}>
+        <FlatList
+          data={item}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          keyExtractor={(p) => p.id?.toString() || Math.random().toString()}
+          renderItem={({ item: p }) => (
+            <TouchableOpacity activeOpacity={0.88} onPress={() => onPress(p, item)} style={{ width: GRID_COL_W, height: 110 }}>
+              <Image 
+                source={{ uri: p.local_uri }} 
+                style={{ width: '100%', height: '100%' }} 
+                contentFit="cover"
+                transition={200}
+              />
+            </TouchableOpacity>
+          )}
+        />
+        
+        {/* Puntos indicadores si hay más de 1 foto */}
+        {item.length > 1 && (
+          <View style={{ position: 'absolute', bottom: 6, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 4 }}>
+            {item.map((_, i) => (
+              <View 
+                key={i} 
+                style={{ 
+                  width: 5, height: 5, borderRadius: 2.5, 
+                  backgroundColor: i === activeIndex ? theme.colors.white : 'rgba(255,255,255,0.5)' 
+                }} 
+              />
+            ))}
+          </View>
+        )}
+
+        {/* OCR Overlay (usa la foto activa) */}
+        {item[activeIndex]?.ocr_text ? (
+          <View style={styles.ocrOverlay}>
+            <MaterialCommunityIcons name="text-recognition" size={10} color={theme.colors.primary} />
+            <Text style={styles.ocrOverlayText}>OCR</Text>
+          </View>
+        ) : null}
+
+        {/* Star button */}
+        <TouchableOpacity
+          onPress={() => onStar(item[activeIndex])}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{
+            position: 'absolute', top: 6, left: 6,
+            backgroundColor: theme.colors.primaryTransparent.heavy,
+            borderRadius: 12, padding: 4,
+          }}
+        >
+          <Ionicons
+            name={item[activeIndex]?.es_favorita ? 'star' : 'star-outline'}
+            size={14}
+            color={item[activeIndex]?.es_favorita ? '#FFD700' : '#fff'}
+          />
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
-        onPress={onStar}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        style={{
-          position: 'absolute', top: 6, left: 6,
-          backgroundColor: theme.colors.primaryTransparent.heavy,
-          borderRadius: 12, padding: 4,
-        }}
+        style={styles.gridInfo}
+        onPress={() => item[activeIndex]?.ocr_text && onOcrPress?.(item[activeIndex].ocr_text)}
+        disabled={!item[activeIndex]?.ocr_text}
+        activeOpacity={item[activeIndex]?.ocr_text ? 0.7 : 1}
       >
-        <Ionicons
-          name={item.es_favorita ? 'star' : 'star-outline'}
-          size={14}
-          color={item.es_favorita ? '#FFD700' : '#fff'}
-        />
-      </TouchableOpacity>
-
-      <View style={styles.gridInfo}>
         <View style={[globalStyles.rowCenter, globalStyles.mb4, { gap: 4 }]}>
           <View style={{
             width: 8, height: 8, borderRadius: 4,
-            backgroundColor: item.subject_color || theme.colors.primary,
+            backgroundColor: firstItem.subject_color || theme.colors.primary,
           }} />
-          <Text style={styles.gridSubject} numberOfLines={1}>{item.subject_name}</Text>
+          <Text style={styles.gridSubject} numberOfLines={1}>{firstItem.subject_name}</Text>
         </View>
-        <Text style={styles.gridDate}>{formatDate(item.created_at)}</Text>
-        {item.ocr_text ? (
-          <Text style={styles.gridOcr} numberOfLines={2}>{item.ocr_text}</Text>
+        <Text style={styles.gridDate}>{formatDate(firstItem.created_at)}</Text>
+        {item[activeIndex]?.ocr_text ? (
+          <Text style={styles.gridOcr} numberOfLines={2}>{item[activeIndex].ocr_text}</Text>
         ) : null}
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -137,8 +182,7 @@ const formatDate = (dateStr?: string) => {
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function GalleryScreen() {
-  const { t } = useTranslation();
-
+  const { t } = useTranslation();  const { showAlert } = useCustomAlert();
   // Subjects come from the shared Zustand store — no extra fetch needed
   const { subjects, loadAllData } = useDataStore();
 
@@ -156,6 +200,8 @@ export default function GalleryScreen() {
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [isPhotoVisible, setIsPhotoVisible] = useState(false);
   const [viewerPhotos, setViewerPhotos] = useState<GalleryPhoto[]>([]);
+  const [ocrModalVisible, setOcrModalVisible] = useState(false);
+  const [selectedOcrText, setSelectedOcrText] = useState<string>('');
 
   // ── Load photos ─────────────────────────────────────────────────────────────
   const loadPhotos = useCallback(async (refreshing = false) => {
@@ -206,9 +252,15 @@ export default function GalleryScreen() {
 
   const handlePhotoDeleted = useCallback((id: number) => {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
+    setViewerPhotos((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
   const handleSave = useCallback(() => loadPhotos(true), [loadPhotos]);
+
+  const handleOcrPress = useCallback((ocrText: string) => {
+    setSelectedOcrText(ocrText);
+    setOcrModalVisible(true);
+  }, []);
 
   // ── Derived filtered lists — only recomputed when deps change ───────────────
   const { imagePhotos, starred } = useMemo(() => {
@@ -233,11 +285,35 @@ export default function GalleryScreen() {
       return true;
     });
 
+    const groupedPhotos: GalleryPhoto[][] = [];
+    const groupMap = new Map<string, GalleryPhoto[]>();
+    
+    gridPhotos.forEach(p => {
+      if (p.group_id) {
+        if (!groupMap.has(p.group_id)) {
+          groupMap.set(p.group_id, []);
+        }
+        groupMap.get(p.group_id).push(p);
+      } else {
+        groupedPhotos.push([p]); // sin grupo, va solo
+      }
+    });
+    
+    groupMap.forEach(group => {
+      groupedPhotos.push(group);
+    });
+
+    groupedPhotos.sort((a, b) => {
+      const dateA = new Date(a[0].created_at || 0).getTime();
+      const dateB = new Date(b[0].created_at || 0).getTime();
+      return dateB - dateA;
+    });
+
     // Las favoritas ahora respetan el filtro de materia
     const starredPhotos = filteredBySubjectAndSearch.filter((p) => p.es_favorita === 1);
 
     return {
-      imagePhotos: gridPhotos,
+      imagePhotos: groupedPhotos,
       starred: starredPhotos,
     };
   }, [photos, filterTab, selectedSubjectId, searchQuery]);
@@ -369,7 +445,7 @@ export default function GalleryScreen() {
 
       <FlatList
         data={imagePhotos}
-        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+        keyExtractor={(item) => item[0].id?.toString() || Math.random().toString()}
         numColumns={2}
         columnWrapperStyle={{ gap: 16, paddingHorizontal: theme.spacing.lg }}
         contentContainerStyle={[styles.scroll, { flexGrow: 1, paddingHorizontal: 0 }]}
@@ -437,13 +513,15 @@ export default function GalleryScreen() {
           <GridItem
             item={item}
             formatDate={formatDate}
-            onPress={() => {
-              setViewerPhotos(imagePhotos);
-              const idx = imagePhotos.findIndex((p) => p.id === item.id);
+            onPress={(photo) => {
+              const flatPhotos = imagePhotos.flat();
+              setViewerPhotos(flatPhotos);
+              const idx = flatPhotos.findIndex((p) => p.id === photo.id);
               setViewerIndex(idx >= 0 ? idx : 0);
               setViewerVisible(true);
             }}
-            onStar={() => toggleStar(item)}
+            onStar={(photo) => toggleStar(photo)}
+            onOcrPress={handleOcrPress}
           />
         )}
         ListEmptyComponent={
@@ -517,6 +595,99 @@ export default function GalleryScreen() {
             onSave={handleSave}
           />
         )}
+
+        {/* ── OCR Text Modal ── */}
+        <Modal
+          visible={ocrModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setOcrModalVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
+              {/* Header */}
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.colors.border,
+              }}>
+                <Text style={{
+                  fontSize: theme.typography.sizes.lg,
+                  fontWeight: '700',
+                  color: theme.colors.text.primary,
+                }}>
+                  {t('common.recognizedText') || 'Texto Reconocido'}
+                </Text>
+                <TouchableOpacity onPress={() => setOcrModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Content */}
+              <ScrollView
+                style={{ flex: 1, padding: theme.spacing.lg }}
+                contentContainerStyle={{ paddingBottom: theme.spacing.lg }}
+              >
+                <Text style={{
+                  fontSize: theme.typography.sizes.md,
+                  color: theme.colors.text.primary,
+                  lineHeight: 24,
+                }}>
+                  {selectedOcrText}
+                </Text>
+              </ScrollView>
+
+              {/* Copy Button */}
+              <SafeAreaView edges={['bottom']} style={{
+                paddingHorizontal: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+              }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: theme.spacing.md,
+                    borderRadius: theme.borderRadius.lg,
+                    gap: 8,
+                  }}
+                  onPress={async () => {
+                    try {
+                      await Clipboard.setStringAsync(selectedOcrText);
+                      showAlert({
+                        title: t('common.success') || 'Éxito',
+                        message: t('common.copiedToClipboard') || 'Texto copiado al portapapeles',
+                        type: 'success',
+                      });
+                    } catch (error) {
+                      showAlert({
+                        title: t('common.error') || 'Error',
+                        message: t('common.errors.copyFailed') || 'No se pudo copiar el texto',
+                        type: 'error',
+                      });
+                    }
+                  }}
+                >
+                  <Ionicons name="copy" size={20} color={theme.colors.white} />
+                  <Text style={{
+                    fontSize: theme.typography.sizes.md,
+                    fontWeight: '700',
+                    color: theme.colors.white,
+                  }}>
+                    {t('common.copyText') || 'Copiar Texto'}
+                  </Text>
+                </TouchableOpacity>
+              </SafeAreaView>
+            </SafeAreaView>
+          </View>
+        </Modal>
       </Suspense>
     </SafeAreaView>
   );

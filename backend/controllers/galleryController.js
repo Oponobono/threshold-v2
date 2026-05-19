@@ -111,19 +111,20 @@ exports.searchPhotosByTag = (req, res) => {
 /**
  * Guarda una nueva foto de una materia.
  * Acepta ocr_text opcional para que el asistente IA tenga contexto inmediato.
+ * Acepta group_id opcional para agrupar múltiples fotos tomadas en la misma sesión.
  * Genera automáticamente tags/palabras clave a partir del OCR para búsqueda.
  */
 exports.savePhoto = (req, res) => {
-  const { subject_id, local_uri, es_favorita, ocr_text } = req.body;
-  console.log('[Gallery] Saving photo:', { subject_id, local_uri });
+  const { subject_id, local_uri, es_favorita, ocr_text, group_id } = req.body;
+  console.log('[Gallery] Saving photo:', { subject_id, local_uri, group_id });
   
   if (!subject_id || !local_uri) {
     return res.status(400).json({ error: 'Faltan campos requeridos (subject_id, local_uri)' });
   }
 
   const query = `
-    INSERT INTO photos (subject_id, local_uri, es_favorita, ocr_text, tags)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO photos (subject_id, local_uri, es_favorita, ocr_text, tags, group_id)
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
 
   // Generar tags a partir del OCR si existe
@@ -132,7 +133,7 @@ exports.savePhoto = (req, res) => {
     tags = generateTagsFromOCR(ocr_text);
   }
 
-  db.run(query, [subject_id, local_uri, es_favorita || 0, ocr_text || null, tags], function(err) {
+  db.run(query, [subject_id, local_uri, es_favorita || 0, ocr_text || null, tags, group_id || null], function(err) {
     if (err) {
       console.error('[Gallery] Save error:', err.message);
       return res.status(500).json({ error: err.message });
@@ -145,6 +146,7 @@ exports.savePhoto = (req, res) => {
       es_favorita: es_favorita || 0,
       ocr_text: ocr_text || null,
       tags: tags,
+      group_id: group_id || null,
       message: 'Foto registrada en BD'
     });
   });

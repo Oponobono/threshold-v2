@@ -36,7 +36,8 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const { showAlert } = useCustomAlert();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedImages, setCapturedImages] = useState<string[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
@@ -62,7 +63,8 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
         });
-        setCapturedImage(photo.uri);
+        setCapturedImages([...capturedImages, photo.uri]);
+        setSelectedImageIndex(capturedImages.length);
       } catch (err) {
         showAlert({ title: t('common.error'), message: t('subjects.errorTakingPhoto') || 'Error', type: 'error' });
       }
@@ -71,14 +73,20 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
 
   const pickImage = async () => {
     try {
+      const MAX_PHOTOS = 10;
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: false,
+        allowsMultipleSelection: true,
+        selectionLimit: MAX_PHOTOS,
         quality: 1,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setCapturedImage(result.assets[0].uri);
+        const newImages = result.assets.map(asset => asset.uri);
+        const updatedImages = [...capturedImages, ...newImages];
+        setCapturedImages(updatedImages);
+        setSelectedImageIndex(updatedImages.length - 1);
       }
     } catch (err) {
       showAlert({ title: t('common.error'), message: t('common.error') || 'Error', type: 'error' });
@@ -86,32 +94,52 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   };
 
   const handleSave = async () => {
-    if (!capturedImage || !selectedSubjectId) {
+    if (capturedImages.length === 0 || !selectedSubjectId) {
       showAlert({ title: t('common.error'), message: t('dashboard.documentScannerModal.selectSubjectError') || 'Error', type: 'warning' });
       return;
     }
 
     try {
       setIsProcessing(true);
-      const photoData = await createPhoto({
-        subject_id: selectedSubjectId,
-        local_uri: capturedImage,
-      });
+      let successCount = 0;
       
-      // Auto subida si está habilitada
-      if (photoData?.id) {
-        await autoUploadIfEnabled(
-          capturedImage,
-          'photo',
-          photoData.id,
-          `photo_${photoData.id}.jpg`,
-          'image/jpeg'
-        ).catch(err => console.warn('[PhotoCaptureModal] Auto-upload error:', err));
+      // Generar un group_id si hay múltiples fotos para mostrarlas agrupadas en la galería
+      const groupId = capturedImages.length > 1 ? `grp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}` : null;
+
+      for (const imageUri of capturedImages) {
+        try {
+          const photoData = await createPhoto({
+            subject_id: selectedSubjectId,
+            local_uri: imageUri,
+            group_id: groupId,
+          });
+          
+          if (photoData?.id) {
+            await autoUploadIfEnabled(
+              imageUri,
+              'photo',
+              photoData.id,
+              `photo_${photoData.id}.jpg`,
+              'image/jpeg'
+            ).catch(err => console.warn('[PhotoCaptureModal] Auto-upload error:', err));
+          }
+          successCount++;
+        } catch (photoError) {
+          console.warn('[PhotoCaptureModal] Error saving photo:', photoError);
+        }
       }
       
-      if (onSave) onSave(capturedImage, selectedSubjectId);
-      showAlert({ title: t('common.success'), message: t('dashboard.quickAddMenu.takePhoto.success') || 'Éxito', type: 'success' });
-      resetAndClose();
+      if (successCount > 0) {
+        if (onSave) onSave(capturedImages[0], selectedSubjectId);
+        showAlert({ 
+          title: t('common.success'), 
+          message: t('dashboard.quickAddMenu.takePhoto.success') || `${successCount} foto(s) guardada(s)`, 
+          type: 'success' 
+        });
+        resetAndClose();
+      } else {
+        showAlert({ title: t('common.error'), message: t('dashboard.quickAddMenu.takePhoto.error') || 'Error', type: 'error' });
+      }
     } catch (error) {
       showAlert({ title: t('common.error'), message: t('dashboard.quickAddMenu.takePhoto.error') || 'Error', type: 'error' });
     } finally {
@@ -120,7 +148,8 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   };
 
   const resetAndClose = () => {
-    setCapturedImage(null);
+    setCapturedImages([]);
+    setSelectedImageIndex(null);
     setSelectedSubjectId(initialSubjectId || null);
     setIsProcessing(false);
     setFlashEnabled(false);
@@ -153,12 +182,12 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
             <Ionicons name="close" size={28} color={theme.colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
-            {capturedImage ? t('common.preview') || 'Vista Previa' : t('dashboard.quickAddMenu.takePhotoLabel') || 'Tomar Foto'}
+            {capturedImages.length > 0 ? t('common.preview') || 'Vista Previa' : t('dashboard.quickAddMenu.takePhotoLabel') || 'Tomar Foto'}
           </Text>
           <View style={{ width: 44 }} />
         </View>
 
-        {!capturedImage ? (
+        {!capturedImages.length ? (
           <View style={styles.camera}>
             <CameraView 
               key={cameraKey}
@@ -190,7 +219,55 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           </View>
         ) : (
           <View style={styles.previewContainer}>
-            <Image source={{ uri: capturedImage }} style={styles.previewImage} resizeMode="contain" />
+            {/* Vista de fotos capturadas */}
+            {selectedImageIndex !== null && capturedImages[selectedImageIndex] && (
+              <Image source={{ uri: capturedImages[selectedImageIndex] }} style={styles.previewImage} resizeMode="contain" />
+            )}
+            
+            {/* Galeria de miniaturas */}
+            {capturedImages.length > 0 && (
+              <View style={{ backgroundColor: theme.colors.inputBackground, padding: 12, borderRadius: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary }}>
+                    {capturedImages.length} {t('common.photos') || 'fotos'}
+                  </Text>
+                  <TouchableOpacity 
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    onPress={pickImage}
+                  >
+                    <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
+                    <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 12 }}>{t('common.add') || 'Agregar'}</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                  {capturedImages.map((uri, idx) => (
+                    <View key={idx} style={{ position: 'relative' }}>
+                      <TouchableOpacity
+                        onPress={() => setSelectedImageIndex(idx)}
+                        style={[
+                          { width: 70, height: 70, borderRadius: 8, overflow: 'hidden', borderWidth: 2 },
+                          selectedImageIndex === idx 
+                            ? { borderColor: theme.colors.primary } 
+                            : { borderColor: theme.colors.border }
+                        ]}
+                      >
+                        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const newImages = capturedImages.filter((_, i) => i !== idx);
+                          setCapturedImages(newImages);
+                          setSelectedImageIndex(newImages.length > 0 ? Math.min(selectedImageIndex || 0, newImages.length - 1) : null);
+                        }}
+                        style={{ position: 'absolute', top: -8, right: -8, backgroundColor: theme.colors.primary, borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Ionicons name="close" size={16} color="white" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
             
             <View style={[styles.actionSheet, { paddingBottom: Platform.OS === 'ios' ? 44 : 52 }]}>
               <Text style={styles.sheetTitle}>{t('dashboard.documentScannerModal.save') || 'Guardar'}</Text>
@@ -218,13 +295,13 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
               </View>
 
               <View style={styles.saveActions}>
-                <TouchableOpacity onPress={() => setCapturedImage(null)} style={styles.secondaryBtn}>
-                  <Text style={styles.secondaryBtnText}>{t('common.retake') || 'Reintentar'}</Text>
+                <TouchableOpacity onPress={() => setCapturedImages([])} style={styles.secondaryBtn}>
+                  <Text style={styles.secondaryBtnText}>{t('common.retake') || 'Limpiar'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   onPress={handleSave} 
-                  disabled={!selectedSubjectId || isProcessing}
-                  style={[styles.primaryBtn, (!selectedSubjectId || isProcessing) && styles.primaryBtnDisabled]}
+                  disabled={capturedImages.length === 0 || !selectedSubjectId || isProcessing}
+                  style={[styles.primaryBtn, (capturedImages.length === 0 || !selectedSubjectId || isProcessing) && styles.primaryBtnDisabled]}
                 >
                   {isProcessing ? <ActivityIndicator color="white" /> : <Text style={styles.primaryBtnText}>{t('common.save') || 'Guardar'}</Text>}
                 </TouchableOpacity>

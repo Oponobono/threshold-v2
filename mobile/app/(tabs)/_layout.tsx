@@ -1,16 +1,66 @@
-import React from 'react';
-import { Platform } from 'react-native';
-import { Tabs } from 'expo-router';
+import React, { useRef, useEffect } from 'react';
+import { Platform, BackHandler, View } from 'react-native';
+import { Tabs, useNavigation } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../src/styles/theme';
 import { useDataStore } from '../../src/store/useDataStore';
+import { Toast, toastRef } from '../../src/components/Toast';
 
 export default function TabLayout() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { loadAllData } = useDataStore();
+  const navigation = useNavigation();
+
+  // 🔒 Double Back to Exit Pattern
+  // Mantiene referencia a la última vez que se presionó atrás
+  const backPressedTimeRef = useRef<number>(0);
+  const backTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      const now = Date.now();
+      const timeSinceLastPress = now - backPressedTimeRef.current;
+      const DOUBLE_BACK_TIMEOUT = 2000; // 2 segundos
+
+      // Si se presionó hace menos de 2 segundos, cerrar la app
+      if (timeSinceLastPress < DOUBLE_BACK_TIMEOUT) {
+        // Limpiar timeout si existía
+        if (backTimeoutRef.current) {
+          clearTimeout(backTimeoutRef.current);
+          backTimeoutRef.current = null;
+        }
+        // Cerrar la app
+        BackHandler.exitApp();
+        return true;
+      }
+
+      // Primera presión: mostrar toast sutil
+      backPressedTimeRef.current = now;
+      toastRef.current?.show(
+        t('common.doubleBackToExit') || 'Presiona atrás de nuevo para salir',
+        2000
+      );
+
+      // Resetear el contador después de 2 segundos
+      backTimeoutRef.current = setTimeout(() => {
+        backPressedTimeRef.current = 0;
+        backTimeoutRef.current = null;
+      }, DOUBLE_BACK_TIMEOUT);
+
+      // Retornar true para prevenir el comportamiento por defecto
+      return true;
+    });
+
+    return () => {
+      backHandler.remove();
+      if (backTimeoutRef.current) {
+        clearTimeout(backTimeoutRef.current);
+      }
+    };
+  }, [t]);
 
   React.useEffect(() => {
     loadAllData();
@@ -21,7 +71,8 @@ export default function TabLayout() {
   const tabHeight = 60 + bottomPadding;
 
   return (
-    <Tabs
+    <View style={{ flex: 1 }}>
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
@@ -94,6 +145,9 @@ export default function TabLayout() {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+      {/* Toast: renderizado DESPUÉS de Tabs para aparecer encima de todo */}
+      <Toast ref={toastRef} />
+    </View>
   );
 }

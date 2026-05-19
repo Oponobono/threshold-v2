@@ -68,6 +68,7 @@ export type Photo = {
   tags?: string | null;
   cloud_url?: string | null;       // URL de Uploadthing (si está respaldada)
   is_backed_up?: number;           // 0 = solo local, 1 = respaldada en la nube
+  group_id?: string | null;        // ID de grupo si fue tomada en ráfaga/sesión
 };
 
 /** Bloque de clase semanal de una materia (día, hora de inicio y fin) */

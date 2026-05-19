@@ -83,6 +83,23 @@ export const loginUser = async (email: string, password: string) => {
 };
 
 /**
+ * Verifica si existe una sesión válida verificando si hay token JWT almacenado
+ */
+export const hasValidSession = async (): Promise<boolean> => {
+  try {
+    const token = await storageService.getSecure('jwt_token');
+    const userId = await storageService.getSecure('app_user_id');
+    const email = await storageService.getSecure('app_user_email');
+    
+    // Sesión válida si existen todos los datos de autenticación
+    return !!(token && userId && email);
+  } catch (error) {
+    console.warn('[Auth] Error verificando sesión:', error);
+    return false;
+  }
+};
+
+/**
  * Cierra la sesión del usuario eliminando todos los datos
  * de autenticación almacenados localmente en el dispositivo.
  * El device_id se preserva para seguir contando visitas futuras.

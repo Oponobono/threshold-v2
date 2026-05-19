@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, BackHandler } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { useColorScheme } from '@/src/hooks/use-color-scheme';
 import { CustomAlertProvider } from '../src/components/CustomAlert';
 import NetInfo from '@react-native-community/netinfo';
 import { flushOfflineQueue } from '../src/services/offlineQueue';
+import { hasValidSession } from '../src/services/api/auth/session';
 
 // Mantener el Splash Screen visible hasta que decidamos ocultarlo
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -21,8 +22,9 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 
 /**
  * Configuración de navegación de Expo Router. Define la ruta inicial como 'welcome'.
+ * Si hay sesión válida, será sobrescrita por hasSessionOnMount.
  */
-export const unstable_settings = {
+export let unstable_settings = {
   initialRouteName: 'welcome',
 };
 
@@ -35,14 +37,23 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [appIsReady, setAppIsReady] = useState(false);
+  const [initialRoute, setInitialRoute] = useState<string>('welcome');
 
   useEffect(() => {
     async function prepare() {
       try {
-        // Aquí podrías cargar fuentes o hacer checks mínimos
-        // Pero no bloqueamos más de lo necesario
+        // Verificar si existe sesión válida al iniciar la app
+        const hasSession = await hasValidSession();
+        if (hasSession) {
+          console.log('[RootLayout] ✅ Sesión válida encontrada, navegando a (tabs)');
+          setInitialRoute('(tabs)');
+        } else {
+          console.log('[RootLayout] ❌ No hay sesión válida, navegando a welcome');
+          setInitialRoute('welcome');
+        }
       } catch (e) {
-        console.warn(e);
+        console.warn('[RootLayout] Error verificando sesión:', e);
+        setInitialRoute('welcome');
       } finally {
         setAppIsReady(true);
       }
@@ -85,11 +96,39 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <CustomAlertProvider>
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack initialRouteName="welcome">
-              <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
-              <Stack.Screen name="login" options={{ headerShown: false, animation: 'fade' }} />
-              <Stack.Screen name="register" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack initialRouteName={initialRoute}>
+              <Stack.Screen 
+                name="welcome" 
+                options={{ 
+                  headerShown: false, 
+                  animation: 'fade',
+                  gestureEnabled: false,
+                }} 
+              />
+              <Stack.Screen 
+                name="login" 
+                options={{ 
+                  headerShown: false, 
+                  animation: 'fade',
+                  gestureEnabled: false,
+                }} 
+              />
+              <Stack.Screen 
+                name="register" 
+                options={{ 
+                  headerShown: false,
+                  gestureEnabled: false,
+                }} 
+              />
+              {/* (tabs) es la pantalla principal - prevenir retroceso */}
+              <Stack.Screen 
+                name="(tabs)" 
+                options={{ 
+                  headerShown: false,
+                  gestureEnabled: false,
+                  animationEnabled: false,
+                }} 
+              />
               <Stack.Screen name="settings" options={{ headerShown: false }} />
               <Stack.Screen name="about" options={{ headerShown: false }} />
             </Stack>

@@ -55,12 +55,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedText, setExtractedText] = useState<string | null>(null);
 
+  // Solo en el primer render visible: ir al initialIndex
   useEffect(() => {
     if (isVisible && photos.length > 0) {
       const index = Math.min(initialIndex, photos.length - 1);
       setCurrentIndex(index);
       
-      // Asegurar que la lista se desplace al índice correcto al abrir
       setTimeout(() => {
         flatListRef.current?.scrollToIndex({
           index,
@@ -68,7 +68,23 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         });
       }, 100);
     }
-  }, [isVisible, initialIndex, photos.length]);
+  }, [isVisible, initialIndex]);
+
+  // Si la longitud de fotos cambia (por ejemplo, se borró una foto)
+  useEffect(() => {
+    if (isVisible && photos.length > 0) {
+      if (currentIndex >= photos.length) {
+        const newIndex = photos.length - 1;
+        setCurrentIndex(newIndex);
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: newIndex,
+            animated: true,
+          });
+        }, 100);
+      }
+    }
+  }, [photos.length]);
 
   const handleShare = async (uri: string) => {
     try {

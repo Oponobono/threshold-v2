@@ -179,7 +179,8 @@ const tableSchema = {
       { name: 'ocr_text', type: 'TEXT' },
       { name: 'tags', type: 'TEXT' },
       { name: 'cloud_url', type: 'TEXT' },
-      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' }
+      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
+      { name: 'group_id', type: 'TEXT' }
     ]
   },
   assessments: {

@@ -405,6 +405,7 @@ export const subjectDetailStyles = StyleSheet.create({
   } as any,
   galleryGridThreeRight: {
     flex: 1,
+    flexDirection: 'column',
     gap: 6,
   },
   galleryImageQuarter: {
@@ -413,6 +414,7 @@ export const subjectDetailStyles = StyleSheet.create({
     overflow: 'hidden',
   } as any,
   galleryGridFour: {
+    flexDirection: 'column',
     gap: 6,
     height: 200,
   },

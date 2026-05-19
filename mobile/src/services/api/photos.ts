@@ -30,6 +30,8 @@ export const createPhoto = async (photoData: {
   es_favorita?: number;
   /** Texto extraído por OCR — alimenta el contexto del asistente IA */
   ocr_text?: string | null;
+  /** ID para agrupar múltiples fotos */
+  group_id?: string | null;
 }) => {
   try {
     const response = await fetchWithFallback('/photos', {

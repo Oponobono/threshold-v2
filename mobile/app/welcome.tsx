@@ -2,13 +2,17 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Text, View, Easing, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { getItemAsync } from 'expo-secure-store';
 import { welcomeStyles as styles } from '../src/styles/Welcome.styles';
 
 /**
  * Pantalla de bienvenida (WelcomeScreen).
- * Renderiza la animación inicial de presentación de la app (logo, título y eslogan)
- * usando Animated de React Native. Después de un temporizador de ~2.8s, redirige
- * automáticamente al usuario hacia la pantalla de `/login`.
+ * Renderiza la animación inicial de presentación de la app (logo, título y eslogan).
+ *
+ * Persistencia de sesión:
+ * - Si el usuario ya tiene un JWT guardado de una sesión anterior, se redirige
+ *   directamente a /(tabs) sin pasar por login.
+ * - Si no hay token, se redirige a /login como de costumbre.
  */
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -43,12 +47,33 @@ export default function WelcomeScreen() {
       ])
     ]).start();
 
+    // Verificar sesión en paralelo con la animación.
+    // La resolución ocurre al finalizar el fade-out (~2.8s), tiempo más que suficiente.
+    const sessionCheckPromise = Promise.all([
+      getItemAsync('jwt_token'),
+      getItemAsync('app_user_id'),
+    ]);
+
     const timer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(fadeTitle, { toValue: 0, duration: 600, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
         Animated.timing(fadeSlogan, { toValue: 0, duration: 600, easing: Easing.in(Easing.cubic), useNativeDriver: true })
-      ]).start(() => {
-        router.replace('/login');
+      ]).start(async () => {
+        try {
+          const [token, userId] = await sessionCheckPromise;
+          if (token && userId) {
+            // Sesión activa: pequeño delay para que expo-router inicialice
+            // su keep-awake interno antes de la navegación (evita race condition en dev)
+            await new Promise(resolve => setTimeout(resolve, 80));
+            console.log('[WelcomeScreen] Sesión activa detectada, saltando login.');
+            router.replace('/(tabs)');
+          } else {
+            router.replace('/login');
+          }
+        } catch {
+          // En caso de error al leer SecureStore, ir a login de forma segura
+          router.replace('/login');
+        }
       });
     }, 2800);
 

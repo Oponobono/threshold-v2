@@ -101,6 +101,7 @@ export const galleryStyles = StyleSheet.create({
   },
   gridCard: {
     width: GRID_COL_W,
+    marginBottom: 16,
     backgroundColor: theme.colors.background,
     borderRadius: theme.borderRadius.lg,
     overflow: 'hidden',
