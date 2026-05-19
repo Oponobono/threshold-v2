@@ -49,11 +49,51 @@ const TRANSCRIPTS_DIR = () => `${FileSystem.documentDirectory}Threshold/transcri
 // ---------------------------------------------------------------------------
 async function transcribeYouTubeWithWhisper(videoId: string, apiKey: string): Promise<string> {
   // Obtener subtítulos del backend mediante api.ts (usa fetchWithFallback)
-  // Esto devuelve TEXT de subtítulos, no audio
   try {
     const result = await getYouTubeSubtitles(videoId, 'es');
     console.log('✓ YouTube captions fetched in', result.language);
-    return result.captions || '';
+    const rawCaptions = result.captions || '';
+
+    if (!rawCaptions) return '';
+
+    // Si tenemos clave de Groq, la usamos para estructurar semánticamente el texto,
+    // separando por ideas y usando palabras clave como subtítulos (como prefería el usuario).
+    if (apiKey && rawCaptions.length > 50) {
+      console.log('Usando Groq para estructurar la transcripción semánticamente...');
+      const body = {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: 'Eres un experto estructurador de textos académicos. Toma esta transcripción cruda de YouTube (que no tiene puntuación) y arréglala. Reglas estrictas:\n1. Agrega la puntuación y capitalización correctas.\n2. Separa el texto por semántica.\n3. Identifica palabras clave que den origen a una nueva idea, y usa esas palabras como subtítulos (formato Markdown ###) para crear párrafos separados.\n4. Mantén todo el texto original, no omitas información ni resumas.\n5. No agregues saludos ni despedidas, solo devuelve el texto formateado.',
+          },
+          {
+            role: 'user',
+            content: rawCaptions,
+          },
+        ],
+        temperature: 0.2,
+      };
+
+      const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const formatted = data?.choices?.[0]?.message?.content;
+        if (formatted) return formatted;
+      } else {
+        console.warn('Groq formatting failed, falling back to raw captions');
+      }
+    }
+
+    return rawCaptions;
   } catch (error) {
     console.error('✗ Error fetching YouTube captions:', error);
     throw new Error(`Error obteniendo subtítulos: ${error instanceof Error ? error.message : error}`);
@@ -382,7 +422,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            YouTube
+            {videoTitle}
           </Text>
           <AutoUploadIndicator size={16} />
         </View>
@@ -419,6 +459,11 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
           </View>
           </View>
         )}
+
+        {/* Video Title */}
+        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary, textAlign: 'center', marginHorizontal: 20, marginBottom: 4 }}>
+          {videoTitle}
+        </Text>
 
         {/* Video Meta (Date) - Compact */}
         {date && (

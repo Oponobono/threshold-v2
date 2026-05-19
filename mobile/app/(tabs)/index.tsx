@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { createSubject, getCurrentUserProfile, createAssessment, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, type Subject, type UserProfile, type Assessment, type PredictionResponse } from '../../src/services/api';
+import { createSubject, getCurrentUserProfile, createAssessment, getPredictedSubject, getTodaySchedules, createSchedule, deleteSchedule, createStudySession, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
 import { useDataStore } from '../../src/store/useDataStore';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
@@ -63,7 +63,7 @@ export default function HybridDashboardScreen() {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   // ── Usar store global para subjects, assessments, schedules y predicciones ──
-  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshSchedules, refreshSubjects, refreshPredictions, loadCachedPredictions, getDuedeckIds } = useDataStore();
+  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshSchedules, refreshSubjects, refreshPredictions, loadCachedPredictions } = useDataStore();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const [isSavingSubject, setIsSavingSubject] = useState(false);
   const [subjectName, setSubjectName] = useState('');

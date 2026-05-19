@@ -42,8 +42,46 @@ export async function transcribeWithWhisper(audioUri: string, apiKey: string): P
     throw new Error(`Error de Groq Whisper ${response.status}: ${errBody}`);
   }
 
-  const text = await response.text();
-  return text.trim();
+  const rawTranscription = (await response.text()).trim();
+
+  if (!rawTranscription) return '';
+
+  // Formatear semánticamente la transcripción usando Llama 3
+  try {
+    const body = {
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: 'Eres un experto estructurador de textos académicos. Toma esta transcripción de audio y arréglala. Reglas estrictas:\n1. Agrega la puntuación y capitalización correctas (si faltan).\n2. Separa el texto por semántica.\n3. Identifica palabras clave que den origen a una nueva idea, y usa esas palabras como subtítulos (formato Markdown ###) para crear párrafos separados.\n4. Mantén todo el texto original, no omitas información ni resumas.\n5. No agregues saludos ni despedidas, solo devuelve el texto formateado.'
+        },
+        {
+          role: 'user',
+          content: rawTranscription
+        }
+      ],
+      temperature: 0.2,
+    };
+
+    const formatResponse = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (formatResponse.ok) {
+      const data = await formatResponse.json();
+      const formatted = data?.choices?.[0]?.message?.content;
+      if (formatted) return formatted;
+    }
+  } catch (error) {
+    console.warn('Error formateando transcripción de audio con Groq:', error);
+  }
+
+  return rawTranscription;
 }
 
 /**

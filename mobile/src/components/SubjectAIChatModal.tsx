@@ -800,85 +800,92 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
             )}
 
             {/* Encabezado */}
-            <View style={s.header}>
-              <View style={s.aiIconWrap}>
-                <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.title}>Zyren</Text>
-                <Text style={s.subtitle} numberOfLines={1}>{subjectName}</Text>
-              </View>
-
-              {/* Selector de proveedor LLM compacto */}
-              <View style={s.providerSelector}>
-                <TouchableOpacity
-                  style={[s.providerOption, currentProvider === 'groq' && s.providerOptionActive]}
-                  onPress={() => setCurrentProvider('groq')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.providerLabel, currentProvider === 'groq' && s.providerLabelActive]}>
-                    ⚡
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.providerOption, currentProvider === 'gemini' && s.providerOptionActive]}
-                  onPress={() => setCurrentProvider('gemini')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.providerLabel, currentProvider === 'gemini' && s.providerLabelActive]}>
-                    🧠
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Chip de contexto activo */}
-              {contextItemCount > 0 && (
-                <View style={s.contextChip}>
-                  <Ionicons name="layers-outline" size={11} color={ASK_CLR} />
-                  <Text style={s.contextChipText}>
-                    {contextItemCount} {contextItemCount === 1 ? 'fuente' : 'fuentes'}
-                  </Text>
+            <View style={s.headerContainer}>
+              {/* Fila Superior */}
+              <View style={s.headerTopRow}>
+                <View style={s.aiIconWrap}>
+                  <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
                 </View>
-              )}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.title}>Zyren</Text>
+                  <Text style={s.subtitle} numberOfLines={1}>{subjectName}</Text>
+                </View>
+                {/* Cerrar */}
+                <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.7}>
+                  <Ionicons name="close" size={18} color={TXT_PRI} />
+                </TouchableOpacity>
+              </View>
 
-              {/* Botón nueva conversación */}
-              {messages.length > 0 && (
+              {/* Fila Inferior */}
+              <View style={s.headerBottomRow}>
+                {/* Selector de proveedor LLM compacto */}
+                <View style={s.providerSelector}>
+                  <TouchableOpacity
+                    style={[s.providerOption, currentProvider === 'groq' && s.providerOptionActive]}
+                    onPress={() => setCurrentProvider('groq')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.providerLabel, currentProvider === 'groq' && s.providerLabelActive]}>
+                      ⚡
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.providerOption, currentProvider === 'gemini' && s.providerOptionActive]}
+                    onPress={() => setCurrentProvider('gemini')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.providerLabel, currentProvider === 'gemini' && s.providerLabelActive]}>
+                      🧠
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Chip de contexto activo */}
+                {contextItemCount > 0 && (
+                  <View style={s.contextChip}>
+                    <Ionicons name="layers-outline" size={11} color={ASK_CLR} />
+                    <Text style={s.contextChipText}>
+                      {contextItemCount} {contextItemCount === 1 ? 'fuente' : 'fuentes'}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={{ flex: 1 }} />
+
+                {/* Botón nueva conversación */}
+                {messages.length > 0 && (
+                  <TouchableOpacity
+                    style={s.clearBtn}
+                    onPress={handleClearHistory}
+                    disabled={isLoading}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="refresh-outline" size={16} color={TXT_SEC} />
+                  </TouchableOpacity>
+                )}
+
+                {/* Botón upload documento (Solo Gemini) */}
+                {currentProvider === 'gemini' && (
+                  <TouchableOpacity
+                    style={s.clearBtn}
+                    onPress={handleUploadDocument}
+                    disabled={isLoading || isUploadingDocument}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="document-attach-outline" size={16} color={TXT_SEC} />
+                  </TouchableOpacity>
+                )}
+
+                {/* 🎓 Botón Generar Material de Estudio */}
                 <TouchableOpacity
-                  style={s.clearBtn}
-                  onPress={handleClearHistory}
-                  disabled={isLoading}
+                  style={[s.clearBtn, s.genBtn]}
+                  onPress={openGenPanel}
+                  disabled={isLoading || isGenerating}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="refresh-outline" size={16} color={TXT_SEC} />
+                  <Ionicons name="school-outline" size={16} color={PRIMARY} />
                 </TouchableOpacity>
-              )}
-
-              {/* Botón upload documento (Solo Gemini) */}
-              {currentProvider === 'gemini' && (
-                <TouchableOpacity
-                  style={s.clearBtn}
-                  onPress={handleUploadDocument}
-                  disabled={isLoading || isUploadingDocument}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="document-attach-outline" size={16} color={TXT_SEC} />
-                </TouchableOpacity>
-              )}
-
-              {/* 🎓 Botón Generar Material de Estudio */}
-              <TouchableOpacity
-                style={[s.clearBtn, s.genBtn]}
-                onPress={openGenPanel}
-                disabled={isLoading || isGenerating}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="school-outline" size={16} color={PRIMARY} />
-              </TouchableOpacity>
-
-              {/* Cerrar */}
-              <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.7}>
-                <Ionicons name="close" size={18} color={TXT_PRI} />
-              </TouchableOpacity>
+              </View>
             </View>
 
             {/* Área de mensajes */}
@@ -1041,10 +1048,18 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignSelf: 'center', marginBottom: 16,
   },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: 10, marginBottom: 12,
+  headerContainer: {
+    marginBottom: 12,
     paddingHorizontal: 20,
+    gap: 12,
+  },
+  headerTopRow: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 10,
+  },
+  headerBottomRow: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 8,
   },
   aiIconWrap: {
     width: 34, height: 34,
