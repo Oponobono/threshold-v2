@@ -483,6 +483,7 @@ eas submit            # Publica a App Store / Play Store
 - **[Learning Engineering](./analysis/LEARNING_ENGINEERING_DOCUMENTATION.md)** - Pedagogía
 - **[Spaced Repetition Logic](./analysis/spaced_repetition_logic.md)** - Algoritmos SM-2/FSRS
 - **[Import Schema](./analysis/FLASHCARD_IMPORT_SCHEMA.md)** - Formato de importación
+- **[MIT License Scope](./analysis/MIT_LICENSE_SCOPE.md)** - Qué puedes y no puedes hacer con Threshold
 
 ---
 
