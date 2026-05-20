@@ -20,8 +20,6 @@ import {
 import { useDataStore } from '../../src/store/useDataStore';
 import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
 import { useCustomAlert } from '../../src/components/CustomAlert';
-import { useLoadingState } from '../../src/hooks/useLoadingState';
-import { GalleryLoadingState } from '../../src/components/LoadingStates';
 
 // ── Lazy-loaded heavy modals ──────────────────────────────────────────────────
 const ImageViewerModal = lazy(() =>
@@ -189,7 +187,7 @@ export default function GalleryScreen() {
   const { subjects, loadAllData } = useDataStore();
 
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
-  const { isSkeleton, isReady, setReady } = useLoadingState({ minLoadingTime: 350 });
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterTab, setFilterTab] = useState<'all' | 'starred' | 'ocr'>('all');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
@@ -208,6 +206,7 @@ export default function GalleryScreen() {
   // ── Load photos ─────────────────────────────────────────────────────────────
   const loadPhotos = useCallback(async (refreshing = false) => {
     if (refreshing) setIsRefreshing(true);
+    else setIsLoading(true);
     try {
       const raw = await getGalleryItems();
       const list = Array.isArray(raw) ? raw : [];
@@ -221,14 +220,13 @@ export default function GalleryScreen() {
         };
       });
       setPhotos(enriched);
-      if (!refreshing) setReady();
     } catch (err) {
       console.warn('[GalleryScreen] loadPhotos error:', err);
-      if (!refreshing) setReady();
     } finally {
+      setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [subjects, t, setReady]);
+  }, [subjects, t]);
 
   // Defer load until navigation animations finish
   useFocusEffect(
@@ -325,23 +323,8 @@ export default function GalleryScreen() {
     };
   }, [photos, filterTab, selectedSubjectId, searchQuery]);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-  if (isLoading) {
-    return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
-        <View style={globalStyles.center}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <>
-      {isSkeleton ? (
-        <GalleryLoadingState />
-      ) : (
-      <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
 
       {/* ── HEADER ── */}
       <View style={[styles.header, isSearchOpen && { paddingBottom: 8 }]}>
@@ -700,8 +683,6 @@ export default function GalleryScreen() {
           </View>
         </Modal>
       </Suspense>
-      </SafeAreaView>
-      )}
-    </>
+    </SafeAreaView>
   );
 }

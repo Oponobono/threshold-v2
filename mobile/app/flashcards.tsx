@@ -34,8 +34,6 @@ import { FlashcardStudyScreenStandalone } from '../src/components/FlashcardStudy
 import { useFlashcardsManager } from '../src/hooks/useFlashcardsManager';
 import { useDataStore } from '../src/store/useDataStore';
 import { AnimatedMarchingAntsBorder } from '../src/components/AnimatedMarchingAntsBorder';
-import { useLoadingState } from '../src/hooks/useLoadingState';
-import { FlashcardsLoadingState } from '../src/components/LoadingStates';
 import { getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck } from '../src/services/api';
 
 /**
@@ -194,9 +192,6 @@ export default function FlashcardsScreen() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // 💾 Loading State para skeleton loaders
-  const { isSkeleton, isReady, setReady } = useLoadingState({ minLoadingTime: 350 });
-
   const activeCloseRef = useRef<(() => void) | null>(null);
 
   const searchAnim = useRef(new Animated.Value(0)).current;
@@ -346,14 +341,13 @@ export default function FlashcardsScreen() {
           console.warn('Error loading subjects:', e);
         }
         await loadDecks();
-        setReady();
       };
       loadAll();
-    }, [loadDecks, setReady])
+    }, [loadDecks])
   );
 
-  if (isSkeleton && filteredDecks.length === 0) {
-    return <FlashcardsLoadingState />;
+  if (isLoading && filteredDecks.length === 0) {
+    return <PremiumLoading text={t('common.loading') || 'CARGANDO'} />;
   }
 
   const isEmpty = filteredDecks.length === 0;

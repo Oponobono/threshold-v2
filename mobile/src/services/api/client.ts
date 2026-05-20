@@ -90,13 +90,14 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
   const method = init?.method?.toUpperCase() || 'GET';
   
   // 🛡️ Rutas excluidas de cache (IA, OCR, etc.)
+  // Nota: YouTube videos INCLUYEN caché para fallback cuando hay error de conexión
   const isExcluded = path.includes('/ocr') || 
                      path.includes('/ai') || 
                      path.includes('/transcribe') || 
                      path.includes('/generate') ||
                      path.includes('/analyze') ||
-                     path.includes('/youtube') ||
-                     path.includes('/pdf-extract');
+                     path.includes('/pdf-extract') ||
+                     path.includes('/youtube-transcripts'); // Solo excluir transcripts, no videos
                      
   const isCacheable = method === 'GET' && !isExcluded;
   const cacheKey = `api_cache_${path}`;

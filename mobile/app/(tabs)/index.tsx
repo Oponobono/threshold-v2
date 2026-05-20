@@ -13,8 +13,6 @@ import { getCurrentUserProfile, getPredictedSubject, getTodaySchedules, createSt
 import { useDataStore } from '../../src/store/useDataStore';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { useCachePreload } from '../../src/hooks/useCachePreload';
-import { useLoadingState } from '../../src/hooks/useLoadingState';
-import { DashboardLoadingState } from '../../src/components/LoadingStates';
 import { cacheService } from '../../src/services/cacheService';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/SnoozeModal';
@@ -79,9 +77,6 @@ export default function HybridDashboardScreen() {
   const [lastSessionMode, setLastSessionMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // 💾 Loading State para skeleton loaders
-  const { isSkeleton, isReady, setReady } = useLoadingState({ minLoadingTime: 400 });
-
   // 📦 Cargar profile del caché al montar (casi instantáneo)
   useEffect(() => {
     (async () => {
@@ -123,13 +118,10 @@ export default function HybridDashboardScreen() {
       
       // 🔁 Pre-cargar datos relacionados en background (no bloquea)
       preloadRelatedData().catch(err => console.warn('[Dashboard] Error preloading:', err));
-      
-      // ✅ Marcar datos como listos (skeleton → ready)
-      setReady();
     } catch (err) {
       console.warn('Error loading dashboard data:', err);
     }
-  }, [loadAllData, preloadRelatedData, setReady]);
+  }, [loadAllData, preloadRelatedData]);
 
   // Handle pull-to-refresh: actualizar datos y predicciones
   const handleRefresh = useCallback(async () => {
@@ -350,10 +342,6 @@ export default function HybridDashboardScreen() {
   return (
     <>
       <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
-      {isSkeleton ? (
-        // 💾 Mostrar skeleton mientras se cargan datos
-        <DashboardLoadingState />
-      ) : (
       <ScrollView 
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContent}
@@ -636,7 +624,6 @@ export default function HybridDashboardScreen() {
         />
 
       </ScrollView>
-      )}
     </SafeAreaView>
       
       {/* TOAST FEEDBACK */}

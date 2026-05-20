@@ -35,6 +35,7 @@ import { useDataStore } from '../store/useDataStore';
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
 import { FlashcardNewDeckScreen } from './FlashcardNewDeckScreen';
 import { FlashcardNewCardScreen } from './FlashcardNewCardScreen';
+import { AnimatedMarchingAntsBorder } from './AnimatedMarchingAntsBorder';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -269,11 +270,17 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 }}
                 renderActions={(close) => renderSwipeActions(item, close)}
               >
-                <TouchableOpacity
-                  style={[s.deckCard, { marginBottom: 0, borderWidth: isDue ? 2 : 1, borderColor: isDue ? theme.colors.danger : '#E0E0E0' }]}
-                  activeOpacity={0.85}
-                  onPress={() => openStudySession(item)}
+                <AnimatedMarchingAntsBorder
+                  borderRadius={18}
+                  strokeColor={theme.colors.danger}
+                  strokeWidth={1}
+                  always={isDue}
                 >
+                  <TouchableOpacity
+                    style={[s.deckCard, { marginBottom: 0, borderWidth: isDue ? 0 : 1, borderColor: isDue ? 'transparent' : '#E0E0E0' }]}
+                    activeOpacity={0.85}
+                    onPress={() => openStudySession(item)}
+                  >
                   <View style={[s.deckBadge, { backgroundColor: (item as any).subject_color || '#DDE7FF' }]}>
                     <MaterialCommunityIcons
                       name={isShared ? 'account-group-outline' : (((item as any).subject_icon as any) || 'cards-outline')}
@@ -318,7 +325,8 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                       style={{ width: '100%', height: '100%' }}
                     />
                   </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </AnimatedMarchingAntsBorder>
               </SwipeableCard>
             );
           }}

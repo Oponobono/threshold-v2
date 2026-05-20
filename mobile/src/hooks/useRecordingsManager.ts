@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo } from '../services/api';
 import { useAudioRecorder } from './useAudioRecorder';
 import { SubjectSection, GridMediaItem } from '../components/RecordingsGrid';
+import { cacheService } from '../services/cacheService';
 
 /**
  * Hook para manejar la lógica de la pantalla de Grabaciones y Multimedia.
@@ -32,8 +33,21 @@ export const useRecordingsManager = () => {
     try {
       const videos = await getYouTubeVideos();
       setYouTubeVideos(videos);
+      // Guardar en caché para usar como fallback si hay error después
+      await cacheService.saveYouTubeVideos(videos);
+      console.log(`[useRecordingsManager] ✅ Cargados ${videos.length} videos de YouTube`);
     } catch (e) {
-      console.warn('Error loading YouTube videos:', e);
+      console.warn('[useRecordingsManager] ⚠️ Error loading YouTube videos:', e);
+      // Intentar cargar desde caché como fallback
+      try {
+        const cachedVideos = await cacheService.loadYouTubeVideos();
+        if (cachedVideos && cachedVideos.length > 0) {
+          console.log(`[useRecordingsManager] ✅ Cargados ${cachedVideos.length} videos desde caché`);
+          setYouTubeVideos(cachedVideos);
+        }
+      } catch (cacheError) {
+        console.warn('[useRecordingsManager] Cache load failed:', cacheError);
+      }
     } finally {
       setIsLoadingVideos(false);
     }
@@ -80,6 +94,7 @@ export const useRecordingsManager = () => {
         subject_id: null,
       });
 
+      // Recargar videos para que el nuevo aparezca
       await loadYouTubeVideos();
     } finally {
       setIsAddingYouTubeVideo(false);
@@ -91,8 +106,14 @@ export const useRecordingsManager = () => {
       const video = youTubeVideos.find((v) => v.id?.toString() === id);
       if (video) {
         deleteYouTubeVideo(video.id!)
-          .catch((e) => console.warn('Error deleting video:', e))
-          .finally(() => loadYouTubeVideos());
+          .catch((e) => {
+            console.warn('[useRecordingsManager] Error deleting video:', e);
+            alert('Error al eliminar el video');
+          })
+          .finally(() => {
+            console.log('[useRecordingsManager] Video eliminado, recargando lista...');
+            loadYouTubeVideos();
+          });
         return;
       }
       const rec = recordings.find((r) => (r.id_string || r.id?.toString()) === id);

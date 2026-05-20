@@ -1,8 +1,9 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { GestureHandlerRootView, BackHandler } from 'react-native-gesture-handler';
+import { useEffect, useState, useRef } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Alert, BackHandler } from 'react-native';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -38,6 +39,67 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [appIsReady, setAppIsReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<string>('welcome');
+  const router = useRouter();
+  const pathname = usePathname();
+  const backPressedOnce = useRef(false);
+  const backPressTimer = useRef<NodeJS.Timeout>();
+
+  // ── Handle Android Back Button ─────────────────────────────────────────────
+  useEffect(() => {
+    const backAction = () => {
+      // Check if we're on the dashboard (home/index)
+      const isDashboard = pathname === '/(tabs)' || pathname === '/(tabs)/index' || pathname === '/(tabs)/';
+      
+      if (isDashboard) {
+        // On dashboard: require double tap to exit
+        if (backPressedOnce.current) {
+          // Second press within 2 seconds: exit app
+          BackHandler.exitApp();
+          return true;
+        }
+
+        // First press: set flag and show alert
+        backPressedOnce.current = true;
+        Alert.alert(
+          '¡Espera!',
+          'Presiona atrás nuevamente para salir de la app',
+          [
+            {
+              text: 'Cancelar',
+              onPress: () => {
+                backPressedOnce.current = false;
+              },
+              style: 'cancel',
+            },
+          ],
+          { cancelable: false }
+        );
+
+        // Reset flag after 2 seconds if not pressed again
+        if (backPressTimer.current) {
+          clearTimeout(backPressTimer.current);
+        }
+        backPressTimer.current = setTimeout(() => {
+          backPressedOnce.current = false;
+        }, 2000);
+
+        return true;
+      } else {
+        // On other screens: normal back navigation
+        router.back();
+        return true;
+      }
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => {
+      subscription.remove();
+      if (backPressTimer.current) {
+        clearTimeout(backPressTimer.current);
+      }
+    };
+  }, [pathname, router]);
 
   useEffect(() => {
     async function prepare() {

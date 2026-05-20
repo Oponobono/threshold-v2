@@ -83,24 +83,46 @@ export const useDataStore = create<DataState>((set, get) => ({
       // 🌐 FASE 2: Hacer llamadas al backend en paralelo
       console.log('[DataStore] 🔄 Actualizando desde servidor...');
       const [subjectsData, assessmentsData, schedulesData] = await Promise.all([
-        getSubjects().catch(() => []),
-        getAllAssessments().catch(() => []),
-        getAllSchedules().catch(() => [])
+        getSubjects().catch((err) => {
+          console.warn('[DataStore] Error obteniendo subjects:', err);
+          return null;
+        }),
+        getAllAssessments().catch((err) => {
+          console.warn('[DataStore] Error obteniendo assessments:', err);
+          return null;
+        }),
+        getAllSchedules().catch((err) => {
+          console.warn('[DataStore] Error obteniendo schedules:', err);
+          return null;
+        })
       ]);
 
-      set({
-        subjects: subjectsData || [],
-        assessments: assessmentsData || [],
-        schedules: schedulesData || [],
-        hasLoadedOnce: true,
-      });
+      // Solo actualizar si hay datos válidos del servidor
+      // Si algo falla, mantener los datos existentes del caché
+      const updatedState: any = { hasLoadedOnce: true };
+      
+      if (subjectsData !== null) {
+        updatedState.subjects = subjectsData;
+      }
+      if (assessmentsData !== null) {
+        updatedState.assessments = assessmentsData;
+      }
+      if (schedulesData !== null) {
+        updatedState.schedules = schedulesData;
+      }
 
-      // 💾 FASE 3: Guardar en caché para próxima apertura
-      await Promise.all([
-        cacheService.saveSubjects(subjectsData || []),
-        cacheService.saveAssessments(assessmentsData || []),
-        cacheService.saveSchedules(schedulesData || []),
-      ]);
+      set(updatedState);
+
+      // 💾 FASE 3: Guardar en caché solo lo que se obtuvo exitosamente
+      if (subjectsData !== null) {
+        await cacheService.saveSubjects(subjectsData);
+      }
+      if (assessmentsData !== null) {
+        await cacheService.saveAssessments(assessmentsData);
+      }
+      if (schedulesData !== null) {
+        await cacheService.saveSchedules(schedulesData);
+      }
       console.log('[DataStore] 💾 Datos guardados en caché');
 
       // 🔁 FASE 4: Disparar pre-descarga en background (no bloquea)
@@ -116,27 +138,36 @@ export const useDataStore = create<DataState>((set, get) => ({
   refreshSubjects: async () => {
     try {
       const data = await getSubjects();
-      set({ subjects: data || [] });
+      if (data) {
+        set({ subjects: data });
+      }
     } catch (error) {
       console.error('Error refreshing subjects:', error);
+      // No setear datos vacíos si falla - mantener los existentes
     }
   },
 
   refreshAssessments: async () => {
     try {
       const data = await getAllAssessments();
-      set({ assessments: data || [] });
+      if (data) {
+        set({ assessments: data });
+      }
     } catch (error) {
       console.error('Error refreshing assessments:', error);
+      // No setear datos vacíos si falla - mantener los existentes
     }
   },
 
   refreshSchedules: async () => {
     try {
       const data = await getAllSchedules();
-      set({ schedules: data || [] });
+      if (data) {
+        set({ schedules: data });
+      }
     } catch (error) {
       console.error('Error refreshing schedules:', error);
+      // No setear datos vacíos si falla - mantener los existentes
     }
   },
 

@@ -23,8 +23,6 @@ import { FilterSortModal } from '../src/components/FilterSortModal';
 import { AudioRecorderBottomBar } from '../src/components/AudioRecorderBottomBar';
 import { useRecordingsManager } from '../src/hooks/useRecordingsManager';
 import { AutoUploadIndicator } from '../src/components/AutoUploadIndicator';
-import { useLoadingState } from '../src/hooks/useLoadingState';
-import { RecordingsLoadingState } from '../src/components/LoadingStates';
 
 
 /**
@@ -85,9 +83,6 @@ export default function RecordingsScreen() {
     cleanupAudio,
   } = audioContext;
 
-  // 💾 Loading State para skeleton loaders
-  const { isSkeleton, isReady, setReady } = useLoadingState({ minLoadingTime: 350 });
-
   // Stop audio when leaving the screen
   useFocusEffect(
     useCallback(() => {
@@ -134,15 +129,9 @@ export default function RecordingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const loadAll = async () => {
-        await Promise.all([
-          loadYouTubeVideos(),
-          loadRecordings(),
-        ]);
-        setReady();
-      };
-      loadAll();
-    }, [loadRecordings, loadYouTubeVideos, setReady])
+      loadYouTubeVideos();
+      loadRecordings();
+    }, [loadRecordings, loadYouTubeVideos])
   );
 
   /**
@@ -229,8 +218,8 @@ export default function RecordingsScreen() {
   };
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (isSkeleton && youTubeVideos.length === 0 && recordings.length === 0) {
-    return <RecordingsLoadingState />;
+  if (isLoadingVideos && youTubeVideos.length === 0 && recordings.length === 0) {
+    return <PremiumLoading text={t('recordings.loadingList') || 'CARGANDO'} />;
   }
 
   const isEmpty = sections.length === 0;

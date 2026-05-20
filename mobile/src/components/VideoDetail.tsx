@@ -8,6 +8,7 @@ import {
   Alert,
   Dimensions,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { alertRef } from './CustomAlert';
 import { Ionicons } from '@expo/vector-icons';

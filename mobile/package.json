@@ -35,7 +35,6 @@
     "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.10",
     "expo-intent-launcher": "~13.0.8",
-    "expo-keep-awake": "~15.0.8",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.11",
     "expo-local-authentication": "~17.0.8",
@@ -79,6 +78,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@babel/helper-define-polyfill-provider": "^0.6.8",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
