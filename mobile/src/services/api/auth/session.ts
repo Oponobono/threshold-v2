@@ -1,5 +1,6 @@
 import { storageService } from '../../storageService';
 import { fetchWithFallback, parseJsonSafely } from '../client';
+import { cacheService } from '../../cacheService';
 
 /**
  * Obtiene el ID del usuario actual almacenado localmente
@@ -109,7 +110,11 @@ export const signOut = async (): Promise<void> => {
     await storageService.removeSecure('jwt_token');
     await storageService.removeSecure('app_user_email');
     await storageService.removeSecure('app_user_id');
-    console.log('[Auth] Sesión cerrada. Datos de autenticación eliminados.');
+    
+    // Limpiar caché de datos de usuario
+    await cacheService.clear();
+    
+    console.log('[Auth] Sesión cerrada. Datos de autenticación y caché eliminados.');
   } catch (error) {
     console.warn('[Auth] Advertencia al limpiar sesión:', error);
   }

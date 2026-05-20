@@ -6,13 +6,16 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../src/styles/theme';
 import { useDataStore } from '../../src/store/useDataStore';
+import { useProgressiveDataLoading } from '../../src/hooks/useProgressiveDataLoading';
 import { Toast, toastRef } from '../../src/components/Toast';
 
 export default function TabLayout() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { loadAllData } = useDataStore();
   const navigation = useNavigation();
+  
+  // 🚀 Carga progresiva: caché primero, luego servidor
+  useProgressiveDataLoading();
 
   // 🔒 Double Back to Exit Pattern
   // Mantiene referencia a la última vez que se presionó atrás
@@ -61,10 +64,8 @@ export default function TabLayout() {
       }
     };
   }, [t]);
-
-  React.useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+  
+  // La carga de datos se maneja con useProgressiveDataLoading() arriba
   
   // Calculate bottom padding factoring in the system navigation bar (Android/iOS)
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 28 : 16);

@@ -12,6 +12,10 @@ import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
 import { getCurrentUserProfile, getPredictedSubject, getTodaySchedules, createStudySession, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
 import { useDataStore } from '../../src/store/useDataStore';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
+import { useCachePreload } from '../../src/hooks/useCachePreload';
+import { useLoadingState } from '../../src/hooks/useLoadingState';
+import { DashboardLoadingState } from '../../src/components/LoadingStates';
+import { cacheService } from '../../src/services/cacheService';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/SnoozeModal';
 import { useDueCardSnooze, type SnoozeOption } from '../../src/hooks/useDueCardSnooze';
@@ -40,6 +44,7 @@ export default function HybridDashboardScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   // ── Usar store global para subjects, assessments, schedules y predicciones ──
   const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions } = useDataStore();
+  const { preloadRelatedData } = useCachePreload();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const subjectsCarouselRef = useRef<FlatList<any> | null>(null);
 
@@ -74,6 +79,20 @@ export default function HybridDashboardScreen() {
   const [lastSessionMode, setLastSessionMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // 💾 Loading State para skeleton loaders
+  const { isSkeleton, isReady, setReady } = useLoadingState({ minLoadingTime: 400 });
+
+  // 📦 Cargar profile del caché al montar (casi instantáneo)
+  useEffect(() => {
+    (async () => {
+      const cachedProfile = await cacheService.loadProfile();
+      if (cachedProfile) {
+        console.log('[Dashboard] 📦 Profile cargado del caché');
+        setProfile(cachedProfile);
+      }
+    })();
+  }, []);
+
   // Snooze State
   const snoozeManager = useDueCardSnooze();
   const [isSnoozeModalVisible, setIsSnoozeModalVisible] = useState(false);
@@ -94,12 +113,23 @@ export default function HybridDashboardScreen() {
       setProfile(userProfile);
       setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
       
+      // 💾 Guardar profile en caché para próxima apertura
+      if (userProfile) {
+        await cacheService.saveProfile(userProfile);
+      }
+      
       // ── Cargar datos globales del store (subjects, assessments, schedules) ──
-      await loadAllData(true); 
+      await loadAllData(true);
+      
+      // 🔁 Pre-cargar datos relacionados en background (no bloquea)
+      preloadRelatedData().catch(err => console.warn('[Dashboard] Error preloading:', err));
+      
+      // ✅ Marcar datos como listos (skeleton → ready)
+      setReady();
     } catch (err) {
       console.warn('Error loading dashboard data:', err);
     }
-  }, [loadAllData]);
+  }, [loadAllData, preloadRelatedData, setReady]);
 
   // Handle pull-to-refresh: actualizar datos y predicciones
   const handleRefresh = useCallback(async () => {
@@ -320,6 +350,10 @@ export default function HybridDashboardScreen() {
   return (
     <>
       <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
+      {isSkeleton ? (
+        // 💾 Mostrar skeleton mientras se cargan datos
+        <DashboardLoadingState />
+      ) : (
       <ScrollView 
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContent}
@@ -602,6 +636,7 @@ export default function HybridDashboardScreen() {
         />
 
       </ScrollView>
+      )}
     </SafeAreaView>
       
       {/* TOAST FEEDBACK */}

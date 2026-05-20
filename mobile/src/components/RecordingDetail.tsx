@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -12,6 +13,7 @@ import {
   StatusBar,
   Animated,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { alertRef } from './CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -78,6 +80,7 @@ interface RecordingDetailProps {
 export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, onBack }) => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   // Playback
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -104,6 +107,8 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
 
   // Flashcard generation
   const [showFlashcardModal, setShowFlashcardModal] = useState(false);
+  const [studyDeck, setStudyDeck] = useState<{ id: number; title: string; cards: any[] } | null>(null);
+  const [showStudyScreen, setShowStudyScreen] = useState(false);
 
   const [audioUri, setAudioUri] = useState<string>(
     `${AUDIO_DIR()}${recordingId.endsWith('.m4a') ? recordingId : `${recordingId}.m4a`}`
@@ -582,12 +587,22 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       <FlashcardCreatorModal
         visible={showFlashcardModal}
         onClose={() => setShowFlashcardModal(false)}
-        onSuccess={(deckId) => {
-          alertRef.show({
-            title: t('flashcards.generate.success'),
-            message: t('flashcards.generate.success'),
-            type: 'success',
-          });
+        onSuccess={async (deckId) => {
+          setShowFlashcardModal(false);
+          // Load deck data and navigate to study screen
+          try {
+            const { getFlashcardsPrioritized, getFlashcardDecksWithMetrics } = await import('../services/api');
+            const decks = await getFlashcardDecksWithMetrics();
+            const deck = decks.find(d => d.id === deckId);
+            if (deck) {
+              const cards = await getFlashcardsPrioritized(deckId);
+              setStudyDeck({ id: deckId, title: deck.title, cards });
+              setShowStudyScreen(true);
+            }
+          } catch (e) {
+            console.error('Error loading deck for study:', e);
+            alertRef.show({ title: 'Error', message: 'No se pudo cargar el mazo', type: 'error' });
+          }
         }}
         content={summary || transcription || ''}
         contentType="recording"
@@ -595,6 +610,30 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         subjectId={selectedSubjectId || 0}
         userId={recordingData?.user_id || 0}
       />
+
+      {/* Study Screen Modal */}
+      {showStudyScreen && studyDeck && (
+        <Modal visible={showStudyScreen} animationType="slide">
+          <View style={{ flex: 1 }}>
+            {(() => {
+              const { FlashcardStudyScreenStandalone } = require('./FlashcardStudyScreenStandalone');
+              return (
+                <FlashcardStudyScreenStandalone
+                  activeDeck={{ ...studyDeck, card_count: studyDeck.cards.length, user_id: recordingData?.user_id || 0 }}
+                  initialCards={studyDeck.cards}
+                  currentUserId={recordingData?.user_id || 0}
+                  onBack={() => {
+                    setShowStudyScreen(false);
+                    setStudyDeck(null);
+                    // Navigate to flashcards screen
+                    setTimeout(() => router.push('/flashcards'), 300);
+                  }}
+                />
+              );
+            })()}
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
