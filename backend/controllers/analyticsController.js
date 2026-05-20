@@ -64,11 +64,18 @@ exports.getReviewPredictions = (req, res) => {
   // Primero: contar cuántos MAZOS tienen tarjetas vencidas (no el total de tarjetas).
   // Esto evita mostrar números grandes (ej: 30 tarjetas) cuando lo que importa
   // es cuántos mazos hay que repasar (ej: 3 mazos).
+  // 
+  // IMPORTANTE: Solo contar tarjetas que realmente necesitan repasar:
+  // - status != 'review' (ej: 'new', 'learning', o cualquiera que no sea 'review'/'mastered')
+  // - next_review_date es NOT NULL y es válido (para evitar NULL comparisons)
+  // - next_review_date <= CURRENT_TIMESTAMP (vencidas)
   db.get(
     `SELECT COUNT(DISTINCT fc.deck_id) as due_deck_count
      FROM flashcards fc
      JOIN flashcard_decks fd ON fc.deck_id = fd.id
-     WHERE fc.next_review_date <= CURRENT_TIMESTAMP
+     WHERE fc.next_review_date IS NOT NULL
+     AND fc.next_review_date <= CURRENT_TIMESTAMP
+     AND fc.status IN ('new', 'learning')
      AND fd.user_id = ?`,
     [userId],
     (countErr, countRow) => {
@@ -78,6 +85,7 @@ exports.getReviewPredictions = (req, res) => {
       }
 
       const dueDeckCount = (countRow && countRow.due_deck_count) || 0;
+      console.log(`[Analytics] Mazos con tarjetas vencidas para userId=${userId}: ${dueDeckCount}`);
 
       // Si no hay mazos con tarjetas vencidas, retornar inmediatamente
       if (dueDeckCount === 0) {
@@ -86,6 +94,7 @@ exports.getReviewPredictions = (req, res) => {
 
       // Segundo: obtener una muestra representativa de las tarjetas más urgentes
       // (para uso futuro / detalle) — limitada para no saturar la respuesta.
+      // Solo devolver tarjetas con status 'new' o 'learning' (no 'review'/'mastered')
       db.all(
         `SELECT
            fc.id,
@@ -105,7 +114,9 @@ exports.getReviewPredictions = (req, res) => {
          JOIN flashcard_decks fd ON fc.deck_id = fd.id
          LEFT JOIN learning_analytics la ON fd.subject_id = la.subject_id AND la.user_id = ?
          LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
-         WHERE fc.next_review_date <= CURRENT_TIMESTAMP
+         WHERE fc.next_review_date IS NOT NULL
+         AND fc.next_review_date <= CURRENT_TIMESTAMP
+         AND fc.status IN ('new', 'learning')
          AND fd.user_id = ?
          GROUP BY fc.id, fc.front, fc.next_review_date, fd.id, fd.title, fd.subject_id, la.mastery_percentage
          ORDER BY
