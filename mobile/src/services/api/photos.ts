@@ -66,7 +66,7 @@ export const getPhotosBySubject = async (subjectId: number): Promise<Photo[]> =>
     }
     return data || [];
   } catch (error: any) {
-    console.warn('[getPhotosBySubject] Network error:', error.message);
+    console.warn('[getPhotosBySubject] Network error:', error?.message || String(error) || 'Unknown error');
     return [];
   }
 };

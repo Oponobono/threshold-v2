@@ -32,7 +32,7 @@ export const getScannedDocumentsBySubject = async (subjectId: number | string): 
     }
     return data || [];
   } catch (error: any) {
-    console.warn('[getScannedDocumentsBySubject] Network error:', error.message);
+    console.warn('[getScannedDocumentsBySubject] Network error:', error?.message || String(error) || 'Unknown error');
     return [];
   }
 };
