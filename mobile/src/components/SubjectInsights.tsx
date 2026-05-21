@@ -68,11 +68,11 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
   return (
     <View style={styles.sectionBlock}>
       <View style={styles.sectionHeaderRow}>
-        <View>
+        <View style={{ flex: 1, paddingRight: 12 }}>
           <Text style={styles.sectionTitle}>{t('analytics.insightsTitle')}</Text>
           <Text style={styles.sectionHint}>{t('analytics.insightsHint')}</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {onOpenCategories && (
             <TouchableOpacity
               style={insightStyles.categoriesChip}

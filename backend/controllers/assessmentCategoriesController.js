@@ -1,4 +1,4 @@
-const db = require('../database/sqlite');
+const { db } = require('../db');
 
 // GET /api/subjects/:subjectId/categories
 exports.getCategoriesBySubject = (req, res) => {
@@ -22,7 +22,7 @@ exports.createCategory = (req, res) => {
   `;
   db.run(query, [subjectId, name, weight || null, drop_lowest || 0], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: this.lastID, subject_id: subjectId, name, weight, drop_lowest });
+    res.status(201).json({ id: this.lastID, subject_id: Number(subjectId), name, weight: weight || null, drop_lowest: drop_lowest || 0 });
   });
 };
 

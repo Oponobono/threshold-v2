@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Platform, BackHandler, View } from 'react-native';
-import { Tabs, useNavigation } from 'expo-router';
+import { Tabs, useNavigation, usePathname } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,47 +13,56 @@ export default function TabLayout() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const pathname = usePathname();
   
   // 🚀 Carga progresiva: caché primero, luego servidor
   useProgressiveDataLoading();
 
-  // 🔒 Double Back to Exit Pattern
-  // Mantiene referencia a la última vez que se presionó atrás
+  // 🔒 Double Back to Exit — solo activo en el dashboard (tab index)
   const backPressedTimeRef = useRef<number>(0);
-  const backTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const backTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Solo interceptar en el dashboard
+      const isDashboard =
+        pathname === '/' ||
+        pathname === '/index' ||
+        pathname === '/(tabs)' ||
+        pathname === '/(tabs)/index' ||
+        pathname === '/(tabs)/';
+
+      if (!isDashboard) {
+        // En cualquier otro tab: dejar que el sistema maneje el back normalmente
+        return false;
+      }
+
       const now = Date.now();
       const timeSinceLastPress = now - backPressedTimeRef.current;
-      const DOUBLE_BACK_TIMEOUT = 2000; // 2 segundos
+      const DOUBLE_BACK_TIMEOUT = 2000;
 
-      // Si se presionó hace menos de 2 segundos, cerrar la app
+      // Segundo toque dentro de 2 segundos → salir
       if (timeSinceLastPress < DOUBLE_BACK_TIMEOUT) {
-        // Limpiar timeout si existía
         if (backTimeoutRef.current) {
           clearTimeout(backTimeoutRef.current);
           backTimeoutRef.current = null;
         }
-        // Cerrar la app
         BackHandler.exitApp();
         return true;
       }
 
-      // Primera presión: mostrar toast sutil
+      // Primer toque: mostrar toast y arrancar temporizador
       backPressedTimeRef.current = now;
       toastRef.current?.show(
         t('common.doubleBackToExit') || 'Presiona atrás de nuevo para salir',
         2000
       );
 
-      // Resetear el contador después de 2 segundos
       backTimeoutRef.current = setTimeout(() => {
         backPressedTimeRef.current = 0;
         backTimeoutRef.current = null;
       }, DOUBLE_BACK_TIMEOUT);
 
-      // Retornar true para prevenir el comportamiento por defecto
       return true;
     });
 
@@ -63,7 +72,7 @@ export default function TabLayout() {
         clearTimeout(backTimeoutRef.current);
       }
     };
-  }, [t]);
+  }, [t, pathname]);
   
   // La carga de datos se maneja con useProgressiveDataLoading() arriba
   
