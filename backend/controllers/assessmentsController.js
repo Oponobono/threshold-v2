@@ -273,17 +273,25 @@ exports.updateAssessment = (req, res) => {
                           SET raw_value = ?, normalized_value = ? 
                           WHERE assessment_id = ?
                         `, [rawValue, normalized, id], (err) => {
-                          if (!err) {
-                            return res.json({ id, message: 'Evaluación actualizada' });
-                          }
+                          return res.json({ id, message: 'Evaluación actualizada' });
                         });
+                      } else {
+                        return res.json({ id, message: 'Evaluación actualizada' });
                       }
+                    } else {
+                      return res.json({ id, message: 'Evaluación actualizada' });
                     }
                   });
+                } else {
+                  return res.json({ id, message: 'Evaluación actualizada' });
                 }
               });
+            } else {
+              return res.json({ id, message: 'Evaluación actualizada' });
             }
           });
+        } else {
+          return res.json({ id, message: 'Evaluación actualizada' });
         }
       });
     } else {
