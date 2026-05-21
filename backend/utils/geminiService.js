@@ -691,10 +691,10 @@ function processAtomicFlashcards(items) {
       continue;
     }
     
-    // Legacy support para flashcards antiguas que podrían venir sin 'front'
-    const front = item.data.front || item.data.question || '';
-    const back = item.data.back || item.data.answer || '';
-    
+    const itemData = item.data || item || {};
+    const front = itemData.front || itemData.question || itemData.pregunta || item.front || item.question || item.pregunta || '';
+    const back = itemData.back || itemData.answer || itemData.respuesta || item.back || item.answer || item.respuesta || '';
+
     const density = analyzeCardDensity({ front, back });
     
     if (density.isDense) {

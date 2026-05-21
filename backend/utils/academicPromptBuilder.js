@@ -80,6 +80,10 @@ REGLAS DE ORO (NO NEGOCIABLES PARA CUALQUIER MATERIA):
       • Conecta a conceptos superiores o aplicaciones reales
       • Deja al estudiante aprendiendo algo NEW, no solo repitiendo datos
 
+   🔹 FORMATO DE CÓDIGO (OBLIGATORIO SI APLICA):
+      • Si el concepto involucra programación, comandos, HTML, JSON o algoritmos, DEBES usar bloques de código Markdown (\`\`\`lenguaje ... \`\`\`).
+      • Puedes insertar estos bloques en el "front", "back", "question", "options" o "explanation" según convenga.
+
 ═══════════════════════════════════════════════════════════════════════════════
 FORMATOS DE RESPUESTA (JSON ESTRICTO - SIN TEXTO ADICIONAL):
 ═══════════════════════════════════════════════════════════════════════════════`;
@@ -315,11 +319,15 @@ CRITERIOS OBLIGATORIOS:
 4. Para MC: distractores son errores conceptuales REALES, no obvios
 5. Responde SOLO JSON válido, SIN texto adicional
 
-COMPONENTES REQUERIDOS:
+COMPONENETES REQUERIDOS:
 - type: "${mode}"
 - data: objeto con contenido (question/options/correctIndex, front/back, etc)
 - hint: pista directiva (15 palabras max)
 - explanation: por qué funciona (50-80 palabras)
+
+FORMATO DE CÓDIGO (SI APLICA A PROGRAMACIÓN):
+- USA SIEMPRE bloques de código Markdown (\`\`\`lenguaje ... \`\`\`) para cualquier fragmento de código.
+- Aplícalo en el front, back, options o explanation cuando sea necesario.
 
 DISTRIBUCIÓN COGNITIVA:
 - 10% Memoria (definiciones básicas)

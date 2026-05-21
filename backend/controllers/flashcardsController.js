@@ -617,8 +617,8 @@ async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, des
     for (const item of items) {
       const itemType = item.type || item.item_type || 'flashcard';
       const content = item.data || item.content || {};
-      const front = itemType === 'flashcard' ? (content.front || item.question || '') : '';
-      const back = itemType === 'flashcard' ? (content.back || item.answer || '') : '';
+      const front = itemType === 'flashcard' ? (content.front || content.question || content.pregunta || item.front || item.question || item.pregunta || '') : '';
+      const back = itemType === 'flashcard' ? (content.back || content.answer || content.respuesta || item.back || item.answer || item.respuesta || '') : '';
       const hint = item.hint || content.hint || null;
       const explanation = item.explanation || content.explanation || null;
 
@@ -682,6 +682,7 @@ CALIDAD ACADÉMICA Y REGLAS DE ORO:
 3. PISTAS (HINTS): Debe ser un andamiaje cognitivo (sugerir una ruta de pensamiento), no una respuesta parcial ni letras iniciales.
 4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico (ej. mala aplicación de una fórmula, confusión de conceptos similares o generalización excesiva). No rellenes con opciones aleatorias.
 5. EXCLUSIVIDAD SEMÁNTICA: En selección múltiple, las 4 opciones deben tener contenido semántico único. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.
+6. FORMATO DE CÓDIGO (OBLIGATORIO SI APLICA): Si la evaluación involucra programación, algoritmos, HTML, JSON o comandos, USA SIEMPRE bloques de código Markdown (\`\`\`lenguaje ... \`\`\`) dentro del "front", "back", "question", "options" o "explanation" para formatear los fragmentos de código.
 
 IMPORTANTE: Debes responder EXCLUSIVAMENTE con un objeto JSON válido que contenga la clave "items", cuyo valor sea un array de objetos con los ítems generados según el formato indicado a continuación.
 No agregues ningún texto introductorio ni explicaciones fuera del JSON. La respuesta debe comenzar con { y terminar con }.`;

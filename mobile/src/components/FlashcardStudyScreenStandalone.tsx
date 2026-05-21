@@ -415,36 +415,41 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
   return (
     <View style={[{ flex: 1, paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingTop: insets.top, marginTop: 8, paddingBottom: Math.max(insets.bottom + 12, 20) }]}>
 
-      {/* ── Header: flecha  |  título (badge inline)  |  snooze + contador + trash ── */}
-      <View style={[s.header, { marginBottom: 6, marginTop: 6 }]}>
-        <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
-        </TouchableOpacity>
+      {/* ── Header Dividido en dos líneas ── */}
+      <View style={{ marginBottom: 16, marginTop: 6, gap: 12 }}>
+        {/* Fila 1: Flecha + Nombre del Mazo */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={[s.deckTitle, { flex: 1, maxWidth: '100%' }]} numberOfLines={1}>
+            {activeDeck?.title}
+          </Text>
+        </View>
 
-        {/* Título + badge en la misma línea */}
-        <View style={s.titleBlock}>
-          <Text style={s.deckTitle} numberOfLines={1}>{activeDeck?.title}</Text>
+        {/* Fila 2: Badge del Tipo de Tarjeta + Botones y Contador */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={[s.inlineBadge, { backgroundColor: badge.bg }]}>
             <Text style={[s.inlineBadgeText, { color: badge.color }]}>{badge.label}</Text>
           </View>
-        </View>
 
-        <View style={s.headerRight}>
-          {/* Botón Snooze (disponible durante la sesión) */}
-          <TouchableOpacity 
-            onPress={() => setShowSnoozeModal(true)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            disabled={isAnswered && !overlayVisible}
-          >
-            <Ionicons name="time-outline" size={18} color={theme.colors.primary} />
-          </TouchableOpacity>
-          
-          <Text style={s.counter}>{itemIndex + 1}/{items.length}</Text>
-          {activeDeck?.user_id === currentUserId && (
-            <TouchableOpacity onPress={() => handleDeleteCard(item.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="trash-outline" size={18} color="#D32F2F" />
+          <View style={s.headerRight}>
+            <TouchableOpacity 
+              onPress={() => setShowSnoozeModal(true)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              disabled={isAnswered && !overlayVisible}
+            >
+              <Ionicons name="time-outline" size={22} color={theme.colors.primary} />
             </TouchableOpacity>
-          )}
+            
+            <Text style={s.counter}>{itemIndex + 1}/{items.length}</Text>
+            
+            {activeDeck?.user_id === currentUserId && (
+              <TouchableOpacity onPress={() => handleDeleteCard(item.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="trash-outline" size={20} color="#D32F2F" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 

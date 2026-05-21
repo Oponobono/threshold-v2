@@ -121,6 +121,7 @@ REGLAS DE ORO:
 3. PISTAS ESTRATÉGICAS: El 'hint' debe ser un andamiaje cognitivo (ruta de pensamiento), no una respuesta parcial.
 4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico.
 5. CONTENIDO RELACIONADO: Si detectas que el usuario solicita temas relacionados (ej: "incluye hantavirus" cuando el documento menciona coronavirus), incorpora esos temas SIEMPRE, priorizando el contenido del documento como base pero enriqueciendo con conocimiento académico general sobre temas conexos.
+6. FORMATO DE CÓDIGO (OBLIGATORIO SI APLICA): Si la evaluación involucra programación, algoritmos, comandos, HTML o JSON, USA SIEMPRE bloques de código Markdown (\`\`\`lenguaje ... \`\`\`) dentro del "front", "back", "question", "options" o "explanation" para formatear los fragmentos de código.
 
 ${modeInstructions[mode] || modeInstructions.mixed}
 
@@ -1404,20 +1405,28 @@ Formato requerido EXACTO (JSON Object):
     if (!jsonMatch) throw new Error('Respuesta de AI no válida');
     const item = JSON.parse(jsonMatch[0]);
 
-    const contentStr = JSON.stringify(item.data);
+    const itemData = item.data || item || {};
+    const front = itemData.front || itemData.question || itemData.pregunta || item.front || item.question || item.pregunta || '';
+    const back = itemData.back || itemData.answer || itemData.respuesta || item.back || item.answer || item.respuesta || '';
+
+    if (!front || !back) {
+      throw new Error('La IA no devolvió el formato esperado (front/back).');
+    }
+
+    const contentStr = JSON.stringify({ front, back });
     const hint = item.hint || null;
     const explanation = item.explanation || null;
 
     db.run(
       `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, is_atomic) VALUES (?, ?, ?, 'flashcard', ?, ?, ?, 'new', 1)`,
-      [deckId, item.data.front, item.data.back, contentStr, hint, explanation],
+      [deckId, front, back, contentStr, hint, explanation],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.status(201).json({
           id: this.lastID,
           deck_id: Number(deckId),
-          front: item.data.front,
-          back: item.data.back,
+          front: front,
+          back: back,
           item_type: 'flashcard',
           content_json: contentStr,
           hint,
