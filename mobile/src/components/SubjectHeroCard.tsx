@@ -14,6 +14,9 @@ interface SubjectHeroCardProps {
   meta: string;
   progress?: number;
   avgScore?: number;
+  displayLabel?: string | null;
+  displayColor?: string | null;
+  gpaEquivalent?: number | null;
   onDelete?: () => void;
   onPress?: () => void;
 }
@@ -41,6 +44,9 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
   meta,
   progress,
   avgScore,
+  displayLabel,
+  displayColor,
+  gpaEquivalent,
   onDelete,
   onPress,
 }) => {
@@ -78,9 +84,16 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
             <Text style={{ fontSize: 8, fontWeight: '800', color: theme.colors.text.secondary, textTransform: 'uppercase', marginBottom: -2 }}>
               Promedio
             </Text>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text.primary }}>
-              {avgScore?.toFixed(1) || '0.0'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: displayColor || theme.colors.text.primary }}>
+                {avgScore?.toFixed(1) || '0.0'}
+              </Text>
+              {displayLabel && (
+                <Text style={{ fontSize: 12, fontWeight: '700', color: displayColor || theme.colors.primary, opacity: 0.8 }}>
+                  ≈ {displayLabel}
+                </Text>
+              )}
+            </View>
           </View>
 
           {onDelete && (

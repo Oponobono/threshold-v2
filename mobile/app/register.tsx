@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -26,6 +27,7 @@ import { MapuviaFooter } from '../src/components/MapuviaFooter';
 import { registerUser } from '../src/services/api';
 import { uploadFileToUploadthing } from '../src/services/uploadthing/storage';
 import { alertRef } from '../src/components/CustomAlert';
+import { fetchGradingSystems, type GradingSystem } from '../src/services/api/grading';
 
 const TOTAL_STEPS = 2;
 
@@ -56,13 +58,18 @@ export default function RegisterScreen() {
   const [referenceLanguage, setReferenceLanguage] = useState<string>('');
 
   // === Paso 2: Escala académica + Contexto + Credenciales ===
-  const [gradingScale, setGradingScale] = useState('0-5.0');
+  const [gradingSystems, setGradingSystems] = useState<GradingSystem[]>([]);
+  const [isLoadingSystems, setIsLoadingSystems] = useState(false);
+  const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null);
   const [approvalThreshold, setApprovalThreshold] = useState('3.0');
   const [major, setMajor] = useState('');
   const [university, setUniversity] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Derived legacy field for backward-compat with current API
+  const selectedSystem = gradingSystems.find(s => s.id === selectedSystemId) ?? null;
 
   // Animations
   useEffect(() => {
@@ -72,6 +79,28 @@ export default function RegisterScreen() {
       useNativeDriver: false,
     }).start();
   }, [step, progressAnim]);
+
+  // Load grading systems from API
+  useEffect(() => {
+    const loadSystems = async () => {
+      setIsLoadingSystems(true);
+      try {
+        const systems = await fetchGradingSystems();
+        setGradingSystems(systems);
+        if (systems.length > 0) {
+          // Default to Colombia 0-5.0 if available, otherwise first in list
+          const col = systems.find(s => s.code === 'COL_0_5') ?? systems[0];
+          setSelectedSystemId(col.id);
+          setApprovalThreshold(String(col.passing_value));
+        }
+      } catch {
+        // Fallback silencioso: si la API falla, el paso 2 mostrará estado vacío
+      } finally {
+        setIsLoadingSystems(false);
+      }
+    };
+    loadSystems();
+  }, []);
 
   const changeStep = (newStep: number) => {
     const direction = newStep > step ? 400 : -400;
@@ -122,7 +151,7 @@ export default function RegisterScreen() {
   };
   const isPasswordValid = Object.values(reqs).every(Boolean);
   const isStep2Valid =
-    gradingScale &&
+    selectedSystemId !== null &&
     !isNaN(parseFloat(approvalThreshold)) &&
     isEmailValid(email) &&
     isPasswordValid &&
@@ -164,8 +193,7 @@ export default function RegisterScreen() {
         name,
         lastname,
         username,
-        grading_scale: gradingScale,
-        approval_threshold: parseFloat(approvalThreshold),
+        active_grading_version_id: selectedSystem?.active_version_id ?? null,
         major,
         university,
         semester,
@@ -210,21 +238,25 @@ export default function RegisterScreen() {
     </View>
   );
 
-  const ScaleButton = ({ scale }: { scale: string }) => (
-    <TouchableOpacity
-      style={[localStyles.segmentButton, gradingScale === scale && localStyles.segmentButtonActive]}
-      onPress={() => {
-        setGradingScale(scale);
-        if (scale === '0-5.0') setApprovalThreshold('3.0');
-        else if (scale === '0-10') setApprovalThreshold('6.0');
-        else setApprovalThreshold('60');
-      }}
-    >
-      <Text style={[localStyles.segmentText, gradingScale === scale && localStyles.segmentTextActive]}>
-        {scale}
-      </Text>
-    </TouchableOpacity>
-  );
+  const SystemButton = ({ system }: { system: GradingSystem }) => {
+    const isActive = selectedSystemId === system.id;
+    return (
+      <TouchableOpacity
+        style={[localStyles.segmentButton, isActive && localStyles.segmentButtonActive]}
+        onPress={() => {
+          setSelectedSystemId(system.id);
+          setApprovalThreshold(String(system.passing_value));
+        }}
+      >
+        <Text style={[localStyles.segmentText, isActive && localStyles.segmentTextActive]} numberOfLines={1}>
+          {system.min_value}–{system.max_value}
+        </Text>
+        <Text style={[localStyles.segmentSubText, isActive && localStyles.segmentTextActive]} numberOfLines={1}>
+          {system.name}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={globalStyles.safeArea}>
@@ -456,11 +488,24 @@ export default function RegisterScreen() {
                     <Text style={localStyles.bentoCardLabel}>{t('register.step2.gradingCard')}</Text>
                   </View>
                   <Text style={localStyles.chipSectionLabel}>{t('register.step2.gradingScaleLabel')}</Text>
-                  <View style={localStyles.segmentedControl}>
-                    <ScaleButton scale="0-5.0" />
-                    <ScaleButton scale="0-10" />
-                    <ScaleButton scale="0-100" />
-                  </View>
+                  {isLoadingSystems ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 12 }} />
+                  ) : (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+                    >
+                      {gradingSystems.map(system => (
+                        <SystemButton key={system.id} system={system} />
+                      ))}
+                    </ScrollView>
+                  )}
+                  {selectedSystem && (
+                    <Text style={localStyles.chipSectionHint}>
+                      Aprobación: {selectedSystem.passing_value} / {selectedSystem.max_value}
+                    </Text>
+                  )}
                   <View style={localStyles.thresholdRow}>
                     <Text style={localStyles.thresholdLabel}>{t('register.step2.approvalThresholdLabel')}</Text>
                     <TextInput

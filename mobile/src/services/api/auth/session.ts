@@ -20,6 +20,7 @@ export const registerUser = async (userData: {
   username?: string;
   grading_scale?: string;
   approval_threshold?: number;
+  active_grading_version_id?: number | null;
   major?: string;
   university?: string;
   semester?: string;

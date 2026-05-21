@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const tableSchema = require('./schema');
 const { migrateColumnsPostgres } = require('./migrations');
+const { seedGradingSystemsPostgres } = require('./seeders');
 
 const initializePostgresDb = async (pool) => {
   try {
@@ -76,6 +77,7 @@ const initializePostgresDb = async (pool) => {
     }
 
     console.log('✅ Base de datos PostgreSQL inicializada correctamente.');
+    await seedGradingSystemsPostgres(pool);
   } catch (err) {
     console.error('❌ Error inicializando PostgreSQL:', err.message);
   }

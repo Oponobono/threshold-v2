@@ -18,6 +18,8 @@ Especificación técnica completa y alineada con la arquitectura polimórfica ac
 8. [Plan de Validación de Código](#plan-de-validación-de-código)
 9. [Cronograma Realista](#cronograma-realista)
 10. [Base de Datos: Extensiones Mínimas](#base-de-datos-extensiones-mínimas)
+11. [Fase 5: Academic Workflow Engine](#fase-5-academic-workflow-engine-policies-layer)
+12. [Fase 6: Transcript & Analytics Engine](#fase-6-transcript--analytics-engine)
 
 ---
 

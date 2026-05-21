@@ -14,12 +14,13 @@ export type UserProfile = {
   name?: string | null;
   lastname?: string | null;
   username?: string | null;
-  grading_scale?: string | null;
-  approval_threshold?: number | null;
+  active_grading_version_id?: number | null;
   major?: string | null;
   university?: string | null;
   semester?: string | null;
   study_goal?: string | null;
+  reference_language?: string | null;
+  biometric_token?: string | null;
   created_at?: string | null;
   last_login?: string | null;
   share_pin?: string | null;
@@ -39,7 +40,11 @@ export type Subject = {
   icon?: string | null;
   target_grade?: number | null;
   avg_score?: number | null;
+  normalized_avg_score?: number | null;
   completion_percent?: number | null;
+  display_label?: string | null;
+  display_color?: string | null;
+  gpa_equivalent?: number | null;
 };
 
 /** Evaluación académica: nota, tarea o examen de una materia */
@@ -54,7 +59,11 @@ export type Assessment = {
   score?: number | null;
   percentage?: number | null;
   grade_value?: number | null;
+  normalized_value?: number | null;
   is_completed?: boolean;
+  display_label?: string | null;
+  display_color?: string | null;
+  gpa_equivalent?: number | null;
 };
 
 /** Foto de la galería vinculada a una materia */

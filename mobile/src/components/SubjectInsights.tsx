@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Assessment, deleteAssessment } from '../services/api';
@@ -23,6 +23,7 @@ const ProgressBar = ({ value, color }: { value: number; color: string }) => (
 interface SubjectInsightsProps {
   recentAssessments: Assessment[];
   onDeleteAssessment?: (id: number) => void;
+  onOpenCategories?: () => void;
 }
 
 /**
@@ -37,7 +38,7 @@ interface SubjectInsightsProps {
  * @param recentAssessments - Lista de evaluaciones de la materia para mostrar.
  * @param onDeleteAssessment - Callback opcional llamado con el ID al eliminar una evaluación.
  */
-export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessments, onDeleteAssessment }) => {
+export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessments, onDeleteAssessment, onOpenCategories }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
 
@@ -71,7 +72,18 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
           <Text style={styles.sectionTitle}>{t('analytics.insightsTitle')}</Text>
           <Text style={styles.sectionHint}>{t('analytics.insightsHint')}</Text>
         </View>
-        <Text style={styles.sectionChip}>{recentAssessments.length} {t('subjects.notes')}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {onOpenCategories && (
+            <TouchableOpacity
+              style={insightStyles.categoriesChip}
+              onPress={onOpenCategories}
+            >
+              <Ionicons name="layers-outline" size={12} color={theme.colors.text.secondary} />
+              <Text style={insightStyles.categoriesChipText}>{t('categories.chipLabel', 'Categorías')}</Text>
+            </TouchableOpacity>
+          )}
+          <Text style={styles.sectionChip}>{recentAssessments.length} {t('subjects.notes')}</Text>
+        </View>
       </View>
 
       <View style={styles.insightsCard}>
@@ -128,3 +140,22 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
     </View>
   );
 };
+
+const insightStyles = StyleSheet.create({
+  categoriesChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: theme.colors.card,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  categoriesChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.text.secondary,
+  },
+});

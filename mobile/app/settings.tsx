@@ -77,8 +77,10 @@ export default function SettingsScreen() {
     profileAvatarUri,
     threshold,
     setThreshold,
-    activeScale,
-    setActiveScale,
+    gradingSystems,
+    selectedSystemId,
+    setSelectedSystemId,
+    isLoadingSystems,
     notifDeadline,
     setNotifDeadline,
     notifWeekly,
@@ -92,7 +94,6 @@ export default function SettingsScreen() {
     TERMS,
     activeTermIndex,
     setActiveTermIndex,
-    SCALES,
     LMS_ACCOUNTS,
     isEditProfileVisible,
     setIsEditProfileVisible,
@@ -137,6 +138,7 @@ export default function SettingsScreen() {
     handleDeleteAccount,
     handleOpenEditProfile,
     handleSaveProfile,
+    handleSaveSettings,
     handleSavePassword,
     handleDeletePasswordVerify,
     handleConfirmDeletion,
@@ -178,7 +180,7 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.cancelBtn} onPress={() => router.replace('/(tabs)')}>
             <Text style={styles.cancelText}>{t('settings.cancel')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.saveBtn}>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveSettings}>
             <Text style={styles.saveBtnText}>{t('settings.save')}</Text>
           </TouchableOpacity>
         </View>
@@ -224,7 +226,7 @@ export default function SettingsScreen() {
               ) : <View />}
 
               <TouchableOpacity onPress={() => setIsChangePasswordVisible(true)}>
-                <Text style={styles.changePwText}>{t('settings.changePass')}</Text>
+                <Text style={styles.changePwText}>{t('account.changePass')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -234,10 +236,10 @@ export default function SettingsScreen() {
         {/* ── ACADEMIC PREFERENCES ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('settings.academicPrefs')} desc={t('settings.academicPrefsDesc')} icon="settings-outline" />
+          <SectionHeader title={t('academic.title')} desc={t('academic.desc')} icon="settings-outline" />
 
           {/* Terms / Semesters */}
-          <Text style={styles.subSectionTitle}>{t('settings.termsSemesters')}</Text>
+          <Text style={styles.subSectionTitle}>{t('academic.termsSemesters')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.termsRow}>
             {TERMS.map((term, index) => (
               <TouchableOpacity
@@ -251,20 +253,20 @@ export default function SettingsScreen() {
           </ScrollView>
           <View style={styles.actionRow}>
             <View style={styles.actionRowTextWrap}>
-              <Text style={styles.settingDesc}>{t('settings.manageTerms')}</Text>
+              <Text style={styles.settingDesc}>{t('academic.manageTerms')}</Text>
             </View>
             <View style={styles.actionRowButtonWrap}>
               <TouchableOpacity style={styles.darkPill}>
-                <Text style={styles.darkPillText}>{t('settings.addTerm')}</Text>
+                <Text style={styles.darkPillText}>{t('academic.addTerm')}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Min Grade */}
-          <Text style={styles.subSectionTitle}>{t('settings.minGrade')}</Text>
+          <Text style={styles.subSectionTitle}>{t('academic.minGrade')}</Text>
           <View style={styles.thresholdRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.settingDesc}>{t('settings.defaultThreshold')}</Text>
+              <Text style={styles.settingDesc}>{t('academic.defaultThreshold')}</Text>
               <TextInput
                 style={styles.thresholdInput}
                 value={threshold}
@@ -274,44 +276,49 @@ export default function SettingsScreen() {
               />
             </View>
             <View style={{ alignItems: 'flex-end', gap: 6 }}>
-              <Text style={styles.settingDesc}>{t('settings.perSubject')}</Text>
+              <Text style={styles.settingDesc}>{t('academic.perSubject')}</Text>
               <TouchableOpacity style={styles.outlinePill}>
-                <Text style={styles.outlinePillText}>{t('settings.manageOverrides')}</Text>
+                <Text style={styles.outlinePillText}>{t('academic.manageOverrides')}</Text>
               </TouchableOpacity>
             </View>
           </View>
           <View style={[styles.actionRow, { marginTop: 8 }]}>
             <View style={styles.actionRowTextWrap}>
-              <Text style={styles.settingDesc}>{t('settings.resetThreshold')}</Text>
+              <Text style={styles.settingDesc}>{t('academic.resetThreshold')}</Text>
             </View>
             <View style={styles.actionRowButtonWrap}>
               <TouchableOpacity style={styles.darkPill} onPress={() => setThreshold('50')}>
-                <Text style={styles.darkPillText}>{t('settings.resetTo50')}</Text>
+                <Text style={styles.darkPillText}>{t('academic.resetTo50')}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Grading Scales */}
-          <Text style={styles.subSectionTitle}>{t('settings.gradingScales')}</Text>
-          {SCALES.map(scale => (
-            <View key={scale.key} style={styles.scaleRow}>
+          <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
+          {isLoadingSystems ? (
+            <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 12 }} />
+          ) : gradingSystems.map(system => (
+            <View key={system.id} style={styles.scaleRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.settingTitle}>{scale.label}</Text>
-                <Text style={styles.settingDesc}>{scale.desc}</Text>
+                <Text style={styles.settingTitle}>{system.name}</Text>
+                <Text style={styles.settingDesc}>{system.min_value} – {system.max_value} (Aprobación: {system.passing_value})</Text>
               </View>
-              {activeScale === scale.key ? (
+              {selectedSystemId === system.id ? (
                 <View style={styles.activeBadge}>
-                  <Text style={styles.activeBadgeText}>{t('settings.active')}</Text>
+                  <Text style={styles.activeBadgeText}>{t('academic.active')}</Text>
                 </View>
               ) : (
-                <TouchableOpacity onPress={() => setActiveScale(scale.key)}>
-                  <Text style={styles.selectText}>{t('settings.select')}</Text>
+                <TouchableOpacity onPress={() => {
+                  setSelectedSystemId(system.id);
+                  setThreshold(String(system.passing_value));
+                }}>
+                  <Text style={styles.selectText}>{t('academic.select')}</Text>
                 </TouchableOpacity>
               )}
             </View>
           ))}
           <TouchableOpacity style={[styles.darkPill, { alignSelf: 'center', marginTop: 8 }]}>
-            <Text style={styles.darkPillText}>{t('settings.addCustomScale')}</Text>
+            <Text style={styles.darkPillText}>{t('academic.addCustomScale')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -362,17 +369,17 @@ export default function SettingsScreen() {
         {/* ── NOTIFICATIONS ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('settings.notifications')} desc={t('settings.notifDesc')} icon="notifications-outline" />
+          <SectionHeader title={t('notifications.title')} desc={t('notifications.desc')} icon="notifications-outline" />
           <SettingRow
-            title={t('settings.deadlineAlerts')} desc={t('settings.deadlineAlertsDesc')}
+            title={t('notifications.deadlineAlerts')} desc={t('notifications.deadlineAlertsDesc')}
             right={<Switch value={notifDeadline} onValueChange={setNotifDeadline} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
-            title={t('settings.weeklyDigest')} desc={t('settings.weeklyDigestDesc')}
+            title={t('notifications.weeklyDigest')} desc={t('notifications.weeklyDigestDesc')}
             right={<Switch value={notifWeekly} onValueChange={setNotifWeekly} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
-            title={t('settings.emailNotif')} desc={t('settings.emailNotifDesc')}
+            title={t('notifications.emailNotif')} desc={t('notifications.emailNotifDesc')}
             right={<Switch value={notifEmail} onValueChange={setNotifEmail} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
         </View>
@@ -381,12 +388,12 @@ export default function SettingsScreen() {
         {/* ── BACKUP & SYNC ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('settings.backupSync')} desc={t('settings.backupSyncDesc')} icon="cloud-outline" />
+          <SectionHeader title={t('backup.title')} desc={t('backup.desc')} icon="cloud-outline" />
 
           {/* ── Toggle principal ── */}
           <SettingRow
-            title={t('settings.enableCloudBackup', 'Backup en la nube')}
-            desc={t('settings.enableCloudBackupDesc', 'Guarda copias de tus archivos en Uploadthing')}
+            title={t('backup.enableCloud', 'Backup en la nube')}
+            desc={t('backup.enableCloudDesc', 'Guarda copias de tus archivos en Uploadthing')}
             right={
               <Switch
                 value={backupPrefs.enabled}
@@ -401,8 +408,8 @@ export default function SettingsScreen() {
             <>
               {/* ── Auto-upload toggle ── */}
               <SettingRow
-                title={t('settings.autoUpload', 'Auto-subida al guardar')}
-                desc={t('settings.autoUploadDesc', 'Sube archivos nuevos automáticamente al guardarlos')}
+                title={t('backup.autoUpload', 'Auto-subida al guardar')}
+                desc={t('backup.autoUploadDesc', 'Sube archivos nuevos automáticamente al guardarlos')}
                 right={
                   <Switch
                     value={backupPrefs.autoUpload}
@@ -415,8 +422,8 @@ export default function SettingsScreen() {
 
               {/* ── Auto-download toggle ── */}
               <SettingRow
-                title={t('settings.autoDownload', 'Auto-descarga al iniciar sesión')}
-                desc={t('settings.autoDownloadDesc', 'Descarga tus archivos al entrar en un nuevo dispositivo')}
+                title={t('backup.autoDownload', 'Auto-descarga al iniciar sesión')}
+                desc={t('backup.autoDownloadDesc', 'Descarga tus archivos al entrar en un nuevo dispositivo')}
                 right={
                   <Switch
                     value={backupPrefs.autoDownload}
@@ -429,7 +436,7 @@ export default function SettingsScreen() {
 
               {/* ── Toggles por tipo ── */}
               <SettingRow
-                title={t('settings.backupPhotos', 'Fotos de galería')}
+                title={t('backup.photos', 'Fotos de galería')}
                 desc={`${backupStats.photos.backed}/${backupStats.photos.total} en la nube`}
                 right={
                   <Switch
@@ -441,7 +448,7 @@ export default function SettingsScreen() {
                 }
               />
               <SettingRow
-                title={t('settings.backupAudio', 'Grabaciones de audio')}
+                title={t('backup.audio', 'Grabaciones de audio')}
                 desc={`${backupStats.audio.backed}/${backupStats.audio.total} en la nube`}
                 right={
                   <Switch
@@ -453,7 +460,7 @@ export default function SettingsScreen() {
                 }
               />
               <SettingRow
-                title={t('settings.backupDocs', 'Documentos')}
+                title={t('backup.docs', 'Documentos')}
                 desc={`${backupStats.docs.backed}/${backupStats.docs.total} en la nube`}
                 right={
                   <Switch
@@ -465,7 +472,7 @@ export default function SettingsScreen() {
                 }
               />
               <SettingRow
-                title={t('settings.backupTranscripts', 'Transcripciones')}
+                title={t('backup.transcripts', 'Transcripciones')}
                 desc={`${backupStats.transcripts.backed}/${backupStats.transcripts.total} en la nube`}
                 right={
                   <Switch
@@ -509,8 +516,8 @@ export default function SettingsScreen() {
                     )}
                     <Text style={styles.darkPillText}>
                       {isUploading
-                        ? t('settings.backingUp', 'Subiendo...')
-                        : t('settings.backup', 'Respaldar')}
+                        ? t('backup.backingUp', 'Subiendo...')
+                        : t('backup.backupNow', 'Respaldar')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -534,8 +541,8 @@ export default function SettingsScreen() {
                     )}
                     <Text style={styles.darkPillText}>
                       {isDownloading
-                        ? t('settings.downloading', 'Descargando...')
-                        : t('settings.download', 'Descargar')}
+                        ? t('backup.downloading', 'Descargando...')
+                        : t('backup.downloadNow', 'Descargar')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -545,7 +552,7 @@ export default function SettingsScreen() {
 
           {!backupPrefs.enabled && (
             <Text style={[styles.settingDesc, { marginTop: 8, fontStyle: 'italic' }]}>
-              {t('settings.backupDisabled', 'Activa el backup para gestionar tus archivos en la nube.')}
+              {t('backup.disabled', 'Activa el backup para gestionar tus archivos en la nube.')}
             </Text>
           )}
         </View>
@@ -554,31 +561,31 @@ export default function SettingsScreen() {
         {/* ── SECURITY & ACCOUNT ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('settings.security')} desc={t('settings.securityDesc')} icon="shield-outline" />
+          <SectionHeader title={t('account.securityTitle')} desc={t('account.securityDesc')} icon="shield-outline" />
           <SettingRow
-            title={t('settings.biometric')} desc={t('settings.biometricDesc')}
+            title={t('account.biometric')} desc={t('account.biometricDesc')}
             right={<Switch value={biometric} onValueChange={handleToggleBiometric} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
-            title={t('settings.twoFactor')} desc={t('settings.twoFactorDesc')}
-            right={<TouchableOpacity style={[styles.actionButton, styles.outlinePill]}><Text style={styles.outlinePillText}>{t('settings.manage')}</Text></TouchableOpacity>}
+            title={t('account.twoFactor')} desc={t('account.twoFactorDesc')}
+            right={<TouchableOpacity style={[styles.actionButton, styles.outlinePill]}><Text style={styles.outlinePillText}>{t('account.manage')}</Text></TouchableOpacity>}
           />
           <SettingRow
-            title={t('settings.signOut')} desc={t('settings.signOutDesc')}
+            title={t('account.signOut')} desc={t('account.signOutDesc')}
             right={
               <TouchableOpacity style={[styles.actionButton, styles.outlinePill]} onPress={handleSignOut}>
-                <Text style={styles.outlinePillText}>{t('settings.signOutBtn')}</Text>
+                <Text style={styles.outlinePillText}>{t('account.signOutBtn')}</Text>
               </TouchableOpacity>
             }
           />
           <SettingRow
-            title={t('settings.deleteAccount')} desc=""
+            title={t('account.deleteAccount')} desc=""
             right={
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: '#FF2D55' }]}
                 onPress={handleDeleteAccount}
               >
-                <Text style={styles.darkPillText}>{t('settings.deleteBtn')}</Text>
+                <Text style={styles.darkPillText}>{t('account.deleteBtn')}</Text>
               </TouchableOpacity>
             }
           />
@@ -588,25 +595,25 @@ export default function SettingsScreen() {
         {/* ── INTEGRATIONS ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('settings.integrations')} desc={t('settings.integrationsDesc')} icon="extension-puzzle-outline" />
+          <SectionHeader title={t('integrations.title')} desc={t('integrations.desc')} icon="extension-puzzle-outline" />
           <SettingRow
-            title={t('settings.calendarSync')} desc={t('settings.calendarSyncDesc')}
+            title={t('integrations.calendarSync')} desc={t('integrations.calendarSyncDesc')}
             right={<Switch value={calendarSync} onValueChange={setCalendarSync} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
-          <Text style={styles.subSectionTitle}>{t('settings.linkedLms')}</Text>
+          <Text style={styles.subSectionTitle}>{t('integrations.linkedLms')}</Text>
           {LMS_ACCOUNTS.map((lms, i) => (
             <View key={i} style={styles.lmsRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.settingTitle}>{lms.name}</Text>
-                <Text style={styles.settingDesc}>{t('settings.connectedAs', { user: lms.user })}</Text>
+                <Text style={styles.settingDesc}>{t('account.connectedAs', { user: lms.user })}</Text>
               </View>
               <TouchableOpacity style={styles.outlinePill}>
-                <Text style={styles.outlinePillText}>{t('settings.remove')}</Text>
+                <Text style={styles.outlinePillText}>{t('integrations.remove')}</Text>
               </TouchableOpacity>
             </View>
           ))}
           <TouchableOpacity style={[styles.darkPill, { alignSelf: 'flex-end', marginTop: 8 }]}>
-            <Text style={styles.darkPillText}>{t('settings.addLms')}</Text>
+            <Text style={styles.darkPillText}>{t('integrations.addLms')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -662,13 +669,13 @@ export default function SettingsScreen() {
         {/* ── DATA EXPORT & RESET ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('settings.dataExport')} desc={t('settings.dataExportDesc')} icon="document-text-outline" />
+          <SectionHeader title={t('integrations.dataExport')} desc={t('integrations.dataExportDesc')} icon="document-text-outline" />
           <View style={styles.exportRow}>
             <TouchableOpacity style={[styles.exportBtn, { flex: 1 }]}>
-              <Text style={styles.exportBtnText}>{t('settings.exportCsv')}</Text>
+              <Text style={styles.exportBtnText}>{t('integrations.exportCsv')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.exportBtn, styles.exportBtnOutline, { flex: 1 }]}>
-              <Text style={styles.exportBtnOutlineText}>{t('settings.exportPdf')}</Text>
+              <Text style={styles.exportBtnOutlineText}>{t('integrations.exportPdf')}</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.subSectionTitle}>{t('settings.resetOptions')}</Text>
@@ -691,24 +698,24 @@ export default function SettingsScreen() {
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
           <SectionHeader 
-            title={t('settings.aboutHelp')} 
-            desc={t('settings.aboutHelpDesc')} 
+            title={t('about.helpTitle')} 
+            desc={t('about.helpDesc')} 
             icon="information-circle-outline" 
             onIconPress={() => router.push('/about')}
             iconColor="#C5A059"
             iconSize={26}
           />
           <SettingRow
-            title={t('settings.faq')} desc=""
-            right={<TouchableOpacity><Text style={styles.openText}>{t('settings.open')}</Text></TouchableOpacity>}
+            title={t('about.faq')} desc=""
+            right={<TouchableOpacity><Text style={styles.openText}>{t('about.open')}</Text></TouchableOpacity>}
           />
           <SettingRow
-            title={t('settings.sendFeedback')} desc=""
-            right={<TouchableOpacity style={styles.darkPill}><Text style={styles.darkPillText}>{t('settings.send')}</Text></TouchableOpacity>}
+            title={t('about.sendFeedback')} desc=""
+            right={<TouchableOpacity style={styles.darkPill}><Text style={styles.darkPillText}>{t('about.send')}</Text></TouchableOpacity>}
           />
           <View style={[styles.settingRow, { marginTop: 4 }]}>
-            <Text style={styles.settingDesc}>{t('settings.appVersion')}</Text>
-            <Text style={styles.versionText}>{t('settings.version')}</Text>
+            <Text style={styles.settingDesc}>{t('about.appVersion')}</Text>
+            <Text style={styles.versionText}>{t('about.version')}</Text>
           </View>
         </View>
 
@@ -726,6 +733,9 @@ export default function SettingsScreen() {
         editSemester={editSemester}
         editStudyGoal={editStudyGoal}
         editPin={editPin}
+        gradingSystems={gradingSystems}
+        selectedSystemId={selectedSystemId}
+        onSystemSelect={(id) => setSelectedSystemId(id)}
         onNameChange={setEditName}
         onLastnameChange={setEditLastname}
         onUsernameChange={setEditUsername}

@@ -14,14 +14,13 @@ exports.registerUser = async (req, res) => {
     name,
     lastname,
     username,
-    grading_scale,
-    approval_threshold,
     major,
     university,
     semester,
     study_goal,
     reference_language,
-    profile_image
+    profile_image,
+    active_grading_version_id
   } = req.body;
 
   if (!email || !password) {
@@ -33,8 +32,8 @@ exports.registerUser = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, saltRounds);
     const sharePin = await getUniqueSharePin();
 
-    const query = `INSERT INTO users (email, password_hash, name, lastname, username, grading_scale, approval_threshold, major, university, semester, study_goal, reference_language, share_pin, profile_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    db.run(query, [email, passwordHash, name, lastname, username, grading_scale, approval_threshold, major, university, semester || null, study_goal || null, reference_language || null, sharePin, profile_image || null], function (err) {
+    const query = `INSERT INTO users (email, password_hash, name, lastname, username, major, university, semester, study_goal, reference_language, share_pin, profile_image, active_grading_version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    db.run(query, [email, passwordHash, name, lastname, username, major, university, semester || null, study_goal || null, reference_language || null, sharePin, profile_image || null, active_grading_version_id || null], function (err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
           return res.status(409).json({ error: 'El correo ya está registrado.' });
@@ -175,7 +174,7 @@ exports.biometricLogin = (req, res) => {
   }
 
   db.get(
-    `SELECT id, email, name, lastname, username, grading_scale, approval_threshold FROM users WHERE biometric_token = ?`,
+    `SELECT id, email, name, lastname, username FROM users WHERE biometric_token = ?`,
     [biometric_token],
     (err, user) => {
       if (err) {

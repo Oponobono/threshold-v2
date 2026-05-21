@@ -24,6 +24,8 @@ const learningRoutes = require('./routes/learning');
 const aiRoutes = require('./routes/ai');
 const uploadRoutes = require('./routes/upload');
 const backupRoutes = require('./routes/backup');
+const gradingRoutes = require('./routes/grading');
+const assessmentCategoriesRoutes = require('./routes/assessmentCategories');
 
 const app = express();
 
@@ -109,6 +111,8 @@ app.use('/api', scannedDocumentsRoutes);
 app.use('/api', learningRoutes);
 app.use('/api', aiRoutes);
 app.use('/api', backupRoutes);
+app.use('/api', gradingRoutes);
+app.use('/api', assessmentCategoriesRoutes);
 
 
 

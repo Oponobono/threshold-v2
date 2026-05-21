@@ -308,6 +308,10 @@ export default function SubjectDetailScreen() {
             title={selectedSubject?.name || t('subjects.noSubjectSelected')}
             subtitle={subjectSubtitle}
             meta={subjectScheduleLabel}
+            avgScore={selectedSubject?.avg_score || 0}
+            displayLabel={selectedSubject?.display_label}
+            displayColor={selectedSubject?.display_color}
+            gpaEquivalent={selectedSubject?.gpa_equivalent}
             onDelete={handleDeleteSubject}
           />
 
@@ -328,6 +332,11 @@ export default function SubjectDetailScreen() {
             recentAssessments={recentAssessments} 
             onDeleteAssessment={(id) => {
               setAssessments(prev => prev.filter(a => a.id !== id));
+            }}
+            onOpenCategories={() => {
+              if (subjectId) {
+                router.push(`/categories/${subjectId}?subjectName=${encodeURIComponent(selectedSubject?.name ?? '')}`);
+              }
             }}
           />
 

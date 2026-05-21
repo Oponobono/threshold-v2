@@ -9,8 +9,6 @@ const tableSchema = {
         name TEXT,
         lastname TEXT,
         username TEXT UNIQUE,
-        grading_scale TEXT,
-        approval_threshold REAL,
         major TEXT,
         university TEXT,
         semester TEXT,
@@ -34,8 +32,6 @@ const tableSchema = {
         name TEXT,
         lastname TEXT,
         username TEXT UNIQUE,
-        grading_scale TEXT,
-        approval_threshold REAL,
         major TEXT,
         university TEXT,
         semester TEXT,
@@ -55,8 +51,6 @@ const tableSchema = {
       { name: 'name', type: 'TEXT' },
       { name: 'lastname', type: 'TEXT' },
       { name: 'username', type: 'TEXT' },
-      { name: 'grading_scale', type: 'TEXT' },
-      { name: 'approval_threshold', type: 'REAL' },
       { name: 'major', type: 'TEXT' },
       { name: 'university', type: 'TEXT' },
       { name: 'semester', type: 'TEXT' },
@@ -67,7 +61,8 @@ const tableSchema = {
       { name: 'deletion_date', type: 'TIMESTAMP' },
       { name: 'share_pin', type: 'VARCHAR(8)' },
       { name: 'display_name', type: 'TEXT' },
-      { name: 'profile_image', type: 'TEXT' }
+      { name: 'profile_image', type: 'TEXT' },
+      { name: 'active_grading_version_id', type: 'INTEGER' }
     ]
   },
   deleted_users: {
@@ -193,9 +188,6 @@ const tableSchema = {
         date TEXT,
         weight TEXT,
         out_of INTEGER,
-        score INTEGER,
-        percentage REAL,
-        grade_value REAL,
         is_completed INTEGER DEFAULT 0,
         FOREIGN KEY (subject_id) REFERENCES subjects(id)
       )
@@ -209,16 +201,14 @@ const tableSchema = {
         date TEXT,
         weight TEXT,
         out_of INTEGER,
-        score INTEGER,
-        percentage REAL,
-        grade_value REAL,
         is_completed INTEGER DEFAULT 0
       )
     `,
     columns: [
-      { name: 'percentage', type: 'REAL' },
-      { name: 'grade_value', type: 'REAL' },
+      { name: 'out_of', type: 'INTEGER' },
       { name: 'is_completed', type: 'INTEGER DEFAULT 0' },
+      { name: 'period_id', type: 'INTEGER' },
+      { name: 'category_id', type: 'INTEGER' }
     ]
   },
   gallery_items: {
@@ -802,6 +792,266 @@ const tableSchema = {
         session_id INTEGER NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
         role VARCHAR(20) NOT NULL,
         content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+  grading_systems: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS grading_systems (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        country_code TEXT,
+        is_system_seeded INTEGER DEFAULT 0,
+        is_custom INTEGER DEFAULT 0,
+        created_by_user_id INTEGER,
+        based_on_system_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS grading_systems (
+        id SERIAL PRIMARY KEY,
+        code TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        country_code TEXT,
+        is_system_seeded BOOLEAN DEFAULT false,
+        is_custom BOOLEAN DEFAULT false,
+        created_by_user_id INTEGER REFERENCES users(id),
+        based_on_system_id INTEGER REFERENCES grading_systems(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+  grading_versions: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS grading_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        grading_system_id INTEGER NOT NULL,
+        owner_type TEXT NOT NULL,
+        owner_id TEXT,
+        min_value REAL,
+        max_value REAL,
+        passing_value REAL,
+        precision INTEGER DEFAULT 2,
+        valid_from DATETIME,
+        valid_to DATETIME,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        archived_at DATETIME,
+        FOREIGN KEY (grading_system_id) REFERENCES grading_systems(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS grading_versions (
+        id SERIAL PRIMARY KEY,
+        grading_system_id INTEGER NOT NULL REFERENCES grading_systems(id) ON DELETE CASCADE,
+        owner_type TEXT NOT NULL,
+        owner_id TEXT,
+        min_value REAL,
+        max_value REAL,
+        passing_value REAL,
+        precision INTEGER DEFAULT 2,
+        valid_from TIMESTAMP,
+        valid_to TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        archived_at TIMESTAMP
+      )
+    `
+  },
+  grading_scales: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS grading_scales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        grading_version_id INTEGER NOT NULL,
+        min_score REAL NOT NULL,
+        max_score REAL NOT NULL,
+        label TEXT NOT NULL,
+        gpa_equivalent REAL,
+        color TEXT,
+        sort_order INTEGER DEFAULT 0,
+        is_passing INTEGER DEFAULT 1,
+        display_color TEXT,
+        display_short_label TEXT,
+        display_priority INTEGER DEFAULT 0,
+        FOREIGN KEY (grading_version_id) REFERENCES grading_versions(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS grading_scales (
+        id SERIAL PRIMARY KEY,
+        grading_version_id INTEGER NOT NULL REFERENCES grading_versions(id) ON DELETE CASCADE,
+        min_score REAL NOT NULL,
+        max_score REAL NOT NULL,
+        label TEXT NOT NULL,
+        gpa_equivalent REAL,
+        color TEXT,
+        sort_order INTEGER DEFAULT 0,
+        is_passing BOOLEAN DEFAULT true,
+        display_color TEXT,
+        display_short_label TEXT,
+        display_priority INTEGER DEFAULT 0
+      )
+    `
+  },
+  grading_periods: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS grading_periods (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        period_type TEXT NOT NULL,
+        start_date DATETIME,
+        end_date DATETIME,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS grading_periods (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        period_type TEXT NOT NULL,
+        start_date TIMESTAMP,
+        end_date TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+  assessment_categories: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS assessment_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        weight REAL,
+        drop_lowest INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS assessment_categories (
+        id SERIAL PRIMARY KEY,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        weight REAL,
+        drop_lowest INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+  assessment_results: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS assessment_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        assessment_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        raw_value REAL,
+        normalized_value DECIMAL(6,5),
+        grading_version_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (grading_version_id) REFERENCES grading_versions(id)
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS assessment_results (
+        id SERIAL PRIMARY KEY,
+        assessment_id INTEGER NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        raw_value REAL,
+        normalized_value DECIMAL(6,5),
+        grading_version_id INTEGER NOT NULL REFERENCES grading_versions(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+  grade_history: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS grade_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        assessment_result_id INTEGER NOT NULL,
+        old_raw_value REAL,
+        new_raw_value REAL,
+        changed_by INTEGER,
+        changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        reason TEXT,
+        FOREIGN KEY (assessment_result_id) REFERENCES assessment_results(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS grade_history (
+        id SERIAL PRIMARY KEY,
+        assessment_result_id INTEGER NOT NULL REFERENCES assessment_results(id) ON DELETE CASCADE,
+        old_raw_value REAL,
+        new_raw_value REAL,
+        changed_by INTEGER,
+        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reason TEXT
+      )
+    `
+  },
+  subject_grade_snapshots: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS subject_grade_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        final_raw_value REAL,
+        final_normalized_value DECIMAL(6,5),
+        grading_version_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (grading_version_id) REFERENCES grading_versions(id)
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS subject_grade_snapshots (
+        id SERIAL PRIMARY KEY,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        final_raw_value REAL,
+        final_normalized_value DECIMAL(6,5),
+        grading_version_id INTEGER NOT NULL REFERENCES grading_versions(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+  assessment_categories: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS assessment_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        weight REAL,
+        drop_lowest INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS assessment_categories (
+        id SERIAL PRIMARY KEY,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        weight REAL,
+        drop_lowest INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `

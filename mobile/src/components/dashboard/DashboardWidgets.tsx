@@ -28,7 +28,9 @@ export const SubjectTile = ({ subject }: { subject: Subject }) => {
         <Text style={styles.subjectTileMeta} numberOfLines={1}>
           {subject.professor || t('dashboard.newSubject.noProfessor')}
         </Text>
-        <Text style={styles.subjectTileStats}>{t('dashboard.subjectCardAvg', { avg: avg.toFixed(1) })}</Text>
+        <Text style={styles.subjectTileStats}>
+          {subject.display_label ? `≈ ${subject.display_label}` : t('dashboard.subjectCardAvg', { avg: avg.toFixed(1) })}
+        </Text>
         <Text style={styles.subjectTileStats}>{t('dashboard.subjectCardCompletion', { completion: completion.toFixed(0) })}</Text>
       </View>
     </TouchableOpacity>

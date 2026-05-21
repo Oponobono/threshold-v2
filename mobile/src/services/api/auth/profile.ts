@@ -26,6 +26,9 @@ export const updateUserProfile = async (payload: {
   semester?: string;
   study_goal?: string;
   share_pin?: string;
+  approval_threshold?: number;
+  active_grading_version_id?: number | null;
+  grading_scale?: string;
 }) => {
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');

@@ -242,6 +242,11 @@ export const registerStyles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
   },
+  segmentSubText: {
+    color: theme.colors.text.secondary,
+    fontSize: 10,
+    marginTop: 2,
+  },
 
   // ── Compact threshold row ─────────────────────────────────
   thresholdRow: {

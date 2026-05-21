@@ -206,6 +206,9 @@ export default function SubjectsScreen() {
               meta={`${selectedSubject.credits || 0} ${t('subjects.credits')}`}
               progress={selectedSubject.completion_percent || 0}
               avgScore={selectedSubject.avg_score || 0}
+              displayLabel={selectedSubject.display_label}
+              displayColor={selectedSubject.display_color}
+              gpaEquivalent={selectedSubject.gpa_equivalent}
               onPress={() => router.push(`/subjects/${selectedSubject.id}`)}
             />
           </View>
@@ -371,9 +374,16 @@ export default function SubjectsScreen() {
                           <Text style={styles.assessMeta}>{a.date || 'Sin fecha'}</Text>
                         </View>
                         <View style={styles.assessRight}>
-                          <Text style={[styles.assessScore, { color: color }]}>
+                          <Text style={[styles.assessScore, { color: a.display_color || color }]}>
                             {score !== null && score !== undefined ? score : '—'}
                           </Text>
+                          {a.display_label && (
+                            <View style={{ backgroundColor: (a.display_color || color) + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginTop: 4 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: a.display_color || color }}>
+                                ≈ {a.display_label}
+                              </Text>
+                            </View>
+                          )}
                         </View>
                       </TouchableOpacity>
                     );

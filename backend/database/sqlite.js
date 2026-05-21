@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const tableSchema = require('./schema');
 const { migrateColumnsSqlite } = require('./migrations');
+const { seedGradingSystemsSqlite } = require('./seeders');
 
 const initializeSqliteDb = (db) => {
   return new Promise((resolve) => {
@@ -88,7 +89,7 @@ const initializeSqliteDb = (db) => {
             db.run(
               `UPDATE users SET share_pin = 'ABC123' WHERE email = 'user' AND (share_pin IS NULL OR share_pin = '')`,
               () => {
-                resolve();
+                seedGradingSystemsSqlite(db).then(() => resolve());
               }
             );
             return;
@@ -96,9 +97,9 @@ const initializeSqliteDb = (db) => {
 
           const defaultPasswordHash = bcrypt.hashSync('1234', 10);
           db.run(
-            `INSERT INTO users (email, password_hash, name, lastname, username, grading_scale, approval_threshold, share_pin)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            ['user', defaultPasswordHash, 'Default', 'User', 'user', '0-5.0', 3.0, 'ABC123'],
+            `INSERT INTO users (email, password_hash, name, lastname, username, share_pin)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            ['user', defaultPasswordHash, 'Default', 'User', 'user', 'ABC123'],
             (seedErr) => {
               if (seedErr) {
                 console.error('Error creando usuario por defecto:', seedErr.message);
@@ -106,7 +107,7 @@ const initializeSqliteDb = (db) => {
                 console.log('✓ Usuario por defecto creado: user / 1234');
               }
               console.log('✅ Base de datos SQLite inicializada correctamente.');
-              resolve();
+              seedGradingSystemsSqlite(db).then(() => resolve());
             }
           );
         });

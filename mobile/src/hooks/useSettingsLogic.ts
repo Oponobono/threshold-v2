@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { setItemAsync, getItemAsync } from 'expo-secure-store';
 import { alertRef } from '../components/CustomAlert';
+import { fetchGradingSystems, type GradingSystem } from '../services/api/grading';
 import {
   getCurrentUserProfile,
   signOut,
@@ -44,7 +45,11 @@ export const useSettingsLogic = () => {
   // Profile & Preferences State
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [threshold, setThreshold] = useState('50');
-  const [activeScale, setActiveScale] = useState<ScaleKey>('af');
+  
+  // Dynamic Grading Systems State
+  const [gradingSystems, setGradingSystems] = useState<GradingSystem[]>([]);
+  const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null);
+  const [isLoadingSystems, setIsLoadingSystems] = useState(true);
   const [notifDeadline, setNotifDeadline] = useState(false);
   const [notifWeekly, setNotifWeekly] = useState(false);
   const [notifEmail, setNotifEmail] = useState(false);
@@ -88,13 +93,6 @@ export const useSettingsLogic = () => {
   const TERMS = t('academic.termOptions', { returnObjects: true }) as string[];
   const [activeTermIndex, setActiveTermIndex] = useState(0);
 
-  const SCALES: { key: ScaleKey; label: string; desc: string }[] = [
-    { key: 'af', label: t('academic.scaleAF'), desc: t('academic.scaleAFDesc') },
-    { key: 'pct', label: t('academic.scalePct'), desc: t('academic.scalePctDesc') },
-    { key: 'scale4', label: t('academic.scale4'), desc: t('academic.scale4Desc') },
-    { key: 'custom', label: t('academic.scaleCustom'), desc: t('academic.scaleCustomDesc') },
-  ];
-
   const LMS_ACCOUNTS = t('integrations.lmsAccounts', { returnObjects: true }) as { name: string; user: string }[];
 
   useEffect(() => {
@@ -109,14 +107,42 @@ export const useSettingsLogic = () => {
         setThreshold(String(userProfile.approval_threshold));
       }
 
-      const scaleMap: Record<string, ScaleKey> = {
-        '0-5.0': 'af',
-        '0-10': 'scale4',
-        '0-100': 'pct',
-      };
+      // Load Grading Systems
+      try {
+        const systems = await fetchGradingSystems();
+        setGradingSystems(systems);
+        setIsLoadingSystems(false);
+        
+        // Find user's current system based on active_grading_version_id or grading_scale fallback
+        let currentSystemId: number | null = null;
+        if (userProfile?.active_grading_version_id) {
+          const sys = systems.find(s => s.active_version_id === userProfile.active_grading_version_id);
+          if (sys) currentSystemId = sys.id;
+        } 
+        
+        if (!currentSystemId && userProfile?.grading_scale) {
+           const scaleMap: Record<string, string> = {
+            '0-5.0': 'COL_0_5',
+            '0-10': 'ES_0_10',
+            '0-100': '0_100_PCT',
+            'A-F': 'US_GPA_4'
+           };
+           const mappedCode = scaleMap[userProfile.grading_scale];
+           if (mappedCode) {
+             const sys = systems.find(s => s.code === mappedCode);
+             if (sys) currentSystemId = sys.id;
+           }
+        }
+        
+        if (currentSystemId) {
+          setSelectedSystemId(currentSystemId);
+        } else if (systems.length > 0) {
+          setSelectedSystemId(systems[0].id);
+        }
 
-      if (userProfile?.grading_scale) {
-        setActiveScale(scaleMap[userProfile.grading_scale] || 'custom');
+      } catch (err) {
+        console.warn('Failed to load grading systems', err);
+        setIsLoadingSystems(false);
       }
 
       const groups = await getUserGroups();
@@ -254,6 +280,12 @@ export const useSettingsLogic = () => {
         return;
       }
     }
+      let active_version_id: number | null = null;
+      if (selectedSystemId) {
+        const sys = gradingSystems.find(s => s.id === selectedSystemId);
+        if (sys) active_version_id = sys.active_version_id;
+      }
+
     try {
       await updateUserProfile({
         name: editName,
@@ -263,6 +295,7 @@ export const useSettingsLogic = () => {
         major: editMajor,
         semester: editSemester,
         study_goal: editStudyGoal,
+        active_grading_version_id: active_version_id,
         ...(!profile?.share_pin && editPin.trim() ? { share_pin: editPin.trim().toUpperCase() } : {}),
       });
       setIsEditProfileVisible(false);
@@ -271,6 +304,29 @@ export const useSettingsLogic = () => {
       setProfile(userProfile);
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error.message || t('settings.errors.profileUpdateFailed'), type: 'error' });
+    }
+  };
+
+  /**
+   * Guarda las preferencias generales (sistema de calificación y threshold)
+   */
+  const handleSaveSettings = async () => {
+    try {
+      let active_version_id: number | null = null;
+
+      if (selectedSystemId) {
+        const sys = gradingSystems.find(s => s.id === selectedSystemId);
+        if (sys) active_version_id = sys.active_version_id;
+      }
+
+      await updateUserProfile({ active_grading_version_id: active_version_id });
+      
+      const userProfile = await getCurrentUserProfile();
+      setProfile(userProfile);
+      
+      alertRef.show({ title: t('common.success'), message: 'Configuraciones guardadas', type: 'success' });
+    } catch (error: any) {
+      alertRef.show({ title: t('common.error'), message: error.message || 'Error guardando configuraciones', type: 'error' });
     }
   };
 
@@ -461,8 +517,10 @@ export const useSettingsLogic = () => {
     profileAvatarUri,
     threshold,
     setThreshold,
-    activeScale,
-    setActiveScale,
+    gradingSystems,
+    selectedSystemId,
+    setSelectedSystemId,
+    isLoadingSystems,
     notifDeadline,
     setNotifDeadline,
     notifWeekly,
@@ -476,7 +534,6 @@ export const useSettingsLogic = () => {
     TERMS,
     activeTermIndex,
     setActiveTermIndex,
-    SCALES,
     LMS_ACCOUNTS,
     isEditProfileVisible,
     setIsEditProfileVisible,
@@ -521,6 +578,7 @@ export const useSettingsLogic = () => {
     handleDeleteAccount,
     handleOpenEditProfile,
     handleSaveProfile,
+    handleSaveSettings,
     handleSavePassword,
     handleDeletePasswordVerify,
     handleConfirmDeletion,
