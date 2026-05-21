@@ -9,6 +9,8 @@ import { alertRef } from '../CustomAlert';
 import { createAssessment, type Subject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 import { SubjectSelectorModal } from './SubjectSelectorModal';
+import { CategorySelectorModal } from './CategorySelectorModal';
+import { getCategoriesBySubject, type AssessmentCategory } from '../../services/api/assessmentCategories';
 
 interface CreateGradeModalProps {
   visible: boolean;
@@ -23,16 +25,31 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
+  const [categories, setCategories] = useState<AssessmentCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [isCategorySelectorVisible, setIsCategorySelectorVisible] = useState(false);
   const [gradeName, setGradeName] = useState('');
   const [gradeValue, setGradeValue] = useState('');
   const [gradePercentage, setGradePercentage] = useState('');
   const [isSavingGrade, setIsSavingGrade] = useState(false);
+
+  React.useEffect(() => {
+    if (selectedSubjectId) {
+      getCategoriesBySubject(selectedSubjectId)
+        .then(setCategories)
+        .catch(console.error);
+    } else {
+      setCategories([]);
+    }
+    setSelectedCategoryId(null);
+  }, [selectedSubjectId]);
 
   const resetForm = () => {
     setGradeName('');
     setGradeValue('');
     setGradePercentage('');
     setSelectedSubjectId(initialSubjectId || null);
+    setSelectedCategoryId(null);
   };
 
   const handleClose = () => {
@@ -55,6 +72,7 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
         percentage: Number(gradePercentage),
         is_completed: true,
         type: 'grade',
+        category_id: selectedCategoryId || undefined,
       });
 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
@@ -98,6 +116,26 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
                 </Text>
                 <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
               </TouchableOpacity>
+
+              {categories.length > 0 && (
+                <>
+                  <Text style={styles.sheetLabel}>{t('categories.category', 'Categoría')}</Text>
+                  <TouchableOpacity 
+                    style={styles.dropdownSelector} 
+                    onPress={() => setIsCategorySelectorVisible(true)}
+                  >
+                    <Text style={[
+                      styles.dropdownSelectorText, 
+                      !selectedCategoryId && styles.dropdownPlaceholder
+                    ]}>
+                      {selectedCategoryId 
+                        ? categories.find(c => c.id === selectedCategoryId)?.name 
+                        : t('categories.none', 'Sin categoría')}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
+                  </TouchableOpacity>
+                </>
+              )}
 
               <Text style={styles.sheetLabel}>{t('dashboard.quickAddMenu.grade.name')}</Text>
               <TextInput
@@ -158,6 +196,14 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
         selectedSubjectId={selectedSubjectId}
         onSelectSubject={setSelectedSubjectId}
         onClose={() => setIsSubjectSelectorVisible(false)}
+      />
+
+      <CategorySelectorModal
+        visible={isCategorySelectorVisible}
+        categories={categories}
+        selectedCategoryId={selectedCategoryId}
+        onSelectCategory={setSelectedCategoryId}
+        onClose={() => setIsCategorySelectorVisible(false)}
       />
     </>
   );

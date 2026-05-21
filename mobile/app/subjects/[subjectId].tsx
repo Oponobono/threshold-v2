@@ -45,6 +45,7 @@ import { SubjectStats } from '../../src/components/SubjectStats';
 import { SubjectThreshold } from '../../src/components/SubjectThreshold';
 import { SubjectInsights } from '../../src/components/SubjectInsights';
 import { SubjectAIFab } from '../../src/components/SubjectAIFab';
+import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
 import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
 import { useAudioRecorder } from '../../src/hooks/useAudioRecorder';
 import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
@@ -94,6 +95,7 @@ export default function SubjectDetailScreen() {
   const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
   const [isPDFImportVisible, setIsPDFImportVisible] = useState(false);
   const [isViewerVisible, setIsViewerVisible] = useState(false);
+  const [isCreateGradeVisible, setIsCreateGradeVisible] = useState(false);
   const [initialViewerIndex, setInitialViewerIndex] = useState(0);
 
   const [recentVideos, setRecentVideos] = useState<YouTubeVideo[]>([]);
@@ -338,6 +340,7 @@ export default function SubjectDetailScreen() {
                 router.push(`/categories/${subjectId}?subjectName=${encodeURIComponent(selectedSubject?.name ?? '')}`);
               }
             }}
+            onAddAssessment={() => setIsCreateGradeVisible(true)}
           />
 
           <SubjectDocumentsList 
@@ -520,6 +523,18 @@ export default function SubjectDetailScreen() {
               });
             }
           }}
+        />
+      )}
+      {selectedSubject && (
+        <CreateGradeModal
+          visible={isCreateGradeVisible}
+          onClose={() => {
+            setIsCreateGradeVisible(false);
+            // Refresh assessments
+            getAssessments(subjectId!).then(setAssessments).catch(console.error);
+          }}
+          subjects={[selectedSubject as any]}
+          initialSubjectId={subjectId}
         />
       )}
       </>)}

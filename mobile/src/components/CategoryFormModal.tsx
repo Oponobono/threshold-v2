@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../styles/theme';
 import {
@@ -40,6 +41,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
+  const insets = useSafeAreaInsets();
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [name, setName] = useState('');
@@ -131,7 +133,15 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
         {/* Sheet */}
-        <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+        <Animated.View 
+          style={[
+            styles.sheet, 
+            { 
+              transform: [{ translateY: slideAnim }],
+              paddingBottom: Math.max(40, insets.bottom + 20)
+            }
+          ]}
+        >
           {/* Handle bar */}
           <View style={styles.handle} />
 
@@ -158,7 +168,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
 
             {/* ─── Name field ─────────────────────────────────────────────────── */}
             <FieldSection
-              icon="tag-outline"
+              icon="pricetag-outline"
               label={t('categories.nameLabel', 'Nombre')}
               hint={t('categories.nameHint', 'Ej: Exámenes, Tareas, Proyectos, Quizzes')}
             >
@@ -166,7 +176,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder={t('categories.namePlaceholder', 'Ej: Exámenes parciales')}
+                placeholder={t('categories.namePlaceholder', 'Ej. Exámenes, Tareas...')}
                 placeholderTextColor={theme.colors.text.placeholder}
                 autoCapitalize="words"
                 returnKeyType="next"

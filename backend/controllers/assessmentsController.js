@@ -135,13 +135,16 @@ exports.getAssessmentsByUser = (req, res) => {
 exports.createAssessment = (req, res) => {
   const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed } = req.body;
 
+  // Si se envía grade_value sin out_of, asumir escala 0-5
+  const finalOutOf = out_of || (grade_value != null ? 5 : null);
+
   const query = `
     INSERT INTO assessments (subject_id, name, type, date, weight, out_of, is_completed)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
   db.run(
     query,
-    [subject_id, name, type, date, weight, out_of, is_completed ? 1 : 0],
+    [subject_id, name, type, date, weight, finalOutOf, is_completed ? 1 : 0],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       const newAssessmentId = this.lastID;

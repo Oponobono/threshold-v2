@@ -41,7 +41,13 @@ export const parseWeight = (assessment: Assessment) => {
 
 /** Normaliza la nota obtenida a la escala máxima definida en `SCALE_MAX` */
 export const normalizeGrade = (assessment: Assessment) => {
+  // Primero checa si hay un valor normalizado del backend [0.0, 1.0]
+  if (typeof assessment.normalized_value === 'number') {
+    return assessment.normalized_value * SCALE_MAX;
+  }
+  // Luego checa grade_value directo (0-5)
   if (typeof assessment.grade_value === 'number') return assessment.grade_value;
+  // Finalmente checa score/out_of
   if (typeof assessment.score === 'number' && typeof assessment.out_of === 'number' && assessment.out_of > 0) {
     return (assessment.score / assessment.out_of) * SCALE_MAX;
   }
@@ -50,9 +56,15 @@ export const normalizeGrade = (assessment: Assessment) => {
 
 /** Calcula el progreso/desempeño de una evaluación como un porcentaje del 0 al 100 */
 export const getAssessmentProgress = (assessment: Assessment) => {
+  // Primero checa si hay un valor normalizado del backend [0.0, 1.0]
+  if (typeof assessment.normalized_value === 'number') {
+    return assessment.normalized_value * 100;
+  }
+  // Luego checa score/out_of
   if (typeof assessment.score === 'number' && typeof assessment.out_of === 'number' && assessment.out_of > 0) {
     return (assessment.score / assessment.out_of) * 100;
   }
+  // Finalmente checa grade_value (0-5 scale)
   if (typeof assessment.grade_value === 'number') return (assessment.grade_value / SCALE_MAX) * 100;
   return 0;
 };

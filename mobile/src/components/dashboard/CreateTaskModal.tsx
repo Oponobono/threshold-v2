@@ -8,6 +8,8 @@ import { alertRef } from '../CustomAlert';
 import { createAssessment, type Subject } from '../../services/api';
 import { ThresholdDatePicker } from '../ThresholdDatePicker';
 import { SubjectSelectorModal } from './SubjectSelectorModal';
+import { CategorySelectorModal } from './CategorySelectorModal';
+import { getCategoriesBySubject, type AssessmentCategory } from '../../services/api/assessmentCategories';
 
 interface CreateTaskModalProps {
   visible: boolean;
@@ -22,6 +24,9 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
+  const [categories, setCategories] = useState<AssessmentCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [isCategorySelectorVisible, setIsCategorySelectorVisible] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [taskDate, setTaskDate] = useState(() => {
@@ -33,6 +38,17 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
   });
   const [isSavingTask, setIsSavingTask] = useState(false);
 
+  React.useEffect(() => {
+    if (selectedSubjectId) {
+      getCategoriesBySubject(selectedSubjectId)
+        .then(setCategories)
+        .catch(console.error);
+    } else {
+      setCategories([]);
+    }
+    setSelectedCategoryId(null);
+  }, [selectedSubjectId]);
+
   const resetForm = () => {
     setTaskName('');
     const now = new Date();
@@ -41,6 +57,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
     const y = now.getFullYear();
     setTaskDate(`${d}-${m}-${y}`);
     setSelectedSubjectId(initialSubjectId || null);
+    setSelectedCategoryId(null);
   };
 
   const handleClose = () => {
@@ -72,6 +89,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
         date: taskDate,
         is_completed: false,
         type: 'task',
+        category_id: selectedCategoryId || undefined,
       });
 
       alertRef.show({ title: t('common.success'), message: t('dashboard.quickAddMenu.task.success'), type: 'success' });
@@ -113,6 +131,26 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
                 </Text>
                 <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
               </TouchableOpacity>
+
+              {categories.length > 0 && (
+                <>
+                  <Text style={styles.sheetLabel}>{t('categories.category', 'Categoría')}</Text>
+                  <TouchableOpacity 
+                    style={styles.dropdownSelector} 
+                    onPress={() => setIsCategorySelectorVisible(true)}
+                  >
+                    <Text style={[
+                      styles.dropdownSelectorText, 
+                      !selectedCategoryId && styles.dropdownPlaceholder
+                    ]}>
+                      {selectedCategoryId 
+                        ? categories.find(c => c.id === selectedCategoryId)?.name 
+                        : t('categories.none', 'Sin categoría')}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
+                  </TouchableOpacity>
+                </>
+              )}
 
               <Text style={styles.sheetLabel}>{t('dashboard.quickAddMenu.task.name')}</Text>
               <TextInput
@@ -179,6 +217,14 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
         selectedSubjectId={selectedSubjectId}
         onSelectSubject={setSelectedSubjectId}
         onClose={() => setIsSubjectSelectorVisible(false)}
+      />
+
+      <CategorySelectorModal
+        visible={isCategorySelectorVisible}
+        categories={categories}
+        selectedCategoryId={selectedCategoryId}
+        onSelectCategory={setSelectedCategoryId}
+        onClose={() => setIsCategorySelectorVisible(false)}
       />
     </>
   );

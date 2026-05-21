@@ -24,6 +24,7 @@ interface SubjectInsightsProps {
   recentAssessments: Assessment[];
   onDeleteAssessment?: (id: number) => void;
   onOpenCategories?: () => void;
+  onAddAssessment?: () => void;
 }
 
 /**
@@ -38,7 +39,7 @@ interface SubjectInsightsProps {
  * @param recentAssessments - Lista de evaluaciones de la materia para mostrar.
  * @param onDeleteAssessment - Callback opcional llamado con el ID al eliminar una evaluación.
  */
-export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessments, onDeleteAssessment, onOpenCategories }) => {
+export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessments, onDeleteAssessment, onOpenCategories, onAddAssessment }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
 
@@ -72,17 +73,23 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
           <Text style={styles.sectionTitle}>{t('analytics.insightsTitle')}</Text>
           <Text style={styles.sectionHint}>{t('analytics.insightsHint')}</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', flexShrink: 0 }}>
+          <Text style={styles.sectionChip}>{recentAssessments.length} {t('subjects.notes')}</Text>
+          
           {onOpenCategories && (
             <TouchableOpacity
-              style={insightStyles.categoriesChip}
               onPress={onOpenCategories}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="layers-outline" size={12} color={theme.colors.text.secondary} />
-              <Text style={insightStyles.categoriesChipText}>{t('categories.chipLabel', 'Categorías')}</Text>
+              <Ionicons name="layers-outline" size={22} color={theme.colors.text.secondary} />
             </TouchableOpacity>
           )}
-          <Text style={styles.sectionChip}>{recentAssessments.length} {t('subjects.notes')}</Text>
+
+          {onAddAssessment && (
+            <TouchableOpacity onPress={onAddAssessment} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -157,5 +164,13 @@ const insightStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: theme.colors.text.secondary,
+  },
+  addBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.inputBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -64,6 +64,7 @@ export type Assessment = {
   display_label?: string | null;
   display_color?: string | null;
   gpa_equivalent?: number | null;
+  category_id?: number | null;
 };
 
 /** Foto de la galería vinculada a una materia */
