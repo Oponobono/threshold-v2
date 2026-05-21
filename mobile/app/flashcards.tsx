@@ -33,7 +33,6 @@ import { FlashcardNewCardScreen } from '../src/components/FlashcardNewCardScreen
 import { FlashcardStudyScreenStandalone } from '../src/components/FlashcardStudyScreenStandalone';
 import { useFlashcardsManager } from '../src/hooks/useFlashcardsManager';
 import { useDataStore } from '../src/store/useDataStore';
-import { AnimatedMarchingAntsBorder } from '../src/components/AnimatedMarchingAntsBorder';
 import { getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck } from '../src/services/api';
 
 /**
@@ -74,12 +73,6 @@ const DeckCard = React.memo(function DeckCard({
   t: any;
 }) {
   return (
-    <AnimatedMarchingAntsBorder
-      borderRadius={18}
-      strokeColor={theme.colors.danger}
-      strokeWidth={1}
-      always={isDue}
-    >
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
@@ -90,8 +83,8 @@ const DeckCard = React.memo(function DeckCard({
           backgroundColor: pressed ? flashcardStyles.deckCard.backgroundColor + '80' : flashcardStyles.deckCard.backgroundColor,
           borderRadius: 18,
           padding: 14,
-          borderWidth: isDue ? 0 : 1,
-          borderColor: isDue ? 'transparent' : flashcardStyles.deckCard.borderColor,
+          borderWidth: 1,
+          borderColor: isDue ? theme.colors.danger : flashcardStyles.deckCard.borderColor,
           gap: 12,
           opacity: pressed ? 0.7 : 1,
         })}
@@ -162,7 +155,6 @@ const DeckCard = React.memo(function DeckCard({
           <AnimatedArrow />
         </View>
       </Pressable>
-    </AnimatedMarchingAntsBorder>
   );
 });
 

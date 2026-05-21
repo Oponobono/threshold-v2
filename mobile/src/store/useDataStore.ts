@@ -37,14 +37,22 @@ interface DataState {
   getDuedeckIds: () => Set<number>;
 }
 
+// Intenta leer del caché síncrono de MMKV. Si el módulo nativo no está listo
+// todavía (primer arranque en frío), cae en el valor por defecto sin crashear.
+const trySync = <T>(fn: () => T | null, fallback: T): T => {
+  try { return fn() ?? fallback; } catch (_e) { return fallback; }
+};
+
 export const useDataStore = create<DataState>((set, get) => ({
-  subjects: [],
-  assessments: [],
-  schedules: [],
-  predictions: null,
+  subjects: trySync(() => cacheService.loadSubjectsSync(), []) as any[],
+  assessments: trySync(() => cacheService.loadAssessmentsSync(), []) as any[],
+  schedules: trySync(() => cacheService.loadSchedulesSync(), []) as any[],
+  predictions: trySync<PredictionResponse | null>(() => cacheService.loadPredictionsSync(), null),
 
   isInitialLoading: false,
   isRefreshing: false,
+  // false para que loadAllData contacte al servidor en el primer uso.
+  // La UI ya tiene datos instantáneos gracias a MMKV (líneas 47-50).
   hasLoadedOnce: false,
 
   loadAllData: async (forceRefresh = false) => {
@@ -57,24 +65,6 @@ export const useDataStore = create<DataState>((set, get) => ({
 
     if (!state.hasLoadedOnce) {
       set({ isInitialLoading: true });
-      
-      // 🚀 FASE 1: Cargar del caché primero (instantáneo)
-      console.log('[DataStore] 📦 Cargando datos del caché...');
-      const [cachedSubjects, cachedAssessments, cachedSchedules] = await Promise.all([
-        cacheService.loadSubjects(),
-        cacheService.loadAssessments(),
-        cacheService.loadSchedules(),
-      ]);
-
-      // Si hay datos en caché, mostrarlos inmediatamente
-      if (cachedSubjects || cachedAssessments || cachedSchedules) {
-        set({
-          subjects: cachedSubjects || [],
-          assessments: cachedAssessments || [],
-          schedules: cachedSchedules || [],
-        });
-        console.log('[DataStore] ✅ Datos del caché mostrados instantáneamente');
-      }
     } else {
       set({ isRefreshing: true });
     }
@@ -176,7 +166,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       console.log(`[DataStore] Refrescando predicciones para userId=${userId}`);
       
       // 🚀 Primero intentar cargar del caché (instantáneo)
-      const cachedPredictions = await cacheService.loadPredictions();
+      const cachedPredictions = await cacheService.loadPredictions() as PredictionResponse | null;
       if (cachedPredictions) {
         console.log(`[DataStore] 📦 Predicciones del caché mostradas`);
         set({ predictions: cachedPredictions });
@@ -202,7 +192,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   loadCachedPredictions: async () => {
     try {
       console.log(`[DataStore] Cargando predicciones del cache`);
-      const cachedData = await loadPredictionsFromCache();
+      const cachedData = await loadPredictionsFromCache() as PredictionResponse | null;
       if (cachedData) {
         console.log(`[DataStore] ✅ Predicciones cargadas del cache`, cachedData);
         set({ predictions: cachedData });
@@ -280,29 +270,8 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   loadCachedDataOnly: async () => {
-    /**
-     * Carga SOLO datos del caché sin hacer llamadas al servidor.
-     * Muy rápido para carga inicial. Luego updateAllData() actualizará en background.
-     */
-    try {
-      console.log('[DataStore] 📦 Cargando SOLO del caché (sin servidor)...');
-      const [cachedSubjects, cachedAssessments, cachedSchedules] = await Promise.all([
-        cacheService.loadSubjects(),
-        cacheService.loadAssessments(),
-        cacheService.loadSchedules(),
-      ]);
-
-      set({
-        subjects: cachedSubjects || [],
-        assessments: cachedAssessments || [],
-        schedules: cachedSchedules || [],
-        hasLoadedOnce: true,
-      });
-
-      console.log('[DataStore] ✅ Datos del caché cargados');
-    } catch (error) {
-      console.error('[DataStore] Error loading cached data:', error);
-    }
+    // Obsoleta por MMKV (ahora es síncrono al instanciar el store)
+    console.log('[DataStore] 📦 loadCachedDataOnly llamado pero ya está hidratado por MMKV.');
   },
 
   getDuedeckIds: () => {

@@ -90,7 +90,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
 
   const handleDownloadTemplate = async () => {
     const templateDeck: any = {
-      _INSTRUCCIONES_: "IMPORTANTE: Para 'multiple_choice', las opciones se numeran desde 0 (0=Opción1, 1=Opción2, 2=Opción3, 3=Opción4). Para 'boolean', usa true o false sin comillas.",
+      _INSTRUCCIONES_: "IMPORTANTE: Para 'multiple_choice', opciones desde 0 (ej: correctIndex: 0). Para 'boolean', usa true o false. CÓDIGO: Las preguntas que contengan código DEBEN usar markdown fences (```lenguaje código ```). Especifica el lenguaje después de los backticks: bash, javascript, python, sql, json, html, css, java, etc. Ejemplo: ```bash git push origin main ``` - SIN especificar lenguaje, puede no resaltar correctamente.",
       title: 'Mi Mazo Ejemplo',
       description: 'Descripción del mazo (opcional)',
       subject_id: 1, // ID de la materia (opcional)
@@ -122,6 +122,15 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
           },
           hint: 'Es una suma aritmética simple',
           explanation: 'Matemáticas básicas',
+        },
+        {
+          type: 'flashcard',
+          data: {
+            front: 'Completa el comando para subir los cambios al repositorio remoto en Git:\n\n```bash\ngit ___ origin main\n```',
+            back: 'El comando correcto es `push`.\n\n```bash\ngit push origin main\n```',
+          },
+          hint: 'Empuja los cambios hacia arriba',
+          explanation: '`git push` actualiza las referencias remotas usando las referencias locales, enviando los objetos necesarios.',
         },
       ],
     };

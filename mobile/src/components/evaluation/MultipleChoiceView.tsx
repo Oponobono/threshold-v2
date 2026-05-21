@@ -10,11 +10,12 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, TouchableWithoutFeedback
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { EvaluationItem, MultipleChoiceContent } from '../../services/api/types';
+import { MarkdownWithCode } from '../MarkdownWithCode';
 
 interface Props {
   item: EvaluationItem;
@@ -22,16 +23,18 @@ interface Props {
   onShowExplanation: () => void;
   isAnswered: boolean;
   selectedIndex: number | null;
+  onNext?: () => void;
 }
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 export const MultipleChoiceView: React.FC<Props> = ({
-  item, onAnswer, onShowExplanation, isAnswered, selectedIndex,
+  item, onAnswer, onShowExplanation, isAnswered, selectedIndex, onNext
 }) => {
   const content = item.content as MultipleChoiceContent;
   const [hintVisible, setHintVisible] = useState(false);
   const hintAnim = useRef(new Animated.Value(0)).current;
+  const isNavigating = useRef(false);
 
   useEffect(() => {
     setHintVisible(false);
@@ -70,7 +73,17 @@ export const MultipleChoiceView: React.FC<Props> = ({
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 8 }} contentContainerStyle={{ paddingBottom: 20, flexGrow: 1 }}>
+      <TouchableWithoutFeedback 
+        onPress={() => { 
+          if (isAnswered && onNext && !isNavigating.current) { 
+            isNavigating.current = true; 
+            onNext(); 
+            setTimeout(() => isNavigating.current = false, 400); 
+          } 
+        }}
+      >
+        <View style={{ flexGrow: 1 }}>
       {/* Hint banner — solo cuando el usuario lo pide */}
       {item.hint && hintVisible && !isAnswered && (
         <Animated.View style={[s.hintBadge, { opacity: hintAnim, transform: [{ translateY: hintAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }] }]}>
@@ -81,12 +94,14 @@ export const MultipleChoiceView: React.FC<Props> = ({
 
       {/* Question + hint toggle button */}
       <View style={s.questionCard}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-          <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+          <View style={{ flex: 1, width: '100%' }}>
             <Text style={s.questionLabel}>Pregunta</Text>
-            <Text style={s.questionText}>{content.question}</Text>
+            <View style={s.questionTextWrapper}>
+              <MarkdownWithCode>{content.question}</MarkdownWithCode>
+            </View>
           </View>
-          <View style={{ gap: 8, flexShrink: 0 }}>
+          <View style={{ gap: 8, flexShrink: 0, marginTop: 4 }}>
             {item.hint && !isAnswered && (
               <TouchableOpacity style={[s.hintBtn, hintVisible && s.hintBtnActive]} onPress={toggleHint} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name={hintVisible ? 'bulb' : 'bulb-outline'} size={15} color={hintVisible ? '#FF9500' : '#999'} />
@@ -128,7 +143,27 @@ export const MultipleChoiceView: React.FC<Props> = ({
         ))}
       </View>
 
-      <View style={{ height: 16 }} />
+        {/* Tap-to-next: solo cuando ya está respondido, toca cualquier zona vacía o este botón */}
+        {isAnswered && onNext && (
+          <TouchableOpacity
+            style={s.nextZone}
+            activeOpacity={0.6}
+            onPress={() => {
+              if (!isNavigating.current) {
+                isNavigating.current = true;
+                onNext();
+                setTimeout(() => { isNavigating.current = false; }, 400);
+              }
+            }}
+          >
+            <Ionicons name="chevron-forward-outline" size={14} color={theme.colors.text.placeholder} />
+            <Text style={s.nextZoneText}>Toca para continuar</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={{ height: 16 }} />
+        </View>
+      </TouchableWithoutFeedback>
     </ScrollView>
   );
 };
@@ -153,6 +188,9 @@ const s = StyleSheet.create({
   questionLabel: {
     fontSize: 10, fontWeight: '700', textTransform: 'uppercase',
     letterSpacing: 1, color: theme.colors.text.placeholder, marginBottom: 8,
+  },
+  questionTextWrapper: {
+    flex: 1, width: '100%', justifyContent: 'flex-start',
   },
   questionText: {
     fontSize: 16, fontWeight: '600', color: theme.colors.text.primary, lineHeight: 23,
@@ -194,4 +232,9 @@ const s = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
   },
   explanationText: { fontSize: 13, color: theme.colors.text.primary, lineHeight: 19 },
+  nextZone: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, paddingVertical: 12, marginTop: 8,
+  },
+  nextZoneText: { fontSize: 12, color: theme.colors.text.placeholder },
 });

@@ -1,10 +1,22 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MMKV, createMMKV } from 'react-native-mmkv';
 
 /**
- * Servicio de caché persistente para datos críticos de la app.
- * Utiliza AsyncStorage para guardar/cargar datos del dispositivo.
- * Permite cargar datos instantáneamente al reabrirse la app.
+ * Servicio de caché persistente ultrarrápido.
+ * Utiliza react-native-mmkv (C++ base) para guardar/cargar datos del dispositivo.
+ * La instancia de MMKV se inicializa de forma lazy para evitar errores al cargar el módulo.
  */
+
+// ─── Lazy Initialization ─────────────────────────────────────────────────────
+// MMKV no puede ser instanciado en el top-level del módulo porque el módulo
+// nativo podría no estar listo aún. Lo inicializamos la primera vez que se usa.
+let _storage: MMKV | null = null;
+
+const getStorage = (): MMKV => {
+  if (!_storage) {
+    _storage = createMMKV();
+  }
+  return _storage;
+};
 
 const CACHE_KEYS = {
   SUBJECTS: 'cache:subjects',
@@ -17,7 +29,6 @@ const CACHE_KEYS = {
   YOUTUBE_VIDEOS: 'cache:youtube_videos',
   FLASHCARD_DECKS: 'cache:flashcard_decks',
   FLASHCARD_DECKS_WITH_METRICS: 'cache:flashcard_decks_with_metrics',
-  // Dinámicas por subject/deck ID
   PHOTOS_BY_SUBJECT: 'cache:photos_by_subject:',
   SCANNED_DOCUMENTS_BY_SUBJECT: 'cache:scanned_docs_by_subject:',
   FLASHCARDS_BY_DECK: 'cache:flashcards_by_deck:',
@@ -32,61 +43,49 @@ interface CacheEntry<T> {
 }
 
 const CACHE_TTL = {
-  SUBJECTS: 1000 * 60 * 60, // 1 hora
-  ASSESSMENTS: 1000 * 60 * 60, // 1 hora
-  SCHEDULES: 1000 * 60 * 30, // 30 minutos
-  PREDICTIONS: 1000 * 60 * 15, // 15 minutos
-  PROFILE: 1000 * 60 * 60 * 24, // 24 horas
-  GALLERY_ITEMS: 1000 * 60 * 60, // 1 hora
-  AUDIO_RECORDINGS: 1000 * 60 * 60, // 1 hora
-  YOUTUBE_VIDEOS: 1000 * 60 * 60, // 1 hora
-  FLASHCARD_DECKS: 1000 * 60 * 30, // 30 minutos
-  FLASHCARD_DECKS_WITH_METRICS: 1000 * 60 * 30, // 30 minutos
-  PHOTOS_BY_SUBJECT: 1000 * 60 * 60, // 1 hora
-  SCANNED_DOCUMENTS_BY_SUBJECT: 1000 * 60 * 60, // 1 hora
-  FLASHCARDS_BY_DECK: 1000 * 60 * 30, // 30 minutos
-  FLASHCARDS_PRIORITIZED_BY_DECK: 1000 * 60 * 15, // 15 minutos
-  CARDS_NOT_SNOOZED_BY_DECK: 1000 * 60 * 15, // 15 minutos
+  SUBJECTS: 1000 * 60 * 60,
+  ASSESSMENTS: 1000 * 60 * 60,
+  SCHEDULES: 1000 * 60 * 30,
+  PREDICTIONS: 1000 * 60 * 15,
+  PROFILE: 1000 * 60 * 60 * 24,
+  GALLERY_ITEMS: 1000 * 60 * 60,
+  AUDIO_RECORDINGS: 1000 * 60 * 60,
+  YOUTUBE_VIDEOS: 1000 * 60 * 60,
+  FLASHCARD_DECKS: 1000 * 60 * 30,
+  FLASHCARD_DECKS_WITH_METRICS: 1000 * 60 * 30,
+  PHOTOS_BY_SUBJECT: 1000 * 60 * 60,
+  SCANNED_DOCUMENTS_BY_SUBJECT: 1000 * 60 * 60,
+  FLASHCARDS_BY_DECK: 1000 * 60 * 30,
+  FLASHCARDS_PRIORITIZED_BY_DECK: 1000 * 60 * 15,
+  CARDS_NOT_SNOOZED_BY_DECK: 1000 * 60 * 15,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Core Cache Functions
+// Core Cache Functions (Synchronous via MMKV)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Guarda datos en caché con timestamp
- */
-export const saveToCache = async <T>(key: string, data: T): Promise<void> => {
+export const saveToCacheSync = <T>(key: string, data: T): void => {
   try {
-    const entry: CacheEntry<T> = {
-      data,
-      timestamp: Date.now(),
-    };
-    await AsyncStorage.setItem(key, JSON.stringify(entry));
-    console.log(`[Cache] ✅ Guardado: ${key}`);
+    const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+    getStorage().set(key, JSON.stringify(entry));
   } catch (error) {
     console.warn(`[Cache] ❌ Error guardando ${key}:`, error);
   }
 };
 
-/**
- * Carga datos del caché si están disponibles y no han expirado
- */
-export const loadFromCache = async <T>(key: string, ttl: number): Promise<T | null> => {
+export const loadFromCacheSync = <T>(key: string, ttl: number): T | null => {
   try {
-    const item = await AsyncStorage.getItem(key);
+    const item = getStorage().getString(key);
     if (!item) return null;
 
     const entry: CacheEntry<T> = JSON.parse(item);
     const isExpired = Date.now() - entry.timestamp > ttl;
 
     if (isExpired) {
-      console.log(`[Cache] ⏰ Expirado: ${key}`);
-      await AsyncStorage.removeItem(key);
+      getStorage().remove(key);
       return null;
     }
 
-    console.log(`[Cache] ✅ Cargado: ${key}`);
     return entry.data;
   } catch (error) {
     console.warn(`[Cache] ❌ Error cargando ${key}:`, error);
@@ -94,26 +93,18 @@ export const loadFromCache = async <T>(key: string, ttl: number): Promise<T | nu
   }
 };
 
-/**
- * Limpia un elemento del caché
- */
-export const clearCacheKey = async (key: string): Promise<void> => {
+export const clearCacheKeySync = (key: string): void => {
   try {
-    await AsyncStorage.removeItem(key);
-    console.log(`[Cache] 🗑️ Limpiado: ${key}`);
+    getStorage().remove(key);
   } catch (error) {
     console.warn(`[Cache] ❌ Error limpiando ${key}:`, error);
   }
 };
 
-/**
- * Limpia todo el caché
- */
-export const clearAllCache = async (): Promise<void> => {
+export const clearAllCacheSync = (): void => {
   try {
-    const keys = Object.values(CACHE_KEYS);
-    await AsyncStorage.multiRemove(keys);
-    console.log(`[Cache] 🗑️ Todo el caché limpiado`);
+    getStorage().clearAll();
+    console.log(`[Cache] 🗑️ Todo el caché limpiado (MMKV)`);
   } catch (error) {
     console.warn(`[Cache] ❌ Error limpiando caché:`, error);
   }
@@ -124,73 +115,64 @@ export const clearAllCache = async (): Promise<void> => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const cacheService = {
-  // Subjects
-  saveSubjects: (subjects: any[]) => saveToCache(CACHE_KEYS.SUBJECTS, subjects),
-  loadSubjects: () => loadFromCache(CACHE_KEYS.SUBJECTS, CACHE_TTL.SUBJECTS),
+  // ── Sync readers for instant UI hydration ──────────────────────────────────
+  loadSubjectsSync: () => loadFromCacheSync(CACHE_KEYS.SUBJECTS, CACHE_TTL.SUBJECTS),
+  loadAssessmentsSync: () => loadFromCacheSync(CACHE_KEYS.ASSESSMENTS, CACHE_TTL.ASSESSMENTS),
+  loadSchedulesSync: () => loadFromCacheSync(CACHE_KEYS.SCHEDULES, CACHE_TTL.SCHEDULES),
+  loadPredictionsSync: () => loadFromCacheSync(CACHE_KEYS.PREDICTIONS, CACHE_TTL.PREDICTIONS),
+  loadProfileSync: () => loadFromCacheSync(CACHE_KEYS.PROFILE, CACHE_TTL.PROFILE),
 
-  // Assessments
-  saveAssessments: (assessments: any[]) => saveToCache(CACHE_KEYS.ASSESSMENTS, assessments),
-  loadAssessments: () => loadFromCache(CACHE_KEYS.ASSESSMENTS, CACHE_TTL.ASSESSMENTS),
+  // ── Async wrappers (backwards compatibility, resuelven síncronamente) ───────
+  saveSubjects: async (subjects: any[]) => saveToCacheSync(CACHE_KEYS.SUBJECTS, subjects),
+  loadSubjects: async () => loadFromCacheSync(CACHE_KEYS.SUBJECTS, CACHE_TTL.SUBJECTS),
 
-  // Schedules
-  saveSchedules: (schedules: any[]) => saveToCache(CACHE_KEYS.SCHEDULES, schedules),
-  loadSchedules: () => loadFromCache(CACHE_KEYS.SCHEDULES, CACHE_TTL.SCHEDULES),
+  saveAssessments: async (assessments: any[]) => saveToCacheSync(CACHE_KEYS.ASSESSMENTS, assessments),
+  loadAssessments: async () => loadFromCacheSync(CACHE_KEYS.ASSESSMENTS, CACHE_TTL.ASSESSMENTS),
 
-  // Predictions
-  savePredictions: (predictions: any) => saveToCache(CACHE_KEYS.PREDICTIONS, predictions),
-  loadPredictions: () => loadFromCache(CACHE_KEYS.PREDICTIONS, CACHE_TTL.PREDICTIONS),
+  saveSchedules: async (schedules: any[]) => saveToCacheSync(CACHE_KEYS.SCHEDULES, schedules),
+  loadSchedules: async () => loadFromCacheSync(CACHE_KEYS.SCHEDULES, CACHE_TTL.SCHEDULES),
 
-  // Profile
-  saveProfile: (profile: any) => saveToCache(CACHE_KEYS.PROFILE, profile),
-  loadProfile: () => loadFromCache(CACHE_KEYS.PROFILE, CACHE_TTL.PROFILE),
+  savePredictions: async (predictions: any) => saveToCacheSync(CACHE_KEYS.PREDICTIONS, predictions),
+  loadPredictions: async () => loadFromCacheSync(CACHE_KEYS.PREDICTIONS, CACHE_TTL.PREDICTIONS),
 
-  // Gallery Items
-  saveGalleryItems: (items: any[]) => saveToCache(CACHE_KEYS.GALLERY_ITEMS, items),
-  loadGalleryItems: () => loadFromCache(CACHE_KEYS.GALLERY_ITEMS, CACHE_TTL.GALLERY_ITEMS),
+  saveProfile: async (profile: any) => saveToCacheSync(CACHE_KEYS.PROFILE, profile),
+  loadProfile: async () => loadFromCacheSync(CACHE_KEYS.PROFILE, CACHE_TTL.PROFILE),
 
-  // Audio Recordings
-  saveAudioRecordings: (recordings: any[]) => saveToCache(CACHE_KEYS.AUDIO_RECORDINGS, recordings),
-  loadAudioRecordings: () => loadFromCache(CACHE_KEYS.AUDIO_RECORDINGS, CACHE_TTL.AUDIO_RECORDINGS),
+  saveGalleryItems: async (items: any[]) => saveToCacheSync(CACHE_KEYS.GALLERY_ITEMS, items),
+  loadGalleryItems: async () => loadFromCacheSync(CACHE_KEYS.GALLERY_ITEMS, CACHE_TTL.GALLERY_ITEMS),
 
-  // YouTube Videos
-  saveYouTubeVideos: (videos: any[]) => saveToCache(CACHE_KEYS.YOUTUBE_VIDEOS, videos),
-  loadYouTubeVideos: () => loadFromCache(CACHE_KEYS.YOUTUBE_VIDEOS, CACHE_TTL.YOUTUBE_VIDEOS),
+  saveAudioRecordings: async (recordings: any[]) => saveToCacheSync(CACHE_KEYS.AUDIO_RECORDINGS, recordings),
+  loadAudioRecordings: async () => loadFromCacheSync(CACHE_KEYS.AUDIO_RECORDINGS, CACHE_TTL.AUDIO_RECORDINGS),
 
-  // Flashcard Decks
-  saveFlashcardDecks: (decks: any[]) => saveToCache(CACHE_KEYS.FLASHCARD_DECKS, decks),
-  loadFlashcardDecks: () => loadFromCache(CACHE_KEYS.FLASHCARD_DECKS, CACHE_TTL.FLASHCARD_DECKS),
+  saveYouTubeVideos: async (videos: any[]) => saveToCacheSync(CACHE_KEYS.YOUTUBE_VIDEOS, videos),
+  loadYouTubeVideos: async () => loadFromCacheSync(CACHE_KEYS.YOUTUBE_VIDEOS, CACHE_TTL.YOUTUBE_VIDEOS),
 
-  // Flashcard Decks with Metrics
-  saveFlashcardDecksWithMetrics: (decks: any[]) => saveToCache(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, decks),
-  loadFlashcardDecksWithMetrics: () => loadFromCache(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, CACHE_TTL.FLASHCARD_DECKS_WITH_METRICS),
+  saveFlashcardDecks: async (decks: any[]) => saveToCacheSync(CACHE_KEYS.FLASHCARD_DECKS, decks),
+  loadFlashcardDecks: async () => loadFromCacheSync(CACHE_KEYS.FLASHCARD_DECKS, CACHE_TTL.FLASHCARD_DECKS),
 
-  // Photos by Subject (dinámico por subject ID)
-  savePhotosBySubject: (subjectId: number, photos: any[]) => saveToCache(`${CACHE_KEYS.PHOTOS_BY_SUBJECT}${subjectId}`, photos),
-  loadPhotosBySubject: (subjectId: number) => loadFromCache(`${CACHE_KEYS.PHOTOS_BY_SUBJECT}${subjectId}`, CACHE_TTL.PHOTOS_BY_SUBJECT),
+  saveFlashcardDecksWithMetrics: async (decks: any[]) => saveToCacheSync(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, decks),
+  loadFlashcardDecksWithMetrics: async () => loadFromCacheSync(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, CACHE_TTL.FLASHCARD_DECKS_WITH_METRICS),
 
-  // Scanned Documents by Subject (dinámico por subject ID)
-  saveScannedDocumentsBySubject: (subjectId: number, docs: any[]) => saveToCache(`${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${subjectId}`, docs),
-  loadScannedDocumentsBySubject: (subjectId: number) => loadFromCache(`${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${subjectId}`, CACHE_TTL.SCANNED_DOCUMENTS_BY_SUBJECT),
+  savePhotosBySubject: async (subjectId: number, photos: any[]) => saveToCacheSync(`${CACHE_KEYS.PHOTOS_BY_SUBJECT}${subjectId}`, photos),
+  loadPhotosBySubject: async (subjectId: number) => loadFromCacheSync(`${CACHE_KEYS.PHOTOS_BY_SUBJECT}${subjectId}`, CACHE_TTL.PHOTOS_BY_SUBJECT),
 
-  // Flashcards by Deck (dinámico por deck ID)
-  saveFlashcardsByDeck: (deckId: number, cards: any[]) => saveToCache(`${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`, cards),
-  loadFlashcardsByDeck: (deckId: number) => loadFromCache(`${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`, CACHE_TTL.FLASHCARDS_BY_DECK),
+  saveScannedDocumentsBySubject: async (subjectId: number, docs: any[]) => saveToCacheSync(`${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${subjectId}`, docs),
+  loadScannedDocumentsBySubject: async (subjectId: number) => loadFromCacheSync(`${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${subjectId}`, CACHE_TTL.SCANNED_DOCUMENTS_BY_SUBJECT),
 
-  // Flashcards Prioritized by Deck (dinámico por deck ID)
-  saveFlashcardsPrioritizedByDeck: (deckId: number, cards: any[]) => saveToCache(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deckId}`, cards),
-  loadFlashcardsPrioritizedByDeck: (deckId: number) => loadFromCache(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deckId}`, CACHE_TTL.FLASHCARDS_PRIORITIZED_BY_DECK),
+  saveFlashcardsByDeck: async (deckId: number, cards: any[]) => saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`, cards),
+  loadFlashcardsByDeck: async (deckId: number) => loadFromCacheSync(`${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`, CACHE_TTL.FLASHCARDS_BY_DECK),
 
-  // Cards Not Snoozed by Deck (dinámico por deck ID)
-  saveCardsNotSnoozedByDeck: (deckId: number, cards: any[]) => saveToCache(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deckId}`, cards),
-  loadCardsNotSnoozedByDeck: (deckId: number) => loadFromCache(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deckId}`, CACHE_TTL.CARDS_NOT_SNOOZED_BY_DECK),
+  saveFlashcardsPrioritizedByDeck: async (deckId: number, cards: any[]) => saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deckId}`, cards),
+  loadFlashcardsPrioritizedByDeck: async (deckId: number) => loadFromCacheSync(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deckId}`, CACHE_TTL.FLASHCARDS_PRIORITIZED_BY_DECK),
 
-  // Sync timestamp
-  saveLastSync: () => AsyncStorage.setItem(CACHE_KEYS.LAST_SYNC, Date.now().toString()),
+  saveCardsNotSnoozedByDeck: async (deckId: number, cards: any[]) => saveToCacheSync(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deckId}`, cards),
+  loadCardsNotSnoozedByDeck: async (deckId: number) => loadFromCacheSync(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deckId}`, CACHE_TTL.CARDS_NOT_SNOOZED_BY_DECK),
+
+  saveLastSync: async () => getStorage().set(CACHE_KEYS.LAST_SYNC, Date.now().toString()),
   getLastSync: async () => {
-    const ts = await AsyncStorage.getItem(CACHE_KEYS.LAST_SYNC);
+    const ts = getStorage().getString(CACHE_KEYS.LAST_SYNC);
     return ts ? parseInt(ts) : 0;
   },
 
-  // Clear everything
-  clear: clearAllCache,
+  clear: async () => clearAllCacheSync(),
 };

@@ -24,11 +24,13 @@ interface Props {
   selectedIndex: number | null;
   // Para boolean
   selectedBoolean: boolean | null;
+  // Callback para avanzar
+  onNext?: () => void;
 }
 
 export const QuestionRendererFactory: React.FC<Props> = ({
   item, onAnswer, onReveal, onShowExplanation, isAnswered,
-  selectedRating, selectedIndex, selectedBoolean,
+  selectedRating, selectedIndex, selectedBoolean, onNext
 }) => {
   switch (item.item_type) {
     case 'flashcard':
@@ -40,6 +42,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
           onShowExplanation={onShowExplanation}
           isAnswered={isAnswered}
           selectedRating={selectedRating}
+          onNext={onNext}
         />
       );
 
@@ -51,6 +54,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
           onShowExplanation={onShowExplanation}
           isAnswered={isAnswered}
           selectedIndex={selectedIndex}
+          onNext={onNext}
         />
       );
 
@@ -62,6 +66,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
           onShowExplanation={onShowExplanation}
           isAnswered={isAnswered}
           selectedAnswer={selectedBoolean}
+          onNext={onNext}
         />
       );
 

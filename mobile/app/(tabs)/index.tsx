@@ -39,7 +39,9 @@ const SUBJECT_CARD_GAP = 12;
 export default function HybridDashboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    try { return cacheService.loadProfileSync(); } catch { return null; }
+  });
   // ── Usar store global para subjects, assessments, schedules y predicciones ──
   const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions } = useDataStore();
   const { preloadRelatedData } = useCachePreload();
@@ -77,16 +79,7 @@ export default function HybridDashboardScreen() {
   const [lastSessionMode, setLastSessionMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // 📦 Cargar profile del caché al montar (casi instantáneo)
-  useEffect(() => {
-    (async () => {
-      const cachedProfile = await cacheService.loadProfile();
-      if (cachedProfile) {
-        console.log('[Dashboard] 📦 Profile cargado del caché');
-        setProfile(cachedProfile);
-      }
-    })();
-  }, []);
+  // Profile ya fue inicializado síncronamente en el useState vía MMKV
 
   // Snooze State
   const snoozeManager = useDueCardSnooze();

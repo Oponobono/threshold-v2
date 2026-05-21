@@ -15,14 +15,22 @@ import { FlashcardDeck, Flashcard } from './types';
 export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
   const userId = await getUserId();
   const response = await fetchWithFallback(`/flashcard-decks?user_id=${userId}`);
-  return (await parseJsonSafely(response)) || [];
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error al obtener los mazos');
+  }
+  return data || [];
 };
 
 /** Obtiene todos los mazos con métricas de prioridad, ordenados por urgencia */
 export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> => {
   const userId = await getUserId();
   const response = await fetchWithFallback(`/flashcard-decks/with-metrics?user_id=${userId}`);
-  return (await parseJsonSafely(response)) || [];
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error al obtener los mazos con métricas');
+  }
+  return data || [];
 };
 
 /** Crea un nuevo mazo vacío vinculado a una materia (opcional). Inyecta automáticamente el `user_id` */
@@ -55,14 +63,22 @@ export const updateFlashcardDeck = async (deckId: number, payload: { subject_id?
 /** Obtiene todas las tarjetas de un mazo específico por su ID */
 export const getFlashcards = async (deckId: number): Promise<Flashcard[]> => {
   const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards`);
-  return (await parseJsonSafely(response)) || [];
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error al obtener tarjetas');
+  }
+  return data || [];
 };
 
 /** Obtiene todas las tarjetas de un mazo ordenadas por prioridad de repaso */
 export const getFlashcardsPrioritized = async (deckId: number): Promise<Flashcard[]> => {
   const userId = await getUserId();
   const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards/prioritized?userId=${userId}`);
-  return (await parseJsonSafely(response)) || [];
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error al obtener tarjetas priorizadas');
+  }
+  return data || [];
 };
 
 /** Obtiene una tarjeta específica por su ID */
@@ -271,7 +287,11 @@ export const getCardsNotSnoozed = async (deckId: number): Promise<Flashcard[]> =
   const response = await fetchWithFallback(
     `/flashcard-decks/${deckId}/cards/not-snoozed?userId=${userId}`
   );
-  return (await parseJsonSafely(response)) || [];
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error al obtener tarjetas no snoozadas');
+  }
+  return data || [];
 };
 
 /**

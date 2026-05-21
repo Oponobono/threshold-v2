@@ -4,8 +4,9 @@
  * Versión para INTERFAZ MAZOS (con márgenes horizontales de 24)
  * Usado en: flashcards.tsx (pantalla dedicada)
  */
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -95,7 +96,12 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
    * Función para avanzar a la siguiente tarjeta.
    * Se llamará tanto desde el tap como desde el overlay dismiss.
    */
+  const isAdvancingRef = useRef(false);
+
   const advanceToNextCard = useCallback(() => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
     const next = itemIndex + 1;
     if (next >= items.length) {
       setSessionDone(true);
@@ -104,6 +110,10 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       resetItemState();
       setCardStartTime(Date.now());
     }
+
+    setTimeout(() => {
+      isAdvancingRef.current = false;
+    }, 400);
   }, [itemIndex, items.length, resetItemState]);
 
   useEffect(() => {
@@ -327,67 +337,73 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
   if (sessionDone) {
     const pct = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
     return (
-      <ScrollView
-        contentContainerStyle={[s.sessionDone, { flexGrow: 1, paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingBottom: Math.max(insets.bottom, 32) }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={s.doneEmoji}>{pct >= 80 ? '🌟' : pct >= 50 ? '👍' : '💪'}</Text>
-        <Text style={s.doneTitle}>{t('flashcards.sessionCompleted', '¡Sesión completada!')}</Text>
-        <Text style={s.doneSubtitle}>{t('flashcards.itemsReviewed', { count: items.length, plural: items.length !== 1 ? 's' : '', defaultValue: `${items.length} ítem${items.length !== 1 ? 's' : ''} revisados` })}</Text>
-        {stats.total > 0 && (
-          <View style={s.statsRow}>
-            <View style={[s.statChip, { backgroundColor: '#E8F5E9' }]}>
-              <Text style={[s.statChipNum, { color: '#2E7D32' }]}>{stats.correct}</Text>
-              <Text style={[s.statChipLabel, { color: '#2E7D32' }]}>{t('flashcards.statCorrect', 'Correctas')}</Text>
-            </View>
-            <View style={[s.statChip, { backgroundColor: '#FFEBEE' }]}>
-              <Text style={[s.statChipNum, { color: '#C62828' }]}>{stats.incorrect}</Text>
-              <Text style={[s.statChipLabel, { color: '#C62828' }]}>{t('flashcards.statIncorrect', 'Incorrectas')}</Text>
-            </View>
-            <View style={[s.statChip, { backgroundColor: '#F3E5F5' }]}>
-              <Text style={[s.statChipNum, { color: '#6A1B9A' }]}>{pct}%</Text>
-              <Text style={[s.statChipLabel, { color: '#6A1B9A' }]}>{t('flashcards.statAccuracy', 'Acierto')}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── Confusion Detection Panel ── */}
-        {isAnalyzingConfusions && (
-          <View style={confusionStyles.banner}>
-            <Text style={confusionStyles.bannerTitle}>{t('flashcards.analyzingDeck', '🧠 Analizando tu mazo...')}</Text>
-            <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.searchingConfusions', 'Buscando conceptos que podrías confundir.')}</Text>
-          </View>
-        )}
-        {!isAnalyzingConfusions && confusionSuggestions.length > 0 && (
-          <View style={confusionStyles.banner}>
-            <Text style={confusionStyles.bannerTitle}>{t('flashcards.confusionTitle', '⚠️ Conceptos Confundibles Detectados')}</Text>
-            <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.confusionSubtitle', { count: confusionSuggestions.length, plural: confusionSuggestions.length > 1 ? 'es' : '', defaultValue: `El análisis encontró ${confusionSuggestions.length} par${confusionSuggestions.length > 1 ? 'es' : ''} que suelen confundirse. Genera una tarjeta de contraste para fijar la diferencia.` })}</Text>
-            {confusionSuggestions.map((s, i) => (
-              <View key={i} style={confusionStyles.suggestionRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={confusionStyles.suggestionConcepts} numberOfLines={1}>
-                    {s.conceptA} <Text style={{ color: '#9E9E9E' }}>vs</Text> {s.conceptB}
-                  </Text>
-                  <Text style={confusionStyles.suggestionReason} numberOfLines={2}>{s.reason}</Text>
-                </View>
-                <TouchableOpacity
-                  style={[confusionStyles.generateBtn, generatingDiff === s.conceptA && { opacity: 0.5 }]}
-                  onPress={() => handleGenerateDiff(s)}
-                  disabled={generatingDiff !== null}
-                >
-                  <Text style={confusionStyles.generateBtnText}>
-                    {generatingDiff === s.conceptA ? '...' : t('flashcards.differentiateBtn', '+ Diferenciar')}
-                  </Text>
-                </TouchableOpacity>
+      <View style={{ flex: 1, width: '100%' }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[s.sessionDone, { flexGrow: 1, paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingBottom: 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={s.doneEmoji}>{pct >= 80 ? '🌟' : pct >= 50 ? '👍' : '💪'}</Text>
+          <Text style={s.doneTitle}>{t('flashcards.sessionCompleted', '¡Sesión completada!')}</Text>
+          <Text style={s.doneSubtitle}>{t('flashcards.itemsReviewed', { count: items.length, plural: items.length !== 1 ? 's' : '', defaultValue: `${items.length} ítem${items.length !== 1 ? 's' : ''} revisados` })}</Text>
+          {stats.total > 0 && (
+            <View style={s.statsRow}>
+              <View style={[s.statChip, { backgroundColor: '#E8F5E9' }]}>
+                <Text style={[s.statChipNum, { color: '#2E7D32' }]}>{stats.correct}</Text>
+                <Text style={[s.statChipLabel, { color: '#2E7D32' }]}>{t('flashcards.statCorrect', 'Correctas')}</Text>
               </View>
-            ))}
-          </View>
-        )}
+              <View style={[s.statChip, { backgroundColor: '#FFEBEE' }]}>
+                <Text style={[s.statChipNum, { color: '#C62828' }]}>{stats.incorrect}</Text>
+                <Text style={[s.statChipLabel, { color: '#C62828' }]}>{t('flashcards.statIncorrect', 'Incorrectas')}</Text>
+              </View>
+              <View style={[s.statChip, { backgroundColor: '#F3E5F5' }]}>
+                <Text style={[s.statChipNum, { color: '#6A1B9A' }]}>{pct}%</Text>
+                <Text style={[s.statChipLabel, { color: '#6A1B9A' }]}>{t('flashcards.statAccuracy', 'Acierto')}</Text>
+              </View>
+            </View>
+          )}
 
-        <TouchableOpacity style={s.backBtn} onPress={onBack}>
-          <Text style={s.backBtnText}>{t('flashcards.backToDecks', 'Volver a mazos')}</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* ── Confusion Detection Panel ── */}
+          {isAnalyzingConfusions && (
+            <View style={confusionStyles.banner}>
+              <Text style={confusionStyles.bannerTitle}>{t('flashcards.analyzingDeck', '🧠 Analizando tu mazo...')}</Text>
+              <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.searchingConfusions', 'Buscando conceptos que podrías confundir.')}</Text>
+            </View>
+          )}
+          {!isAnalyzingConfusions && confusionSuggestions.length > 0 && (
+            <View style={confusionStyles.banner}>
+              <Text style={confusionStyles.bannerTitle}>{t('flashcards.confusionTitle', '⚠️ Conceptos Confundibles Detectados')}</Text>
+              <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.confusionSubtitle', { count: confusionSuggestions.length, plural: confusionSuggestions.length > 1 ? 'es' : '', defaultValue: `El análisis encontró ${confusionSuggestions.length} par${confusionSuggestions.length > 1 ? 'es' : ''} que suelen confundirse. Genera una tarjeta de contraste para fijar la diferencia.` })}</Text>
+              {confusionSuggestions.map((s, i) => (
+                <View key={i} style={confusionStyles.suggestionRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={confusionStyles.suggestionConcepts} numberOfLines={1}>
+                      {s.conceptA} <Text style={{ color: '#9E9E9E' }}>vs</Text> {s.conceptB}
+                    </Text>
+                    <Text style={confusionStyles.suggestionReason} numberOfLines={2}>{s.reason}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[confusionStyles.generateBtn, generatingDiff === s.conceptA && { opacity: 0.5 }]}
+                    onPress={() => handleGenerateDiff(s)}
+                    disabled={generatingDiff !== null}
+                  >
+                    <Text style={confusionStyles.generateBtnText}>
+                      {generatingDiff === s.conceptA ? '...' : t('flashcards.differentiateBtn', '+ Diferenciar')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+        
+        {/* Botón anclado justo encima de la barra nativa del móvil */}
+        <View style={{ paddingHorizontal: Math.max(insets.left, horizontalPadding, 20), paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12) }}>
+          <TouchableOpacity style={s.backBtn} onPress={onBack}>
+            <Text style={s.backBtnText}>{t('flashcards.backToDecks', 'Volver a mazos')}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
@@ -400,7 +416,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
     <View style={[{ flex: 1, paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingTop: insets.top, marginTop: 8, paddingBottom: Math.max(insets.bottom + 12, 20) }]}>
 
       {/* ── Header: flecha  |  título (badge inline)  |  snooze + contador + trash ── */}
-      <View style={[s.header, { marginBottom: 6 }]}>
+      <View style={[s.header, { marginBottom: 6, marginTop: 6 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
         </TouchableOpacity>
@@ -437,17 +453,8 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
         <View style={[s.progressFill, { width: `${((itemIndex + 1) / items.length) * 100}%` as any }]} />
       </View>
 
-      {/* ── Question renderer (sin ScrollView envolvente: cada vista gestiona su scroll) ── */}
-      <TouchableOpacity 
-        style={{ flex: 1, marginTop: 10 }}
-        onPress={() => {
-          // Solo avanza si: respondió + no está procesando + overlay no visible
-          if (isAnswered && !isProcessing && !overlayVisible) {
-            advanceToNextCard();
-          }
-        }}
-        activeOpacity={1}
-      >
+      {/* ── Question renderer (cada vista gestiona su scroll y touch para avanzar) ── */}
+      <View style={{ flex: 1, marginHorizontal: -8, marginLeft: -Math.max(insets.left, 8), marginRight: -Math.max(insets.right, 8) }}>
         <QuestionRendererFactory
           item={item}
           onAnswer={handleAnswer}
@@ -457,8 +464,13 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           selectedRating={selectedRating}
           selectedIndex={selectedIndex}
           selectedBoolean={selectedBoolean}
+          onNext={() => {
+            if (isAnswered && !overlayVisible) {
+              advanceToNextCard();
+            }
+          }}
         />
-      </TouchableOpacity>
+      </View>
 
       {/* ── Overlay flotante de explicación ── */}
       <ExplanationOverlay

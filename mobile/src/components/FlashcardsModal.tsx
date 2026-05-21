@@ -35,7 +35,6 @@ import { useDataStore } from '../store/useDataStore';
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
 import { FlashcardNewDeckScreen } from './FlashcardNewDeckScreen';
 import { FlashcardNewCardScreen } from './FlashcardNewCardScreen';
-import { AnimatedMarchingAntsBorder } from './AnimatedMarchingAntsBorder';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -270,14 +269,8 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 }}
                 renderActions={(close) => renderSwipeActions(item, close)}
               >
-                <AnimatedMarchingAntsBorder
-                  borderRadius={18}
-                  strokeColor={theme.colors.danger}
-                  strokeWidth={1}
-                  always={isDue}
-                >
                   <TouchableOpacity
-                    style={[s.deckCard, { marginBottom: 0, borderWidth: isDue ? 0 : 1, borderColor: isDue ? 'transparent' : '#E0E0E0' }]}
+                    style={[s.deckCard, { marginBottom: 0, borderWidth: 1, borderColor: isDue ? theme.colors.danger : '#E0E0E0' }]}
                     activeOpacity={0.85}
                     onPress={() => openStudySession(item)}
                   >
@@ -326,7 +319,6 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                     />
                   </View>
                   </TouchableOpacity>
-                </AnimatedMarchingAntsBorder>
               </SwipeableCard>
             );
           }}

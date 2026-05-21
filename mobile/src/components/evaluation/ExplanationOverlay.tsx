@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import { MarkdownWithCode } from '../MarkdownWithCode';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -58,7 +59,7 @@ export const ExplanationOverlay: React.FC<Props> = ({
           <View style={{ flex: 1 }}>
             <Text style={s.explanationTitle}>¿Por qué?</Text>
             <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
-              <Text style={s.explanationText}>{explanation}</Text>
+              <MarkdownWithCode>{explanation}</MarkdownWithCode>
             </ScrollView>
             <View style={s.tapHint}>
               <Text style={s.tapHintText}>Toca para continuar</Text>

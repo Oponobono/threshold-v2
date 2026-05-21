@@ -1,0 +1,126 @@
+{
+  "title": "Test de Preguntas Code - 10 Ejemplos",
+  "description": "Mazo de prueba con 10 preguntas que contienen código con fences correctamente formateados",
+  "cards": [
+    {
+      "type": "flashcard",
+      "data": {
+        "front": "¿Cuál es el comando Git para enviar cambios al repositorio remoto?",
+        "back": "El comando es `git push`. Aquí está el ejemplo completo:\n\n```bash\ngit push origin main\n```\n\nEsto envía los commits locales a la rama 'main' del repositorio remoto 'origin'."
+      },
+      "hint": "Empuja (push) los cambios hacia arriba",
+      "explanation": "`git push` actualiza las referencias remotas usando las referencias locales, enviando los objetos necesarios al servidor remoto."
+    },
+    {
+      "type": "multiple_choice",
+      "data": {
+        "question": "¿Cuál es la salida de este código JavaScript?\n\n```javascript\nconsole.log(2 + 2 * 3);\n```",
+        "options": [
+          "8",
+          "12",
+          "SyntaxError",
+          "undefined"
+        ],
+        "correctIndex": 0
+      },
+      "hint": "Recuerda el orden de operaciones (multiplicación antes que suma)",
+      "explanation": "Primero se ejecuta 2 * 3 = 6, luego 2 + 6 = 8. La salida es 8."
+    },
+    {
+      "type": "flashcard",
+      "data": {
+        "front": "Completa el comando para verificar el estado de tu repositorio Git:\n\n```bash\ngit ___\n```",
+        "back": "El comando es:\n\n```bash\ngit status\n```\n\nEste comando muestra qué archivos han sido modificados, cuáles están staged (listos para commit) y cuáles no están rastreados."
+      },
+      "hint": "Muestra el 'estado' actual del repositorio",
+      "explanation": "`git status` es fundamental para ver el estado del working directory y staging area antes de hacer commit."
+    },
+    {
+      "type": "multiple_choice",
+      "data": {
+        "question": "¿Cuál es la consulta SQL correcta para obtener todos los usuarios de la tabla 'users'?\n\n```sql\n? * FROM users;\n```",
+        "options": [
+          "GET * FROM users;",
+          "SELECT * FROM users;",
+          "FETCH * FROM users;",
+          "QUERY users;"
+        ],
+        "correctIndex": 1
+      },
+      "hint": "La palabra clave comienza con S",
+      "explanation": "`SELECT` es la palabra clave SQL correcta para recuperar datos."
+    },
+    {
+      "type": "flashcard",
+      "data": {
+        "front": "¿Cuál es la forma correcta de imprimir en Python?\n\n```python\n___(___)\n___(42)\n___(3.14)\n```",
+        "back": "La forma correcta es usando la función `print()`:\n\n```python\nprint('Hola, mundo!')\nprint(42)\nprint(3.14)\n```\n\nLa función print() puede aceptar múltiples argumentos separados por comas."
+      },
+      "hint": "Es una función built-in de Python",
+      "explanation": "La función print() envía datos a la salida estándar (consola). Es una de las funciones más básicas en Python."
+    },
+    {
+      "type": "multiple_choice",
+      "data": {
+        "question": "¿Cuál es la forma moderna de declarar una variable en JavaScript?\n\n```javascript\n? nombre = 'Juan';\n```",
+        "options": [
+          "var nombre = 'Juan';",
+          "let nombre = 'Juan';",
+          "name nombre = 'Juan';",
+          "fn nombre = 'Juan';"
+        ],
+        "correctIndex": 1
+      },
+      "hint": "Es la forma recomendada en ES6 para variables locales",
+      "explanation": "`let` es la forma moderna de declarar variables en JavaScript. `var` está deprecado y tiene comportamientos inesperados. `const` se usa para constantes."
+    },
+    {
+      "type": "flashcard",
+      "data": {
+        "front": "Completa el comando Git para crear una rama nueva:\n\n```bash\ngit ___ -b nombre-de-rama\n```",
+        "back": "El comando es:\n\n```bash\ngit checkout -b nombre-de-rama\n```\n\nO alternativamente, en versiones modernas de Git:\n\n```bash\ngit switch -c nombre-de-rama\n```\n\nAmbos crean y cambian a una rama nueva al mismo tiempo."
+      },
+      "hint": "Usa 'checkout' con la bandera '-b' o 'switch' con '-c'",
+      "explanation": "La bandera '-b' (o '-c' en switch) le dice a Git que cree la rama antes de cambiar a ella."
+    },
+    {
+      "type": "multiple_choice",
+      "data": {
+        "question": "¿Cuál es el resultado de este código Python?\n\n```python\nfor i in range(3):\n    print(i)\n```",
+        "options": [
+          "1, 2, 3",
+          "0, 1, 2",
+          "1, 2",
+          "0, 1, 2, 3"
+        ],
+        "correctIndex": 1
+      },
+      "hint": "La función range() comienza desde 0 y es exclusiva del límite superior",
+      "explanation": "`range(3)` genera 0, 1, 2. Por eso el bucle imprime esos tres números. Comienza en 0 y termina antes de llegar a 3."
+    },
+    {
+      "type": "flashcard",
+      "data": {
+        "front": "Completa la estructura básica de un documento HTML:\n\n```html\n<!DOCTYPE html>\n<___ lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Mi Página</title>\n</head>\n<body>\n  <h1>Bienvenido</h1>\n  <p>Contenido aquí</p>\n</___>\n```",
+        "back": "La estructura básica de HTML es:\n\n```html\n<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Mi Página</title>\n</head>\n<body>\n  <h1>Bienvenido</h1>\n  <p>Contenido aquí</p>\n</html>\n```\n\nCada elemento tiene su propósito específico en la estructura del documento."
+      },
+      "hint": "Comienza con DOCTYPE y contiene head y body",
+      "explanation": "El DOCTYPE indica que es HTML5, <html> es la raíz, <head> contiene metadatos, y <body> contiene el contenido visible."
+    },
+    {
+      "type": "multiple_choice",
+      "data": {
+        "question": "¿Cuál es la forma correcta de hacer un comentario en JavaScript?\n\n```javascript\n// Este es un comentario de una línea\n/* Este es un comentario\n   de múltiples líneas */\n```",
+        "options": [
+          "# Este es un comentario",
+          "// Este es un comentario",
+          "/* Este es un comentario */",
+          "Ambas opciones B y C son correctas"
+        ],
+        "correctIndex": 3
+      },
+      "hint": "Hay más de una forma correcta",
+      "explanation": "JavaScript soporta dos tipos de comentarios: de una línea con `//` y de múltiples líneas con `/* */`. Ambas formas son válidas."
+    }
+  ]
+}
