@@ -276,13 +276,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 0,
   },
-  circleProgressCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 0,
-  },
+
   circleCounter: {
     fontSize: 11,
     fontWeight: '800',

@@ -38,8 +38,8 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects }: EditG
     if (assessment && visible) {
       setSelectedSubjectId(assessment.subject_id);
       setGradeName(assessment.name);
-      setGradeValue(assessment.grade_value?.toString() || '');
-      setGradePercentage(assessment.percentage?.toString() || '');
+      setGradeValue(assessment.score?.toString() || assessment.grade_value?.toString() || '');
+      setGradePercentage(assessment.weight?.toString() || assessment.percentage?.toString() || '');
       setSelectedCategoryId(assessment.category_id || null);
     }
   }, [assessment, visible]);
@@ -70,7 +70,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects }: EditG
         subject_id: selectedSubjectId,
         name: gradeName.trim(),
         grade_value: Number(gradeValue),
-        percentage: Number(gradePercentage),
+        weight: gradePercentage,
         category_id: selectedCategoryId || undefined,
       });
 
