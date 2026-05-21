@@ -189,6 +189,110 @@ exports.createAssessment = (req, res) => {
 };
 
 /**
+ * Actualizar una evaluación existente
+ */
+exports.updateAssessment = (req, res) => {
+  const { id } = req.params;
+  const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id } = req.body;
+
+  // Build dynamic UPDATE query
+  const updates = [];
+  const values = [];
+
+  if (subject_id !== undefined) {
+    updates.push('subject_id = ?');
+    values.push(subject_id);
+  }
+  if (name !== undefined) {
+    updates.push('name = ?');
+    values.push(name);
+  }
+  if (type !== undefined) {
+    updates.push('type = ?');
+    values.push(type);
+  }
+  if (date !== undefined) {
+    updates.push('date = ?');
+    values.push(date);
+  }
+  if (weight !== undefined) {
+    updates.push('weight = ?');
+    values.push(weight);
+  }
+  if (out_of !== undefined) {
+    updates.push('out_of = ?');
+    values.push(out_of);
+  }
+  if (is_completed !== undefined) {
+    updates.push('is_completed = ?');
+    values.push(is_completed ? 1 : 0);
+  }
+  if (category_id !== undefined) {
+    updates.push('category_id = ?');
+    values.push(category_id);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  values.push(id);
+
+  const query = `UPDATE assessments SET ${updates.join(', ')} WHERE id = ?`;
+  db.run(query, values, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: 'Evaluación no encontrada.' });
+
+    // Si se actualiza grade_value o percentage, también actualizar assessment_results
+    if (grade_value !== undefined || percentage !== undefined || score !== undefined) {
+      db.get('SELECT subject_id FROM assessments WHERE id = ?', [id], (err, assessment) => {
+        if (!err && assessment) {
+          db.get('SELECT user_id FROM subjects WHERE id = ?', [assessment.subject_id], (err, subject) => {
+            if (!err && subject) {
+              db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
+                if (!err && user && user.active_grading_version_id) {
+                  db.get(`
+                    SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
+                    FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
+                    WHERE gv.id = ?
+                  `, [user.active_grading_version_id], (err, version) => {
+                    if (!err && version) {
+                      let rawValue = null;
+                      if (grade_value != null) rawValue = grade_value;
+                      else if (score != null && (out_of || 5) > 0) rawValue = (score / (out_of || 5)) * version.max_value;
+                      else if (percentage != null) {
+                        if (version.max_value === 100) rawValue = percentage;
+                        else rawValue = (percentage / 100) * version.max_value;
+                      }
+
+                      if (rawValue !== null) {
+                        const { normalizeGrade } = require('../services/gradingEngine');
+                        const normalized = normalizeGrade(rawValue, version);
+                        db.run(`
+                          UPDATE assessment_results 
+                          SET raw_value = ?, normalized_value = ? 
+                          WHERE assessment_id = ?
+                        `, [rawValue, normalized, id], (err) => {
+                          if (!err) {
+                            return res.json({ id, message: 'Evaluación actualizada' });
+                          }
+                        });
+                      }
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    } else {
+      res.json({ id, message: 'Evaluación actualizada' });
+    }
+  });
+};
+
+/**
  * Eliminar una evaluación
  */
 exports.deleteAssessment = (req, res) => {

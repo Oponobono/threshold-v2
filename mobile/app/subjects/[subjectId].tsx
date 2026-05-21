@@ -49,6 +49,7 @@ import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModa
 import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
 import { useAudioRecorder } from '../../src/hooks/useAudioRecorder';
 import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
+import { useDataStore } from '../../src/store/useDataStore';
 import * as FileSystem from 'expo-file-system/legacy';
 import { subjectDetailStyles as styles } from '../../src/styles/SubjectDetail.styles';
 import { useCustomAlert } from '../../src/components/CustomAlert';
@@ -74,6 +75,7 @@ export default function SubjectDetailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ subjectId?: string }>();
+  const { subjects: storeSubjects } = useDataStore();
 
   const subjectId = useMemo(() => {
     const raw = Array.isArray(params.subjectId) ? params.subjectId[0] : params.subjectId;
@@ -87,6 +89,7 @@ export default function SubjectDetailScreen() {
   const [subjectSchedules, setSubjectSchedules] = useState<any[]>([]);
   const [photos, setPhotos] = useState<any[]>([]);
   const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>([]);
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -341,6 +344,7 @@ export default function SubjectDetailScreen() {
               }
             }}
             onAddAssessment={() => setIsCreateGradeVisible(true)}
+            subjects={storeSubjects}
           />
 
           <SubjectDocumentsList 

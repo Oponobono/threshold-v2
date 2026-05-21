@@ -53,6 +53,25 @@ export const createAssessment = async (payload: Assessment) => {
 };
 
 /**
+ * Actualiza una evaluación o tarea existente
+ */
+export const updateAssessment = async (id: number, payload: Partial<Assessment>) => {
+  const response = await fetchWithFallback(`/assessments/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'No se pudo actualizar la evaluación.');
+  }
+  return data;
+};
+
+/**
  * Elimina una evaluación o tarea
  */
 export const deleteAssessment = async (id: number) => {

@@ -83,6 +83,53 @@ router.post('/assessments', assessmentsController.createAssessment);
 /**
  * @swagger
  * /api/assessments/{id}:
+ *   put:
+ *     summary: Actualiza una evaluación existente
+ *     tags: [Assessments]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               subject_id:
+ *                 type: integer
+ *               name:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               date:
+ *                 type: string
+ *               weight:
+ *                 type: string
+ *               out_of:
+ *                 type: number
+ *               score:
+ *                 type: number
+ *               percentage:
+ *                 type: number
+ *               grade_value:
+ *                 type: number
+ *               is_completed:
+ *                 type: boolean
+ *               category_id:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Evaluación actualizada
+ */
+router.put('/assessments/:id', assessmentsController.updateAssessment);
+
+/**
+ * @swagger
+ * /api/assessments/{id}:
  *   delete:
  *     summary: Elimina una evaluación
  *     tags: [Assessments]
