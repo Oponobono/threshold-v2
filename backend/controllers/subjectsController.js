@@ -6,40 +6,57 @@ const gradingEngine = require('../services/gradingEngine');
  */
 exports.getSubjectById = (req, res) => {
   const { subjectId } = req.params;
-  const query = `
-    SELECT s.*,
-    COALESCE((
-      SELECT 
-        CASE 
-          WHEN SUM(CAST(REPLACE(COALESCE(a.weight, '0'), '%', '') AS REAL)) > 0 
-          THEN 
-            SUM(
-              ar.normalized_value
-              * (CAST(REPLACE(COALESCE(a.weight, '0'), '%', '') AS REAL) / 100.0)
-            ) / (
-              SUM(CAST(REPLACE(COALESCE(a.weight, '0'), '%', '') AS REAL)) / 100.0
-            )
-          WHEN COUNT(ar.id) > 0
-          THEN
-            AVG(ar.normalized_value)
-          ELSE 0 
-        END
-      FROM assessments a
-      LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
-      WHERE a.subject_id = s.id
-    ), 0) AS normalized_avg_score,
-    COALESCE((
-      SELECT SUM(CAST(REPLACE(COALESCE(a.weight, '0'), '%', '') AS REAL))
-      FROM assessments a
-      WHERE a.subject_id = s.id
-    ), 0) AS completion_percent
-    FROM subjects s WHERE id = ?
-  `;
-  db.get(query, [subjectId], async (err, row) => {
+  
+  // First get the subject
+  db.get('SELECT * FROM subjects WHERE id = ?', [subjectId], async (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Materia no encontrada' });
 
     try {
+      // Fetch Categories
+      const categories = await new Promise((resolve, reject) => {
+        db.all(`SELECT * FROM assessment_categories WHERE subject_id = ?`, [subjectId], (err, cats) => {
+          if (err) return reject(err);
+          resolve(cats || []);
+        });
+      });
+
+      // Fetch Assessments and Results
+      const assessments = await new Promise((resolve, reject) => {
+        const sql = `
+          SELECT a.id, a.subject_id, a.category_id, a.weight, a.is_completed, ar.normalized_value 
+          FROM assessments a
+          LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+          WHERE a.subject_id = ?
+        `;
+        db.all(sql, [subjectId], (err, asts) => {
+          if (err) return reject(err);
+          resolve(asts || []);
+        });
+      });
+
+      // Normalize weights
+      assessments.forEach(a => {
+        let finalWeight = 0;
+        if (a.weight) {
+          finalWeight = parseFloat(String(a.weight).replace('%', ''));
+        }
+        a.weight = finalWeight;
+      });
+
+      // Calculate grade using AcademicWorkflowEngine
+      const { normalized_avg_score } = AcademicWorkflowEngine.calculateSubjectGrade(categories, assessments);
+      row.normalized_avg_score = normalized_avg_score || 0;
+
+      // Calculate completion percent
+      let completion = 0;
+      assessments.forEach(a => {
+        if (a.is_completed || (a.normalized_value !== null && a.normalized_value !== undefined)) {
+          completion += parseFloat(a.weight || 0);
+        }
+      });
+      row.completion_percent = completion;
+
       // Find the user's active version to denormalize
       const user = await new Promise((resolve, reject) => {
         db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [row.user_id], (err, u) => {
@@ -156,9 +173,17 @@ exports.getSubjectsByUser = (req, res) => {
           }
         });
         row.completion_percent = completion;
+
+        // Always calculate avg_score (denormalized) - use a default scale if no active version
+        // Default: assume 0-5 scale for display
+        if (row.normalized_avg_score > 0) {
+          row.avg_score = row.normalized_avg_score * 5; // Simple denormalization to 0-5
+        } else {
+          row.avg_score = 0;
+        }
       });
 
-      // Find the user's active version to denormalize
+      // Find the user's active version to denormalize (and override avg_score)
       const user = await new Promise((resolve, reject) => {
         db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [userId], (err, u) => {
           if (err) return reject(err);
