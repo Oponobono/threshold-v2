@@ -2,6 +2,46 @@ const { db } = require('../db');
 const gradingEngine = require('../services/gradingEngine');
 
 /**
+ * Helper: Denormalize a single assessment row
+ */
+const denormalizeAssessment = (row, versionRow, scales) => {
+  const result = {
+    id: row.id,
+    subject_id: row.subject_id,
+    name: row.name,
+    type: row.type,
+    date: row.date,
+    weight: row.weight,
+    out_of: row.out_of,
+    score: row.score,
+    percentage: row.percentage,
+    is_completed: row.is_completed === 1 ? 1 : 0,
+    period_id: row.period_id,
+    category_id: row.category_id,
+    normalized_value: row.normalized_value !== null && row.normalized_value !== undefined ? parseFloat(row.normalized_value) : null,
+    original_raw_value: row.original_raw_value,
+    grade_value: row.original_raw_value !== null && row.original_raw_value !== undefined ? parseFloat(row.original_raw_value) : null,
+    subject_name: row.subject_name,
+    subject_color: row.subject_color,
+    subject_icon: row.subject_icon,
+    user_id: row.user_id
+  };
+
+  // Denormalize grade to display label
+  if (result.normalized_value !== null && versionRow && scales) {
+    result.score = gradingEngine.denormalizeGrade(result.normalized_value, versionRow);
+    const eq = gradingEngine.getEquivalencies(result.normalized_value, scales, versionRow.mode);
+    if (eq) {
+      result.display_label = eq.display_short_label || eq.label;
+      result.display_color = eq.color;
+      result.gpa_equivalent = eq.gpa_equivalent;
+    }
+  }
+
+  return result;
+};
+
+/**
  * Obtener evaluaciones por materia
  */
 exports.getAssessmentsBySubject = (req, res) => {
@@ -54,34 +94,7 @@ exports.getAssessmentsBySubject = (req, res) => {
         
         if (versionRow) {
           const scales = await gradingEngine.getScalesForVersion(versionRow.id);
-          rows = rows.map(row => {
-            // Create new object to avoid DB driver descriptor issues
-            const processed = { ...row };
-            
-            // Normalize data types
-            if (processed.normalized_value !== null && processed.normalized_value !== undefined) {
-              processed.normalized_value = parseFloat(processed.normalized_value);
-            }
-            if (processed.original_raw_value !== null && processed.original_raw_value !== undefined) {
-              processed.grade_value = parseFloat(processed.original_raw_value);
-            } else {
-              processed.grade_value = null;
-            }
-            if (processed.is_completed !== undefined) {
-              processed.is_completed = processed.is_completed === 1 ? 1 : 0;
-            }
-            
-            if (processed.normalized_value !== null && processed.normalized_value !== undefined) {
-              processed.score = gradingEngine.denormalizeGrade(processed.normalized_value, versionRow);
-              const eq = gradingEngine.getEquivalencies(processed.normalized_value, scales, versionRow.mode);
-              if (eq) {
-                processed.display_label = eq.display_short_label || eq.label;
-                processed.display_color = eq.color;
-                processed.gpa_equivalent = eq.gpa_equivalent;
-              }
-            }
-            return processed;
-          });
+          rows = rows.map(row => denormalizeAssessment(row, versionRow, scales));
           console.log(`[GET] getAssessmentsBySubject denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
         }
       }
@@ -146,34 +159,7 @@ exports.getAssessmentsByUser = (req, res) => {
         
         if (versionRow) {
           const scales = await gradingEngine.getScalesForVersion(versionRow.id);
-          rows = rows.map(row => {
-            // Create new object to avoid DB driver descriptor issues
-            const processed = { ...row };
-            
-            // Normalize data types
-            if (processed.normalized_value !== null && processed.normalized_value !== undefined) {
-              processed.normalized_value = parseFloat(processed.normalized_value);
-            }
-            if (processed.original_raw_value !== null && processed.original_raw_value !== undefined) {
-              processed.grade_value = parseFloat(processed.original_raw_value);
-            } else {
-              processed.grade_value = null;
-            }
-            if (processed.is_completed !== undefined) {
-              processed.is_completed = processed.is_completed === 1 ? 1 : 0;
-            }
-            
-            if (processed.normalized_value !== null && processed.normalized_value !== undefined) {
-              processed.score = gradingEngine.denormalizeGrade(processed.normalized_value, versionRow);
-              const eq = gradingEngine.getEquivalencies(processed.normalized_value, scales, versionRow.mode);
-              if (eq) {
-                processed.display_label = eq.display_short_label || eq.label;
-                processed.display_color = eq.color;
-                processed.gpa_equivalent = eq.gpa_equivalent;
-              }
-            }
-            return processed;
-          });
+          rows = rows.map(row => denormalizeAssessment(row, versionRow, scales));
           console.log(`[GET] getAssessmentsByUser denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
         }
       }
