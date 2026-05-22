@@ -341,19 +341,45 @@ export default function SubjectDetailScreen() {
               Promise.all([refreshSubjects(), refreshAssessments()]).catch(console.error);
             }}
             onAssessmentUpdated={(updatedAssessment) => {
+              console.log('[SubjectDetailScreen] 📥 onAssessmentUpdated callback recibido:', {
+                updated: updatedAssessment ? true : false,
+                assessmentId: updatedAssessment?.id,
+                grade_value: updatedAssessment?.grade_value,
+                normalized_value: updatedAssessment?.normalized_value,
+                is_completed: updatedAssessment?.is_completed,
+              });
+
               // If we have an updated assessment, merge it into local state immediately
               if (updatedAssessment && updatedAssessment.id) {
-                setAssessments(prev => 
-                  prev.map(a => a.id === updatedAssessment.id ? updatedAssessment : a)
-                );
+                console.log('[SubjectDetailScreen] 🔄 Merging assessment into local state immediately:', {
+                  assessmentId: updatedAssessment.id,
+                  gradeValue: updatedAssessment.grade_value,
+                });
+                setAssessments(prev => {
+                  const updated = prev.map(a => a.id === updatedAssessment.id ? updatedAssessment : a);
+                  console.log('[SubjectDetailScreen] ✅ Local state merged. New assessments count:', updated.length);
+                  return updated;
+                });
               }
               
               // Also refetch to ensure consistency
               if (subjectId) {
-                getAssessments(subjectId).then(res => setAssessments((res || []) as Assessment[])).catch(console.error);
+                console.log('[SubjectDetailScreen] 🔄 Refetching assessments from API...');
+                getAssessments(subjectId)
+                  .then(res => {
+                    console.log('[SubjectDetailScreen] ✅ API refetch completed, new count:', res?.length || 0);
+                    setAssessments((res || []) as Assessment[]);
+                  })
+                  .catch((err) => {
+                    console.error('[SubjectDetailScreen] ❌ Error refetching assessments:', err);
+                  });
               }
+              
+              console.log('[SubjectDetailScreen] 🔄 Refreshing global store...');
               const { refreshSubjects, refreshAssessments } = useDataStore.getState();
-              Promise.all([refreshSubjects(), refreshAssessments()]).catch(console.error);
+              Promise.all([refreshSubjects(), refreshAssessments()])
+                .then(() => console.log('[SubjectDetailScreen] ✅ Global store refreshed'))
+                .catch(err => console.error('[SubjectDetailScreen] ❌ Error refreshing store:', err));
             }}
             onOpenCategories={() => {
               if (subjectId) {

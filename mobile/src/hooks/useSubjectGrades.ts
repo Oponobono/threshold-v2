@@ -36,45 +36,69 @@ export function useSubjectGrades(
 ) {
   const { t } = useTranslation();
 
-  const gradedAssessments = useMemo(
-    () => assessments.filter((assessment) => assessment.is_completed || normalizeGrade(assessment) !== null),
-    [assessments],
-  );
+  const gradedAssessments = useMemo(() => {
+    const filtered = assessments.filter((assessment) => assessment.is_completed || normalizeGrade(assessment) !== null);
+    console.log('[useSubjectGrades] 📊 FILTER LOGIC:', {
+      totalAssessments: assessments.length,
+      gradedAssessments: filtered.length,
+      filterDetails: assessments.map(a => ({
+        id: a.id,
+        name: a.name,
+        is_completed: a.is_completed,
+        normalizeGrade: normalizeGrade(a),
+        passesFilter: a.is_completed || normalizeGrade(a) !== null,
+      }))
+    });
+    return filtered;
+  }, [assessments]);
 
   // 1. Porcentaje Evaluado (Pe)
   const evaluatedPercentage = useMemo(
-    () => gradedAssessments.reduce((sum, assessment) => sum + parseWeight(assessment), 0),
+    () => {
+      const result = gradedAssessments.reduce((sum, assessment) => sum + parseWeight(assessment), 0);
+      console.log('[useSubjectGrades] 📊 evaluatedPercentage:', result, 'from assessments:', gradedAssessments.length);
+      return result;
+    },
     [gradedAssessments],
   );
 
   // 3. Puntos Acumulados (Pts)
   const accumulatedPoints = useMemo(
-    () => gradedAssessments.reduce((sum, assessment) => {
-      const grade = normalizeGrade(assessment) || 0;
-      const weight = parseWeight(assessment) || 0;
-      return sum + (grade * (weight / 100));
-    }, 0),
+    () => {
+      const result = gradedAssessments.reduce((sum, assessment) => {
+        const grade = normalizeGrade(assessment) || 0;
+        const weight = parseWeight(assessment) || 0;
+        const contribution = grade * (weight / 100);
+        console.log('[useSubjectGrades] 📊 Assessment contribution:', { id: assessment.id, grade, weight, contribution });
+        return sum + contribution;
+      }, 0);
+      console.log('[useSubjectGrades] 📊 accumulatedPoints (total):', result);
+      return result;
+    },
     [gradedAssessments],
   );
 
   // 2. Promedio Actual (A_actual)
   const averageGrade = useMemo(() => {
+    let result = 0;
     if (evaluatedPercentage > 0) {
-      return accumulatedPoints / (evaluatedPercentage / 100);
-    }
-    
-    // FALLBACK: Simple average if no weights are defined but there are grades
-    if (gradedAssessments.length > 0) {
-      const validGrades = gradedAssessments
-        .map(a => normalizeGrade(a))
-        .filter(g => g !== null) as number[];
-      
-      if (validGrades.length > 0) {
-        return validGrades.reduce((sum, g) => sum + g, 0) / validGrades.length;
+      result = accumulatedPoints / (evaluatedPercentage / 100);
+      console.log('[useSubjectGrades] 📊 averageGrade (weighted):', result, 'accumulatedPoints:', accumulatedPoints, 'evaluatedPercentage:', evaluatedPercentage);
+    } else {
+      // FALLBACK: Simple average if no weights are defined but there are grades
+      if (gradedAssessments.length > 0) {
+        const validGrades = gradedAssessments
+          .map(a => normalizeGrade(a))
+          .filter(g => g !== null) as number[];
+        
+        if (validGrades.length > 0) {
+          result = validGrades.reduce((sum, g) => sum + g, 0) / validGrades.length;
+          console.log('[useSubjectGrades] 📊 averageGrade (simple fallback):', result, 'validGrades:', validGrades);
+        }
       }
     }
     
-    return 0;
+    return result;
   }, [accumulatedPoints, evaluatedPercentage, gradedAssessments]);
 
   // 4. Nota Necesaria (N_necesaria)
@@ -95,7 +119,9 @@ export function useSubjectGrades(
   const requiredGrade = useMemo(() => {
     if (remainingPercentage <= 0) return null;
     const missingPoints = targetGrade - accumulatedPoints;
-    return missingPoints / (remainingPercentage / 100);
+    const result = missingPoints / (remainingPercentage / 100);
+    console.log('[useSubjectGrades] 📊 requiredGrade:', result, 'missingPoints:', missingPoints, 'remainingPercentage:', remainingPercentage);
+    return result;
   }, [targetGrade, accumulatedPoints, remainingPercentage]);
 
   const projectedGrade = useMemo(() => averageGrade, [averageGrade]);
@@ -105,6 +131,16 @@ export function useSubjectGrades(
   }, [evaluatedPercentage]);
 
   const deliveredText = `${gradedAssessments.length} / ${Math.max(assessments.length, gradedAssessments.length)}`;
+  console.log('[useSubjectGrades] 📊 FINAL RESULTS:', {
+    deliveredText,
+    averageGrade,
+    projectedGrade,
+    securedPercent,
+    evaluatedPercentage,
+    accumulatedPoints,
+    targetGrade,
+    requiredGrade,
+  });
   
   const finalNeededText = useMemo(() => {
     if (requiredGrade === null || remainingPercentage === 0) {

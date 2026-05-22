@@ -67,13 +67,32 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
 
     try {
       setIsSaving(true);
-      const updatedAssessment = await updateAssessment(assessment.id, {
+      const updatePayload = {
         subject_id: selectedSubjectId,
         name: gradeName.trim(),
         grade_value: Number(gradeValue),
         weight: gradePercentage,
         category_id: selectedCategoryId || undefined,
         is_completed: true,
+      };
+      console.log('[EditGradeModal] 📤 Enviando UPDATE assessment:', {
+        assessmentId: assessment.id,
+        payload: updatePayload,
+        gradeValueType: typeof updatePayload.grade_value,
+        weightType: typeof updatePayload.weight,
+      });
+      
+      const updatedAssessment = await updateAssessment(assessment.id, updatePayload);
+      
+      console.log('[EditGradeModal] 📥 Respuesta del backend:', {
+        id: updatedAssessment?.id,
+        grade_value: updatedAssessment?.grade_value,
+        score: updatedAssessment?.score,
+        normalized_value: updatedAssessment?.normalized_value,
+        is_completed: updatedAssessment?.is_completed,
+        weight: updatedAssessment?.weight,
+        gradeValueType: typeof updatedAssessment?.grade_value,
+        normalized_valueType: typeof updatedAssessment?.normalized_value,
       });
 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
@@ -81,13 +100,17 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
       
       // Call callback with updated assessment to update parent state immediately
       if (onAssessmentSaved && updatedAssessment) {
+        console.log('[EditGradeModal] 🔄 Llamando onAssessmentSaved con assessment actualizado');
         onAssessmentSaved(updatedAssessment as Assessment);
       }
       
       const { refreshSubjects, refreshAssessments } = useDataStore.getState();
+      console.log('[EditGradeModal] 🔄 Refrescando store...', { refreshSubjects: !!refreshSubjects, refreshAssessments: !!refreshAssessments });
       await Promise.all([refreshSubjects(), refreshAssessments()]);
+      console.log('[EditGradeModal] ✅ Store refrescado exitosamente');
       handleClose();
     } catch (error: any) {
+      console.error('[EditGradeModal] ❌ Error al guardar:', { message: error?.message, error });
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.quickAddMenu.grade.errorSave'), type: 'error' });
     } finally {
       setIsSaving(false);

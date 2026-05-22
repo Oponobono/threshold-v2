@@ -6,6 +6,8 @@ const gradingEngine = require('../services/gradingEngine');
  */
 exports.getAssessmentsBySubject = (req, res) => {
   const { subjectId } = req.params;
+  console.log(`[GET] getAssessmentsBySubject para subjectId=${subjectId}`);
+  
   const query = `
     SELECT a.*, ar.normalized_value, ar.raw_value as original_raw_value, s.user_id
     FROM assessments a
@@ -15,8 +17,16 @@ exports.getAssessmentsBySubject = (req, res) => {
     ORDER BY a.date ASC
   `;
   db.all(query, [subjectId], async (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!rows || rows.length === 0) return res.json(rows);
+    if (err) {
+      console.error(`[GET] Error en getAssessmentsBySubject:`, err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    if (!rows || rows.length === 0) {
+      console.log(`[GET] getAssessmentsBySubject retorna vacío`);
+      return res.json(rows);
+    }
+
+    console.log(`[GET] getAssessmentsBySubject encontró ${rows.length} assessments sin denormalizar`);
 
     try {
       const userId = rows[0].user_id;
@@ -66,6 +76,7 @@ exports.getAssessmentsBySubject = (req, res) => {
               }
             }
           });
+          console.log(`[GET] getAssessmentsBySubject denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
         }
       }
     } catch (error) {
@@ -81,6 +92,8 @@ exports.getAssessmentsBySubject = (req, res) => {
  */
 exports.getAssessmentsByUser = (req, res) => {
   const { userId } = req.params;
+  console.log(`[GET] getAssessmentsByUser para userId=${userId}`);
+  
   const query = `
     SELECT a.*, ar.normalized_value, ar.raw_value as original_raw_value, 
            s.name as subject_name, s.color as subject_color, s.icon as subject_icon, s.user_id
@@ -91,8 +104,16 @@ exports.getAssessmentsByUser = (req, res) => {
     ORDER BY a.date ASC
   `;
   db.all(query, [userId], async (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!rows || rows.length === 0) return res.json(rows);
+    if (err) {
+      console.error(`[GET] Error en getAssessmentsByUser:`, err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    if (!rows || rows.length === 0) {
+      console.log(`[GET] getAssessmentsByUser retorna vacío`);
+      return res.json(rows);
+    }
+
+    console.log(`[GET] getAssessmentsByUser encontró ${rows.length} assessments sin denormalizar`);
 
     try {
       const user = await new Promise((resolve, reject) => {
@@ -141,6 +162,7 @@ exports.getAssessmentsByUser = (req, res) => {
               }
             }
           });
+          console.log(`[GET] getAssessmentsByUser denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
         }
       }
     } catch (error) {
@@ -156,11 +178,13 @@ exports.getAssessmentsByUser = (req, res) => {
  */
 exports.createAssessment = (req, res) => {
   const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id } = req.body;
-  console.log('[AssessmentsController] createAssessment payload:', req.body);
+  console.log('[POST] 📝 createAssessment payload:', {
+    subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id
+  });
 
   // Si se envía grade_value sin out_of, asumir escala 0-5
   const finalOutOf = out_of || (grade_value != null ? 5 : null);
-  console.log('[AssessmentsController] finalOutOf:', finalOutOf);
+  console.log('[POST] 📊 Configuración final:', { finalOutOf, gradeValueInput: grade_value });
 
   const query = `
     INSERT INTO assessments (subject_id, name, type, date, weight, out_of, is_completed, category_id)
@@ -171,20 +195,23 @@ exports.createAssessment = (req, res) => {
     [subject_id, name, type, date, weight, finalOutOf, is_completed ? 1 : 0, category_id || null],
     function(err) {
       if (err) {
-        console.error('[AssessmentsController] Error insertando assessment:', err.message);
+        console.error('[POST] ❌ Error insertando assessment:', err.message);
         return res.status(500).json({ error: err.message });
       }
       const newAssessmentId = this.lastID;
-      console.log('[AssessmentsController] Assessment creado con ID:', newAssessmentId);
+      console.log('[POST] ✅ Assessment creado con ID:', newAssessmentId);
+      
       // Fase 1 & 2: Dual Write en assessment_results
       db.get('SELECT user_id FROM subjects WHERE id = ?', [subject_id], (err, subject) => {
         if (err || !subject) {
-          console.log('[AssessmentsController] Error/No Subject en dual write:', err || 'No subject');
+          console.log('[POST] ⚠️  Error/No Subject en dual write:', err || 'No subject');
           return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (sin notas adicionales)' });
         }
+        console.log('[POST] ✅ Subject encontrado:', { subjectId: subject_id, userId: subject.user_id });
         
         db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
           const gradingVersionId = user?.active_grading_version_id || 3; // Fallback to 3 (0-5.0 scale)
+          console.log('[POST] ✅ GradingVersion obtenido:', { gradingVersionId });
           
           db.get(`
             SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
@@ -192,9 +219,11 @@ exports.createAssessment = (req, res) => {
             WHERE gv.id = ?
           `, [gradingVersionId], (err, version) => {
             if (err || !version) {
-              console.log('[AssessmentsController] Error recuperando version details:', err || 'No version');
+              console.log('[POST] ⚠️  Error recuperando version details:', err || 'No version');
               return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (versión no encontrada)' });
             }
+            
+            console.log('[POST] ✅ Version obtenido:', { id: version.id, max_value: version.max_value, min_value: version.min_value });
             
             let rawValue = null;
             if (grade_value != null) rawValue = grade_value;
@@ -204,20 +233,26 @@ exports.createAssessment = (req, res) => {
               else rawValue = (percentage / 100) * version.max_value;
             }
 
+            console.log('[POST] 📊 Raw value calculado:', { rawValue, gradeValueInput: grade_value, scoreInput: score, percentageInput: percentage });
+
             if (rawValue !== null) {
               const { normalizeGrade } = require('../services/gradingEngine');
               const normalized = normalizeGrade(rawValue, version);
-              console.log(`[AssessmentsController] Insertando assessment_results: raw=${rawValue}, normalized=${normalized}`);
+              console.log(`[POST] 📊 Normalización: raw=${rawValue}, normalized=${normalized}, maxValue=${version.max_value}`);
+              
               db.run(`
                 INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
                 VALUES (?, ?, ?, ?, ?)
               `, [newAssessmentId, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
-                if (err) console.error('[AssessmentsController] Error insertando assessment_results:', err.message);
-                else console.log('[AssessmentsController] assessment_results insertado correctamente.');
+                if (err) {
+                  console.error('[POST] ❌ Error insertando assessment_results:', err.message);
+                } else {
+                  console.log('[POST] ✅ assessment_results insertado correctamente:', { assessmentId: newAssessmentId, raw_value: rawValue, normalized_value: normalized });
+                }
                 return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
               });
             } else {
-              console.log('[AssessmentsController] No hay rawValue para insertar en assessment_results');
+              console.log('[POST] ⚠️  No hay rawValue para insertar en assessment_results');
               return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
             }
           });
@@ -382,6 +417,8 @@ exports.updateAssessment = (req, res) => {
     // Promisify remaining operations to avoid callback hell and race conditions
     (async () => {
       try {
+        console.log('[AssessmentsController] ✅ UPDATE ejecutado, changes:', this.changes);
+        
         // Get current assessment to find userId
         const assessment = await new Promise((resolve, reject) => {
           db.get('SELECT subject_id FROM assessments WHERE id = ?', [id], (err, row) => {
@@ -397,9 +434,11 @@ exports.updateAssessment = (req, res) => {
           });
         });
 
+        console.log('[AssessmentsController] ✅ Assessment encontrado:', { assessmentId: id, subjectId: subject.id, userId: subject.user_id });
+
         // Si se actualiza grade_value o percentage, también actualizar assessment_results
         if (grade_value !== undefined || percentage !== undefined || score !== undefined) {
-          console.log('[AssessmentsController] Detectado cambio en nota, iniciando dual-write');
+          console.log('[AssessmentsController] 🔄 Detectado cambio en nota, iniciando dual-write:', { grade_value, percentage, score });
           
           const user = await new Promise((resolve, reject) => {
             db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, row) => {
@@ -409,6 +448,7 @@ exports.updateAssessment = (req, res) => {
           });
           
           const gradingVersionId = user?.active_grading_version_id || 3; // Fallback to 3 (0-5.0 scale)
+          console.log('[AssessmentsController] ✅ GradingVersion obtenido:', { gradingVersionId });
 
           const version = await new Promise((resolve, reject) => {
             db.get(`
@@ -421,6 +461,8 @@ exports.updateAssessment = (req, res) => {
             });
           });
 
+          console.log('[AssessmentsController] ✅ Version obtenido:', { id: version?.id, max_value: version?.max_value, min_value: version?.min_value });
+
           if (version) {
             let rawValue = null;
             if (grade_value != null) rawValue = grade_value;
@@ -430,10 +472,12 @@ exports.updateAssessment = (req, res) => {
               else rawValue = (percentage / 100) * version.max_value;
             }
 
+            console.log('[AssessmentsController] 📊 Raw value calculado:', { rawValue, gradeValueInput: grade_value, scoreInput: score, percentageInput: percentage });
+
             if (rawValue !== null) {
               const { normalizeGrade } = require('../services/gradingEngine');
               const normalized = normalizeGrade(rawValue, version);
-              console.log(`[AssessmentsController] update dual-write: raw=${rawValue}, normalized=${normalized}`);
+              console.log(`[AssessmentsController] 📊 Normalización: raw=${rawValue}, normalized=${normalized}, maxValue=${version.max_value}`);
               
               const existingResult = await new Promise((resolve, reject) => {
                 db.get('SELECT id FROM assessment_results WHERE assessment_id = ?', [id], (err, row) => {
@@ -443,6 +487,7 @@ exports.updateAssessment = (req, res) => {
               });
 
               if (existingResult) {
+                console.log('[AssessmentsController] 🔄 Actualizando assessment_results existente');
                 await new Promise((resolve, reject) => {
                   db.run(`
                     UPDATE assessment_results 
@@ -450,25 +495,26 @@ exports.updateAssessment = (req, res) => {
                     WHERE assessment_id = ?
                   `, [rawValue, normalized, gradingVersionId, id], (err) => {
                     if (err) {
-                      console.error('[AssessmentsController] Error UPDATE assessment_results:', err.message);
+                      console.error('[AssessmentsController] ❌ Error UPDATE assessment_results:', err.message);
                       reject(err);
                     } else {
-                      console.log('[AssessmentsController] assessment_results actualizado');
+                      console.log('[AssessmentsController] ✅ assessment_results actualizado:', { assessmentId: id, raw_value: rawValue, normalized_value: normalized });
                       resolve();
                     }
                   });
                 });
               } else {
+                console.log('[AssessmentsController] ➕ Insertando assessment_results nuevo');
                 await new Promise((resolve, reject) => {
                   db.run(`
                     INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
                     VALUES (?, ?, ?, ?, ?)
                   `, [id, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
                     if (err) {
-                      console.error('[AssessmentsController] Error INSERT assessment_results:', err.message);
+                      console.error('[AssessmentsController] ❌ Error INSERT assessment_results:', err.message);
                       reject(err);
                     } else {
-                      console.log('[AssessmentsController] assessment_results insertado');
+                      console.log('[AssessmentsController] ✅ assessment_results insertado:', { assessmentId: id, raw_value: rawValue, normalized_value: normalized });
                       resolve();
                     }
                   });
@@ -480,11 +526,18 @@ exports.updateAssessment = (req, res) => {
 
         // Fetch and return the updated assessment with denormalized data
         const updatedAssessment = await fetchAndDenormalizeAssessment(id, subject.user_id);
-        console.log('[AssessmentsController] updateAssessment returning:', { id: updatedAssessment.id, grade_value: updatedAssessment.grade_value, normalized_value: updatedAssessment.normalized_value });
+        console.log('[AssessmentsController] 📦 RESPUESTA updateAssessment:', { 
+          id: updatedAssessment.id, 
+          grade_value: updatedAssessment.grade_value, 
+          normalized_value: updatedAssessment.normalized_value,
+          is_completed: updatedAssessment.is_completed,
+          score: updatedAssessment.score,
+          allFields: updatedAssessment
+        });
         return res.json(updatedAssessment);
 
       } catch (error) {
-        console.error('[AssessmentsController] Error in updateAssessment:', error.message);
+        console.error('[AssessmentsController] ❌ Error in updateAssessment:', error.message, error);
         return res.status(500).json({ error: error.message || 'Error updating assessment' });
       }
     })();

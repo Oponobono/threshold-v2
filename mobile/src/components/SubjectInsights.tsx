@@ -307,12 +307,21 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
       <EditGradeModal
         visible={isEditGradeModalVisible}
         onClose={() => {
+          console.log('[SubjectInsights] 🔄 Cerrando EditGradeModal');
           setIsEditGradeModalVisible(false);
           setSelectedAssessment(null);
         }}
         assessment={selectedAssessment}
         subjects={subjects}
         onAssessmentSaved={(updatedAssessment) => {
+          console.log('[SubjectInsights] 📥 onAssessmentSaved recibido:', {
+            id: updatedAssessment?.id,
+            grade_value: updatedAssessment?.grade_value,
+            normalized_value: updatedAssessment?.normalized_value,
+            is_completed: updatedAssessment?.is_completed,
+            name: updatedAssessment?.name,
+          });
+          console.log('[SubjectInsights] 🔄 Propagando a parent via onAssessmentUpdated');
           onAssessmentUpdated?.(updatedAssessment);
         }}
       />
