@@ -622,10 +622,11 @@ exports.getProjectionAnalytics = (req, res) => {
   const { subjectId } = req.params;
   
   if (!subjectId) {
+    console.error(`[Analytics] ❌ subjectId es requerido`);
     return res.status(400).json({ error: 'subjectId es requerido' });
   }
 
-  console.log(`[Analytics] getProjectionAnalytics para subjectId=${subjectId}`);
+  console.log(`[Analytics] 🔍 getProjectionAnalytics START para subjectId=${subjectId}`);
 
   // Obtener todas las evaluaciones con notas de esta materia, ordenadas por fecha
   // Busca tanto en grade_value directo como en assessment_results
@@ -641,16 +642,20 @@ exports.getProjectionAnalytics = (req, res) => {
     ORDER BY a.date ASC
   `;
 
+  console.log(`[Analytics] 📝 SQL Query: ${query.split('\n')[0]}...`);
+
   db.all(query, [subjectId], async (err, rows) => {
     if (err) {
-      console.error(`[Analytics] Error en getProjectionAnalytics:`, err.message);
-      return res.status(500).json({ error: err.message });
+      console.error(`[Analytics] ❌ DB Error:`, err.message);
+      return res.status(500).json({ error: `DB Error: ${err.message}` });
     }
 
     try {
+      console.log(`[Analytics] ✅ DB query retornó ${rows?.length || 0} rows`);
+      
       // Denormalizar los assessments
       if (!rows || rows.length === 0) {
-        console.log(`[Analytics] No hay evaluaciones calificadas para subjectId=${subjectId}`);
+        console.log(`[Analytics] ℹ️ No hay evaluaciones calificadas para subjectId=${subjectId}`);
         return res.json({
           subjectId: parseInt(subjectId),
           currentAverage: 0,
@@ -664,6 +669,7 @@ exports.getProjectionAnalytics = (req, res) => {
       }
 
       const userId = rows[0].user_id;
+      console.log(`[Analytics] 👤 userId=${userId}`);
 
       // Obtener versión de calificación del usuario
       const user = await new Promise((resolve, reject) => {
@@ -690,7 +696,7 @@ exports.getProjectionAnalytics = (req, res) => {
         }
       }
 
-      console.log(`[Analytics] Max scale para user=${userId}: ${maxScale}`);
+      console.log(`[Analytics] 📏 maxScale=${maxScale}`);
 
       // Denormalizar assessments (asegurar que grade_value esté poblado)
       const denormalizedAssessments = rows.map(row => {
@@ -714,15 +720,20 @@ exports.getProjectionAnalytics = (req, res) => {
         };
       });
 
-      console.log(`[Analytics] Assessments denormalizados:`, denormalizedAssessments);
+      console.log(`[Analytics] 📊 Denormalized ${denormalizedAssessments.length} assessments`);
+
+      // Filtrar solo los que tienen grade_value
+      const validAssessments = denormalizedAssessments.filter(a => a.grade_value !== null);
+      console.log(`[Analytics] ✓ ${validAssessments.length} assessments con notas válidas`);
 
       // Calcular proyección usando la función del gradingEngine
-      const projection = gradingEngine.calculateProjectedGrade(
-        denormalizedAssessments.filter(a => a.grade_value !== null),
-        maxScale
-      );
+      const projection = gradingEngine.calculateProjectedGrade(validAssessments, maxScale);
 
-      console.log(`[Analytics] Proyección calculada:`, projection);
+      console.log(`[Analytics] ✅ Proyección calculada:`, {
+        currentAverage: projection.currentAverage,
+        projectedGrade: projection.projectedGrade,
+        delta: projection.delta,
+      });
 
       return res.json({
         subjectId: parseInt(subjectId),
@@ -731,8 +742,8 @@ exports.getProjectionAnalytics = (req, res) => {
         maxScale,
       });
     } catch (error) {
-      console.error(`[Analytics] Error calculando proyección:`, error.message);
-      return res.status(500).json({ error: error.message });
+      console.error(`[Analytics] ❌ Exception:`, error.message, error.stack);
+      return res.status(500).json({ error: `Exception: ${error.message}` });
     }
   });
 };

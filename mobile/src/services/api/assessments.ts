@@ -158,13 +158,16 @@ export const getProjectionAnalytics = async (subjectId: number) => {
     console.log(`[API/Assessments] 🚀 Llamando getProjectionAnalytics con URL:`, url);
     
     const response = await fetchWithFallback(url);
-    console.log(`[API/Assessments] 📡 Response status:`, response.status);
+    console.log(`[API/Assessments] 📡 Response status: ${response.status}`, response.statusText);
     
     const data = await parseJsonSafely(response);
-    console.log(`[API/Assessments] 📦 Response data:`, data);
+    console.log(`[API/Assessments] 📦 Response data:`, JSON.stringify(data).substring(0, 200));
     
     if (!response.ok) {
-      console.warn(`[API/Assessments] ❌ Error obteniendo proyección para subject ${subjectId}:`, data?.error);
+      console.warn(
+        `[API/Assessments] ❌ Error HTTP ${response.status} para subject ${subjectId}:`,
+        data?.error || response.statusText || 'Sin detalles de error'
+      );
       return null;
     }
     
@@ -180,7 +183,7 @@ export const getProjectionAnalytics = async (subjectId: number) => {
     });
     return data;
   } catch (error) {
-    console.warn(`[API/Assessments] ❌ Error en getProjectionAnalytics:`, error);
+    console.warn(`[API/Assessments] ❌ Exception en getProjectionAnalytics:`, error instanceof Error ? error.message : String(error));
     return null;
   }
 };
