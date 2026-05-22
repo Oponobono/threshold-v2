@@ -13,6 +13,7 @@ import '../src/locales/i18n';
 import { useColorScheme } from '@/src/hooks/use-color-scheme';
 import { CustomAlertProvider } from '../src/components/CustomAlert';
 import { useAutoSync } from '../src/hooks/useAutoSync';
+import { ConnectivityBanner } from '../src/components/ConnectivityBanner';
 import NetInfo from '@react-native-community/netinfo';
 import { flushOfflineQueue } from '../src/services/offlineQueue';
 import { hasValidSession } from '../src/services/api/auth/session';
@@ -141,6 +142,8 @@ export default function RootLayout() {
               <Stack.Screen name="about" options={{ headerShown: false }} />
             </Stack>
             <StatusBar style="auto" />
+            {/* Banner persistente de conectividad */}
+            <ConnectivityBanner />
           </ThemeProvider>
         </CustomAlertProvider>
       </SafeAreaProvider>

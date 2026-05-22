@@ -68,10 +68,6 @@ export const createPhoto = async (photoData: {
     };
   }
 };
-  } catch (error: any) {
-    throw new Error(error.message || 'Error de red al intentar guardar la foto');
-  }
-};
 
 /**
  * Obtiene las fotos de una materia específica
