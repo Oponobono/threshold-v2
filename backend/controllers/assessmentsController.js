@@ -217,7 +217,7 @@ exports.createAssessment = (req, res) => {
             SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
             FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
             WHERE gv.id = ?
-          `, [gradingVersionId], (err, version) => {
+          `, [gradingVersionId], async (err, version) => {
             if (err || !version) {
               console.log('[POST] ⚠️  Error recuperando version details:', err || 'No version');
               return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (versión no encontrada)' });
