@@ -77,7 +77,8 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects }: EditG
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       alertRef.show({ title: t('common.success'), message: t('assessments.updateSuccess', 'Nota actualizada'), type: 'success' });
       
-      await refreshSubjects();
+      const { refreshSubjects, refreshAssessments } = useDataStore.getState();
+      await Promise.all([refreshSubjects(), refreshAssessments()]);
       handleClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.quickAddMenu.grade.errorSave'), type: 'error' });

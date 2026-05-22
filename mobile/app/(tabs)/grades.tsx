@@ -8,7 +8,7 @@ import { LineChart } from 'react-native-chart-kit';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { gradesStyles as styles } from '../../src/styles/Grades.styles';
-
+import { normalizeGrade, parseWeight, SCALE_MAX } from '../../src/utils/grades';
 
 import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../../src/store/useDataStore';
@@ -26,7 +26,7 @@ export default function GradesScreen() {
   const { t } = useTranslation();
   const chartWidth = Math.max(240, Dimensions.get('window').width - theme.spacing.lg * 2 - theme.spacing.lg * 2 - 2);
 
-  const { subjects, assessments, loadAllData } = useDataStore();
+  const { subjects, assessments, refreshAssessments } = useDataStore();
 
   const [termGpa, setTermGpa] = useState('0.00');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
@@ -41,39 +41,32 @@ export default function GradesScreen() {
     return assessments.filter(a => a.subject_id === selectedSubjectId);
   }, [assessments, selectedSubjectId]);
 
-  React.useEffect(() => {
-    const graded = filteredAssessments.filter((a: any) => 
-      (a.grade_value !== null && a.grade_value !== undefined) || 
-      (a.score !== null && a.score !== undefined)
-    );
-    if (graded.length > 0) {
-      let maxVal = Math.max(...graded.map((a: any) => Number(a.grade_value) || 0));
-      let inferredScale = 5.0;
-      if (maxVal > 10) inferredScale = 100.0;
-      else if (maxVal > 5) inferredScale = 10.0;
+  // Evaluaciones que tienen una calificación real
+  const gradedAssessments = useMemo(() => 
+    filteredAssessments.filter((a: any) => normalizeGrade(a) !== null),
+  [filteredAssessments]);
 
-      const sum = graded.reduce((acc: number, curr: any) => {
-        if (curr.grade_value !== null && curr.grade_value !== undefined) {
-           return acc + Number(curr.grade_value);
-        }
-        const outOf = curr.out_of && curr.out_of > 0 ? curr.out_of : inferredScale;
-        return acc + ((curr.score || 0) / outOf) * inferredScale;
+  React.useEffect(() => {
+    if (gradedAssessments.length > 0) {
+      const sum = gradedAssessments.reduce((acc: number, curr: any) => {
+        return acc + (normalizeGrade(curr) ?? 0);
       }, 0);
-      setTermGpa((sum / graded.length).toFixed(2));
+      setTermGpa((sum / gradedAssessments.length).toFixed(2));
     } else {
       setTermGpa('0.00');
     }
-  }, [filteredAssessments]);
+  }, [gradedAssessments]);
 
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   
   useFocusEffect(
     useCallback(() => {
       const task = InteractionManager.runAfterInteractions(() => {
-        loadAllData();
+        // Forzar refresco de evaluaciones cada vez que el tab recibe foco
+        refreshAssessments();
       });
       return () => task.cancel();
-    }, [loadAllData])
+    }, [refreshAssessments])
   );
 
   const [simScore, setSimScore] = useState('');
@@ -88,16 +81,14 @@ export default function GradesScreen() {
       return;
     }
 
-    let maxScale = 5.0;
+    const N = gradedAssessments.length;
     const currentGpaVal = parseFloat(termGpa) || 0;
-    if (currentGpaVal > 10) maxScale = 100.0;
-    else if (currentGpaVal > 5) maxScale = 10.0;
-
-    const N = filteredAssessments.filter(a => a.score !== null || a.grade_value !== null).length;
+    // Normalizar la nota simulada a la escala 0-5
+    const simNormalized = (s / p) * SCALE_MAX;
     if (N === 0) {
-      setProjectedGpa(((s / p) * maxScale).toFixed(2));
+      setProjectedGpa(simNormalized.toFixed(2));
     } else {
-      const newGpa = ((currentGpaVal * N + ((s / p) * maxScale)) / (N + 1)).toFixed(2);
+      const newGpa = ((currentGpaVal * N + simNormalized) / (N + 1)).toFixed(2);
       setProjectedGpa(newGpa);
     }
   };
@@ -109,10 +100,7 @@ export default function GradesScreen() {
   };
 
   const historicalGpas = useMemo(() => {
-    const graded = filteredAssessments.filter((a: any) => 
-      (a.grade_value !== null && a.grade_value !== undefined) || 
-      (a.score !== null && a.score !== undefined)
-    ).sort((a: any, b: any) => {
+    const graded = [...gradedAssessments].sort((a: any, b: any) => {
       if (a.date && b.date) {
         try {
           const [da, ma, ya] = a.date.split('-');
@@ -124,29 +112,18 @@ export default function GradesScreen() {
     });
 
     if (graded.length === 0) return [0, 0];
-    
-    let maxVal = Math.max(...graded.map((a: any) => Number(a.grade_value) || 0));
-    let inferredScale = 5.0;
-    if (maxVal > 10) inferredScale = 100.0;
-    else if (maxVal > 5) inferredScale = 10.0;
 
     let currentSum = 0;
     const points: number[] = [];
     graded.forEach((curr, idx) => {
-      let val = 0;
-      if (curr.grade_value !== null && curr.grade_value !== undefined) {
-         val = Number(curr.grade_value);
-      } else {
-         const outOf = curr.out_of && curr.out_of > 0 ? curr.out_of : inferredScale;
-         val = ((curr.score || 0) / outOf) * inferredScale;
-      }
+      const val = normalizeGrade(curr) ?? 0;
       currentSum += val;
       points.push(currentSum / (idx + 1));
     });
 
     if (points.length === 1) return [0, points[0]];
     return points.slice(-10);
-  }, [filteredAssessments]);
+  }, [gradedAssessments]);
 
   const trendSeries = projectedGpa 
     ? [...historicalGpas, Number(projectedGpa)] 
@@ -311,15 +288,14 @@ export default function GradesScreen() {
 
           {/* Full-width elegant sparkline */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 4 }}>
-            {filteredAssessments.length === 0 ? (
+            {gradedAssessments.length === 0 ? (
               Array.from({ length: 12 }).map((_, i) => (
                 <View key={i} style={{ flex: 1, height: `${Math.random() * 40 + 20}%`, backgroundColor: theme.colors.text.secondary, opacity: 0.1, borderRadius: 2 }} />
               ))
             ) : (
-              filteredAssessments.filter(a => a.score !== null || a.grade_value !== null).slice(-12).map((a: any, i, arr) => {
-                const score = a.score ?? a.grade_value ?? 0;
-                const outOf = a.out_of ?? 5;
-                const h = Math.max(15, Math.min(100, (score / outOf) * 100));
+              gradedAssessments.slice(-12).map((a: any, i, arr) => {
+                const val = normalizeGrade(a) ?? 0;
+                const h = Math.max(15, Math.min(100, (val / SCALE_MAX) * 100));
                 const isLast = i === arr.length - 1;
                 return (
                   <View 
@@ -378,41 +354,51 @@ export default function GradesScreen() {
               <FlatList
                 data={filteredAssessments}
                 keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
-                scrollEnabled={false} // Since it's inside a ScrollView
+                scrollEnabled={false}
                 removeClippedSubviews={true}
                 maxToRenderPerBatch={10}
                 initialNumToRender={6}
                 windowSize={5}
                 renderItem={({ item: a, index }) => {
-                  const score = a.grade_value !== null && a.grade_value !== undefined ? a.grade_value : (a.score || 0);
-                  const outOf = a.out_of || (a.grade_value !== null && a.grade_value !== undefined ? 5 : 5);
-                  const pct = Math.round((score / outOf) * 100);
+                  const gradeVal = normalizeGrade(a as any);
+                  const weight = parseWeight(a as any);
+                  const pct = gradeVal !== null ? Math.round((gradeVal / SCALE_MAX) * 100) : null;
                   const subject = subjects.find(s => s.id === a.subject_id);
                   const color = subject?.color || '#5856D6';
                   const isLast = index === filteredAssessments.length - 1;
+                  const isTask = a.type === 'task';
+                  const isCompleted = (a as any).is_completed;
 
                   return (
                     <View style={{ padding: 16, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                       <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: color + '20', justifyContent: 'center', alignItems: 'center' }}>
-                        <MaterialCommunityIcons name={a.type === 'exam' ? 'file-document' : 'check-circle'} size={24} color={theme.colors.text.primary} />
+                        <MaterialCommunityIcons name={isTask ? 'check-circle' : 'file-document'} size={24} color={pct !== null ? GRADE_COLORS(pct) : theme.colors.text.secondary} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 2 }} numberOfLines={1}>
                           {a.name}
                         </Text>
                         <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '500' }} numberOfLines={1}>
-                          {subject?.name || 'Materia'} 
-                          <Text style={{ opacity: 0.5 }}> • </Text> 
-                          {a.percentage ? `${a.percentage}%` : (a.weight || t('grades.eval', 'Evaluación'))}
+                          {subject?.name || 'Materia'}
+                          <Text style={{ opacity: 0.5 }}> • </Text>
+                          {weight > 0 ? `${weight}%` : (a.weight || t('grades.eval', 'Evaluación'))}
                         </Text>
                       </View>
                       <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-                        <Text style={{ fontSize: 16, fontWeight: '800', color: GRADE_COLORS(pct) }}>
-                          {pct}%
-                        </Text>
-                        <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600', marginTop: 1, textTransform: 'uppercase' }}>
-                          {score} / {outOf}
-                        </Text>
+                        {pct !== null ? (
+                          <>
+                            <Text style={{ fontSize: 16, fontWeight: '800', color: GRADE_COLORS(pct) }}>
+                              {gradeVal!.toFixed(1)}/{SCALE_MAX}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600', marginTop: 1, textTransform: 'uppercase' }}>
+                              {pct}%
+                            </Text>
+                          </>
+                        ) : (
+                          <Text style={{ fontSize: 12, color: isTask && isCompleted ? '#34C759' : theme.colors.text.secondary, fontWeight: '600' }}>
+                            {isTask ? (isCompleted ? t('common.done', 'Entregada') : t('subjects.pending', 'Pendiente')) : t('subjects.pending', 'Sin nota')}
+                          </Text>
+                        )}
                       </View>
                     </View>
                   );

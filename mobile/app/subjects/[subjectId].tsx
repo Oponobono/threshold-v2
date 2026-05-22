@@ -337,11 +337,15 @@ export default function SubjectDetailScreen() {
             recentAssessments={recentAssessments} 
             onDeleteAssessment={(id) => {
               setAssessments(prev => prev.filter(a => a.id !== id));
+              const { refreshSubjects, refreshAssessments } = useDataStore.getState();
+              Promise.all([refreshSubjects(), refreshAssessments()]).catch(console.error);
             }}
             onAssessmentUpdated={() => {
               if (subjectId) {
                 getAssessments(subjectId).then(res => setAssessments((res || []) as Assessment[])).catch(console.error);
               }
+              const { refreshSubjects, refreshAssessments } = useDataStore.getState();
+              Promise.all([refreshSubjects(), refreshAssessments()]).catch(console.error);
             }}
             onOpenCategories={() => {
               if (subjectId) {

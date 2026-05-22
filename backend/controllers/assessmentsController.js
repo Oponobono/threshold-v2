@@ -148,42 +148,43 @@ exports.createAssessment = (req, res) => {
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       const newAssessmentId = this.lastID;
-
       // Fase 1 & 2: Dual Write en assessment_results
       db.get('SELECT user_id FROM subjects WHERE id = ?', [subject_id], (err, subject) => {
-        if (!err && subject) {
-          db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
-            if (!err && user && user.active_grading_version_id) {
-              db.get(`
-                SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
-                FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
-                WHERE gv.id = ?
-              `, [user.active_grading_version_id], (err, version) => {
-                if (!err && version) {
-                  let rawValue = null;
-                  if (grade_value != null) rawValue = grade_value;
-                  else if (score != null && out_of > 0) rawValue = (score / out_of) * version.max_value;
-                  else if (percentage != null) {
-                    if (version.max_value === 100) rawValue = percentage;
-                    else rawValue = (percentage / 100) * version.max_value;
-                  }
+        if (err || !subject) return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (sin notas adicionales)' });
+        
+        db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
+          if (err || !user || !user.active_grading_version_id) return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (usuario sin versión)' });
+          
+          db.get(`
+            SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
+            FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
+            WHERE gv.id = ?
+          `, [user.active_grading_version_id], (err, version) => {
+            if (err || !version) return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (versión no encontrada)' });
+            
+            let rawValue = null;
+            if (grade_value != null) rawValue = grade_value;
+            else if (score != null && out_of > 0) rawValue = (score / out_of) * version.max_value;
+            else if (percentage != null) {
+              if (version.max_value === 100) rawValue = percentage;
+              else rawValue = (percentage / 100) * version.max_value;
+            }
 
-                  if (rawValue !== null) {
-                    const { normalizeGrade } = require('../services/gradingEngine');
-                    const normalized = normalizeGrade(rawValue, version);
-                    db.run(`
-                      INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
-                      VALUES (?, ?, ?, ?, ?)
-                    `, [newAssessmentId, subject.user_id, rawValue, normalized, user.active_grading_version_id]);
-                  }
-                }
+            if (rawValue !== null) {
+              const { normalizeGrade } = require('../services/gradingEngine');
+              const normalized = normalizeGrade(rawValue, version);
+              db.run(`
+                INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
+                VALUES (?, ?, ?, ?, ?)
+              `, [newAssessmentId, subject.user_id, rawValue, normalized, user.active_grading_version_id], (err) => {
+                return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
               });
+            } else {
+              return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
             }
           });
-        }
+        });
       });
-
-      res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
     }
   );
 };

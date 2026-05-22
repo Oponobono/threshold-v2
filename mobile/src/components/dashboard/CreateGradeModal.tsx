@@ -78,7 +78,8 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       alertRef.show({ title: t('common.success'), message: t('dashboard.quickAddMenu.grade.success', { subject: subjectName }), type: 'success' });
       
-      await refreshSubjects();
+      const { refreshSubjects, refreshAssessments } = useDataStore.getState();
+      await Promise.all([refreshSubjects(), refreshAssessments()]);
       handleClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.quickAddMenu.grade.errorSave'), type: 'error' });

@@ -71,7 +71,8 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       alertRef.show({ title: t('common.success'), message: t('tasks.updateSuccess', 'Tarea actualizada'), type: 'success' });
       
-      await refreshSubjects();
+      const { refreshSubjects, refreshAssessments } = useDataStore.getState();
+      await Promise.all([refreshSubjects(), refreshAssessments()]);
       handleClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('common.errorOccurred'), type: 'error' });

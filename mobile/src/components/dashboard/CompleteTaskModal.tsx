@@ -58,7 +58,8 @@ export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalP
         type: 'success' 
       });
       
-      await refreshSubjects();
+      const { refreshSubjects, refreshAssessments } = useDataStore.getState();
+      await Promise.all([refreshSubjects(), refreshAssessments()]);
       handleClose();
     } catch (error: any) {
       alertRef.show({ 
