@@ -45,6 +45,14 @@ exports.getAssessmentsBySubject = (req, res) => {
         if (versionRow) {
           const scales = await gradingEngine.getScalesForVersion(versionRow.id);
           rows.forEach(row => {
+            // Normalize data types
+            if (row.normalized_value !== null && row.normalized_value !== undefined) {
+              row.normalized_value = parseFloat(row.normalized_value);
+            }
+            if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
+              row.grade_value = parseFloat(row.original_raw_value);
+            }
+            
             if (row.normalized_value !== null && row.normalized_value !== undefined) {
               row.score = gradingEngine.denormalizeGrade(row.normalized_value, versionRow);
               const eq = gradingEngine.getEquivalencies(row.normalized_value, scales, versionRow.mode);
@@ -109,6 +117,14 @@ exports.getAssessmentsByUser = (req, res) => {
         if (versionRow) {
           const scales = await gradingEngine.getScalesForVersion(versionRow.id);
           rows.forEach(row => {
+            // Normalize data types
+            if (row.normalized_value !== null && row.normalized_value !== undefined) {
+              row.normalized_value = parseFloat(row.normalized_value);
+            }
+            if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
+              row.grade_value = parseFloat(row.original_raw_value);
+            }
+            
             if (row.normalized_value !== null && row.normalized_value !== undefined) {
               row.score = gradingEngine.denormalizeGrade(row.normalized_value, versionRow);
               const eq = gradingEngine.getEquivalencies(row.normalized_value, scales, versionRow.mode);
@@ -228,6 +244,14 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
       }
       
       try {
+        // Normalize data types
+        if (row.normalized_value !== null && row.normalized_value !== undefined) {
+          row.normalized_value = parseFloat(row.normalized_value);
+        }
+        if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
+          row.grade_value = parseFloat(row.original_raw_value);
+        }
+        
         const user = await new Promise((res, rej) => {
           db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [userId], (e, u) => {
             if (e) rej(e);
@@ -263,11 +287,17 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
             }
           }
         }
-        console.log('[fetchAndDenormalizeAssessment] Returning assessment:', { id: row.id, grade_value: row.grade_value, normalized_value: row.normalized_value });
+        console.log('[fetchAndDenormalizeAssessment] Returning assessment:', { id: row.id, grade_value: row.grade_value, normalized_value: row.normalized_value, original_raw_value: row.original_raw_value });
         resolve(row);
       } catch (error) {
         console.error('[Assessments] Error denormalizing assessment:', error.message);
-        // Return row even if denormalization fails
+        // Return row even if denormalization fails, but with normalized data types
+        if (row.normalized_value !== null && row.normalized_value !== undefined) {
+          row.normalized_value = parseFloat(row.normalized_value);
+        }
+        if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
+          row.grade_value = parseFloat(row.original_raw_value);
+        }
         console.log('[fetchAndDenormalizeAssessment] Denormalization failed, returning raw row:', { id: row.id, grade_value: row.grade_value, normalized_value: row.normalized_value });
         resolve(row);
       }
