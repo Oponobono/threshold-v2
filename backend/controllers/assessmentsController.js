@@ -52,6 +52,9 @@ exports.getAssessmentsBySubject = (req, res) => {
             if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
               row.grade_value = parseFloat(row.original_raw_value);
             }
+            if (row.is_completed !== undefined) {
+              row.is_completed = row.is_completed === 1 ? 1 : 0;
+            }
             
             if (row.normalized_value !== null && row.normalized_value !== undefined) {
               row.score = gradingEngine.denormalizeGrade(row.normalized_value, versionRow);
@@ -123,6 +126,9 @@ exports.getAssessmentsByUser = (req, res) => {
             }
             if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
               row.grade_value = parseFloat(row.original_raw_value);
+            }
+            if (row.is_completed !== undefined) {
+              row.is_completed = row.is_completed === 1 ? 1 : 0;
             }
             
             if (row.normalized_value !== null && row.normalized_value !== undefined) {
@@ -251,6 +257,10 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
         if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
           row.grade_value = parseFloat(row.original_raw_value);
         }
+        // Convert SQLite integer to boolean
+        if (row.is_completed !== undefined) {
+          row.is_completed = row.is_completed === 1 ? 1 : 0;
+        }
         
         const user = await new Promise((res, rej) => {
           db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [userId], (e, u) => {
@@ -287,7 +297,7 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
             }
           }
         }
-        console.log('[fetchAndDenormalizeAssessment] Returning assessment:', { id: row.id, grade_value: row.grade_value, normalized_value: row.normalized_value, original_raw_value: row.original_raw_value });
+        console.log('[fetchAndDenormalizeAssessment] Returning assessment:', { id: row.id, grade_value: row.grade_value, normalized_value: row.normalized_value, is_completed: row.is_completed, original_raw_value: row.original_raw_value });
         resolve(row);
       } catch (error) {
         console.error('[Assessments] Error denormalizing assessment:', error.message);
@@ -298,7 +308,10 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
         if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
           row.grade_value = parseFloat(row.original_raw_value);
         }
-        console.log('[fetchAndDenormalizeAssessment] Denormalization failed, returning raw row:', { id: row.id, grade_value: row.grade_value, normalized_value: row.normalized_value });
+        if (row.is_completed !== undefined) {
+          row.is_completed = row.is_completed === 1 ? 1 : 0;
+        }
+        console.log('[fetchAndDenormalizeAssessment] Denormalization failed, returning raw row:', { id: row.id, grade_value: row.grade_value, normalized_value: row.normalized_value, is_completed: row.is_completed });
         resolve(row);
       }
     });

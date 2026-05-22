@@ -73,6 +73,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
         grade_value: Number(gradeValue),
         weight: gradePercentage,
         category_id: selectedCategoryId || undefined,
+        is_completed: true,
       });
 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
