@@ -11,44 +11,26 @@ exports.getSubjectById = (req, res) => {
     COALESCE((
       SELECT 
         CASE 
-          WHEN SUM(
-            CASE WHEN a.percentage IS NOT NULL THEN a.percentage
-                 WHEN a.weight IS NOT NULL THEN CAST(REPLACE(a.weight, '%', '') AS REAL)
-                 ELSE 0 END
-          ) > 0 
+          WHEN SUM(CAST(REPLACE(COALESCE(a.weight, '0'), '%', '') AS REAL)) > 0 
           THEN 
             SUM(
               ar.normalized_value
-              * (
-                CASE WHEN a.percentage IS NOT NULL THEN (a.percentage / 100.0)
-                     WHEN a.weight IS NOT NULL THEN (CAST(REPLACE(a.weight, '%', '') AS REAL) / 100.0)
-                     ELSE 0 END
-              )
+              * (CAST(REPLACE(COALESCE(a.weight, '0'), '%', '') AS REAL) / 100.0)
             ) / (
-              SUM(
-                CASE WHEN a.percentage IS NOT NULL THEN a.percentage
-                     WHEN a.weight IS NOT NULL THEN CAST(REPLACE(a.weight, '%', '') AS REAL)
-                     ELSE 0 END
-              ) / 100.0
+              SUM(CAST(REPLACE(COALESCE(a.weight, '0'), '%', '') AS REAL)) / 100.0
             )
-          -- FALLBACK: If no weights are defined, calculate a simple average of existing scores
           WHEN COUNT(ar.id) > 0
           THEN
             AVG(ar.normalized_value)
           ELSE 0 
         END
       FROM assessments a
-      JOIN assessment_results ar ON a.id = ar.assessment_id
+      LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
       WHERE a.subject_id = s.id
     ), 0) AS normalized_avg_score,
     COALESCE((
-      SELECT SUM(
-        CASE WHEN a.percentage IS NOT NULL THEN a.percentage
-             WHEN a.weight IS NOT NULL THEN CAST(REPLACE(a.weight, '%', '') AS REAL)
-             ELSE 0 END
-      )
+      SELECT SUM(CAST(REPLACE(COALESCE(a.weight, '0'), '%', '') AS REAL))
       FROM assessments a
-      JOIN assessment_results ar ON a.id = ar.assessment_id
       WHERE a.subject_id = s.id
     ), 0) AS completion_percent
     FROM subjects s WHERE id = ?
@@ -128,7 +110,7 @@ exports.getSubjectsByUser = (req, res) => {
       // Fetch Assessments and Results
       const assessments = await new Promise((resolve, reject) => {
         const sql = `
-          SELECT a.id, a.subject_id, a.category_id, a.weight, a.percentage, a.is_completed, ar.normalized_value 
+          SELECT a.id, a.subject_id, a.category_id, a.weight, a.is_completed, ar.normalized_value 
           FROM assessments a
           LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
           WHERE a.subject_id IN (${placeholders})
@@ -149,12 +131,10 @@ exports.getSubjectsByUser = (req, res) => {
 
       categories.forEach(c => categoriesBySub[c.subject_id].push(c));
       assessments.forEach(a => {
-        // Normalizar weight vs percentage
+        // Normalizar weight (remove % if present)
         let finalWeight = 0;
         if (a.weight) {
           finalWeight = parseFloat(String(a.weight).replace('%', ''));
-        } else if (a.percentage) {
-          finalWeight = parseFloat(a.percentage);
         }
         a.weight = finalWeight;
         assessmentsBySub[a.subject_id].push(a);
