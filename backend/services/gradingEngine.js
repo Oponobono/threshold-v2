@@ -76,10 +76,6 @@ function normalizeGrade(rawValue, version, roundMode = 'nearest') {
     throw new Error('GradingEngine: max_value y min_value no pueden ser iguales.');
   }
 
-  const raw = parseFloat(rawValue);
-  const min = parseFloat(min_value);
-  const max = parseFloat(max_value);
-
   if (raw < min || raw > max) {
     throw new Error(
       `GradingEngine: raw_value ${raw} está fuera del rango [${min}, ${max}].`

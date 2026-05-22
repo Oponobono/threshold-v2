@@ -236,7 +236,7 @@ const tableSchema = {
         date TEXT,
         time TEXT,
         ocr_text TEXT,
-        is_starred BOOLEAN DEFAULT false,
+        is_starred INTEGER DEFAULT 0,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0
       )
@@ -437,7 +437,7 @@ const tableSchema = {
         subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
         title TEXT NOT NULL,
         description TEXT,
-        is_public BOOLEAN DEFAULT false,
+        is_public INTEGER DEFAULT 0,
         total_reviews INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -822,8 +822,8 @@ const tableSchema = {
         mode TEXT NOT NULL,
         direction TEXT NOT NULL,
         country_code TEXT,
-        is_system_seeded BOOLEAN DEFAULT false,
-        is_custom BOOLEAN DEFAULT false,
+        is_system_seeded INTEGER DEFAULT 0,
+        is_custom INTEGER DEFAULT 0,
         created_by_user_id INTEGER REFERENCES users(id),
         based_on_system_id INTEGER REFERENCES grading_systems(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -861,7 +861,7 @@ const tableSchema = {
         precision INTEGER DEFAULT 2,
         valid_from TIMESTAMP,
         valid_to TIMESTAMP,
-        is_active BOOLEAN DEFAULT true,
+        is_active INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         archived_at TIMESTAMP
       )
@@ -895,7 +895,7 @@ const tableSchema = {
         gpa_equivalent REAL,
         color TEXT,
         sort_order INTEGER DEFAULT 0,
-        is_passing BOOLEAN DEFAULT true,
+        is_passing INTEGER DEFAULT 1,
         display_color TEXT,
         display_short_label TEXT,
         display_priority INTEGER DEFAULT 0
@@ -924,7 +924,7 @@ const tableSchema = {
         period_type TEXT NOT NULL,
         start_date TIMESTAMP,
         end_date TIMESTAMP,
-        is_active BOOLEAN DEFAULT true,
+        is_active INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `
@@ -1033,29 +1033,4 @@ const tableSchema = {
       )
     `
   },
-  assessment_categories: {
-    sqlite: `
-      CREATE TABLE IF NOT EXISTS assessment_categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subject_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        weight REAL,
-        drop_lowest INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
-      )
-    `,
-    postgres: `
-      CREATE TABLE IF NOT EXISTS assessment_categories (
-        id SERIAL PRIMARY KEY,
-        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        weight REAL,
-        drop_lowest INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `
-  }
-};
-
-module.exports = tableSchema;
+  };
