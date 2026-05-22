@@ -154,18 +154,33 @@ export const deleteAssessment = async (id: number) => {
  */
 export const getProjectionAnalytics = async (subjectId: number) => {
   try {
-    const response = await fetchWithFallback(`/assessments/analytics/subject/${subjectId}/projection`);
+    const url = `/assessments/analytics/subject/${subjectId}/projection`;
+    console.log(`[API/Assessments] 🚀 Llamando getProjectionAnalytics con URL:`, url);
+    
+    const response = await fetchWithFallback(url);
+    console.log(`[API/Assessments] 📡 Response status:`, response.status);
+    
     const data = await parseJsonSafely(response);
+    console.log(`[API/Assessments] 📦 Response data:`, data);
     
     if (!response.ok) {
-      console.warn(`[API/Assessments] Error obteniendo proyección para subject ${subjectId}:`, data?.error);
+      console.warn(`[API/Assessments] ❌ Error obteniendo proyección para subject ${subjectId}:`, data?.error);
       return null;
     }
     
-    console.log(`[API/Assessments] Proyección para subject ${subjectId}:`, data);
+    if (!data) {
+      console.warn(`[API/Assessments] ⚠️ Response vacío para subject ${subjectId}`);
+      return null;
+    }
+    
+    console.log(`[API/Assessments] ✅ Proyección para subject ${subjectId}:`, {
+      currentAverage: data.currentAverage,
+      projectedGrade: data.projectedGrade,
+      delta: data.delta,
+    });
     return data;
   } catch (error) {
-    console.warn(`[API/Assessments] Error en getProjectionAnalytics:`, error);
+    console.warn(`[API/Assessments] ❌ Error en getProjectionAnalytics:`, error);
     return null;
   }
 };

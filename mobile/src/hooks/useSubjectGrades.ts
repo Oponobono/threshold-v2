@@ -50,6 +50,7 @@ export function useSubjectGrades(
   // Efecto: Cargar datos de proyección del backend cuando la materia cambie
   useEffect(() => {
     if (!selectedSubject?.id) {
+      console.log('[useSubjectGrades] ⚠️ selectedSubject.id no disponible:', selectedSubject?.id);
       setProjectionData(null);
       return;
     }
@@ -59,8 +60,19 @@ export function useSubjectGrades(
         console.log(`[useSubjectGrades] 📊 Cargando proyección para subject ${selectedSubject.id}`);
         const data = await getProjectionAnalytics(selectedSubject.id);
         if (data) {
-          console.log(`[useSubjectGrades] 📊 Proyección cargada:`, data);
+          console.log(`[useSubjectGrades] 📊 Proyección cargada exitosamente:`, {
+            currentAverage: data.currentAverage,
+            currentEMA: data.currentEMA,
+            projectedGrade: data.projectedGrade,
+            delta: data.delta,
+            evaluatedWeight: data.evaluatedWeight,
+            remainingWeight: data.remainingWeight,
+            assessmentCount: data.assessmentCount,
+          });
           setProjectionData(data);
+        } else {
+          console.warn('[useSubjectGrades] ⚠️ getProjectionAnalytics retornó null');
+          setProjectionData(null);
         }
       } catch (error) {
         console.warn(`[useSubjectGrades] ⚠️ Error cargando proyección:`, error);

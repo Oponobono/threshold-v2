@@ -628,6 +628,7 @@ exports.getProjectionAnalytics = (req, res) => {
   console.log(`[Analytics] getProjectionAnalytics para subjectId=${subjectId}`);
 
   // Obtener todas las evaluaciones con notas de esta materia, ordenadas por fecha
+  // Busca tanto en grade_value directo como en assessment_results
   const query = `
     SELECT 
       a.id, a.subject_id, a.name, a.type, a.date, a.weight, a.grade_value,
@@ -636,7 +637,7 @@ exports.getProjectionAnalytics = (req, res) => {
     FROM assessments a
     JOIN subjects s ON a.subject_id = s.id
     LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
-    WHERE a.subject_id = ? AND a.grade_value IS NOT NULL
+    WHERE a.subject_id = ? AND (a.grade_value IS NOT NULL OR ar.raw_value IS NOT NULL OR ar.normalized_value IS NOT NULL)
     ORDER BY a.date ASC
   `;
 
