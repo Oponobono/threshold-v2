@@ -162,7 +162,7 @@ exports.createAssessment = (req, res) => {
         }
         
         db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
-          const gradingVersionId = user?.active_grading_version_id || 1; // Fallback to 1
+          const gradingVersionId = user?.active_grading_version_id || 3; // Fallback to 3 (0-5.0 scale)
           
           db.get(`
             SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
@@ -274,7 +274,7 @@ exports.updateAssessment = (req, res) => {
           db.get('SELECT user_id FROM subjects WHERE id = ?', [assessment.subject_id], (err, subject) => {
             if (!err && subject) {
               db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
-                const gradingVersionId = user?.active_grading_version_id || 1; // Fallback to 1
+                const gradingVersionId = user?.active_grading_version_id || 3; // Fallback to 3 (0-5.0 scale)
 
                 db.get(`
                   SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 

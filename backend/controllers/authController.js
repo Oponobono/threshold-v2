@@ -33,7 +33,7 @@ exports.registerUser = async (req, res) => {
     const sharePin = await getUniqueSharePin();
 
     const query = `INSERT INTO users (email, password_hash, name, lastname, username, major, university, semester, study_goal, reference_language, share_pin, profile_image, active_grading_version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    db.run(query, [email, passwordHash, name, lastname, username, major, university, semester || null, study_goal || null, reference_language || null, sharePin, profile_image || null, active_grading_version_id || null], function (err) {
+    db.run(query, [email, passwordHash, name, lastname, username, major, university, semester || null, study_goal || null, reference_language || null, sharePin, profile_image || null, active_grading_version_id || 3], function (err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
           return res.status(409).json({ error: 'El correo ya está registrado.' });
