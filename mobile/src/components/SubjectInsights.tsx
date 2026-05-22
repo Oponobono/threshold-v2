@@ -29,7 +29,7 @@ interface SubjectInsightsProps {
   onDeleteAssessment?: (id: number) => void;
   onOpenCategories?: () => void;
   onAddAssessment?: () => void;
-  onAssessmentUpdated?: () => void;
+  onAssessmentUpdated?: (assessment?: Assessment) => void;
   subjects: any[];
 }
 
@@ -309,10 +309,12 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
         onClose={() => {
           setIsEditGradeModalVisible(false);
           setSelectedAssessment(null);
-          onAssessmentUpdated?.();
         }}
         assessment={selectedAssessment}
         subjects={subjects}
+        onAssessmentSaved={(updatedAssessment) => {
+          onAssessmentUpdated?.(updatedAssessment);
+        }}
       />
 
       {/* Edit Task Modal */}

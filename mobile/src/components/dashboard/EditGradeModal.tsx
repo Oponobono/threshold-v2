@@ -17,9 +17,10 @@ interface EditGradeModalProps {
   onClose: () => void;
   assessment: Assessment | null;
   subjects: Subject[];
+  onAssessmentSaved?: (assessment: Assessment) => void;
 }
 
-export const EditGradeModal = ({ visible, onClose, assessment, subjects }: EditGradeModalProps) => {
+export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAssessmentSaved }: EditGradeModalProps) => {
   const { t } = useTranslation();
   const { refreshSubjects } = useDataStore();
 
@@ -66,7 +67,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects }: EditG
 
     try {
       setIsSaving(true);
-      await updateAssessment(assessment.id, {
+      const updatedAssessment = await updateAssessment(assessment.id, {
         subject_id: selectedSubjectId,
         name: gradeName.trim(),
         grade_value: Number(gradeValue),
@@ -76,6 +77,11 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects }: EditG
 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       alertRef.show({ title: t('common.success'), message: t('assessments.updateSuccess', 'Nota actualizada'), type: 'success' });
+      
+      // Call callback with updated assessment to update parent state immediately
+      if (onAssessmentSaved && updatedAssessment) {
+        onAssessmentSaved(updatedAssessment as Assessment);
+      }
       
       const { refreshSubjects, refreshAssessments } = useDataStore.getState();
       await Promise.all([refreshSubjects(), refreshAssessments()]);

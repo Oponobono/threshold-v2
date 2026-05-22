@@ -340,7 +340,15 @@ export default function SubjectDetailScreen() {
               const { refreshSubjects, refreshAssessments } = useDataStore.getState();
               Promise.all([refreshSubjects(), refreshAssessments()]).catch(console.error);
             }}
-            onAssessmentUpdated={() => {
+            onAssessmentUpdated={(updatedAssessment) => {
+              // If we have an updated assessment, merge it into local state immediately
+              if (updatedAssessment && updatedAssessment.id) {
+                setAssessments(prev => 
+                  prev.map(a => a.id === updatedAssessment.id ? updatedAssessment : a)
+                );
+              }
+              
+              // Also refetch to ensure consistency
               if (subjectId) {
                 getAssessments(subjectId).then(res => setAssessments((res || []) as Assessment[])).catch(console.error);
               }
