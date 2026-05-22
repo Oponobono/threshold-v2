@@ -134,9 +134,11 @@ exports.getAssessmentsByUser = (req, res) => {
  */
 exports.createAssessment = (req, res) => {
   const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id } = req.body;
+  console.log('[AssessmentsController] createAssessment payload:', req.body);
 
   // Si se envía grade_value sin out_of, asumir escala 0-5
   const finalOutOf = out_of || (grade_value != null ? 5 : null);
+  console.log('[AssessmentsController] finalOutOf:', finalOutOf);
 
   const query = `
     INSERT INTO assessments (subject_id, name, type, date, weight, out_of, is_completed, category_id)
@@ -146,21 +148,34 @@ exports.createAssessment = (req, res) => {
     query,
     [subject_id, name, type, date, weight, finalOutOf, is_completed ? 1 : 0, category_id || null],
     function(err) {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) {
+        console.error('[AssessmentsController] Error insertando assessment:', err.message);
+        return res.status(500).json({ error: err.message });
+      }
       const newAssessmentId = this.lastID;
+      console.log('[AssessmentsController] Assessment creado con ID:', newAssessmentId);
       // Fase 1 & 2: Dual Write en assessment_results
       db.get('SELECT user_id FROM subjects WHERE id = ?', [subject_id], (err, subject) => {
-        if (err || !subject) return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (sin notas adicionales)' });
+        if (err || !subject) {
+          console.log('[AssessmentsController] Error/No Subject en dual write:', err || 'No subject');
+          return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (sin notas adicionales)' });
+        }
         
         db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
-          if (err || !user || !user.active_grading_version_id) return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (usuario sin versión)' });
+          if (err || !user || !user.active_grading_version_id) {
+            console.log('[AssessmentsController] Error/No Version en dual write:', err || 'No user o no version');
+            return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (usuario sin versión)' });
+          }
           
           db.get(`
             SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
             FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
             WHERE gv.id = ?
           `, [user.active_grading_version_id], (err, version) => {
-            if (err || !version) return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (versión no encontrada)' });
+            if (err || !version) {
+              console.log('[AssessmentsController] Error recuperando version details:', err || 'No version');
+              return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (versión no encontrada)' });
+            }
             
             let rawValue = null;
             if (grade_value != null) rawValue = grade_value;
@@ -173,13 +188,17 @@ exports.createAssessment = (req, res) => {
             if (rawValue !== null) {
               const { normalizeGrade } = require('../services/gradingEngine');
               const normalized = normalizeGrade(rawValue, version);
+              console.log(`[AssessmentsController] Insertando assessment_results: raw=${rawValue}, normalized=${normalized}`);
               db.run(`
                 INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
                 VALUES (?, ?, ?, ?, ?)
               `, [newAssessmentId, subject.user_id, rawValue, normalized, user.active_grading_version_id], (err) => {
+                if (err) console.error('[AssessmentsController] Error insertando assessment_results:', err.message);
+                else console.log('[AssessmentsController] assessment_results insertado correctamente.');
                 return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
               });
             } else {
+              console.log('[AssessmentsController] No hay rawValue para insertar en assessment_results');
               return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
             }
           });
@@ -195,6 +214,7 @@ exports.createAssessment = (req, res) => {
 exports.updateAssessment = (req, res) => {
   const { id } = req.params;
   const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id } = req.body;
+  console.log(`[AssessmentsController] updateAssessment ID ${id} payload:`, req.body);
 
   // Build dynamic UPDATE query
   const updates = [];
@@ -240,12 +260,18 @@ exports.updateAssessment = (req, res) => {
   values.push(id);
 
   const query = `UPDATE assessments SET ${updates.join(', ')} WHERE id = ?`;
+  console.log(`[AssessmentsController] Ejecutando: ${query} con`, values);
+
   db.run(query, values, function(err) {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      console.error('[AssessmentsController] Error en UPDATE assessments:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
     if (this.changes === 0) return res.status(404).json({ error: 'Evaluación no encontrada.' });
 
     // Si se actualiza grade_value o percentage, también actualizar assessment_results
     if (grade_value !== undefined || percentage !== undefined || score !== undefined) {
+      console.log('[AssessmentsController] Detectado cambio en nota, iniciando dual-write');
       db.get('SELECT subject_id FROM assessments WHERE id = ?', [id], (err, assessment) => {
         if (!err && assessment) {
           db.get('SELECT user_id FROM subjects WHERE id = ?', [assessment.subject_id], (err, subject) => {
@@ -269,6 +295,7 @@ exports.updateAssessment = (req, res) => {
                       if (rawValue !== null) {
                         const { normalizeGrade } = require('../services/gradingEngine');
                         const normalized = normalizeGrade(rawValue, version);
+                        console.log(`[AssessmentsController] update dual-write: raw=${rawValue}, normalized=${normalized}`);
                         db.get('SELECT id FROM assessment_results WHERE assessment_id = ?', [id], (err, existingResult) => {
                           if (existingResult) {
                             db.run(`
@@ -276,6 +303,8 @@ exports.updateAssessment = (req, res) => {
                               SET raw_value = ?, normalized_value = ?, grading_version_id = ?
                               WHERE assessment_id = ?
                             `, [rawValue, normalized, user.active_grading_version_id, id], (err) => {
+                              if(err) console.error('[AssessmentsController] Error UPDATE assessment_results:', err.message);
+                              else console.log('[AssessmentsController] assessment_results actualizado');
                               return res.json({ id, message: 'Evaluación actualizada' });
                             });
                           } else {
@@ -283,18 +312,23 @@ exports.updateAssessment = (req, res) => {
                               INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
                               VALUES (?, ?, ?, ?, ?)
                             `, [id, subject.user_id, rawValue, normalized, user.active_grading_version_id], (err) => {
+                              if(err) console.error('[AssessmentsController] Error INSERT assessment_results:', err.message);
+                              else console.log('[AssessmentsController] assessment_results insertado');
                               return res.json({ id, message: 'Evaluación actualizada' });
                             });
                           }
                         });
                       } else {
+                        console.log('[AssessmentsController] No hay rawValue para actualizar en assessment_results');
                         return res.json({ id, message: 'Evaluación actualizada' });
                       }
                     } else {
+                      console.log('[AssessmentsController] dual-write: version not found');
                       return res.json({ id, message: 'Evaluación actualizada' });
                     }
                   });
                 } else {
+                  console.log('[AssessmentsController] dual-write: user active_grading_version_id not found');
                   return res.json({ id, message: 'Evaluación actualizada' });
                 }
               });

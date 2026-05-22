@@ -37,6 +37,7 @@ export const getAllAssessments = async (): Promise<any[]> => {
  * Crea una nueva evaluación o tarea
  */
 export const createAssessment = async (payload: Assessment) => {
+  console.log('[API/Assessments] createAssessment -> Sending payload:', JSON.stringify(payload, null, 2));
   const response = await fetchWithFallback('/assessments', {
     method: 'POST',
     headers: {
@@ -47,8 +48,10 @@ export const createAssessment = async (payload: Assessment) => {
 
   const data = await parseJsonSafely(response);
   if (!response.ok) {
+    console.error('[API/Assessments] createAssessment failed:', data?.error || 'Unknown error');
     throw new Error(data?.error || 'No se pudo crear la evaluación.');
   }
+  console.log('[API/Assessments] createAssessment success:', data);
   return data;
 };
 
@@ -56,6 +59,7 @@ export const createAssessment = async (payload: Assessment) => {
  * Actualiza una evaluación o tarea existente
  */
 export const updateAssessment = async (id: number, payload: Partial<Assessment>) => {
+  console.log(`[API/Assessments] updateAssessment (id:${id}) -> Sending payload:`, JSON.stringify(payload, null, 2));
   const response = await fetchWithFallback(`/assessments/${id}`, {
     method: 'PUT',
     headers: {
@@ -66,8 +70,10 @@ export const updateAssessment = async (id: number, payload: Partial<Assessment>)
 
   const data = await parseJsonSafely(response);
   if (!response.ok) {
+    console.error(`[API/Assessments] updateAssessment (id:${id}) failed:`, data?.error || 'Unknown error');
     throw new Error(data?.error || 'No se pudo actualizar la evaluación.');
   }
+  console.log(`[API/Assessments] updateAssessment (id:${id}) success:`, data);
   return data;
 };
 
