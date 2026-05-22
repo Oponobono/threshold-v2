@@ -75,7 +75,7 @@ export default function SubjectDetailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ subjectId?: string }>();
-  const { subjects: storeSubjects } = useDataStore();
+  const { subjects: storeSubjects, assessments: storeAssessments, refreshAssessments } = useDataStore();
 
   const subjectId = useMemo(() => {
     const raw = Array.isArray(params.subjectId) ? params.subjectId[0] : params.subjectId;
@@ -85,7 +85,6 @@ export default function SubjectDetailScreen() {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<DetailSubject | null>(null);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [subjectSchedules, setSubjectSchedules] = useState<any[]>([]);
   const [photos, setPhotos] = useState<any[]>([]);
   const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>([]);
@@ -208,7 +207,6 @@ export default function SubjectDetailScreen() {
         if (subjectRes.status === 'fulfilled') setSelectedSubject(subjectRes.value as DetailSubject);
         if (photosRes.status === 'fulfilled') setPhotos(photosRes.value || []);
         if (docsRes.status === 'fulfilled') setScannedDocuments(docsRes.value || []);
-        if (assessmentsRes.status === 'fulfilled') setAssessments((assessmentsRes.value || []) as Assessment[]);
         if (schedulesRes.status === 'fulfilled') setSubjectSchedules(schedulesRes.value || []);
         // Grabaciones gestionadas por useAudioRecorder hook
         if (videosRes.status === 'fulfilled') {
@@ -243,6 +241,12 @@ export default function SubjectDetailScreen() {
     };
   }, [stopSound]);
 
+  // Filter assessments for this subject from the global store
+  const subjectAssessments = useMemo(() => {
+    if (!subjectId) return [];
+    return storeAssessments.filter(a => a.subject_id === subjectId);
+  }, [storeAssessments, subjectId]);
+
   const {
     averageGrade,
     projectedGrade,
@@ -251,7 +255,7 @@ export default function SubjectDetailScreen() {
     finalNeededText,
     recentAssessments,
     thresholdStatus,
-  } = useSubjectGrades(assessments, selectedSubject, profile);
+  } = useSubjectGrades(subjectAssessments, selectedSubject, profile);
 
   const imagePhotos = useMemo(() => photos.filter(p => !p.local_uri?.endsWith('.pdf')), [photos]);
   // Combine old pdfs saved as photos + new scanned_documents
@@ -336,8 +340,7 @@ export default function SubjectDetailScreen() {
           <SubjectInsights 
             recentAssessments={recentAssessments} 
             onDeleteAssessment={(id) => {
-              setAssessments(prev => prev.filter(a => a.id !== id));
-              const { refreshSubjects, refreshAssessments } = useDataStore.getState();
+              const { refreshSubjects } = useDataStore.getState();
               Promise.all([refreshSubjects(), refreshAssessments()]).catch(console.error);
             }}
             onAssessmentUpdated={(updatedAssessment) => {
@@ -365,10 +368,9 @@ export default function SubjectDetailScreen() {
               // Also refetch to ensure consistency
               if (subjectId) {
                 console.log('[SubjectDetailScreen] 🔄 Refetching assessments from API...');
-                getAssessments(subjectId)
-                  .then(res => {
-                    console.log('[SubjectDetailScreen] ✅ API refetch completed, new count:', res?.length || 0);
-                    setAssessments((res || []) as Assessment[]);
+                refreshAssessments()
+                  .then(() => {
+                    console.log('[SubjectDetailScreen] ✅ API refetch completed');
                   })
                   .catch((err) => {
                     console.error('[SubjectDetailScreen] ❌ Error refetching assessments:', err);
@@ -577,8 +579,8 @@ export default function SubjectDetailScreen() {
           visible={isCreateGradeVisible}
           onClose={() => {
             setIsCreateGradeVisible(false);
-            // Refresh assessments
-            getAssessments(subjectId!).then(setAssessments).catch(console.error);
+            // Refresh assessments from API
+            refreshAssessments().catch(console.error);
           }}
           subjects={[selectedSubject as any]}
           initialSubjectId={subjectId}

@@ -4,42 +4,6 @@ const assessmentsController = require('../controllers/assessmentsController');
 
 /**
  * @swagger
- * /api/assessments/{subjectId}:
- *   get:
- *     summary: Obtiene todas las evaluaciones de una materia
- *     tags: [Assessments]
- *     parameters:
- *       - in: path
- *         name: subjectId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Lista de evaluaciones
- */
-router.get('/assessments/:subjectId', assessmentsController.getAssessmentsBySubject);
-
-/**
- * @swagger
- * /api/assessments/user/{userId}:
- *   get:
- *     summary: Obtiene todas las evaluaciones de todas las materias de un usuario
- *     tags: [Assessments]
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Lista de evaluaciones consolidadas
- */
-router.get('/assessments/user/:userId', assessmentsController.getAssessmentsByUser);
-
-/**
- * @swagger
  * /api/assessments:
  *   post:
  *     summary: Agrega una nueva evaluación a una materia
@@ -79,6 +43,42 @@ router.get('/assessments/user/:userId', assessmentsController.getAssessmentsByUs
  *         description: Evaluación agregada
  */
 router.post('/assessments', assessmentsController.createAssessment);
+
+/**
+ * @swagger
+ * /api/assessments/user/{userId}:
+ *   get:
+ *     summary: Obtiene todas las evaluaciones de todas las materias de un usuario
+ *     tags: [Assessments]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Lista de evaluaciones consolidadas
+ */
+router.get('/assessments/user/:userId', assessmentsController.getAssessmentsByUser);
+
+/**
+ * @swagger
+ * /api/assessments/{subjectId}:
+ *   get:
+ *     summary: Obtiene todas las evaluaciones de una materia
+ *     tags: [Assessments]
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Lista de evaluaciones
+ */
+router.get('/assessments/:subjectId', assessmentsController.getAssessmentsBySubject);
 
 /**
  * @swagger

@@ -361,7 +361,7 @@ exports.updateAssessment = (req, res) => {
   const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id } = req.body;
   console.log(`[AssessmentsController] updateAssessment ID ${id} payload:`, req.body);
 
-  // Build dynamic UPDATE query
+  // Build dynamic UPDATE query for assessments table
   const updates = [];
   const values = [];
 
@@ -398,151 +398,154 @@ exports.updateAssessment = (req, res) => {
     values.push(category_id);
   }
 
-  if (updates.length === 0) {
+  // Permitir actualizaciones si se envían campos para assessment_results
+  const hasScoreFields = score !== undefined || percentage !== undefined || grade_value !== undefined;
+  
+  if (updates.length === 0 && !hasScoreFields) {
     return res.status(400).json({ error: 'No fields to update' });
   }
 
-  values.push(id);
+  // Si hay campos de assessments, actualizar la tabla assessments
+  if (updates.length > 0) {
+    values.push(id);
+    const query = `UPDATE assessments SET ${updates.join(', ')} WHERE id = ?`;
+    console.log(`[AssessmentsController] Ejecutando UPDATE assessments:`, query, 'con', values);
 
-  const query = `UPDATE assessments SET ${updates.join(', ')} WHERE id = ?`;
-  console.log(`[AssessmentsController] Ejecutando: ${query} con`, values);
+    db.run(query, values, function(err) {
+      if (err) {
+        console.error('[AssessmentsController] Error en UPDATE assessments:', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) return res.status(404).json({ error: 'Evaluación no encontrada.' });
 
-  db.run(query, values, function(err) {
-    if (err) {
-      console.error('[AssessmentsController] Error en UPDATE assessments:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
-    if (this.changes === 0) return res.status(404).json({ error: 'Evaluación no encontrada.' });
+      console.log('[AssessmentsController] ✅ UPDATE assessments ejecutado, changes:', this.changes);
+      
+      // Si también hay cambios en assessment_results, actualizarlos
+      if (hasScoreFields) {
+        handleAssessmentResultsUpdate(id, score, percentage, grade_value, res);
+      } else {
+        return res.status(200).json({ message: 'Evaluación actualizada' });
+      }
+    });
+  } else {
+    // Si SOLO hay cambios en assessment_results (sin cambios en assessments)
+    handleAssessmentResultsUpdate(id, score, percentage, grade_value, res);
+  }
+};
 
-    // Promisify remaining operations to avoid callback hell and race conditions
-    (async () => {
-      try {
-        console.log('[AssessmentsController] ✅ UPDATE ejecutado, changes:', this.changes);
-        
-        // Get current assessment to find userId
-        const assessment = await new Promise((resolve, reject) => {
-          db.get('SELECT subject_id FROM assessments WHERE id = ?', [id], (err, row) => {
-            if (err || !row) reject(err || new Error('Assessment not found'));
-            else resolve(row);
-          });
+/**
+ * Helper para actualizar assessment_results
+ */
+function handleAssessmentResultsUpdate(assessmentId, score, percentage, grade_value, res) {
+  (async () => {
+    try {
+      // Get current assessment to find userId
+      const assessment = await new Promise((resolve, reject) => {
+        db.get('SELECT subject_id FROM assessments WHERE id = ?', [assessmentId], (err, row) => {
+          if (err || !row) reject(err || new Error('Assessment not found'));
+          else resolve(row);
         });
+      });
 
-        const subject = await new Promise((resolve, reject) => {
-          db.get('SELECT user_id FROM subjects WHERE id = ?', [assessment.subject_id], (err, row) => {
-            if (err || !row) reject(err || new Error('Subject not found'));
-            else resolve(row);
-          });
+      const subject = await new Promise((resolve, reject) => {
+        db.get('SELECT user_id FROM subjects WHERE id = ?', [assessment.subject_id], (err, row) => {
+          if (err || !row) reject(err || new Error('Subject not found'));
+          else resolve(row);
         });
+      });
 
-        console.log('[AssessmentsController] ✅ Assessment encontrado:', { assessmentId: id, subjectId: subject.id, userId: subject.user_id });
+      console.log('[AssessmentsController] ✅ Assessment encontrado:', { assessmentId, subjectId: assessment.subject_id, userId: subject.user_id });
 
-        // Si se actualiza grade_value o percentage, también actualizar assessment_results
-        if (grade_value !== undefined || percentage !== undefined || score !== undefined) {
-          console.log('[AssessmentsController] 🔄 Detectado cambio en nota, iniciando dual-write:', { grade_value, percentage, score });
-          
-          const user = await new Promise((resolve, reject) => {
-            db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, row) => {
-              if (err) reject(err);
-              else resolve(row);
-            });
-          });
-          
-          const gradingVersionId = user?.active_grading_version_id || 3; // Fallback to 3 (0-5.0 scale)
-          console.log('[AssessmentsController] ✅ GradingVersion obtenido:', { gradingVersionId });
+      const user = await new Promise((resolve, reject) => {
+        db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
+      
+      const gradingVersionId = user?.active_grading_version_id || 3;
+      console.log('[AssessmentsController] ✅ GradingVersion obtenido:', { gradingVersionId });
 
-          const version = await new Promise((resolve, reject) => {
-            db.get(`
-              SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
-              FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
-              WHERE gv.id = ?
-            `, [gradingVersionId], (err, row) => {
-              if (err) reject(err);
-              else resolve(row);
-            });
-          });
+      const version = await new Promise((resolve, reject) => {
+        db.get(`
+          SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
+          FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
+          WHERE gv.id = ?
+        `, [gradingVersionId], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
 
-          console.log('[AssessmentsController] ✅ Version obtenido:', { id: version?.id, max_value: version?.max_value, min_value: version?.min_value });
+      console.log('[AssessmentsController] ✅ Version obtenido:', { id: version?.id, max_value: version?.max_value });
 
-          if (version) {
-            let rawValue = null;
-            if (grade_value != null) rawValue = grade_value;
-            else if (score != null && (out_of || 5) > 0) rawValue = (score / (out_of || 5)) * version.max_value;
-            else if (percentage != null) {
-              if (version.max_value === 100) rawValue = percentage;
-              else rawValue = (percentage / 100) * version.max_value;
-            }
-
-            console.log('[AssessmentsController] 📊 Raw value calculado:', { rawValue, gradeValueInput: grade_value, scoreInput: score, percentageInput: percentage });
-
-            if (rawValue !== null) {
-              const { normalizeGrade } = require('../services/gradingEngine');
-              const normalized = normalizeGrade(rawValue, version);
-              console.log(`[AssessmentsController] 📊 Normalización: raw=${rawValue}, normalized=${normalized}, maxValue=${version.max_value}`);
-              
-              const existingResult = await new Promise((resolve, reject) => {
-                db.get('SELECT id FROM assessment_results WHERE assessment_id = ?', [id], (err, row) => {
-                  if (err) reject(err);
-                  else resolve(row);
-                });
-              });
-
-              if (existingResult) {
-                console.log('[AssessmentsController] 🔄 Actualizando assessment_results existente');
-                await new Promise((resolve, reject) => {
-                  db.run(`
-                    UPDATE assessment_results 
-                    SET raw_value = ?, normalized_value = ?, grading_version_id = ?
-                    WHERE assessment_id = ?
-                  `, [rawValue, normalized, gradingVersionId, id], (err) => {
-                    if (err) {
-                      console.error('[AssessmentsController] ❌ Error UPDATE assessment_results:', err.message);
-                      reject(err);
-                    } else {
-                      console.log('[AssessmentsController] ✅ assessment_results actualizado:', { assessmentId: id, raw_value: rawValue, normalized_value: normalized });
-                      resolve();
-                    }
-                  });
-                });
-              } else {
-                console.log('[AssessmentsController] ➕ Insertando assessment_results nuevo');
-                await new Promise((resolve, reject) => {
-                  db.run(`
-                    INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
-                    VALUES (?, ?, ?, ?, ?)
-                  `, [id, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
-                    if (err) {
-                      console.error('[AssessmentsController] ❌ Error INSERT assessment_results:', err.message);
-                      reject(err);
-                    } else {
-                      console.log('[AssessmentsController] ✅ assessment_results insertado:', { assessmentId: id, raw_value: rawValue, normalized_value: normalized });
-                      resolve();
-                    }
-                  });
-                });
-              }
-            }
-          }
+      if (version) {
+        let rawValue = null;
+        if (grade_value != null) rawValue = grade_value;
+        else if (score != null) rawValue = (score / 5) * version.max_value;
+        else if (percentage != null) {
+          if (version.max_value === 100) rawValue = percentage;
+          else rawValue = (percentage / 100) * version.max_value;
         }
 
-        // Fetch and return the updated assessment with denormalized data
-        const updatedAssessment = await fetchAndDenormalizeAssessment(id, subject.user_id);
-        console.log('[AssessmentsController] 📦 RESPUESTA updateAssessment:', { 
-          id: updatedAssessment.id, 
-          grade_value: updatedAssessment.grade_value, 
-          normalized_value: updatedAssessment.normalized_value,
-          is_completed: updatedAssessment.is_completed,
-          score: updatedAssessment.score,
-          allFields: updatedAssessment
-        });
-        return res.json(updatedAssessment);
+        console.log('[AssessmentsController] 📊 Raw value calculado:', { rawValue, gradeValue: grade_value, score, percentage });
 
-      } catch (error) {
-        console.error('[AssessmentsController] ❌ Error in updateAssessment:', error.message, error);
-        return res.status(500).json({ error: error.message || 'Error updating assessment' });
+        if (rawValue !== null) {
+          const { normalizeGrade } = require('../services/gradingEngine');
+          const normalized = normalizeGrade(rawValue, version);
+          console.log(`[AssessmentsController] 📊 Normalización: raw=${rawValue}, normalized=${normalized}`);
+          
+          const existingResult = await new Promise((resolve, reject) => {
+            db.get('SELECT id FROM assessment_results WHERE assessment_id = ?', [assessmentId], (err, row) => {
+              if (err) reject(err);
+              else resolve(row);
+            });
+          });
+
+          if (existingResult) {
+            console.log('[AssessmentsController] 🔄 Actualizando assessment_results existente');
+            await new Promise((resolve, reject) => {
+              db.run(`
+                UPDATE assessment_results 
+                SET raw_value = ?, normalized_value = ?, grading_version_id = ?
+                WHERE assessment_id = ?
+              `, [rawValue, normalized, gradingVersionId, assessmentId], (err) => {
+                if (err) {
+                  console.error('[AssessmentsController] ❌ Error UPDATE assessment_results:', err.message);
+                  reject(err);
+                } else {
+                  console.log('[AssessmentsController] ✅ assessment_results actualizado:', { assessmentId, raw_value: rawValue, normalized_value: normalized });
+                  resolve();
+                }
+              });
+            });
+          } else {
+            console.log('[AssessmentsController] ➕ Creando nuevo assessment_results');
+            await new Promise((resolve, reject) => {
+              db.run(`
+                INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
+                VALUES (?, ?, ?, ?, ?)
+              `, [assessmentId, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
+                if (err) {
+                  console.error('[AssessmentsController] ❌ Error INSERT assessment_results:', err.message);
+                  reject(err);
+                } else {
+                  console.log('[AssessmentsController] ✅ assessment_results creado:', { assessmentId, raw_value: rawValue, normalized_value: normalized });
+                  resolve();
+                }
+              });
+            });
+          }
+        }
       }
-    })();
-  });
-};
+
+      return res.status(200).json({ message: 'Evaluación actualizada' });
+    } catch (err) {
+      console.error('[AssessmentsController] ❌ Error en actualización de assessment_results:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  })();
+}
 
 /**
  * Eliminar una evaluación
