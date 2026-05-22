@@ -162,16 +162,13 @@ exports.createAssessment = (req, res) => {
         }
         
         db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
-          if (err || !user || !user.active_grading_version_id) {
-            console.log('[AssessmentsController] Error/No Version en dual write:', err || 'No user o no version');
-            return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (usuario sin versión)' });
-          }
+          const gradingVersionId = user?.active_grading_version_id || 1; // Fallback to 1
           
           db.get(`
             SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
             FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
             WHERE gv.id = ?
-          `, [user.active_grading_version_id], (err, version) => {
+          `, [gradingVersionId], (err, version) => {
             if (err || !version) {
               console.log('[AssessmentsController] Error recuperando version details:', err || 'No version');
               return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (versión no encontrada)' });
@@ -192,7 +189,7 @@ exports.createAssessment = (req, res) => {
               db.run(`
                 INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
                 VALUES (?, ?, ?, ?, ?)
-              `, [newAssessmentId, subject.user_id, rawValue, normalized, user.active_grading_version_id], (err) => {
+              `, [newAssessmentId, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
                 if (err) console.error('[AssessmentsController] Error insertando assessment_results:', err.message);
                 else console.log('[AssessmentsController] assessment_results insertado correctamente.');
                 return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
@@ -277,12 +274,13 @@ exports.updateAssessment = (req, res) => {
           db.get('SELECT user_id FROM subjects WHERE id = ?', [assessment.subject_id], (err, subject) => {
             if (!err && subject) {
               db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
-                if (!err && user && user.active_grading_version_id) {
-                  db.get(`
-                    SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
-                    FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
-                    WHERE gv.id = ?
-                  `, [user.active_grading_version_id], (err, version) => {
+                const gradingVersionId = user?.active_grading_version_id || 1; // Fallback to 1
+
+                db.get(`
+                  SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
+                  FROM grading_versions gv JOIN grading_systems gs ON gv.grading_system_id = gs.id 
+                  WHERE gv.id = ?
+                `, [gradingVersionId], (err, version) => {
                     if (!err && version) {
                       let rawValue = null;
                       if (grade_value != null) rawValue = grade_value;
@@ -302,7 +300,7 @@ exports.updateAssessment = (req, res) => {
                               UPDATE assessment_results 
                               SET raw_value = ?, normalized_value = ?, grading_version_id = ?
                               WHERE assessment_id = ?
-                            `, [rawValue, normalized, user.active_grading_version_id, id], (err) => {
+                            `, [rawValue, normalized, gradingVersionId, id], (err) => {
                               if(err) console.error('[AssessmentsController] Error UPDATE assessment_results:', err.message);
                               else console.log('[AssessmentsController] assessment_results actualizado');
                               return res.json({ id, message: 'Evaluación actualizada' });
@@ -311,7 +309,7 @@ exports.updateAssessment = (req, res) => {
                             db.run(`
                               INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
                               VALUES (?, ?, ?, ?, ?)
-                            `, [id, subject.user_id, rawValue, normalized, user.active_grading_version_id], (err) => {
+                            `, [id, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
                               if(err) console.error('[AssessmentsController] Error INSERT assessment_results:', err.message);
                               else console.log('[AssessmentsController] assessment_results insertado');
                               return res.json({ id, message: 'Evaluación actualizada' });
@@ -327,10 +325,6 @@ exports.updateAssessment = (req, res) => {
                       return res.json({ id, message: 'Evaluación actualizada' });
                     }
                   });
-                } else {
-                  console.log('[AssessmentsController] dual-write: user active_grading_version_id not found');
-                  return res.json({ id, message: 'Evaluación actualizada' });
-                }
               });
             } else {
               return res.json({ id, message: 'Evaluación actualizada' });
