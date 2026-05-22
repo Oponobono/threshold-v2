@@ -77,8 +77,11 @@ exports.getAssessmentsBySubject = (req, res) => {
         });
       });
 
+      let versionRow = null;
+      let scales = null;
+
       if (user && user.active_grading_version_id) {
-        const versionRow = await new Promise((resolve, reject) => {
+        versionRow = await new Promise((resolve, reject) => {
           db.get(
             `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code 
              FROM grading_versions gv
@@ -93,13 +96,17 @@ exports.getAssessmentsBySubject = (req, res) => {
         });
         
         if (versionRow) {
-          const scales = await gradingEngine.getScalesForVersion(versionRow.id);
-          rows = rows.map(row => denormalizeAssessment(row, versionRow, scales));
-          console.log(`[GET] getAssessmentsBySubject denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
+          scales = await gradingEngine.getScalesForVersion(versionRow.id);
         }
       }
+
+      // Always denormalize rows to ensure grade_value is populated
+      rows = rows.map(row => denormalizeAssessment(row, versionRow, scales));
+      console.log(`[GET] getAssessmentsBySubject denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
     } catch (error) {
       console.warn('[Assessments] Error denormalizing grades:', error.message);
+      // Ensure rows still get basic denormalization
+      rows = rows.map(row => denormalizeAssessment(row, null, null));
     }
     
     res.json(rows);
@@ -142,8 +149,11 @@ exports.getAssessmentsByUser = (req, res) => {
         });
       });
 
+      let versionRow = null;
+      let scales = null;
+
       if (user && user.active_grading_version_id) {
-        const versionRow = await new Promise((resolve, reject) => {
+        versionRow = await new Promise((resolve, reject) => {
           db.get(
             `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code 
              FROM grading_versions gv
@@ -158,13 +168,17 @@ exports.getAssessmentsByUser = (req, res) => {
         });
         
         if (versionRow) {
-          const scales = await gradingEngine.getScalesForVersion(versionRow.id);
-          rows = rows.map(row => denormalizeAssessment(row, versionRow, scales));
-          console.log(`[GET] getAssessmentsByUser denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
+          scales = await gradingEngine.getScalesForVersion(versionRow.id);
         }
       }
+
+      // Always denormalize rows to ensure grade_value is populated
+      rows = rows.map(row => denormalizeAssessment(row, versionRow, scales));
+      console.log(`[GET] getAssessmentsByUser denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
     } catch (error) {
       console.warn('[Assessments] Error denormalizing grades:', error.message);
+      // Ensure rows still get basic denormalization
+      rows = rows.map(row => denormalizeAssessment(row, null, null));
     }
     
     res.json(rows);
