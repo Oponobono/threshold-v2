@@ -243,17 +243,28 @@ exports.createAssessment = (req, res) => {
               db.run(`
                 INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
                 VALUES (?, ?, ?, ?, ?)
-              `, [newAssessmentId, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
+              `, [newAssessmentId, subject.user_id, rawValue, normalized, gradingVersionId], async (err) => {
                 if (err) {
                   console.error('[POST] ❌ Error insertando assessment_results:', err.message);
-                } else {
-                  console.log('[POST] ✅ assessment_results insertado correctamente:', { assessmentId: newAssessmentId, raw_value: rawValue, normalized_value: normalized });
+                  return res.status(500).json({ error: 'Error al insertar los resultados: ' + err.message });
                 }
-                return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
+                console.log('[POST] ✅ assessment_results insertado correctamente:', { assessmentId: newAssessmentId, raw_value: rawValue, normalized_value: normalized });
+                
+                try {
+                  const fullAssessment = await fetchAndDenormalizeAssessment(newAssessmentId, subject.user_id);
+                  return res.status(201).json(fullAssessment);
+                } catch (fetchErr) {
+                  return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
+                }
               });
             } else {
               console.log('[POST] ⚠️  No hay rawValue para insertar en assessment_results');
-              return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
+              try {
+                const fullAssessment = await fetchAndDenormalizeAssessment(newAssessmentId, subject.user_id);
+                return res.status(201).json(fullAssessment);
+              } catch (fetchErr) {
+                return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
+              }
             }
           });
         });

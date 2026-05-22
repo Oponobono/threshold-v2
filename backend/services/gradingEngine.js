@@ -59,9 +59,20 @@ function applyRounding(value, mode = 'nearest', precision = 5) {
  * @returns {number}          - Valor normalizado en DECIMAL(6,5) ej: 0.90000
  */
 function normalizeGrade(rawValue, version, roundMode = 'nearest') {
-  const { min_value, max_value, direction = 'ascending' } = version;
+  if (!version || version.max_value === undefined || version.max_value === null) {
+    throw new Error('GradingEngine: max_value es requerido para normalización.');
+  }
 
-  if (max_value === min_value) {
+  const direction = version.direction || 'ascending';
+  const raw = parseFloat(rawValue);
+  const min = parseFloat(version.min_value || 0);
+  const max = parseFloat(version.max_value);
+
+  if (isNaN(raw) || isNaN(max)) {
+    throw new Error('GradingEngine: raw_value o max_value no son números válidos.');
+  }
+
+  if (max === min) {
     throw new Error('GradingEngine: max_value y min_value no pueden ser iguales.');
   }
 
