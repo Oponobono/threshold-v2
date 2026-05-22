@@ -9,6 +9,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Photo } from './types';
+import { offlineSyncService } from '../offlineSyncService';
 
 /**
  * Obtiene ítems de la galería
@@ -23,6 +24,7 @@ export const getGalleryItems = async () => {
 /**
  * Crea una nueva entrada de foto en la base de datos.
  * Acepta ocr_text opcional para que el asistente IA pueda leerlo directamente sin acceder al archivo.
+ * Si falla la red, guarda en cola offline para sincronizar después
  */
 export const createPhoto = async (photoData: {
   subject_id: number;
@@ -48,6 +50,24 @@ export const createPhoto = async (photoData: {
     }
 
     return data;
+  } catch (error) {
+    // Si falla, guardar en cola offline
+    console.warn('[Photos] Red no disponible, guardando foto en cola offline:', error);
+    await offlineSyncService.addPendingOperation(
+      'POST',
+      '/photos',
+      'photo',
+      photoData
+    );
+    
+    // Retornar objeto temporal para que la UI sea optimista
+    return {
+      id: -1, // ID temporal
+      ...photoData,
+      _isPending: true, // Bandera para UI
+    };
+  }
+};
   } catch (error: any) {
     throw new Error(error.message || 'Error de red al intentar guardar la foto');
   }

@@ -9,6 +9,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Assessment } from './types';
+import { offlineSyncService } from '../offlineSyncService';
 
 /**
  * Obtiene evaluaciones por materia
@@ -35,62 +36,97 @@ export const getAllAssessments = async (): Promise<any[]> => {
 
 /**
  * Crea una nueva evaluación o tarea
+ * Si falla la red, guarda en cola offline para sincronizar después
  */
 export const createAssessment = async (payload: Assessment) => {
   console.log('[API/Assessments] createAssessment -> Sending payload:', JSON.stringify(payload, null, 2));
-  const response = await fetchWithFallback('/assessments', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await parseJsonSafely(response);
   
-  // Si obtenemos una respuesta con un ID válido, consideramos que fue exitoso
-  // Incluso si el status es 400 (problema de status en el servidor)
-  if (data && data.id) {
-    console.log('[API/Assessments] createAssessment success (con ID):', data);
-    return data;
-  }
+  try {
+    const response = await fetchWithFallback('/assessments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  if (!response.ok) {
-    console.error('[API/Assessments] createAssessment failed:', data?.error || 'Unknown error', 'Status:', response.status);
-    throw new Error(data?.error || 'No se pudo crear la evaluación.');
+    const data = await parseJsonSafely(response);
+    
+    // Si obtenemos una respuesta con un ID válido, consideramos que fue exitoso
+    // Incluso si el status es 400 (problema de status en el servidor)
+    if (data && data.id) {
+      console.log('[API/Assessments] createAssessment success (con ID):', data);
+      return data;
+    }
+
+    if (!response.ok) {
+      console.error('[API/Assessments] createAssessment failed:', data?.error || 'Unknown error', 'Status:', response.status);
+      throw new Error(data?.error || 'No se pudo crear la evaluación.');
+    }
+    console.log('[API/Assessments] createAssessment success:', data);
+    return data;
+  } catch (error) {
+    // Si falla, guardar en cola offline
+    console.warn('[Assessments] Red no disponible, guardando en cola offline:', error);
+    await offlineSyncService.addPendingOperation(
+      'POST',
+      '/assessments',
+      'assessment',
+      payload
+    );
+    
+    // Retornar objeto temporal con datos del payload para que la UI sea optimista
+    return {
+      id: -1, // ID temporal
+      ...payload,
+      _isPending: true, // Bandera para UI
+    };
   }
-  console.log('[API/Assessments] createAssessment success:', data);
-  return data;
 };
 
 /**
  * Actualiza una evaluación o tarea existente
+ * Si falla la red, guarda en cola offline para sincronizar después
  */
 export const updateAssessment = async (id: number, payload: Partial<Assessment>) => {
   console.log(`[API/Assessments] updateAssessment (id:${id}) -> Sending payload:`, JSON.stringify(payload, null, 2));
-  const response = await fetchWithFallback(`/assessments/${id}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await parseJsonSafely(response);
   
-  // Si obtenemos una respuesta con datos válidos, consideramos que fue exitoso
-  // incluso si el status es 400 (problema de status en el servidor)
-  if (data && (data.message || data.success)) {
+  try {
+    const response = await fetchWithFallback(`/assessments/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await parseJsonSafely(response);
+    
+    // Si obtenemos una respuesta con datos válidos, consideramos que fue exitoso
+    // incluso si el status es 400 (problema de status en el servidor)
+    if (data && (data.message || data.success)) {
+      console.log(`[API/Assessments] updateAssessment (id:${id}) success:`, data);
+      return data;
+    }
+
+    if (!response.ok) {
+      console.error(`[API/Assessments] updateAssessment (id:${id}) failed:`, data?.error || 'Unknown error', 'Status:', response.status);
+      throw new Error(data?.error || 'No se pudo actualizar la evaluación.');
+    }
     console.log(`[API/Assessments] updateAssessment (id:${id}) success:`, data);
     return data;
+  } catch (error) {
+    // Si falla, guardar en cola offline
+    console.warn(`[Assessments] Red no disponible, guardando actualización en cola offline:`, error);
+    await offlineSyncService.addPendingOperation(
+      'PUT',
+      `/assessments/${id}`,
+      'assessment',
+      payload
+    );
+    
+    return { success: true, message: 'Guardado localmente, se sincronizará cuando recupere conexión' };
   }
-
-  if (!response.ok) {
-    console.error(`[API/Assessments] updateAssessment (id:${id}) failed:`, data?.error || 'Unknown error', 'Status:', response.status);
-    throw new Error(data?.error || 'No se pudo actualizar la evaluación.');
-  }
-  console.log(`[API/Assessments] updateAssessment (id:${id}) success:`, data);
-  return data;
 };
 
 /**

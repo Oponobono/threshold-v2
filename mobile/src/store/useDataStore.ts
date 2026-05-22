@@ -10,6 +10,7 @@ import {
 } from '../services/api';
 import { loadPredictionsFromCache, savePredictionsToCache } from '../hooks/usePredictionPolling';
 import { cacheService } from '../services/cacheService';
+import { offlineSyncService } from '../services/offlineSyncService';
 
 interface DataState {
   // Datos
@@ -32,6 +33,7 @@ interface DataState {
   refreshPredictions: (userId: string | number) => Promise<void>;
   loadCachedPredictions: () => Promise<void>;
   preloadOfflineCache: () => Promise<void>;
+  syncPendingOperations: () => Promise<{ success: number; failed: number; pending: number }>;
   
   // Selectores
   getDuedeckIds: () => Set<number>;
@@ -283,5 +285,30 @@ export const useDataStore = create<DataState>((set, get) => ({
         .filter(card => card.deckId !== undefined)
         .map(card => card.deckId as number)
     );
+  },
+
+  syncPendingOperations: async () => {
+    try {
+      console.log('[DataStore] 🔄 Sincronizando operaciones offline pendientes...');
+      
+      // Importar fetch desde el cliente
+      const { fetchWithFallback } = await import('../services/api/client');
+      
+      // Sincronizar todas las operaciones pendientes
+      const result = await offlineSyncService.syncPendingOperations(fetchWithFallback);
+      
+      console.log(`[DataStore] ✅ Sincronización completada: ${result.success} éxito, ${result.failed} fallos, ${result.pending} pendientes`);
+      
+      // Si hubo éxitos, refrescar datos
+      if (result.success > 0) {
+        console.log('[DataStore] 🔄 Refrescando datos después de sincronización...');
+        await get().loadAllData(true);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('[DataStore] Error sincronizando operaciones offline:', error);
+      return { success: 0, failed: 0, pending: 0 };
+    }
   }
 }));

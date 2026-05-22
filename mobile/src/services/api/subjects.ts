@@ -9,6 +9,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Subject } from './types';
+import { offlineSyncService } from '../offlineSyncService';
 
 /**
  * Obtiene una materia específica
@@ -36,6 +37,7 @@ export const getSubjects = async () => {
 
 /**
  * Crea una materia para el usuario actual
+ * Si falla la red, guarda en cola offline para sincronizar después
  */
 export const createSubject = async (payload: {
   name: string;
@@ -49,23 +51,53 @@ export const createSubject = async (payload: {
     throw new Error('No hay sesión activa.');
   }
 
-  const response = await fetchWithFallback('/subjects', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  const payloadWithUser = {
+    user_id: Number(userId),
+    ...payload,
+  };
+
+  try {
+    const response = await fetchWithFallback('/subjects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payloadWithUser),
+    });
+
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo crear la materia.');
+    }
+
+    return data as Subject;
+  } catch (error) {
+    // Si falla, guardar en cola offline
+    console.warn('[Subjects] Red no disponible, guardando en cola offline:', error);
+    await offlineSyncService.addPendingOperation(
+      'POST',
+      '/subjects',
+      'subject',
+      payloadWithUser
+    );
+    
+    // Retornar objeto temporal con datos del payload para que la UI sea optimista
+    return {
+      id: -1, // ID temporal
       user_id: Number(userId),
-      ...payload,
-    }),
-  });
-
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo crear la materia.');
+      name: payload.name,
+      code: '',
+      professor: payload.professor,
+      color: payload.color || '#CCCCCC',
+      icon: payload.icon || 'book-outline',
+      target_grade: payload.target_grade,
+      avg_score: 0,
+      normalized_avg_score: 0,
+      completion_percent: 0,
+      credits: 0,
+      _isPending: true, // Bandera para UI
+    } as any;
   }
-
-  return data as Subject;
 };
 
 /**

@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../src/locales/i18n';
 import { useColorScheme } from '@/src/hooks/use-color-scheme';
 import { CustomAlertProvider } from '../src/components/CustomAlert';
+import { useAutoSync } from '../src/hooks/useAutoSync';
 import NetInfo from '@react-native-community/netinfo';
 import { flushOfflineQueue } from '../src/services/offlineQueue';
 import { hasValidSession } from '../src/services/api/auth/session';
@@ -42,6 +43,9 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [appIsReady, setAppIsReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<string>('welcome');
+
+  // Activar sincronización automática cuando recupere internet
+  useAutoSync();
 
   useEffect(() => {
     async function prepare() {

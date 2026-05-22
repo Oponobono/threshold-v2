@@ -8,6 +8,7 @@
  */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
+import { offlineSyncService } from '../offlineSyncService';
 
 /**
  * Obtiene los horarios de hoy
@@ -21,22 +22,41 @@ export const getTodaySchedules = async (): Promise<any[]> => {
 
 /**
  * Crea un nuevo horario (soporta repetición enviando múltiples peticiones si es necesario)
+ * Si falla la red, guarda en cola offline para sincronizar después
  */
 export const createSchedule = async (payload: { subject_id: number, day_of_week: number, start_time: string, end_time: string }) => {
-  const response = await fetchWithFallback('/schedules', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetchWithFallback('/schedules', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo crear el horario.');
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo crear el horario.');
+    }
+
+    return data;
+  } catch (error) {
+    // Si falla, guardar en cola offline
+    console.warn('[Schedules] Red no disponible, guardando en cola offline:', error);
+    await offlineSyncService.addPendingOperation(
+      'POST',
+      '/schedules',
+      'schedule',
+      payload
+    );
+    
+    // Retornar objeto temporal para que la UI sea optimista
+    return {
+      id: -1, // ID temporal
+      ...payload,
+      _isPending: true, // Bandera para UI
+    };
   }
-
-  return data;
 };
 
 /**
