@@ -123,7 +123,19 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
     try {
       const response = await fetch(`${base}${path}`, customInit);
       activeBaseUrl = base;
-      
+      // ✅ Interceptar 304 Not Modified y servir desde caché
+      if (response.status === 304 && isCacheable) {
+        console.log(`[Cache] 304 Not Modified interceptado para ${path}. Sirviendo caché local.`);
+        const cachedText = await storageService.getLocal(cacheKey);
+        if (cachedText) {
+          return new Response(cachedText, {
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers({ 'Content-Type': 'application/json' })
+          });
+        }
+      }
+
       // ✅ Guardar en cache si es exitosa y cacheable
       if (response.ok && isCacheable) {
         try {
