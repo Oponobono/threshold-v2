@@ -368,16 +368,26 @@ export default function GradesScreen() {
                   const isLast = index === filteredAssessments.length - 1;
                   const isTask = a.type === 'task';
                   const isCompleted = (a as any).is_completed;
+                  const isPending = (a as any)._isPending === true;
 
                   return (
-                    <View style={{ padding: 16, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                    <View style={{ padding: 16, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', gap: 14, opacity: isPending ? 0.6 : 1 }}>
                       <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: color + '20', justifyContent: 'center', alignItems: 'center' }}>
                         <MaterialCommunityIcons name={isTask ? 'check-circle' : 'file-document'} size={24} color={pct !== null ? GRADE_COLORS(pct) : theme.colors.text.secondary} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 2 }} numberOfLines={1}>
-                          {a.name}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text.primary }} numberOfLines={1}>
+                            {a.name}
+                          </Text>
+                          {isPending && (
+                            <View style={{ backgroundColor: theme.colors.warning, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 9, fontWeight: '600', color: '#FFF' }}>
+                                {t('common.syncing', 'SINCRONIZANDO')}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '500' }} numberOfLines={1}>
                           {subject?.name || 'Materia'}
                           <Text style={{ opacity: 0.5 }}> • </Text>

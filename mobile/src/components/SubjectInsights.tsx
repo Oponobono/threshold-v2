@@ -165,6 +165,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
                 : t('subjects.note');
               const weightValue = parseWeight(assessment);
               const weightText = weightValue > 0 ? ` (${weightValue}%)` : '';
+              const isPending = (assessment as any)._isPending === true;
 
               let scoreText = t('subjects.pending');
               if (grade !== null) {
@@ -174,17 +175,29 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
               }
 
               return (
-                <View key={`${assessment.id ?? assessment.name}-${assessment.date ?? 'no-date'}`} style={styles.insightRow}>
+                <View 
+                  key={`${assessment.id ?? assessment.name}-${assessment.date ?? 'no-date'}`} 
+                  style={[styles.insightRow, isPending && { opacity: 0.6 }]}
+                >
                   <View style={styles.insightTopRow}>
                     <View style={styles.insightTextBlock}>
-                      <Text style={styles.insightTitle} numberOfLines={1}>{assessment.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={styles.insightTitle} numberOfLines={1}>{assessment.name}</Text>
+                        {isPending && (
+                          <View style={{ backgroundColor: theme.colors.warning, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 9, fontWeight: '600', color: '#FFF' }}>
+                              {t('common.syncing', 'SINCRONIZANDO')}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={styles.insightMeta} numberOfLines={1}>
                         {typeLabel}{weightText}{assessment.date ? ` · ${assessment.date}` : ''}
                       </Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                       <Text style={styles.insightScore}>{scoreText}</Text>
-                      {assessment.id && (
+                      {assessment.id && assessment.id > 0 && (
                         <TouchableOpacity 
                           onPress={() => handleShowMenu(assessment)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

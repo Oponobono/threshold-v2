@@ -39,7 +39,9 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
     if (assessment && visible) {
       setSelectedSubjectId(assessment.subject_id);
       setGradeName(assessment.name);
-      setGradeValue(assessment.score?.toString() || assessment.grade_value?.toString() || '');
+      // IMPORTANT: grade_value is the primary source from backend denormalization
+      // Only use score as fallback if grade_value is not available
+      setGradeValue(assessment.grade_value?.toString() || assessment.score?.toString() || '');
       setGradePercentage(assessment.weight?.toString() || assessment.percentage?.toString() || '');
       setSelectedCategoryId(assessment.category_id || null);
     }
