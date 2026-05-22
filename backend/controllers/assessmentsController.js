@@ -424,7 +424,23 @@ exports.updateAssessment = (req, res) => {
       if (hasScoreFields) {
         handleAssessmentResultsUpdate(id, score, percentage, grade_value, res);
       } else {
-        return res.status(200).json({ message: 'Evaluación actualizada' });
+        // Return full assessment even when only metadata fields changed
+        (async () => {
+          try {
+            const subjectRow = await new Promise((resolve, reject) => {
+              db.get(
+                'SELECT s.user_id FROM subjects s JOIN assessments a ON s.id = a.subject_id WHERE a.id = ?',
+                [id],
+                (err, row) => { if (err || !row) reject(err || new Error('Not found')); else resolve(row); }
+              );
+            });
+            const fullAssessment = await fetchAndDenormalizeAssessment(id, subjectRow.user_id);
+            return res.status(200).json(fullAssessment);
+          } catch (err) {
+            console.warn('[AssessmentsController] Could not denormalize for response, using fallback:', err.message);
+            return res.status(200).json({ message: 'Evaluación actualizada', id: parseInt(id) });
+          }
+        })();
       }
     });
   } else {
@@ -539,7 +555,10 @@ function handleAssessmentResultsUpdate(assessmentId, score, percentage, grade_va
         }
       }
 
-      return res.status(200).json({ message: 'Evaluación actualizada' });
+      // Return the full denormalized assessment so the frontend can update its state immediately
+      const fullAssessment = await fetchAndDenormalizeAssessment(assessmentId, subject.user_id);
+      console.log('[AssessmentsController] ✅ Retornando assessment completo:', { id: fullAssessment.id, grade_value: fullAssessment.grade_value, normalized_value: fullAssessment.normalized_value });
+      return res.status(200).json(fullAssessment);
     } catch (err) {
       console.error('[AssessmentsController] ❌ Error en actualización de assessment_results:', err.message);
       return res.status(500).json({ error: err.message });

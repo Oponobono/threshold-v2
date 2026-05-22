@@ -22,7 +22,7 @@ interface EditGradeModalProps {
 
 export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAssessmentSaved }: EditGradeModalProps) => {
   const { t } = useTranslation();
-  const { refreshSubjects } = useDataStore();
+  const { refreshSubjects, refreshAssessments } = useDataStore();
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
@@ -70,8 +70,8 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
       const updatePayload = {
         subject_id: selectedSubjectId,
         name: gradeName.trim(),
-        grade_value: Number(gradeValue),
-        weight: gradePercentage,
+        grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
+        weight: gradePercentage ? gradePercentage.replace(',', '.') : '0',
         category_id: selectedCategoryId || undefined,
         is_completed: true,
       };
@@ -98,13 +98,14 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       alertRef.show({ title: t('common.success'), message: t('assessments.updateSuccess', 'Nota actualizada'), type: 'success' });
       
-      // Call callback with updated assessment to update parent state immediately
-      if (onAssessmentSaved && updatedAssessment) {
-        console.log('[EditGradeModal] 🔄 Llamando onAssessmentSaved con assessment actualizado');
+      // Call callback with updated assessment ONLY if the backend returned a valid full object
+      if (onAssessmentSaved && updatedAssessment?.id) {
+        console.log('[EditGradeModal] 🔄 Llamando onAssessmentSaved con assessment completo del backend');
         onAssessmentSaved(updatedAssessment as Assessment);
+      } else if (updatedAssessment && !updatedAssessment.id) {
+        console.warn('[EditGradeModal] ⚠️ Backend no retornó un objeto completo, skipping onAssessmentSaved');
       }
       
-      const { refreshSubjects, refreshAssessments } = useDataStore.getState();
       console.log('[EditGradeModal] 🔄 Refrescando store...', { refreshSubjects: !!refreshSubjects, refreshAssessments: !!refreshAssessments });
       await Promise.all([refreshSubjects(), refreshAssessments()]);
       console.log('[EditGradeModal] ✅ Store refrescado exitosamente');

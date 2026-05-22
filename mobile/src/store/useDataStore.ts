@@ -47,7 +47,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   subjects: trySync(() => cacheService.loadSubjectsSync(), []) as any[],
   assessments: trySync(() => cacheService.loadAssessmentsSync(), []) as any[],
   schedules: trySync(() => cacheService.loadSchedulesSync(), []) as any[],
-  predictions: trySync<PredictionResponse | null>(() => cacheService.loadPredictionsSync(), null),
+  predictions: trySync<PredictionResponse | null>(() => cacheService.loadPredictionsSync() as PredictionResponse | null, null),
 
   isInitialLoading: false,
   isRefreshing: false,
@@ -130,10 +130,10 @@ export const useDataStore = create<DataState>((set, get) => ({
       const data = await getSubjects();
       if (data) {
         set({ subjects: data });
+        await cacheService.saveSubjects(data);
       }
     } catch (error) {
       console.error('Error refreshing subjects:', error);
-      // No setear datos vacíos si falla - mantener los existentes
     }
   },
 
@@ -142,10 +142,10 @@ export const useDataStore = create<DataState>((set, get) => ({
       const data = await getAllAssessments();
       if (data) {
         set({ assessments: data });
+        await cacheService.saveAssessments(data);
       }
     } catch (error) {
       console.error('Error refreshing assessments:', error);
-      // No setear datos vacíos si falla - mantener los existentes
     }
   },
 

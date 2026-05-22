@@ -21,7 +21,7 @@ interface CreateGradeModalProps {
 
 export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId }: CreateGradeModalProps) => {
   const { t } = useTranslation();
-  const { refreshSubjects } = useDataStore();
+  const { refreshSubjects, refreshAssessments } = useDataStore();
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
@@ -68,8 +68,8 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
       await createAssessment({
         subject_id: selectedSubjectId,
         name: gradeName.trim(),
-        grade_value: Number(gradeValue),
-        weight: gradePercentage,
+        grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
+        weight: gradePercentage ? gradePercentage.replace(',', '.') : '0',
         is_completed: true,
         type: 'grade',
         category_id: selectedCategoryId || undefined,
@@ -78,7 +78,6 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       alertRef.show({ title: t('common.success'), message: t('dashboard.quickAddMenu.grade.success', { subject: subjectName }), type: 'success' });
       
-      const { refreshSubjects, refreshAssessments } = useDataStore.getState();
       await Promise.all([refreshSubjects(), refreshAssessments()]);
       handleClose();
     } catch (error: any) {

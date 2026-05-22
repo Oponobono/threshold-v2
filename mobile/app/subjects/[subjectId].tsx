@@ -347,39 +347,11 @@ export default function SubjectDetailScreen() {
               console.log('[SubjectDetailScreen] 📥 onAssessmentUpdated callback recibido:', {
                 updated: updatedAssessment ? true : false,
                 assessmentId: updatedAssessment?.id,
-                grade_value: updatedAssessment?.grade_value,
-                normalized_value: updatedAssessment?.normalized_value,
-                is_completed: updatedAssessment?.is_completed,
               });
 
-              // If we have an updated assessment, merge it into local state immediately
-              if (updatedAssessment && updatedAssessment.id) {
-                console.log('[SubjectDetailScreen] 🔄 Merging assessment into local state immediately:', {
-                  assessmentId: updatedAssessment.id,
-                  gradeValue: updatedAssessment.grade_value,
-                });
-                setAssessments(prev => {
-                  const updated = prev.map(a => a.id === updatedAssessment.id ? updatedAssessment : a);
-                  console.log('[SubjectDetailScreen] ✅ Local state merged. New assessments count:', updated.length);
-                  return updated;
-                });
-              }
-              
-              // Also refetch to ensure consistency
-              if (subjectId) {
-                console.log('[SubjectDetailScreen] 🔄 Refetching assessments from API...');
-                refreshAssessments()
-                  .then(() => {
-                    console.log('[SubjectDetailScreen] ✅ API refetch completed');
-                  })
-                  .catch((err) => {
-                    console.error('[SubjectDetailScreen] ❌ Error refetching assessments:', err);
-                  });
-              }
-              
               console.log('[SubjectDetailScreen] 🔄 Refreshing global store...');
-              const { refreshSubjects, refreshAssessments } = useDataStore.getState();
-              Promise.all([refreshSubjects(), refreshAssessments()])
+              const store = useDataStore.getState();
+              Promise.all([store.refreshSubjects(), store.refreshAssessments()])
                 .then(() => console.log('[SubjectDetailScreen] ✅ Global store refreshed'))
                 .catch(err => console.error('[SubjectDetailScreen] ❌ Error refreshing store:', err));
             }}

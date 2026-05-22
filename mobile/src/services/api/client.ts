@@ -116,6 +116,12 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
+  
+  if (method === 'GET') {
+    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
+  }
 
   const customInit = { ...init, headers };
 

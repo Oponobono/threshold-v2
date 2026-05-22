@@ -17,7 +17,7 @@ interface CompleteTaskModalProps {
 
 export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalProps) => {
   const { t } = useTranslation();
-  const { refreshSubjects } = useDataStore();
+  const { refreshSubjects, refreshAssessments } = useDataStore();
 
   const [gradeValue, setGradeValue] = useState('');
   const [gradePercentage, setGradePercentage] = useState('');
@@ -48,8 +48,8 @@ export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalP
       setIsSaving(true);
       await updateAssessment(task.id, {
         is_completed: true,
-        grade_value: Number(gradeValue),
-        percentage: Number(gradePercentage),
+        grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
+        percentage: gradePercentage ? Number(gradePercentage.replace(',', '.')) : 0,
       });
 
       alertRef.show({ 
@@ -58,7 +58,6 @@ export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalP
         type: 'success' 
       });
       
-      const { refreshSubjects, refreshAssessments } = useDataStore.getState();
       await Promise.all([refreshSubjects(), refreshAssessments()]);
       handleClose();
     } catch (error: any) {
