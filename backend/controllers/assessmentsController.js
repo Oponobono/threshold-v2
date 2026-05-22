@@ -600,3 +600,138 @@ exports.deleteAssessment = (req, res) => {
     res.json({ message: 'Evaluación eliminada exitosamente' });
   });
 };
+
+/**
+ * GET /api/assessments/analytics/subject/:subjectId/projection
+ * 
+ * Calcula y devuelve las métricas de proyección para una materia.
+ * Usa el algoritmo EMA (Exponential Moving Average) para predecir desempeño futuro.
+ * 
+ * Respuesta:
+ * {
+ *   "subjectId": 1,
+ *   "currentAverage": 3.78,       // PA: Promedio Actual ponderado
+ *   "currentEMA": 4.0,             // Tendencia reciente (EMA)
+ *   "projectedGrade": 3.89,        // NP: Nota Proyectada final
+ *   "delta": 0.11,                 // Momentum (+0.11 verde en UI)
+ *   "evaluatedWeight": 0.5,        // Porcentaje evaluado
+ *   "remainingWeight": 0.5         // Porcentaje restante
+ * }
+ */
+exports.getProjectionAnalytics = (req, res) => {
+  const { subjectId } = req.params;
+  
+  if (!subjectId) {
+    return res.status(400).json({ error: 'subjectId es requerido' });
+  }
+
+  console.log(`[Analytics] getProjectionAnalytics para subjectId=${subjectId}`);
+
+  // Obtener todas las evaluaciones con notas de esta materia, ordenadas por fecha
+  const query = `
+    SELECT 
+      a.id, a.subject_id, a.name, a.type, a.date, a.weight, a.grade_value,
+      a.is_completed, ar.normalized_value, ar.raw_value as original_raw_value,
+      s.name as subject_name, s.user_id
+    FROM assessments a
+    JOIN subjects s ON a.subject_id = s.id
+    LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+    WHERE a.subject_id = ? AND a.grade_value IS NOT NULL
+    ORDER BY a.date ASC
+  `;
+
+  db.all(query, [subjectId], async (err, rows) => {
+    if (err) {
+      console.error(`[Analytics] Error en getProjectionAnalytics:`, err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    try {
+      // Denormalizar los assessments
+      if (!rows || rows.length === 0) {
+        console.log(`[Analytics] No hay evaluaciones calificadas para subjectId=${subjectId}`);
+        return res.json({
+          subjectId: parseInt(subjectId),
+          currentAverage: 0,
+          currentEMA: 0,
+          projectedGrade: 0,
+          delta: 0,
+          evaluatedWeight: 0,
+          remainingWeight: 1,
+          assessmentCount: 0,
+        });
+      }
+
+      const userId = rows[0].user_id;
+
+      // Obtener versión de calificación del usuario
+      const user = await new Promise((resolve, reject) => {
+        db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [userId], (err, u) => {
+          if (err) return reject(err);
+          resolve(u);
+        });
+      });
+
+      let maxScale = 5.0;
+      if (user && user.active_grading_version_id) {
+        const versionRow = await new Promise((resolve, reject) => {
+          db.get(
+            `SELECT gv.max_value FROM grading_versions gv WHERE gv.id = ?`,
+            [user.active_grading_version_id],
+            (err, v) => {
+              if (err) return reject(err);
+              resolve(v);
+            }
+          );
+        });
+        if (versionRow) {
+          maxScale = parseFloat(versionRow.max_value) || 5.0;
+        }
+      }
+
+      console.log(`[Analytics] Max scale para user=${userId}: ${maxScale}`);
+
+      // Denormalizar assessments (asegurar que grade_value esté poblado)
+      const denormalizedAssessments = rows.map(row => {
+        let gradeValue = parseFloat(row.grade_value) || null;
+        
+        // Si no hay grade_value pero hay normalized_value, calcular desde aquí
+        if (!gradeValue && row.normalized_value !== null) {
+          gradeValue = parseFloat(row.normalized_value) * maxScale;
+        }
+        
+        // Si no hay gradeValue aún, usar original_raw_value
+        if (!gradeValue && row.original_raw_value !== null) {
+          gradeValue = parseFloat(row.original_raw_value);
+        }
+
+        return {
+          id: row.id,
+          grade_value: gradeValue,
+          weight: parseFloat(row.weight) || 0,
+          date: row.date,
+        };
+      });
+
+      console.log(`[Analytics] Assessments denormalizados:`, denormalizedAssessments);
+
+      // Calcular proyección usando la función del gradingEngine
+      const projection = gradingEngine.calculateProjectedGrade(
+        denormalizedAssessments.filter(a => a.grade_value !== null),
+        maxScale
+      );
+
+      console.log(`[Analytics] Proyección calculada:`, projection);
+
+      return res.json({
+        subjectId: parseInt(subjectId),
+        ...projection,
+        assessmentCount: denormalizedAssessments.length,
+        maxScale,
+      });
+    } catch (error) {
+      console.error(`[Analytics] Error calculando proyección:`, error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  });
+};

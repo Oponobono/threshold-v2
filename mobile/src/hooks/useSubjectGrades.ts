@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Assessment, Subject, UserProfile } from '../services/api';
+import { getProjectionAnalytics } from '../services/api/assessments';
 import {
   parseDate,
   parseWeight,
@@ -35,6 +36,40 @@ export function useSubjectGrades(
   profile: UserProfile | null
 ) {
   const { t } = useTranslation();
+  
+  // Estado para almacenar datos de proyección desde el backend
+  const [projectionData, setProjectionData] = useState<{
+    currentAverage?: number;
+    currentEMA?: number;
+    projectedGrade?: number;
+    delta?: number;
+    evaluatedWeight?: number;
+    remainingWeight?: number;
+  } | null>(null);
+
+  // Efecto: Cargar datos de proyección del backend cuando la materia cambie
+  useEffect(() => {
+    if (!selectedSubject?.id) {
+      setProjectionData(null);
+      return;
+    }
+
+    const loadProjection = async () => {
+      try {
+        console.log(`[useSubjectGrades] 📊 Cargando proyección para subject ${selectedSubject.id}`);
+        const data = await getProjectionAnalytics(selectedSubject.id);
+        if (data) {
+          console.log(`[useSubjectGrades] 📊 Proyección cargada:`, data);
+          setProjectionData(data);
+        }
+      } catch (error) {
+        console.warn(`[useSubjectGrades] ⚠️ Error cargando proyección:`, error);
+        setProjectionData(null);
+      }
+    };
+
+    loadProjection();
+  }, [selectedSubject?.id]);
 
   const gradedAssessments = useMemo(() => {
     // Only include assessments with actual grades/scores
@@ -128,7 +163,16 @@ export function useSubjectGrades(
     return result;
   }, [targetGrade, accumulatedPoints, remainingPercentage]);
 
-  const projectedGrade = useMemo(() => averageGrade, [averageGrade]);
+  const projectedGrade = useMemo(() => {
+    // Usar proyección del backend si está disponible
+    if (projectionData?.projectedGrade !== undefined) {
+      console.log('[useSubjectGrades] 📊 Usando projectedGrade del backend:', projectionData.projectedGrade);
+      return projectionData.projectedGrade;
+    }
+    // Fallback: usar promedio actual si no hay datos de proyección
+    console.log('[useSubjectGrades] 📊 Usando fallback averageGrade:', averageGrade);
+    return averageGrade;
+  }, [projectionData, averageGrade]);
 
   const securedPercent = useMemo(() => {
     return Math.max(0, Math.min(100, evaluatedPercentage));
@@ -193,6 +237,8 @@ export function useSubjectGrades(
     remainingPercentage,
     requiredGrade,
     projectedGrade,
+    delta: projectionData?.delta ?? 0,
+    currentEMA: projectionData?.currentEMA ?? null,
     securedPercent,
     deliveredText,
     finalNeededText,

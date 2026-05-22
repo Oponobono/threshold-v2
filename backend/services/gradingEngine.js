@@ -269,6 +269,117 @@ function getScalesForVersion(versionId) {
   });
 }
 
+/**
+ * calculateProjectedGrade
+ * 
+ * Implementa las fórmulas de Analytics Educativo para predicción de desempeño.
+ * 
+ * FÓRMULAS:
+ * 1. Promedio Actual (PA): SUM(Grade_i * Weight_i) / SUM(Weight_i)
+ * 2. EMA (Tendencia): (Latest_Grade * 0.35) + (Previous_EMA * 0.65)
+ * 3. Nota Proyectada (NP): (PA * Evaluated_Weight) + (EMA * Remaining_Weight)
+ *    - Clamped a [0, Max_Scale]
+ * 4. Delta: NP - PA
+ * 
+ * Entrada:
+ *   - gradedAssessments: Array de evaluaciones {grade_value, weight}, ordenadas por fecha
+ *   - maxScale: Valor máximo de calificación (ej. 5.0)
+ * 
+ * Salida:
+ *   {
+ *     currentAverage: Promedio Actual ponderado (0 a maxScale),
+ *     currentEMA: Tendencia reciente con EMA (0 a maxScale),
+ *     projectedGrade: Nota Proyectada (0 a maxScale),
+ *     delta: Diferencia (projectedGrade - currentAverage),
+ *     evaluatedWeight: Porcentaje evaluado (0 a 1),
+ *     remainingWeight: Porcentaje restante (0 a 1)
+ *   }
+ */
+function calculateProjectedGrade(gradedAssessments = [], maxScale = 5.0) {
+  const ALPHA = 0.35; // Factor de suavizado EMA (constante)
+
+  // VALIDACIÓN MÍNIMA
+  if (!Array.isArray(gradedAssessments) || gradedAssessments.length === 0) {
+    return {
+      currentAverage: 0,
+      currentEMA: 0,
+      projectedGrade: 0,
+      delta: 0,
+      evaluatedWeight: 0,
+      remainingWeight: 1,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // PASO 1: Extraer notas y pesos
+  // ─────────────────────────────────────────────────────────────────
+  const grades = gradedAssessments.map(a => parseFloat(a.grade_value) || 0);
+  const weights = gradedAssessments.map(a => parseFloat(a.weight) || 0);
+
+  // ─────────────────────────────────────────────────────────────────
+  // PASO 2: CÁLCULO DEL PROMEDIO ACTUAL (PA)
+  // Fórmula: PA = SUM(Grade_i * Weight_i) / SUM(Weight_i)
+  // ─────────────────────────────────────────────────────────────────
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  let currentAverage = 0;
+
+  if (totalWeight > 0) {
+    const weightedSum = grades.reduce((sum, g, i) => sum + g * weights[i], 0);
+    currentAverage = weightedSum / totalWeight;
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // PASO 3: CÁLCULO DEL EMA (Tendencia Reciente)
+  // Fórmula: EMA_t = (Latest_Grade * 0.35) + (Previous_EMA * 0.65)
+  // Nota: Iterar cronológicamente desde la primera nota
+  // ─────────────────────────────────────────────────────────────────
+  let currentEMA = grades[0] || 0; // Inicializar con la primera nota
+
+  for (let i = 1; i < grades.length; i++) {
+    currentEMA = (grades[i] * ALPHA) + (currentEMA * (1 - ALPHA));
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // PASO 4: CÁLCULO DE PESOS (Evaluado vs Restante)
+  // ─────────────────────────────────────────────────────────────────
+  // Asumir que los pesos están en porcentaje (0-100) o (0-1)
+  // Si están en porcentaje (> 1), normalizar a decimales
+  let evaluatedWeight = totalWeight;
+  if (evaluatedWeight > 1) {
+    evaluatedWeight = evaluatedWeight / 100;
+  }
+  const remainingWeight = Math.max(0, 1.0 - evaluatedWeight);
+
+  // ─────────────────────────────────────────────────────────────────
+  // PASO 5: CÁLCULO DE NOTA PROYECTADA (NP)
+  // Fórmula: NP = (PA * Evaluated_Weight) + (EMA * Remaining_Weight)
+  // ─────────────────────────────────────────────────────────────────
+  let projectedGrade = (currentAverage * evaluatedWeight) + (currentEMA * remainingWeight);
+
+  // ─────────────────────────────────────────────────────────────────
+  // PASO 6: CLAMP (Restricción Matemática)
+  // Projected_Grade nunca puede exceder Max_Scale
+  // ─────────────────────────────────────────────────────────────────
+  currentAverage = Math.max(0, Math.min(maxScale, currentAverage));
+  currentEMA = Math.max(0, Math.min(maxScale, currentEMA));
+  projectedGrade = Math.max(0, Math.min(maxScale, projectedGrade));
+
+  // ─────────────────────────────────────────────────────────────────
+  // PASO 7: CÁLCULO DEL DELTA (Puntuación Adicional para UI)
+  // Fórmula: Delta = NP - PA
+  // ─────────────────────────────────────────────────────────────────
+  const delta = projectedGrade - currentAverage;
+
+  return {
+    currentAverage: parseFloat(currentAverage.toFixed(2)),
+    currentEMA: parseFloat(currentEMA.toFixed(2)),
+    projectedGrade: parseFloat(projectedGrade.toFixed(2)),
+    delta: parseFloat(delta.toFixed(2)),
+    evaluatedWeight: parseFloat(evaluatedWeight.toFixed(4)),
+    remainingWeight: parseFloat(remainingWeight.toFixed(4)),
+  };
+}
+
 module.exports = {
   normalizeGrade,
   denormalizeGrade,
@@ -277,4 +388,5 @@ module.exports = {
   getActiveVersion,
   getScalesForVersion,
   applyRounding,
+  calculateProjectedGrade,
 };

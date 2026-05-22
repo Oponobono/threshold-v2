@@ -144,3 +144,28 @@ export const deleteAssessment = async (id: number) => {
 
   return data;
 };
+
+/**
+ * Obtiene métricas de proyección para una materia
+ * Calcula: PA (promedio actual), EMA (tendencia), NP (proyección final)
+ * 
+ * @param subjectId - ID de la materia
+ * @returns {currentAverage, currentEMA, projectedGrade, delta, evaluatedWeight, remainingWeight}
+ */
+export const getProjectionAnalytics = async (subjectId: number) => {
+  try {
+    const response = await fetchWithFallback(`/assessments/analytics/subject/${subjectId}/projection`);
+    const data = await parseJsonSafely(response);
+    
+    if (!response.ok) {
+      console.warn(`[API/Assessments] Error obteniendo proyección para subject ${subjectId}:`, data?.error);
+      return null;
+    }
+    
+    console.log(`[API/Assessments] Proyección para subject ${subjectId}:`, data);
+    return data;
+  } catch (error) {
+    console.warn(`[API/Assessments] Error en getProjectionAnalytics:`, error);
+    return null;
+  }
+};

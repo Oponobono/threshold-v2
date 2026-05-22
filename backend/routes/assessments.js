@@ -145,4 +145,52 @@ router.put('/assessments/:id', assessmentsController.updateAssessment);
  */
 router.delete('/assessments/:id', assessmentsController.deleteAssessment);
 
+/**
+ * @swagger
+ * /api/assessments/analytics/subject/{subjectId}/projection:
+ *   get:
+ *     summary: Obtiene métricas de proyección de desempeño para una materia
+ *     tags: [Assessments]
+ *     description: Calcula proyección de nota final usando EMA (Exponential Moving Average), considerando el desempeño actual y la tendencia de aprendizaje.
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Métricas de proyección calculadas exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 subjectId:
+ *                   type: integer
+ *                 currentAverage:
+ *                   type: number
+ *                   description: PA - Promedio Actual ponderado
+ *                 currentEMA:
+ *                   type: number
+ *                   description: Tendencia reciente usando EMA (α=0.35)
+ *                 projectedGrade:
+ *                   type: number
+ *                   description: NP - Nota Proyectada final
+ *                 delta:
+ *                   type: number
+ *                   description: Cambio esperado (NP - PA), puede ser positivo o negativo
+ *                 evaluatedWeight:
+ *                   type: number
+ *                   description: Porcentaje evaluado (0-1)
+ *                 remainingWeight:
+ *                   type: number
+ *                   description: Porcentaje pendiente (0-1)
+ *                 assessmentCount:
+ *                   type: integer
+ *                 maxScale:
+ *                   type: number
+ */
+router.get('/assessments/analytics/subject/:subjectId/projection', assessmentsController.getProjectionAnalytics);
+
 module.exports = router;
