@@ -136,6 +136,7 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
            WHERE gm.user_id = ?
          )
        )
+    GROUP BY fd.id
     ORDER BY
       due_count DESC,
       learning_count DESC,
