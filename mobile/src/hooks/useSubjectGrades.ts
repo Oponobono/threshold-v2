@@ -37,16 +37,20 @@ export function useSubjectGrades(
   const { t } = useTranslation();
 
   const gradedAssessments = useMemo(() => {
-    const filtered = assessments.filter((assessment) => assessment.is_completed || normalizeGrade(assessment) !== null);
+    // Only include assessments with actual grades/scores
+    // Tasks (is_completed) should NOT be included in GPA calculations
+    // because they have no numeric score to contribute to the average
+    const filtered = assessments.filter((assessment) => normalizeGrade(assessment) !== null);
     console.log('[useSubjectGrades] 📊 FILTER LOGIC:', {
       totalAssessments: assessments.length,
       gradedAssessments: filtered.length,
       filterDetails: assessments.map(a => ({
         id: a.id,
         name: a.name,
+        type: a.type,
         is_completed: a.is_completed,
         normalizeGrade: normalizeGrade(a),
-        passesFilter: a.is_completed || normalizeGrade(a) !== null,
+        passesFilter: normalizeGrade(a) !== null,
       }))
     });
     return filtered;
