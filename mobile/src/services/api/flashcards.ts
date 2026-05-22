@@ -10,27 +10,58 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { FlashcardDeck, Flashcard } from './types';
+import { cacheService } from '../../services/cacheService';
 
 /** Obtiene todos los mazos del usuario autenticado, incluyendo los recibidos por colaboración */
 export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(`/flashcard-decks?user_id=${userId}`);
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'Error al obtener los mazos');
+  try {
+    const userId = await getUserId();
+    const response = await fetchWithFallback(`/flashcard-decks?user_id=${userId}`);
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'Error al obtener los mazos');
+    }
+    // Cache the result on success
+    if (data && Array.isArray(data)) {
+      await cacheService.saveFlashcardDecks(data);
+    }
+    return data || [];
+  } catch (error) {
+    // Fallback to cache on error
+    console.warn('[Flashcards] Network error, attempting to load from cache:', error);
+    const cached = await cacheService.loadFlashcardDecks();
+    if (cached) {
+      console.log('[Flashcards] ✅ Loaded decks from cache (offline mode)');
+      return cached;
+    }
+    throw error;
   }
-  return data || [];
 };
 
 /** Obtiene todos los mazos con métricas de prioridad, ordenados por urgencia */
 export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(`/flashcard-decks/with-metrics?user_id=${userId}`);
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'Error al obtener los mazos con métricas');
+  try {
+    const userId = await getUserId();
+    const response = await fetchWithFallback(`/flashcard-decks/with-metrics?user_id=${userId}`);
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'Error al obtener los mazos con métricas');
+    }
+    // Cache the result on success
+    if (data && Array.isArray(data)) {
+      await cacheService.saveFlashcardDecksWithMetrics(data);
+    }
+    return data || [];
+  } catch (error) {
+    // Fallback to cache on error
+    console.warn('[Flashcards] Network error, attempting to load metrics from cache:', error);
+    const cached = await cacheService.loadFlashcardDecksWithMetrics();
+    if (cached) {
+      console.log('[Flashcards] ✅ Loaded decks with metrics from cache (offline mode)');
+      return cached;
+    }
+    throw error;
   }
-  return data || [];
 };
 
 /** Crea un nuevo mazo vacío vinculado a una materia (opcional). Inyecta automáticamente el `user_id` */
@@ -62,23 +93,53 @@ export const updateFlashcardDeck = async (deckId: number, payload: { subject_id?
 
 /** Obtiene todas las tarjetas de un mazo específico por su ID */
 export const getFlashcards = async (deckId: number): Promise<Flashcard[]> => {
-  const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards`);
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'Error al obtener tarjetas');
+  try {
+    const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards`);
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'Error al obtener tarjetas');
+    }
+    // Cache the result on success
+    if (data && Array.isArray(data)) {
+      await cacheService.saveFlashcardsByDeck(deckId, data);
+    }
+    return data || [];
+  } catch (error) {
+    // Fallback to cache on error
+    console.warn(`[Flashcards] Network error getting cards for deck ${deckId}, attempting cache:`, error);
+    const cached = await cacheService.loadFlashcardsByDeck(deckId);
+    if (cached) {
+      console.log(`[Flashcards] ✅ Loaded ${cached.length} cards from cache (offline mode)`);
+      return cached;
+    }
+    throw error;
   }
-  return data || [];
 };
 
 /** Obtiene todas las tarjetas de un mazo ordenadas por prioridad de repaso */
 export const getFlashcardsPrioritized = async (deckId: number): Promise<Flashcard[]> => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards/prioritized?userId=${userId}`);
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'Error al obtener tarjetas priorizadas');
+  try {
+    const userId = await getUserId();
+    const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards/prioritized?userId=${userId}`);
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'Error al obtener tarjetas priorizadas');
+    }
+    // Cache the result on success
+    if (data && Array.isArray(data)) {
+      await cacheService.saveFlashcardsPrioritizedByDeck(deckId, data);
+    }
+    return data || [];
+  } catch (error) {
+    // Fallback to cache on error
+    console.warn(`[Flashcards] Network error getting prioritized cards for deck ${deckId}, attempting cache:`, error);
+    const cached = await cacheService.loadFlashcardsPrioritizedByDeck(deckId);
+    if (cached) {
+      console.log(`[Flashcards] ✅ Loaded ${cached.length} prioritized cards from cache (offline mode)`);
+      return cached;
+    }
+    throw error;
   }
-  return data || [];
 };
 
 /** Obtiene una tarjeta específica por su ID */
@@ -283,15 +344,30 @@ export const getSnoozeStatus = async (cardId: number): Promise<SnoozeStatus> => 
  * Obtiene tarjetas de un mazo excluyendo las snoozed
  */
 export const getCardsNotSnoozed = async (deckId: number): Promise<Flashcard[]> => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(
-    `/flashcard-decks/${deckId}/cards/not-snoozed?userId=${userId}`
-  );
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'Error al obtener tarjetas no snoozadas');
+  try {
+    const userId = await getUserId();
+    const response = await fetchWithFallback(
+      `/flashcard-decks/${deckId}/cards/not-snoozed?userId=${userId}`
+    );
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'Error al obtener tarjetas no snoozadas');
+    }
+    // Cache the result on success
+    if (data && Array.isArray(data)) {
+      await cacheService.saveCardsNotSnoozedByDeck(deckId, data);
+    }
+    return data || [];
+  } catch (error) {
+    // Fallback to cache on error
+    console.warn(`[Flashcards] Network error getting non-snoozed cards for deck ${deckId}, attempting cache:`, error);
+    const cached = await cacheService.loadCardsNotSnoozedByDeck(deckId);
+    if (cached) {
+      console.log(`[Flashcards] ✅ Loaded ${cached.length} non-snoozed cards from cache (offline mode)`);
+      return cached;
+    }
+    throw error;
   }
-  return data || [];
 };
 
 /**
