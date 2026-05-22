@@ -47,8 +47,10 @@ export function useSubjectGrades(
     remainingWeight?: number;
   } | null>(null);
 
-  // Efecto: Cargar datos de proyección del backend cuando la materia cambie
+  // Efecto: Cargar datos de proyección del backend cuando la materia cambie o se actualicen assessments
   useEffect(() => {
+    console.log('[useSubjectGrades] 🔍 Effect ejecutado - selectedSubject.id:', selectedSubject?.id, 'assessmentCount:', assessments.length);
+    
     if (!selectedSubject?.id) {
       console.log('[useSubjectGrades] ⚠️ selectedSubject.id no disponible:', selectedSubject?.id);
       setProjectionData(null);
@@ -81,7 +83,7 @@ export function useSubjectGrades(
     };
 
     loadProjection();
-  }, [selectedSubject?.id]);
+  }, [selectedSubject?.id, assessments.length]);
 
   const gradedAssessments = useMemo(() => {
     // Only include assessments with actual grades/scores
