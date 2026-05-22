@@ -29,6 +29,7 @@ interface SubjectInsightsProps {
   onDeleteAssessment?: (id: number) => void;
   onOpenCategories?: () => void;
   onAddAssessment?: () => void;
+  onAssessmentUpdated?: () => void;
   subjects: any[];
 }
 
@@ -45,7 +46,7 @@ interface SubjectInsightsProps {
  * @param onDeleteAssessment - Callback opcional llamado con el ID al eliminar una evaluación.
  * @param subjects - Lista de materias disponibles para cambiar de materia al editar.
  */
-export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessments, onDeleteAssessment, onOpenCategories, onAddAssessment, subjects }) => {
+export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessments, onDeleteAssessment, onOpenCategories, onAddAssessment, onAssessmentUpdated, subjects }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   
@@ -308,6 +309,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
         onClose={() => {
           setIsEditGradeModalVisible(false);
           setSelectedAssessment(null);
+          onAssessmentUpdated?.();
         }}
         assessment={selectedAssessment}
         subjects={subjects}
@@ -319,6 +321,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
         onClose={() => {
           setIsEditTaskModalVisible(false);
           setSelectedAssessment(null);
+          onAssessmentUpdated?.();
         }}
         task={selectedAssessment}
         subjects={subjects}
@@ -330,6 +333,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
         onClose={() => {
           setIsCompleteTaskModalVisible(false);
           setSelectedAssessment(null);
+          onAssessmentUpdated?.();
         }}
         task={selectedAssessment}
       />

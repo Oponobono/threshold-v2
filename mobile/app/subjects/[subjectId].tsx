@@ -338,6 +338,11 @@ export default function SubjectDetailScreen() {
             onDeleteAssessment={(id) => {
               setAssessments(prev => prev.filter(a => a.id !== id));
             }}
+            onAssessmentUpdated={() => {
+              if (subjectId) {
+                getAssessments(subjectId).then(res => setAssessments((res || []) as Assessment[])).catch(console.error);
+              }
+            }}
             onOpenCategories={() => {
               if (subjectId) {
                 router.push(`/categories/${subjectId}?subjectName=${encodeURIComponent(selectedSubject?.name ?? '')}`);

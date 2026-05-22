@@ -268,12 +268,23 @@ exports.updateAssessment = (req, res) => {
                       if (rawValue !== null) {
                         const { normalizeGrade } = require('../services/gradingEngine');
                         const normalized = normalizeGrade(rawValue, version);
-                        db.run(`
-                          UPDATE assessment_results 
-                          SET raw_value = ?, normalized_value = ? 
-                          WHERE assessment_id = ?
-                        `, [rawValue, normalized, id], (err) => {
-                          return res.json({ id, message: 'Evaluación actualizada' });
+                        db.get('SELECT id FROM assessment_results WHERE assessment_id = ?', [id], (err, existingResult) => {
+                          if (existingResult) {
+                            db.run(`
+                              UPDATE assessment_results 
+                              SET raw_value = ?, normalized_value = ?, grading_version_id = ?
+                              WHERE assessment_id = ?
+                            `, [rawValue, normalized, user.active_grading_version_id, id], (err) => {
+                              return res.json({ id, message: 'Evaluación actualizada' });
+                            });
+                          } else {
+                            db.run(`
+                              INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
+                              VALUES (?, ?, ?, ?, ?)
+                            `, [id, subject.user_id, rawValue, normalized, user.active_grading_version_id], (err) => {
+                              return res.json({ id, message: 'Evaluación actualizada' });
+                            });
+                          }
                         });
                       } else {
                         return res.json({ id, message: 'Evaluación actualizada' });
