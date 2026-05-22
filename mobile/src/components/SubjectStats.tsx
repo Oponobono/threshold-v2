@@ -11,6 +11,7 @@ import { globalStyles } from '../styles/globalStyles';
 interface SubjectStatsProps {
   averageGrade: number;
   projectedGrade: number;
+  delta?: number;
   deliveredText: string;
 }
 
@@ -23,6 +24,7 @@ interface SubjectStatsProps {
 export const SubjectStats: React.FC<SubjectStatsProps> = ({
   averageGrade,
   projectedGrade,
+  delta = 0,
   deliveredText,
 }) => {
   const { t } = useTranslation();
@@ -34,11 +36,11 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
   const isValidTasks = !isNaN(done) && !isNaN(total) && total > 0;
   const taskPercent = isValidTasks ? Math.min(100, Math.max(0, (done / total) * 100)) : 0;
 
-  // Tendencia: diferencia entre proyectada y promedio
-  const difference = projectedGrade - averageGrade;
+  // Tendencia: usar delta del backend si está disponible, sino calcular localmente
+  const difference = delta || (projectedGrade - averageGrade);
   const isUp = difference > 0.05;
   const isDown = difference < -0.05;
-  const differenceMagnitude = Math.abs(difference).toFixed(1);
+  const differenceMagnitude = Math.abs(difference).toFixed(2);
 
   return (
     <View style={globalSectionStyles.sectionBlock}>

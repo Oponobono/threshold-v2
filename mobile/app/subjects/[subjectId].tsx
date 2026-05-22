@@ -250,6 +250,7 @@ export default function SubjectDetailScreen() {
   const {
     averageGrade,
     projectedGrade,
+    delta,
     deliveredText,
     securedPercent,
     finalNeededText,
@@ -327,6 +328,7 @@ export default function SubjectDetailScreen() {
           <SubjectStats
             averageGrade={averageGrade}
             projectedGrade={projectedGrade}
+            delta={delta}
             deliveredText={deliveredText}
           />
 
