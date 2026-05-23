@@ -735,9 +735,20 @@ exports.getProjectionAnalytics = (req, res) => {
         delta: projection.delta,
       });
 
+      // 🔥 DELTA HARDCODEADO PARA TESTING - Verificar que aparece en UI
+      const projectionWithHardcodedDelta = {
+        ...projection,
+        delta: 0.75, // Valor quemado para verificar visibilidad en UI
+      };
+
+      console.log(`[Analytics] 🔥 DELTA HARDCODEADO:`, {
+        originalDelta: projection.delta,
+        hardcodedDelta: 0.75,
+      });
+
       return res.json({
         subjectId: parseInt(subjectId),
-        ...projection,
+        ...projectionWithHardcodedDelta,
         assessmentCount: denormalizedAssessments.length,
         maxScale,
       });
