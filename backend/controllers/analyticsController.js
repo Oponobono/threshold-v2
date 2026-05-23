@@ -25,6 +25,16 @@ exports.trackGuest = (req, res) => {
 // GET /api/analytics/mastery/:userId/:subjectId
 exports.getMastery = (req, res) => {
   const { userId, subjectId } = req.params;
+  const startTime = Date.now();
+  const TIMEOUT = 30000; // 30 segundos timeout
+
+  // Configurar timeout para prevenir que el request cuelgue
+  const timeoutId = setTimeout(() => {
+    console.error(`[getMastery] Request timeout para userId=${userId}, subjectId=${subjectId}`);
+    if (!res.headersSent) {
+      res.status(503).json({ error: 'Request timeout al obtener analítica de dominio' });
+    }
+  }, TIMEOUT);
 
   let query = `
     SELECT la.*, s.name as subject_name
@@ -40,16 +50,34 @@ exports.getMastery = (req, res) => {
   }
 
   db.all(query, params, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+    clearTimeout(timeoutId);
+    const duration = Date.now() - startTime;
 
-    const masteryData = learningAnalytics.createDomainMap(
-      rows.map(row => ({
-        subject_id: row.subject_id,
-        subject_name: row.subject_name || 'General',
-        mastery_percentage: row.mastery_percentage || 0,
-      }))
-    );
-    res.json(masteryData);
+    if (err) {
+      console.error(`[getMastery] Error DB para userId=${userId}: ${err.message} (${duration}ms)`);
+      return res.status(500).json({ error: `Database error: ${err.message}` });
+    }
+
+    if (!rows || rows.length === 0) {
+      console.warn(`[getMastery] Sin datos para userId=${userId}, subjectId=${subjectId}`);
+      return res.json([]);
+    }
+
+    try {
+      const masteryData = learningAnalytics.createDomainMap(
+        rows.map(row => ({
+          subject_id: row.subject_id,
+          subject_name: row.subject_name || 'General',
+          mastery_percentage: row.mastery_percentage || 0,
+        }))
+      );
+      console.log(`[getMastery] ✓ userId=${userId}, subjectId=${subjectId} (${duration}ms)`);
+      res.json(masteryData);
+    } catch (mapErr) {
+      console.error(`[getMastery] Error al mapear datos: ${mapErr.message}`);
+      res.status(500).json({ error: `Error processing mastery data: ${mapErr.message}` });
+    }
+  });
   });
 };
 
@@ -613,10 +641,20 @@ exports.getDeckStats = (req, res) => {
  */
 exports.getGlobalGPAAnalytics = (req, res) => {
   const { userId } = req.params;
+  const startTime = Date.now();
+  const TIMEOUT = 30000; // 30 segundos timeout
 
   if (!userId) {
     return res.status(400).json({ error: 'Se requiere userId' });
   }
+
+  // Configurar timeout
+  const timeoutId = setTimeout(() => {
+    console.error(`[getGlobalGPAAnalytics] Request timeout para userId=${userId}`);
+    if (!res.headersSent) {
+      res.status(503).json({ error: 'Request timeout al calcular GPA global' });
+    }
+  }, TIMEOUT);
 
   try {
     // Calcular promedio global ponderado considerando todas las materias
@@ -638,12 +676,16 @@ exports.getGlobalGPAAnalytics = (req, res) => {
        ORDER BY a.created_at DESC`,
       [userId],
       (err, assessments) => {
+        clearTimeout(timeoutId);
+        const duration = Date.now() - startTime;
+
         if (err) {
-          console.error('[GlobalGPA] Error fetching assessments:', err);
-          return res.status(500).json({ error: err.message });
+          console.error(`[getGlobalGPAAnalytics] Error DB para userId=${userId}: ${err.message} (${duration}ms)`);
+          return res.status(500).json({ error: `Database error: ${err.message}` });
         }
 
         if (!assessments || assessments.length === 0) {
+          console.log(`[getGlobalGPAAnalytics] Sin evaluaciones para userId=${userId}`);
           return res.json({
             currentAverage: 0,
             projectedGrade: 0,
@@ -655,58 +697,67 @@ exports.getGlobalGPAAnalytics = (req, res) => {
           });
         }
 
-        // Normalizar y calcular promedio ponderado
-        let totalWeightedGrade = 0;
-        let totalWeight = 0;
-        const subjects = new Set();
+        try {
+          // Normalizar y calcular promedio ponderado
+          let totalWeightedGrade = 0;
+          let totalWeight = 0;
+          const subjects = new Set();
 
-        assessments.forEach(a => {
-          if (a.subject_id) subjects.add(a.subject_id);
+          assessments.forEach(a => {
+            if (a.subject_id) subjects.add(a.subject_id);
 
-          // Obtener la nota normalizada (0-1)
-          let normalized = 0;
-          if (typeof a.normalized_value === 'number') {
-            normalized = a.normalized_value;
-          } else if (typeof a.grade_value === 'number' && a.grade_value <= 5) {
-            normalized = a.grade_value / 5; // Asumir escala 0-5
-          } else if (typeof a.score === 'number' && typeof a.out_of === 'number' && a.out_of > 0) {
-            normalized = a.score / a.out_of;
-          }
+            // Obtener la nota normalizada (0-1)
+            let normalized = 0;
+            if (typeof a.normalized_value === 'number') {
+              normalized = a.normalized_value;
+            } else if (typeof a.grade_value === 'number' && a.grade_value <= 5) {
+              normalized = a.grade_value / 5; // Asumir escala 0-5
+            } else if (typeof a.score === 'number' && typeof a.out_of === 'number' && a.out_of > 0) {
+              normalized = a.score / a.out_of;
+            }
 
-          // Parsear peso (default 1 si no hay)
-          let weight = 1;
-          if (typeof a.percentage === 'number') {
-            weight = a.percentage;
-          } else if (typeof a.weight === 'string') {
-            const parsed = parseFloat(a.weight);
-            weight = !isNaN(parsed) ? Math.min(parsed, 100) : 1;
-          } else if (typeof a.weight === 'number') {
-            weight = a.weight;
-          }
+            // Parsear peso (default 1 si no hay)
+            let weight = 1;
+            if (typeof a.percentage === 'number') {
+              weight = a.percentage;
+            } else if (typeof a.weight === 'string') {
+              const parsed = parseFloat(a.weight);
+              weight = !isNaN(parsed) ? Math.min(parsed, 100) : 1;
+            } else if (typeof a.weight === 'number') {
+              weight = a.weight;
+            }
 
-          // Convertir a escala 0-5 para visualización
-          const gradeOutOf5 = normalized * 5;
-          totalWeightedGrade += gradeOutOf5 * weight;
-          totalWeight += weight;
-        });
+            // Convertir a escala 0-5 para visualización
+            const gradeOutOf5 = normalized * 5;
+            totalWeightedGrade += gradeOutOf5 * weight;
+            totalWeight += weight;
+          });
 
-        const currentAverage = totalWeight > 0 ? totalWeightedGrade / totalWeight : 0;
-        const projectedGrade = currentAverage; // Puede sofisticarse con EMA futura
-        const delta = 0; // Delta future = EMA - current
+          const currentAverage = totalWeight > 0 ? totalWeightedGrade / totalWeight : 0;
+          const projectedGrade = currentAverage; // Puede sofisticarse con EMA futura
+          const delta = 0; // Delta future = EMA - current
 
-        res.json({
-          currentAverage: parseFloat(currentAverage.toFixed(2)),
-          projectedGrade: parseFloat(projectedGrade.toFixed(2)),
-          delta: delta,
-          evaluatedWeight: Math.round((totalWeight / Math.max(totalWeight, 100)) * 100),
-          remainingWeight: Math.max(0, 100 - Math.round((totalWeight / Math.max(totalWeight, 100)) * 100)),
-          assessmentCount: assessments.length,
-          subjectCount: subjects.size,
-        });
+          const result = {
+            currentAverage: parseFloat(currentAverage.toFixed(2)),
+            projectedGrade: parseFloat(projectedGrade.toFixed(2)),
+            delta: delta,
+            evaluatedWeight: Math.round((totalWeight / Math.max(totalWeight, 100)) * 100),
+            remainingWeight: Math.max(0, 100 - Math.round((totalWeight / Math.max(totalWeight, 100)) * 100)),
+            assessmentCount: assessments.length,
+            subjectCount: subjects.size,
+          };
+
+          console.log(`[getGlobalGPAAnalytics] ✓ userId=${userId}, GPA=${result.currentAverage} (${duration}ms)`);
+          res.json(result);
+        } catch (calcErr) {
+          console.error(`[getGlobalGPAAnalytics] Error al calcular GPA: ${calcErr.message}`);
+          res.status(500).json({ error: `Error calculating GPA: ${calcErr.message}` });
+        }
       }
     );
   } catch (err) {
-    console.error('[GlobalGPA] Unexpected error:', err);
+    clearTimeout(timeoutId);
+    console.error(`[getGlobalGPAAnalytics] Unexpected error: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 };

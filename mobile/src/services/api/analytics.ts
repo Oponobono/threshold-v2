@@ -234,11 +234,33 @@ export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');
   
-  const response = await fetchWithFallback(`/analytics/global/gpa/${userId}`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) throw new Error('Error al obtener GPA global');
-  const data = await parseJsonSafely(response);
-  return data;
+  try {
+    const url = `/analytics/global/gpa/${userId}`;
+    const response = await fetchWithFallback(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    const data = await parseJsonSafely(response);
+    
+    if (!response.ok) {
+      const errorMsg = data?.error || `HTTP ${response.status}: ${response.statusText}`;
+      console.error(`[getGlobalGPAAnalytics] Server error (${response.status}): ${errorMsg}`);
+      throw new Error(`Error al obtener GPA global: ${errorMsg}`);
+    }
+    
+    return data || {
+      currentAverage: 0,
+      projectedGrade: 0,
+      delta: 0,
+      evaluatedWeight: 0,
+      remainingWeight: 100,
+      assessmentCount: 0,
+      subjectCount: 0,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[getGlobalGPAAnalytics] Network error:`, errorMsg);
+    throw error;
+  }
 };

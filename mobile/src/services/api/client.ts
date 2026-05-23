@@ -67,20 +67,36 @@ export const API_PORTS = [3000, 3001];
 
 export let API_BASE_URLS: string[] = [];
 
-if (__DEV__) {
-  API_BASE_URLS = API_PORTS.map((port) => `http://${DEFAULT_LAN_IP}:${port}/api`);
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    API_BASE_URLS.push(process.env.EXPO_PUBLIC_API_URL);
+// 🌐 Prioriza URL de Render si está configurada (producción), luego fallback a localhost
+if (process.env.EXPO_PUBLIC_API_URL) {
+  // Si hay URL en variables de entorno (Render en prod, o configurada en desarrollo)
+  API_BASE_URLS = [process.env.EXPO_PUBLIC_API_URL];
+  
+  // En modo desarrollo, también intenta URLs locales como fallback
+  if (__DEV__) {
+    API_BASE_URLS.push(...API_PORTS.map((port) => `http://${DEFAULT_LAN_IP}:${port}/api`));
   }
+} else if (__DEV__) {
+  // Si no hay URL remota y estamos en dev, usa solo locales
+  API_BASE_URLS = API_PORTS.map((port) => `http://${DEFAULT_LAN_IP}:${port}/api`);
 } else {
-  API_BASE_URLS = process.env.EXPO_PUBLIC_API_URL 
-    ? [process.env.EXPO_PUBLIC_API_URL]
-    : API_PORTS.map((port) => `http://${DEFAULT_LAN_IP}:${port}/api`);
+  // Fallback en producción sin URL configurada
+  API_BASE_URLS = API_PORTS.map((port) => `http://${DEFAULT_LAN_IP}:${port}/api`);
 }
 
 export let activeBaseUrl = API_BASE_URLS[0];
 
 export const buildApiError = (message: string): Error => new Error(message);
+
+// 🔍 Logging de configuración de URLs
+console.log(
+  '[API Config]',
+  __DEV__ ? '🔨 Development Mode' : '🚀 Production Mode',
+  '| EXPO_PUBLIC_API_URL:',
+  process.env.EXPO_PUBLIC_API_URL ? '✓ Configurada' : '✗ No configurada',
+  '| URLs a intentar:',
+  API_BASE_URLS
+);
 
 /**
  * Realiza la petición HTTP probándolas todas las URLs base en orden.
@@ -127,8 +143,17 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
 
   for (const base of candidates) {
     try {
-      const response = await fetch(`${base}${path}`, customInit);
+      const fullUrl = `${base}${path}`;
+      const response = await fetch(fullUrl, customInit);
       activeBaseUrl = base;
+      
+      // ✅ Log successful connection
+      if (response.ok) {
+        console.log(`[✓ API] ${method} ${path} → ${response.status} (${base.split('/api')[0]})`);
+      } else {
+        console.warn(`[⚠ API] ${method} ${path} → ${response.status} (${base.split('/api')[0]})`);
+      }
+      
       // ✅ Interceptar 304 Not Modified y servir desde caché
       if (response.status === 304 && isCacheable) {
         console.log(`[Cache] 304 Not Modified interceptado para ${path}. Sirviendo caché local.`);
@@ -155,6 +180,8 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
       
       return response;
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[✗ API] Fallo conectando a ${base}${path} — ${errorMsg}`);
       lastError = error;
     }
   }

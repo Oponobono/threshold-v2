@@ -27,12 +27,14 @@ export const getScannedDocumentsBySubject = async (subjectId: number | string): 
     const response = await fetchWithFallback(`/scanned_documents/subject/${subjectId}`);
     const data = await parseJsonSafely(response);
     if (!response.ok) {
-      console.warn('[getScannedDocumentsBySubject] Error:', data?.error);
+      const errorMsg = data?.error || `HTTP ${response.status}: ${response.statusText}`;
+      console.warn(`[getScannedDocumentsBySubject] Server error for subject ${subjectId}:`, errorMsg);
       return [];
     }
     return data || [];
   } catch (error: any) {
-    console.warn('[getScannedDocumentsBySubject] Network error:', error?.message || String(error) || 'Unknown error');
+    const errorMsg = error instanceof Error ? error.message : (error && typeof error === 'object' ? JSON.stringify(error) : String(error) || 'Unknown network error');
+    console.warn(`[getScannedDocumentsBySubject] Network error for subject ${subjectId}:`, errorMsg);
     return [];
   }
 };

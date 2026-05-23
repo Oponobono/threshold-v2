@@ -51,7 +51,9 @@ export default function GradesScreen() {
       getGlobalGPAAnalytics()
         .then(data => setGlobalGPA(data))
         .catch(err => {
-          console.warn('Failed to fetch global GPA:', err);
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          console.warn(`[grades.tsx] Failed to fetch global GPA: ${errorMsg}`);
+          console.warn('[grades.tsx] App will display cached data or empty state');
           setGlobalGPA(null);
         })
         .finally(() => setIsLoadingGlobalGPA(false));

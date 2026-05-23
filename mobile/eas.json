@@ -6,7 +6,11 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://threshold-backend-cn82.onrender.com/api",
+        "EXPO_PUBLIC_GROQ_API_KEY": "@env GROQ_API_KEY"
+      }
     },
     "preview": {
       "distribution": "internal",
