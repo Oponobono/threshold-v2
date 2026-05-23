@@ -657,10 +657,10 @@ exports.getGlobalGPAAnalytics = (req, res) => {
 
   try {
     // Calcular promedio global ponderado considerando todas las materias
+    // Usa JOIN con subjects para obtener user_id (assessments puede no tener la columna en producción)
     db.all(
       `SELECT 
          a.id,
-         a.user_id,
          a.subject_id,
          a.grade_value,
          a.score,
@@ -669,10 +669,11 @@ exports.getGlobalGPAAnalytics = (req, res) => {
          a.percentage,
          a.weight,
          a.date,
-         s.name as subject_name
+         s.name as subject_name,
+         s.user_id
        FROM assessments a
        LEFT JOIN subjects s ON a.subject_id = s.id
-       WHERE a.user_id = ?
+       WHERE s.user_id = ?
        AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR a.normalized_value IS NOT NULL)
        ORDER BY a.date DESC`,
       [userId],
