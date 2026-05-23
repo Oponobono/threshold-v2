@@ -38,8 +38,8 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
 
   // Tendencia: usar delta del backend si está disponible, sino calcular localmente
   const difference = delta || (projectedGrade - averageGrade);
-  const isUp = difference > 0.05;
-  const isDown = difference < -0.05;
+  const isUp = difference > 0.01;
+  const isDown = difference < -0.01;
   const differenceMagnitude = Math.abs(difference).toFixed(2);
 
   return (
