@@ -323,6 +323,8 @@ export default function GradesScreen() {
           <View style={{ alignItems: 'center', marginBottom: 12 }}>
             <Text style={{ fontSize: 10, color: theme.colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>
               {selectedSubjectId === null && globalGPA ? t('grades.cumulative') : t('grades.projected')}: <Text style={{ color: theme.colors.text.primary }}>{displayProjectedGPA > 0 ? displayProjectedGPA : t('grades.insufficientData', 'Faltan evaluaciones')}</Text>
+            </Text>
+          </View>
 
           {/* Full-width elegant sparkline */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 4 }}>
