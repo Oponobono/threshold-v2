@@ -328,6 +328,13 @@ function calculateProjectedGrade(gradedAssessments = [], maxScale = 5.0) {
     currentAverage = weightedSum / totalWeight;
   }
 
+  console.log(`[GradingEngine] 📊 PA Calculation:`, {
+    grades,
+    weights,
+    totalWeight,
+    currentAverage,
+  });
+
   // ─────────────────────────────────────────────────────────────────
   // PASO 3: CÁLCULO DEL EMA (Tendencia Reciente)
   // Fórmula: EMA_t = (Latest_Grade * 0.35) + (Previous_EMA * 0.65)
@@ -338,6 +345,12 @@ function calculateProjectedGrade(gradedAssessments = [], maxScale = 5.0) {
   for (let i = 1; i < grades.length; i++) {
     currentEMA = (grades[i] * ALPHA) + (currentEMA * (1 - ALPHA));
   }
+
+  console.log(`[GradingEngine] 📊 EMA Calculation:`, {
+    firstGrade: grades[0],
+    finalEMA: currentEMA,
+    ALPHA,
+  });
 
   // ─────────────────────────────────────────────────────────────────
   // PASO 4: CÁLCULO DE PESOS (Evaluado vs Restante)
@@ -356,6 +369,14 @@ function calculateProjectedGrade(gradedAssessments = [], maxScale = 5.0) {
   // ─────────────────────────────────────────────────────────────────
   let projectedGrade = (currentAverage * evaluatedWeight) + (currentEMA * remainingWeight);
 
+  console.log(`[GradingEngine] 📊 NP Calculation:`, {
+    currentAverage,
+    evaluatedWeight,
+    currentEMA,
+    remainingWeight,
+    projectedGrade,
+  });
+
   // ─────────────────────────────────────────────────────────────────
   // PASO 6: CLAMP (Restricción Matemática)
   // Projected_Grade nunca puede exceder Max_Scale
@@ -369,6 +390,13 @@ function calculateProjectedGrade(gradedAssessments = [], maxScale = 5.0) {
   // Fórmula: Delta = NP - PA
   // ─────────────────────────────────────────────────────────────────
   const delta = projectedGrade - currentAverage;
+
+  console.log(`[GradingEngine] 📊 DELTA Calculation:`, {
+    projectedGrade,
+    currentAverage,
+    delta,
+    'delta should be': `${projectedGrade} - ${currentAverage} = ${delta}`,
+  });
 
   return {
     currentAverage: parseFloat(currentAverage.toFixed(2)),

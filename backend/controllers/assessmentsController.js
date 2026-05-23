@@ -720,11 +720,11 @@ exports.getProjectionAnalytics = (req, res) => {
         };
       });
 
-      console.log(`[Analytics] 📊 Denormalized ${denormalizedAssessments.length} assessments`);
+      console.log(`[Analytics] 📊 Denormalized ${denormalizedAssessments.length} assessments:`, denormalizedAssessments);
 
       // Filtrar solo los que tienen grade_value
       const validAssessments = denormalizedAssessments.filter(a => a.grade_value !== null);
-      console.log(`[Analytics] ✓ ${validAssessments.length} assessments con notas válidas`);
+      console.log(`[Analytics] ✓ ${validAssessments.length} assessments con notas válidas:`, validAssessments);
 
       // Calcular proyección usando la función del gradingEngine
       const projection = gradingEngine.calculateProjectedGrade(validAssessments, maxScale);
@@ -735,20 +735,9 @@ exports.getProjectionAnalytics = (req, res) => {
         delta: projection.delta,
       });
 
-      // 🔥 DELTA HARDCODEADO PARA TESTING - Verificar que aparece en UI
-      const projectionWithHardcodedDelta = {
-        ...projection,
-        delta: 0.75, // Valor quemado para verificar visibilidad en UI
-      };
-
-      console.log(`[Analytics] 🔥 DELTA HARDCODEADO:`, {
-        originalDelta: projection.delta,
-        hardcodedDelta: 0.75,
-      });
-
       return res.json({
         subjectId: parseInt(subjectId),
-        ...projectionWithHardcodedDelta,
+        ...projection,
         assessmentCount: denormalizedAssessments.length,
         maxScale,
       });
