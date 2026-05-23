@@ -78,7 +78,6 @@ exports.getMastery = (req, res) => {
       res.status(500).json({ error: `Error processing mastery data: ${mapErr.message}` });
     }
   });
-  });
 };
 
 // GET /api/analytics/predictions/:userId
