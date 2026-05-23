@@ -48,6 +48,10 @@ mobile/dist/
 mobile/web-build/
 mobile/expo-env.d.ts
 mobile/.kotlin/
+
+# ==================== ANALYSIS & DOCUMENTATION ====================
+# Local analysis and documentation files
+analysis/
 mobile/*.orig.*
 mobile/*.jks
 mobile/*.p8
