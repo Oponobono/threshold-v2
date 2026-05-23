@@ -199,7 +199,7 @@ exports.generateReport = async (req, res) => {
            LEFT JOIN flashcards fc ON fc.deck_id = fd.id
            LEFT JOIN subjects s ON fd.subject_id = s.id
            WHERE fd.user_id = ?
-           GROUP BY fd.id
+           GROUP BY fd.id, fd.title, s.name
            ORDER BY mastered DESC
            LIMIT 15`,
           [userId], (err, rows) => resolve(rows || [])
@@ -523,7 +523,7 @@ exports.getDeckStats = (req, res) => {
          LEFT JOIN flashcards fc ON fc.deck_id = fd.id
          LEFT JOIN card_logs cl ON fc.id = cl.card_id
          WHERE fd.id = ? AND fd.user_id = ?
-         GROUP BY fd.id`,
+         GROUP BY fd.id, fd.title, fd.description, s.name`,
         [deckId, userId],
         (err, row) => resolve(row || {})
       )
@@ -596,6 +596,119 @@ exports.getDeckStats = (req, res) => {
       console.error('[getDeckStats] Error:', err);
       res.status(500).json({ error: err.message });
     });
+};
+
+/**
+ * GET /api/analytics/global/gpa/:userId
+ *
+ * Calcula GPA global del estudiante (promedio ponderado de TODAS las materias)
+ * Retorna:
+ *  - currentAverage: Promedio ponderado global
+ *  - projectedGrade: Proyección de calificación final (usando EMA o promedio simple)
+ *  - delta: Diferencia entre promedio actual y proyección
+ *  - evaluatedWeight: Porcentaje del semestre ya evaluado (global)
+ *  - remainingWeight: Porcentaje pendiente de evaluación
+ *  - assessmentCount: Total de evaluaciones
+ *  - subjectCount: Total de materias con evaluaciones
+ */
+exports.getGlobalGPAAnalytics = (req, res) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Se requiere userId' });
+  }
+
+  try {
+    // Calcular promedio global ponderado considerando todas las materias
+    db.all(
+      `SELECT 
+         a.id,
+         a.subject_id,
+         a.grade_value,
+         a.score,
+         a.out_of,
+         a.normalized_value,
+         a.percentage,
+         a.weight,
+         s.name as subject_name
+       FROM assessments a
+       LEFT JOIN subjects s ON a.subject_id = s.id
+       WHERE a.user_id = ?
+       AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR a.normalized_value IS NOT NULL)
+       ORDER BY a.created_at DESC`,
+      [userId],
+      (err, assessments) => {
+        if (err) {
+          console.error('[GlobalGPA] Error fetching assessments:', err);
+          return res.status(500).json({ error: err.message });
+        }
+
+        if (!assessments || assessments.length === 0) {
+          return res.json({
+            currentAverage: 0,
+            projectedGrade: 0,
+            delta: 0,
+            evaluatedWeight: 0,
+            remainingWeight: 100,
+            assessmentCount: 0,
+            subjectCount: 0,
+          });
+        }
+
+        // Normalizar y calcular promedio ponderado
+        let totalWeightedGrade = 0;
+        let totalWeight = 0;
+        const subjects = new Set();
+
+        assessments.forEach(a => {
+          if (a.subject_id) subjects.add(a.subject_id);
+
+          // Obtener la nota normalizada (0-1)
+          let normalized = 0;
+          if (typeof a.normalized_value === 'number') {
+            normalized = a.normalized_value;
+          } else if (typeof a.grade_value === 'number' && a.grade_value <= 5) {
+            normalized = a.grade_value / 5; // Asumir escala 0-5
+          } else if (typeof a.score === 'number' && typeof a.out_of === 'number' && a.out_of > 0) {
+            normalized = a.score / a.out_of;
+          }
+
+          // Parsear peso (default 1 si no hay)
+          let weight = 1;
+          if (typeof a.percentage === 'number') {
+            weight = a.percentage;
+          } else if (typeof a.weight === 'string') {
+            const parsed = parseFloat(a.weight);
+            weight = !isNaN(parsed) ? Math.min(parsed, 100) : 1;
+          } else if (typeof a.weight === 'number') {
+            weight = a.weight;
+          }
+
+          // Convertir a escala 0-5 para visualización
+          const gradeOutOf5 = normalized * 5;
+          totalWeightedGrade += gradeOutOf5 * weight;
+          totalWeight += weight;
+        });
+
+        const currentAverage = totalWeight > 0 ? totalWeightedGrade / totalWeight : 0;
+        const projectedGrade = currentAverage; // Puede sofisticarse con EMA futura
+        const delta = 0; // Delta future = EMA - current
+
+        res.json({
+          currentAverage: parseFloat(currentAverage.toFixed(2)),
+          projectedGrade: parseFloat(projectedGrade.toFixed(2)),
+          delta: delta,
+          evaluatedWeight: Math.round((totalWeight / Math.max(totalWeight, 100)) * 100),
+          remainingWeight: Math.max(0, 100 - Math.round((totalWeight / Math.max(totalWeight, 100)) * 100)),
+          assessmentCount: assessments.length,
+          subjectCount: subjects.size,
+        });
+      }
+    );
+  } catch (err) {
+    console.error('[GlobalGPA] Unexpected error:', err);
+    res.status(500).json({ error: err.message });
+  }
 };
 
 /**

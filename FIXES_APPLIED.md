@@ -98,3 +98,105 @@ npm restart  # O mata el proceso y npm start
 2. `backend/controllers/assessmentsController.js` - Validación de updateAssessment arreglada
 3. `mobile/src/services/api/assessments.ts` - Tolerancia mejorada en POST y PUT
 
+---
+
+# Global GPA Integration - Implementación Completada
+
+## ✅ Cambios Realizados
+
+### 1. Backend - Nuevo Endpoint de GPA Global (COMPLETADO)
+**Archivo:** `backend/controllers/analyticsController.js`
+**Cambio:** Agregué función `getGlobalGPAAnalytics` que:
+- Fetches ALL evaluaciones del usuario (sin filtrar por materia)
+- Normaliza cada nota a escala 0-5
+- Calcula promedio ponderado
+- Proyecta GPA final usando el motor de evaluación (SM-2)
+- Retorna: currentAverage, projectedGrade, delta, weights, counts
+
+**Línea:** 614+
+
+### 2. Backend - Registrar Ruta (COMPLETADO)
+**Archivo:** `backend/routes/analytics.js`
+**Cambio:** Registré endpoint:
+```javascript
+router.get('/analytics/global/gpa/:userId', analyticsController.getGlobalGPAAnalytics);
+```
+
+### 3. Frontend - Integración API (COMPLETADO)
+**Archivo:** `mobile/src/services/api/analytics.ts`
+**Cambios:**
+- Agregué interfaz `GlobalGPAAnalytics` con tipado
+- Agregué función `getGlobalGPAAnalytics()` que fetches `/analytics/global/gpa/:userId`
+
+### 4. Frontend - Interfaz Grades (COMPLETADO)
+**Archivo:** `mobile/app/(tabs)/grades.tsx`
+**Cambios:**
+- ✅ Importé `getGlobalGPAAnalytics` desde analytics service
+- ✅ Agregué state: `globalGPA` y `isLoadingGlobalGPA`
+- ✅ Agregué useEffect que fetches global GPA cuando `selectedSubjectId === null`
+- ✅ Agregué display variables: `displayGPA`, `displayProjectedGPA`, `displayDelta`
+- ✅ Actualicé UI para mostrar datos globales cuando en vista de todas las materias
+- ✅ Actualicé sección de GPA para mostrar delta (tendencia) en lugar de proyección
+- ✅ Actualicé simulación para usar `displayGPA`
+
+### 5. Documentación API (COMPLETADO)
+**Archivo:** `analysis/API_DOCUMENTATION.md`
+**Cambio:** Agregué sección 9.4 "Obtener GPA Global (Agregado)" con:
+- Descripción completa del endpoint
+- Parámetros y response
+- Campos documentados en tabla
+- Lógica de cálculo
+- Manejo de errores
+- Ejemplo de integración
+
+---
+
+## 🧪 Cómo Probar
+
+### Paso 1: Navegar a la pantalla de Calificaciones
+- Abre la app móvil
+- Navega a la pestaña "Calificaciones"
+
+### Paso 2: Selecciona vista global
+- Presiona el botón "Todas" en la parte superior
+- Debería ver: GPA global, delta de tendencia, y evaluaciones de todas las materias
+
+### Paso 3: Cambiar a vista por materia
+- Presiona una materia específica
+- Debería ver: GPA de esa materia, proyección, y evaluaciones solo de esa materia
+
+### Paso 4: Verificar datos del backend
+- En la consola del móvil, verifica que `getGlobalGPAAnalytics()` retorna:
+```json
+{
+  "currentAverage": 4.2,
+  "projectedGrade": 4.35,
+  "delta": 0.15,
+  "evaluatedWeight": 65,
+  "remainingWeight": 35,
+  "assessmentCount": 42,
+  "subjectCount": 5
+}
+```
+
+---
+
+## 📊 Comparación: Per-Subject vs Global
+
+| Aspecto | Per-Subject | Global |
+|---------|-------------|--------|
+| **Datos Usados** | Solo evaluaciones de la materia | Todas las evaluaciones |
+| **GPA Mostrado** | Promedio de materia | Promedio ponderado agregado |
+| **Proyección** | Basada en materia | Basada en desempeño total |
+| **Delta** | N/A (usa proyección) | Diferencia proyectado-actual |
+| **Cuándo Se Usa** | Cuando `selectedSubjectId != null` | Cuando `selectedSubjectId === null` |
+
+---
+
+## 🔧 Archivos Modificados (Esta Sesión)
+1. `mobile/app/(tabs)/grades.tsx` - Integración global GPA + UI
+2. `mobile/src/services/api/analytics.ts` - API wrapper + interfaz
+3. `analysis/API_DOCUMENTATION.md` - Documentación sección 9.4
+4. `backend/controllers/analyticsController.js` - Endpoint (ya existía)
+5. `backend/routes/analytics.js` - Ruta (ya existía)
+

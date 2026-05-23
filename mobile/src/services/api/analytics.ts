@@ -173,6 +173,16 @@ export interface ProgressTrends {
   }>;
 }
 
+export interface GlobalGPAAnalytics {
+  currentAverage: number;
+  projectedGrade: number;
+  delta: number;
+  evaluatedWeight: number;
+  remainingWeight: number;
+  assessmentCount: number;
+  subjectCount: number;
+}
+
 /**
  * Obtiene estadísticas globales del usuario
  */
@@ -211,6 +221,24 @@ export const getProgressTrends = async (userId: number, days?: number): Promise<
     headers: { 'Content-Type': 'application/json' },
   });
   if (!response.ok) throw new Error('Error al obtener tendencias de progreso');
+  const data = await parseJsonSafely(response);
+  return data;
+};
+
+/**
+ * Obtiene el GPA global agregado para todos los sujetos del usuario
+ * Calcula el promedio ponderado de todas las evaluaciones realizadas
+ */
+export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
+  const { getUserId } = await import('./auth');
+  const userId = await getUserId();
+  if (!userId) throw new Error('Usuario no autenticado');
+  
+  const response = await fetchWithFallback(`/analytics/global/gpa/${userId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Error al obtener GPA global');
   const data = await parseJsonSafely(response);
   return data;
 };

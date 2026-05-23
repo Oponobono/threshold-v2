@@ -29,6 +29,7 @@ router.post('/track-guest', analyticsController.trackGuest);
 router.get('/analytics/mastery/:userId/:subjectId', analyticsController.getMastery);
 router.get('/analytics/predictions/:userId', analyticsController.getReviewPredictions);
 router.get('/analytics/report/:userId', analyticsController.generateReport);
+router.get('/analytics/global/gpa/:userId', analyticsController.getGlobalGPAAnalytics);
 
 /**
  * @swagger

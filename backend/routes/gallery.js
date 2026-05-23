@@ -58,24 +58,6 @@ router.post('/gallery', galleryController.addGalleryItem);
 
 /**
  * @swagger
- * /api/photos/{subjectId}:
- *   get:
- *     summary: Obtiene todas las fotos de una materia
- *     tags: [Photos]
- *     parameters:
- *       - in: path
- *         name: subjectId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Lista de fotos
- */
-router.get('/photos/:subjectId', galleryController.getPhotosBySubject);
-
-/**
- * @swagger
  * /api/photos/{subjectId}/search:
  *   get:
  *     summary: Buscar fotos por tag/palabra clave
@@ -96,6 +78,24 @@ router.get('/photos/:subjectId', galleryController.getPhotosBySubject);
  *         description: Lista de fotos con el tag
  */
 router.get('/photos/:subjectId/search', galleryController.searchPhotosByTag);
+
+/**
+ * @swagger
+ * /api/photos/{subjectId}:
+ *   get:
+ *     summary: Obtiene todas las fotos de una materia
+ *     tags: [Photos]
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Lista de fotos
+ */
+router.get('/photos/:subjectId', galleryController.getPhotosBySubject);
 
 /**
  * @swagger

@@ -12,9 +12,10 @@ import { normalizeGrade, parseWeight, SCALE_MAX } from '../../src/utils/grades';
 
 import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../../src/store/useDataStore';
+import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
 import { MasteryRadar } from '../../src/components/MasteryRadar';
-import { getUserId } from '../../src/services/api/auth';
-import { downloadReport } from '../../src/services/api/analytics';
+import { getUserId, getCurrentUserProfile } from '../../src/services/api/auth';
+import { downloadReport, getGlobalGPAAnalytics } from '../../src/services/api/analytics';
 
 const GRADE_COLORS = (pct: number) => {
   if (pct >= 80) return '#34C759';
@@ -27,35 +28,69 @@ export default function GradesScreen() {
   const chartWidth = Math.max(240, Dimensions.get('window').width - theme.spacing.lg * 2 - theme.spacing.lg * 2 - 2);
 
   const { subjects, assessments, refreshAssessments } = useDataStore();
+  
+  // Fetch user profile for grading engine integration
+  const [profile, setProfile] = React.useState<any>(null);
+  React.useEffect(() => {
+    getCurrentUserProfile().then(p => setProfile(p)).catch(() => {});
+  }, []);
 
-  const [termGpa, setTermGpa] = useState('0.00');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
+  const [globalGPA, setGlobalGPA] = useState<any>(null);
+  const [isLoadingGlobalGPA, setIsLoadingGlobalGPA] = useState(false);
 
   React.useEffect(() => {
     getUserId().then(id => setUserId(id ? Number(id) : null));
   }, []);
+
+  // Fetch global GPA analytics when viewing all subjects
+  React.useEffect(() => {
+    if (selectedSubjectId === null && userId) {
+      setIsLoadingGlobalGPA(true);
+      getGlobalGPAAnalytics()
+        .then(data => setGlobalGPA(data))
+        .catch(err => {
+          console.warn('Failed to fetch global GPA:', err);
+          setGlobalGPA(null);
+        })
+        .finally(() => setIsLoadingGlobalGPA(false));
+    } else {
+      setGlobalGPA(null);
+    }
+  }, [selectedSubjectId, userId]);
 
   const filteredAssessments = useMemo(() => {
     if (selectedSubjectId === null) return assessments;
     return assessments.filter(a => a.subject_id === selectedSubjectId);
   }, [assessments, selectedSubjectId]);
 
-  // Evaluaciones que tienen una calificación real
+  // Get selected subject for grading engine
+  const selectedSubject = useMemo(() => 
+    subjects.find(s => s.id === selectedSubjectId) || null,
+  [subjects, selectedSubjectId]);
+
+  // Use backend-powered grading engine for all calculations
+  const {
+    averageGrade,
+    projectedGrade: engineProjectedGrade,
+    securedPercent,
+    deliveredText,
+    thresholdStatus,
+  } = useSubjectGrades(filteredAssessments, selectedSubject, profile);
+
+  // Evaluaciones que tienen una calificación real (for display purposes)
   const gradedAssessments = useMemo(() => 
     filteredAssessments.filter((a: any) => normalizeGrade(a) !== null),
   [filteredAssessments]);
 
-  React.useEffect(() => {
-    if (gradedAssessments.length > 0) {
-      const sum = gradedAssessments.reduce((acc: number, curr: any) => {
-        return acc + (normalizeGrade(curr) ?? 0);
-      }, 0);
-      setTermGpa((sum / gradedAssessments.length).toFixed(2));
-    } else {
-      setTermGpa('0.00');
-    }
-  }, [gradedAssessments]);
+  // Use averageGrade from engine (which calls backend) instead of local calculation
+  const termGpa = averageGrade.toFixed(2);
+  
+  // Use global GPA if available (when viewing all subjects), otherwise use subject-specific calculations
+  const displayGPA = selectedSubjectId === null && globalGPA ? globalGPA.currentAverage?.toFixed(2) : termGpa;
+  const displayProjectedGPA = selectedSubjectId === null && globalGPA ? globalGPA.projectedGrade?.toFixed(2) : engineProjectedGrade.toFixed(2);
+  const displayDelta = selectedSubjectId === null && globalGPA ? globalGPA.delta : null;
 
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   
@@ -82,7 +117,7 @@ export default function GradesScreen() {
     }
 
     const N = gradedAssessments.length;
-    const currentGpaVal = parseFloat(termGpa) || 0;
+    const currentGpaVal = parseFloat(displayGPA) || 0;
     // Normalizar la nota simulada a la escala 0-5
     const simNormalized = (s / p) * SCALE_MAX;
     if (N === 0) {
@@ -99,6 +134,10 @@ export default function GradesScreen() {
     setProjectedGpa(null);
   };
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // HISTORICAL TREND (from grading engine)
+  // The engine calculates projectedGrade which incorporates historical data
+  // ══════════════════════════════════════════════════════════════════════════
   const historicalGpas = useMemo(() => {
     const graded = [...gradedAssessments].sort((a: any, b: any) => {
       if (a.date && b.date) {
@@ -125,9 +164,10 @@ export default function GradesScreen() {
     return points.slice(-10);
   }, [gradedAssessments]);
 
+  // Use simulation projection if available, otherwise use engine's projected grade
   const trendSeries = projectedGpa 
-    ? [...historicalGpas, Number(projectedGpa)] 
-    : historicalGpas;
+    ? [...historicalGpas, Number(projectedGpa)]
+    : [...historicalGpas, engineProjectedGrade];
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
@@ -266,25 +306,23 @@ export default function GradesScreen() {
                 {t('grades.termGpa')}
               </Text>
               <Text style={{ fontSize: 44, fontWeight: '900', color: theme.colors.text.primary, letterSpacing: -1, lineHeight: 44 }}>
-                {termGpa}
+                {displayGPA}
               </Text>
             </View>
             <View style={{ width: 1, height: 50, backgroundColor: theme.colors.border }} />
             <View style={{ flex: 1, alignItems: 'center' }}>
               <Text numberOfLines={2} style={{ fontSize: 11, color: theme.colors.text.secondary, marginBottom: 8, fontWeight: '600', textTransform: 'uppercase', textAlign: 'center' }}>
-                {t('grades.cumulative')}
+                {selectedSubjectId === null ? t('grades.cumulative') : t('grades.projected')}
               </Text>
-              <Text style={{ fontSize: 44, fontWeight: '900', color: theme.colors.text.secondary, opacity: 0.6, letterSpacing: -1, lineHeight: 44 }}>
-                {termGpa}
+              <Text style={{ fontSize: 44, fontWeight: '900', color: displayDelta && displayDelta > 0 ? '#34C759' : (displayDelta && displayDelta < 0 ? '#FF2D55' : theme.colors.text.secondary), opacity: selectedSubjectId === null && !globalGPA ? 0.6 : 1, letterSpacing: -1, lineHeight: 44 }}>
+                {selectedSubjectId === null && globalGPA ? (displayDelta ? displayDelta.toFixed(2) : '-') : displayProjectedGPA}
               </Text>
             </View>
           </View>
 
           <View style={{ alignItems: 'center', marginBottom: 12 }}>
             <Text style={{ fontSize: 10, color: theme.colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>
-              {t('grades.projected', 'Proyectado')}: <Text style={{ color: theme.colors.text.primary }}>{t('grades.insufficientData', 'Faltan evaluaciones')}</Text>
-            </Text>
-          </View>
+              {selectedSubjectId === null && globalGPA ? t('grades.cumulative') : t('grades.projected')}: <Text style={{ color: theme.colors.text.primary }}>{displayProjectedGPA > 0 ? displayProjectedGPA : t('grades.insufficientData', 'Faltan evaluaciones')}</Text>
 
           {/* Full-width elegant sparkline */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 4 }}>

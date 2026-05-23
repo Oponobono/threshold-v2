@@ -81,7 +81,7 @@ exports.getFlashcardDecks = (req, res) => {
            WHERE gm.user_id = ?
          )
        )
-    GROUP BY fd.id
+    GROUP BY fd.id, s.id, s.name, s.color, s.icon, u.id, u.username, u.name
     ORDER BY fd.created_at DESC
   `;
   db.all(query, [userId, userId, userId], (err, rows) => {
@@ -136,7 +136,7 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
            WHERE gm.user_id = ?
          )
        )
-    GROUP BY fd.id
+    GROUP BY fd.id, s.id, s.name, s.color, s.icon, u.id, u.username, u.name
     ORDER BY
       due_count DESC,
       learning_count DESC,
