@@ -182,6 +182,7 @@ const tableSchema = {
     sqlite: `
       CREATE TABLE IF NOT EXISTS assessments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
         subject_id INTEGER NOT NULL,
         name TEXT NOT NULL,
         type TEXT,
@@ -189,26 +190,41 @@ const tableSchema = {
         weight TEXT,
         out_of INTEGER,
         is_completed INTEGER DEFAULT 0,
+        grade_value REAL,
+        score REAL,
+        normalized_value REAL,
+        percentage REAL,
+        FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects(id)
       )
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS assessments (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
         subject_id INTEGER NOT NULL REFERENCES subjects(id),
         name TEXT NOT NULL,
         type TEXT,
         date TEXT,
         weight TEXT,
         out_of INTEGER,
-        is_completed INTEGER DEFAULT 0
+        is_completed INTEGER DEFAULT 0,
+        grade_value REAL,
+        score REAL,
+        normalized_value REAL,
+        percentage REAL
       )
     `,
     columns: [
+      { name: 'user_id', type: 'INTEGER NOT NULL' },
       { name: 'out_of', type: 'INTEGER' },
       { name: 'is_completed', type: 'INTEGER DEFAULT 0' },
       { name: 'period_id', type: 'INTEGER' },
-      { name: 'category_id', type: 'INTEGER' }
+      { name: 'category_id', type: 'INTEGER' },
+      { name: 'grade_value', type: 'REAL' },
+      { name: 'score', type: 'REAL' },
+      { name: 'normalized_value', type: 'REAL' },
+      { name: 'percentage', type: 'REAL' }
     ]
   },
   gallery_items: {
