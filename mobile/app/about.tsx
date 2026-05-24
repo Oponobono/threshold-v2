@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../src/styles/theme';
 import { AboutHero } from '../src/components/AboutHero';
 import { AboutThreshold } from '../src/components/AboutThreshold';
+import { AboutFeatures } from '../src/components/AboutFeatures';
 import { AboutDragonfly } from '../src/components/AboutDragonfly';
 import { AboutMapuvia } from '../src/components/AboutMapuvia';
 
@@ -48,6 +49,7 @@ export default function AboutScreen() {
         <AboutThreshold />
         <AboutDragonfly />
         <AboutMapuvia />
+        <AboutFeatures />
       </Animated.ScrollView>
     </View>
   );

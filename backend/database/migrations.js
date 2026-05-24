@@ -47,8 +47,27 @@ const migrateColumnsPostgres = async (pool, tableName, columns) => {
     if (missingColumns.length === 0) return;
 
     for (const column of missingColumns) {
-      await pool.query(`ALTER TABLE ${tableName} ADD COLUMN ${column.name} ${column.type}`);
-      console.log(`✓ Columna agregada en ${tableName}: ${column.name}`);
+      const hasNotNull = /\bNOT\s+NULL\b/i.test(column.type);
+      const safeType = hasNotNull
+        ? column.type.replace(/\s+NOT\s+NULL\b/i, '')
+        : column.type;
+
+      try {
+        await pool.query(`ALTER TABLE ${tableName} ADD COLUMN ${column.name} ${safeType}`);
+        console.log(`✓ Columna agregada en ${tableName}: ${column.name}${hasNotNull ? ' (sin NOT NULL)' : ''}`);
+
+        // Si originalmente tenía NOT NULL, intentamos aplicar la restricción
+        if (hasNotNull) {
+          try {
+            await pool.query(`ALTER TABLE ${tableName} ALTER COLUMN ${column.name} SET NOT NULL`);
+            console.log(`  → Restricción NOT NULL aplicada en ${tableName}.${column.name}`);
+          } catch (setNullErr) {
+            console.warn(`  ⚠️ No se pudo aplicar NOT NULL en ${tableName}.${column.name}: ${setNullErr.message}. Se queda como nullable.`);
+          }
+        }
+      } catch (addErr) {
+        console.error(`Error agregando columna ${column.name} en ${tableName}:`, addErr.message);
+      }
     }
   } catch (err) {
     console.error(`Error migrando columnas en ${tableName}:`, err.message);
