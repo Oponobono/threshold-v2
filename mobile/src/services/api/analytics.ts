@@ -225,6 +225,34 @@ export const getProgressTrends = async (userId: number, days?: number): Promise<
   return data;
 };
 
+export interface MasteryRadarItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface MasteryRadarData {
+  radar: MasteryRadarItem[];
+  averageMastery: number;
+  strongestArea: { name: string; value: number } | null;
+  weakestArea: { name: string; value: number } | null;
+  recommendation: string;
+}
+
+/**
+ * Obtiene el análisis de dominio (mastery) para un usuario/materia
+ * GET /api/analytics/mastery/:userId/:subjectId
+ */
+export const getMasteryAnalytics = async (userId: number, subjectId: number | 'all'): Promise<MasteryRadarData> => {
+  const response = await fetchWithFallback(`/analytics/mastery/${userId}/${subjectId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Error al obtener analytics de dominio');
+  const data = await parseJsonSafely(response);
+  return data;
+};
+
 /**
  * Obtiene el GPA global agregado para todos los sujetos del usuario
  * Calcula el promedio ponderado de todas las evaluaciones realizadas

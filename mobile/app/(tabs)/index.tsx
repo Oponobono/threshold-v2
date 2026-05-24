@@ -10,6 +10,7 @@ import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
 import { getCurrentUserProfile, getPredictedSubject, getTodaySchedules, createStudySession, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
+import { getGlobalGPAAnalytics } from '../../src/services/api/analytics';
 import { useDataStore } from '../../src/store/useDataStore';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { useCachePreload } from '../../src/hooks/useCachePreload';
@@ -60,6 +61,7 @@ export default function HybridDashboardScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
+  const [overallGpa, setOverallGpa] = useState<number | null>(null);
 
   // ── allSchedules viene del store ahora ─────────────────────────────────
   const allSchedules = storeSchedules;
@@ -108,6 +110,14 @@ export default function HybridDashboardScreen() {
       
       // ── Cargar datos globales del store (subjects, assessments, schedules) ──
       await loadAllData(true);
+
+      // ── Obtener GPA general ──
+      try {
+        const gpaData = await getGlobalGPAAnalytics();
+        setOverallGpa(gpaData.currentAverage);
+      } catch {
+        // Silently fail — GPA no es crítico
+      }
       
       // 🔁 Pre-cargar datos relacionados en background (no bloquea)
       preloadRelatedData().catch(err => console.warn('[Dashboard] Error preloading:', err));
@@ -123,6 +133,7 @@ export default function HybridDashboardScreen() {
       await Promise.all([
         loadData(),
         profile?.id ? refreshPredictions(profile.id) : Promise.resolve(),
+        getGlobalGPAAnalytics().then(d => setOverallGpa(d.currentAverage)).catch(() => {}),
       ]);
     } catch (err) {
       console.warn('Error refreshing dashboard:', err);
@@ -213,8 +224,9 @@ export default function HybridDashboardScreen() {
 
   const profileSubtitle = useMemo(() => {
     const nameTag = nickname || t('dashboard.you');
-    return t('dashboard.gpaSummary', { gpa: '3.78', name: nameTag });
-  }, [nickname, t]);
+    const gpaStr = overallGpa != null ? overallGpa.toFixed(2) : '—';
+    return t('dashboard.gpaSummary', { gpa: gpaStr, name: nameTag });
+  }, [nickname, t, overallGpa]);
 
   const profileAvatarUri = useMemo(() => {
     const displayName = nickname || t('dashboard.defaultUser');

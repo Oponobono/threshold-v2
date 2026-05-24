@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { VictoryPolarAxis, VictoryChart, VictoryTheme, VictoryArea } from 'victory-native';
 import { theme } from '../styles/theme';
-import { fetchWithFallback, parseJsonSafely } from '../services/api/client';
+import { getMasteryAnalytics } from '../services/api/analytics';
 import { useTranslation } from 'react-i18next';
 
 interface MasteryRadarProps {
@@ -20,8 +20,7 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId, o
     const fetchMastery = async () => {
       try {
         setLoading(true);
-        const response = await fetchWithFallback(`/analytics/mastery/${userId}/${subjectId}`);
-        const data = await parseJsonSafely(response);
+        const data = await getMasteryAnalytics(userId, subjectId);
         setMasteryData(data);
       } catch (err) {
         console.warn('Error fetching mastery:', err);

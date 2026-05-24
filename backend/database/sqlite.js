@@ -103,20 +103,21 @@ const initializeSqliteDb = async (db) => {
     }
 
     // Step 4: Legacy card migration (SM-2 Bootstrapping)
+    // NOTA: next_review_date se deja en NULL intencionalmente.
+    // Según SM-2, las tarjetas sin primera revisión no tienen intervalo.
     console.log('[DB Init] 🔄 Paso 4: Migrando tarjetas legacy...');
     try {
       const result = await dbRun(db, `
         UPDATE flashcards
         SET
-          next_review_date  = CURRENT_TIMESTAMP,
           is_atomic         = COALESCE(is_atomic, 1),
           sm2_ease_factor   = COALESCE(sm2_ease_factor, 2.5),
           sm2_interval      = COALESCE(sm2_interval, 1),
           sm2_repetitions   = COALESCE(sm2_repetitions, 0)
-        WHERE next_review_date IS NULL
+        WHERE next_review_date IS NULL AND status IN ('new', 'learning')
       `);
       if (result.changes > 0) {
-        console.log(`✅ [Migración SM-2] ${result.changes} tarjeta(s) legacy inicializadas.`);
+        console.log(`✅ [Migración SM-2] ${result.changes} tarjeta(s) legacy bootstrapeadas (next_review_date=NULL).`);
       }
     } catch (err) {
       console.error('Error en migración de legacy cards:', err.message);

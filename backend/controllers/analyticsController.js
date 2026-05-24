@@ -60,7 +60,7 @@ exports.getMastery = (req, res) => {
 
     if (!rows || rows.length === 0) {
       console.warn(`[getMastery] Sin datos para userId=${userId}, subjectId=${subjectId}`);
-      return res.json([]);
+      return res.json({ radar: [], averageMastery: 0, strongestArea: null, weakestArea: null, recommendation: 'Aún no hay suficientes datos de dominio. Crea y practica flashcards para generar analytics.' });
     }
 
     try {
@@ -572,8 +572,9 @@ exports.getDeckStats = (req, res) => {
            fc.fsrs_difficulty
          FROM flashcards fc
          LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
-         WHERE fc.deck_id = ? AND COUNT(cl.id) > 0
-         GROUP BY fc.id
+          WHERE fc.deck_id = ?
+          GROUP BY fc.id
+          HAVING COUNT(cl.id) > 0
          ORDER BY failure_rate DESC
          LIMIT 10`,
         [userId, deckId],

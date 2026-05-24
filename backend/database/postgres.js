@@ -36,19 +36,22 @@ const initializePostgresDb = async (pool) => {
     `);
 
     // ── Migración de Legacy Cards (SM-2 Bootstrapping) ──────────────────────
+    // NOTA: next_review_date se deja en NULL intencionalmente.
+    // Según SM-2, las tarjetas sin primera revisión no tienen intervalo.
+    // Solo después del primer repaso (vía POST /flashcards/:cardId/review)
+    // se asigna next_review_date = NOW + 1 día (I(1) = 1).
     try {
       const legacyResult = await pool.query(`
         UPDATE flashcards
         SET
-          next_review_date  = NOW(),
           is_atomic         = COALESCE(is_atomic, 1),
           sm2_ease_factor   = COALESCE(sm2_ease_factor, 2.5),
           sm2_interval      = COALESCE(sm2_interval, 1),
           sm2_repetitions   = COALESCE(sm2_repetitions, 0)
-        WHERE next_review_date IS NULL
+        WHERE next_review_date IS NULL AND status IN ('new', 'learning')
       `);
       if (legacyResult.rowCount > 0) {
-        console.log(`✅ [Migración SM-2] ${legacyResult.rowCount} tarjeta(s) legacy inicializadas con next_review_date = NOW.`);
+        console.log(`✅ [Migración SM-2] ${legacyResult.rowCount} tarjeta(s) legacy bootstrapeadas (next_review_date=NULL — sin repaso urgente).`);
       }
     } catch (migErr) {
       console.warn('⚠️ Migración de legacy cards omitida (posiblemente columna no existe aún):', migErr.message);

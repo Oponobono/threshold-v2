@@ -295,14 +295,13 @@ exports.createCard = (req, res) => {
 
   const contentJson = JSON.stringify({ front, back });
   
-  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
-  const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + 7);
-  const nextReviewDateStr = nextReviewDate.toISOString();
+  // NOTA: next_review_date se deja NULL intencionalmente.
+  // Según SM-2, las tarjetas sin primera revisión no tienen intervalo.
+  // Solo tras POST /flashcards/:cardId/review se asigna next_review_date.
   
   db.run(
-    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
-    [deckId, front, back, contentJson, nextReviewDateStr],
+    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, status, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, 'flashcard', ?, 'new', 2.5, 1, 0, 1, 0.5, 0)`,
+    [deckId, front, back, contentJson],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json(normalizeCard({
@@ -337,14 +336,11 @@ exports.createEvaluationItem = (req, res) => {
   const front = item_type === 'flashcard' ? (parsed.front || '') : '';
   const back = item_type === 'flashcard' ? (parsed.back || '') : '';
 
-  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
-  const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + 7);
-  const nextReviewDateStr = nextReviewDate.toISOString();
+  // NOTA: next_review_date se deja NULL. SM-2: sin primera revisión = sin intervalo.
 
   db.run(
-    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
-    [deckId, front, back, item_type, contentStr, hint || null, explanation || null, nextReviewDateStr],
+    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', 2.5, 1, 0, 1, 0.5, 0)`,
+    [deckId, front, back, item_type, contentStr, hint || null, explanation || null],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json(normalizeCard({
