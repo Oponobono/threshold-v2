@@ -7,6 +7,7 @@ const { db, initializeDb } = require('./db');
 const { swaggerUi, specs } = require('./swagger');
 const helmet = require('helmet');
 const { globalLimiter } = require('./middlewares/rateLimiter');
+const os = require('os');
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
@@ -26,6 +27,8 @@ const uploadRoutes = require('./routes/upload');
 const backupRoutes = require('./routes/backup');
 const gradingRoutes = require('./routes/grading');
 const assessmentCategoriesRoutes = require('./routes/assessmentCategories');
+const calendarRoutes = require('./routes/calendar');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 
@@ -76,7 +79,19 @@ initializeDb();
 // Configurar Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-// Ruta de estado
+// 🏥 Health Check Endpoint (Completamente público, sin autenticación)
+// Usado por el cliente para detectar si el backend está disponible
+app.get('/health', (req, res) => {
+  const dbType = secrets.DATABASE_URL ? 'PostgreSQL' : 'SQLite';
+  res.json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    db: dbType,
+    env: secrets.NODE_ENV
+  });
+});
+
+// Ruta de estado (deprecated - usar /health)
 app.get('/api/status', (req, res) => {
   const dbType = secrets.DATABASE_URL ? 'PostgreSQL' : 'SQLite';
   res.json({ 
@@ -113,6 +128,8 @@ app.use('/api', aiRoutes);
 app.use('/api', backupRoutes);
 app.use('/api', gradingRoutes);
 app.use('/api', assessmentCategoriesRoutes);
+app.use('/api', calendarRoutes);
+app.use('/api', settingsRoutes);
 
 
 
@@ -137,11 +154,38 @@ app.use((err, req, res, _next) => {
   return res.status(status).json({ error: message });
 });
 
+// ─── Helper: Obtener IP local ──────────────────────────────────────────────────
+function getLocalIpAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      // Saltar loopback e IPs IPv6 internas
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
 function startServer(port, retriesLeft) {
   const server = app.listen(port, HOST, () => {
-    console.log(`Servidor corriendo en http://localhost:${port}`);
-    console.log(`Documentación de Swagger disponible en http://localhost:${port}/api-docs`);
-    console.log('Para celular, usa la IP local de esta PC (ej: 192.168.x.x).');
+    console.log(`
+╔═══════════════════════════════════════════════════════════╗
+║             ✅ SERVIDOR INICIADO                        ║
+╠═══════════════════════════════════════════════════════════╣
+║ URL Local: http://localhost:${port}
+║ URL Red: http://${getLocalIpAddress()}:${port}
+║ HOST Config: ${HOST} (${HOST === '0.0.0.0' ? '✓ Todas las interfaces' : '⚠️ Específico'})
+║ 
+║ 📱 Desde tu teléfono/emulador:
+║ - Asegúrate de estar en la MISMA WIFI que la PC
+║ - Usa: http://${getLocalIpAddress()}:${port}/api
+║ 
+║ 📚 Swagger Docs: http://localhost:${port}/api-docs
+║ 🏥 Health Check: http://localhost:${port}/health
+╚═══════════════════════════════════════════════════════════╝
+    `);
   });
 
   // Mantiene una referencia activa del socket del servidor.

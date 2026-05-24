@@ -14,6 +14,7 @@ import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../../src/store/useDataStore';
 import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
 import { MasteryRadar } from '../../src/components/MasteryRadar';
+import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { getUserId, getCurrentUserProfile } from '../../src/services/api/auth';
 import { downloadReport, getGlobalGPAAnalytics } from '../../src/services/api/analytics';
 
@@ -79,6 +80,7 @@ export default function GradesScreen() {
     securedPercent,
     deliveredText,
     thresholdStatus,
+    delta: engineDelta,
   } = useSubjectGrades(filteredAssessments, selectedSubject, profile);
 
   // Evaluaciones que tienen una calificación real (for display purposes)
@@ -92,7 +94,7 @@ export default function GradesScreen() {
   // Use global GPA if available (when viewing all subjects), otherwise use subject-specific calculations
   const displayGPA = selectedSubjectId === null && globalGPA ? globalGPA.currentAverage?.toFixed(2) : termGpa;
   const displayProjectedGPA = selectedSubjectId === null && globalGPA ? globalGPA.projectedGrade?.toFixed(2) : engineProjectedGrade.toFixed(2);
-  const displayDelta = selectedSubjectId === null && globalGPA ? globalGPA.delta : null;
+  const displayDelta = selectedSubjectId === null && globalGPA ? globalGPA.delta : engineDelta;
 
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   
@@ -109,23 +111,31 @@ export default function GradesScreen() {
   const [simScore, setSimScore] = useState('');
   const [simPossible, setSimPossible] = useState('');
   const [projectedGpa, setProjectedGpa] = useState<string | null>(null);
+  
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [overlayText, setOverlayText] = useState('');
 
   const handleRunSimulation = () => {
     const s = parseFloat(simScore);
-    const p = parseFloat(simPossible);
-    if (isNaN(s) || isNaN(p) || p === 0) {
-      alertRef.show({ title: t('common.error'), message: t('common.enterValidScorePossible'), type: 'error' });
+    const w = parseFloat(simPossible); // Interpreting 'simPossible' input as 'Weight (%)'
+    if (isNaN(s) || isNaN(w) || w === 0) {
+      alertRef.show({ title: t('common.error'), message: t('common.enterValidScorePossible', 'Ingresa una nota y un peso válido'), type: 'error' });
       return;
     }
 
-    const N = gradedAssessments.length;
     const currentGpaVal = parseFloat(displayGPA) || 0;
-    // Normalizar la nota simulada a la escala 0-5
-    const simNormalized = (s / p) * SCALE_MAX;
-    if (N === 0) {
+    const currentEvaluated = selectedSubjectId === null && globalGPA ? globalGPA.evaluatedWeight : evaluatedPercentage;
+    
+    // Asumir que 's' ya es la nota en escala 0-5
+    const simNormalized = s; 
+    
+    if (currentEvaluated === 0) {
       setProjectedGpa(simNormalized.toFixed(2));
     } else {
-      const newGpa = ((currentGpaVal * N + simNormalized) / (N + 1)).toFixed(2);
+      const currentPoints = currentGpaVal * (currentEvaluated / 100);
+      const newPoints = currentPoints + (simNormalized * (w / 100));
+      const newEvaluated = currentEvaluated + w;
+      const newGpa = (newPoints / (newEvaluated / 100)).toFixed(2);
       setProjectedGpa(newGpa);
     }
   };
@@ -154,12 +164,19 @@ export default function GradesScreen() {
 
     if (graded.length === 0) return [0, 0];
 
-    let currentSum = 0;
+    let currentWeightedSum = 0;
+    let currentTotalWeight = 0;
     const points: number[] = [];
-    graded.forEach((curr, idx) => {
+    
+    graded.forEach((curr) => {
       const val = normalizeGrade(curr) ?? 0;
-      currentSum += val;
-      points.push(currentSum / (idx + 1));
+      let w = parseWeight(curr);
+      if (w <= 0) w = 1; // Fallback para evitar división por cero si falta el peso
+      
+      currentWeightedSum += (val * w);
+      currentTotalWeight += w;
+      
+      points.push(currentTotalWeight > 0 ? (currentWeightedSum / currentTotalWeight) : 0);
     });
 
     if (points.length === 1) return [0, points[0]];
@@ -169,7 +186,7 @@ export default function GradesScreen() {
   // Use simulation projection if available, otherwise use engine's projected grade
   const trendSeries = projectedGpa 
     ? [...historicalGpas, Number(projectedGpa)]
-    : [...historicalGpas, engineProjectedGrade];
+    : [...historicalGpas, parseFloat(displayProjectedGPA) || 0];
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
@@ -314,17 +331,17 @@ export default function GradesScreen() {
             <View style={{ width: 1, height: 50, backgroundColor: theme.colors.border }} />
             <View style={{ flex: 1, alignItems: 'center' }}>
               <Text numberOfLines={2} style={{ fontSize: 11, color: theme.colors.text.secondary, marginBottom: 8, fontWeight: '600', textTransform: 'uppercase', textAlign: 'center' }}>
-                {selectedSubjectId === null ? t('grades.cumulative') : t('grades.projected')}
+                {t('grades.projected')}
               </Text>
               <Text style={{ fontSize: 44, fontWeight: '900', color: displayDelta && displayDelta > 0 ? '#34C759' : (displayDelta && displayDelta < 0 ? '#FF2D55' : theme.colors.text.secondary), opacity: selectedSubjectId === null && !globalGPA ? 0.6 : 1, letterSpacing: -1, lineHeight: 44 }}>
-                {selectedSubjectId === null && globalGPA ? (displayDelta ? displayDelta.toFixed(2) : '-') : displayProjectedGPA}
+                {displayProjectedGPA}
               </Text>
             </View>
           </View>
 
           <View style={{ alignItems: 'center', marginBottom: 12 }}>
             <Text style={{ fontSize: 10, color: theme.colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>
-              {selectedSubjectId === null && globalGPA ? t('grades.cumulative') : t('grades.projected')}: <Text style={{ color: theme.colors.text.primary }}>{displayProjectedGPA > 0 ? displayProjectedGPA : t('grades.insufficientData', 'Faltan evaluaciones')}</Text>
+              {t('grades.projected')}: <Text style={{ color: theme.colors.text.primary }}>{parseFloat(displayProjectedGPA) > 0 ? `${displayProjectedGPA}${displayDelta ? ` (${displayDelta > 0 ? '+' : ''}${displayDelta.toFixed(2)} pts)` : ''}` : t('grades.insufficientData', 'Faltan evaluaciones')}</Text>
             </Text>
           </View>
 
@@ -363,7 +380,14 @@ export default function GradesScreen() {
                 {t('grades.mastery', 'Dominio de Aprendizaje')}
               </Text>
             </View>
-            <MasteryRadar userId={userId} subjectId={selectedSubjectId || 'all'} />
+            <MasteryRadar 
+              userId={userId} 
+              subjectId={selectedSubjectId || 'all'} 
+              onPress={() => {
+                setOverlayText('**Dominio del Aprendizaje**\n\nEste radar ilustra tu nivel de dominio basado en el algoritmo de repetición espaciada de tus *Flashcards*.\n\nMuestra visualmente en qué áreas o mazos eres más fuerte y cuáles necesitan más atención y repaso.');
+                setOverlayVisible(true);
+              }}
+            />
           </View>
         )}
 
@@ -468,7 +492,7 @@ export default function GradesScreen() {
 
           <View style={styles.simInputRow}>
             <View style={styles.simInputWrapper}>
-              <Text style={styles.simInputLabel}>{t('grades.scoreLabel')}</Text>
+              <Text style={styles.simInputLabel}>{t('grades.scoreLabel', 'Nota')}</Text>
               <TextInput
                 style={styles.simInput}
                 placeholder="0"
@@ -479,7 +503,7 @@ export default function GradesScreen() {
               />
             </View>
             <View style={styles.simInputWrapper}>
-              <Text style={styles.simInputLabel}>{t('grades.possibleLabel')}</Text>
+              <Text style={styles.simInputLabel}>{t('grades.weightLabel', 'Peso (%)')}</Text>
               <TextInput
                 style={styles.simInput}
                 placeholder="0"
@@ -495,9 +519,22 @@ export default function GradesScreen() {
           </View>
 
           <View style={styles.simChartCard}>
-            <LineChart
+            <TouchableOpacity 
+              activeOpacity={0.9} 
+              onPress={() => {
+                setOverlayText('**Simulador de Proyección**\n\nEsta gráfica muestra cómo ha evolucionado tu promedio (GPA) a lo largo del tiempo basándose en el peso real de tus entregas.\n\nEl punto **"Proy."** (color naranja) simula matemáticamente tu nuevo promedio ponderado en caso de obtener la nota que ingresaste.');
+                setOverlayVisible(true);
+              }}
+            >
+              <LineChart
               data={{
-                labels: trendSeries.map(() => ''),
+                labels: trendSeries.map((_, i) => {
+                  if (i === trendSeries.length - 1) return 'Proy.';
+                  if (gradedAssessments.length === 0) return '';
+                  if (gradedAssessments.length === 1) return i === 0 ? '0' : '1';
+                  const startIndex = gradedAssessments.length - historicalGpas.length;
+                  return `${startIndex + i + 1}`;
+                }),
                 datasets: [
                   {
                     data: trendSeries,
@@ -507,31 +544,48 @@ export default function GradesScreen() {
                 ],
               }}
               width={chartWidth}
-              height={140}
-              withDots={false}
+              height={160} // Un poco más de altura para acomodar las etiquetas
+              withDots={true} // Mostrar puntos para mayor claridad
+              getDotColor={(dataPoint, index) => 
+                (index === trendSeries.length - 1 && projectedGpa) ? '#FF9500' : theme.colors.primary
+              }
               withShadow={false}
-              withVerticalLabels={false}
-              withHorizontalLabels={false}
-              withInnerLines={false}
-              withOuterLines={false}
-              bezier={false}
+              withVerticalLabels={true}
+              withHorizontalLabels={true}
+              withInnerLines={true}
+              withOuterLines={true}
+              bezier={true} // Una línea suavizada se ve más profesional
               fromZero={false}
+              yAxisSuffix=""
+              yAxisInterval={1}
               chartConfig={{
-                backgroundColor: theme.colors.inputBackground,
-                backgroundGradientFrom: theme.colors.inputBackground,
-                backgroundGradientTo: theme.colors.inputBackground,
-                decimalPlaces: 2,
-                color: () => theme.colors.text.primary,
+                backgroundColor: '#EEF4FA',
+                backgroundGradientFrom: '#EEF4FA',
+                backgroundGradientTo: '#EEF4FA',
+                decimalPlaces: 1, // 1 decimal es suficiente para los ejes Y
+                color: () => theme.colors.primary, // Color de las líneas del grid
                 labelColor: () => theme.colors.text.secondary,
+                style: {
+                  borderRadius: 16,
+                  paddingRight: 20, // Ajuste para que la etiqueta final no se corte
+                },
+                propsForDots: {
+                  r: "4",
+                  strokeWidth: "2",
+                  stroke: '#EEF4FA'
+                },
                 propsForBackgroundLines: {
-                  strokeWidth: 0,
+                  strokeWidth: 1,
+                  strokeDasharray: "4",
+                  stroke: theme.colors.border || '#e0e0e0',
                 },
                 propsForLabels: {
-                  fontSize: 0,
+                  fontSize: 10,
                 },
               }}
               style={styles.simChart}
             />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.currentProjectionCentered}>
@@ -609,6 +663,12 @@ export default function GradesScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <ExplanationOverlay 
+        visible={overlayVisible} 
+        explanation={overlayText} 
+        onDismiss={() => setOverlayVisible(false)} 
+      />
     </SafeAreaView>
   );
 }

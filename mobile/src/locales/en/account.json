@@ -35,5 +35,7 @@
   "profileUpdated": "Profile updated successfully",
   "passwordUpdated": "Password updated successfully",
   "passwordsDontMatch": "Passwords do not match",
-  "fillAllFields": "Please fill in all required fields"
+  "fillAllFields": "Please fill in all required fields",
+  "enable": "Enable",
+  "disable": "Disable"
 }

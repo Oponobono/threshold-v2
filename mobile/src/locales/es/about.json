@@ -17,5 +17,7 @@
   "open": "Abrir",
   "sendFeedback": "Enviar comentarios",
   "send": "Enviar",
-  "appVersion": "Versión de la app"
+  "appVersion": "Versión de la app",
+  "feedbackDesc": "¿Tienes sugerencias, reporte de bugs o comentarios? Cuéntanos.",
+  "feedbackPlaceholder": "Escribe tu mensaje aquí..."
 }

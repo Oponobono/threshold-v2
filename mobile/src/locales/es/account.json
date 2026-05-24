@@ -35,5 +35,7 @@
   "profileUpdated": "Perfil actualizado correctamente",
   "passwordUpdated": "Contraseña actualizada correctamente",
   "passwordsDontMatch": "Las contraseñas no coinciden",
-  "fillAllFields": "Por favor, completa todos los campos requeridos"
+  "fillAllFields": "Por favor, completa todos los campos requeridos",
+  "enable": "Activar",
+  "disable": "Desactivar"
 }

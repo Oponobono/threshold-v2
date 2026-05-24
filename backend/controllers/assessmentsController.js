@@ -198,30 +198,32 @@ exports.createAssessment = (req, res) => {
   const finalOutOf = out_of || (grade_value != null ? 5 : null);
   console.log('[POST] 📊 Configuración final:', { finalOutOf, gradeValueInput: grade_value });
 
-  const query = `
-    INSERT INTO assessments (subject_id, name, type, date, weight, out_of, is_completed, category_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-  db.run(
-    query,
-    [subject_id, name, type, date, weight, finalOutOf, is_completed ? 1 : 0, category_id || null],
-    function(err) {
-      if (err) {
-        console.error('[POST] ❌ Error insertando assessment:', err.message);
-        return res.status(500).json({ error: err.message });
-      }
-      const newAssessmentId = this.lastID;
-      console.log('[POST] ✅ Assessment creado con ID:', newAssessmentId);
-      
-      // Fase 1 & 2: Dual Write en assessment_results
-      db.get('SELECT user_id FROM subjects WHERE id = ?', [subject_id], (err, subject) => {
-        if (err || !subject) {
-          console.log('[POST] ⚠️  Error/No Subject en dual write:', err || 'No subject');
-          return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada (sin notas adicionales)' });
+  // First get user_id from subject before inserting
+  db.get('SELECT user_id FROM subjects WHERE id = ?', [subject_id], (err, subject) => {
+    if (err || !subject) {
+      console.error('[POST] ❌ Error obteniendo subject:', err?.message || 'Subject no encontrado');
+      return res.status(400).json({ error: 'Materia no encontrada' });
+    }
+
+    const user_id = subject.user_id;
+    const query = `
+      INSERT INTO assessments (user_id, subject_id, name, type, date, weight, out_of, is_completed, category_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    db.run(
+      query,
+      [user_id, subject_id, name, type, date, weight, finalOutOf, is_completed ? 1 : 0, category_id || null],
+      function(err) {
+        if (err) {
+          console.error('[POST] ❌ Error insertando assessment:', err.message);
+          return res.status(500).json({ error: err.message });
         }
-        console.log('[POST] ✅ Subject encontrado:', { subjectId: subject_id, userId: subject.user_id });
+        const newAssessmentId = this.lastID;
+        console.log('[POST] ✅ Assessment creado con ID:', newAssessmentId);
+        console.log('[POST] ✅ Subject encontrado:', { subjectId: subject_id, userId: user_id });
         
-        db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [subject.user_id], (err, user) => {
+        // Fase 1 & 2: Dual Write en assessment_results
+        db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [user_id], (err, user) => {
           const gradingVersionId = user?.active_grading_version_id || 3; // Fallback to 3 (0-5.0 scale)
           console.log('[POST] ✅ GradingVersion obtenido:', { gradingVersionId });
           

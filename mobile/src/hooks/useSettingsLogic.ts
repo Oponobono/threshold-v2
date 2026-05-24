@@ -25,6 +25,23 @@ import {
   revokeBiometricToken,
   hasBiometricTokenStored
 } from '../services/biometricService';
+import { getSubjects } from '../services/api/subjects';
+import {
+  getGradingPeriods,
+  createGradingPeriod,
+  getThresholdOverrides,
+  saveThresholdOverrides,
+  createCustomGradingSystem,
+  getTwoFactorStatus,
+  enableTwoFactor as apiEnableTwoFactor,
+  disableTwoFactor as apiDisableTwoFactor,
+  getLmsAccounts as apiGetLmsAccounts,
+  addLmsAccount as apiAddLmsAccount,
+  removeLmsAccount as apiRemoveLmsAccount,
+  exportDataCsv,
+  exportDataPdf,
+  sendFeedback as apiSendFeedback,
+} from '../services/api/settings';
 
 /**
  * Claves para los tipos de escalas de calificación disponibles.
@@ -62,6 +79,14 @@ export const useSettingsLogic = () => {
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [isDeleteAccountVisible, setIsDeleteAccountVisible] = useState(false);
+  const [isAddTermVisible, setIsAddTermVisible] = useState(false);
+  const [isManageOverridesVisible, setIsManageOverridesVisible] = useState(false);
+  const [isAddCustomScaleVisible, setIsAddCustomScaleVisible] = useState(false);
+  const [isTwoFactorVisible, setIsTwoFactorVisible] = useState(false);
+  const [isAddLmsVisible, setIsAddLmsVisible] = useState(false);
+  const [isExportDataVisible, setIsExportDataVisible] = useState(false);
+  const [isFaqVisible, setIsFaqVisible] = useState(false);
+  const [isFeedbackVisible, setIsFeedbackVisible] = useState(false);
 
   // Edit Profile State
   const [editName, setEditName] = useState('');
@@ -89,11 +114,23 @@ export const useSettingsLogic = () => {
   const [pinToJoin, setPinToJoin] = useState('');
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
 
-  // Constants
-  const TERMS = t('academic.termOptions', { returnObjects: true }) as string[];
+  // Dynamic loaded data
+  const [gradingPeriods, setGradingPeriods] = useState<any[]>([]);
+  const [thresholdOverrides, setThresholdOverrides] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<{ id: number; name: string; color?: string }[]>([]);
+  const [lmsAccounts, setLmsAccounts] = useState<any[]>([]);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+
+  // Constants — merge translation defaults with DB grading periods
+  const defaultTerms = t('academic.termOptions', { returnObjects: true }) as string[];
+  const TERMS = useMemo(() => {
+    const dbTerms = gradingPeriods.map(p => p.name);
+    const all = [...new Set([...defaultTerms, ...dbTerms])];
+    return all.length > 0 ? all : defaultTerms;
+  }, [defaultTerms, gradingPeriods]);
   const [activeTermIndex, setActiveTermIndex] = useState(0);
 
-  const LMS_ACCOUNTS = t('integrations.lmsAccounts', { returnObjects: true }) as { name: string; user: string }[];
+  // LMS accounts now come from API (lmsAccounts state, loaded in useEffect)
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -147,6 +184,24 @@ export const useSettingsLogic = () => {
 
       const groups = await getUserGroups();
       setUserGroups(groups || []);
+
+      // Load dynamic settings data
+      try {
+        const [periods, overrides, lms, twoFactor, userSubjects] = await Promise.all([
+          getGradingPeriods().catch(() => []),
+          getThresholdOverrides().catch(() => []),
+          apiGetLmsAccounts().catch(() => []),
+          getTwoFactorStatus().catch(() => ({ enabled: false })),
+          getSubjects().catch(() => []),
+        ]);
+        setGradingPeriods(periods);
+        setThresholdOverrides(overrides);
+        setLmsAccounts(lms);
+        setTwoFactorEnabled((twoFactor as any)?.enabled || false);
+        setSubjects(userSubjects || []);
+      } catch (e) {
+        console.warn('Failed to load some settings data', e);
+      }
 
       // Load persisted language
       const savedLanguage = await getItemAsync('app_language');
@@ -287,6 +342,7 @@ export const useSettingsLogic = () => {
       }
 
     try {
+      const thresholdNum = Number(threshold);
       await updateUserProfile({
         name: editName,
         lastname: editLastname,
@@ -296,6 +352,7 @@ export const useSettingsLogic = () => {
         semester: editSemester,
         study_goal: editStudyGoal,
         active_grading_version_id: active_version_id,
+        ...(!isNaN(thresholdNum) ? { approval_threshold: thresholdNum } : {}),
         ...(!profile?.share_pin && editPin.trim() ? { share_pin: editPin.trim().toUpperCase() } : {}),
       });
       setIsEditProfileVisible(false);
@@ -313,13 +370,18 @@ export const useSettingsLogic = () => {
   const handleSaveSettings = async () => {
     try {
       let active_version_id: number | null = null;
-
       if (selectedSystemId) {
         const sys = gradingSystems.find(s => s.id === selectedSystemId);
         if (sys) active_version_id = sys.active_version_id;
       }
 
-      await updateUserProfile({ active_grading_version_id: active_version_id });
+      const payload: any = { active_grading_version_id: active_version_id };
+      const thresholdNum = Number(threshold);
+      if (!isNaN(thresholdNum)) {
+        payload.approval_threshold = thresholdNum;
+      }
+
+      await updateUserProfile(payload);
       
       const userProfile = await getCurrentUserProfile();
       setProfile(userProfile);
@@ -534,7 +596,6 @@ export const useSettingsLogic = () => {
     TERMS,
     activeTermIndex,
     setActiveTermIndex,
-    LMS_ACCOUNTS,
     isEditProfileVisible,
     setIsEditProfileVisible,
     editName,
@@ -587,5 +648,109 @@ export const useSettingsLogic = () => {
     handleLeaveGroup,
     appLanguage,
     handleChangeLanguage,
+
+    // Dynamic data for modals
+    gradingPeriods,
+    thresholdOverrides,
+    subjects,
+    lmsAccounts,
+    twoFactorEnabled,
+
+    // New modal states
+    isAddTermVisible, setIsAddTermVisible,
+    isManageOverridesVisible, setIsManageOverridesVisible,
+    isAddCustomScaleVisible, setIsAddCustomScaleVisible,
+    isTwoFactorVisible, setIsTwoFactorVisible,
+    isAddLmsVisible, setIsAddLmsVisible,
+    isExportDataVisible, setIsExportDataVisible,
+    isFaqVisible, setIsFaqVisible,
+    isFeedbackVisible, setIsFeedbackVisible,
+
+    // New modal handlers — REAL API calls
+    handleAddTerm: async (term: string) => {
+      try {
+        await createGradingPeriod(term);
+        const periods = await getGradingPeriods();
+        setGradingPeriods(periods);
+        alertRef.show({ title: t('common.success'), message: `Período "${term}" añadido`, type: 'success' });
+      } catch (error: any) {
+        alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+      }
+    },
+    handleSaveOverrides: async (overrides: any[]) => {
+      try {
+        await saveThresholdOverrides(overrides);
+        const updated = await getThresholdOverrides();
+        setThresholdOverrides(updated);
+        alertRef.show({ title: t('common.success'), message: 'Excepciones guardadas', type: 'success' });
+      } catch (error: any) {
+        alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+      }
+    },
+    handleAddCustomScale: async (name: string, passingValue: number, minValue: number, maxValue: number) => {
+      try {
+        const result = await createCustomGradingSystem({ name, min_value: minValue, max_value: maxValue, passing_value: passingValue });
+        setGradingSystems(prev => [...prev, result]);
+        alertRef.show({ title: t('common.success'), message: `Escala "${name}" creada`, type: 'success' });
+      } catch (error: any) {
+        alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+      }
+    },
+    handleTwoFactorEnable: async () => {
+      const result = await apiEnableTwoFactor();
+      setTwoFactorEnabled(result.enabled);
+    },
+    handleTwoFactorDisable: async () => {
+      const result = await apiDisableTwoFactor();
+      setTwoFactorEnabled(result.enabled);
+    },
+    handleAddLms: async (platform: string, url: string, username: string) => {
+      try {
+        const account = await apiAddLmsAccount(platform, url, username);
+        setLmsAccounts(prev => [...prev, account]);
+        alertRef.show({ title: t('common.success'), message: `LMS "${platform}" vinculado`, type: 'success' });
+      } catch (error: any) {
+        alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+      }
+    },
+    handleRemoveLms: async (index: number) => {
+      try {
+        const account = lmsAccounts[index];
+        if (account?.id) await apiRemoveLmsAccount(account.id);
+        setLmsAccounts(prev => prev.filter((_, i) => i !== index));
+        alertRef.show({ title: t('common.success'), message: 'LMS desvinculado', type: 'success' });
+      } catch (error: any) {
+        alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+      }
+    },
+    handleExportCsv: async () => {
+      try {
+        const blob = await exportDataCsv();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'threshold_export.csv'; a.click();
+        URL.revokeObjectURL(url);
+      } catch (error: any) {
+        throw error;
+      }
+    },
+    handleExportPdf: async () => {
+      try {
+        const blob = await exportDataPdf();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'threshold_export.pdf'; a.click();
+        URL.revokeObjectURL(url);
+      } catch (error: any) {
+        throw error;
+      }
+    },
+    handleSendFeedback: async (message: string) => {
+      try {
+        await apiSendFeedback(message);
+      } catch (error: any) {
+        throw error;
+      }
+    },
   };
 };

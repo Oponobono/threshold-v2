@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { VictoryPolarAxis, VictoryChart, VictoryTheme, VictoryArea } from 'victory-native';
 import { theme } from '../styles/theme';
 import { fetchWithFallback, parseJsonSafely } from '../services/api/client';
@@ -8,9 +8,10 @@ import { useTranslation } from 'react-i18next';
 interface MasteryRadarProps {
   userId: number;
   subjectId: number | 'all';
+  onPress?: () => void;
 }
 
-export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId }) => {
+export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId, onPress }) => {
   const { t } = useTranslation();
   const [masteryData, setMasteryData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,7 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId })
 
   return (
     <View style={{ alignItems: 'center' }}>
+      <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={{ width: '100%', alignItems: 'center' }}>
       <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.text.primary, marginBottom: 8 }}>
         {t('analytics.totalMastery', 'Dominio Total:')} {Math.round(masteryData.averageMastery)}%
       </Text>
@@ -108,6 +110,7 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId })
           {'"'}{masteryData.recommendation}{'"'}
         </Text>
       )}
+      </TouchableOpacity>
     </View>
   );
 };

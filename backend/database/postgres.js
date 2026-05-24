@@ -64,9 +64,9 @@ const initializePostgresDb = async (pool) => {
     if (existingUser.length === 0) {
       const defaultPasswordHash = bcrypt.hashSync('1234', 10);
       await pool.query(
-        `INSERT INTO users (email, password_hash, name, lastname, username, grading_scale, approval_threshold, share_pin)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        ['user', defaultPasswordHash, 'Default', 'User', 'user', '0-5.0', 3.0, 'ABC123']
+        `INSERT INTO users (email, password_hash, name, lastname, username, share_pin)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        ['user', defaultPasswordHash, 'Default', 'User', 'user', 'ABC123']
       );
       console.log('✓ Usuario por defecto creado: user / 1234 (PIN: ABC123)');
     } else {

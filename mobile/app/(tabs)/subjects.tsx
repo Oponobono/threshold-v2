@@ -13,21 +13,22 @@ import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
 import { Subject } from '../../src/services/api/types';
 import { useDataStore } from '../../src/store/useDataStore';
 import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
+import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 
 
 
 const getStatusColor = (minNeeded: number, target: number) => {
   const maxScale = target <= 5 ? 5 : target <= 10 ? 10 : 100;
   if (minNeeded > maxScale) return '#FF2D55'; // Impossible
-  if (minNeeded > target + (maxScale * 0.1)) return '#FF9500'; // Hard
+  if (minNeeded > target) return '#FF9500'; // Hard
   return '#34C759'; // Safe
 };
 
 const getStatus = (minNeeded: number, target: number, t: any) => {
   const maxScale = target <= 5 ? 5 : target <= 10 ? 10 : 100;
   if (minNeeded > maxScale) return t('subjects.statusImpossible') || 'Inalcanzable';
-  if (minNeeded > target) return t('subjects.statusAtRisk');
-  return t('subjects.statusSafe');
+  if (minNeeded > target) return t('subjects.statusAtRisk') || 'Exigente / En Riesgo';
+  return t('subjects.statusSafe') || 'Seguro / Alcanzable';
 };
 
 // ─── Main Screen ───────────────────────────────────────────────
@@ -39,6 +40,9 @@ export default function SubjectsScreen() {
 
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [search, setSearch] = useState('');
+
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [overlayText, setOverlayText] = useState('');
 
   // Keep selected subject in sync when subjects array updates
   useEffect(() => {
@@ -67,6 +71,7 @@ export default function SubjectsScreen() {
   const [requiredPass, setRequiredPass] = useState('60');
   const [remainingWeight, setRemainingWeight] = useState('');
   const [minNeeded, setMinNeeded] = useState<number | null>(null);
+  const [maxAchievable, setMaxAchievable] = useState<number | null>(null);
 
   // Pre-llenar calculador cuando cambia la materia
   useEffect(() => {
@@ -91,8 +96,15 @@ export default function SubjectsScreen() {
     }
 
     const doneWeight = 100 - rw;
+    // Calculate required grade
     const result = (rp - (cg * doneWeight) / 100) / (rw / 100);
+    
+    // Calculate maximum achievable grade (if we get perfect 5.0 in remaining weight)
+    const maxScale = rp <= 5 ? 5 : rp <= 10 ? 10 : 100;
+    const max = (cg * doneWeight / 100) + (maxScale * rw / 100);
+    
     setMinNeeded(Number(result.toFixed(2)));
+    setMaxAchievable(Number(max.toFixed(2)));
   };
 
   const handleReset = () => {
@@ -100,6 +112,7 @@ export default function SubjectsScreen() {
     setRequiredPass(selectedSubject?.target_grade ? String(selectedSubject.target_grade) : '60');
     setRemainingWeight('');
     setMinNeeded(null);
+    setMaxAchievable(null);
   };
 
   const handleSaveTarget = async () => {
@@ -224,10 +237,18 @@ export default function SubjectsScreen() {
 
         {/* ── CALCULATOR: MINIMUM GRADE TO PASS ── */}
         <View style={styles.calcCard}>
-          <View style={styles.calcHeaderRow}>
-            <Text style={styles.calcTitle}>{t('subjects.minGradeTitle')}</Text>
-            <Text style={styles.calcSubject}>{selectedSubject?.name || t('subjects.selectSubject') || 'Selecciona una materia'}</Text>
-          </View>
+          <TouchableOpacity activeOpacity={0.8} onPress={() => {
+            setOverlayText('**Calculadora de Salvavidas**\n\nEsta herramienta utiliza álgebra simple para responder la pregunta: *"¿Cuánto necesito sacar en el examen final para pasar?"*\n\nSi la nota necesaria es mayor a tu meta (ej. necesitas 4.15 para lograr 4.0), se pondrá en color naranja porque es un reto exigente.\n\nNo usa tendencias históricas como el simulador global, es solo un cálculo exacto.');
+            setOverlayVisible(true);
+          }}>
+            <View style={styles.calcHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.calcTitle}>{t('subjects.minGradeTitle')}</Text>
+                <Ionicons name="information-circle-outline" size={16} color={theme.colors.text.placeholder} />
+              </View>
+              <Text style={styles.calcSubject}>{selectedSubject?.name || t('subjects.selectSubject') || 'Selecciona una materia'}</Text>
+            </View>
+          </TouchableOpacity>
 
           {!selectedSubject ? (
             <View style={[globalStyles.center, { paddingVertical: 32 }]}>
@@ -284,6 +305,18 @@ export default function SubjectsScreen() {
                     {getStatus(minNeeded, parseFloat(requiredPass || '60'), t)}
                   </Text>
 
+                  {/* Show max achievable when impossible */}
+                  {maxAchievable !== null && minNeeded > (parseFloat(requiredPass || '60') <= 5 ? 5 : parseFloat(requiredPass || '60') <= 10 ? 10 : 100) && (
+                    <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+                      <Text style={[styles.calcHint, { color: '#FF9500', marginBottom: 4 }]}>
+                        {t('subjects.maxAchievable', 'Máximo alcanzable')}
+                      </Text>
+                      <Text style={[styles.calcResult, { color: '#FF9500', fontSize: 18 }]}>
+                        {maxAchievable}
+                      </Text>
+                    </View>
+                  )}
+
                   {/* Status bar */}
                   <View style={styles.statusBar}>
                     <View style={[styles.statusSegment, { backgroundColor: '#FF2D55', borderTopLeftRadius: 3, borderBottomLeftRadius: 3 }]} />
@@ -317,39 +350,55 @@ export default function SubjectsScreen() {
         {/* ── ASSESSMENTS ── */}
         {selectedSubject && (
           <View style={styles.assessCard}>
-            <View style={[styles.assessHeader, { marginBottom: 16 }]}>
-              <View style={[globalStyles.rowCenter, { gap: 10 }]}>
-                <View style={{ backgroundColor: theme.colors.primaryTransparent.light, padding: 6, borderRadius: 8 }}>
-                  <MaterialCommunityIcons name="clipboard-check-outline" size={18} color={theme.colors.primary} />
-                </View>
-                <View>
-                  <Text style={[styles.assessTitle, { marginBottom: 2 }]}>{t('subjects.academicTracking', 'Seguimiento académico')}</Text>
-                  <View style={[globalStyles.rowCenter, { gap: 4 }]}>
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.success }} />
-                    <Text style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, fontWeight: '600' }}>
-                      {assessments.length} {t('subjects.registered', 'notas registradas')}
-                    </Text>
+            {(() => {
+              const subjectAssessments = assessments.filter(a => a.subject_id === selectedSubject?.id);
+              
+              return (
+                <>
+                  <View style={[styles.assessHeader, { marginBottom: 16 }]}>
+                    <View style={[globalStyles.rowCenter, { gap: 10 }]}>
+                      <View style={{ backgroundColor: theme.colors.primaryTransparent.light, padding: 6, borderRadius: 8 }}>
+                        <MaterialCommunityIcons name="clipboard-check-outline" size={18} color={theme.colors.primary} />
+                      </View>
+                      <View>
+                        <Text style={[styles.assessTitle, { marginBottom: 2 }]}>{t('subjects.academicTracking', 'Seguimiento académico')}</Text>
+                        <View style={[globalStyles.rowCenter, { gap: 4 }]}>
+                          {subjectAssessments.length > 0 ? (
+                            <>
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.success }} />
+                              <Text style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, fontWeight: '600' }}>
+                                {subjectAssessments.length} {t('subjects.registered', 'notas registradas')}
+                              </Text>
+                            </>
+                          ) : (
+                            <>
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.text.secondary }} />
+                              <Text style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, fontWeight: '600' }}>
+                                {t('subjects.noDataTracking', 'Sin registros para mostrar')}
+                              </Text>
+                            </>
+                          )}
+                        </View>
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </View>
-            </View>
 
-            {assessments.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-                <MaterialCommunityIcons name="clipboard-text-outline" size={32} color="rgba(0,0,0,0.1)" />
-                <Text style={{ color: theme.colors.text.secondary, marginTop: 12, fontSize: 12 }}>
-                  {t('subjects.noAssessments')}
-                </Text>
-              </View>
-            ) : (
-              <>
-                <FlatList
-                  data={assessments.filter(a => a.subject_id === selectedSubject?.id)}
-                  keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
-                  style={styles.assessList}
-                  scrollEnabled={false} // Since it's inside a ScrollView
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={8}
+                  {subjectAssessments.length === 0 ? (
+                    <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                      <MaterialCommunityIcons name="clipboard-text-outline" size={40} color="rgba(0,0,0,0.1)" style={{ marginBottom: 12 }} />
+                      <Text style={{ color: theme.colors.text.secondary, marginTop: 4, fontSize: 13, textAlign: 'center', paddingHorizontal: 16 }}>
+                        {t('subjects.noAssessmentsMsg', 'Agrega evaluaciones para visualizar tu progreso académico')}
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      <FlatList
+                        data={subjectAssessments}
+                        keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
+                        style={styles.assessList}
+                        scrollEnabled={false}
+                        removeClippedSubviews={true}
+                        maxToRenderPerBatch={8}
                   initialNumToRender={5}
                   windowSize={5}
                   renderItem={({ item: a, index }) => {
@@ -390,8 +439,8 @@ export default function SubjectsScreen() {
                   }}
                 />
 
-            {/* Performance sparkline (dynamic based on last 6 assessments) */}
-            <View style={styles.sparklineContainer}>
+                {/* Performance sparkline (dynamic based on last 6 assessments) */}
+                <View style={styles.sparklineContainer}>
                   <Text style={styles.sparklineLabel}>{t('subjects.performanceTrend')}</Text>
                   <View style={styles.sparklineWrapper}>
                     {/* Y Axis Labels */}
@@ -402,14 +451,14 @@ export default function SubjectsScreen() {
                     </View>
                     
                     <View style={[styles.sparkline, styles.sparklineMain]}>
-                      {(assessments.filter(a => a.subject_id === selectedSubject?.id && ((a.score !== null && a.score !== undefined) || (a.grade_value !== null && a.grade_value !== undefined))).slice(-6)).map((a, i, arr) => {
+                      {subjectAssessments.filter(a => (a.score !== null && a.score !== undefined) || (a.grade_value !== null && a.grade_value !== undefined)).slice(-6).map((a, i, arr) => {
                         const score = a.score ?? a.grade_value ?? 0;
                         // Determine scale (5 or 100)
                         const scale = score <= 5 ? 5 : 100;
                         const barHeight = (score / scale) * 60;
                         const isLast = i === arr.length - 1;
                         const colors = ['#5856D6', '#FF9500', '#34C759', '#FF2D55'];
-                        const color = colors[assessments.indexOf(a) % colors.length];
+                        const color = colors[subjectAssessments.indexOf(a) % colors.length];
                         
                         return (
                           <View 
@@ -427,12 +476,21 @@ export default function SubjectsScreen() {
                     </View>
                   </View>
                 </View>
-              </>
-            )}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </View>
         )}
 
       </ScrollView>
+
+      <ExplanationOverlay 
+        visible={overlayVisible} 
+        explanation={overlayText} 
+        onDismiss={() => setOverlayVisible(false)} 
+      />
     </SafeAreaView>
   );
 }

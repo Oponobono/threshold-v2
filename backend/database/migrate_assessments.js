@@ -17,17 +17,15 @@ async function migrateAssessments() {
     new Promise((resolve, reject) => db.run(query, params, function (err) { err ? reject(err) : resolve(this) }));
 
   try {
-    const users = await dbAll('SELECT id, grading_scale, active_grading_version_id FROM users');
+    const users = await dbAll('SELECT id, active_grading_version_id FROM users');
 
     for (const user of users) {
       let activeVersionId = user.active_grading_version_id;
 
       // 1. Asignar active_grading_version_id si no tiene
       if (!activeVersionId) {
-        let systemCode = '0_100_PCT';
-        if (user.grading_scale === '0-5.0') systemCode = 'COL_0_5';
-        else if (user.grading_scale === '0-10') systemCode = 'ES_0_10';
-        else if (user.grading_scale === 'A-F' || user.grading_scale === 'Escala 4.0') systemCode = 'US_GPA_4';
+        // Por defecto usar el sistema colombiano 0-5.0 si no hay grading_scale
+        const systemCode = 'COL_0_5';
 
         const versionRow = await dbGet(`
           SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 

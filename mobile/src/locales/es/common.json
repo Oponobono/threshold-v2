@@ -66,5 +66,7 @@
     "processFailed": "Error: No pude procesar tu pregunta."
   },
   "title": "Título",
+  "name": "Nombre",
+  "sending": "Enviando...",
   "all": "Todos"
 }

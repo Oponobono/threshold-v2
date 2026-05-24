@@ -23,5 +23,8 @@
   "dataExport": "Exportar y restablecer datos",
   "dataExportDesc": "Exporta tus datos o restablece tus registros académicos",
   "exportCsv": "Exportar CSV",
-  "exportPdf": "Exportar PDF"
+  "exportPdf": "Exportar PDF",
+  "platform": "Plataforma",
+  "instanceUrl": "URL de la instancia",
+  "lmsUsername": "Nombre de usuario"
 }

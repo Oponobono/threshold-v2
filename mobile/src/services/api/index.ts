@@ -13,3 +13,5 @@ export * from './learning';
 export * from './ai';
 export * from './analytics';
 export * from './assessmentCategories';
+export * from './calendar';
+export * from './settings';

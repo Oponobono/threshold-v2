@@ -23,5 +23,8 @@
   "dataExport": "Data Export & Reset",
   "dataExportDesc": "Export your data or reset academic records",
   "exportCsv": "Export CSV",
-  "exportPdf": "Export PDF"
+  "exportPdf": "Export PDF",
+  "platform": "Platform",
+  "instanceUrl": "Instance URL",
+  "lmsUsername": "Username"
 }

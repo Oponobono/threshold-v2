@@ -17,6 +17,7 @@ import { ConnectivityBanner } from '../src/components/ConnectivityBanner';
 import NetInfo from '@react-native-community/netinfo';
 import { flushOfflineQueue } from '../src/services/offlineQueue';
 import { hasValidSession } from '../src/services/api/auth/session';
+import { initializeApiClient } from '../src/services/api/client';
 
 // Mantener el Splash Screen visible hasta que decidamos ocultarlo
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -51,7 +52,12 @@ export default function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Verificar si existe sesión válida al iniciar la app
+        // 🔷 1. Inicializar cliente API con detección de backend (local vs Render)
+        console.log('[RootLayout] 🔄 Inicializando cliente API...');
+        await initializeApiClient();
+        console.log('[RootLayout] ✅ Cliente API inicializado');
+        
+        // 🔷 2. Verificar si existe sesión válida al iniciar la app
         const hasSession = await hasValidSession();
         if (hasSession) {
           console.log('[RootLayout] ✅ Sesión válida encontrada, navegando a (tabs)');
@@ -61,7 +67,7 @@ export default function RootLayout() {
           setInitialRoute('welcome');
         }
       } catch (e) {
-        console.warn('[RootLayout] Error verificando sesión:', e);
+        console.warn('[RootLayout] Error durante preparación:', e);
         setInitialRoute('welcome');
       } finally {
         setAppIsReady(true);

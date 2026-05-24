@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
@@ -13,6 +13,7 @@ interface SubjectStatsProps {
   projectedGrade: number;
   delta?: number;
   deliveredText: string;
+  onPressInfo?: (column: 'average' | 'projected' | 'tasks') => void;
 }
 
 /**
@@ -26,6 +27,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
   projectedGrade,
   delta = 0,
   deliveredText,
+  onPressInfo,
 }) => {
   const { t } = useTranslation();
 
@@ -52,24 +54,22 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
       <View style={styles.card}>
 
         {/* Columna 1: Promedio */}
-        <View style={styles.col}>
+        <TouchableOpacity activeOpacity={0.8} style={styles.col} onPress={() => onPressInfo?.('average')}>
           <View style={styles.titleContainer}>
             <Ionicons name="calculator-outline" size={16} color="#007AFF" />
             <Text style={styles.colLabel}>{t('subjects.currentAverage', 'PROMEDIO')}</Text>
           </View>
           <View style={styles.contentContainer}>
-            <View style={styles.valueRow}>
-              <Text style={styles.colValue}>{formatGrade(averageGrade)}</Text>
-              <Text style={styles.colDenominator}>/5.0</Text>
-            </View>
+            <Text style={styles.colValue}>{formatGrade(averageGrade)}</Text>
+            <Text style={styles.colDenominator}>/5.0</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Separador */}
         <View style={styles.separator} />
 
         {/* Columna 2: Proyectada */}
-        <View style={styles.col}>
+        <TouchableOpacity activeOpacity={0.8} style={styles.col} onPress={() => onPressInfo?.('projected')}>
           <View style={styles.titleContainer}>
             <Ionicons 
               name="trending-up" 
@@ -90,13 +90,13 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
               </Text>
             )}
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Separador */}
         <View style={styles.separator} />
 
         {/* Columna 3: Tareas */}
-        <View style={styles.col}>
+        <TouchableOpacity activeOpacity={0.8} style={styles.col} onPress={() => onPressInfo?.('tasks')}>
           <View style={styles.titleContainer}>
             <Ionicons name="checkmark-circle" size={16} color="#FF9500" />
             <Text style={styles.colLabel}>{t('subjects.deliveredTasks', 'TAREAS')}</Text>
@@ -140,7 +140,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
             )}
           </View>
           <Text style={styles.tasksSubLabel}>COMPLETADAS</Text>
-        </View>
+        </TouchableOpacity>
 
       </View>
     </View>
@@ -187,11 +187,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 0,
-  },
   colValue: {
     fontSize: 22,
     fontWeight: '800',
@@ -199,10 +194,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   colDenominator: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.text.placeholder,
-    marginLeft: 2,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#007AFF',
+    letterSpacing: 0.3,
   },
   differenceBadge: {
     paddingHorizontal: 8,

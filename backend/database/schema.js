@@ -62,7 +62,8 @@ const tableSchema = {
       { name: 'share_pin', type: 'VARCHAR(8)' },
       { name: 'display_name', type: 'TEXT' },
       { name: 'profile_image', type: 'TEXT' },
-      { name: 'active_grading_version_id', type: 'INTEGER' }
+      { name: 'active_grading_version_id', type: 'INTEGER' },
+      { name: 'approval_threshold', type: 'REAL DEFAULT 50.0' }
     ]
   },
   deleted_users: {
@@ -647,6 +648,115 @@ const tableSchema = {
       )
     `
   },
+  subject_threshold_overrides: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        subject_id INTEGER NOT NULL,
+        threshold REAL NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        UNIQUE(user_id, subject_id)
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        threshold REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, subject_id)
+      )
+    `,
+    columns: [
+      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'subject_id', type: 'INTEGER NOT NULL' },
+      { name: 'threshold', type: 'REAL NOT NULL' }
+    ]
+  },
+  two_factor_auth: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS two_factor_auth (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        enabled INTEGER DEFAULT 0,
+        secret TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS two_factor_auth (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        enabled INTEGER DEFAULT 0,
+        secret TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'enabled', type: 'INTEGER DEFAULT 0' },
+      { name: 'secret', type: 'TEXT' }
+    ]
+  },
+  lms_accounts: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS lms_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        platform TEXT NOT NULL,
+        instance_url TEXT NOT NULL,
+        username TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS lms_accounts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        platform TEXT NOT NULL,
+        instance_url TEXT NOT NULL,
+        username TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'platform', type: 'TEXT NOT NULL' },
+      { name: 'instance_url', type: 'TEXT NOT NULL' },
+      { name: 'username', type: 'TEXT NOT NULL' }
+    ]
+  },
+  feedback_messages: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS feedback_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        message TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS feedback_messages (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'message', type: 'TEXT NOT NULL' }
+    ]
+  },
   card_snoozes: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS card_snoozes (
@@ -693,6 +803,61 @@ const tableSchema = {
         end_time TEXT NOT NULL
       )
     `
+  },
+  calendar_events: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS calendar_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        subject_id INTEGER,
+        title TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        description TEXT,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        start_time TEXT,
+        end_time TEXT,
+        all_day INTEGER DEFAULT 0,
+        create_study_plan INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS calendar_events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+        title TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        description TEXT,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        start_time TEXT,
+        end_time TEXT,
+        all_day INTEGER DEFAULT 0,
+        create_study_plan INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'subject_id', type: 'INTEGER' },
+      { name: 'title', type: 'TEXT NOT NULL' },
+      { name: 'event_type', type: 'TEXT NOT NULL' },
+      { name: 'description', type: 'TEXT' },
+      { name: 'start_date', type: 'TEXT NOT NULL' },
+      { name: 'end_date', type: 'TEXT NOT NULL' },
+      { name: 'start_time', type: 'TEXT' },
+      { name: 'end_time', type: 'TEXT' },
+      { name: 'all_day', type: 'INTEGER DEFAULT 0' },
+      { name: 'create_study_plan', type: 'INTEGER DEFAULT 0' },
+      { name: 'created_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'updated_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' }
+    ]
   },
   study_sessions: {
     sqlite: `
@@ -1049,4 +1214,6 @@ const tableSchema = {
       )
     `
   },
-  };
+};
+
+module.exports = tableSchema;

@@ -26,5 +26,8 @@
   "scaleCustomDesc": "A+: 97-100, A: 93-96...",
   "active": "Active",
   "select": "Select",
-  "addCustomScale": "Add Custom Scale"
+  "addCustomScale": "Add Custom Scale",
+  "termName": "Term name",
+  "overrideDesc": "Set a different passing threshold for each subject.",
+  "maxGrade": "Maximum value"
 }

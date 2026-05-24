@@ -17,5 +17,7 @@
   "open": "Open",
   "sendFeedback": "Send Feedback",
   "send": "Send",
-  "appVersion": "App version"
+  "appVersion": "App version",
+  "feedbackDesc": "Have suggestions, bug reports, or feedback? Tell us.",
+  "feedbackPlaceholder": "Write your message here..."
 }

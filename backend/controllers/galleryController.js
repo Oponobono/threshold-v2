@@ -97,7 +97,7 @@ exports.searchPhotosByTag = (req, res) => {
   // Buscar fotos que contengan el tag en su JSON array de tags
   const query = `
     SELECT * FROM photos 
-    WHERE subject_id = ? AND tags LIKE ?
+    WHERE subject_id = ? AND LOWER(tags) LIKE ?
     ORDER BY created_at DESC
   `;
 

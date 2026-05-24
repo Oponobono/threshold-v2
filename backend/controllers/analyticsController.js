@@ -665,17 +665,19 @@ exports.getGlobalGPAAnalytics = (req, res) => {
          a.grade_value,
          a.score,
          a.out_of,
-         a.normalized_value,
          a.percentage,
          a.weight,
          a.date,
+         ar.normalized_value,
+         ar.raw_value as original_raw_value,
          s.name as subject_name,
          s.user_id
        FROM assessments a
+       LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
        LEFT JOIN subjects s ON a.subject_id = s.id
        WHERE s.user_id = ?
-       AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR a.normalized_value IS NOT NULL)
-       ORDER BY a.date DESC`,
+       AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR ar.raw_value IS NOT NULL OR ar.normalized_value IS NOT NULL)
+       ORDER BY a.date ASC`,
       [userId],
       (err, assessments) => {
         clearTimeout(timeoutId);
@@ -705,15 +707,19 @@ exports.getGlobalGPAAnalytics = (req, res) => {
           let totalWeight = 0;
           const subjects = new Set();
 
+          const validAssessments = [];
+
           assessments.forEach(a => {
             if (a.subject_id) subjects.add(a.subject_id);
 
             // Obtener la nota normalizada (0-1)
             let normalized = 0;
             if (typeof a.normalized_value === 'number') {
-              normalized = a.normalized_value;
+              normalized = a.normalized_value; // Del assessment_results (ya está de 0 a 1 normalizado)
+            } else if (typeof a.original_raw_value === 'number') {
+              normalized = a.original_raw_value / 5; // Asumir 0-5 si es del DB nuevo
             } else if (typeof a.grade_value === 'number' && a.grade_value <= 5) {
-              normalized = a.grade_value / 5; // Asumir escala 0-5
+              normalized = a.grade_value / 5; // Asumir escala 0-5 de tabla antigua
             } else if (typeof a.score === 'number' && typeof a.out_of === 'number' && a.out_of > 0) {
               normalized = a.score / a.out_of;
             }
@@ -733,16 +739,25 @@ exports.getGlobalGPAAnalytics = (req, res) => {
             const gradeOutOf5 = normalized * 5;
             totalWeightedGrade += gradeOutOf5 * weight;
             totalWeight += weight;
+            
+            validAssessments.push({ grade_value: gradeOutOf5, weight });
           });
 
           const currentAverage = totalWeight > 0 ? totalWeightedGrade / totalWeight : 0;
-          const projectedGrade = currentAverage; // Puede sofisticarse con EMA futura
-          const delta = 0; // Delta future = EMA - current
+          
+          const subjectCount = Math.max(subjects.size, 1);
+          const normalizedAssessments = validAssessments.map(a => ({
+            ...a,
+            weight: a.weight / subjectCount
+          }));
+
+          const { calculateProjectedGrade } = require('../services/gradingEngine');
+          const projection = calculateProjectedGrade(normalizedAssessments, 5.0);
 
           const result = {
             currentAverage: parseFloat(currentAverage.toFixed(2)),
-            projectedGrade: parseFloat(projectedGrade.toFixed(2)),
-            delta: delta,
+            projectedGrade: projection.projectedGrade,
+            delta: projection.delta,
             evaluatedWeight: Math.round((totalWeight / Math.max(totalWeight, 100)) * 100),
             remainingWeight: Math.max(0, 100 - Math.round((totalWeight / Math.max(totalWeight, 100)) * 100)),
             assessmentCount: assessments.length,
@@ -781,6 +796,9 @@ exports.getProgressTrends = (req, res) => {
   }
 
   const numDays = Math.max(7, Math.min(365, parseInt(days) || 30));
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - numDays);
+  const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
 
   Promise.all([
     // Daily mastery
@@ -795,10 +813,10 @@ exports.getProgressTrends = (req, res) => {
              1
            ) as daily_accuracy
          FROM card_logs cl
-         WHERE cl.user_id = ? AND DATE(cl.timestamp) >= DATE('now', '-' || ? || ' days')
+         WHERE cl.user_id = ? AND DATE(cl.timestamp) >= DATE(?)
          GROUP BY DATE(cl.timestamp)
          ORDER BY date ASC`,
-        [userId, numDays],
+        [userId, cutoffDateStr],
         (err, rows) => resolve(rows || [])
       )
     ),
@@ -811,10 +829,10 @@ exports.getProgressTrends = (req, res) => {
            COUNT(DISTINCT CASE WHEN cl.result = 'correct' THEN fc.id END) as cards_mastered
          FROM card_logs cl
          JOIN flashcards fc ON cl.card_id = fc.id
-         WHERE cl.user_id = ? AND DATE(cl.timestamp) >= DATE('now', '-' || ? || ' days')
+         WHERE cl.user_id = ? AND DATE(cl.timestamp) >= DATE(?)
          GROUP BY DATE(cl.timestamp)
          ORDER BY date ASC`,
-        [userId, numDays],
+        [userId, cutoffDateStr],
         (err, rows) => resolve(rows || [])
       )
     ),

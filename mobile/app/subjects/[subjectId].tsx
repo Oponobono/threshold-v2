@@ -45,6 +45,7 @@ import { SubjectStats } from '../../src/components/SubjectStats';
 import { SubjectThreshold } from '../../src/components/SubjectThreshold';
 import { SubjectInsights } from '../../src/components/SubjectInsights';
 import { SubjectAIFab } from '../../src/components/SubjectAIFab';
+import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
 import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
 import { useAudioRecorder } from '../../src/hooks/useAudioRecorder';
@@ -102,6 +103,9 @@ export default function SubjectDetailScreen() {
 
   const [recentVideos, setRecentVideos] = useState<YouTubeVideo[]>([]);
   const [allSubjectVideos, setAllSubjectVideos] = useState<YouTubeVideo[]>([]);
+  
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [overlayText, setOverlayText] = useState('');
 
   const { playSound, stopSound, playingId, deleteRecordingConfirmed, recordings, cleanupAudio } = useAudioRecorder();
 
@@ -330,6 +334,16 @@ export default function SubjectDetailScreen() {
             projectedGrade={projectedGrade}
             delta={delta}
             deliveredText={deliveredText}
+            onPressInfo={(column) => {
+              if (column === 'average') {
+                setOverlayText('**Promedio Ponderado**\n\nEste número no es un promedio simple. Es el resultado exacto de calcular cada una de tus notas multiplicada por su peso o porcentaje real.\n\nEs el reflejo verdadero de tu desempeño acumulado hasta este momento.');
+              } else if (column === 'projected') {
+                setOverlayText('**Nota Proyectada & Delta**\n\nUtiliza nuestro motor matemático (Media Móvil Exponencial) para predecir cuál será tu nota final al terminar el semestre si mantienes tu tendencia actual.\n\nEl **Delta** (ej. +0.05 pts) indica si tu rendimiento está subiendo o bajando en comparación con tu promedio actual.');
+              } else if (column === 'tasks') {
+                setOverlayText('**Tareas Completadas**\n\nMuestra el número de actividades y evaluaciones que ya has entregado frente al total planificado de esta materia en específico.');
+              }
+              setOverlayVisible(true);
+            }}
           />
 
           <SubjectThreshold
@@ -561,6 +575,12 @@ export default function SubjectDetailScreen() {
         />
       )}
       </>)}
+
+      <ExplanationOverlay 
+        visible={overlayVisible} 
+        explanation={overlayText} 
+        onDismiss={() => setOverlayVisible(false)} 
+      />
     </>
   );
 }

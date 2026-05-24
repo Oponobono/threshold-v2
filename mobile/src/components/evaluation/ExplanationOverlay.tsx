@@ -59,7 +59,9 @@ export const ExplanationOverlay: React.FC<Props> = ({
           <View style={{ flex: 1 }}>
             <Text style={s.explanationTitle}>¿Por qué?</Text>
             <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
-              <MarkdownWithCode>{explanation}</MarkdownWithCode>
+              <MarkdownWithCode style={{ body: { fontSize: 14, lineHeight: 21, color: theme.colors.text.primary } }}>
+                {explanation}
+              </MarkdownWithCode>
             </ScrollView>
             <View style={s.tapHint}>
               <Text style={s.tapHintText}>Toca para continuar</Text>

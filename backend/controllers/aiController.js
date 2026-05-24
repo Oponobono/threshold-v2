@@ -790,7 +790,7 @@ exports.buildContext = async (req, res) => {
                     text = `[VIDEO YOUTUBE: ${item.label}]\n${captionData.captions}`;
                     // Guardar en BD para no repetir el fetch la próxima vez
                     db.run(
-                      `INSERT OR REPLACE INTO youtube_transcripts (video_id, transcript_text)
+                      `INSERT INTO youtube_transcripts (video_id, transcript_text)
                        VALUES (?, ?)
                        ON CONFLICT(video_id) DO UPDATE SET transcript_text = excluded.transcript_text`,
                       [item.id, captionData.captions],

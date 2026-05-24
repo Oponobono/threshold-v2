@@ -2,15 +2,20 @@
  * client.ts
  *
  * Núcleo HTTP de la capa de servicios. Centraliza la lógica de:
+ * - Detección automática inteligente del backend (local vs Render)
  * - Detección automática de la IP LAN del servidor en desarrollo.
  * - Construcción de las URLs base de la API (soporta varios puertos y env. de producción).
  * - `fetchWithFallback`: intenta todos los candidatos de URL en orden, rotando
  *   el servidor activo para las llamadas siguientes si uno falla.
  * - `parseJsonSafely`: evita que errores de parseo de JSON rompan el flujo.
+ *
+ * MEJORA: Ahora detecta automáticamente si el servidor local está disponible
+ * con un health check rápido (1s timeout) antes de decidir.
  */
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { storageService } from '../storageService';
+import { detectAvailableBackend, resetBackendDetectionCache } from './backendDetector';
 
 /** Valida que un string tenga formato de dirección IPv4 válida */
 export const isValidIpv4 = (value: string): boolean => {
@@ -66,37 +71,167 @@ export const DEFAULT_LAN_IP =
 export const API_PORTS = [3000, 3001];
 
 export let API_BASE_URLS: string[] = [];
+export let activeBaseUrl = '';
 
-// 🌐 Prioriza URL de Render si está configurada (producción), luego fallback a localhost
-if (process.env.EXPO_PUBLIC_API_URL) {
-  // Si hay URL en variables de entorno (Render en prod, o configurada en desarrollo)
-  API_BASE_URLS = [process.env.EXPO_PUBLIC_API_URL];
-  
-  // En modo desarrollo, también intenta URLs locales como fallback
-  if (__DEV__) {
-    API_BASE_URLS.push(...API_PORTS.map((port) => `http://${DEFAULT_LAN_IP}:${port}/api`));
+// 🔷 Estado de inicialización
+let isApiClientInitialized = false;
+let initializationPromise: Promise<void> | null = null;
+
+/**
+ * Inicializa el cliente API con detección automática del backend disponible.
+ * Debe llamarse al inicio de la app (en RootLayout o similar).
+ *
+ * Flujo:
+ * 1. Usa un backend por defecto inmediatamente (Render o localhost)
+ * 2. En background, detecta qué backend está realmente disponible
+ * 3. Cuando encuentra disponible, cambia automáticamente
+ * 4. Esto no bloquea el startup de la app
+ */
+export async function initializeApiClient(): Promise<void> {
+  // Si ya se está inicializando, esperar a que termine
+  if (initializationPromise) {
+    return initializationPromise;
   }
-} else if (__DEV__) {
-  // Si no hay URL remota y estamos en dev, usa solo locales
-  API_BASE_URLS = API_PORTS.map((port) => `http://${DEFAULT_LAN_IP}:${port}/api`);
-} else {
-  // Fallback en producción sin URL configurada
-  API_BASE_URLS = API_PORTS.map((port) => `http://${DEFAULT_LAN_IP}:${port}/api`);
+  
+  // Si ya se inicializó, no hacer nada
+  if (isApiClientInitialized) {
+    console.log('[API Client] ✅ Ya inicializado.');
+    return;
+  }
+  
+  initializationPromise = (async () => {
+    try {
+      console.log('[API Client] 🚀 Inicializando...');
+      
+      // 1. Setup inicial rápido (no bloqueante)
+      const localIp = getExpoHostIp() || process.env.EXPO_PUBLIC_API_HOST || '127.0.0.1';
+      setupDefaultApiUrls();
+      isApiClientInitialized = true;
+      
+      console.log(
+        '[API Client] ✅ Inicialización rápida completada.',
+        `\n  🎯 Usando: ${activeBaseUrl}`,
+        `\n  🔄 Detectando en background...`
+      );
+      
+      // 2. Detección en background (no bloquea)
+      // Esta es una Promise que NO esperamos, para que no bloquee
+      detectAvailableBackend(localIp, API_PORTS)
+        .then((detectedBackend) => {
+          if (detectedBackend.isAvailable) {
+            // Convertir base URL a API URL agregando /api
+            const apiUrl = detectedBackend.url.endsWith('/api') 
+              ? detectedBackend.url 
+              : `${detectedBackend.url}/api`;
+            
+            if (apiUrl !== activeBaseUrl) {
+              console.log(`[API Client] 🔄 Cambiando a backend detectado: ${apiUrl}`);
+              
+              // Actualizar URLs con la detectada primero
+              const newUrls: string[] = [apiUrl];
+              
+              // Agregar fallbacks (otras IPs locales)
+              for (const port of API_PORTS) {
+                const fallbackUrl = `http://${localIp}:${port}/api`;
+                if (!newUrls.includes(fallbackUrl) && fallbackUrl !== apiUrl) {
+                  newUrls.push(fallbackUrl);
+                }
+              }
+              
+              // Agregar Render si está configurada
+              if (process.env.EXPO_PUBLIC_API_URL && !newUrls.includes(process.env.EXPO_PUBLIC_API_URL)) {
+                newUrls.push(process.env.EXPO_PUBLIC_API_URL);
+              }
+              
+              API_BASE_URLS = newUrls;
+              activeBaseUrl = newUrls[0];
+              
+              console.log(`[API Client] ✅ Backend optimizado: ${activeBaseUrl}`);
+            } else {
+              console.log(`[API Client] ℹ️  Backend detectado es el mismo que está en uso`);
+            }
+          } else {
+            console.log(`[API Client] ℹ️  No se detectó backend disponible, usando configuración por defecto`);
+          }
+        })
+        .catch((error) => {
+          console.error('[API Client] Error en detección background:', error);
+        });
+      
+    } catch (error) {
+      console.error('[API Client] ❌ Error durante inicialización:', error);
+      setupDefaultApiUrls();
+      isApiClientInitialized = true;
+    } finally {
+      initializationPromise = null;
+    }
+  })();
+  
+  return initializationPromise;
 }
 
-export let activeBaseUrl = API_BASE_URLS[0];
+/**
+ * Configura URLs por defecto si la detección falla.
+ * Se usa como fallback en caso de error.
+ */
+function setupDefaultApiUrls(): void {
+  const localIp = getExpoHostIp() || process.env.EXPO_PUBLIC_API_HOST || '127.0.0.1';
+  
+  API_BASE_URLS = [];
+  
+  if (__DEV__) {
+    // 1. LAN IP primero (funciona en dispositivos físicos y simuladores)
+    if (localIp && localIp !== '127.0.0.1') {
+      API_BASE_URLS.push(...API_PORTS.map((port) => `http://${localIp}:${port}/api`));
+    }
+    
+    // 2. 10.0.2.2 para Android emulator
+    if (Platform.OS === 'android') {
+      API_BASE_URLS.push(...API_PORTS.map((port) => `http://10.0.2.2:${port}/api`));
+    }
+    
+    // 3. localhost al final (solo funciona en iOS simulator)
+    API_BASE_URLS.push(...API_PORTS.map((port) => `http://localhost:${port}/api`));
+  }
+  
+  // 4. Render como respaldo si internet está disponible
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    API_BASE_URLS.push(process.env.EXPO_PUBLIC_API_URL);
+  }
+  
+  // Si no hay URLs configuradas, fallback a localhost
+  if (API_BASE_URLS.length === 0) {
+    API_BASE_URLS = API_PORTS.map((port) => `http://localhost:${port}/api`);
+  }
+  
+  activeBaseUrl = API_BASE_URLS[0];
+}
 
-export const buildApiError = (message: string): Error => new Error(message);
+/**
+ * Resetea la detección de backend y fuerza un nuevo health check.
+ * Útil cuando el usuario cambia de red o quiere reconectar.
+ */
+export async function resetApiClientDetection(): Promise<void> {
+  isApiClientInitialized = false;
+  initializationPromise = null;
+  resetBackendDetectionCache();
+  await initializeApiClient();
+}
 
-// 🔍 Logging de configuración de URLs
+// ─── Setup inicial (fallback mientras se inicializa) ─────────────────────────
+setupDefaultApiUrls();
+
+// Log de configuración inicial
 console.log(
-  '[API Config]',
+  '[API Client] 📋 Setup inicial:',
   __DEV__ ? '🔨 Development Mode' : '🚀 Production Mode',
   '| EXPO_PUBLIC_API_URL:',
   process.env.EXPO_PUBLIC_API_URL ? '✓ Configurada' : '✗ No configurada',
-  '| URLs a intentar:',
+  '| URLs base (antes de init):',
   API_BASE_URLS
 );
+
+export const buildApiError = (message: string): Error => new Error(message);
 
 /**
  * Realiza la petición HTTP probándolas todas las URLs base en orden.
@@ -145,10 +280,10 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
     try {
       const fullUrl = `${base}${path}`;
       const response = await fetch(fullUrl, customInit);
-      activeBaseUrl = base;
       
-      // ✅ Log successful connection
+      // ✅ Solo actualizar activeBaseUrl si la conexión fue exitosa
       if (response.ok) {
+        activeBaseUrl = base;
         console.log(`[✓ API] ${method} ${path} → ${response.status} (${base.split('/api')[0]})`);
       } else {
         console.warn(`[⚠ API] ${method} ${path} → ${response.status} (${base.split('/api')[0]})`);

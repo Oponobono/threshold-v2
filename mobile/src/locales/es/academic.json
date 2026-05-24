@@ -26,5 +26,8 @@
   "scaleCustomDesc": "A+: 97-100, A: 93-96...",
   "active": "Activa",
   "select": "Seleccionar",
-  "addCustomScale": "Añadir escala personalizada"
+  "addCustomScale": "Añadir escala personalizada",
+  "termName": "Nombre del período",
+  "overrideDesc": "Define un umbral de aprobación distinto para cada materia.",
+  "maxGrade": "Valor máximo"
 }

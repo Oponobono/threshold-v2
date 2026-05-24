@@ -16,7 +16,7 @@ interface CreateTaskModalProps {
   onClose: () => void;
   subjects: Subject[];
   initialSubjectId?: number | null;
-  onTaskCreated: () => void;
+  onTaskCreated: () => Promise<void> | void;
 }
 
 export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, onTaskCreated }: CreateTaskModalProps) => {
@@ -93,7 +93,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
       });
 
       alertRef.show({ title: t('common.success'), message: t('dashboard.quickAddMenu.task.success'), type: 'success' });
-      onTaskCreated();
+      await onTaskCreated();
       handleClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.quickAddMenu.task.errorSave'), type: 'error' });

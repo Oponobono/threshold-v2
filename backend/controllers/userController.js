@@ -8,7 +8,7 @@ const { getUniqueSharePin } = require('../utils/pinHelper');
 exports.getUserProfile = (req, res) => {
   const { userId } = req.params;
   const query = `
-    SELECT id, email, name, lastname, username, major, university, semester, study_goal, created_at, last_login, share_pin, display_name, profile_image, active_grading_version_id
+    SELECT id, email, name, lastname, username, major, university, semester, study_goal, created_at, last_login, share_pin, display_name, profile_image, active_grading_version_id, approval_threshold
     FROM users
     WHERE id = ?
   `;
@@ -48,7 +48,7 @@ exports.updateUserProfile = (req, res) => {
   const updates = [];
   const values = [];
 
-  const fields = ['name', 'lastname', 'username', 'major', 'university', 'semester', 'study_goal', 'share_pin', 'display_name', 'profile_image', 'active_grading_version_id'];
+  const fields = ['name', 'lastname', 'username', 'major', 'university', 'semester', 'study_goal', 'share_pin', 'display_name', 'profile_image', 'active_grading_version_id', 'approval_threshold'];
   
   fields.forEach(field => {
     if (req.body[field] !== undefined) {

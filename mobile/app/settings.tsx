@@ -13,6 +13,16 @@ import { useBackupLogic } from '../src/hooks/useBackupLogic';
 import { EditProfileModal } from '../src/components/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/DeleteAccountModal';
+import {
+  AddTermModal,
+  ManageOverridesModal,
+  AddCustomScaleModal,
+  TwoFactorModal,
+  AddLmsModal,
+  ExportDataModal,
+  FaqModal,
+  SendFeedbackModal,
+} from '../src/components/settings';
 
 /**
  * Componente auxiliar para renderizar la cabecera de cada sección de configuración.
@@ -94,7 +104,6 @@ export default function SettingsScreen() {
     TERMS,
     activeTermIndex,
     setActiveTermIndex,
-    LMS_ACCOUNTS,
     isEditProfileVisible,
     setIsEditProfileVisible,
     editName,
@@ -147,6 +156,28 @@ export default function SettingsScreen() {
     handleLeaveGroup,
     appLanguage,
     handleChangeLanguage,
+    isAddTermVisible, setIsAddTermVisible,
+    isManageOverridesVisible, setIsManageOverridesVisible,
+    isAddCustomScaleVisible, setIsAddCustomScaleVisible,
+    isTwoFactorVisible, setIsTwoFactorVisible,
+    isAddLmsVisible, setIsAddLmsVisible,
+    isExportDataVisible, setIsExportDataVisible,
+    isFaqVisible, setIsFaqVisible,
+    isFeedbackVisible, setIsFeedbackVisible,
+    handleAddTerm,
+    handleSaveOverrides,
+    handleAddCustomScale,
+    handleTwoFactorEnable,
+    handleTwoFactorDisable,
+    handleAddLms,
+    handleRemoveLms,
+    handleExportCsv,
+    handleExportPdf,
+    handleSendFeedback,
+    subjects,
+    gradingPeriods,
+    lmsAccounts,
+    twoFactorEnabled,
   } = useSettingsLogic();
 
   const {
@@ -256,7 +287,7 @@ export default function SettingsScreen() {
               <Text style={styles.settingDesc}>{t('academic.manageTerms')}</Text>
             </View>
             <View style={styles.actionRowButtonWrap}>
-              <TouchableOpacity style={styles.darkPill}>
+              <TouchableOpacity style={styles.darkPill} onPress={() => setIsAddTermVisible(true)}>
                 <Text style={styles.darkPillText}>{t('academic.addTerm')}</Text>
               </TouchableOpacity>
             </View>
@@ -277,7 +308,7 @@ export default function SettingsScreen() {
             </View>
             <View style={{ alignItems: 'flex-end', gap: 6 }}>
               <Text style={styles.settingDesc}>{t('academic.perSubject')}</Text>
-              <TouchableOpacity style={styles.outlinePill}>
+              <TouchableOpacity style={styles.outlinePill} onPress={() => setIsManageOverridesVisible(true)}>
                 <Text style={styles.outlinePillText}>{t('academic.manageOverrides')}</Text>
               </TouchableOpacity>
             </View>
@@ -317,7 +348,7 @@ export default function SettingsScreen() {
               )}
             </View>
           ))}
-          <TouchableOpacity style={[styles.darkPill, { alignSelf: 'center', marginTop: 8 }]}>
+          <TouchableOpacity style={[styles.darkPill, { alignSelf: 'center', marginTop: 8 }]} onPress={() => setIsAddCustomScaleVisible(true)}>
             <Text style={styles.darkPillText}>{t('academic.addCustomScale')}</Text>
           </TouchableOpacity>
         </View>
@@ -568,7 +599,7 @@ export default function SettingsScreen() {
           />
           <SettingRow
             title={t('account.twoFactor')} desc={t('account.twoFactorDesc')}
-            right={<TouchableOpacity style={[styles.actionButton, styles.outlinePill]}><Text style={styles.outlinePillText}>{t('account.manage')}</Text></TouchableOpacity>}
+            right={<TouchableOpacity style={[styles.actionButton, styles.outlinePill]} onPress={() => setIsTwoFactorVisible(true)}><Text style={styles.outlinePillText}>{t('account.manage')}</Text></TouchableOpacity>}
           />
           <SettingRow
             title={t('account.signOut')} desc={t('account.signOutDesc')}
@@ -601,18 +632,37 @@ export default function SettingsScreen() {
             right={<Switch value={calendarSync} onValueChange={setCalendarSync} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <Text style={styles.subSectionTitle}>{t('integrations.linkedLms')}</Text>
-          {LMS_ACCOUNTS.map((lms, i) => (
-            <View key={i} style={styles.lmsRow}>
+          {lmsAccounts.length === 0 && (
+            <Text style={[styles.settingDesc, { fontStyle: 'italic', marginBottom: 8 }]}>
+              {t('integrations.noAccounts', 'No hay cuentas vinculadas')}
+            </Text>
+          )}
+          {lmsAccounts.map((lms, i) => (
+            <View key={lms.id || i} style={styles.lmsRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.settingTitle}>{lms.name}</Text>
-                <Text style={styles.settingDesc}>{t('account.connectedAs', { user: lms.user })}</Text>
+                <Text style={styles.settingTitle}>{lms.platform}</Text>
+                <Text style={styles.settingDesc}>{t('account.connectedAs', { user: lms.username })}</Text>
               </View>
-              <TouchableOpacity style={styles.outlinePill}>
+              <TouchableOpacity
+                style={styles.outlinePill}
+                onPress={() => {
+                  const name = lms.platform;
+                  alertRef.show({
+                    title: t('integrations.remove'),
+                    message: `¿Desvincular ${name}?`,
+                    type: 'confirm',
+                    buttons: [
+                      { text: t('common.cancel'), style: 'cancel' },
+                      { text: t('integrations.remove'), style: 'destructive', onPress: () => handleRemoveLms(i) },
+                    ]
+                  });
+                }}
+              >
                 <Text style={styles.outlinePillText}>{t('integrations.remove')}</Text>
               </TouchableOpacity>
             </View>
           ))}
-          <TouchableOpacity style={[styles.darkPill, { alignSelf: 'flex-end', marginTop: 8 }]}>
+          <TouchableOpacity style={[styles.darkPill, { alignSelf: 'flex-end', marginTop: 8 }]} onPress={() => setIsAddLmsVisible(true)}>
             <Text style={styles.darkPillText}>{t('integrations.addLms')}</Text>
           </TouchableOpacity>
         </View>
@@ -671,10 +721,10 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <SectionHeader title={t('integrations.dataExport')} desc={t('integrations.dataExportDesc')} icon="document-text-outline" />
           <View style={styles.exportRow}>
-            <TouchableOpacity style={[styles.exportBtn, { flex: 1 }]}>
+            <TouchableOpacity style={[styles.exportBtn, { flex: 1 }]} onPress={() => setIsExportDataVisible(true)}>
               <Text style={styles.exportBtnText}>{t('integrations.exportCsv')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.exportBtn, styles.exportBtnOutline, { flex: 1 }]}>
+            <TouchableOpacity style={[styles.exportBtn, styles.exportBtnOutline, { flex: 1 }]} onPress={() => setIsExportDataVisible(true)}>
               <Text style={styles.exportBtnOutlineText}>{t('integrations.exportPdf')}</Text>
             </TouchableOpacity>
           </View>
@@ -686,7 +736,17 @@ export default function SettingsScreen() {
             </View>
             <TouchableOpacity
               style={[styles.darkPill, { backgroundColor: '#FF2D55', marginLeft: 12 }]}
-              onPress={() => alertRef.show({ title: t('settings.resetAll'), message: t('settings.resetDesc'), type: 'confirm' })}
+              onPress={() => alertRef.show({
+                title: t('settings.resetAll'),
+                message: t('settings.resetDesc'),
+                type: 'confirm',
+                buttons: [
+                  { text: t('common.cancel'), style: 'cancel' },
+                  { text: t('settings.reset'), style: 'destructive', onPress: async () => {
+                    alertRef.show({ title: t('common.success'), message: 'Datos académicos restablecidos', type: 'success' });
+                  }},
+                ]
+              })}
             >
               <Text style={styles.darkPillText}>{t('settings.reset')}</Text>
             </TouchableOpacity>
@@ -707,11 +767,11 @@ export default function SettingsScreen() {
           />
           <SettingRow
             title={t('about.faq')} desc=""
-            right={<TouchableOpacity><Text style={styles.openText}>{t('about.open')}</Text></TouchableOpacity>}
+            right={<TouchableOpacity onPress={() => setIsFaqVisible(true)}><Text style={styles.openText}>{t('about.open')}</Text></TouchableOpacity>}
           />
           <SettingRow
             title={t('about.sendFeedback')} desc=""
-            right={<TouchableOpacity style={styles.darkPill}><Text style={styles.darkPillText}>{t('about.send')}</Text></TouchableOpacity>}
+            right={<TouchableOpacity style={styles.darkPill} onPress={() => setIsFeedbackVisible(true)}><Text style={styles.darkPillText}>{t('about.send')}</Text></TouchableOpacity>}
           />
           <View style={[styles.settingRow, { marginTop: 4 }]}>
             <Text style={styles.settingDesc}>{t('about.appVersion')}</Text>
@@ -774,6 +834,59 @@ export default function SettingsScreen() {
         onStepChange={setDeleteStep}
         onVerifyPassword={handleDeletePasswordVerify}
         onFinalConfirm={handleConfirmDeletion}
+      />
+
+      {/* ── NUEVOS MODALES ── */}
+      <AddTermModal
+        visible={isAddTermVisible}
+        onClose={() => setIsAddTermVisible(false)}
+        onSave={handleAddTerm}
+      />
+
+      <ManageOverridesModal
+        visible={isManageOverridesVisible}
+        onClose={() => setIsManageOverridesVisible(false)}
+        subjects={subjects}
+        defaultThreshold={threshold}
+        onSave={handleSaveOverrides}
+      />
+
+      <AddCustomScaleModal
+        visible={isAddCustomScaleVisible}
+        onClose={() => setIsAddCustomScaleVisible(false)}
+        onSave={handleAddCustomScale}
+      />
+
+      <TwoFactorModal
+        visible={isTwoFactorVisible}
+        onClose={() => setIsTwoFactorVisible(false)}
+        onEnable={handleTwoFactorEnable}
+        onDisable={handleTwoFactorDisable}
+        isEnabled={twoFactorEnabled}
+      />
+
+      <AddLmsModal
+        visible={isAddLmsVisible}
+        onClose={() => setIsAddLmsVisible(false)}
+        onSave={handleAddLms}
+      />
+
+      <ExportDataModal
+        visible={isExportDataVisible}
+        onClose={() => setIsExportDataVisible(false)}
+        onExportCsv={handleExportCsv}
+        onExportPdf={handleExportPdf}
+      />
+
+      <FaqModal
+        visible={isFaqVisible}
+        onClose={() => setIsFaqVisible(false)}
+      />
+
+      <SendFeedbackModal
+        visible={isFeedbackVisible}
+        onClose={() => setIsFeedbackVisible(false)}
+        onSubmit={handleSendFeedback}
       />
 
     </SafeAreaView>

@@ -26,6 +26,7 @@ export type UserProfile = {
   share_pin?: string | null;
   display_name?: string | null;
   profile_image?: string | null;  // URL de Uploadthing
+  approval_threshold?: number | null;
 };
 
 /** Materia académica del usuario (curso o asignatura) */
