@@ -76,7 +76,8 @@ const migrateGradingVersionsBoolean = async (pool) => {
     }
   } catch (err) {
     console.error('[Migration] Error en migración de is_active:', err.message);
-    throw err;
+    console.warn('[Migration] ⚠️  Continuando a pesar del error de migración');
+    // No lanzar error para que no bloquee la inicialización del servidor
   }
 };
 
