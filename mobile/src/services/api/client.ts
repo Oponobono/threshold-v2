@@ -250,8 +250,9 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
                      path.includes('/pdf-extract') ||
                      path.includes('/youtube-transcripts'); // Solo excluir transcripts, no videos
                      
-  const isCacheable = method === 'GET' && !isExcluded;
-  const cacheKey = `api_cache_${path}`;
+  const API_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
+const isCacheable = method === 'GET' && !isExcluded;
+const cacheKey = `api_cache_${path}`;
 
   const candidates = [
     activeBaseUrl,
@@ -292,22 +293,39 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
       // ✅ Interceptar 304 Not Modified y servir desde caché
       if (response.status === 304 && isCacheable) {
         console.log(`[Cache] 304 Not Modified interceptado para ${path}. Sirviendo caché local.`);
-        const cachedText = await storageService.getLocal(cacheKey);
-        if (cachedText) {
-          return new Response(cachedText, {
-            status: 200,
-            statusText: 'OK',
-            headers: new Headers({ 'Content-Type': 'application/json' })
-          });
+        const cachedEntry = await storageService.getLocal(cacheKey);
+        if (cachedEntry) {
+          try {
+            const parsed = JSON.parse(cachedEntry);
+            const age = Date.now() - (parsed.timestamp || 0);
+            if (age <= API_CACHE_TTL_MS) {
+              return new Response(parsed.data, {
+                status: 200,
+                statusText: 'OK',
+                headers: new Headers({ 'Content-Type': 'application/json' })
+              });
+            }
+            console.log(`[Cache] Cache expirado para ${path}, ignorando 304`);
+          } catch {
+            // old format without TTL wrapper, serve it anyway
+            return new Response(cachedEntry, {
+              status: 200,
+              statusText: 'OK',
+              headers: new Headers({ 'Content-Type': 'application/json' })
+            });
+          }
         }
       }
 
-      // ✅ Guardar en cache si es exitosa y cacheable
+      // ✅ Guardar en cache si es exitosa y cacheable (con timestamp para TTL)
       if (response.ok && isCacheable) {
         try {
           const clone = response.clone();
           const text = await clone.text();
-          await storageService.saveLocal(cacheKey, text);
+          await storageService.saveLocal(cacheKey, JSON.stringify({
+            data: text,
+            timestamp: Date.now(),
+          }));
         } catch (e) {
           console.error('[Cache] Error guardando cache para', path, e);
         }
@@ -324,14 +342,28 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
   // 🛡️ Fallback: Si no hay conexión (fallaron las URLs) y es cacheable, devolvemos del cache local
   if (isCacheable) {
     try {
-      const cachedText = await storageService.getLocal(cacheKey);
-      if (cachedText) {
-        console.log(`[Cache Fallback] Modo Offline. Sirviendo desde cache: ${path}`);
-        return new Response(cachedText, {
-          status: 200,
-          statusText: 'OK',
-          headers: new Headers({ 'Content-Type': 'application/json' })
-        });
+      const cachedEntry = await storageService.getLocal(cacheKey);
+      if (cachedEntry) {
+        let data: string | undefined;
+        try {
+          const parsed = JSON.parse(cachedEntry);
+          const age = Date.now() - (parsed.timestamp || 0);
+          if (age <= API_CACHE_TTL_MS) {
+            data = parsed.data;
+          } else {
+            console.log(`[Cache Fallback] Cache expirado para ${path} (${Math.round(age / 60000)}min)`);
+          }
+        } catch {
+          data = cachedEntry; // old format
+        }
+        if (data) {
+          console.log(`[Cache Fallback] Modo Offline. Sirviendo desde cache: ${path}`);
+          return new Response(data, {
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers({ 'Content-Type': 'application/json' })
+          });
+        }
       }
     } catch (cacheError) {
       console.error('[Cache Fallback] Error leyendo de cache', cacheError);

@@ -9,6 +9,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Subject } from './types';
+import { cacheService, CACHE_KEYS } from '../../services/cacheService';
 import { offlineSyncService } from '../offlineSyncService';
 
 /**
@@ -32,7 +33,11 @@ export const getSubjects = async () => {
     throw new Error(errorData?.error || 'Error al obtener materias.');
   }
   const data = await parseJsonSafely(response);
-  return Array.isArray(data) ? data : [];
+  if (Array.isArray(data)) {
+    cacheService.saveSubjects(data);
+    return data;
+  }
+  return [];
 };
 
 /**
@@ -70,6 +75,7 @@ export const createSubject = async (payload: {
       throw new Error(data?.error || 'No se pudo crear la materia.');
     }
 
+    cacheService.clearKey(CACHE_KEYS.SUBJECTS);
     return data as Subject;
   } catch (error) {
     // Si falla, guardar en cola offline
@@ -115,14 +121,21 @@ export const getPredictedSubject = async (): Promise<Subject | null> => {
  * Elimina una materia
  */
 export const deleteSubject = async (subjectId: number | string) => {
-  const response = await fetchWithFallback(`/subjects/${subjectId}`, {
-    method: 'DELETE',
-  });
-  if (!response.ok) {
-    const errorData = await parseJsonSafely(response);
-    throw new Error(errorData?.error || 'No se pudo eliminar la materia.');
+  try {
+    const response = await fetchWithFallback(`/subjects/${subjectId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const errorData = await parseJsonSafely(response);
+      throw new Error(errorData?.error || 'No se pudo eliminar la materia.');
+    }
+    cacheService.clearKey(CACHE_KEYS.SUBJECTS);
+    return await parseJsonSafely(response);
+  } catch (error) {
+    console.warn('[Subjects] Red no disponible, guardando en cola offline:', error);
+    await offlineSyncService.addPendingOperation('DELETE', `/subjects/${subjectId}`, 'subject');
+    return { success: true, _isPending: true };
   }
-  return await parseJsonSafely(response);
 };
 
 /**
@@ -142,5 +155,6 @@ export const updateSubject = async (subjectId: number | string, payload: Partial
     throw new Error(data?.error || 'No se pudo actualizar la materia.');
   }
 
+  cacheService.clearKey(CACHE_KEYS.SUBJECTS);
   return data;
 };

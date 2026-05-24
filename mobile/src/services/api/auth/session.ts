@@ -1,6 +1,7 @@
 import { storageService } from '../../storageService';
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { cacheService } from '../../cacheService';
+import { clearProfileImageCache } from '../../profileImageCache';
 
 /**
  * Obtiene el ID del usuario actual almacenado localmente
@@ -112,8 +113,9 @@ export const signOut = async (): Promise<void> => {
     await storageService.removeSecure('app_user_email');
     await storageService.removeSecure('app_user_id');
     
-    // Limpiar caché de datos de usuario
+    // Limpiar TODO: MMKV, cola offline, AsyncStorage, imágenes locales
     await cacheService.clear();
+    await clearProfileImageCache();
     
     console.log('[Auth] Sesión cerrada. Datos de autenticación y caché eliminados.');
   } catch (error) {

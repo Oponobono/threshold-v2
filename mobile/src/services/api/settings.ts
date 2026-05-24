@@ -1,4 +1,5 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { saveToCacheSync, loadFromCacheSync } from '../cacheService';
 
 export interface GradingPeriod {
   id: number;
@@ -56,11 +57,19 @@ export const deleteGradingPeriod = async (id: number): Promise<void> => {
   if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al eliminar período'); }
 };
 
+const CACHE_KEY_THRESHOLD_OVERRIDES = 'cache:threshold_overrides';
+const TTL_THRESHOLD_OVERRIDES = 1000 * 60 * 5; // 5 min
+
 export const getThresholdOverrides = async (): Promise<ThresholdOverride[]> => {
+  const cached = loadFromCacheSync<ThresholdOverride[]>(CACHE_KEY_THRESHOLD_OVERRIDES, TTL_THRESHOLD_OVERRIDES);
+  if (cached) return cached;
+
   const response = await fetchWithFallback('/threshold-overrides');
   if (!response.ok) throw new Error('Error al obtener excepciones');
   const data = await parseJsonSafely(response);
-  return data?.overrides || [];
+  const overrides = data?.overrides || [];
+  saveToCacheSync(CACHE_KEY_THRESHOLD_OVERRIDES, overrides);
+  return overrides;
 };
 
 export const saveThresholdOverrides = async (overrides: { subjectId: number; threshold: string }[]): Promise<void> => {

@@ -3,10 +3,15 @@ import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { setItemAsync, getItemAsync } from 'expo-secure-store';
+import * as ImagePicker from 'expo-image-picker';
 import { alertRef } from '../components/CustomAlert';
+import { uploadFileToUploadthing } from '../services/uploadthing/storage';
+import { downloadProfileImage } from '../services/profileImageCache';
+import { cacheService } from '../services/cacheService';
 import { fetchGradingSystems, type GradingSystem } from '../services/api/grading';
 import {
   getCurrentUserProfile,
+  getCurrentUserProfileSync,
   signOut,
   type UserProfile,
   updateUserProfile,
@@ -29,6 +34,7 @@ import { getSubjects } from '../services/api/subjects';
 import {
   getGradingPeriods,
   createGradingPeriod,
+  deleteGradingPeriod,
   getThresholdOverrides,
   saveThresholdOverrides,
   createCustomGradingSystem,
@@ -97,6 +103,8 @@ export const useSettingsLogic = () => {
   const [editSemester, setEditSemester] = useState('');
   const [editStudyGoal, setEditStudyGoal] = useState('');
   const [editPin, setEditPin] = useState('');
+  const [editProfileImage, setEditProfileImage] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // Password State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -134,8 +142,30 @@ export const useSettingsLogic = () => {
 
   useEffect(() => {
     const loadProfile = async () => {
+      const cached = getCurrentUserProfileSync();
+      if (cached) {
+        setProfile(cached);
+        if (cached.approval_threshold !== null && cached.approval_threshold !== undefined) {
+          setThreshold(String(cached.approval_threshold));
+        }
+        if (cached.profile_image) {
+          downloadProfileImage(cached.profile_image).then(localUri => {
+            if (localUri) setLocalProfileImageUri(localUri);
+          });
+        }
+      }
+
       const userProfile = await getCurrentUserProfile();
       setProfile(userProfile);
+
+      if (userProfile?.profile_image) {
+        const localUri = await downloadProfileImage(userProfile.profile_image);
+        if (localUri) {
+          setLocalProfileImageUri(localUri);
+        }
+      } else {
+        setLocalProfileImageUri(null);
+      }
 
       const hasBiometric = await hasBiometricTokenStored();
       setBiometric(hasBiometric);
@@ -320,7 +350,44 @@ export const useSettingsLogic = () => {
     setEditSemester(profile?.semester || '');
     setEditStudyGoal(profile?.study_goal || '');
     setEditPin(profile?.share_pin || '');
+    setEditProfileImage(null);
     setIsEditProfileVisible(true);
+  };
+
+  const handlePickProfilePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      alertRef.show({ title: t('common.error'), message: 'Se requiere acceso a la galería', type: 'warning' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    setIsUploadingPhoto(true);
+    try {
+      const uploadResult = await uploadFileToUploadthing(result.assets[0].uri);
+      setEditProfileImage(uploadResult.url);
+    } catch (error: any) {
+      alertRef.show({ title: t('common.error'), message: error.message || 'Error al subir la foto', type: 'error' });
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleRemoveProfilePhoto = () => {
+    alertRef.show({
+      title: t('common.confirm'),
+      message: '¿Eliminar foto de perfil?',
+      type: 'confirm',
+      buttons: [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.delete'), style: 'destructive', onPress: () => setEditProfileImage('__remove__') },
+      ],
+    });
   };
 
   /**
@@ -343,6 +410,11 @@ export const useSettingsLogic = () => {
 
     try {
       const thresholdNum = Number(threshold);
+      const profileImagePayload = editProfileImage === '__remove__'
+        ? { profile_image: null }
+        : editProfileImage
+          ? { profile_image: editProfileImage }
+          : {};
       await updateUserProfile({
         name: editName,
         lastname: editLastname,
@@ -354,6 +426,7 @@ export const useSettingsLogic = () => {
         active_grading_version_id: active_version_id,
         ...(!isNaN(thresholdNum) ? { approval_threshold: thresholdNum } : {}),
         ...(!profile?.share_pin && editPin.trim() ? { share_pin: editPin.trim().toUpperCase() } : {}),
+        ...profileImagePayload,
       });
       setIsEditProfileVisible(false);
       alertRef.show({ title: t('common.success'), message: t('account.profileUpdated'), type: 'success' });
@@ -560,6 +633,15 @@ export const useSettingsLogic = () => {
     }
   };
 
+  const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cachedLocal = cacheService.getLocalProfileImage();
+    if (cachedLocal) {
+      setLocalProfileImageUri(cachedLocal);
+    }
+  }, [profile?.profile_image]);
+
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
     const last = profile?.lastname?.trim() || '';
@@ -568,7 +650,7 @@ export const useSettingsLogic = () => {
 
   const profileName = fullName || profile?.username || t('account.profileName');
   const profileEmail = profile?.email || t('account.profileEmail');
-  const profileAvatarUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileName)}&background=EDEEF2&color=111111&bold=true`;
+  const profileAvatarUri = localProfileImageUri || profile?.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileName)}&background=EDEEF2&color=111111&bold=true`;
 
   return {
     t,
@@ -577,6 +659,7 @@ export const useSettingsLogic = () => {
     profileName,
     profileEmail,
     profileAvatarUri,
+    localProfileImageUri,
     threshold,
     setThreshold,
     gradingSystems,
@@ -614,6 +697,11 @@ export const useSettingsLogic = () => {
     setEditStudyGoal,
     editPin,
     setEditPin,
+    editProfileImage,
+    setEditProfileImage,
+    isUploadingPhoto,
+    handlePickProfilePhoto,
+    handleRemoveProfilePhoto,
     isChangePasswordVisible,
     setIsChangePasswordVisible,
     currentPassword,
@@ -677,6 +765,16 @@ export const useSettingsLogic = () => {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }
     },
+    handleDeleteTerm: async (id: number, name: string) => {
+      try {
+        await deleteGradingPeriod(id);
+        const periods = await getGradingPeriods();
+        setGradingPeriods(periods);
+        alertRef.show({ title: t('common.success'), message: `Período "${name}" eliminado`, type: 'success' });
+      } catch (error: any) {
+        alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+      }
+    },
     handleSaveOverrides: async (overrides: any[]) => {
       try {
         await saveThresholdOverrides(overrides);
@@ -697,12 +795,22 @@ export const useSettingsLogic = () => {
       }
     },
     handleTwoFactorEnable: async () => {
-      const result = await apiEnableTwoFactor();
-      setTwoFactorEnabled(result.enabled);
+      try {
+        const result = await apiEnableTwoFactor();
+        setTwoFactorEnabled(result.enabled);
+        alertRef.show({ title: t('common.success'), message: 'Autenticación de dos factores activada', type: 'success' });
+      } catch (error: any) {
+        alertRef.show({ title: t('common.error'), message: error.message || 'Error al activar 2FA', type: 'error' });
+      }
     },
     handleTwoFactorDisable: async () => {
-      const result = await apiDisableTwoFactor();
-      setTwoFactorEnabled(result.enabled);
+      try {
+        const result = await apiDisableTwoFactor();
+        setTwoFactorEnabled(result.enabled);
+        alertRef.show({ title: t('common.success'), message: 'Autenticación de dos factores desactivada', type: 'success' });
+      } catch (error: any) {
+        alertRef.show({ title: t('common.error'), message: error.message || 'Error al desactivar 2FA', type: 'error' });
+      }
     },
     handleAddLms: async (platform: string, url: string, username: string) => {
       try {

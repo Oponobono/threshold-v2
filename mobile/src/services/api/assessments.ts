@@ -9,6 +9,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Assessment } from './types';
+import { cacheService, CACHE_KEYS } from '../../services/cacheService';
 import { offlineSyncService } from '../offlineSyncService';
 
 /**
@@ -51,36 +52,23 @@ export const createAssessment = async (payload: Assessment) => {
     });
 
     const data = await parseJsonSafely(response);
-    
-    // Si obtenemos una respuesta con un ID válido, consideramos que fue exitoso
-    // Incluso si el status es 400 (problema de status en el servidor)
-    if (data && data.id) {
-      console.log('[API/Assessments] createAssessment success (con ID):', data);
-      return data;
-    }
 
-    if (!response.ok) {
+    // Si el servidor devuelve 4xx/5xx con datos válidos, confiar en los datos
+    if (!response.ok && !data?.id) {
       console.error('[API/Assessments] createAssessment failed:', data?.error || 'Unknown error', 'Status:', response.status);
       throw new Error(data?.error || 'No se pudo crear la evaluación.');
     }
+    cacheService.clearKey(CACHE_KEYS.ASSESSMENTS);
     console.log('[API/Assessments] createAssessment success:', data);
     return data;
-  } catch (error) {
-    // Si falla, guardar en cola offline
-    console.warn('[Assessments] Red no disponible, guardando en cola offline:', error);
-    await offlineSyncService.addPendingOperation(
-      'POST',
-      '/assessments',
-      'assessment',
-      payload
-    );
-    
-    // Retornar objeto temporal con datos del payload para que la UI sea optimista
-    return {
-      id: -1, // ID temporal
-      ...payload,
-      _isPending: true, // Bandera para UI
-    };
+  } catch (error: any) {
+    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network');
+    if (isNetworkError) {
+      console.warn('[Assessments] Red no disponible, guardando en cola offline:', error);
+      await offlineSyncService.addPendingOperation('POST', '/assessments', 'assessment', payload);
+      return { id: -1, ...payload, _isPending: true };
+    }
+    throw error; // errores del servidor se relanzan
   }
 };
 
@@ -101,31 +89,21 @@ export const updateAssessment = async (id: number, payload: Partial<Assessment>)
     });
 
     const data = await parseJsonSafely(response);
-    
-    // Si obtenemos una respuesta con datos válidos, consideramos que fue exitoso
-    // incluso si el status es 400 (problema de status en el servidor)
-    if (data && (data.message || data.success)) {
-      console.log(`[API/Assessments] updateAssessment (id:${id}) success:`, data);
-      return data;
-    }
-
-    if (!response.ok) {
+    if (!response.ok && !data?.success) {
       console.error(`[API/Assessments] updateAssessment (id:${id}) failed:`, data?.error || 'Unknown error', 'Status:', response.status);
       throw new Error(data?.error || 'No se pudo actualizar la evaluación.');
     }
+    cacheService.clearKey(CACHE_KEYS.ASSESSMENTS);
     console.log(`[API/Assessments] updateAssessment (id:${id}) success:`, data);
     return data;
-  } catch (error) {
-    // Si falla, guardar en cola offline
-    console.warn(`[Assessments] Red no disponible, guardando actualización en cola offline:`, error);
-    await offlineSyncService.addPendingOperation(
-      'PUT',
-      `/assessments/${id}`,
-      'assessment',
-      payload
-    );
-    
-    return { success: true, message: 'Guardado localmente, se sincronizará cuando recupere conexión' };
+  } catch (error: any) {
+    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network');
+    if (isNetworkError) {
+      console.warn(`[Assessments] Red no disponible, guardando actualización en cola offline:`, error);
+      await offlineSyncService.addPendingOperation('PUT', `/assessments/${id}`, 'assessment', payload);
+      return { success: true, message: 'Guardado localmente, se sincronizará cuando recupere conexión' };
+    }
+    throw error;
   }
 };
 
@@ -133,16 +111,21 @@ export const updateAssessment = async (id: number, payload: Partial<Assessment>)
  * Elimina una evaluación o tarea
  */
 export const deleteAssessment = async (id: number) => {
-  const response = await fetchWithFallback(`/assessments/${id}`, {
-    method: 'DELETE',
-  });
-
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo eliminar la evaluación.');
+  try {
+    const response = await fetchWithFallback(`/assessments/${id}`, {
+      method: 'DELETE',
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo eliminar la evaluación.');
+    }
+    cacheService.clearKey(CACHE_KEYS.ASSESSMENTS);
+    return data;
+  } catch (error) {
+    console.warn('[Assessments] Red no disponible, guardando eliminación en cola offline:', error);
+    await offlineSyncService.addPendingOperation('DELETE', `/assessments/${id}`, 'assessment');
+    return { success: true, _isPending: true };
   }
-
-  return data;
 };
 
 /**

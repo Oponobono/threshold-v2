@@ -94,10 +94,22 @@ export const savePredictionsToCache = async (predictions: any) => {
 /**
  * Carga predicciones del cache
  */
+const PREDICTIONS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
+
 export const loadPredictionsFromCache = async () => {
   try {
-    const cached = await AsyncStorage.getItem(PREDICTIONS_CACHE_KEY);
+    const [cached, timestamp] = await Promise.all([
+      AsyncStorage.getItem(PREDICTIONS_CACHE_KEY),
+      AsyncStorage.getItem(PREDICTIONS_TIMESTAMP_KEY),
+    ]);
     if (cached) {
+      if (timestamp) {
+        const age = Date.now() - new Date(timestamp).getTime();
+        if (age > PREDICTIONS_CACHE_TTL_MS) {
+          console.log(`[PredictionsCache] Cache expirado (${Math.round(age / 60000)}min > 30min), ignorando`);
+          return null;
+        }
+      }
       console.log(`[PredictionsCache] Predicciones cargadas del cache`);
       return JSON.parse(cached);
     }

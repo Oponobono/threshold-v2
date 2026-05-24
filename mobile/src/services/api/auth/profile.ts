@@ -1,11 +1,39 @@
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { UserProfile } from '../types';
 import { getUserId } from './session';
+import { cacheService } from '../../cacheService';
+import { downloadProfileImage, clearProfileImageCache } from '../../profileImageCache';
 
 /**
- * Obtiene el perfil del usuario actual
+ * Obtiene el perfil del usuario actual con caché persistente.
+ * Cache-first: devuelve datos cacheados instantáneamente,
+ * luego refresca desde el servidor en segundo plano.
  */
 export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
+  const freshProfile = await fetchProfileFromServer();
+  if (freshProfile) {
+    await cacheService.saveProfile(freshProfile);
+    if (freshProfile.profile_image) {
+      await downloadProfileImage(freshProfile.profile_image);
+    }
+    return freshProfile;
+  }
+
+  const cached = cacheService.loadProfileSync() as UserProfile | null;
+  if (cached) return cached;
+
+  return null;
+};
+
+/**
+ * Obtiene el perfil desde caché síncrona (sin red).
+ * Útil para hidratación instantánea de UI.
+ */
+export const getCurrentUserProfileSync = (): UserProfile | null => {
+  return cacheService.loadProfileSync() as UserProfile | null;
+};
+
+const fetchProfileFromServer = async (): Promise<UserProfile | null> => {
   const userId = await getUserId();
   if (!userId) return null;
 
@@ -29,6 +57,7 @@ export const updateUserProfile = async (payload: {
   approval_threshold?: number;
   active_grading_version_id?: number | null;
   grading_scale?: string;
+  profile_image?: string | null;
 }) => {
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');
@@ -43,6 +72,21 @@ export const updateUserProfile = async (payload: {
   if (!response.ok) {
     throw new Error(data?.error || 'Error al actualizar el perfil');
   }
+
+  const hasImagePayload = 'profile_image' in payload;
+  if (hasImagePayload) {
+    if (payload.profile_image === null || payload.profile_image === undefined) {
+      await clearProfileImageCache();
+    } else {
+      await downloadProfileImage(payload.profile_image);
+    }
+  }
+
+  const freshProfile = await fetchProfileFromServer();
+  if (freshProfile) {
+    await cacheService.saveProfile(freshProfile);
+  }
+
   return data;
 };
 

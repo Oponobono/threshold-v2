@@ -122,6 +122,10 @@ export default function SettingsScreen() {
     setEditStudyGoal,
     editPin,
     setEditPin,
+    editProfileImage,
+    isUploadingPhoto,
+    handlePickProfilePhoto,
+    handleRemoveProfilePhoto,
     isChangePasswordVisible,
     setIsChangePasswordVisible,
     currentPassword,
@@ -793,6 +797,7 @@ export default function SettingsScreen() {
         editSemester={editSemester}
         editStudyGoal={editStudyGoal}
         editPin={editPin}
+        editProfileImage={editProfileImage}
         gradingSystems={gradingSystems}
         selectedSystemId={selectedSystemId}
         onSystemSelect={(id) => setSelectedSystemId(id)}
@@ -804,8 +809,11 @@ export default function SettingsScreen() {
         onSemesterChange={setEditSemester}
         onStudyGoalChange={setEditStudyGoal}
         onPinChange={setEditPin}
+        onPickPhoto={handlePickProfilePhoto}
+        onRemovePhoto={handleRemoveProfilePhoto}
         onClose={() => setIsEditProfileVisible(false)}
         onSave={handleSaveProfile}
+        isUploadingPhoto={isUploadingPhoto}
       />
 
       <ChangePasswordModal

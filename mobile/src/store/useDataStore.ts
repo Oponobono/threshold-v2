@@ -6,7 +6,8 @@ import {
   getGalleryItems, getPhotosBySubject,
   getAudioRecordings,
   getFlashcardDecks, getFlashcardDecksWithMetrics, getFlashcards, getFlashcardsPrioritized, getCardsNotSnoozed,
-  getScannedDocumentsBySubject
+  getScannedDocumentsBySubject,
+  fetchWithFallback,
 } from '../services/api';
 import { loadPredictionsFromCache, savePredictionsToCache } from '../hooks/usePredictionPolling';
 import { cacheService } from '../services/cacheService';
@@ -156,10 +157,10 @@ export const useDataStore = create<DataState>((set, get) => ({
       const data = await getAllSchedules();
       if (data) {
         set({ schedules: data });
+        await cacheService.saveSchedules(data);
       }
     } catch (error) {
       console.error('Error refreshing schedules:', error);
-      // No setear datos vacíos si falla - mantener los existentes
     }
   },
 
@@ -235,34 +236,32 @@ export const useDataStore = create<DataState>((set, get) => ({
 
       // Descargar y cachear dependencias de subjects (Fotos por materia y Documentos)
       if (subjectsToProcess && subjectsToProcess.length > 0) {
-        for (const sub of subjectsToProcess) {
+        await Promise.all(subjectsToProcess.map(async (sub) => {
           const [photos, docs] = await Promise.all([
             getPhotosBySubject(sub.id).catch(() => []),
             getScannedDocumentsBySubject(sub.id).catch(() => [])
           ]);
-          // Guardar en caché
           await Promise.all([
             cacheService.savePhotosBySubject(sub.id, photos || []),
             cacheService.saveScannedDocumentsBySubject(sub.id, docs || [])
           ]);
-        }
+        }));
       }
 
       // Descargar y cachear dependencias de mazos (Flashcards)
       if (decks && decks.length > 0) {
-        for (const deck of decks) {
+        await Promise.all(decks.map(async (deck) => {
           const [cards, prioritized, notSnoozed] = await Promise.all([
             getFlashcards(deck.id).catch(() => []),
             getFlashcardsPrioritized(deck.id).catch(() => []),
             getCardsNotSnoozed(deck.id).catch(() => [])
           ]);
-          // Guardar en caché
           await Promise.all([
             cacheService.saveFlashcardsByDeck(deck.id, cards || []),
             cacheService.saveFlashcardsPrioritizedByDeck(deck.id, prioritized || []),
             cacheService.saveCardsNotSnoozedByDeck(deck.id, notSnoozed || [])
           ]);
-        }
+        }));
       }
 
       console.log('[Cache] ✅ Pre-descarga completada y datos cacheados.');
@@ -292,8 +291,6 @@ export const useDataStore = create<DataState>((set, get) => ({
       console.log('[DataStore] 🔄 Sincronizando operaciones offline pendientes...');
       
       // Importar fetch desde el cliente
-      const { fetchWithFallback } = await import('../services/api/client');
-      
       // Sincronizar todas las operaciones pendientes
       const result = await offlineSyncService.syncPendingOperations(fetchWithFallback);
       

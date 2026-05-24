@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +31,8 @@ interface EditProfileModalProps {
   editSemester: string;
   editStudyGoal: string;
   editPin: string;
+  editProfileImage: string | null;
+  isUploadingPhoto?: boolean;
   onNameChange: (val: string) => void;
   onLastnameChange: (val: string) => void;
   onUsernameChange: (val: string) => void;
@@ -38,6 +41,8 @@ interface EditProfileModalProps {
   onSemesterChange: (val: string) => void;
   onStudyGoalChange: (val: string) => void;
   onPinChange: (val: string) => void;
+  onPickPhoto: () => void;
+  onRemovePhoto: () => void;
   onClose: () => void;
   onSave: () => void;
 }
@@ -125,6 +130,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   onMajorChange,
   onSemesterChange,
   onStudyGoalChange,
+  editProfileImage,
+  isUploadingPhoto,
+  onPickPhoto,
+  onRemovePhoto,
   onPinChange,
   onClose,
   onSave,
@@ -184,21 +193,38 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               borderBottomColor: theme.colors.border,
             }}>
               {/* Avatar + nombre actual */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                {profile?.profile_image ? (
-                  <Image
-                    source={{ uri: profile.profile_image }}
-                    style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: theme.colors.border }}
-                  />
-                ) : (
-                  <View style={{
-                    width: 36, height: 36, borderRadius: 18,
-                    backgroundColor: theme.colors.primary + '20',
-                    alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Ionicons name="person" size={18} color={theme.colors.primary} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <TouchableOpacity onPress={onPickPhoto} activeOpacity={0.7}>
+                  <View style={{ position: 'relative' }}>
+                    {editProfileImage || profile?.profile_image ? (
+                      <Image
+                        source={{ uri: editProfileImage || profile?.profile_image! }}
+                        style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1.5, borderColor: theme.colors.border }}
+                      />
+                    ) : (
+                      <View style={{
+                        width: 48, height: 48, borderRadius: 24,
+                        backgroundColor: theme.colors.primary + '15',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Ionicons name="person" size={22} color={theme.colors.primary} />
+                      </View>
+                    )}
+                    <View style={{
+                      position: 'absolute', bottom: -2, right: -2,
+                      width: 22, height: 22, borderRadius: 11,
+                      backgroundColor: theme.colors.primary,
+                      alignItems: 'center', justifyContent: 'center',
+                      borderWidth: 2, borderColor: theme.colors.background,
+                    }}>
+                      {isUploadingPhoto ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <Ionicons name="camera" size={12} color="#FFF" />
+                      )}
+                    </View>
                   </View>
-                )}
+                </TouchableOpacity>
                 <View>
                   <Text style={{ fontSize: 15, fontWeight: '800', color: theme.colors.text.primary }}>
                     {t('settings.editProfile', 'Editar Perfil')}
@@ -206,6 +232,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <Text style={{ fontSize: 11, color: theme.colors.text.secondary }}>
                     {profile?.email || ''}
                   </Text>
+                  <TouchableOpacity onPress={onPickPhoto}>
+                    <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600', marginTop: 2 }}>
+                      {t('settings.changePhoto', 'Cambiar foto')}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -221,6 +252,23 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <Ionicons name="close" size={16} color={theme.colors.text.secondary} />
               </TouchableOpacity>
             </View>
+
+            {/* Remove photo button */}
+            {(editProfileImage || profile?.profile_image) ? (
+              <TouchableOpacity
+                onPress={onRemovePhoto}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  paddingVertical: 10, marginHorizontal: 20, marginTop: 4,
+                  borderRadius: 8, backgroundColor: theme.colors.danger + '10',
+                }}
+              >
+                <Ionicons name="trash-outline" size={14} color={theme.colors.danger} />
+                <Text style={{ fontSize: 12, color: theme.colors.danger, fontWeight: '600' }}>
+                  {t('settings.removePhoto', 'Eliminar foto')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             {/* Scrollable body */}
             <ScrollView

@@ -10,7 +10,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { FlashcardDeck, Flashcard } from './types';
-import { cacheService } from '../../services/cacheService';
+import { cacheService, CACHE_KEYS } from '../../services/cacheService';
 
 /** Obtiene todos los mazos del usuario autenticado, incluyendo los recibidos por colaboración */
 export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
@@ -159,6 +159,9 @@ export const createFlashcard = async (payload: { deck_id: number; front: string;
   });
   const data = await parseJsonSafely(response);
   if (!response.ok) throw new Error(data?.error || 'Error al crear tarjeta');
+  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id);
+  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + payload.deck_id);
+  cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + payload.deck_id);
   return data;
 };
 
@@ -177,6 +180,9 @@ export const createEvaluationItem = async (payload: {
   });
   const data = await parseJsonSafely(response);
   if (!response.ok) throw new Error(data?.error || 'Error al crear ítem');
+  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id);
+  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + payload.deck_id);
+  cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + payload.deck_id);
   return data;
 };
 
@@ -262,6 +268,11 @@ export const deleteFlashcardDeck = async (deckId: number) => {
   });
   const data = await parseJsonSafely(response);
   if (!response.ok) throw new Error(data?.error || 'Error al eliminar el mazo');
+  cacheService.clearKey(CACHE_KEYS.FLASHCARD_DECKS);
+  cacheService.clearKey(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS);
+  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + deckId);
+  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + deckId);
+  cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + deckId);
   return data;
 };
 
@@ -392,5 +403,8 @@ export const deleteFlashcard = async (cardId: number) => {
   });
   const data = await parseJsonSafely(response);
   if (!response.ok) throw new Error(data?.error || 'Error al eliminar la tarjeta');
+  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK);
+  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK);
+  cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK);
   return data;
 };

@@ -8,6 +8,7 @@
  */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
+import { cacheService, CACHE_KEYS } from '../../services/cacheService';
 import { offlineSyncService } from '../offlineSyncService';
 
 /**
@@ -39,6 +40,7 @@ export const createSchedule = async (payload: { subject_id: number, day_of_week:
       throw new Error(data?.error || 'No se pudo crear el horario.');
     }
 
+    cacheService.clearKey(CACHE_KEYS.SCHEDULES);
     return data;
   } catch (error) {
     // Si falla, guardar en cola offline
@@ -63,7 +65,19 @@ export const createSchedule = async (payload: { subject_id: number, day_of_week:
  * Elimina un horario
  */
 export const deleteSchedule = async (id: number) => {
-  return await fetchWithFallback(`/schedules/${id}`, { method: 'DELETE' });
+  try {
+    const response = await fetchWithFallback(`/schedules/${id}`, { method: 'DELETE' });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo eliminar el horario.');
+    }
+    cacheService.clearKey(CACHE_KEYS.SCHEDULES);
+    return data;
+  } catch (error) {
+    console.warn('[Schedules] Red no disponible, guardando eliminación en cola offline:', error);
+    await offlineSyncService.addPendingOperation('DELETE', `/schedules/${id}`, 'schedule');
+    return { success: true, _isPending: true };
+  }
 };
 
 /**
@@ -86,5 +100,9 @@ export const getAllSchedules = async (): Promise<any[]> => {
     throw new Error(errorData?.error || 'Error al obtener horarios.');
   }
   const data = await parseJsonSafely(response);
-  return Array.isArray(data) ? data : [];
+  if (Array.isArray(data)) {
+    cacheService.saveSchedules(data);
+    return data;
+  }
+  return [];
 };
