@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
@@ -11,6 +11,8 @@ interface SubjectThresholdProps {
   finalNeededText: string;
   subjectColor?: string;
   status?: 'safe' | 'caution' | 'risk';
+  objectiveGrade?: number | null;
+  onPressInfo?: () => void;
 }
 
 /**
@@ -32,12 +34,14 @@ export const SubjectThreshold: React.FC<SubjectThresholdProps> = ({
   finalNeededText,
   subjectColor,
   status = 'safe',
+  objectiveGrade,
+  onPressInfo,
 }) => {
   const { t } = useTranslation();
   const clampedPct = Math.max(0, Math.min(100, Math.round(securedPercent)));
   const statusColor = getStatusColor(status);
   const accentColor = subjectColor || statusColor;
-  const darkAccentColor = darkenColor(accentColor, 40); // 40% darker for high contrast text
+  const darkAccentColor = darkenColor(accentColor, 40);
 
   const renderHighlightedText = (text: string) => {
     if (!text) return null;
@@ -54,19 +58,36 @@ export const SubjectThreshold: React.FC<SubjectThresholdProps> = ({
     });
   };
 
+  const buildNeededText = () => {
+    let text = finalNeededText;
+    if (objectiveGrade) {
+      text += ` para alcanzar tu Threshold de ${objectiveGrade}`;
+    }
+    return text;
+  };
+
   return (
     <View style={styles.card}>
-      {/* Top row: label + status pill */}
+      {/* Top row: label + status pill + info button */}
       <View style={styles.topRow}>
         <View style={styles.labelGroup}>
-          <Text style={styles.eyebrow}>{t('subjects.thresholdTitle')}</Text>
+          <Text style={styles.eyebrow}>THRESHOLD</Text>
         </View>
 
-        <View style={[styles.statusPill, { backgroundColor: `${statusColor}26` }]}>
-          <MaterialCommunityIcons name={getStatusIcon(status) as any} size={13} color={statusColor} />
-          <Text style={[styles.statusPillText, { color: statusColor }]}>
-            {getStatusLabel(status, t)}
-          </Text>
+        <View style={styles.rightControls}>
+          <View style={[styles.statusPill, { backgroundColor: `${statusColor}26` }]}>
+            <MaterialCommunityIcons name={getStatusIcon(status) as any} size={13} color={statusColor} />
+            <Text style={[styles.statusPillText, { color: statusColor }]}>
+              {getStatusLabel(status, t)}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={onPressInfo}
+            style={styles.infoButton}
+          >
+            <MaterialCommunityIcons name="information-outline" size={16} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -93,7 +114,7 @@ export const SubjectThreshold: React.FC<SubjectThresholdProps> = ({
             <Text style={styles.neededTitle}>{t('subjects.neededLabel')}</Text>
           </View>
           <Text style={[styles.neededValue, { color: theme.colors.text.primary }]}>
-            {renderHighlightedText(finalNeededText)}
+            {renderHighlightedText(buildNeededText())}
           </Text>
         </View>
       </View>

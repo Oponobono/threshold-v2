@@ -54,21 +54,21 @@ export const ExplanationOverlay: React.FC<Props> = ({
         s.floatingBox, 
         { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }
       ]}>
-        <TouchableOpacity activeOpacity={1} onPress={onDismiss} style={s.explanationBox}>
+        <View style={s.explanationBox}>
           <Ionicons name="information-circle" size={18} color={theme.colors.info} style={{ marginTop: 2 }} />
           <View style={{ flex: 1 }}>
             <Text style={s.explanationTitle}>¿Por qué?</Text>
-            <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
+            <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
               <MarkdownWithCode style={{ body: { fontSize: 14, lineHeight: 21, color: theme.colors.text.primary } }}>
                 {explanation}
               </MarkdownWithCode>
             </ScrollView>
-            <View style={s.tapHint}>
+            <TouchableOpacity onPress={onDismiss} activeOpacity={0.7} style={s.tapHint}>
               <Text style={s.tapHintText}>Toca para continuar</Text>
               <Ionicons name="chevron-forward" size={10} color={theme.colors.text.placeholder} />
-            </View>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Animated.View>
     </View>
   );
@@ -80,19 +80,21 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
-    zIndex: 999,
+    zIndex: 9999,
+    elevation: 9999,
+    pointerEvents: 'box-none',
   },
   floatingBox: {
     width: '100%',
-    maxHeight: SCREEN_HEIGHT * 0.7,
+    maxHeight: SCREEN_HEIGHT * 0.8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 10,
+    elevation: 9999,
   },
   scroll: {
-    maxHeight: SCREEN_HEIGHT * 0.5,
+    maxHeight: SCREEN_HEIGHT * 0.65,
   },
   explanationBox: {
     flexDirection: 'row',

@@ -171,35 +171,4 @@ export const getProjectionAnalytics = async (subjectId: number) => {
   }
 };
 
-/**
- * Obtiene GPA global del usuario (promedio ponderado de TODAS las materias)
- * Usado en la vista de Grades para mostrar semestre y acumulado
- */
-export const getGlobalGPAAnalytics = async () => {
-  try {
-    const userId = await getUserId();
-    if (!userId) throw new Error('Usuario no autenticado');
 
-    const url = `/analytics/global/gpa/${userId}`;
-    console.log(`[API/Assessments] 🚀 Llamando getGlobalGPAAnalytics con URL:`, url);
-    
-    const response = await fetchWithFallback(url);
-    const data = await parseJsonSafely(response);
-    
-    if (!response.ok) {
-      console.warn(`[API/Assessments] ❌ Error al obtener GPA global:`, data?.error);
-      return null;
-    }
-    
-    console.log(`[API/Assessments] ✅ GPA global obtenido:`, {
-      currentAverage: data.currentAverage,
-      projectedGrade: data.projectedGrade,
-      delta: data.delta,
-      evaluatedWeight: data.evaluatedWeight,
-    });
-    return data;
-  } catch (error) {
-    console.warn(`[API/Assessments] ❌ Exception en getGlobalGPAAnalytics:`, error instanceof Error ? error.message : String(error));
-    return null;
-  }
-};

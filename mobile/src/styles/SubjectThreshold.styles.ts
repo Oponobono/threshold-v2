@@ -24,6 +24,14 @@ export const thresholdStyles = StyleSheet.create({
   labelGroup: {
     flex: 1,
   },
+  rightControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoButton: {
+    padding: 8,
+  },
   eyebrow: {
     fontSize: 13,
     fontWeight: '800',
@@ -59,19 +67,19 @@ export const thresholdStyles = StyleSheet.create({
     minWidth: 72,
   },
   percentValue: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '800',
     letterSpacing: -1.5,
-    lineHeight: 40,
+    lineHeight: 36,
   },
   percentSign: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0,
   },
   percentLabel: {
     marginTop: 2,
-    fontSize: 11,
+    fontSize: 10,
     color: theme.colors.text.secondary,
     fontWeight: '600',
     textTransform: 'lowercase',
@@ -105,10 +113,10 @@ export const thresholdStyles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   neededValue: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '500',
     letterSpacing: -0.1,
-    lineHeight: 22,
+    lineHeight: 20,
     textAlign: 'justify',
   },
   trackWrap: {

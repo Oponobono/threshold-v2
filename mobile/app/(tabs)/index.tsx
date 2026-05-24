@@ -42,7 +42,7 @@ export default function HybridDashboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(() => {
-    try { return cacheService.loadProfileSync(); } catch { return null; }
+    try { return cacheService.loadProfileSync() as UserProfile | null; } catch { return null; }
   });
   const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(() => {
     try { return cacheService.getLocalProfileImage(); } catch { return null; }

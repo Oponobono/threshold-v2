@@ -27,6 +27,7 @@ export type UserProfile = {
   display_name?: string | null;
   profile_image?: string | null;  // URL de Uploadthing
   approval_threshold?: number | null;
+  grading_scale?: string | null;
 };
 
 /** Materia académica del usuario (curso o asignatura) */
@@ -189,6 +190,8 @@ export interface AudioRecording {
   summary_uri?: string;
   cloud_url?: string | null;       // URL de Uploadthing del audio
   is_backed_up?: number;           // 0 = solo local, 1 = respaldado
+  id_string?: string;              // ID como string (devuelto por API)
+  uri?: string;                    // Alias de local_uri (compatibilidad)
 }
 
 /** Video de YouTube enlazado con sus rutas locales de transcripción y resumen */

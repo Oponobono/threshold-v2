@@ -29,7 +29,7 @@ export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
   } catch (error) {
     // Fallback to cache on error
     console.warn('[Flashcards] Network error, attempting to load from cache:', error);
-    const cached = await cacheService.loadFlashcardDecks();
+    const cached: FlashcardDeck[] | null = await cacheService.loadFlashcardDecks() as FlashcardDeck[] | null;
     if (cached) {
       console.log('[Flashcards] ✅ Loaded decks from cache (offline mode)');
       return cached;
@@ -55,7 +55,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
   } catch (error) {
     // Fallback to cache on error
     console.warn('[Flashcards] Network error, attempting to load metrics from cache:', error);
-    const cached = await cacheService.loadFlashcardDecksWithMetrics();
+    const cached: FlashcardDeck[] | null = await cacheService.loadFlashcardDecksWithMetrics() as FlashcardDeck[] | null;
     if (cached) {
       console.log('[Flashcards] ✅ Loaded decks with metrics from cache (offline mode)');
       return cached;
@@ -107,7 +107,7 @@ export const getFlashcards = async (deckId: number): Promise<Flashcard[]> => {
   } catch (error) {
     // Fallback to cache on error
     console.warn(`[Flashcards] Network error getting cards for deck ${deckId}, attempting cache:`, error);
-    const cached = await cacheService.loadFlashcardsByDeck(deckId);
+    const cached: Flashcard[] | null = await cacheService.loadFlashcardsByDeck(deckId) as Flashcard[] | null;
     if (cached) {
       console.log(`[Flashcards] ✅ Loaded ${cached.length} cards from cache (offline mode)`);
       return cached;
@@ -133,7 +133,7 @@ export const getFlashcardsPrioritized = async (deckId: number): Promise<Flashcar
   } catch (error) {
     // Fallback to cache on error
     console.warn(`[Flashcards] Network error getting prioritized cards for deck ${deckId}, attempting cache:`, error);
-    const cached = await cacheService.loadFlashcardsPrioritizedByDeck(deckId);
+    const cached: Flashcard[] | null = await cacheService.loadFlashcardsPrioritizedByDeck(deckId) as Flashcard[] | null;
     if (cached) {
       console.log(`[Flashcards] ✅ Loaded ${cached.length} prioritized cards from cache (offline mode)`);
       return cached;
@@ -372,7 +372,7 @@ export const getCardsNotSnoozed = async (deckId: number): Promise<Flashcard[]> =
   } catch (error) {
     // Fallback to cache on error
     console.warn(`[Flashcards] Network error getting non-snoozed cards for deck ${deckId}, attempting cache:`, error);
-    const cached = await cacheService.loadCardsNotSnoozedByDeck(deckId);
+    const cached: Flashcard[] | null = await cacheService.loadCardsNotSnoozedByDeck(deckId) as Flashcard[] | null;
     if (cached) {
       console.log(`[Flashcards] ✅ Loaded ${cached.length} non-snoozed cards from cache (offline mode)`);
       return cached;

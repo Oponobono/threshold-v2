@@ -12,7 +12,7 @@ export const gradesStyles = StyleSheet.create({
     borderRadius: theme.borderRadius.full, borderWidth: 1, borderColor: theme.colors.border,
   },
   termText: { fontSize: theme.typography.sizes.sm, fontWeight: '600', color: theme.colors.text.primary },
-  filtersContainer: { padding: theme.spacing.md, gap: 8 },
+  filtersContainer: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.sm, gap: 8 },
   filterRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   filterPill: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4,
@@ -46,9 +46,7 @@ export const gradesStyles = StyleSheet.create({
   section: { gap: 12 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   projectionHeaderRow: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   sectionTitle: { fontSize: theme.typography.sizes.md, fontWeight: '800', color: theme.colors.text.primary },
   addBtn: {
@@ -219,4 +217,75 @@ export const gradesStyles = StyleSheet.create({
     minWidth: 105,
   },
   smallBadgeText: { color: theme.colors.text.primary, fontWeight: '700', fontSize: 11 },
+
+  // Header actions
+  headerActionBtn: { marginLeft: 10 },
+
+  // Subject filter bar
+  subjectFilterContent: { paddingHorizontal: 20, paddingVertical: 6, gap: 6, alignItems: 'center' },
+  subjectFilterChip: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, alignSelf: 'center',
+    paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
+  },
+  subjectFilterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  subjectFilterChipText: { fontSize: 13, fontWeight: '500', color: theme.colors.text.secondary, letterSpacing: -0.1 },
+  subjectFilterChipTextActive: { fontWeight: '700', color: theme.colors.white },
+
+  // GPA metrics
+  gpaMetricLabel: {
+    fontSize: 11, color: theme.colors.text.secondary, marginBottom: 8,
+    fontWeight: '600', textTransform: 'uppercase', textAlign: 'center',
+  },
+  gpaMetricValue: { fontSize: 44, fontWeight: '900', color: theme.colors.text.primary, letterSpacing: -1, lineHeight: 44 },
+  gpaDivider: { width: 1, height: 50, backgroundColor: theme.colors.border },
+
+  // Scale badge
+  scaleBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: theme.colors.inputBackground,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border,
+  },
+  scaleBadgeText: { fontSize: 10, fontWeight: '700', color: theme.colors.text.secondary },
+
+  // Projected meta
+  projectedMetaRow: { alignItems: 'center', marginBottom: 12 },
+  projectedMetaText: { fontSize: 10, color: theme.colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' },
+
+  // Sparkline
+  sparklineRow: { flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 4 },
+  sparklineBar: { flex: 1, borderRadius: 2 },
+  sparklineBarPlaceholder: {
+    flex: 1, backgroundColor: theme.colors.text.secondary,
+    opacity: 0.1, borderRadius: 2, height: '30%',
+  },
+
+  // Assessment list item
+  assessItem: {
+    padding: 16, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+  },
+  assessItemLast: { borderBottomWidth: 0 },
+  assessItemPending: { opacity: 0.6 },
+  assessInfo: { flex: 1 },
+  assessNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  assessPendingBadge: { backgroundColor: theme.colors.warning, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  assessPendingText: { fontSize: 9, fontWeight: '600', color: '#FFF' },
+  assessMeta: { fontSize: 11, color: theme.colors.text.secondary, fontWeight: '500' },
+  assessScoreWrap: { alignItems: 'flex-end', justifyContent: 'center' },
+  assessScore: { fontSize: 16, fontWeight: '800' },
+  assessPct: { fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600', marginTop: 1, textTransform: 'uppercase' },
+  assessStatus: { fontSize: 12, fontWeight: '600' },
+
+  // Action cards
+  actionCardContent: { flexDirection: 'column', flex: 1, gap: 4 },
+  actionCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  // Section actions
+  sectionActions: { flexDirection: 'row' },
+
+  // Empty assessments
+  emptyAssessments: { padding: 32, alignItems: 'center' },
 });

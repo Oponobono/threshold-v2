@@ -13,7 +13,7 @@ interface SubjectStatsProps {
   projectedGrade: number;
   delta?: number;
   deliveredText: string;
-  onPressInfo?: (column: 'average' | 'projected' | 'tasks') => void;
+  onPressInfo?: () => void;
 }
 
 /**
@@ -46,15 +46,22 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
 
   return (
     <View style={globalSectionStyles.sectionBlock}>
-      <Text style={globalSectionStyles.sectionTitle}>
-        {t('analytics.statsTitle', 'Estadísticas')}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={globalSectionStyles.sectionTitle}>
+          {t('analytics.statsTitle', 'Estadísticas')}
+        </Text>
+        {onPressInfo && (
+          <TouchableOpacity onPress={onPressInfo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="information-circle-outline" size={20} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* ── Card único con 3 columnas ─────────────────────────────── */}
       <View style={styles.card}>
 
         {/* Columna 1: Promedio */}
-        <TouchableOpacity activeOpacity={0.8} style={styles.col} onPress={() => onPressInfo?.('average')}>
+        <View style={styles.col}>
           <View style={styles.titleContainer}>
             <Ionicons name="calculator-outline" size={16} color="#007AFF" />
             <Text style={styles.colLabel}>{t('subjects.currentAverage', 'PROMEDIO')}</Text>
@@ -63,13 +70,13 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
             <Text style={styles.colValue}>{formatGrade(averageGrade)}</Text>
             <Text style={styles.colDenominator}>/5.0</Text>
           </View>
-        </TouchableOpacity>
+        </View>
 
         {/* Separador */}
         <View style={styles.separator} />
 
         {/* Columna 2: Proyectada */}
-        <TouchableOpacity activeOpacity={0.8} style={styles.col} onPress={() => onPressInfo?.('projected')}>
+        <View style={styles.col}>
           <View style={styles.titleContainer}>
             <Ionicons 
               name="trending-up" 
@@ -90,13 +97,13 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
               </Text>
             )}
           </View>
-        </TouchableOpacity>
+        </View>
 
         {/* Separador */}
         <View style={styles.separator} />
 
         {/* Columna 3: Tareas */}
-        <TouchableOpacity activeOpacity={0.8} style={styles.col} onPress={() => onPressInfo?.('tasks')}>
+        <View style={styles.col}>
           <View style={styles.titleContainer}>
             <Ionicons name="checkmark-circle" size={16} color="#FF9500" />
             <Text style={styles.colLabel}>{t('subjects.deliveredTasks', 'TAREAS')}</Text>
@@ -140,7 +147,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
             )}
           </View>
           <Text style={styles.tasksSubLabel}>COMPLETADAS</Text>
-        </TouchableOpacity>
+        </View>
 
       </View>
     </View>

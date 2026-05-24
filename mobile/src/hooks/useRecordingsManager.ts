@@ -40,7 +40,7 @@ export const useRecordingsManager = () => {
       console.warn('[useRecordingsManager] ⚠️ Error loading YouTube videos:', e);
       // Intentar cargar desde caché como fallback
       try {
-        const cachedVideos = await cacheService.loadYouTubeVideos();
+        const cachedVideos: YouTubeVideo[] | null = await cacheService.loadYouTubeVideos() as YouTubeVideo[] | null;
         if (cachedVideos && cachedVideos.length > 0) {
           console.log(`[useRecordingsManager] ✅ Cargados ${cachedVideos.length} videos desde caché`);
           setYouTubeVideos(cachedVideos);

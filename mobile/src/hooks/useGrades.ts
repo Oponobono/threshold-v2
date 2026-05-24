@@ -1,0 +1,200 @@
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { InteractionManager } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useDataStore } from '../store/useDataStore';
+import { useSubjectGrades } from './useSubjectGrades';
+import { getUserId, getCurrentUserProfile } from '../services/api/auth';
+import { downloadReport, getGlobalGPAAnalytics } from '../services/api/analytics';
+import { normalizeGrade, parseWeight, SCALE_MAX } from '../utils/grades';
+import { alertRef } from '../components/CustomAlert';
+
+export function useGrades(t: any) {
+  const { subjects, assessments, refreshAssessments } = useDataStore();
+
+  const [profile, setProfile] = useState<any>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [globalGPA, setGlobalGPA] = useState<any>(null);
+  const [isLoadingGlobalGPA, setIsLoadingGlobalGPA] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const [simScore, setSimScore] = useState('');
+  const [simPossible, setSimPossible] = useState('');
+  const [projectedGpa, setProjectedGpa] = useState<string | null>(null);
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [overlayText, setOverlayText] = useState('');
+
+  useEffect(() => {
+    getCurrentUserProfile().then(p => setProfile(p)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    getUserId().then(id => setUserId(id ? Number(id) : null));
+  }, []);
+
+  useEffect(() => {
+    if (selectedSubjectId === null && userId) {
+      setIsLoadingGlobalGPA(true);
+      getGlobalGPAAnalytics()
+        .then(data => setGlobalGPA(data))
+        .catch(err => {
+          console.warn(`[grades.tsx] Failed to fetch global GPA: ${err}`);
+          setGlobalGPA(null);
+        })
+        .finally(() => setIsLoadingGlobalGPA(false));
+    } else {
+      setGlobalGPA(null);
+    }
+  }, [selectedSubjectId, userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const task = InteractionManager.runAfterInteractions(() => {
+        refreshAssessments();
+      });
+      return () => task.cancel();
+    }, [refreshAssessments])
+  );
+
+  const filteredAssessments = useMemo(() => {
+    if (selectedSubjectId === null) return assessments;
+    return assessments.filter(a => a.subject_id === selectedSubjectId);
+  }, [assessments, selectedSubjectId]);
+
+  const selectedSubject = useMemo(() =>
+    subjects.find(s => s.id === selectedSubjectId) || null,
+  [subjects, selectedSubjectId]);
+
+  const {
+    averageGrade,
+    projectedGrade: engineProjectedGrade,
+    securedPercent,
+    deliveredText,
+    thresholdStatus,
+    delta: engineDelta,
+  } = useSubjectGrades(filteredAssessments, selectedSubject, profile);
+
+  const gradedAssessments = useMemo(() =>
+    filteredAssessments.filter((a: any) => normalizeGrade(a) !== null),
+  [filteredAssessments]);
+
+  const evaluatedPercentage = useMemo(() => {
+    return gradedAssessments.reduce((sum, a: any) => sum + (parseWeight(a) || 0), 0);
+  }, [gradedAssessments]);
+
+  const termGpa = averageGrade.toFixed(2);
+
+  const displayGPA = selectedSubjectId === null && globalGPA
+    ? globalGPA.currentAverage?.toFixed(2)
+    : termGpa;
+
+  const displayProjectedGPA = selectedSubjectId === null && globalGPA
+    ? globalGPA.projectedGrade?.toFixed(2)
+    : engineProjectedGrade.toFixed(2);
+
+  const displayDelta = selectedSubjectId === null && globalGPA
+    ? globalGPA.delta
+    : engineDelta;
+
+  const handleRunSimulation = () => {
+    const s = parseFloat(simScore);
+    const w = parseFloat(simPossible);
+    if (isNaN(s) || isNaN(w) || w === 0) {
+      alertRef.show({
+        title: t('common.error'),
+        message: t('common.enterValidScorePossible', 'Ingresa una nota y un peso válido'),
+        type: 'error',
+      });
+      return;
+    }
+    const currentGpaVal = parseFloat(displayGPA) || 0;
+    const currentEvaluated = selectedSubjectId === null && globalGPA
+      ? globalGPA.evaluatedWeight
+      : evaluatedPercentage;
+    const simNormalized = s;
+    if (currentEvaluated === 0) {
+      setProjectedGpa(simNormalized.toFixed(2));
+    } else {
+      const currentPoints = currentGpaVal * (currentEvaluated / 100);
+      const newPoints = currentPoints + (simNormalized * (w / 100));
+      const newEvaluated = currentEvaluated + w;
+      const newGpa = (newPoints / (newEvaluated / 100)).toFixed(2);
+      setProjectedGpa(newGpa);
+    }
+  };
+
+  const handleResetSim = () => {
+    setSimScore('');
+    setSimPossible('');
+    setProjectedGpa(null);
+  };
+
+  const historicalGpas = useMemo(() => {
+    const graded = [...gradedAssessments].sort((a: any, b: any) => {
+      if (a.date && b.date) {
+        try {
+          const [da, ma, ya] = a.date.split('-');
+          const [db, mb, yb] = b.date.split('-');
+          return new Date(`${ya}-${ma}-${da}`).getTime() - new Date(`${yb}-${mb}-${db}`).getTime();
+        } catch { return a.id - b.id; }
+      }
+      return a.id - b.id;
+    });
+
+    if (graded.length === 0) return [0, 0];
+
+    let currentWeightedSum = 0;
+    let currentTotalWeight = 0;
+    const points: number[] = [];
+
+    graded.forEach((curr) => {
+      const val = normalizeGrade(curr) ?? 0;
+      let w = parseWeight(curr);
+      if (w <= 0) w = 1;
+      currentWeightedSum += (val * w);
+      currentTotalWeight += w;
+      points.push(currentTotalWeight > 0 ? (currentWeightedSum / currentTotalWeight) : 0);
+    });
+
+    if (points.length === 1) return [0, points[0]];
+    return points.slice(-10);
+  }, [gradedAssessments]);
+
+  const trendSeries = projectedGpa
+    ? [...historicalGpas, Number(projectedGpa)]
+    : [...historicalGpas, parseFloat(displayProjectedGPA) || 0];
+
+  const handleDownloadReport = async () => {
+    const uid = await getUserId();
+    if (!uid || isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      await downloadReport(uid);
+    } catch (e: any) {
+      alertRef.show({
+        title: 'Error',
+        message: e.message || 'No se pudo generar el informe',
+        type: 'error',
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  return {
+    subjects, filteredAssessments, gradedAssessments,
+    selectedSubjectId, setSelectedSubjectId,
+    userId,
+    displayGPA, displayProjectedGPA, displayDelta,
+    termGpa, evaluatedPercentage, selectedSubject,
+    simScore, setSimScore,
+    simPossible, setSimPossible,
+    projectedGpa,
+    trendSeries, historicalGpas,
+    overlayVisible, setOverlayVisible,
+    overlayText, setOverlayText,
+    isExportingPdf,
+    handleRunSimulation, handleResetSim,
+    handleDownloadReport,
+  };
+}

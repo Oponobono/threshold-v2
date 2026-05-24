@@ -1,673 +1,241 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, Dimensions, TextInput, TouchableOpacity, InteractionManager, FlatList } from 'react-native';
-import { alertRef } from '../../src/components/CustomAlert';
+import React, { useState } from 'react';
+import { Modal, View, ScrollView, Dimensions, FlatList, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { LineChart } from 'react-native-chart-kit';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
-import { gradesStyles as styles } from '../../src/styles/Grades.styles';
-import { normalizeGrade, parseWeight, SCALE_MAX } from '../../src/utils/grades';
-
-import { useFocusEffect } from 'expo-router';
-import { useDataStore } from '../../src/store/useDataStore';
-import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
-import { MasteryRadar } from '../../src/components/MasteryRadar';
+import { gradesStyles } from '../../src/styles/Grades.styles';
+import { useGrades } from '../../src/hooks/useGrades';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
-import { getUserId, getCurrentUserProfile } from '../../src/services/api/auth';
-import { downloadReport, getGlobalGPAAnalytics } from '../../src/services/api/analytics';
-
-const GRADE_COLORS = (pct: number) => {
-  if (pct >= 80) return '#34C759';
-  if (pct >= 65) return '#FF9500';
-  return '#FF2D55';
-};
+import { MasteryRadarCard } from '../../src/components/grades/MasteryRadarCard';
+import { MasteryRadar } from '../../src/components/MasteryRadar';
+import { GradesHeader } from '../../src/components/grades/GradesHeader';
+import { FilterBar } from '../../src/components/grades/FilterBar';
+import { SubjectFilterBar } from '../../src/components/grades/SubjectFilterBar';
+import { PerformanceCard } from '../../src/components/grades/PerformanceCard';
+import { AssessmentItem } from '../../src/components/grades/AssessmentItem';
+import { ProjectionSimulator } from '../../src/components/grades/ProjectionSimulator';
+import { ActionCard } from '../../src/components/grades/ActionCard';
 
 export default function GradesScreen() {
   const { t } = useTranslation();
   const chartWidth = Math.max(240, Dimensions.get('window').width - theme.spacing.lg * 2 - theme.spacing.lg * 2 - 2);
-
-  const { subjects, assessments, refreshAssessments } = useDataStore();
-  
-  // Fetch user profile for grading engine integration
-  const [profile, setProfile] = React.useState<any>(null);
-  React.useEffect(() => {
-    getCurrentUserProfile().then(p => setProfile(p)).catch(() => {});
-  }, []);
-
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
-  const [userId, setUserId] = useState<number | null>(null);
-  const [globalGPA, setGlobalGPA] = useState<any>(null);
-  const [isLoadingGlobalGPA, setIsLoadingGlobalGPA] = useState(false);
-
-  React.useEffect(() => {
-    getUserId().then(id => setUserId(id ? Number(id) : null));
-  }, []);
-
-  // Fetch global GPA analytics when viewing all subjects
-  React.useEffect(() => {
-    if (selectedSubjectId === null && userId) {
-      setIsLoadingGlobalGPA(true);
-      getGlobalGPAAnalytics()
-        .then(data => setGlobalGPA(data))
-        .catch(err => {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          console.warn(`[grades.tsx] Failed to fetch global GPA: ${errorMsg}`);
-          console.warn('[grades.tsx] App will display cached data or empty state');
-          setGlobalGPA(null);
-        })
-        .finally(() => setIsLoadingGlobalGPA(false));
-    } else {
-      setGlobalGPA(null);
-    }
-  }, [selectedSubjectId, userId]);
-
-  const filteredAssessments = useMemo(() => {
-    if (selectedSubjectId === null) return assessments;
-    return assessments.filter(a => a.subject_id === selectedSubjectId);
-  }, [assessments, selectedSubjectId]);
-
-  // Get selected subject for grading engine
-  const selectedSubject = useMemo(() => 
-    subjects.find(s => s.id === selectedSubjectId) || null,
-  [subjects, selectedSubjectId]);
-
-  // Use backend-powered grading engine for all calculations
-  const {
-    averageGrade,
-    projectedGrade: engineProjectedGrade,
-    securedPercent,
-    deliveredText,
-    thresholdStatus,
-    delta: engineDelta,
-  } = useSubjectGrades(filteredAssessments, selectedSubject, profile);
-
-  // Evaluaciones que tienen una calificación real (for display purposes)
-  const gradedAssessments = useMemo(() => 
-    filteredAssessments.filter((a: any) => normalizeGrade(a) !== null),
-  [filteredAssessments]);
-
-  // Use averageGrade from engine (which calls backend) instead of local calculation
-  const termGpa = averageGrade.toFixed(2);
-  
-  // Use global GPA if available (when viewing all subjects), otherwise use subject-specific calculations
-  const displayGPA = selectedSubjectId === null && globalGPA ? globalGPA.currentAverage?.toFixed(2) : termGpa;
-  const displayProjectedGPA = selectedSubjectId === null && globalGPA ? globalGPA.projectedGrade?.toFixed(2) : engineProjectedGrade.toFixed(2);
-  const displayDelta = selectedSubjectId === null && globalGPA ? globalGPA.delta : engineDelta;
-
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
-  
-  useFocusEffect(
-    useCallback(() => {
-      const task = InteractionManager.runAfterInteractions(() => {
-        // Forzar refresco de evaluaciones cada vez que el tab recibe foco
-        refreshAssessments();
-      });
-      return () => task.cancel();
-    }, [refreshAssessments])
-  );
-
-  const [simScore, setSimScore] = useState('');
-  const [simPossible, setSimPossible] = useState('');
-  const [projectedGpa, setProjectedGpa] = useState<string | null>(null);
-  
-  const [overlayVisible, setOverlayVisible] = useState(false);
-  const [overlayText, setOverlayText] = useState('');
-
-  const handleRunSimulation = () => {
-    const s = parseFloat(simScore);
-    const w = parseFloat(simPossible); // Interpreting 'simPossible' input as 'Weight (%)'
-    if (isNaN(s) || isNaN(w) || w === 0) {
-      alertRef.show({ title: t('common.error'), message: t('common.enterValidScorePossible', 'Ingresa una nota y un peso válido'), type: 'error' });
-      return;
-    }
-
-    const currentGpaVal = parseFloat(displayGPA) || 0;
-    const currentEvaluated = selectedSubjectId === null && globalGPA ? globalGPA.evaluatedWeight : evaluatedPercentage;
-    
-    // Asumir que 's' ya es la nota en escala 0-5
-    const simNormalized = s; 
-    
-    if (currentEvaluated === 0) {
-      setProjectedGpa(simNormalized.toFixed(2));
-    } else {
-      const currentPoints = currentGpaVal * (currentEvaluated / 100);
-      const newPoints = currentPoints + (simNormalized * (w / 100));
-      const newEvaluated = currentEvaluated + w;
-      const newGpa = (newPoints / (newEvaluated / 100)).toFixed(2);
-      setProjectedGpa(newGpa);
-    }
-  };
-
-  const handleResetSim = () => {
-    setSimScore('');
-    setSimPossible('');
-    setProjectedGpa(null);
-  };
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // HISTORICAL TREND (from grading engine)
-  // The engine calculates projectedGrade which incorporates historical data
-  // ══════════════════════════════════════════════════════════════════════════
-  const historicalGpas = useMemo(() => {
-    const graded = [...gradedAssessments].sort((a: any, b: any) => {
-      if (a.date && b.date) {
-        try {
-          const [da, ma, ya] = a.date.split('-');
-          const [db, mb, yb] = b.date.split('-');
-          return new Date(`${ya}-${ma}-${da}`).getTime() - new Date(`${yb}-${mb}-${db}`).getTime();
-        } catch { return a.id - b.id; }
-      }
-      return a.id - b.id;
-    });
-
-    if (graded.length === 0) return [0, 0];
-
-    let currentWeightedSum = 0;
-    let currentTotalWeight = 0;
-    const points: number[] = [];
-    
-    graded.forEach((curr) => {
-      const val = normalizeGrade(curr) ?? 0;
-      let w = parseWeight(curr);
-      if (w <= 0) w = 1; // Fallback para evitar división por cero si falta el peso
-      
-      currentWeightedSum += (val * w);
-      currentTotalWeight += w;
-      
-      points.push(currentTotalWeight > 0 ? (currentWeightedSum / currentTotalWeight) : 0);
-    });
-
-    if (points.length === 1) return [0, points[0]];
-    return points.slice(-10);
-  }, [gradedAssessments]);
-
-  // Use simulation projection if available, otherwise use engine's projected grade
-  const trendSeries = projectedGpa 
-    ? [...historicalGpas, Number(projectedGpa)]
-    : [...historicalGpas, parseFloat(displayProjectedGPA) || 0];
+  const g = useGrades(t);
+  const [expandedChart, setExpandedChart] = useState<'mastery' | 'projection' | null>(null);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
-      <View style={styles.header}>
-        <View style={globalStyles.row}>
-          <Ionicons name="school-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
-          <Text style={styles.logoText}>{t('grades.title') || 'Calificaciones'}</Text>
-        </View>
-        <View style={globalStyles.row}>
-          <TouchableOpacity style={styles.termPill}>
-            <Text style={styles.termText}>{t('grades.activeTerm')}</Text>
-            <Ionicons name="chevron-down" size={14} color={theme.colors.text.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={{ marginLeft: 10 }}
-            onPress={async () => {
-              const uid = await getUserId();
-              if (!uid || isExportingPdf) return;
-              setIsExportingPdf(true);
-              try {
-                await downloadReport(uid);
-              } catch (e: any) {
-                alertRef.show({ title: 'Error', message: e.message || 'No se pudo generar el informe', type: 'error' });
-              } finally {
-                setIsExportingPdf(false);
-              }
-            }}
-            disabled={isExportingPdf}
-          >
-            <Ionicons name={isExportingPdf ? "hourglass-outline" : "cloud-download-outline"} size={22} color={theme.colors.text.secondary} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={{ marginLeft: 10 }}
-            onPress={() => alertRef.show({ title: 'Próximamente', message: 'La sincronización en la nube estará disponible pronto.', type: 'info' })}
-          >
-            <Ionicons name="cloud-upload-outline" size={22} color={theme.colors.text.secondary} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <GradesHeader
+        isExportingPdf={g.isExportingPdf}
+        onDownloadReport={g.handleDownloadReport}
+        t={t}
+      />
 
-      <View style={styles.filtersContainer}>
-        <View style={styles.filterRow}>
-          <TouchableOpacity 
-            style={[styles.filterPill, { flex: 1, backgroundColor: theme.colors.inputBackground, borderWidth: 1, borderColor: theme.colors.border }]}
-            onPress={() => alertRef.show({ title: 'Filtros', message: 'El rango de fechas estará disponible próximamente.', type: 'info' })}
-          >
-            <Text style={[styles.filterText, { color: theme.colors.text.primary }]}>{t('grades.dateRange')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.applyBtn}
-            onPress={() => alertRef.show({ title: 'Filtros aplicados', message: 'Mostrando todas las notas registradas.', type: 'success' })}
-          >
-            <Text style={styles.applyBtnText}>{t('grades.apply')}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <FilterBar t={t} />
 
-      <View>
-        <FlatList
-          horizontal
-          data={subjects}
-          keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, gap: 8 }}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={8}
-          initialNumToRender={5}
-          windowSize={5}
-          ListHeaderComponent={
-            <TouchableOpacity 
-              style={{ 
-                paddingHorizontal: 16, 
-                paddingVertical: 8, 
-                borderRadius: 20, 
-                backgroundColor: selectedSubjectId === null ? theme.colors.primary : theme.colors.inputBackground,
-                borderWidth: 1,
-                borderColor: selectedSubjectId === null ? theme.colors.primary : theme.colors.border
-              }}
-              onPress={() => setSelectedSubjectId(null)}
-            >
-              <Text style={{ 
-                color: selectedSubjectId === null ? '#FFF' : theme.colors.text.primary, 
-                fontWeight: '600', 
-                fontSize: 13 
-              }}>
-                {t('common.all', 'Todas')}
-              </Text>
-            </TouchableOpacity>
-          }
-          renderItem={({ item: sub }) => (
-            <TouchableOpacity 
-              style={{ 
-                paddingHorizontal: 16, 
-                paddingVertical: 8, 
-                borderRadius: 20, 
-                backgroundColor: selectedSubjectId === sub.id ? (sub.color || theme.colors.primary) : theme.colors.inputBackground,
-                borderWidth: 1,
-                borderColor: selectedSubjectId === sub.id ? (sub.color || theme.colors.primary) : theme.colors.border
-              }}
-              onPress={() => setSelectedSubjectId(sub.id)}
-            >
-              <Text style={{ 
-                color: selectedSubjectId === sub.id ? '#FFF' : theme.colors.text.primary, 
-                fontWeight: '600', 
-                fontSize: 13 
-              }}>
-                {sub.name}
-              </Text>
-            </TouchableOpacity>
-          )}
+      <SubjectFilterBar
+        subjects={g.subjects}
+        selectedSubjectId={g.selectedSubjectId}
+        onSelectSubject={g.setSelectedSubjectId}
+        t={t}
+      />
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={gradesStyles.scroll}>
+        <PerformanceCard
+          displayGPA={g.displayGPA}
+          displayProjectedGPA={g.displayProjectedGPA}
+          displayDelta={g.displayDelta}
+          selectedSubjectId={g.selectedSubjectId}
+          globalGPA={null}
+          gradedAssessments={g.gradedAssessments}
+          onPressInfo={() => {
+            g.setOverlayText('**Rendimiento General**\n\n**Promedio del Semestre** — Es el promedio ponderado real de todas tus evaluaciones con nota, calculado según el peso porcentual de cada una.\n\n**Proyección** — Estima tu nota final si mantienes tu rendimiento actual, usando una regresión lineal sobre tus últimas calificaciones.\n\n**Delta (± pts)** — La diferencia entre tu promedio actual y la proyección. Positivo = vas mejorando; negativo = necesitas recuperar.\n\n**Gráfica de barras** — Cada barra representa una evaluación ordenada cronológicamente. La última barra (más oscura) es tu nota más reciente. La altura refleja tu calificación normalizada.');
+            g.setOverlayVisible(true);
+          }}
+          t={t}
         />
-      </View>
 
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <View style={styles.card}>
-          {/* Top Action Row */}
-          <View style={[globalStyles.rowBetweenCenter, globalStyles.mb16]}>
-            <Text style={styles.sectionTitle}>
-              {t('grades.academicPerformance', 'Rendimiento general')}
-            </Text>
-            <TouchableOpacity 
-              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.inputBackground, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border }}
-              onPress={() => alertRef.show({ title: 'Configuración', message: 'La escala actual se detecta automáticamente de tus notas. La edición manual estará disponible pronto.', type: 'info' })}
-            >
-              <Ionicons name="settings-outline" size={12} color={theme.colors.text.secondary} style={{ marginRight: 4 }} />
-              <Text style={{ fontSize: 10, fontWeight: '700', color: theme.colors.text.secondary }}>
-                {t('grades.editScale', 'ESCALA AUTO')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={[globalStyles.rowCenter, { marginBottom: 20 }]}>
-            <View style={[globalStyles.flex1, globalStyles.centerHorizontal]}>
-              <Text numberOfLines={2} style={{ fontSize: 11, color: theme.colors.text.secondary, marginBottom: 8, fontWeight: '600', textTransform: 'uppercase', textAlign: 'center' }}>
-                {t('grades.termGpa')}
-              </Text>
-              <Text style={{ fontSize: 44, fontWeight: '900', color: theme.colors.text.primary, letterSpacing: -1, lineHeight: 44 }}>
-                {displayGPA}
-              </Text>
-            </View>
-            <View style={{ width: 1, height: 50, backgroundColor: theme.colors.border }} />
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text numberOfLines={2} style={{ fontSize: 11, color: theme.colors.text.secondary, marginBottom: 8, fontWeight: '600', textTransform: 'uppercase', textAlign: 'center' }}>
-                {t('grades.projected')}
-              </Text>
-              <Text style={{ fontSize: 44, fontWeight: '900', color: displayDelta && displayDelta > 0 ? '#34C759' : (displayDelta && displayDelta < 0 ? '#FF2D55' : theme.colors.text.secondary), opacity: selectedSubjectId === null && !globalGPA ? 0.6 : 1, letterSpacing: -1, lineHeight: 44 }}>
-                {displayProjectedGPA}
-              </Text>
-            </View>
-          </View>
-
-          <View style={{ alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ fontSize: 10, color: theme.colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>
-              {t('grades.projected')}: <Text style={{ color: theme.colors.text.primary }}>{parseFloat(displayProjectedGPA) > 0 ? `${displayProjectedGPA}${displayDelta ? ` (${displayDelta > 0 ? '+' : ''}${displayDelta.toFixed(2)} pts)` : ''}` : t('grades.insufficientData', 'Faltan evaluaciones')}</Text>
-            </Text>
-          </View>
-
-          {/* Full-width elegant sparkline */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 4 }}>
-            {gradedAssessments.length === 0 ? (
-              Array.from({ length: 12 }).map((_, i) => (
-                <View key={i} style={{ flex: 1, height: `${Math.random() * 40 + 20}%`, backgroundColor: theme.colors.text.secondary, opacity: 0.1, borderRadius: 2 }} />
-              ))
-            ) : (
-              gradedAssessments.slice(-12).map((a: any, i, arr) => {
-                const val = normalizeGrade(a) ?? 0;
-                const h = Math.max(15, Math.min(100, (val / SCALE_MAX) * 100));
-                const isLast = i === arr.length - 1;
-                return (
-                  <View 
-                    key={i} 
-                    style={{ 
-                      flex: 1, 
-                      height: `${h}%`, 
-                      backgroundColor: isLast ? theme.colors.primary : theme.colors.primary + '40', 
-                      borderRadius: 2 
-                    }} 
-                  />
-                );
-              })
-            )}
-          </View>
-        </View>
-
-        {/* --- LEARNING ENGINEERING RADAR --- */}
-        {userId && (
-          <View style={styles.card}>
-            <View style={[globalStyles.rowBetweenCenter, globalStyles.mb16]}>
-              <Text style={styles.sectionTitle}>
-                {t('grades.mastery', 'Dominio de Aprendizaje')}
-              </Text>
-            </View>
-            <MasteryRadar 
-              userId={userId} 
-              subjectId={selectedSubjectId || 'all'} 
-              onPress={() => {
-                setOverlayText('**Dominio del Aprendizaje**\n\nEste radar ilustra tu nivel de dominio basado en el algoritmo de repetición espaciada de tus *Flashcards*.\n\nMuestra visualmente en qué áreas o mazos eres más fuerte y cuáles necesitan más atención y repaso.');
-                setOverlayVisible(true);
-              }}
-            />
-          </View>
+        {g.userId && (
+          <MasteryRadarCard
+            userId={g.userId}
+            selectedSubjectId={g.selectedSubjectId}
+            onPressInfo={() => {
+              g.setOverlayText('**Dominio del Aprendizaje**\n\nEste radar ilustra tu nivel de dominio basado en el algoritmo de repetición espaciada de tus *Flashcards*.\n\nMuestra visualmente en qué áreas o mazos eres más fuerte y cuáles necesitan más atención y repaso.');
+              g.setOverlayVisible(true);
+            }}
+            onExpand={() => setExpandedChart('mastery')}
+            t={t}
+          />
         )}
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t('grades.assessments')}</Text>
+        <View style={gradesStyles.section}>
+          <View style={gradesStyles.sectionHeaderRow}>
+            <Text style={gradesStyles.sectionTitle}>{t('grades.assessments')}</Text>
             <View style={globalStyles.row}>
-              <TouchableOpacity 
-                style={styles.addBtn}
-                onPress={() => alertRef.show({ title: 'Añadir nota', message: 'Por favor, usa el menú rápido en el Dashboard de Inicio para añadir notas.', type: 'info' })}
-              >
-                <Text style={styles.addBtnText}>{t('grades.add')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.addBtn, styles.bulkBtn]}
-                onPress={() => alertRef.show({ title: 'Importación masiva', message: 'La carga masiva estará disponible en la próxima actualización.', type: 'info' })}
-              >
-                <Text style={[styles.addBtnText, { color: theme.colors.text.primary }]}>{t('grades.bulk')}</Text>
-              </TouchableOpacity>
+              <View style={gradesStyles.sectionActions}>
+                <View style={gradesStyles.addBtn}>
+                  <Text style={gradesStyles.addBtnText}>{t('grades.add')}</Text>
+                </View>
+                <View style={[gradesStyles.addBtn, gradesStyles.bulkBtn]}>
+                  <Text style={[gradesStyles.addBtnText, { color: theme.colors.text.primary }]}>{t('grades.bulk')}</Text>
+                </View>
+              </View>
             </View>
           </View>
 
-          <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-            {filteredAssessments.length === 0 ? (
-              <View style={{ padding: 32, alignItems: 'center' }}>
+          <View style={[gradesStyles.card, { padding: 0, overflow: 'hidden' }]}>
+            {g.filteredAssessments.length === 0 ? (
+              <View style={gradesStyles.emptyAssessments}>
                 <Ionicons name="document-text-outline" size={32} color={theme.colors.text.secondary} style={{ opacity: 0.5, marginBottom: 8 }} />
                 <Text style={{ color: theme.colors.text.secondary, fontSize: 13 }}>{t('subjects.noAssessments', 'No hay evaluaciones')}</Text>
               </View>
             ) : (
               <FlatList
-                data={filteredAssessments}
+                data={g.filteredAssessments}
                 keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
                 scrollEnabled={false}
                 removeClippedSubviews={true}
                 maxToRenderPerBatch={10}
                 initialNumToRender={6}
                 windowSize={5}
-                renderItem={({ item: a, index }) => {
-                  const gradeVal = normalizeGrade(a as any);
-                  const weight = parseWeight(a as any);
-                  const pct = gradeVal !== null ? Math.round((gradeVal / SCALE_MAX) * 100) : null;
-                  const subject = subjects.find(s => s.id === a.subject_id);
-                  const color = subject?.color || '#5856D6';
-                  const isLast = index === filteredAssessments.length - 1;
-                  const isTask = a.type === 'task';
-                  const isCompleted = (a as any).is_completed;
-                  const isPending = (a as any)._isPending === true;
-
-                  return (
-                    <View style={{ padding: 16, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', gap: 14, opacity: isPending ? 0.6 : 1 }}>
-                      <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: color + '20', justifyContent: 'center', alignItems: 'center' }}>
-                        <MaterialCommunityIcons name={isTask ? 'check-circle' : 'file-document'} size={24} color={pct !== null ? GRADE_COLORS(pct) : theme.colors.text.secondary} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text.primary }} numberOfLines={1}>
-                            {a.name}
-                          </Text>
-                          {isPending && (
-                            <View style={{ backgroundColor: theme.colors.warning, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                              <Text style={{ fontSize: 9, fontWeight: '600', color: '#FFF' }}>
-                                {t('common.syncing', 'SINCRONIZANDO')}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '500' }} numberOfLines={1}>
-                          {subject?.name || 'Materia'}
-                          <Text style={{ opacity: 0.5 }}> • </Text>
-                          {weight > 0 ? `${weight}%` : (a.weight || t('grades.eval', 'Evaluación'))}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-                        {pct !== null ? (
-                          <>
-                            <Text style={{ fontSize: 16, fontWeight: '800', color: GRADE_COLORS(pct) }}>
-                              {gradeVal!.toFixed(1)}/{SCALE_MAX}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600', marginTop: 1, textTransform: 'uppercase' }}>
-                              {pct}%
-                            </Text>
-                          </>
-                        ) : (
-                          <Text style={{ fontSize: 12, color: isTask && isCompleted ? '#34C759' : theme.colors.text.secondary, fontWeight: '600' }}>
-                            {isTask ? (isCompleted ? t('common.done', 'Entregada') : t('subjects.pending', 'Pendiente')) : t('subjects.pending', 'Sin nota')}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  );
-                }}
+                renderItem={({ item: a, index }) => (
+                  <AssessmentItem
+                    assessment={a}
+                    index={index}
+                    isLast={index === g.filteredAssessments.length - 1}
+                    subject={g.subjects.find(s => s.id === a.subject_id)}
+                    t={t}
+                  />
+                )}
               />
             )}
           </View>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.projectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t('grades.projectionsSim')}</Text>
-          </View>
-          <Text style={styles.descText}>{t('grades.projectionsDesc')}</Text>
+        <ProjectionSimulator
+          simScore={g.simScore}
+          simPossible={g.simPossible}
+          projectedGpa={g.projectedGpa}
+          trendSeries={g.trendSeries}
+          chartWidth={chartWidth}
+          termGpa={g.termGpa}
+          gradedAssessmentsLength={g.gradedAssessments.length}
+          historicalGpasLength={g.historicalGpas.length}
+          onScoreChange={g.setSimScore}
+          onPossibleChange={g.setSimPossible}
+          onRunSim={g.handleRunSimulation}
+          onReset={g.handleResetSim}
+          onPressInfo={() => {
+            g.setOverlayText('**Simulador de Proyección**\n\nEsta gráfica muestra cómo ha evolucionado tu promedio (GPA) a lo largo del tiempo basándose en el peso real de tus entregas.\n\nEl punto **"Proy."** (color naranja) simula matemáticamente tu nuevo promedio ponderado en caso de obtener la nota que ingresaste.');
+            g.setOverlayVisible(true);
+          }}
+          onExpand={() => setExpandedChart('projection')}
+          t={t}
+        />
 
-          <View style={styles.simInputRow}>
-            <View style={styles.simInputWrapper}>
-              <Text style={styles.simInputLabel}>{t('grades.scoreLabel', 'Nota')}</Text>
-              <TextInput
-                style={styles.simInput}
-                placeholder="0"
-                placeholderTextColor={theme.colors.text.placeholder}
-                keyboardType="numeric"
-                value={simScore}
-                onChangeText={setSimScore}
-              />
-            </View>
-            <View style={styles.simInputWrapper}>
-              <Text style={styles.simInputLabel}>{t('grades.weightLabel', 'Peso (%)')}</Text>
-              <TextInput
-                style={styles.simInput}
-                placeholder="0"
-                placeholderTextColor={theme.colors.text.placeholder}
-                keyboardType="numeric"
-                value={simPossible}
-                onChangeText={setSimPossible}
-              />
-            </View>
-            <TouchableOpacity style={styles.simAddBtn} onPress={handleRunSimulation}>
-              <Ionicons name="add" size={18} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        <ActionCard
+          title={t('grades.bulkImport')}
+          description={t('grades.bulkImportDesc')}
+          buttonLabel={t('grades.importCsv', 'Importar CSV')}
+          buttonIcon="cloud-upload-outline"
+          onPress={() => {}}
+        />
 
-          <View style={styles.simChartCard}>
-            <TouchableOpacity 
-              activeOpacity={0.9} 
-              onPress={() => {
-                setOverlayText('**Simulador de Proyección**\n\nEsta gráfica muestra cómo ha evolucionado tu promedio (GPA) a lo largo del tiempo basándose en el peso real de tus entregas.\n\nEl punto **"Proy."** (color naranja) simula matemáticamente tu nuevo promedio ponderado en caso de obtener la nota que ingresaste.');
-                setOverlayVisible(true);
-              }}
-            >
-              <LineChart
-              data={{
-                labels: trendSeries.map((_, i) => {
-                  if (i === trendSeries.length - 1) return 'Proy.';
-                  if (gradedAssessments.length === 0) return '';
-                  if (gradedAssessments.length === 1) return i === 0 ? '0' : '1';
-                  const startIndex = gradedAssessments.length - historicalGpas.length;
-                  return `${startIndex + i + 1}`;
-                }),
-                datasets: [
-                  {
-                    data: trendSeries,
-                    color: () => theme.colors.text.primary,
-                    strokeWidth: 2.8,
-                  },
-                ],
-              }}
-              width={chartWidth}
-              height={160} // Un poco más de altura para acomodar las etiquetas
-              withDots={true} // Mostrar puntos para mayor claridad
-              getDotColor={(dataPoint, index) => 
-                (index === trendSeries.length - 1 && projectedGpa) ? '#FF9500' : theme.colors.primary
-              }
-              withShadow={false}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              withInnerLines={true}
-              withOuterLines={true}
-              bezier={true} // Una línea suavizada se ve más profesional
-              fromZero={false}
-              yAxisSuffix=""
-              yAxisInterval={1}
-              chartConfig={{
-                backgroundColor: '#EEF4FA',
-                backgroundGradientFrom: '#EEF4FA',
-                backgroundGradientTo: '#EEF4FA',
-                decimalPlaces: 1, // 1 decimal es suficiente para los ejes Y
-                color: () => theme.colors.primary, // Color de las líneas del grid
-                labelColor: () => theme.colors.text.secondary,
-                style: {
-                  borderRadius: 16,
-                  paddingRight: 20, // Ajuste para que la etiqueta final no se corte
-                },
-                propsForDots: {
-                  r: "4",
-                  strokeWidth: "2",
-                  stroke: '#EEF4FA'
-                },
-                propsForBackgroundLines: {
-                  strokeWidth: 1,
-                  strokeDasharray: "4",
-                  stroke: theme.colors.border || '#e0e0e0',
-                },
-                propsForLabels: {
-                  fontSize: 10,
-                },
-              }}
-              style={styles.simChart}
-            />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.currentProjectionCentered}>
-            <Text style={styles.currentProjectionLine} numberOfLines={1}>
-              <Text style={styles.currentProjectionLabel}>{t('grades.currentProjection')} </Text>
-              <Text style={styles.currentProjectionValue}>{termGpa}</Text>
-            </Text>
-          </View>
-
-          {projectedGpa && (
-            <View style={styles.simSummary}>
-              <Text style={styles.simSummaryText}>{t('grades.simSummary')}</Text>
-              <Text style={styles.projGpaText}>
-                {t('grades.projectedTermGpa')} <Text style={{ color: '#34C759', fontWeight: '900' }}>{projectedGpa}</Text>
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.simActions}>
-            <TouchableOpacity style={styles.simActionPrimary} onPress={handleRunSimulation}>
-              <Text style={styles.simActionPrimaryText}>{t('grades.run')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.simActionSecondary} onPress={handleResetSim}>
-              <Text style={styles.simActionSecondaryText}>{t('grades.reset')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={[styles.card, styles.bulkCard]}>
-          <View style={{ flexDirection: 'column', flex: 1, gap: 4 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={styles.sectionTitle}>{t('grades.bulkImport')}</Text>
-              <TouchableOpacity style={styles.smallBadgeBtn}>
-                <Ionicons name="cloud-upload-outline" size={14} color={theme.colors.text.primary} />
-                <Text style={styles.smallBadgeText}>{t('grades.importCsv', 'Importar CSV')}</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.descText}>{t('grades.bulkImportDesc')}</Text>
-            <TouchableOpacity>
-              <Text style={styles.chooseFileText}>{t('grades.chooseFile')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={[styles.card, styles.bulkCard]}>
-          <View style={{ flexDirection: 'column', flex: 1, gap: 4 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={styles.sectionTitle}>{t('grades.gpaReport')}</Text>
-              <TouchableOpacity 
-                style={styles.smallBadgeBtn}
-                disabled={isExportingPdf}
-                onPress={async () => {
-                  const uid = await getUserId();
-                  if (!uid || isExportingPdf) return;
-                  setIsExportingPdf(true);
-                  try {
-                    await downloadReport(uid);
-                  } catch (e: any) {
-                    alertRef.show({ title: 'Error', message: e.message || 'No se pudo generar el informe', type: 'error' });
-                  } finally {
-                    setIsExportingPdf(false);
-                  }
-                }}
-              >
-                <Ionicons name="cloud-download-outline" size={14} color={theme.colors.text.primary} />
-                <Text style={styles.smallBadgeText}>
-                  {isExportingPdf ? 'Generando...' : 'Exportar PDF'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.descText}>{t('grades.gpaReportDesc')}</Text>
-            <TouchableOpacity>
-              <Text style={styles.chooseFileText}>{t('grades.preview')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ActionCard
+          title={t('grades.gpaReport')}
+          description={t('grades.gpaReportDesc')}
+          buttonLabel={g.isExportingPdf ? 'Generando...' : 'Exportar PDF'}
+          buttonIcon="cloud-download-outline"
+          onPress={g.handleDownloadReport}
+        />
       </ScrollView>
 
-      <ExplanationOverlay 
-        visible={overlayVisible} 
-        explanation={overlayText} 
-        onDismiss={() => setOverlayVisible(false)} 
+      {/* Expanded chart modals */}
+      {expandedChart === 'mastery' && g.userId && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setExpandedChart(null)}>
+          <View style={{
+            flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
+            justifyContent: 'center', alignItems: 'center', padding: 24,
+          }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 60, right: 24, zIndex: 10 }}
+              onPress={() => setExpandedChart(null)}
+            >
+              <Ionicons name="close-circle" size={32} color="#fff" />
+            </TouchableOpacity>
+            <MasteryRadar userId={g.userId} subjectId={g.selectedSubjectId || 'all'} />
+          </View>
+        </Modal>
+      )}
+
+      {expandedChart === 'projection' && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setExpandedChart(null)}>
+          <View style={{
+            flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
+            justifyContent: 'center', alignItems: 'center', padding: 24,
+          }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 60, right: 24, zIndex: 10 }}
+              onPress={() => setExpandedChart(null)}
+            >
+              <Ionicons name="close-circle" size={32} color="#fff" />
+            </TouchableOpacity>
+            <View style={{ backgroundColor: '#EEF4FA', borderRadius: 16, padding: 16 }}>
+              <LineChart
+                data={{
+                  labels: g.trendSeries.map((_, i) => {
+                    if (i === g.trendSeries.length - 1) return 'Proy.';
+                    if (g.gradedAssessments.length === 0) return '';
+                    if (g.gradedAssessments.length === 1) return i === 0 ? '0' : '1';
+                    const startIndex = g.gradedAssessments.length - g.historicalGpas.length;
+                    return `${startIndex + i + 1}`;
+                  }),
+                  datasets: [{
+                    data: g.trendSeries,
+                    color: () => theme.colors.primary,
+                    strokeWidth: 2.8,
+                  }],
+                }}
+                width={Math.min(Dimensions.get('window').width - 64, 500)}
+                height={280}
+                withDots={true}
+                getDotColor={(_, index) =>
+                  (index === g.trendSeries.length - 1 && g.projectedGpa) ? '#FF9500' : theme.colors.primary
+                }
+                withShadow={false}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                withInnerLines={true}
+                withOuterLines={true}
+                bezier={true}
+                fromZero={false}
+                yAxisSuffix=""
+                yAxisInterval={1}
+                chartConfig={{
+                  backgroundColor: '#EEF4FA',
+                  backgroundGradientFrom: '#EEF4FA',
+                  backgroundGradientTo: '#EEF4FA',
+                  decimalPlaces: 1,
+                  color: () => theme.colors.primary,
+                  labelColor: () => theme.colors.text.secondary,
+                  style: { borderRadius: 16, paddingRight: 20 },
+                  propsForDots: { r: "6", strokeWidth: "2", stroke: '#EEF4FA' },
+                  propsForBackgroundLines: { strokeWidth: 1, strokeDasharray: "4", stroke: theme.colors.border || '#e0e0e0' },
+                  propsForLabels: { fontSize: 12 },
+                }}
+                style={{ borderRadius: 16 }}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      <ExplanationOverlay
+        visible={g.overlayVisible}
+        explanation={g.overlayText}
+        onDismiss={() => g.setOverlayVisible(false)}
       />
     </SafeAreaView>
   );

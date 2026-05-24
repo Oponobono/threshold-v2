@@ -20,7 +20,7 @@ export const usePredictionPolling = (
   enabled: boolean = true
 ) => {
   const { refreshPredictions, loadCachedPredictions } = useDataStore();
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initializedRef = useRef(false);
 
   // Al iniciar: cargar del cache

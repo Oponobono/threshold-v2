@@ -1,38 +1,13 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-  InteractionManager,
-} from 'react-native';
+import React from 'react';
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-
-import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
-import {
-  getAssessments,
-  getSubjectById,
-  getPhotosBySubject,
-  getCurrentUserProfile,
-  getSchedulesBySubject,
-  getAudioRecordings,
-  getYouTubeVideos,
-  getScannedDocumentsBySubject,
-  deleteYouTubeVideo,
-  deleteSubject,
-  type Assessment,
-  type Subject,
-  type UserProfile,
-  type YouTubeVideo,
-  type ScannedDocument,
-} from '../../src/services/api';
-
+import { subjectDetailStyles as styles } from '../../src/styles/SubjectDetail.styles';
 import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
 import { SubjectRecentRecordings } from '../../src/components/SubjectRecentRecordings';
 import { DocumentScannerModal } from '../../src/components/DocumentScannerModal';
@@ -47,211 +22,22 @@ import { SubjectInsights } from '../../src/components/SubjectInsights';
 import { SubjectAIFab } from '../../src/components/SubjectAIFab';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
-import { useSubjectGrades } from '../../src/hooks/useSubjectGrades';
-import { useAudioRecorder } from '../../src/hooks/useAudioRecorder';
 import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
-import { useDataStore } from '../../src/store/useDataStore';
-import * as FileSystem from 'expo-file-system/legacy';
-import { subjectDetailStyles as styles } from '../../src/styles/SubjectDetail.styles';
-import { useCustomAlert } from '../../src/components/CustomAlert';
 import { SubjectYouTubeVideos } from '../../src/components/SubjectYouTubeVideos';
 import { PDFImportModal } from '../../src/components/PDFImportModal';
-import { generatePdfFromImages } from '../../src/utils/pdfGenerator';
+import { useSubjectDetail } from '../../src/hooks/useSubjectDetail';
+import type { Subject } from '../../src/services/api';
 
-// Helper removed
-
-type DetailSubject = Subject & {
-  avg_score?: number | null;
-  completion_percent?: number | null;
-};
-
-/**
- * SubjectDetailScreen
- *
- * Pantalla principal de detalle de una materia. Actúa como el orquestador o contenedor (Smart Component)
- * que reúne y distribuye todos los datos académicos (grabaciones, documentos, fotos, flashcards y estadísticas).
- * Provee callbacks para el manejo de estado y persistencia hacia los componentes hijos (Dumb Components).
- */
 export default function SubjectDetailScreen() {
   const { t } = useTranslation();
-  const router = useRouter();
-  const params = useLocalSearchParams<{ subjectId?: string }>();
-  const { subjects: storeSubjects, assessments: storeAssessments, refreshAssessments } = useDataStore();
-
-  const subjectId = useMemo(() => {
-    const raw = Array.isArray(params.subjectId) ? params.subjectId[0] : params.subjectId;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-  }, [params.subjectId]);
-
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState<DetailSubject | null>(null);
-  const [subjectSchedules, setSubjectSchedules] = useState<any[]>([]);
-  const [photos, setPhotos] = useState<any[]>([]);
-  const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>([]);
-  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDetailLoading] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-
-  const [isScannerVisible, setIsScannerVisible] = useState(false);
-  const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
-  const [isPDFImportVisible, setIsPDFImportVisible] = useState(false);
-  const [isViewerVisible, setIsViewerVisible] = useState(false);
-  const [isCreateGradeVisible, setIsCreateGradeVisible] = useState(false);
-  const [initialViewerIndex, setInitialViewerIndex] = useState(0);
-
-  const [recentVideos, setRecentVideos] = useState<YouTubeVideo[]>([]);
-  const [allSubjectVideos, setAllSubjectVideos] = useState<YouTubeVideo[]>([]);
-  
-  const [overlayVisible, setOverlayVisible] = useState(false);
-  const [overlayText, setOverlayText] = useState('');
-
-  const { playSound, stopSound, playingId, deleteRecordingConfirmed, recordings, cleanupAudio } = useAudioRecorder();
-
-  // Stop audio when leaving the subject screen
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        cleanupAudio();
-      };
-    }, [cleanupAudio])
-  );
-
-  // All recordings for this subject (used by the AI context modal — not sliced)
-  const allSubjectRecordings = useMemo(() => {
-    if (!subjectId || !recordings) return [];
-    // eslint-disable-next-line eqeqeq
-    return recordings.filter(r => r.subject_id == subjectId);
-  }, [recordings, subjectId]);
-
-  const recentRecordings = useMemo(() => allSubjectRecordings.slice(0, 3), [allSubjectRecordings]);
-  
-  const [isFlashcardModalVisible, setIsFlashcardModalVisible] = useState(false);
-  /** contextText construido por el backend — se pasa directamente al FlashcardCreatorModal como `content` */
-  const [flashcardContextText, setFlashcardContextText] = useState<string>('');
-  const [flashcardBase64, setFlashcardBase64] = useState<string>('');
-  const { showAlert } = useCustomAlert();
-
-  /** Muestra la alerta de confirmación y elimina la materia completa (en cascada) */
-  const handleDeleteSubject = () => {
-    showAlert({
-      title: t('subjects.deleteSubjectTitle'),
-      message: t('subjects.deleteSubjectConfirm'),
-      type: 'confirm',
-      buttons: [
-        { text: t('common.cancel') || 'Cancelar', style: 'cancel' },
-        {
-          text: t('common.delete') || 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            if (!subjectId) return;
-            try {
-              setIsLoading(true);
-              await deleteSubject(subjectId);
-              router.back();
-              showAlert({ title: t('subjects.deleteSubjectTitle'), message: t('subjects.deleteSubjectSuccess'), type: 'info' });
-            } catch {
-              setIsLoading(false);
-              showAlert({ title: t('subjects.error') || 'Error', message: t('subjects.deleteSubjectError'), type: 'error' });
-            }
-          }
-        }
-      ]
-    });
-  };
-
-  /** Muestra la alerta de confirmación y elimina el enlace de un video de YouTube */
-  const handleDeleteVideo = (videoId: number | string) => {
-    showAlert({
-      title: t('subjects.deleteVideo'),
-      message: t('subjects.deleteVideoConfirm'),
-      type: 'confirm',
-      buttons: [
-        { text: t('subjects.cancel'), style: 'cancel' },
-        {
-          text: t('subjects.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteYouTubeVideo(Number(videoId));
-              setRecentVideos(prev => prev.filter(v => v.id !== videoId));
-            } catch {
-              showAlert({ title: t('subjects.error'), message: t('subjects.deleteVideoError'), type: 'error' });
-            }
-          }
-        }
-      ]
-    });
-  };
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadAllData = async () => {
-      if (!subjectId) return;
-
-      setIsLoading(true);
-      try {
-        const [profileRes, subjectRes, photosRes, docsRes, assessmentsRes, schedulesRes, , videosRes] =
-          await Promise.allSettled([
-            getCurrentUserProfile(),
-            getSubjectById(subjectId),
-            getPhotosBySubject(subjectId),
-            getScannedDocumentsBySubject(subjectId),
-            getAssessments(subjectId),
-            getSchedulesBySubject(subjectId),
-            getAudioRecordings(),
-            getYouTubeVideos(),
-          ]);
-
-        if (!mounted) return;
-
-        if (profileRes.status === 'fulfilled') setProfile(profileRes.value);
-        if (subjectRes.status === 'fulfilled') setSelectedSubject(subjectRes.value as DetailSubject);
-        if (photosRes.status === 'fulfilled') setPhotos(photosRes.value || []);
-        if (docsRes.status === 'fulfilled') setScannedDocuments(docsRes.value || []);
-        if (schedulesRes.status === 'fulfilled') setSubjectSchedules(schedulesRes.value || []);
-        // Grabaciones gestionadas por useAudioRecorder hook
-        if (videosRes.status === 'fulfilled') {
-          const videoList = Array.isArray(videosRes.value) ? videosRes.value : [];
-          // eslint-disable-next-line eqeqeq
-          const filtered = videoList.filter(v => v.subject_id == subjectId);
-          setAllSubjectVideos(filtered);
-          setRecentVideos(filtered.slice(0, 3));
-        }
-      } catch (err) {
-        console.error('Error loading subject data:', err);
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    };
-
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsReady(true);
-      loadAllData();
-    });
-
-    return () => { 
-      mounted = false; 
-      task.cancel();
-    };
-  }, [subjectId]);
-
-  // Cleanup: detener la reproducción de audio cuando se desmonta el componente o se sale de la pantalla
-  useEffect(() => {
-    return () => {
-      stopSound();
-    };
-  }, [stopSound]);
-
-  // Filter assessments for this subject from the global store
-  const subjectAssessments = useMemo(() => {
-    if (!subjectId) return [];
-    return storeAssessments.filter(a => a.subject_id === subjectId);
-  }, [storeAssessments, subjectId]);
-
   const {
+    selectedSubject,
+    isLoading,
+    isReady,
+    imagePhotos,
+    pdfDocuments,
+    recentRecordings,
+    storeSubjects,
     averageGrade,
     projectedGrade,
     delta,
@@ -260,22 +46,59 @@ export default function SubjectDetailScreen() {
     finalNeededText,
     recentAssessments,
     thresholdStatus,
-  } = useSubjectGrades(subjectAssessments, selectedSubject, profile);
-
-  const imagePhotos = useMemo(() => photos.filter(p => !p.local_uri?.endsWith('.pdf')), [photos]);
-  // Combine old pdfs saved as photos + new scanned_documents
-  const pdfDocuments = useMemo(() => {
-    const oldPdfs = photos.filter(p => p.local_uri?.endsWith('.pdf')).map(p => ({ ...p, is_legacy_photo: true }));
-    return [...scannedDocuments, ...oldPdfs];
-  }, [photos, scannedDocuments]);
-
-  const subjectSubtitle = selectedSubject?.professor || profile?.major || t('subjects.defaultSubtitle');
-  const subjectScheduleLabel = subjectSchedules[0]
-    ? `${subjectSchedules[0].start_time} - ${subjectSchedules[0].end_time}`
-    : t('subjects.noSchedule');
-
-  const handleTakePhoto = () => setIsPhotoModalVisible(true);
-  const handleOpenScanner = () => setIsScannerVisible(true);
+    playingId,
+    playSound,
+    stopSound,
+    deleteRecordingConfirmed,
+    router,
+    subjectId,
+    profile,
+    isScannerVisible,
+    isPhotoModalVisible,
+    isPDFImportVisible,
+    isViewerVisible,
+    isCreateGradeVisible,
+    isFlashcardModalVisible,
+    flashcardContextText,
+    flashcardBase64,
+    initialViewerIndex,
+    overlayVisible,
+    overlayText,
+    subjectSubtitle,
+    subjectScheduleLabel,
+    recentVideos,
+    allSubjectRecordings,
+    allSubjectVideos,
+    setIsScannerVisible,
+    setIsPhotoModalVisible,
+    setIsViewerVisible,
+    setIsPDFImportVisible,
+    setInitialViewerIndex,
+    setOverlayVisible,
+    setOverlayText,
+    setFlashcardBase64,
+    setIsFlashcardModalVisible,
+    handleDeleteSubject,
+    handleDeleteVideo,
+    handleTakePhoto,
+    handleOpenScanner,
+    handleScannerSave,
+    handlePhotoSave,
+    handleViewerPhotoDeleted,
+    handleViewerOCRSaved,
+    handleDocumentDeleted,
+    handlePDFImportSuccess,
+    handleGenerateFlashcardsFromDocs,
+    handleExportPdf,
+    handleFlashcardModalClose,
+    handleFlashcardSuccess,
+    handleAIGenerateFlashcards,
+    handleOpenCreateGrade,
+    handleCloseCreateGrade,
+    handleDeleteAssessment,
+    handleAssessmentUpdated,
+    handleOpenCategories,
+  } = useSubjectDetail();
 
   if (isLoading) {
     return (
@@ -334,14 +157,8 @@ export default function SubjectDetailScreen() {
             projectedGrade={projectedGrade}
             delta={delta}
             deliveredText={deliveredText}
-            onPressInfo={(column) => {
-              if (column === 'average') {
-                setOverlayText('**Promedio Ponderado**\n\nEste número no es un promedio simple. Es el resultado exacto de calcular cada una de tus notas multiplicada por su peso o porcentaje real.\n\nEs el reflejo verdadero de tu desempeño acumulado hasta este momento.');
-              } else if (column === 'projected') {
-                setOverlayText('**Nota Proyectada & Delta**\n\nUtiliza nuestro motor matemático (Media Móvil Exponencial) para predecir cuál será tu nota final al terminar el semestre si mantienes tu tendencia actual.\n\nEl **Delta** (ej. +0.05 pts) indica si tu rendimiento está subiendo o bajando en comparación con tu promedio actual.');
-              } else if (column === 'tasks') {
-                setOverlayText('**Tareas Completadas**\n\nMuestra el número de actividades y evaluaciones que ya has entregado frente al total planificado de esta materia en específico.');
-              }
+            onPressInfo={() => {
+              setOverlayText('**Promedio Ponderado**\n\nEste número no es un promedio simple. Es el resultado exacto de calcular cada una de tus notas multiplicada por su peso o porcentaje real.\n\n**Nota Proyectada & Delta**\n\nUtiliza nuestro motor matemático (Media Móvil Exponencial) para predecir cuál será tu nota final al terminar el semestre si mantienes tu tendencia actual. El **Delta** (ej. +0.05 pts) indica si tu rendimiento está subiendo o bajando en comparación con tu promedio actual.\n\n**Tareas Completadas**\n\nMuestra el número de actividades y evaluaciones que ya has entregado frente al total planificado de esta materia en específico.');
               setOverlayVisible(true);
             }}
           />
@@ -351,65 +168,28 @@ export default function SubjectDetailScreen() {
             finalNeededText={finalNeededText}
             subjectColor={selectedSubject?.color ?? undefined}
             status={thresholdStatus}
+            objectiveGrade={selectedSubject?.target_grade}
+            onPressInfo={() => {
+              setOverlayText('**Threshold**\n\nEsta es la sección más importante de la aplicación. Aquí se muestra el porcentaje de tu materia que ya has "asegurado" con tus calificaciones actuales.\n\n**Tu Porcentaje Asegurado**\nEs el porcentaje de la nota final que ya está matemáticamente garantizado por las evaluaciones que has completado.\n\n**Tu Objetivo**\nMuestra exactamente qué nota necesitas en el porcentaje restante de la materia para alcanzar tu Threshold (nota objetivo). El cálculo considera todos tus pesos actuales y es 100% preciso.\n\n**Barra de Progreso**\nVisualiza visualmente cuánto falta para llegar al 100% y completar la materia.');
+              setOverlayVisible(true);
+            }}
           />
 
-          <SubjectInsights 
-            recentAssessments={recentAssessments} 
-            onDeleteAssessment={(id) => {
-              const { refreshSubjects } = useDataStore.getState();
-              Promise.all([refreshSubjects(), refreshAssessments()]).catch(console.error);
-            }}
-            onAssessmentUpdated={(updatedAssessment) => {
-              console.log('[SubjectDetailScreen] 📥 onAssessmentUpdated callback recibido:', {
-                updated: updatedAssessment ? true : false,
-                assessmentId: updatedAssessment?.id,
-              });
-
-              console.log('[SubjectDetailScreen] 🔄 Refreshing global store...');
-              const store = useDataStore.getState();
-              Promise.all([store.refreshSubjects(), store.refreshAssessments()])
-                .then(() => console.log('[SubjectDetailScreen] ✅ Global store refreshed'))
-                .catch(err => console.error('[SubjectDetailScreen] ❌ Error refreshing store:', err));
-            }}
-            onOpenCategories={() => {
-              if (subjectId) {
-                router.push(`/categories/${subjectId}?subjectName=${encodeURIComponent(selectedSubject?.name ?? '')}`);
-              }
-            }}
-            onAddAssessment={() => setIsCreateGradeVisible(true)}
+          <SubjectInsights
+            recentAssessments={recentAssessments}
+            onDeleteAssessment={handleDeleteAssessment}
+            onAssessmentUpdated={handleAssessmentUpdated}
+            onOpenCategories={handleOpenCategories}
+            onAddAssessment={handleOpenCreateGrade}
             subjects={storeSubjects}
           />
 
-          <SubjectDocumentsList 
+          <SubjectDocumentsList
             documents={pdfDocuments}
-            onDocumentDeleted={(id) => {
-              setScannedDocuments(prev => prev.filter(d => d.id !== id));
-            }}
+            onDocumentDeleted={handleDocumentDeleted}
             onOpenImportPDF={() => setIsPDFImportVisible(true)}
-            onGenerateFlashcards={async (uris) => {
-              if (uris.length === 0) return;
-              // Leemos la primera imagen para las flashcards (como MVP)
-              // Idealmente las combinariamos o enviariamos todas, pero por ahora tomaremos la primera para este prototipo.
-              try {
-                const base64Data = await FileSystem.readAsStringAsync(uris[0], {
-                  encoding: FileSystem.EncodingType.Base64,
-                });
-                setFlashcardBase64(base64Data);
-                setIsFlashcardModalVisible(true);
-              } catch (e) {
-                console.error('Error leyendo base64 para flashcards:', e);
-              }
-            }}
-            onExportPdf={async (uris) => {
-              if (uris.length === 0) return;
-              try {
-                await generatePdfFromImages(uris);
-              } catch (e: any) {
-                console.error('[PDF] Error:', e?.message || e);
-                const message = t('subjects.pdfGenerationError').replace('{{message}}', e?.message || 'desconocido');
-                showAlert({ title: t('subjects.error'), message, type: 'error' });
-              }
-            }}
+            onGenerateFlashcards={handleGenerateFlashcardsFromDocs}
+            onExportPdf={handleExportPdf}
           />
 
           <SubjectGalleryGrid
@@ -435,13 +215,6 @@ export default function SubjectDetailScreen() {
             videos={recentVideos}
             onDeleteVideo={handleDeleteVideo}
           />
-
-          {isDetailLoading && (
-            <View style={styles.detailLoadingRow}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text style={styles.detailLoadingText}>{t('subjects.refreshing')}</Text>
-            </View>
-          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -451,19 +224,7 @@ export default function SubjectDetailScreen() {
         isVisible={isScannerVisible}
         onClose={() => setIsScannerVisible(false)}
         subjects={selectedSubject ? [selectedSubject as Subject] : []}
-        onSave={async (uri, id, base64) => {
-          if (subjectId) {
-            const updatedPhotos = await getPhotosBySubject(subjectId);
-            const updatedDocs = await getScannedDocumentsBySubject(subjectId);
-            setPhotos(updatedPhotos || []);
-            setScannedDocuments(updatedDocs || []);
-            
-            if (base64) {
-              setFlashcardBase64(base64);
-              setIsFlashcardModalVisible(true);
-            }
-          }
-        }}
+        onSave={handleScannerSave}
       />
 
       <PhotoCaptureModal
@@ -471,14 +232,7 @@ export default function SubjectDetailScreen() {
         onClose={() => setIsPhotoModalVisible(false)}
         subjects={selectedSubject ? [selectedSubject as Subject] : []}
         initialSubjectId={subjectId || undefined}
-        onSave={async () => {
-          if (subjectId) {
-            const updatedPhotos = await getPhotosBySubject(subjectId);
-            const updatedDocs = await getScannedDocumentsBySubject(subjectId);
-            setPhotos(updatedPhotos || []);
-            setScannedDocuments(updatedDocs || []);
-          }
-        }}
+        onSave={handlePhotoSave}
       />
 
       <ImageViewerModal
@@ -486,47 +240,22 @@ export default function SubjectDetailScreen() {
         photos={imagePhotos}
         initialIndex={initialViewerIndex}
         onClose={() => setIsViewerVisible(false)}
-        onPhotoDeleted={(id) => {
-          setPhotos(prev => prev.filter(p => p.id !== id));
-        }}
-        onOCRSaved={async () => {
-          if (subjectId) {
-            const updatedPhotos = await getPhotosBySubject(subjectId);
-            setPhotos(updatedPhotos || []);
-          }
-        }}
+        onPhotoDeleted={handleViewerPhotoDeleted}
+        onOCRSaved={handleViewerOCRSaved}
       />
 
       <PDFImportModal
         isVisible={isPDFImportVisible}
         onClose={() => setIsPDFImportVisible(false)}
         selectedSubjectId={subjectId || undefined}
-        onImportSuccess={async () => {
-          if (subjectId) {
-            const updatedDocs = await getScannedDocumentsBySubject(subjectId);
-            setScannedDocuments(updatedDocs || []);
-          }
-        }}
+        onImportSuccess={handlePDFImportSuccess}
       />
 
       {subjectId && profile?.id && (
         <FlashcardCreatorModal
           visible={isFlashcardModalVisible}
-          onClose={() => {
-            setIsFlashcardModalVisible(false);
-            setFlashcardContextText('');
-            setFlashcardBase64('');
-          }}
-          onSuccess={(deckId: number) => {
-            setIsFlashcardModalVisible(false);
-            setFlashcardContextText('');
-            setFlashcardBase64('');
-            // Navegar al módulo de flashcards para que vea el mazo creado
-            if (deckId) {
-              router.push(`/flashcards?deckId=${deckId}`);
-            }
-          }}
-          // Pasar el texto construido por el backend o la imagen base64
+          onClose={handleFlashcardModalClose}
+          onSuccess={handleFlashcardSuccess}
           content={flashcardContextText}
           imageBase64={flashcardBase64}
           contentType="document"
@@ -545,41 +274,24 @@ export default function SubjectDetailScreen() {
           photos={imagePhotos}
           documents={pdfDocuments as any}
           videos={allSubjectVideos}
-          onGenerateFlashcards={async (contextText, selectedItems) => {
-            // El contextText ya fue construido por el backend (texto de transcripciones,
-            // OCR de docs, captions de videos). Se pasa directamente como `content`
-            // al FlashcardCreatorModal sin necesidad de leer archivos del dispositivo.
-            if (contextText && subjectId && profile?.id) {
-              setFlashcardContextText(contextText);
-              setIsFlashcardModalVisible(true);
-            } else {
-              showAlert({
-                title: t('subjects.noContextTitle'),
-                message: t('subjects.noContextMessage'),
-                type: 'warning',
-              });
-            }
-          }}
+          onGenerateFlashcards={handleAIGenerateFlashcards}
         />
       )}
+
       {selectedSubject && (
         <CreateGradeModal
           visible={isCreateGradeVisible}
-          onClose={() => {
-            setIsCreateGradeVisible(false);
-            // Refresh assessments from API
-            refreshAssessments().catch(console.error);
-          }}
+          onClose={handleCloseCreateGrade}
           subjects={[selectedSubject as any]}
           initialSubjectId={subjectId}
         />
       )}
       </>)}
 
-      <ExplanationOverlay 
-        visible={overlayVisible} 
-        explanation={overlayText} 
-        onDismiss={() => setOverlayVisible(false)} 
+      <ExplanationOverlay
+        visible={overlayVisible}
+        explanation={overlayText}
+        onDismiss={() => setOverlayVisible(false)}
       />
     </>
   );

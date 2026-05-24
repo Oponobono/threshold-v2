@@ -52,7 +52,7 @@ export const CardReviewModal: React.FC<CardReviewModalProps> = ({
   // Timer state
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Card flip state
   const [isFlipped, setIsFlipped] = useState(false);
@@ -175,7 +175,7 @@ export const CardReviewModal: React.FC<CardReviewModalProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} disabled={isSubmitting}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Ionicons name="close" size={24} color={theme.colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('card_review') || 'Revisar Tarjeta'}</Text>
           <View style={{ width: 24 }} />
@@ -213,7 +213,7 @@ export const CardReviewModal: React.FC<CardReviewModalProps> = ({
                     <Text style={styles.cardLabel}>Pregunta</Text>
                     <Text style={styles.cardContent}>{card.front}</Text>
                     <View style={styles.flipHint}>
-                      <Ionicons name="swap" size={16} color="#999" />
+                      <Ionicons name="swap-horizontal-outline" size={16} color="#999" />
                       <Text style={styles.flipHintText}>Toca para ver respuesta</Text>
                     </View>
                   </Animated.View>
@@ -228,7 +228,7 @@ export const CardReviewModal: React.FC<CardReviewModalProps> = ({
                     <Text style={styles.cardLabel}>Respuesta</Text>
                     <Text style={styles.cardContent}>{card.back}</Text>
                     <View style={styles.flipHint}>
-                      <Ionicons name="swap" size={16} color="#999" />
+                      <Ionicons name="swap-horizontal-outline" size={16} color="#999" />
                       <Text style={styles.flipHintText}>Toca para ver pregunta</Text>
                     </View>
                   </Animated.View>
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme.colors.text,
+    color: theme.colors.text.primary,
   },
   content: {
     flex: 1,
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   },
   flipCardContainer: {
     marginBottom: 24,
-    perspective: 1000,
+    transform: [{ perspective: 1000 }] as any,
   },
   flipCardButton: {
     height: 300,
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     fontSize: 20,
-    color: theme.colors.text,
+    color: theme.colors.text.primary,
     lineHeight: 28,
     flex: 1,
   },
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   nextReviewTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: theme.colors.text,
+    color: theme.colors.text.primary,
   },
   nextReviewDate: {
     fontSize: 18,
