@@ -227,7 +227,7 @@ function getActiveVersion(gradingSystemId, userId = null) {
         FROM grading_versions gv
         JOIN grading_systems gs ON gs.id = gv.grading_system_id
         WHERE gv.grading_system_id = ?
-          AND gv.is_active = 1
+          AND COALESCE(CAST(gv.is_active AS INTEGER), 0) = 1
           AND ((gv.owner_type = 'user' AND gv.owner_id = ?)
                OR gv.owner_type = 'system')
         ORDER BY CASE WHEN gv.owner_type = 'user' THEN 0 ELSE 1 END
@@ -239,7 +239,7 @@ function getActiveVersion(gradingSystemId, userId = null) {
         SELECT gv.*, gs.direction, gs.mode, gs.code as system_code
         FROM grading_versions gv
         JOIN grading_systems gs ON gs.id = gv.grading_system_id
-        WHERE gv.grading_system_id = ? AND gv.is_active = 1 AND gv.owner_type = 'system'
+        WHERE gv.grading_system_id = ? AND COALESCE(CAST(gv.is_active AS INTEGER), 0) = 1 AND gv.owner_type = 'system'
         LIMIT 1
       `;
       params = [gradingSystemId];
