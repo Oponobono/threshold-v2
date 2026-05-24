@@ -15,6 +15,7 @@ import { useDataStore } from '../../src/store/useDataStore';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { useCachePreload } from '../../src/hooks/useCachePreload';
 import { cacheService } from '../../src/services/cacheService';
+import { downloadProfileImage } from '../../src/services/profileImageCache';
 import { StudyTimerCard } from '../../src/components/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/SnoozeModal';
 import { useDueCardSnooze, type SnoozeOption } from '../../src/hooks/useDueCardSnooze';
@@ -42,6 +43,9 @@ export default function HybridDashboardScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(() => {
     try { return cacheService.loadProfileSync(); } catch { return null; }
+  });
+  const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(() => {
+    try { return cacheService.getLocalProfileImage(); } catch { return null; }
   });
   // ── Usar store global para subjects, assessments, schedules y predicciones ──
   const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions } = useDataStore();
@@ -101,6 +105,12 @@ export default function HybridDashboardScreen() {
       ]);
 
       setProfile(userProfile);
+
+      if (userProfile?.profile_image) {
+        const localUri = await downloadProfileImage(userProfile.profile_image);
+        if (localUri) setLocalProfileImageUri(localUri);
+      }
+
       setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
       
       // 💾 Guardar profile en caché para próxima apertura
@@ -228,10 +238,7 @@ export default function HybridDashboardScreen() {
     return t('dashboard.gpaSummary', { gpa: gpaStr, name: nameTag });
   }, [nickname, t, overallGpa]);
 
-  const profileAvatarUri = useMemo(() => {
-    const displayName = nickname || t('dashboard.defaultUser');
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=EDEEF2&color=111111&bold=true`;
-  }, [nickname, t]);
+  const profileAvatarUri = localProfileImageUri || profile?.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(nickname || t('dashboard.defaultUser'))}&background=EDEEF2&color=111111&bold=true`;
 
   const shouldUseInfiniteCarousel = subjects.length > SUBJECT_LOOP_THRESHOLD;
 
