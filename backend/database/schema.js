@@ -1042,7 +1042,7 @@ const tableSchema = {
         precision INTEGER DEFAULT 2,
         valid_from TIMESTAMP,
         valid_to TIMESTAMP,
-        is_active BOOLEAN DEFAULT true,
+        is_active INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         archived_at TIMESTAMP
       )

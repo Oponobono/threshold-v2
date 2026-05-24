@@ -32,7 +32,7 @@ const getGradingSystems = (req, res) => {
             gv.owner_type, gv.owner_id
      FROM grading_systems gs
      LEFT JOIN grading_versions gv ON gv.grading_system_id = gs.id
-       AND CAST(gv.is_active AS INTEGER) = 1
+       AND gv.is_active = 1
        AND (gv.owner_type = 'system'
             OR (gv.owner_type = 'user' AND gv.owner_id = ?))
      WHERE gs.is_system_seeded = 1

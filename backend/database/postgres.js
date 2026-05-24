@@ -19,8 +19,9 @@ const initializePostgresDb = async (pool) => {
       }
     }
 
-    // Migrar is_active de INTEGER a BOOLEAN en grading_versions
-    await migrateGradingVersionsBoolean(pool);
+    // NOTE: Removed migration from is_active INTEGER to BOOLEAN
+    // We're keeping is_active as INTEGER in both SQLite and PostgreSQL for consistency
+    // This ensures all queries work without type casting issues
 
     // Crear índices únicos (DESPUÉS de asegurarse que las columnas existen)
     await pool.query(`
