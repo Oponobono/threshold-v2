@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const tableSchema = require('./schema');
 const { migrateColumnsPostgres } = require('./migrations');
 const { seedGradingSystemsPostgres } = require('./seeders');
+const { migrateGradingVersionsBoolean } = require('./migrations/migrate-is-active-boolean');
 
 const initializePostgresDb = async (pool) => {
   try {
@@ -17,6 +18,9 @@ const initializePostgresDb = async (pool) => {
         await migrateColumnsPostgres(pool, tableName, schema.columns);
       }
     }
+
+    // Migrar is_active de INTEGER a BOOLEAN en grading_versions
+    await migrateGradingVersionsBoolean(pool);
 
     // Crear índices únicos (DESPUÉS de asegurarse que las columnas existen)
     await pool.query(`

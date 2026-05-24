@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-05-24T18:21:32.946Z",
+  "results": {
+    "Database Initialization": {
+      "status": "OK",
+      "details": "Base de datos inicializada correctamente"
+    },
+    "Table Structure": {
+      "status": "OK",
+      "details": "Todas las 15 columnas existen"
+    },
+    "Users Check": {
+      "status": "OK",
+      "details": "Encontrados 1 usuario(s)"
+    },
+    "Profile Update Test": {
+      "status": "OK",
+      "details": "Actualización exitosa (1 filas)"
+    },
+    "Indexes": {
+      "status": "OK",
+      "details": "Todos los índices esperados existen"
+    }
+  },
+  "errors": []
+}
