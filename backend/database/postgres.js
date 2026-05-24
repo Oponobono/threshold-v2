@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const tableSchema = require('./schema');
 const { migrateColumnsPostgres } = require('./migrations');
 const { seedGradingSystemsPostgres } = require('./seeders');
-const { migrateGradingVersionsBoolean } = require('./migrations/migrate-is-active-boolean');
+const { fixIsActiveBooleanToInteger } = require('./migrations/fix-is-active-type');
 
 const initializePostgresDb = async (pool) => {
   try {
@@ -19,9 +19,8 @@ const initializePostgresDb = async (pool) => {
       }
     }
 
-    // NOTE: Removed migration from is_active INTEGER to BOOLEAN
-    // We're keeping is_active as INTEGER in both SQLite and PostgreSQL for consistency
-    // This ensures all queries work without type casting issues
+    // Fix any existing is_active BOOLEAN columns back to INTEGER for consistency
+    await fixIsActiveBooleanToInteger(pool);
 
     // Crear índices únicos (DESPUÉS de asegurarse que las columnas existen)
     await pool.query(`
