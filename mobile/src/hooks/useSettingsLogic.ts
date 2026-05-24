@@ -177,6 +177,7 @@ export const useSettingsLogic = () => {
       // Load Grading Systems
       try {
         const systems = await fetchGradingSystems();
+        console.log('[useSettingsLogic] Loaded systems:', systems);
         setGradingSystems(systems);
         setIsLoadingSystems(false);
         
@@ -202,13 +203,15 @@ export const useSettingsLogic = () => {
         }
         
         if (currentSystemId) {
+          console.log('[useSettingsLogic] Setting selected system to:', currentSystemId);
           setSelectedSystemId(currentSystemId);
         } else if (systems.length > 0) {
+          console.log('[useSettingsLogic] No current system found, setting first system:', systems[0].id);
           setSelectedSystemId(systems[0].id);
         }
 
       } catch (err) {
-        console.warn('Failed to load grading systems', err);
+        console.warn('[useSettingsLogic] Failed to load grading systems', err);
         setIsLoadingSystems(false);
       }
 

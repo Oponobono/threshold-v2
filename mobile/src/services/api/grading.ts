@@ -94,10 +94,25 @@ export interface GradeHistoryEntry {
  * Obtiene todos los sistemas de calificación disponibles para el usuario.
  */
 export const fetchGradingSystems = async (): Promise<GradingSystem[]> => {
-  const response = await fetchWithFallback('/grading-systems');
-  if (!response.ok) throw new Error('Failed to fetch grading systems');
-  const data = await parseJsonSafely(response);
-  return data?.systems || [];
+  try {
+    console.log('[API] Fetching grading systems...');
+    const response = await fetchWithFallback('/grading-systems');
+    console.log('[API] Grading systems response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch grading systems (${response.status})`);
+    }
+    
+    const data = await parseJsonSafely(response);
+    console.log('[API] Parsed grading systems data:', data);
+    
+    const systems = data?.systems || [];
+    console.log('[API] Returning', systems.length, 'grading systems');
+    return systems;
+  } catch (error) {
+    console.error('[API] Error fetching grading systems:', error);
+    throw error;
+  }
 };
 
 /**
