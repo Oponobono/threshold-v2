@@ -32,7 +32,7 @@ const getGradingSystems = (req, res) => {
             gv.owner_type, gv.owner_id
      FROM grading_systems gs
      LEFT JOIN grading_versions gv ON gv.grading_system_id = gs.id
-       AND gv.is_active = true
+       AND (gv.is_active = true OR gv.is_active = 1)
        AND (gv.owner_type = 'system'
             OR (gv.owner_type = 'user' AND gv.owner_id = ?))
      WHERE gs.is_system_seeded = 1
@@ -42,10 +42,15 @@ const getGradingSystems = (req, res) => {
     (err, rows) => {
       if (err) {
         console.error('[GradingController] Error fetching systems:', err.message);
-        return res.status(500).json({ error: 'Error obteniendo sistemas de calificación.' });
+        console.error('[GradingController] Error code:', err.code);
+        console.error('[GradingController] Error details:', err);
+        return res.status(500).json({ error: 'Error obteniendo sistemas de calificación.', details: err.message });
       }
       console.log(`[GradingController] ✓ Devolviendo ${rows?.length || 0} sistemas`);
-      res.json({ systems: rows });
+      if (!rows || rows.length === 0) {
+        console.warn('[GradingController] ⚠️ No systems returned from query');
+      }
+      res.json({ systems: rows || [] });
     }
   );
 };

@@ -31,7 +31,7 @@ async function migrateAssessments() {
           SELECT gv.id, gv.min_value, gv.max_value, gv.passing_value, gv.precision, gs.direction 
           FROM grading_versions gv
           JOIN grading_systems gs ON gv.grading_system_id = gs.id
-          WHERE gs.code = ? AND gv.is_active = true
+          WHERE gs.code = ? AND (gv.is_active = true OR gv.is_active = 1)
         `, [systemCode]);
 
         if (versionRow) {
