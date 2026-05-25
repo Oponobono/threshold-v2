@@ -798,9 +798,6 @@ export default function SettingsScreen() {
         editStudyGoal={editStudyGoal}
         editPin={editPin}
         editProfileImage={editProfileImage}
-        gradingSystems={gradingSystems}
-        selectedSystemId={selectedSystemId}
-        onSystemSelect={(id) => setSelectedSystemId(id)}
         onNameChange={setEditName}
         onLastnameChange={setEditLastname}
         onUsernameChange={setEditUsername}

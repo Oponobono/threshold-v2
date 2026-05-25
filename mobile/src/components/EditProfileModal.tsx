@@ -20,9 +20,6 @@ import { UserProfile } from '../services/api';
 interface EditProfileModalProps {
   visible: boolean;
   profile: UserProfile | null;
-  gradingSystems: any[];
-  selectedSystemId: number | null;
-  onSystemSelect: (id: number) => void;
   editName: string;
   editLastname: string;
   editUsername: string;
@@ -120,9 +117,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   editSemester,
   editStudyGoal,
   editPin,
-  gradingSystems,
-  selectedSystemId,
-  onSystemSelect,
   onNameChange,
   onLastnameChange,
   onUsernameChange,
@@ -385,64 +379,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                         color: isActive ? '#fff' : theme.colors.text.secondary,
                       }}>
                         {t(`register.goals.${goal}`)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Separador */}
-              <View style={{ height: 1, backgroundColor: theme.colors.border, marginBottom: 16 }} />
-
-              {/* Sección: Sistema de Calificación */}
-              <Text style={{
-                fontSize: 11, fontWeight: '800',
-                color: theme.colors.primary,
-                textTransform: 'uppercase',
-                letterSpacing: 1,
-                marginBottom: 12,
-              }}>
-                {t('academic.gradingScales', 'Sistema de Calificación')}
-              </Text>
-              
-              <View style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                gap: 8,
-                marginBottom: 14,
-              }}>
-                {gradingSystems.map((system) => {
-                  const isActive = selectedSystemId === system.id;
-                  return (
-                    <TouchableOpacity
-                      key={system.id}
-                      onPress={() => onSystemSelect(system.id)}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 10,
-                        borderRadius: theme.borderRadius.md,
-                        backgroundColor: isActive ? theme.colors.primary : theme.colors.inputBackground,
-                        borderWidth: 1,
-                        borderColor: isActive ? theme.colors.primary : theme.colors.border,
-                        flex: 1,
-                        minWidth: '45%',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Text style={{
-                        fontSize: theme.typography.sizes.sm,
-                        fontWeight: isActive ? '700' : '500',
-                        color: isActive ? '#fff' : theme.colors.text.secondary,
-                      }} numberOfLines={1}>
-                        {system.name}
-                      </Text>
-                      <Text style={{
-                        fontSize: 10,
-                        fontWeight: '500',
-                        color: isActive ? '#fff' : theme.colors.text.secondary,
-                        opacity: 0.8
-                      }} numberOfLines={1}>
-                        {system.min_value} – {system.max_value}
                       </Text>
                     </TouchableOpacity>
                   );
