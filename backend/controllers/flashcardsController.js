@@ -554,6 +554,53 @@ exports.deleteDeck = (req, res) => {
 };
 
 /**
+ * Elimina un mazo compartido de un grupo (solo owner del mazo o admin del grupo)
+ */
+exports.removeDeckFromGroup = (req, res) => {
+  const { deckId } = req.params;
+  const { user_id, group_pin_id } = req.body;
+
+  if (!user_id || !group_pin_id) {
+    return res.status(400).json({ error: 'Faltan campos requeridos (user_id, group_pin_id).' });
+  }
+
+  // Verificar si el usuario es owner del mazo o admin del grupo
+  db.get(`SELECT id, user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
+
+    const isOwner = Number(deck.user_id) === Number(user_id);
+
+    if (!isOwner) {
+      // Verificar si es admin del grupo
+      db.get(`SELECT id FROM group_memberships WHERE user_id = ? AND group_pin_id = ? AND role = 'creator'`,
+        [user_id, group_pin_id],
+        (err2, membership) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          if (!membership) return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo del grupo.' });
+
+          deleteFromGroup();
+        }
+      );
+    } else {
+      deleteFromGroup();
+    }
+
+    function deleteFromGroup() {
+      db.run(
+        `DELETE FROM shared_group_decks WHERE deck_id = ? AND group_pin_id = ?`,
+        [deckId, group_pin_id],
+        function(delErr) {
+          if (delErr) return res.status(500).json({ error: delErr.message });
+          if (this.changes === 0) return res.status(404).json({ error: 'El mazo no estaba compartido en este grupo.' });
+          res.json({ success: true, message: 'Mazo eliminado del grupo exitosamente.' });
+        }
+      );
+    }
+  });
+};
+
+/**
  * Comparte un mazo con otro usuario usando su PIN o con un grupo
  */
 exports.shareDeck = (req, res) => {

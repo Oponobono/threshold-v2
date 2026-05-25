@@ -33,6 +33,12 @@ const initializePostgresDb = async (pool) => {
       ON users(share_pin) WHERE share_pin IS NOT NULL
     `);
 
+    // Índice único para youtube_transcripts (permite ON CONFLICT)
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_yt_transcripts_video_id 
+      ON youtube_transcripts(video_id)
+    `);
+
     // Índices de rendimiento
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_decks_user_created 

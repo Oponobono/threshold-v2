@@ -288,20 +288,19 @@ exports.createSubject = (req, res) => {
 exports.deleteSubject = (req, res) => {
   const { subjectId } = req.params;
   
-  db.serialize(() => {
-    db.run(`DELETE FROM assessments WHERE subject_id = ?`, [subjectId]);
-    db.run(`DELETE FROM schedules WHERE subject_id = ?`, [subjectId]);
-    db.run(`DELETE FROM photos WHERE subject_id = ?`, [subjectId]);
-    db.run(`DELETE FROM scanned_documents WHERE subject_id = ?`, [subjectId]);
-    db.run(`DELETE FROM audio_recordings WHERE subject_id = ?`, [subjectId]);
-    db.run(`DELETE FROM youtube_videos WHERE subject_id = ?`, [subjectId]);
-    db.run(`DELETE FROM flashcard_decks WHERE subject_id = ?`, [subjectId]);
-    
-    db.run(`DELETE FROM subjects WHERE id = ?`, [subjectId], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true, message: 'Materia y elementos asociados eliminados correctamente' });
-    });
-  });
+  const tables = ['assessments', 'schedules', 'photos', 'scanned_documents', 'audio_recordings', 'youtube_videos', 'flashcard_decks'];
+  let i = 0;
+  const next = () => {
+    if (i < tables.length) {
+      db.run(`DELETE FROM ${tables[i]} WHERE subject_id = ?`, [subjectId], () => { i++; next(); });
+    } else {
+      db.run(`DELETE FROM subjects WHERE id = ?`, [subjectId], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, message: 'Materia y elementos asociados eliminados correctamente' });
+      });
+    }
+  };
+  next();
 };
 
 /**

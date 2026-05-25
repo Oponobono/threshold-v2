@@ -133,7 +133,7 @@ exports.savePhoto = (req, res) => {
     tags = generateTagsFromOCR(ocr_text);
   }
 
-  db.run(query, [subject_id, local_uri, es_favorita || 0, ocr_text || null, tags, group_id || null], function(err) {
+  db.run(query, [subject_id, local_uri, es_favorita ? 1 : 0, ocr_text || null, tags, group_id || null], function(err) {
     if (err) {
       console.error('[Gallery] Save error:', err.message);
       return res.status(500).json({ error: err.message });

@@ -401,7 +401,7 @@ const tableSchema = {
     sqlite: `
       CREATE TABLE IF NOT EXISTS youtube_transcripts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        video_id INTEGER NOT NULL,
+        video_id INTEGER NOT NULL UNIQUE,
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
@@ -415,7 +415,7 @@ const tableSchema = {
     postgres: `
       CREATE TABLE IF NOT EXISTS youtube_transcripts (
         id SERIAL PRIMARY KEY,
-        video_id INTEGER NOT NULL REFERENCES youtube_videos(id) ON DELETE CASCADE,
+        video_id INTEGER NOT NULL UNIQUE REFERENCES youtube_videos(id) ON DELETE CASCADE,
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,

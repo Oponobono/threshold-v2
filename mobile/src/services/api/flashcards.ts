@@ -263,6 +263,19 @@ export const shareDeck = async (deckId: number, options: { recipientPin?: string
   return data;
 };
 
+/** Elimina un mazo compartido de un grupo (solo owner o admin del grupo) */
+export const removeDeckFromGroup = async (deckId: number, groupPinId: string): Promise<any> => {
+  const userId = await getUserId();
+  const response = await fetchWithFallback(`/flashcard-decks/${deckId}/group-share`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, group_pin_id: groupPinId }),
+  });
+  const data = await parseJsonSafely(response);
+  if (!response.ok) throw new Error(data?.error || 'Error al eliminar el mazo del grupo');
+  return data;
+};
+
 /** Elimina un mazo completo o quita un mazo compartido de la lista */
 export const deleteFlashcardDeck = async (deckId: number) => {
   const userId = await getUserId();

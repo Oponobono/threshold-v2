@@ -64,8 +64,8 @@ exports.saveThresholdOverrides = (req, res) => {
   if (!Array.isArray(overrides)) {
     return res.status(400).json({ error: 'overrides debe ser un array' });
   }
-  db.serialize(() => {
-    db.run(`DELETE FROM subject_threshold_overrides WHERE user_id = ?`, [userId]);
+  db.run(`DELETE FROM subject_threshold_overrides WHERE user_id = ?`, [userId], (deleteErr) => {
+    if (deleteErr) return res.status(500).json({ error: deleteErr.message });
     let completed = 0;
     const total = overrides.length;
     if (total === 0) return res.json({ message: 'Excepciones guardadas' });
@@ -97,20 +97,20 @@ exports.createCustomGradingSystem = async (req, res) => {
   db.run(
     `INSERT INTO grading_systems (code, name, type, mode, direction, country_code, is_system_seeded, is_custom, created_by_user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [systemCode, name, type || 'numeric', mode || 'continuous', direction || 'ascending', null, false, true, userId],
+    [systemCode, name, type || 'numeric', mode || 'continuous', direction || 'ascending', null, 0, 1, userId],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
       const systemId = this.lastID;
       db.run(
         `INSERT INTO grading_versions (grading_system_id, owner_type, owner_id, min_value, max_value, passing_value, precision, is_active)
          VALUES (?, 'user', ?, ?, ?, ?, ?, ?)`,
-        [systemId, String(userId), min_value, max_value, passing_value, precision || 2, true],
+        [systemId, String(userId), min_value, max_value, passing_value, precision || 2, 1],
         function (err) {
           if (err) return res.status(500).json({ error: err.message });
           const versionId = this.lastID;
           const scales = [
-            { label: 'Aprobado', min: passing_value, max: max_value, sort_order: 1, is_passing: true, gpa_equivalent: 3.0, color: '#4CAF50' },
-            { label: 'Reprobado', min: min_value, max: Math.max(min_value, passing_value - 0.01), sort_order: 2, is_passing: false, gpa_equivalent: 0.0, color: '#F44336' },
+            { label: 'Aprobado', min: passing_value, max: max_value, sort_order: 1, is_passing: 1, gpa_equivalent: 3.0, color: '#4CAF50' },
+            { label: 'Reprobado', min: min_value, max: Math.max(min_value, passing_value - 0.01), sort_order: 2, is_passing: 0, gpa_equivalent: 0.0, color: '#F44336' },
           ];
           let scaleCount = 0;
           for (const s of scales) {

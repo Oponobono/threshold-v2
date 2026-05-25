@@ -6,7 +6,7 @@ import { useFlashcardsManager } from './useFlashcardsManager';
 import { useDataStore } from '../store/useDataStore';
 import { useCustomAlert } from '../components/CustomAlert';
 import {
-  getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck, shareDeck,
+  getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck, shareDeck, removeDeckFromGroup,
 } from '../services/api';
 import {
   scheduleDueDeckNotification,
@@ -39,6 +39,30 @@ export function useFlashcards() {
   const [sharePin, setSharePin] = useState('');
   const [isSharing, setIsSharing] = useState(false);
 
+  const handleRemoveFromGroup = useCallback(async (deck: FlashcardDeck, groupPin: string) => {
+    showAlert({
+      title: t('modals.removeFromGroup', 'Quitar del grupo'),
+      message: t('modals.removeFromGroupConfirm', { title: deck.title, defaultValue: `¿Deseas quitar el mazo "${deck.title}" del grupo?` }),
+      type: 'confirm',
+      buttons: [
+        { text: t('common.cancel', 'Cancelar'), style: 'cancel' },
+        {
+          text: t('common.delete', 'Quitar'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeDeckFromGroup(deck.id, groupPin);
+              setGroupDecks((prev: any[]) => prev.filter((d: any) => d.id !== deck.id));
+              showAlert({ title: t('common.success', 'Éxito'), message: 'Mazo quitado del grupo.', type: 'success' });
+            } catch (e: any) {
+              showAlert({ title: t('common.error', 'Error'), message: e.message, type: 'error' });
+            }
+          },
+        },
+      ],
+    });
+  }, [t, showAlert]);
+
   const handleShareDeck = useCallback(async (groupPinId?: string) => {
     if (!shareDeckTarget) return;
     if (!groupPinId && !sharePin.trim()) return;
@@ -59,6 +83,9 @@ export function useFlashcards() {
   const [activeTab, setActiveTab] = useState<'mazos' | 'grupos'>('mazos');
   const [groups, setGroups] = useState<any[]>([]);
   const [activeGroupPin, setActiveGroupPin] = useState<string | null>(null);
+  const isGroupAdmin = activeGroupPin ? groups.some(
+    (g: any) => g.group_pin_id === activeGroupPin && g.role === 'creator'
+  ) : false;
   const [groupDecks, setGroupDecks] = useState<any[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
 
@@ -231,16 +258,24 @@ export function useFlashcards() {
 
   // Load group decks when selected group changes
   useEffect(() => {
-    if (activeGroupPin && activeTab === 'grupos') {
-      setLoadingGroups(true);
-      getGroupDecks(activeGroupPin).then(decks => {
-        setGroupDecks(decks || []);
+    if (activeTab !== 'grupos') { setGroupDecks([]); return; }
+    setLoadingGroups(true);
+    if (activeGroupPin) {
+      getGroupDecks(activeGroupPin).then(decks => { setGroupDecks(decks || []); setLoadingGroups(false); });
+    } else if (groups.length > 0) {
+      Promise.all(groups.map((g: any) =>
+        getGroupDecks(g.group_pin_id).then(decks =>
+          (decks || []).map((d: any) => ({ ...d, _groupPinId: g.group_pin_id }))
+        )
+      )).then(results => {
+        const seen = new Set();
+        setGroupDecks(results.flat().filter((d: any) => { if (!d || seen.has(d.id)) return false; seen.add(d.id); return true; }));
         setLoadingGroups(false);
       });
     } else {
-      setGroupDecks([]);
+      setGroupDecks([]); setLoadingGroups(false);
     }
-  }, [activeGroupPin, activeTab]);
+  }, [activeGroupPin, activeTab, groups]);
 
   return {
     showSearch, showNewDeckModal, showImportModal, showMenuModal, showNewCardModal,
@@ -261,5 +296,6 @@ export function useFlashcards() {
     activeTab, setActiveTab,
     groups, activeGroupPin, setActiveGroupPin,
     groupDecks, loadingGroups,
+    isGroupAdmin, handleRemoveFromGroup,
   };
 }

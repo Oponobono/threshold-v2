@@ -23,6 +23,7 @@ exports.getCurrentSubjectPrediction = (req, res) => {
     WHERE sub.user_id = ? 
       AND s.day_of_week = ? 
       AND ? BETWEEN s.start_time AND s.end_time
+    ORDER BY s.start_time ASC
     LIMIT 1
   `;
 

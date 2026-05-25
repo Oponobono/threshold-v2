@@ -20,7 +20,7 @@ exports.createCategory = (req, res) => {
     INSERT INTO assessment_categories (subject_id, name, weight, drop_lowest)
     VALUES (?, ?, ?, ?)
   `;
-  db.run(query, [subjectId, name, weight || null, drop_lowest || 0], function(err) {
+  db.run(query, [subjectId, name, weight || null, drop_lowest ? 1 : 0], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({ id: this.lastID, subject_id: Number(subjectId), name, weight: weight || null, drop_lowest: drop_lowest || 0 });
   });
@@ -35,7 +35,7 @@ exports.updateCategory = (req, res) => {
     SET name = ?, weight = ?, drop_lowest = ?
     WHERE id = ?
   `;
-  db.run(query, [name, weight || null, drop_lowest || 0, id], function(err) {
+  db.run(query, [name, weight || null, drop_lowest ? 1 : 0, id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     if (this.changes === 0) return res.status(404).json({ error: 'Categoría no encontrada' });
     res.json({ message: 'Categoría actualizada con éxito' });

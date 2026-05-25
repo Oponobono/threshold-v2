@@ -45,6 +45,7 @@ export default function FlashcardsScreen() {
     activeTab, setActiveTab,
     groups, activeGroupPin, setActiveGroupPin,
     groupDecks, loadingGroups,
+    isGroupAdmin, handleRemoveFromGroup,
   } = useFlashcards();
 
   if (isLoading && filteredDecks.length === 0 && activeTab === 'mazos') {
@@ -230,39 +231,61 @@ export default function FlashcardsScreen() {
                       const isOwn = (item as any).is_own;
                       const duedeckIds = getDuedeckIds();
                       const isDue = duedeckIds.has(item.id);
-                      return (
+                      const canRemove = (isOwn || isGroupAdmin) && (!!activeGroupPin || !!(item as any)._groupPinId);
+                      const card = (
                         <TouchableOpacity
                           style={[flashcardStyles.deckCard, { marginBottom: 0, borderWidth: 1, borderColor: isDue ? theme.colors.danger : '#E0E0E0' }]}
                           activeOpacity={0.85}
                           onPress={() => handleOpenStudy(item)}
                         >
-                          <View style={[flashcardStyles.deckBadge, { backgroundColor: (item as any).subject_color || '#DDE7FF' }]}>
-                            <MaterialCommunityIcons
-                              name={(item as any).subject_icon || 'cards-outline'}
-                              size={20}
-                              color={theme.colors.text.primary}
-                            />
-                          </View>
-                          <View style={{ flex: 1, paddingRight: 8 }}>
-                            <Text style={flashcardStyles.deckTitle} numberOfLines={1}>{item.title}</Text>
-                            {!isOwn && (
-                              <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
-                                por @{item.owner_username || 'compañero'}
-                              </Text>
-                            )}
-                            <Text style={flashcardStyles.deckMeta} numberOfLines={1}>{item.subject_name}</Text>
-                            <View style={flashcardStyles.deckStatsRow}>
-                              <Text style={flashcardStyles.statLabel}>{Number(item.card_count ?? 0)} tarjetas</Text>
-                              {Number(item.card_count ?? 0) > 0 && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                  <Text style={flashcardStyles.statValueSuccess}>✓ {Number(item.review_count ?? 0)}</Text>
-                                  <Text style={flashcardStyles.statValuePending}>💪 {Number(item.learning_count ?? 0) + Number(item.new_count ?? 0)}</Text>
-                                </View>
-                              )}
+                            <View style={[flashcardStyles.deckBadge, { backgroundColor: (item as any).subject_color || '#DDE7FF' }]}>
+                              <MaterialCommunityIcons
+                                name={(item as any).subject_icon || 'cards-outline'}
+                                size={20}
+                                color={theme.colors.text.primary}
+                              />
                             </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                              <Text style={flashcardStyles.deckTitle} numberOfLines={1}>{item.title}</Text>
+                              {!isOwn && (
+                                <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
+                                  por @{item.owner_username || 'compañero'}
+                                </Text>
+                              )}
+                              <Text style={flashcardStyles.deckMeta} numberOfLines={1}>{item.subject_name}</Text>
+                              <View style={flashcardStyles.deckStatsRow}>
+                                <Text style={flashcardStyles.statLabel}>{Number(item.card_count ?? 0)} tarjetas</Text>
+                                {Number(item.card_count ?? 0) > 0 && (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Text style={flashcardStyles.statValueSuccess}>✓ {Number(item.review_count ?? 0)}</Text>
+                                    <Text style={flashcardStyles.statValuePending}>💪 {Number(item.learning_count ?? 0) + Number(item.new_count ?? 0)}</Text>
+                                  </View>
+                                )}
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      return canRemove ? (
+                        <SwipeableCard
+                          onOpen={(closeFn) => {
+                            if (activeCloseRef.current && activeCloseRef.current !== closeFn) activeCloseRef.current();
+                            activeCloseRef.current = closeFn;
+                          }}
+                          renderActions={(close) => (
+                            <View style={[flashcardStyles.swipeActionsPill, { width: 70 }]}>
+                              <TouchableOpacity
+                                style={flashcardStyles.swipeActionBtn}
+                                onPress={() => { close(); handleRemoveFromGroup(item, (item as any)._groupPinId || activeGroupPin!); }}
+                                activeOpacity={0.6}
+                              >
+                                <Ionicons name="trash-outline" size={17} color={theme.colors.danger} />
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        >
+                          {card}
+                        </SwipeableCard>
+                      ) : card;
                     }}
                   />
                 )}

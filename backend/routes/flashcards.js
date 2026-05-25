@@ -393,6 +393,7 @@ router.delete('/flashcard-decks/:deckId', flashcardsController.deleteDeck);
  *         description: PIN no encontrado
  */
 router.post('/flashcard-decks/:deckId/share', flashcardsController.shareDeck);
+router.delete('/flashcard-decks/:deckId/group-share', flashcardsController.removeDeckFromGroup);
 
 /**
  * @swagger

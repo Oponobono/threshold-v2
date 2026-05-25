@@ -67,6 +67,10 @@ const initializeSqliteDb = async (db) => {
       {
         sql: `CREATE INDEX IF NOT EXISTS idx_decks_user_created ON flashcard_decks(user_id, created_at)`,
         name: 'idx_decks_user_created'
+      },
+      {
+        sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_yt_transcripts_video_id ON youtube_transcripts(video_id)`,
+        name: 'idx_yt_transcripts_video_id'
       }
     ];
 

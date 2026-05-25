@@ -28,6 +28,7 @@ import {
   getFlashcardsPrioritized,
   getUserId,
   shareDeck,
+  removeDeckFromGroup,
   deleteFlashcardDeck,
   downloadReport,
 } from '../services/api';
@@ -86,6 +87,35 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const [sharePin, setSharePin] = useState('');
   const [isSharing, setIsSharing] = useState(false);
 
+  // Check if user is admin of the active group
+  const isGroupAdmin = activeGroupPin ? groups.some(
+    (g: any) => g.group_pin_id === activeGroupPin && g.role === 'creator'
+  ) : false;
+
+  const handleRemoveFromGroup = async (deck: FlashcardDeck, groupPin: string) => {
+    showAlert({
+      title: t('modals.removeFromGroup', 'Quitar del grupo'),
+      message: t('modals.removeFromGroupConfirm', { title: deck.title, defaultValue: `¿Deseas quitar el mazo "${deck.title}" del grupo?` }),
+      type: 'confirm',
+      buttons: [
+        { text: t('common.cancel', 'Cancelar'), style: 'cancel' },
+        {
+          text: t('common.delete', 'Quitar'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeDeckFromGroup(deck.id, groupPin);
+              setGroupDecks((prev: FlashcardDeck[]) => prev.filter((d) => d.id !== deck.id));
+              showAlert({ title: t('common.success', 'Éxito'), message: 'Mazo quitado del grupo.', type: 'success' });
+            } catch (e: any) {
+              showAlert({ title: t('common.error', 'Error'), message: e.message, type: 'error' });
+            }
+          },
+        },
+      ],
+    });
+  };
+
   const handleShareDeck = async (groupPinId?: string) => {
     if (!shareDeckTarget) return;
     if (!groupPinId && !sharePin.trim()) return;
@@ -136,18 +166,26 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
     }
   }, [isVisible]);
 
-  // Load group decks when a group is selected
+  // Load group decks when selected group changes
   useEffect(() => {
-    if (activeGroupPin && activeTab === 'grupos') {
-      setLoadingGroups(true);
-      getGroupDecks(activeGroupPin).then(decks => {
-        setGroupDecks(decks || []);
+    if (activeTab !== 'grupos') { setGroupDecks([]); return; }
+    setLoadingGroups(true);
+    if (activeGroupPin) {
+      getGroupDecks(activeGroupPin).then(decks => { setGroupDecks(decks || []); setLoadingGroups(false); });
+    } else if (groups.length > 0) {
+      Promise.all(groups.map((g: any) =>
+        getGroupDecks(g.group_pin_id).then(decks =>
+          (decks || []).map((d: any) => ({ ...d, _groupPinId: g.group_pin_id }))
+        )
+      )).then(results => {
+        const seen = new Set();
+        setGroupDecks(results.flat().filter((d: any) => { if (!d || seen.has(d.id)) return false; seen.add(d.id); return true; }));
         setLoadingGroups(false);
       });
     } else {
-      setGroupDecks([]);
+      setGroupDecks([]); setLoadingGroups(false);
     }
-  }, [activeGroupPin, activeTab]);
+  }, [activeGroupPin, activeTab, groups]);
 
   // ── Study session ─────────────────────────────────────────────────────────
 
@@ -419,43 +457,65 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                   keyExtractor={(d) => d.id.toString()}
                   style={{ flex: 1 }}
                   contentContainerStyle={{ paddingBottom: 8 }}
-                  renderItem={({ item }) => {
+                    renderItem={({ item }) => {
                     const isOwn = (item as any).is_own;
                     const duedeckIds = getDuedeckIds();
                     const isDue = duedeckIds.has(item.id);
-                    return (
-                      <TouchableOpacity
-                        style={[s.deckCard, { marginBottom: 8, borderWidth: 1, borderColor: isDue ? theme.colors.danger : '#E0E0E0' }]}
-                        activeOpacity={0.85}
-                        onPress={() => openStudySession(item)}
-                      >
-                        <View style={[s.deckBadge, { backgroundColor: (item as any).subject_color || '#DDE7FF' }]}>
-                          <MaterialCommunityIcons
-                            name={(item as any).subject_icon || 'cards-outline'}
-                            size={20}
-                            color={theme.colors.text.primary}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.deckTitle} numberOfLines={1} ellipsizeMode="tail">{item.title}</Text>
-                          {!isOwn && (
-                            <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
-                              {t('flashcards.sharedBy', 'por')} @{item.owner_username || t('flashcards.peer', 'compañero')}
-                            </Text>
-                          )}
-                          <Text style={s.deckMeta} numberOfLines={1}>{item.subject_name}</Text>
-                          <View style={s.deckStatsRow}>
-                            <Text style={s.statLabel}>{Number(item.card_count ?? 0)} {t('flashcards.cards')}</Text>
-                            {Number(item.card_count ?? 0) > 0 && (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Text style={s.statValueSuccess}>✓ {Number(item.review_count ?? 0)}</Text>
-                                <Text style={s.statValuePending}>💪 {Number(item.learning_count ?? 0) + Number(item.new_count ?? 0)}</Text>
-                              </View>
-                            )}
+                    const canRemove = (isOwn || isGroupAdmin) && (!!activeGroupPin || !!(item as any)._groupPinId);
+                    const card = (
+                        <TouchableOpacity
+                          style={[s.deckCard, { marginBottom: 8, borderWidth: 1, borderColor: isDue ? theme.colors.danger : '#E0E0E0' }]}
+                          activeOpacity={0.85}
+                          onPress={() => openStudySession(item)}
+                        >
+                          <View style={[s.deckBadge, { backgroundColor: (item as any).subject_color || '#DDE7FF' }]}>
+                            <MaterialCommunityIcons
+                              name={(item as any).subject_icon || 'cards-outline'}
+                              size={20}
+                              color={theme.colors.text.primary}
+                            />
                           </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.deckTitle} numberOfLines={1} ellipsizeMode="tail">{item.title}</Text>
+                            {!isOwn && (
+                              <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
+                                {t('flashcards.sharedBy', 'por')} @{item.owner_username || t('flashcards.peer', 'compañero')}
+                              </Text>
+                            )}
+                            <Text style={s.deckMeta} numberOfLines={1}>{item.subject_name}</Text>
+                            <View style={s.deckStatsRow}>
+                              <Text style={s.statLabel}>{Number(item.card_count ?? 0)} {t('flashcards.cards')}</Text>
+                              {Number(item.card_count ?? 0) > 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <Text style={s.statValueSuccess}>✓ {Number(item.review_count ?? 0)}</Text>
+                                  <Text style={s.statValuePending}>💪 {Number(item.learning_count ?? 0) + Number(item.new_count ?? 0)}</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    return canRemove ? (
+                      <SwipeableCard
+                        onOpen={(closeFn) => {
+                          if (activeCloseRef.current && activeCloseRef.current !== closeFn) activeCloseRef.current();
+                          activeCloseRef.current = closeFn;
+                        }}
+                        renderActions={(close) => (
+                          <View style={[s.swipeActionsPill, { width: 70 }]}>
+                            <TouchableOpacity
+                              style={s.swipeActionBtn}
+                              onPress={() => { close(); handleRemoveFromGroup(item, (item as any)._groupPinId || activeGroupPin!); }}
+                              activeOpacity={0.6}
+                            >
+                              <Ionicons name="trash-outline" size={17} color={theme.colors.danger} />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      >
+                        {card}
+                      </SwipeableCard>
+                    ) : card;
                   }}
                 />
               )}
