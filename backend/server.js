@@ -73,9 +73,6 @@ app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
-// Inicializar la base de datos y crear tablas
-initializeDb();
-
 // Configurar Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
@@ -204,5 +201,11 @@ function startServer(port, retriesLeft) {
   });
 }
 
-startServer(PORT, MAX_PORT_RETRIES);
+// 🛡️ Inicializar DB primero, LUEGO arrancar servidor
+// Esto evita race conditions: el servidor no acepta peticiones
+// hasta que todas las tablas y semillas estén listas.
+(async () => {
+  await initializeDb();
+  startServer(PORT, MAX_PORT_RETRIES);
+})();
 
