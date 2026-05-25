@@ -35,7 +35,7 @@ const getGradingSystems = (req, res) => {
        AND COALESCE(CAST(gv.is_active AS INTEGER), 0) = 1
        AND (gv.owner_type = 'system'
             OR (gv.owner_type = 'user' AND gv.owner_id = ?))
-     WHERE gs.is_system_seeded = 1
+     WHERE CAST(gs.is_system_seeded AS INTEGER) = 1
         OR gs.created_by_user_id = ?
      ORDER BY gs.is_system_seeded DESC, gs.name ASC`,
     [String(userId), userId],

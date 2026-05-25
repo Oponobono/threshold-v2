@@ -61,7 +61,6 @@ exports.createCardLog = async (req, res) => {
       return res.status(400).json({ error: 'Faltan campos requeridos (card_id, user_id).' });
     }
 
-    // Obtener tarjeta actual de la BD
     const currentCard = await new Promise((resolve, reject) => {
       db.get(`SELECT * FROM flashcards WHERE id = ?`, [card_id], (err, row) => {
         if (err) reject(err);
@@ -73,19 +72,17 @@ exports.createCardLog = async (req, res) => {
       return res.status(404).json({ error: 'Tarjeta no encontrada' });
     }
 
-    // MAGIC: Procesar resultado con learning engineering
     const isCorrect = result === 'correct' || result === true;
     const processingResult = await cardResultProcessor.processCardResult({
       cardId: card_id,
       userId: user_id,
-      subjectId: subject_id || currentCard.deck_id, // Usamos deck_id como fallback temporal si subject_id no viene
+      subjectId: subject_id || currentCard.deck_id,
       isCorrect,
       responseTimeMs: response_time_ms || 0,
       questionWordCount: question_word_count || currentCard.word_count || 20,
       currentCard,
     });
 
-    // Guardar cambios en BD
     await new Promise((resolve, reject) => {
       db.run(
         `UPDATE flashcards SET 
@@ -106,7 +103,6 @@ exports.createCardLog = async (req, res) => {
       );
     });
 
-    // Insertar log detallado
     const logId = await new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO card_logs 
@@ -129,7 +125,6 @@ exports.createCardLog = async (req, res) => {
       );
     });
 
-    // Actualizar analíticas agregadas (nota: esto requiere que updateAnalyticsAfterResult use db correctamente con promises o callbacks)
     try {
       await cardResultProcessor.updateAnalyticsAfterResult(
         db,
@@ -139,10 +134,8 @@ exports.createCardLog = async (req, res) => {
       );
     } catch (analyticsError) {
       console.error('[learningController] Error updating analytics:', analyticsError);
-      // No fallamos la request si la analítica falla
     }
 
-    // Retornar respuesta completa
     res.status(201).json({
       success: true,
       logId: logId,
@@ -162,12 +155,16 @@ exports.createCardLog = async (req, res) => {
 };
 
 /**
- * Obtener los grupos de un usuario
+ * Obtener los grupos de un usuario (incluye nombre del grupo)
  */
 exports.getGroups = (req, res) => {
   const { userId } = req.params;
   db.all(
-    `SELECT * FROM group_memberships WHERE user_id = ? ORDER BY joined_at DESC`,
+    `SELECT gm.*, g.name, g.is_public
+     FROM group_memberships gm
+     LEFT JOIN groups g ON g.group_pin_id = gm.group_pin_id
+     WHERE gm.user_id = ?
+     ORDER BY gm.joined_at DESC`,
     [userId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -177,33 +174,87 @@ exports.getGroups = (req, res) => {
 };
 
 /**
+ * Crea un nuevo grupo colaborativo
+ */
+exports.createGroup = (req, res) => {
+  const { creator_user_id, group_pin_id, name, is_public, password } = req.body;
+
+  if (!creator_user_id || !group_pin_id || !name) {
+    return res.status(400).json({ error: 'Faltan campos requeridos (creator_user_id, group_pin_id, name).' });
+  }
+
+  // Verificar que el PIN no esté ya registrado en la tabla groups
+  db.get(`SELECT id FROM groups WHERE group_pin_id = ?`, [group_pin_id], (err, existing) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (existing) return res.status(409).json({ error: 'El PIN del grupo ya está en uso.' });
+
+    const isPublicVal = is_public !== false ? 1 : 0;
+    const pwd = password || null;
+
+    db.run(
+      `INSERT INTO groups (group_pin_id, name, creator_user_id, is_public, password) VALUES (?, ?, ?, ?, ?)`,
+      [group_pin_id, name, creator_user_id, isPublicVal, pwd],
+      function(insertErr) {
+        if (insertErr) return res.status(500).json({ error: insertErr.message });
+
+        // Auto-inscribir al creador como miembro con rol 'creator'
+        db.run(
+          `INSERT INTO group_memberships (user_id, group_pin_id, role) VALUES (?, ?, 'creator')`,
+          [creator_user_id, group_pin_id],
+          function(memberErr) {
+            if (memberErr) return res.status(500).json({ error: memberErr.message });
+            res.status(201).json({
+              id: this.lastID,
+              group_pin_id,
+              name,
+              message: 'Grupo creado exitosamente.',
+            });
+          }
+        );
+      }
+    );
+  });
+};
+
+/**
  * Unirse a un grupo mediante PIN
  */
 exports.joinGroup = (req, res) => {
-  const { user_id, group_pin_id } = req.body;
+  const { user_id, group_pin_id, password } = req.body;
   
   if (!user_id || !group_pin_id) {
     return res.status(400).json({ error: 'Faltan campos requeridos.' });
   }
 
-  db.get(`SELECT id, username, name FROM users WHERE share_pin = ?`, [group_pin_id], (err, targetUser) => {
+  // Buscar el grupo por su PIN
+  db.get(`SELECT * FROM groups WHERE group_pin_id = ?`, [group_pin_id], (err, group) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (!targetUser) return res.status(404).json({ error: 'PIN de grupo no encontrado. Verifica e inténtalo de nuevo.' });
-    if (targetUser.id === user_id) return res.status(400).json({ error: 'No puedes unirte a tu propia cuenta.' });
+    if (!group) return res.status(404).json({ error: 'PIN de grupo no encontrado. Verifica e inténtalo de nuevo.' });
 
+    // Verificar contraseña si el grupo es privado
+    if (!group.is_public) {
+      if (!password) return res.status(400).json({ error: 'Este grupo es privado. Ingresa la contraseña.' });
+      if (password !== group.password) return res.status(403).json({ error: 'Contraseña incorrecta.' });
+    }
+
+    // Verificar si ya es miembro
     db.get(`SELECT id FROM group_memberships WHERE user_id = ? AND group_pin_id = ?`, [user_id, group_pin_id], (err2, row) => {
       if (err2) return res.status(500).json({ error: err2.message });
       if (row) return res.status(400).json({ error: 'Ya eres miembro de este grupo.' });
 
-      const query = `
-        INSERT INTO group_memberships (user_id, group_pin_id, role)
-        VALUES (?, ?, 'member')
-      `;
-
-      db.run(query, [user_id, group_pin_id], function(insertErr) {
-        if (insertErr) return res.status(500).json({ error: insertErr.message });
-        res.status(201).json({ id: this.lastID, message: `Te has unido exitosamente al grupo de ${targetUser.name || targetUser.username}.` });
-      });
+      db.run(
+        `INSERT INTO group_memberships (user_id, group_pin_id, role) VALUES (?, ?, 'member')`,
+        [user_id, group_pin_id],
+        function(insertErr) {
+          if (insertErr) return res.status(500).json({ error: insertErr.message });
+          res.status(201).json({
+            id: this.lastID,
+            group_pin_id,
+            name: group.name,
+            message: `Te has unido exitosamente al grupo "${group.name}".`,
+          });
+        }
+      );
     });
   });
 };

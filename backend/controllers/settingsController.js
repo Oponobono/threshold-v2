@@ -96,15 +96,15 @@ exports.createCustomGradingSystem = async (req, res) => {
   const systemCode = code || `CUSTOM_${Date.now()}`;
   db.run(
     `INSERT INTO grading_systems (code, name, type, mode, direction, country_code, is_system_seeded, is_custom, created_by_user_id)
-     VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?)`,
-    [systemCode, name, type || 'numeric', mode || 'continuous', direction || 'ascending', null, userId],
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [systemCode, name, type || 'numeric', mode || 'continuous', direction || 'ascending', null, false, true, userId],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
       const systemId = this.lastID;
       db.run(
         `INSERT INTO grading_versions (grading_system_id, owner_type, owner_id, min_value, max_value, passing_value, precision, is_active)
-         VALUES (?, 'user', ?, ?, ?, ?, ?, 1)`,
-        [systemId, String(userId), min_value, max_value, passing_value, precision || 2],
+         VALUES (?, 'user', ?, ?, ?, ?, ?, ?)`,
+        [systemId, String(userId), min_value, max_value, passing_value, precision || 2, true],
         function (err) {
           if (err) return res.status(500).json({ error: err.message });
           const versionId = this.lastID;

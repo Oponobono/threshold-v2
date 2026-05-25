@@ -1,8 +1,9 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as Notifications from 'expo-notifications';
 
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
@@ -93,6 +94,29 @@ export default function RootLayout() {
     return () => unsubscribe();
   }, []);
 
+
+  const router = useRouter();
+
+  // ── Notification response listener ─────────────────────────────────────
+  const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
+
+  useEffect(() => {
+    notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data as Record<string, any>;
+      const type = data?.type as string | undefined;
+      if (type === 'deadline') {
+        router.push('/calendar');
+      } else if (type === 'duedeck') {
+        router.push('/flashcards');
+      } else if (type === 'weekly_digest') {
+        router.push('/');
+      }
+    });
+
+    return () => {
+      notificationResponseListener.current?.remove();
+    };
+  }, [router]);
 
   useEffect(() => {
     if (appIsReady) {

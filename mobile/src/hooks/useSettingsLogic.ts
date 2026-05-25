@@ -9,6 +9,7 @@ import { uploadFileToUploadthing } from '../services/uploadthing/storage';
 import { downloadProfileImage } from '../services/profileImageCache';
 import { cacheService } from '../services/cacheService';
 import { fetchGradingSystems, type GradingSystem } from '../services/api/grading';
+import { DEFAULT_GRADING_SYSTEMS } from '../services/api/gradingDefaults';
 import {
   getCurrentUserProfile,
   getCurrentUserProfileSync,
@@ -23,6 +24,7 @@ import {
   joinGroup,
   getUserGroups,
   leaveGroup,
+  createGroup,
   type GroupMembership
 } from '../services/api';
 import {
@@ -121,6 +123,8 @@ export const useSettingsLogic = () => {
   // Group State
   const [pinToJoin, setPinToJoin] = useState('');
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
+  const [isCreateGroupVisible, setIsCreateGroupVisible] = useState(false);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
   // Dynamic loaded data
   const [gradingPeriods, setGradingPeriods] = useState<any[]>([]);
@@ -174,46 +178,54 @@ export const useSettingsLogic = () => {
         setThreshold(String(userProfile.approval_threshold));
       }
 
-      // Load Grading Systems
+      // Load Grading Systems – defaults siempre disponibles, personalizadas desde API
+      const defaultIds = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.id));
+      let allSystems = [...DEFAULT_GRADING_SYSTEMS];
+      const usedCodes = new Set(allSystems.map(s => s.code));
+      let nextId = Math.max(...DEFAULT_GRADING_SYSTEMS.map(s => s.id)) + 1;
       try {
-        const systems = await fetchGradingSystems();
-        console.log('[useSettingsLogic] Loaded systems:', systems);
-        setGradingSystems(systems);
-        setIsLoadingSystems(false);
-        
-        // Find user's current system based on active_grading_version_id or grading_scale fallback
-        let currentSystemId: number | null = null;
-        if (userProfile?.active_grading_version_id) {
-          const sys = systems.find(s => s.active_version_id === userProfile.active_grading_version_id);
-          if (sys) currentSystemId = sys.id;
-        } 
-        
-        if (!currentSystemId && userProfile?.grading_scale) {
-           const scaleMap: Record<string, string> = {
-            '0-5.0': 'COL_0_5',
-            '0-10': 'ES_0_10',
-            '0-100': '0_100_PCT',
-            'A-F': 'US_GPA_4'
-           };
-           const mappedCode = scaleMap[userProfile.grading_scale];
-           if (mappedCode) {
-             const sys = systems.find(s => s.code === mappedCode);
-             if (sys) currentSystemId = sys.id;
-           }
+        const apiSystems = await fetchGradingSystems();
+        const customSystems = (apiSystems || []).filter(s => {
+          if (!s.is_custom) return false;
+          if (usedCodes.has(s.code)) return false;
+          return true;
+        });
+        if (customSystems.length > 0) {
+          const remapped = customSystems.map(s => defaultIds.has(s.id) ? { ...s, id: nextId++ } : s);
+          allSystems = [...allSystems, ...remapped];
         }
-        
-        if (currentSystemId) {
-          console.log('[useSettingsLogic] Setting selected system to:', currentSystemId);
-          setSelectedSystemId(currentSystemId);
-        } else if (systems.length > 0) {
-          console.log('[useSettingsLogic] No current system found, setting first system:', systems[0].id);
-          setSelectedSystemId(systems[0].id);
-        }
-
       } catch (err) {
-        console.warn('[useSettingsLogic] Failed to load grading systems', err);
-        setIsLoadingSystems(false);
+        console.warn('[useSettingsLogic] No se pudieron cargar escalas personalizadas:', err);
       }
+      setGradingSystems(allSystems);
+      setIsLoadingSystems(false);
+
+      let currentSystemId: number | null = null;
+      if (userProfile?.active_grading_version_id) {
+        const sys = allSystems.find(s => s.active_version_id === userProfile.active_grading_version_id);
+        if (sys) currentSystemId = sys.id;
+      }
+
+      if (!currentSystemId && userProfile?.grading_scale) {
+        const scaleMap: Record<string, string> = {
+          '0-5.0': 'COL_0_5',
+          '0-10': 'ES_0_10',
+          '0-100': '0_100_PCT',
+          'A-F': 'US_GPA_4',
+        };
+        const mappedCode = scaleMap[userProfile.grading_scale];
+        if (mappedCode) {
+          const sys = allSystems.find(s => s.code === mappedCode);
+          if (sys) currentSystemId = sys.id;
+        }
+      }
+
+      if (currentSystemId) {
+        setSelectedSystemId(currentSystemId);
+      } else if (allSystems.length > 0) {
+        setSelectedSystemId(allSystems[0].id);
+      }
+
 
       const groups = await getUserGroups();
       setUserGroups(groups || []);
@@ -619,6 +631,21 @@ export const useSettingsLogic = () => {
     });
   };
 
+  const handleCreateGroup = async (name: string, pin: string, isPublic: boolean, password: string) => {
+    setIsCreatingGroup(true);
+    try {
+      await createGroup({ group_pin_id: pin, name, is_public: isPublic, password: password || undefined });
+      setIsCreateGroupVisible(false);
+      const groups = await getUserGroups();
+      setUserGroups(groups || []);
+      alertRef.show({ title: t('common.success'), message: t('settings.groupCreated', 'Grupo creado correctamente'), type: 'success' });
+    } catch (error: any) {
+      alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  };
+
   /**
    * Cambia el idioma de la aplicación y persiste la elección en SecureStore
    * para que se restaure automáticamente en futuros inicios de sesión.
@@ -725,6 +752,9 @@ export const useSettingsLogic = () => {
     pinToJoin,
     setPinToJoin,
     isJoiningGroup,
+    isCreateGroupVisible, setIsCreateGroupVisible,
+    isCreatingGroup,
+    handleCreateGroup,
     handleSignOut,
     handleToggleBiometric,
     handleDeleteAccount,
@@ -791,7 +821,15 @@ export const useSettingsLogic = () => {
     handleAddCustomScale: async (name: string, passingValue: number, minValue: number, maxValue: number) => {
       try {
         const result = await createCustomGradingSystem({ name, min_value: minValue, max_value: maxValue, passing_value: passingValue });
-        setGradingSystems(prev => [...prev, result]);
+        setGradingSystems(prev => {
+          const defaultIds = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.id));
+          const existingIds = new Set(prev.map(s => s.id));
+          if (existingIds.has(result.id)) {
+            const maxId = Math.max(...prev.map(s => s.id)) + 1;
+            return [...prev, { ...result, id: maxId }];
+          }
+          return [...prev, result];
+        });
         alertRef.show({ title: t('common.success'), message: `Escala "${name}" creada`, type: 'success' });
       } catch (error: any) {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });

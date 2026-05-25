@@ -13,8 +13,19 @@ export interface GroupMembership {
   id?: number;
   user_id?: number;
   group_pin_id: string;
+  name?: string;
   role?: string;
   joined_at?: string;
+  is_public?: boolean;
+  password?: string;
+}
+
+/** Parámetros para crear un nuevo grupo colaborativo */
+export interface CreateGroupParams {
+  group_pin_id: string;
+  name: string;
+  is_public: boolean;
+  password?: string;
 }
 
 /** Obtiene todos los grupos a los que pertenece el usuario autenticado */
@@ -37,15 +48,18 @@ export const getUserGroups = async (): Promise<GroupMembership[]> => {
 };
 
 /** Une al usuario autenticado a un grupo mediante su PIN de acceso */
-export const joinGroup = async (group_pin_id: string): Promise<any> => {
+export const joinGroup = async (group_pin_id: string, password?: string): Promise<any> => {
   try {
     const userId = await getUserId();
     if (!userId) throw new Error('Usuario no autenticado');
 
+    const body: Record<string, any> = { user_id: userId, group_pin_id };
+    if (password) body.password = password;
+
     const response = await fetchWithFallback('/learning/groups/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, group_pin_id }),
+      body: JSON.stringify(body),
     });
     
     const responseData = await parseJsonSafely(response);
@@ -77,5 +91,27 @@ export const leaveGroup = async (group_pin_id: string): Promise<any> => {
     return responseData;
   } catch (error: any) {
     throw new Error(error.message || 'Error de red al intentar salir del grupo');
+  }
+};
+
+/** Crea un nuevo grupo colaborativo */
+export const createGroup = async (params: CreateGroupParams): Promise<any> => {
+  try {
+    const userId = await getUserId();
+    if (!userId) throw new Error('Usuario no autenticado');
+
+    const response = await fetchWithFallback('/learning/groups/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creator_user_id: userId, ...params }),
+    });
+
+    const responseData = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(responseData?.error || 'Error al crear el grupo');
+    }
+    return responseData;
+  } catch (error: any) {
+    throw new Error(error.message || 'Error de red al intentar crear el grupo');
   }
 };

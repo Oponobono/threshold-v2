@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
 import { theme } from '../styles/theme';
 import { styles } from '../styles/ImageViewerModal.styles';
+import { ZoomableImage } from './ZoomableImage';
 
 const { width } = Dimensions.get('window');
 
@@ -184,18 +185,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
   const ImageWithFallback = ({ item }: { item: PhotoItem }) => {
     const [sourceUri, setSourceUri] = useState(item.local_uri || item.cloud_url || '');
+    
     return (
       <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: sourceUri }} 
-          style={styles.image} 
-          resizeMode="contain" 
-          onError={() => {
-            if (sourceUri === item.local_uri && item.cloud_url) {
-              console.log(`[ImageViewerModal] Fallback a cloud_url para foto: ${item.id}`);
-              setSourceUri(item.cloud_url);
-            }
-          }}
+        <ZoomableImage 
+          uri={sourceUri}
+          resizeMode="contain"
         />
       </View>
     );

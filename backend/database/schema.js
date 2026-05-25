@@ -909,6 +909,32 @@ const tableSchema = {
     `
   },
 
+  groups: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_pin_id TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        creator_user_id INTEGER NOT NULL,
+        is_public INTEGER DEFAULT 1,
+        password TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (creator_user_id) REFERENCES users(id)
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS groups (
+        id SERIAL PRIMARY KEY,
+        group_pin_id TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        creator_user_id INTEGER NOT NULL REFERENCES users(id),
+        is_public BOOLEAN DEFAULT TRUE,
+        password TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
+
   shared_decks: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS shared_decks (

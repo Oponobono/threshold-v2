@@ -6,3 +6,4 @@ export { AddLmsModal } from './AddLmsModal';
 export { ExportDataModal } from './ExportDataModal';
 export { FaqModal } from './FaqModal';
 export { SendFeedbackModal } from './SendFeedbackModal';
+export { CreateGroupModal } from './CreateGroupModal';

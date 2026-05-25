@@ -132,7 +132,7 @@ export const GradeCalculator: React.FC<GradeCalculatorProps> = ({
               <Text style={subjectsStyles.calcBtnText}>{t('subjects.simulate')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[subjectsStyles.calcBtn, subjectsStyles.calcBtnSecondary]} onPress={onSaveTarget}>
-              <Text style={subjectsStyles.calcBtnSecText}>{t('subjects.saveThreshold')}</Text>
+              <Text style={subjectsStyles.calcBtnSecText}>{t('common.save')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={subjectsStyles.calcBtnReset} onPress={onReset}>
               <Text style={subjectsStyles.calcBtnSecText}>{t('subjects.reset')}</Text>

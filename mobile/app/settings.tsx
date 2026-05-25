@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -13,6 +13,9 @@ import { useBackupLogic } from '../src/hooks/useBackupLogic';
 import { EditProfileModal } from '../src/components/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/DeleteAccountModal';
+import { WeeklySummaryPicker } from '../src/components/settings/WeeklySummaryPicker';
+import { useNotifications } from '../src/hooks/useNotifications';
+import type { WeeklyDigestConfig } from '../src/services/notificationService';
 import {
   AddTermModal,
   ManageOverridesModal,
@@ -22,6 +25,7 @@ import {
   ExportDataModal,
   FaqModal,
   SendFeedbackModal,
+  CreateGroupModal,
 } from '../src/components/settings';
 
 /**
@@ -77,7 +81,12 @@ const SettingRow = ({ title, desc, right }: { title: string; desc?: string; righ
  * general de la cuenta. Toda la lógica de estado y peticiones a la API
  * se ha extraído al hook `useSettingsLogic`.
  */
+const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+
 export default function SettingsScreen() {
+  const [scalesExpanded, setScalesExpanded] = useState(true);
+  const [showWeeklyPicker, setShowWeeklyPicker] = useState(false);
+  const [weeklyConfig, setWeeklyConfig] = useState<WeeklyDigestConfig | null>(null);
   const {
     t,
     router,
@@ -146,6 +155,9 @@ export default function SettingsScreen() {
     pinToJoin,
     setPinToJoin,
     isJoiningGroup,
+    isCreateGroupVisible, setIsCreateGroupVisible,
+    isCreatingGroup,
+    handleCreateGroup,
     handleSignOut,
     handleToggleBiometric,
     handleDeleteAccount,
@@ -183,6 +195,8 @@ export default function SettingsScreen() {
     lmsAccounts,
     twoFactorEnabled,
   } = useSettingsLogic();
+
+  const {} = useNotifications(notifDeadline, notifWeekly, weeklyConfig);
 
   const {
     prefs: backupPrefs,
@@ -329,7 +343,15 @@ export default function SettingsScreen() {
           </View>
 
           {/* Grading Scales */}
-          <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
+          <TouchableOpacity
+            onPress={() => setScalesExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}
+          >
+            <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
+            <Ionicons name={scalesExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+          {scalesExpanded && (
+            <>
           {isLoadingSystems ? (
             <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 12 }} />
           ) : gradingSystems.map(system => (
@@ -355,6 +377,8 @@ export default function SettingsScreen() {
           <TouchableOpacity style={[styles.darkPill, { alignSelf: 'center', marginTop: 8 }]} onPress={() => setIsAddCustomScaleVisible(true)}>
             <Text style={styles.darkPillText}>{t('academic.addCustomScale')}</Text>
           </TouchableOpacity>
+          </>
+          )}
         </View>
 
         {/* ─────────────────────────────────────────── */}
@@ -407,15 +431,21 @@ export default function SettingsScreen() {
           <SectionHeader title={t('notifications.title')} desc={t('notifications.desc')} icon="notifications-outline" />
           <SettingRow
             title={t('notifications.deadlineAlerts')} desc={t('notifications.deadlineAlertsDesc')}
-            right={<Switch value={notifDeadline} onValueChange={setNotifDeadline} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            right={<Switch value={notifDeadline} onValueChange={(v) => { setNotifDeadline(v); alertRef.show({ title: v ? 'Notificaciones activadas' : 'Notificaciones desactivadas', message: v ? 'Recibirás alertas de tus fechas límite.' : 'Ya no recibirás alertas de fechas límite.', type: v ? 'success' : 'info', buttons: [{ text: 'OK' }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
-            title={t('notifications.weeklyDigest')} desc={t('notifications.weeklyDigestDesc')}
-            right={<Switch value={notifWeekly} onValueChange={setNotifWeekly} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            title={t('notifications.weeklyDigest')}
+            desc={weeklyConfig
+              ? t('notifications.weeklyDigestDescFmt', {
+                  day: t(`notifications.day.${DAYS[weeklyConfig.dayOfWeek]}`),
+                  time: `${weeklyConfig.hour.toString().padStart(2, '0')}:${weeklyConfig.minute.toString().padStart(2, '0')}`,
+                })
+              : t('notifications.weeklyDigestDesc')}
+            right={<Switch value={notifWeekly} onValueChange={(v) => { if (v) setShowWeeklyPicker(true); else { setNotifWeekly(false); alertRef.show({ title: 'Resumen semanal desactivado', message: 'Ya no recibirás el resumen semanal.', type: 'info', buttons: [{ text: 'OK' }] }); } }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
             title={t('notifications.emailNotif')} desc={t('notifications.emailNotifDesc')}
-            right={<Switch value={notifEmail} onValueChange={setNotifEmail} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            right={<Switch value={notifEmail} onValueChange={(v) => { setNotifEmail(v); alertRef.show({ title: v ? 'Notificaciones por correo activadas' : 'Notificaciones por correo desactivadas', message: v ? 'Recibirás notificaciones por correo electrónico.' : 'Ya no recibirás notificaciones por correo electrónico.', type: v ? 'success' : 'info', buttons: [{ text: 'OK' }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
         </View>
 
@@ -698,14 +728,21 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
+          <TouchableOpacity style={[styles.darkPill, { alignSelf: 'flex-start', marginTop: 12 }]} onPress={() => setIsCreateGroupVisible(true)}>
+            <Ionicons name="add-circle-outline" size={16} color={theme.colors.text.inverse} style={{ marginRight: 4 }} />
+            <Text style={styles.darkPillText}>{t('settings.createGroupBtn', 'Crear grupo')}</Text>
+          </TouchableOpacity>
+
           {userGroups.length > 0 && (
             <>
               <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>{t('settings.myGroups', 'Mis grupos')} ({userGroups.length})</Text>
               {userGroups.map((group, i) => (
                 <View key={i} style={styles.lmsRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.settingTitle}>{t('settings.groupPin', 'Grupo PIN:')} {group.group_pin_id}</Text>
-                    <Text style={styles.settingDesc}>{t('settings.role', 'Rol:')} {group.role} • {t('settings.joinedOn', 'Unido el')} {new Date(group.joined_at!).toLocaleDateString()}</Text>
+                    <Text style={styles.settingTitle}>{group.name || group.group_pin_id}</Text>
+                    <Text style={styles.settingDesc}>
+                      {t('settings.groupPin', 'PIN:')} {group.group_pin_id} • {t('settings.role', 'Rol:')} {group.role} • {t('settings.joinedOn', 'Unido el')} {new Date(group.joined_at!).toLocaleDateString()}
+                    </Text>
                   </View>
                   <TouchableOpacity 
                     style={styles.outlinePill}
@@ -892,6 +929,23 @@ export default function SettingsScreen() {
         visible={isFeedbackVisible}
         onClose={() => setIsFeedbackVisible(false)}
         onSubmit={handleSendFeedback}
+      />
+
+      <WeeklySummaryPicker
+        visible={showWeeklyPicker}
+        initialConfig={weeklyConfig ?? undefined}
+        onSave={(config) => {
+          setWeeklyConfig(config);
+          setNotifWeekly(true);
+        }}
+        onClose={() => setShowWeeklyPicker(false)}
+      />
+
+      <CreateGroupModal
+        visible={isCreateGroupVisible}
+        isCreating={isCreatingGroup}
+        onClose={() => setIsCreateGroupVisible(false)}
+        onCreate={handleCreateGroup}
       />
 
     </SafeAreaView>

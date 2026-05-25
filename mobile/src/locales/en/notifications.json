@@ -6,5 +6,15 @@
   "weeklyDigest": "Weekly digest",
   "weeklyDigestDesc": "Summary every Monday morning",
   "emailNotif": "Email notifications",
-  "emailNotifDesc": "Receive reminders by email"
+  "emailNotifDesc": "Receive reminders by email",
+  "day": {
+    "sunday": "Sunday",
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday"
+  },
+  "weeklyDigestDescFmt": "Summary every {day} at {time}"
 }

@@ -6,5 +6,15 @@
   "weeklyDigest": "Resumen semanal",
   "weeklyDigestDesc": "Resumen cada lunes por la mañana",
   "emailNotif": "Notificaciones por correo",
-  "emailNotifDesc": "Recibe recordatorios por email"
+  "emailNotifDesc": "Recibe recordatorios por email",
+  "day": {
+    "sunday": "domingo",
+    "monday": "lunes",
+    "tuesday": "martes",
+    "wednesday": "miércoles",
+    "thursday": "jueves",
+    "friday": "viernes",
+    "saturday": "sábado"
+  },
+  "weeklyDigestDescFmt": "Resumen cada {day} a las {time}"
 }

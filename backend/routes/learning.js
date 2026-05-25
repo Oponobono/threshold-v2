@@ -111,6 +111,39 @@ router.post('/learning/card_logs', learningController.createCardLog);
 
 /**
  * @swagger
+ * /api/learning/groups/create:
+ *   post:
+ *     summary: Crea un nuevo grupo colaborativo
+ *     tags: [Learning]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - creator_user_id
+ *               - group_pin_id
+ *               - name
+ *             properties:
+ *               creator_user_id:
+ *                 type: integer
+ *               group_pin_id:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               is_public:
+ *                 type: boolean
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Grupo creado exitosamente
+ */
+router.post('/learning/groups/create', learningController.createGroup);
+
+/**
+ * @swagger
  * /api/learning/groups/{userId}:
  *   get:
  *     summary: Obtiene los grupos a los que pertenece el usuario
@@ -146,6 +179,8 @@ router.get('/learning/groups/:userId', learningController.getGroups);
  *               user_id:
  *                 type: integer
  *               group_pin_id:
+ *                 type: string
+ *               password:
  *                 type: string
  *     responses:
  *       201:
