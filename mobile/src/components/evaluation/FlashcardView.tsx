@@ -27,7 +27,6 @@ export const FlashcardView: React.FC<Props> = ({
   const hintAnim = useRef(new Animated.Value(0)).current;
   const [activeFace, setActiveFace] = useState<'front' | 'back'>('front');
   const [hasRevealed, setHasRevealed] = useState(false);
-  const isNavigating = useRef(false);
 
   useEffect(() => {
     setIsFlipped(false);
@@ -197,21 +196,14 @@ export const FlashcardView: React.FC<Props> = ({
           </View>
         )}
 
-        {/* Zona táctil para ir al siguiente cuando ya está respondida */}
         {isAnswered && onNext && (
           <TouchableOpacity
-            style={s.nextZone}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 }}
             activeOpacity={0.6}
-            onPress={() => {
-              if (!isNavigating.current) {
-                isNavigating.current = true;
-                onNext();
-                setTimeout(() => { isNavigating.current = false; }, 400);
-              }
-            }}
+            onPress={onNext}
           >
             <Ionicons name="chevron-forward-outline" size={14} color={theme.colors.text.placeholder} />
-            <Text style={s.nextZoneText}>Toca para continuar</Text>
+            <Text style={{ fontSize: 12, color: theme.colors.text.placeholder }}>Toca para continuar</Text>
           </TouchableOpacity>
         )}
 
@@ -278,9 +270,4 @@ const s = StyleSheet.create({
   ratingEasy: { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' },
   ratingEmoji: { fontSize: 22 },
   ratingLabel: { fontSize: 13, fontWeight: '700' },
-  nextZone: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 4, paddingVertical: 12,
-  },
-  nextZoneText: { fontSize: 12, color: theme.colors.text.placeholder },
 });

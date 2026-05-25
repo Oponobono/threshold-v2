@@ -119,25 +119,17 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation
           </Animated.View>
         </View>
 
-        {/* Tap-to-next: solo cuando ya está respondido, toca cualquier zona vacía o este botón */}
+        <View style={{ height: 16 }} />
         {isAnswered && onNext && (
           <TouchableOpacity
-            style={s.nextZone}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 }}
             activeOpacity={0.6}
-            onPress={() => {
-              if (!isNavigating.current) {
-                isNavigating.current = true;
-                onNext();
-                setTimeout(() => { isNavigating.current = false; }, 400);
-              }
-            }}
+            onPress={() => { if (!isNavigating.current) { isNavigating.current = true; onNext(); setTimeout(() => isNavigating.current = false, 400); } }}
           >
             <Ionicons name="chevron-forward-outline" size={14} color={theme.colors.text.placeholder} />
-            <Text style={s.nextZoneText}>Toca para continuar</Text>
+            <Text style={{ fontSize: 12, color: theme.colors.text.placeholder }}>Toca para continuar</Text>
           </TouchableOpacity>
         )}
-
-        <View style={{ height: 16 }} />
         </View>
       </TouchableWithoutFeedback>
     </ScrollView>
@@ -166,9 +158,4 @@ const s = StyleSheet.create({
   explanationBox: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: 'rgba(0,122,255,0.07)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(0,122,255,0.18)' },
   explanationTitle: { fontSize: 11, fontWeight: '700', color: theme.colors.info, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   explanationText: { fontSize: 13, color: theme.colors.text.primary, lineHeight: 19 },
-  nextZone: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 4, paddingVertical: 12, marginTop: 8,
-  },
-  nextZoneText: { fontSize: 12, color: theme.colors.text.placeholder },
 });
