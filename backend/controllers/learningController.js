@@ -155,6 +155,47 @@ exports.createCardLog = async (req, res) => {
 };
 
 /**
+ * Obtener los mazos compartidos dentro de un grupo específico
+ */
+exports.getGroupDecks = (req, res) => {
+  const { groupPinId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) return res.status(401).json({ error: 'No autenticado' });
+
+  // Verificar que el usuario es miembro del grupo
+  db.get(`SELECT id FROM group_memberships WHERE user_id = ? AND group_pin_id = ?`,
+    [userId, groupPinId],
+    (err, membership) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!membership) return res.status(403).json({ error: 'No eres miembro de este grupo' });
+
+      // Obtener todos los mazos de los miembros del grupo
+      db.all(
+        `SELECT fd.*, u.username as owner_username
+         FROM flashcard_decks fd
+         JOIN users u ON fd.user_id = u.id
+         WHERE fd.user_id IN (
+           SELECT user_id FROM group_memberships
+           WHERE group_pin_id = ?
+         )
+         ORDER BY fd.title ASC`,
+        [groupPinId],
+        (err, rows) => {
+          if (err) return res.status(500).json({ error: err.message });
+          // Marcar los mazos del usuario actual como propios
+          const result = (rows || []).map((deck) => ({
+            ...deck,
+            is_own: deck.user_id === userId,
+          }));
+          res.json(result);
+        }
+      );
+    }
+  );
+};
+
+/**
  * Obtener los grupos de un usuario (incluye nombre del grupo)
  */
 exports.getGroups = (req, res) => {
@@ -188,7 +229,7 @@ exports.createGroup = (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (existing) return res.status(409).json({ error: 'El PIN del grupo ya está en uso.' });
 
-    const isPublicVal = is_public !== false ? 1 : 0;
+    const isPublicVal = is_public !== false;
     const pwd = password || null;
 
     db.run(

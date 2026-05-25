@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Animated, TextInput, ActionSheetIOS, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -6,13 +6,14 @@ import { useFlashcardsManager } from './useFlashcardsManager';
 import { useDataStore } from '../store/useDataStore';
 import { useCustomAlert } from '../components/CustomAlert';
 import {
-  getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck,
+  getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck, shareDeck,
 } from '../services/api';
 import {
   scheduleDueDeckNotification,
   cancelDueDeckNotification,
   cancelAllDueDeckNotifications,
 } from '../services/notificationService';
+import { getUserGroups, getGroupDecks } from '../services/api/learning/groups';
 
 export function useFlashcards() {
   const { t } = useTranslation();
@@ -32,6 +33,34 @@ export function useFlashcards() {
   const [studyDeckCards, setStudyDeckCards] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Share deck state
+  const [shareDeckTarget, setShareDeckTarget] = useState<FlashcardDeck | null>(null);
+  const [sharePin, setSharePin] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
+
+  const handleShareDeck = useCallback(async (groupPinId?: string) => {
+    if (!shareDeckTarget) return;
+    if (!groupPinId && !sharePin.trim()) return;
+    setIsSharing(true);
+    try {
+      const result = await shareDeck(shareDeckTarget.id, groupPinId ? { groupPinId } : { recipientPin: sharePin });
+      showAlert({ title: t('common.success', '¡Éxito!'), message: result.message, type: 'success' });
+      setShareDeckTarget(null);
+      setSharePin('');
+    } catch (error: any) {
+      showAlert({ title: t('common.error', 'Error'), message: error.message, type: 'error' });
+    } finally {
+      setIsSharing(false);
+    }
+  }, [shareDeckTarget, sharePin, t, showAlert]);
+
+  // Groups tab state
+  const [activeTab, setActiveTab] = useState<'mazos' | 'grupos'>('mazos');
+  const [groups, setGroups] = useState<any[]>([]);
+  const [activeGroupPin, setActiveGroupPin] = useState<string | null>(null);
+  const [groupDecks, setGroupDecks] = useState<any[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
 
   const activeCloseRef = useRef<(() => void) | null>(null);
 
@@ -112,9 +141,15 @@ export function useFlashcards() {
   }, [t, showAlert, loadDecks, refreshPredictions]);
 
   const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
-    const pillWidth = 101;
-    return { pillWidth, onAddPress: () => { close(); setActiveDeck(deck); setShowNewCardModal(true); }, onDeletePress: () => { close(); handleDeleteDeck(deck); } };
-  }, [handleDeleteDeck]);
+    const isOwner = deck.user_id === currentUserId;
+    const pillWidth = isOwner ? 152 : 101;
+    return {
+      pillWidth,
+      onAddPress: () => { close(); setActiveDeck(deck); setShowNewCardModal(true); },
+      onSharePress: isOwner ? () => { close(); setShareDeckTarget(deck); setSharePin(''); } : undefined,
+      onDeletePress: () => { close(); handleDeleteDeck(deck); },
+    };
+  }, [handleDeleteDeck, currentUserId]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -144,12 +179,14 @@ export function useFlashcards() {
 
   // ── Due deck notifications ──────────────────────────────────────────
   const dueNotifScheduled = useRef<Set<number>>(new Set());
+  const filteredDecksRef = useRef(filteredDecks);
+  filteredDecksRef.current = filteredDecks;
 
   const scheduleDueNotifications = useCallback(async () => {
     const dueIds = getDuedeckIds();
     if (!dueIds || dueIds.size === 0) return;
 
-    for (const deck of filteredDecks) {
+    for (const deck of filteredDecksRef.current) {
       if (dueIds.has(deck.id) && !dueNotifScheduled.current.has(deck.id)) {
         await scheduleDueDeckNotification(deck.id, deck.title, 1);
         dueNotifScheduled.current.add(deck.id);
@@ -158,7 +195,11 @@ export function useFlashcards() {
         dueNotifScheduled.current.delete(deck.id);
       }
     }
-  }, [getDuedeckIds, filteredDecks]);
+  }, [getDuedeckIds]);
+
+  useEffect(() => {
+    scheduleDueNotifications();
+  }, [filteredDecks]);
 
   useFocusEffect(
     useCallback(() => {
@@ -168,19 +209,38 @@ export function useFlashcards() {
           setCurrentUserId(userId ? Number(userId) : null);
           const subs = await getSubjects();
           setSubjects(subs || []);
+          // Load groups
+          const userGroups = await getUserGroups();
+          const valid = (userGroups || []).filter((g: any) => g.group_pin_id);
+          setGroups(valid);
+          if (valid.length > 0 && !activeGroupPin) {
+            setActiveGroupPin(valid[0].group_pin_id);
+          }
         } catch (e) {
           console.warn('Error loading subjects:', e);
         }
         await loadDecks();
-        await scheduleDueNotifications();
       };
       loadAll();
       return () => {
         cancelAllDueDeckNotifications();
         dueNotifScheduled.current.clear();
       };
-    }, [loadDecks, scheduleDueNotifications]),
+    }, [loadDecks]),
   );
+
+  // Load group decks when selected group changes
+  useEffect(() => {
+    if (activeGroupPin && activeTab === 'grupos') {
+      setLoadingGroups(true);
+      getGroupDecks(activeGroupPin).then(decks => {
+        setGroupDecks(decks || []);
+        setLoadingGroups(false);
+      });
+    } else {
+      setGroupDecks([]);
+    }
+  }, [activeGroupPin, activeTab]);
 
   return {
     showSearch, showNewDeckModal, showImportModal, showMenuModal, showNewCardModal,
@@ -193,5 +253,13 @@ export function useFlashcards() {
     setStudyDeckCards,
     handleOpenMenu, handleOpenStudy, handleOpenEditDeck, handleDeleteDeck,
     renderSwipeActions, handleRefresh, toggleSearch,
+    // Share
+    shareDeckTarget, setShareDeckTarget,
+    sharePin, setSharePin,
+    isSharing, handleShareDeck,
+    // Groups
+    activeTab, setActiveTab,
+    groups, activeGroupPin, setActiveGroupPin,
+    groupDecks, loadingGroups,
   };
 }

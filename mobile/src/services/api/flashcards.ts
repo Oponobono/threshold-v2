@@ -248,12 +248,15 @@ export const generateFlashcardsFromImage = async (payload: {
  * @param deckId - ID del mazo a compartir.
  * @param recipientPin - PIN del usuario destinatario (case-insensitive, se normaliza a mayúsculas).
  */
-export const shareDeck = async (deckId: number, recipientPin: string): Promise<{ message: string; recipient_name: string }> => {
+export const shareDeck = async (deckId: number, options: { recipientPin?: string; groupPinId?: string }): Promise<{ message: string; recipient_name?: string }> => {
   const userId = await getUserId();
+  const body: Record<string, any> = { user_id: userId };
+  if (options.recipientPin) body.recipient_pin = options.recipientPin.trim().toUpperCase();
+  if (options.groupPinId) body.group_pin_id = options.groupPinId;
   const response = await fetchWithFallback(`/flashcard-decks/${deckId}/share`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, recipient_pin: recipientPin.trim().toUpperCase() }),
+    body: JSON.stringify(body),
   });
   const data = await parseJsonSafely(response);
   if (!response.ok) throw new Error(data?.error || 'Error al compartir el mazo');

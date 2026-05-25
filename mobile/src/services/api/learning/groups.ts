@@ -94,6 +94,22 @@ export const leaveGroup = async (group_pin_id: string): Promise<any> => {
   }
 };
 
+/** Obtiene los mazos compartidos dentro de un grupo específico */
+export const getGroupDecks = async (groupPinId: string): Promise<any[]> => {
+  try {
+    const response = await fetchWithFallback(`/learning/groups/${groupPinId}/decks`);
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      console.warn('[getGroupDecks] Error:', data?.error);
+      return [];
+    }
+    return data || [];
+  } catch (error: any) {
+    console.warn('[getGroupDecks] Network error:', error.message);
+    return [];
+  }
+};
+
 /** Crea un nuevo grupo colaborativo */
 export const createGroup = async (params: CreateGroupParams): Promise<any> => {
   try {

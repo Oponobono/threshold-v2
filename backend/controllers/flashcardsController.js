@@ -69,22 +69,27 @@ exports.getFlashcardDecks = (req, res) => {
     LEFT JOIN subjects s ON fd.subject_id = s.id
     WHERE fd.user_id = ? 
        OR fd.id IN (
-         SELECT sd.deck_id FROM shared_decks sd
-         WHERE sd.shared_to_user_id = ?
-       )
+          SELECT sd.deck_id FROM shared_decks sd
+          WHERE sd.shared_to_user_id = ?
+        )
        OR fd.id IN (
-         SELECT fd2.id FROM flashcard_decks fd2
-         JOIN subjects s2 ON fd2.subject_id = s2.id
-         WHERE s2.user_id IN (
-           SELECT u2.id FROM users u2
-           JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
-           WHERE gm.user_id = ?
-         )
-       )
-    GROUP BY fd.id, s.id, s.name, s.color, s.icon, u.id, u.username, u.name
-    ORDER BY fd.created_at DESC
-  `;
-  db.all(query, [userId, userId, userId], (err, rows) => {
+          SELECT sgd.deck_id FROM shared_group_decks sgd
+          JOIN group_memberships gm ON gm.group_pin_id = sgd.group_pin_id
+          WHERE gm.user_id = ?
+        )
+       OR fd.id IN (
+          SELECT fd2.id FROM flashcard_decks fd2
+          JOIN subjects s2 ON fd2.subject_id = s2.id
+          WHERE s2.user_id IN (
+            SELECT u2.id FROM users u2
+            JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
+            WHERE gm.user_id = ?
+          )
+        )
+     GROUP BY fd.id, s.id, s.name, s.color, s.icon, u.id, u.username, u.name
+     ORDER BY fd.created_at DESC
+   `;
+  db.all(query, [userId, userId, userId, userId], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
@@ -124,28 +129,33 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
     LEFT JOIN subjects s ON fd.subject_id = s.id
     WHERE fd.user_id = ?
        OR fd.id IN (
-         SELECT sd.deck_id FROM shared_decks sd
-         WHERE sd.shared_to_user_id = ?
-       )
+          SELECT sd.deck_id FROM shared_decks sd
+          WHERE sd.shared_to_user_id = ?
+        )
        OR fd.id IN (
-         SELECT fd2.id FROM flashcard_decks fd2
-         JOIN subjects s2 ON fd2.subject_id = s2.id
-         WHERE s2.user_id IN (
-           SELECT u2.id FROM users u2
-           JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
-           WHERE gm.user_id = ?
-         )
-       )
-    GROUP BY fd.id, s.id, s.name, s.color, s.icon, u.id, u.username, u.name
-    ORDER BY
-      due_count DESC,
-      learning_count DESC,
-      new_count DESC,
-      deck_mastery ASC,
-      fd.created_at DESC
-  `;
+          SELECT sgd.deck_id FROM shared_group_decks sgd
+          JOIN group_memberships gm ON gm.group_pin_id = sgd.group_pin_id
+          WHERE gm.user_id = ?
+        )
+       OR fd.id IN (
+          SELECT fd2.id FROM flashcard_decks fd2
+          JOIN subjects s2 ON fd2.subject_id = s2.id
+          WHERE s2.user_id IN (
+            SELECT u2.id FROM users u2
+            JOIN group_memberships gm ON gm.group_pin_id = u2.share_pin
+            WHERE gm.user_id = ?
+          )
+        )
+     GROUP BY fd.id, s.id, s.name, s.color, s.icon, u.id, u.username, u.name
+     ORDER BY
+       due_count DESC,
+       learning_count DESC,
+       new_count DESC,
+       deck_mastery ASC,
+       fd.created_at DESC
+   `;
 
-  db.all(query, [userId, userId, userId, userId], (err, rows) => {
+  db.all(query, [userId, userId, userId, userId, userId], (err, rows) => {
     if (err) {
       console.error('[FlashcardMetrics] Error:', err);
       return res.status(500).json({ error: err.message });
@@ -544,14 +554,51 @@ exports.deleteDeck = (req, res) => {
 };
 
 /**
- * Comparte un mazo con otro usuario usando su PIN
+ * Comparte un mazo con otro usuario usando su PIN o con un grupo
  */
 exports.shareDeck = (req, res) => {
   const { deckId } = req.params;
-  const { user_id, recipient_pin } = req.body;
+  const { user_id, recipient_pin, group_pin_id } = req.body;
 
-  if (!user_id || !recipient_pin) {
-    return res.status(400).json({ error: 'Faltan campos requeridos (user_id, recipient_pin).' });
+  if (!user_id) {
+    return res.status(400).json({ error: 'Faltan campos requeridos (user_id).' });
+  }
+
+  // ── Compartir con un grupo ──────────────────────────────────────────────
+  if (group_pin_id) {
+    db.get(`SELECT id FROM group_memberships WHERE user_id = ? AND group_pin_id = ?`,
+      [user_id, group_pin_id],
+      (err, membership) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!membership) return res.status(403).json({ error: 'No eres miembro de este grupo.' });
+
+        db.get(`SELECT id, title FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], (err2, deck) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          if (!deck) return res.status(403).json({ error: 'No tienes permiso para compartir este mazo.' });
+
+          db.get(`SELECT id FROM shared_group_decks WHERE deck_id = ? AND group_pin_id = ?`, [deckId, group_pin_id], (checkErr, existing) => {
+            if (checkErr) return res.status(500).json({ error: checkErr.message });
+            if (existing) {
+              return res.status(200).json({ message: 'El mazo ya estaba compartido con este grupo.' });
+            }
+            db.run(
+              `INSERT INTO shared_group_decks (deck_id, shared_by_user_id, group_pin_id) VALUES (?, ?, ?)`,
+              [deckId, user_id, group_pin_id],
+              function(insertErr) {
+                if (insertErr) return res.status(500).json({ error: insertErr.message });
+                res.status(201).json({ message: `Mazo "${deck.title}" compartido con el grupo exitosamente.` });
+              }
+            );
+          });
+        });
+      }
+    );
+    return;
+  }
+
+  // ── Compartir con un usuario por PIN ────────────────────────────────────
+  if (!recipient_pin) {
+    return res.status(400).json({ error: 'Faltan campos requeridos (recipient_pin o group_pin_id).' });
   }
 
   db.get(`SELECT id, username, name FROM users WHERE share_pin = ?`, [recipient_pin.trim().toUpperCase()], (err, recipient) => {

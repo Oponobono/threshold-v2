@@ -162,6 +162,26 @@ router.get('/learning/groups/:userId', learningController.getGroups);
 
 /**
  * @swagger
+ * /api/learning/groups/{groupPinId}/decks:
+ *   get:
+ *     summary: Obtiene los mazos compartidos dentro de un grupo
+ *     tags: [Learning]
+ *     parameters:
+ *       - in: path
+ *         name: groupPinId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Lista de mazos del grupo
+ *       403:
+ *         description: No eres miembro del grupo
+ */
+router.get('/learning/groups/:groupPinId/decks', learningController.getGroupDecks);
+
+/**
+ * @swagger
  * /api/learning/groups/join:
  *   post:
  *     summary: Se une a un grupo de estudio mediante un PIN

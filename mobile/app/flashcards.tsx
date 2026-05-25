@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, FlatList, RefreshControl, StatusBar, Text, TouchableOpacity, Modal } from 'react-native';
+import { View, FlatList, RefreshControl, StatusBar, Text, TouchableOpacity, Modal, Pressable, TextInput, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../src/styles/theme';
 import { recordingsStyles } from '../src/styles/RecordingsScreen.styles';
 import { flashcardsStyles as flashcardStyles } from '../src/styles/FlashcardsModal.styles';
@@ -14,6 +16,7 @@ import { FlashcardStudyScreenStandalone } from '../src/components/FlashcardStudy
 import { FlashcardHeader } from '../src/components/flashcards/FlashcardHeader';
 import { FlashcardSearchBar } from '../src/components/flashcards/FlashcardSearchBar';
 import { FlashcardSubjectPills } from '../src/components/flashcards/FlashcardSubjectPills';
+import { GroupPills } from '../src/components/flashcards/GroupPills';
 import { FlashcardDeckCard } from '../src/components/flashcards/FlashcardDeckCard';
 import { EmptyFlashcards } from '../src/components/flashcards/EmptyFlashcards';
 import { FlashcardFloatingButton } from '../src/components/flashcards/FlashcardFloatingButton';
@@ -34,9 +37,17 @@ export default function FlashcardsScreen() {
     setShowStudyModal, setShowEditDeckModal, setActiveDeck, setStudyDeckCards,
     handleOpenMenu, handleOpenStudy, handleOpenEditDeck, renderSwipeActions,
     handleRefresh, toggleSearch,
+    // Share
+    shareDeckTarget, setShareDeckTarget,
+    sharePin, setSharePin,
+    isSharing, handleShareDeck,
+    // Groups
+    activeTab, setActiveTab,
+    groups, activeGroupPin, setActiveGroupPin,
+    groupDecks, loadingGroups,
   } = useFlashcards();
 
-  if (isLoading && filteredDecks.length === 0) {
+  if (isLoading && filteredDecks.length === 0 && activeTab === 'mazos') {
     return <PremiumLoading text="CARGANDO" />;
   }
 
@@ -44,7 +55,7 @@ export default function FlashcardsScreen() {
 
   return (
     <GestureHandlerRootView style={[recordingsStyles.container, { flex: 1 }]}>
-      <View style={[recordingsStyles.container, { flex: 1 }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[recordingsStyles.container, { flex: 1 }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <StatusBar barStyle="dark-content" backgroundColor={theme.colors.card} translucent={false} />
 
@@ -54,89 +65,212 @@ export default function FlashcardsScreen() {
           onOpenMenu={handleOpenMenu}
         />
 
-        <FlashcardSearchBar
-          searchAnim={searchAnim}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          inputRef={searchInputRef}
-        />
+        {activeTab === 'mazos' && (
+          <>
+            <FlashcardSearchBar
+              searchAnim={searchAnim}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              inputRef={searchInputRef}
+            />
 
-        <FlashcardSubjectPills
-          subjects={subjects}
-          activeSubjectId={activeSubjectId}
-          onSelect={setActiveSubjectId}
-        />
-
-        {isEmpty ? (
-          <EmptyFlashcards />
-        ) : (
-          <FlatList
-            data={filteredDecks}
-            keyExtractor={(deck) => deck.id.toString()}
-            scrollEnabled={true}
-            contentContainerStyle={[recordingsStyles.listContent, { gap: 12, paddingBottom: 120 }]}
-            showsVerticalScrollIndicator={false}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            updateCellsBatchingPeriod={50}
-            initialNumToRender={10}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                colors={[theme.colors.primary]}
-                tintColor={theme.colors.primary}
-              />
-            }
-            renderItem={({ item: deck }) => {
-              const isShared = deck.user_id != null && Number(deck.user_id) !== Number(currentUserId);
-              const duedeckIds = getDuedeckIds();
-              const isDue = duedeckIds.has(deck.id);
-              const { pillWidth, onAddPress, onDeletePress } = renderSwipeActions(deck, () => {});
-              return (
-                <SwipeableCard
-                  onOpen={(closeFn) => {
-                    if (activeCloseRef.current && activeCloseRef.current !== closeFn) {
-                      activeCloseRef.current();
-                    }
-                    activeCloseRef.current = closeFn;
-                  }}
-                  renderActions={(close) => (
-                    <View style={[flashcardStyles.swipeActionsPill, { width: pillWidth }]}>
-                      <TouchableOpacity
-                        style={flashcardStyles.swipeActionBtn}
-                        onPress={() => { close(); onAddPress(); }}
-                        activeOpacity={0.6}
-                      >
-                        <Ionicons name="add" size={18} color={theme.colors.text.secondary} />
-                      </TouchableOpacity>
-                      <View style={flashcardStyles.swipeActionDivider} />
-                      <TouchableOpacity
-                        style={flashcardStyles.swipeActionBtn}
-                        onPress={() => { close(); onDeletePress(); }}
-                        activeOpacity={0.6}
-                      >
-                        <Ionicons name="trash-outline" size={17} color={theme.colors.danger} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                >
-                  <FlashcardDeckCard
-                    deck={deck}
-                    isShared={isShared}
-                    currentUserId={currentUserId}
-                    isDue={isDue}
-                    onPress={() => handleOpenStudy(deck)}
-                    onLongPress={() => handleOpenEditDeck(deck)}
-                  />
-                </SwipeableCard>
-              );
-            }}
-          />
+            <FlashcardSubjectPills
+              subjects={subjects}
+              activeSubjectId={activeSubjectId}
+              onSelect={setActiveSubjectId}
+            />
+          </>
         )}
 
-        <FlashcardFloatingButton onPress={() => setShowNewDeckModal(true)} />
-      </View>
+        {/* Tab Switcher */}
+        <View style={{ flexDirection: 'row', marginHorizontal: 16, marginBottom: 8, gap: 0 }}>
+          <TouchableOpacity
+            onPress={() => setActiveTab('mazos')}
+            style={{
+              flex: 1, paddingVertical: 8, alignItems: 'center',
+              borderBottomWidth: 2,
+              borderBottomColor: activeTab === 'mazos' ? theme.colors.primary : 'transparent',
+            }}
+          >
+            <Text style={{
+              fontWeight: activeTab === 'mazos' ? '700' : '400',
+              color: activeTab === 'mazos' ? theme.colors.primary : theme.colors.text.secondary,
+              fontSize: 14,
+            }}>Mis Mazos</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setActiveTab('grupos')}
+            style={{
+              flex: 1, paddingVertical: 8, alignItems: 'center',
+              borderBottomWidth: 2,
+              borderBottomColor: activeTab === 'grupos' ? theme.colors.primary : 'transparent',
+            }}
+          >
+            <Text style={{
+              fontWeight: activeTab === 'grupos' ? '700' : '400',
+              color: activeTab === 'grupos' ? theme.colors.primary : theme.colors.text.secondary,
+              fontSize: 14,
+            }}>Grupos</Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 'mazos' ? (
+          <>
+            {isEmpty ? (
+              <EmptyFlashcards />
+            ) : (
+              <FlatList
+                data={filteredDecks}
+                keyExtractor={(deck) => deck.id.toString()}
+                scrollEnabled={true}
+                contentContainerStyle={[recordingsStyles.listContent, { gap: 12, paddingBottom: 120 }]}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                updateCellsBatchingPeriod={50}
+                initialNumToRender={10}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={handleRefresh}
+                    colors={[theme.colors.primary]}
+                    tintColor={theme.colors.primary}
+                  />
+                }
+                renderItem={({ item: deck }) => {
+                  const isShared = deck.user_id != null && Number(deck.user_id) !== Number(currentUserId);
+                  const duedeckIds = getDuedeckIds();
+                  const isDue = duedeckIds.has(deck.id);
+                  const { pillWidth, onAddPress, onSharePress, onDeletePress } = renderSwipeActions(deck, () => {});
+                  return (
+                    <SwipeableCard
+                      onOpen={(closeFn) => {
+                        if (activeCloseRef.current && activeCloseRef.current !== closeFn) {
+                          activeCloseRef.current();
+                        }
+                        activeCloseRef.current = closeFn;
+                      }}
+                      renderActions={(close) => (
+                        <View style={[flashcardStyles.swipeActionsPill, { width: pillWidth }]}>
+                          <TouchableOpacity
+                            style={flashcardStyles.swipeActionBtn}
+                            onPress={() => { close(); onAddPress(); }}
+                            activeOpacity={0.6}
+                          >
+                            <Ionicons name="add" size={18} color={theme.colors.text.secondary} />
+                          </TouchableOpacity>
+                          {onSharePress && (
+                            <>
+                              <View style={flashcardStyles.swipeActionDivider} />
+                              <TouchableOpacity
+                                style={flashcardStyles.swipeActionBtn}
+                                onPress={() => { close(); onSharePress(); }}
+                                activeOpacity={0.6}
+                              >
+                                <Ionicons name="share-social-outline" size={17} color={theme.colors.text.secondary} />
+                              </TouchableOpacity>
+                            </>
+                          )}
+                          <View style={flashcardStyles.swipeActionDivider} />
+                          <TouchableOpacity
+                            style={flashcardStyles.swipeActionBtn}
+                            onPress={() => { close(); onDeletePress(); }}
+                            activeOpacity={0.6}
+                          >
+                            <Ionicons name="trash-outline" size={17} color={theme.colors.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    >
+                      <FlashcardDeckCard
+                        deck={deck}
+                        isShared={isShared}
+                        currentUserId={currentUserId}
+                        isDue={isDue}
+                        onPress={() => handleOpenStudy(deck)}
+                        onLongPress={() => handleOpenEditDeck(deck)}
+                      />
+                    </SwipeableCard>
+                  );
+                }}
+              />
+            )}
+
+            <FlashcardFloatingButton onPress={() => setShowNewDeckModal(true)} />
+          </>
+        ) : (
+          <>
+            {groups.length === 0 ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+                <Ionicons name="people-outline" size={48} color={theme.colors.text.placeholder} />
+                <Text style={{ color: theme.colors.text.secondary, fontSize: 14, marginTop: 12, textAlign: 'center' }}>
+                  No perteneces a ningún grupo
+                </Text>
+              </View>
+            ) : (
+              <>
+                <GroupPills
+                  groups={groups}
+                  activeGroupPin={activeGroupPin}
+                  onSelect={setActiveGroupPin}
+                />
+                {loadingGroups ? (
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: theme.colors.text.secondary, fontSize: 14 }}>
+                      Cargando...
+                    </Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={groupDecks}
+                    keyExtractor={(d) => d.id.toString()}
+                    contentContainerStyle={[recordingsStyles.listContent, { gap: 12, paddingBottom: 120 }]}
+                    showsVerticalScrollIndicator={false}
+                    renderItem={({ item }) => {
+                      const isOwn = (item as any).is_own;
+                      const duedeckIds = getDuedeckIds();
+                      const isDue = duedeckIds.has(item.id);
+                      return (
+                        <TouchableOpacity
+                          style={[flashcardStyles.deckCard, { marginBottom: 0, borderWidth: 1, borderColor: isDue ? theme.colors.danger : '#E0E0E0' }]}
+                          activeOpacity={0.85}
+                          onPress={() => handleOpenStudy(item)}
+                        >
+                          <View style={[flashcardStyles.deckBadge, { backgroundColor: (item as any).subject_color || '#DDE7FF' }]}>
+                            <MaterialCommunityIcons
+                              name={(item as any).subject_icon || 'cards-outline'}
+                              size={20}
+                              color={theme.colors.text.primary}
+                            />
+                          </View>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={flashcardStyles.deckTitle} numberOfLines={1}>{item.title}</Text>
+                            {!isOwn && (
+                              <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
+                                por @{item.owner_username || 'compañero'}
+                              </Text>
+                            )}
+                            <Text style={flashcardStyles.deckMeta} numberOfLines={1}>{item.subject_name}</Text>
+                            <View style={flashcardStyles.deckStatsRow}>
+                              <Text style={flashcardStyles.statLabel}>{Number(item.card_count ?? 0)} tarjetas</Text>
+                              {Number(item.card_count ?? 0) > 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <Text style={flashcardStyles.statValueSuccess}>✓ {Number(item.review_count ?? 0)}</Text>
+                                  <Text style={flashcardStyles.statValuePending}>💪 {Number(item.learning_count ?? 0) + Number(item.new_count ?? 0)}</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    }}
+                  />
+                )}
+              </>
+            )}
+          </>
+        )}
+      </SafeAreaView>
 
       <NewDeckModal
         visible={showNewDeckModal}
@@ -193,6 +327,88 @@ export default function FlashcardsScreen() {
             />
           )}
         </View>
+      </Modal>
+
+      {/* ─── SHARE DECK MODAL ─── */}
+      <Modal visible={!!shareDeckTarget} transparent animationType="fade">
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => { setShareDeckTarget(null); setSharePin(''); }}
+        >
+          <Pressable
+            style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '85%', gap: 12 }}
+            onPress={() => null}
+          >
+            <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text.primary }}>
+              Compartir mazo
+            </Text>
+            <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+              Comparte{shareDeckTarget ? ` "${shareDeckTarget.title}"` : ''} con un usuario o un grupo.
+            </Text>
+            <TextInput
+              style={{
+                borderWidth: 1.5,
+                borderColor: theme.colors.border,
+                borderRadius: 10,
+                padding: 12,
+                fontSize: 20,
+                fontWeight: '700',
+                letterSpacing: 4,
+                textAlign: 'center',
+                color: theme.colors.text.primary,
+              }}
+              placeholder="PIN del usuario (Ej: ABC123)"
+              placeholderTextColor={theme.colors.text.placeholder}
+              value={sharePin}
+              onChangeText={setSharePin}
+              autoCapitalize="characters"
+              maxLength={8}
+            />
+            {groups.length > 0 && (
+              <>
+                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center', marginTop: 4 }}>
+                  — o comparte con un grupo —
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 36 }}>
+                  {groups.map((g) => (
+                    <TouchableOpacity
+                      key={g.group_pin_id}
+                      onPress={() => handleShareDeck(g.group_pin_id)}
+                      style={{
+                        paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, marginRight: 8,
+                        backgroundColor: theme.colors.primary + '20',
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.primary }}>
+                        {g.name || g.group_pin_id}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}
+                onPress={() => { setShareDeckTarget(null); setSharePin(''); }}
+              >
+                <Text style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  { flex: 1, padding: 12, borderRadius: 10, backgroundColor: theme.colors.primary, alignItems: 'center' },
+                  (!sharePin.trim() || isSharing) && { opacity: 0.5 },
+                ]}
+                onPress={() => handleShareDeck()}
+                disabled={!sharePin.trim() || isSharing}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700' }}>
+                  {isSharing ? 'Compartiendo...' : 'Compartir'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </GestureHandlerRootView>
   );

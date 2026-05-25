@@ -109,8 +109,8 @@ exports.createCustomGradingSystem = async (req, res) => {
           if (err) return res.status(500).json({ error: err.message });
           const versionId = this.lastID;
           const scales = [
-            { label: 'Aprobado', min: passing_value, max: max_value, sort_order: 1, is_passing: 1, gpa_equivalent: 3.0, color: '#4CAF50' },
-            { label: 'Reprobado', min: min_value, max: Math.max(min_value, passing_value - 0.01), sort_order: 2, is_passing: 0, gpa_equivalent: 0.0, color: '#F44336' },
+            { label: 'Aprobado', min: passing_value, max: max_value, sort_order: 1, is_passing: true, gpa_equivalent: 3.0, color: '#4CAF50' },
+            { label: 'Reprobado', min: min_value, max: Math.max(min_value, passing_value - 0.01), sort_order: 2, is_passing: false, gpa_equivalent: 0.0, color: '#F44336' },
           ];
           let scaleCount = 0;
           for (const s of scales) {
