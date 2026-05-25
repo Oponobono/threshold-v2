@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Image } from 'react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { setItemAsync, getItemAsync } from 'expo-secure-store';
@@ -377,14 +378,29 @@ export const useSettingsLogic = () => {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       quality: 0.8,
     });
     if (result.canceled || !result.assets[0]) return;
     setIsUploadingPhoto(true);
     try {
-      const uploadResult = await uploadFileToUploadthing(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+
+      const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        Image.getSize(uri, (w, h) => resolve({ width: w, height: h }), reject);
+      });
+
+      const size = Math.min(width, height);
+      const originX = (width - size) / 2;
+      const originY = (height - size) / 2;
+
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ crop: { originX, originY, width: size, height: size } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const uploadResult = await uploadFileToUploadthing(manipResult.uri);
       setEditProfileImage(uploadResult.url);
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error.message || 'Error al subir la foto', type: 'error' });

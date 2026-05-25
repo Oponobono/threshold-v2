@@ -469,12 +469,20 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           selectedRating={selectedRating}
           selectedIndex={selectedIndex}
           selectedBoolean={selectedBoolean}
-          onNext={() => {
-            if (isAnswered && !overlayVisible) {
-              advanceToNextCard();
-            }
-          }}
+          onNext={advanceToNextCard}
         />
+        {isAnswered && !overlayVisible && (
+          <View style={{ paddingHorizontal: Math.max(insets.left, 8), marginTop: 4 }}>
+            <TouchableOpacity
+              style={s.nextZone}
+              activeOpacity={0.6}
+              onPress={advanceToNextCard}
+            >
+              <Ionicons name="chevron-forward-outline" size={14} color={theme.colors.text.placeholder} />
+              <Text style={s.nextZoneText}>Toca para continuar</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* ── Overlay flotante de explicación ── */}
@@ -574,6 +582,11 @@ const s = StyleSheet.create({
   statChipLabel: { fontSize: 11, fontWeight: '600' },
   backBtn: { backgroundColor: theme.colors.primary, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 32, marginTop: 8 },
   backBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  nextZone: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, paddingVertical: 12,
+  },
+  nextZoneText: { fontSize: 12, color: theme.colors.text.placeholder },
   // Feedback Toast
   feedbackToast: {
     position: 'absolute',
