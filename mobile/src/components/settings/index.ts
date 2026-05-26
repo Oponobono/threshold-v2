@@ -7,3 +7,4 @@ export { ExportDataModal } from './ExportDataModal';
 export { FaqModal } from './FaqModal';
 export { SendFeedbackModal } from './SendFeedbackModal';
 export { CreateGroupModal } from './CreateGroupModal';
+export { ZyrenInfoModal } from './ZyrenInfoModal';

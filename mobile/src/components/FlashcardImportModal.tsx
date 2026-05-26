@@ -89,48 +89,59 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   };
 
   const handleDownloadTemplate = async () => {
+    const languagesList = [
+      'JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Go', 'Rust',
+      'PHP', 'Swift', 'Kotlin', 'Ruby', 'SQL', 'HTML/XML', 'CSS', 'Bash/Shell',
+      'PowerShell', 'R', 'Scala', 'Groovy', 'Elixir', 'Dart', 'Objective-C',
+      'VB.NET', 'JSON', 'GraphQL', 'MongoDB',
+    ];
+
     const templateDeck: any = {
-      _INSTRUCCIONES_: "IMPORTANTE: Para 'multiple_choice', opciones desde 0 (ej: correctIndex: 0). Para 'boolean', usa true o false. CÓDIGO: Las preguntas que contengan código DEBEN usar markdown fences (```lenguaje código ```). Especifica el lenguaje después de los backticks: bash, javascript, python, sql, json, html, css, java, etc. Ejemplo: ```bash git push origin main ``` - SIN especificar lenguaje, puede no resaltar correctamente.",
+      _info: `LENGUAJES SOPORTADOS (${languagesList.length} registrados): ${languagesList.join(', ')}. La aplicación tiene soporte para más de 190 lenguajes de programación. Si el lenguaje que necesitas no está en la lista, solicítalo en Configuración > Acerca de nosotros.`,
       title: 'Mi Mazo Ejemplo',
-      description: 'Descripción del mazo (opcional)',
-      subject_id: 1, // ID de la materia (opcional)
+      description: 'Máximo 200 caracteres. Describe el contenido del mazo.',
       cards: [
         {
           type: 'flashcard',
           data: {
-            front: 'Frente de la tarjeta',
-            back: 'Reverso de la tarjeta',
+            front: 'Pregunta o concepto (texto o markdown)',
+            back: 'Respuesta o definición (texto o markdown)',
           },
-          hint: 'Pista (opcional)',
-          explanation: 'Explicación (opcional)',
+          hint: 'Pista opcional para ayudar al repaso',
+          explanation: 'Explicación opcional sobre el tema',
         },
         {
           type: 'multiple_choice',
           data: {
             question: '¿Cuál es la capital de Francia?',
-            options: ['París (Índice 0)', 'Londres (Índice 1)', 'Berlín (Índice 2)', 'Madrid (Índice 3)'],
+            options: [
+              'París',
+              'Londres',
+              'Berlín',
+              'Madrid',
+            ],
             correctIndex: 0,
           },
-          hint: 'Tiene la Torre Eiffel',
-          explanation: 'París es la capital de Francia',
+          hint: 'Pista opcional',
+          explanation: 'París es la capital y la ciudad más poblada de Francia.',
         },
         {
           type: 'boolean',
           data: {
-            question: '¿2 + 2 = 4?',
+            question: '¿La fotosíntesis produce oxígeno?',
             correctAnswer: true,
           },
-          hint: 'Es una suma aritmética simple',
-          explanation: 'Matemáticas básicas',
+          hint: 'Pista opcional',
+          explanation: 'Durante la fotosíntesis, las plantas convierten CO₂ y agua en glucosa y oxígeno.',
         },
         {
           type: 'flashcard',
           data: {
-            front: 'Completa el comando para subir los cambios al repositorio remoto en Git:\n\n```bash\ngit ___ origin main\n```',
-            back: 'El comando correcto es `push`.\n\n```bash\ngit push origin main\n```',
+            front: 'Completa el comando Git:\n\n```bash\ngit ___ origin main\n```',
+            back: 'El comando es `push`:\n\n```bash\ngit push origin main\n```',
           },
-          hint: 'Empuja los cambios hacia arriba',
-          explanation: '`git push` actualiza las referencias remotas usando las referencias locales, enviando los objetos necesarios.',
+          hint: 'Empuja los cambios al remoto',
+          explanation: '`git push` envía los commits locales al repositorio remoto.',
         },
       ],
     };
@@ -168,6 +179,48 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
     }
   };
 
+  /**
+   * Sanitiza un objeto eliminando claves peligrosas (__proto__, constructor, prototype)
+   */
+  const sanitizeJSON = (obj: any): any => {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(sanitizeJSON);
+
+    const sanitized: any = {};
+    for (const key of Object.keys(obj)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+      sanitized[key] = typeof obj[key] === 'object' && obj[key] !== null ? sanitizeJSON(obj[key]) : obj[key];
+    }
+    return sanitized;
+  };
+
+  /**
+   * Valida que el content_json tenga la estructura correcta según su tipo
+   */
+  const validateCardSchema = (type: string, data: any): string | null => {
+    if (!data || typeof data !== 'object') return 'La tarjeta debe tener un campo "data" válido';
+
+    switch (type) {
+      case 'flashcard':
+        if (!data.front || typeof data.front !== 'string') return 'Tarjeta flashcard requiere "data.front" (texto)';
+        if (!data.back || typeof data.back !== 'string') return 'Tarjeta flashcard requiere "data.back" (texto)';
+        break;
+      case 'multiple_choice':
+        if (!data.question || typeof data.question !== 'string') return 'Opción múltiple requiere "data.question" (texto)';
+        if (!Array.isArray(data.options) || data.options.length < 2) return 'Opción múltiple requiere "data.options" (array con al menos 2 opciones)';
+        if (typeof data.correctIndex !== 'number') return 'Opción múltiple requiere "data.correctIndex" (número)';
+        if (data.correctIndex < 0 || data.correctIndex >= data.options.length) return 'data.correctIndex está fuera del rango de opciones';
+        break;
+      case 'boolean':
+        if (!data.question || typeof data.question !== 'string') return 'Verdadero/Falso requiere "data.question" (texto)';
+        if (typeof data.correctAnswer !== 'boolean') return 'Verdadero/Falso requiere "data.correctAnswer" (true/false)';
+        break;
+      default:
+        return `Tipo de tarjeta no soportado: "${type}"`;
+    }
+    return null;
+  };
+
   const handleImportJSON = async (file: DocumentPicker.DocumentPickerAsset) => {
     try {
       setIsProcessing(true);
@@ -185,7 +238,10 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
 
       // Leer el contenido del archivo JSON
       const jsonContent = await FileSystem.readAsStringAsync(file.uri);
-      const deckData: DeckJSON = JSON.parse(jsonContent);
+      const rawData = JSON.parse(jsonContent);
+
+      // Sanitizar contra prototype pollution
+      const deckData: DeckJSON = sanitizeJSON(rawData);
 
       // Validar estructura básica
       if (!deckData.title || !deckData.title.trim()) {
@@ -196,6 +252,51 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         });
         setIsProcessing(false);
         return;
+      }
+
+      // Validar límite de tarjetas
+      if (deckData.cards && deckData.cards.length > 20) {
+        showAlert({
+          title: t('common.error') || 'Error',
+          message: 'El mazo excede el límite de 20 tarjetas. Reduce la cantidad e intenta de nuevo.',
+          type: 'error',
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      // Validar tamaño de cada tarjeta
+      if (deckData.cards) {
+        for (let i = 0; i < deckData.cards.length; i++) {
+          const card = deckData.cards[i];
+          const jsonSize = new TextEncoder().encode(JSON.stringify(card.data)).length;
+          if (jsonSize > 50 * 1024) {
+            showAlert({
+              title: t('common.error') || 'Error',
+              message: `La tarjeta #${i + 1} excede el límite de 50KB. Reduce su contenido.`,
+              type: 'error',
+            });
+            setIsProcessing(false);
+            return;
+          }
+        }
+      }
+
+      // Validar esquema de cada tarjeta
+      if (deckData.cards) {
+        for (let i = 0; i < deckData.cards.length; i++) {
+          const card = deckData.cards[i];
+          const schemaError = validateCardSchema(card.type || 'flashcard', card.data);
+          if (schemaError) {
+            showAlert({
+              title: t('common.error') || 'Error',
+              message: `Tarjeta #${i + 1}: ${schemaError}`,
+              type: 'error',
+            });
+            setIsProcessing(false);
+            return;
+          }
+        }
       }
 
       // Crear el mazo SIN subject_id (se asignará después)

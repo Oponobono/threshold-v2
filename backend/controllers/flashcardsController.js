@@ -169,14 +169,15 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
  * Crear un nuevo mazo de flashcards
  */
 exports.createFlashcardDeck = (req, res) => {
-  const { subject_id, user_id, title, description } = req.body;
-  if (!title || !user_id) return res.status(400).json({ error: 'Faltan campos requeridos (user_id, title).' });
+  const { subject_id, title, description } = req.body;
+  const userId = req.user.id;
+  if (!title) return res.status(400).json({ error: 'Faltan campos requeridos (title).' });
   db.run(
     `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
-    [subject_id || null, user_id, title, description || ''],
+    [subject_id || null, userId, title, description || ''],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: this.lastID, subject_id: subject_id || null, user_id, title, description: description || '', card_count: 0 });
+      res.status(201).json({ id: this.lastID, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 });
     }
   );
 };
@@ -323,6 +324,59 @@ exports.createCard = (req, res) => {
 };
 
 /**
+ * Valida que el content_json tenga la estructura correcta según su tipo.
+ */
+function validateContentSchema(itemType, data) {
+  if (!data || typeof data !== 'object') {
+    return 'content_json debe ser un objeto';
+  }
+
+  switch (itemType) {
+    case 'flashcard':
+      if (!data.front || typeof data.front !== 'string') return 'flashcard requiere "front" (string)';
+      if (!data.back || typeof data.back !== 'string') return 'flashcard requiere "back" (string)';
+      if (data.front.length > 2000) return '"front" no puede exceder 2000 caracteres';
+      if (data.back.length > 2000) return '"back" no puede exceder 2000 caracteres';
+      break;
+
+    case 'multiple_choice':
+      if (!data.question || typeof data.question !== 'string') return 'multiple_choice requiere "question" (string)';
+      if (!Array.isArray(data.options) || data.options.length < 2 || data.options.length > 6) return 'multiple_choice requiere "options" (array de 2-6 elementos)';
+      if (typeof data.correctIndex !== 'number' || !Number.isInteger(data.correctIndex)) return 'multiple_choice requiere "correctIndex" (entero)';
+      if (data.correctIndex < 0 || data.correctIndex >= data.options.length) return `correctIndex (${data.correctIndex}) está fuera del rango de options (0-${data.options.length - 1})`;
+      if (data.options.some(o => typeof o !== 'string')) return 'Todos los elementos de "options" deben ser strings';
+      if (data.question.length > 2000) return '"question" no puede exceder 2000 caracteres';
+      break;
+
+    case 'boolean':
+      if (!data.question || typeof data.question !== 'string') return 'boolean requiere "question" (string)';
+      if (typeof data.correctAnswer !== 'boolean') return 'boolean requiere "correctAnswer" (true/false)';
+      if (data.question.length > 2000) return '"question" no puede exceder 2000 caracteres';
+      break;
+
+    default:
+      return `Tipo no soportado: ${itemType}`;
+  }
+
+  return null;
+}
+
+/**
+ * Sanitiza un objeto eliminando claves peligrosas (__proto__, constructor, prototype)
+ */
+function sanitizeJSON(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeJSON);
+
+  const sanitized = {};
+  for (const key of Object.keys(obj)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+    sanitized[key] = typeof obj[key] === 'object' && obj[key] !== null ? sanitizeJSON(obj[key]) : obj[key];
+  }
+  return sanitized;
+}
+
+/**
  * Crear un ítem de evaluación polimórfico (flashcard | multiple_choice | boolean)
  * Body: { item_type, content_json: { ... }, hint?, explanation? }
  */
@@ -336,29 +390,57 @@ exports.createEvaluationItem = (req, res) => {
   }
   if (!content_json) return res.status(400).json({ error: 'Se requiere content_json.' });
 
-  const contentStr = typeof content_json === 'string' ? content_json : JSON.stringify(content_json);
+  // Sanitizar contra prototype pollution
+  const safeContent = sanitizeJSON(content_json);
+
+  const contentStr = typeof safeContent === 'string' ? safeContent : JSON.stringify(safeContent);
   let parsed;
   try { parsed = JSON.parse(contentStr); } catch (_) {
     return res.status(400).json({ error: 'content_json no es JSON válido.' });
   }
 
-  // Para flashcard legacy, extraer front/back
-  const front = item_type === 'flashcard' ? (parsed.front || '') : '';
-  const back = item_type === 'flashcard' ? (parsed.back || '') : '';
+  // Límite de tamaño por carta (50KB)
+  if (contentStr.length > 50 * 1024) {
+    return res.status(400).json({ error: 'content_json excede el límite de 50KB por tarjeta.' });
+  }
 
-  // NOTA: next_review_date se deja NULL. SM-2: sin primera revisión = sin intervalo.
+  // Validar esquema según tipo de ítem
+  const schemaError = validateContentSchema(item_type, parsed);
+  if (schemaError) {
+    return res.status(400).json({ error: `Error de validación: ${schemaError}` });
+  }
 
-  db.run(
-    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', 2.5, 1, 0, 1, 0.5, 0)`,
-    [deckId, front, back, item_type, contentStr, hint || null, explanation || null],
-    function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json(normalizeCard({
-        id: this.lastID, deck_id: Number(deckId), front, back,
-        item_type, content_json: contentStr, hint: hint || null, explanation: explanation || null, status: 'new',
-      }));
+  // Verificar que el mazo existe y pertenece al usuario autenticado
+  db.get(`SELECT id, user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!deck) return res.status(404).json({ error: 'Mazo no encontrado' });
+    if (deck.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tienes permiso para modificar este mazo' });
     }
-  );
+
+    // Verificar que el mazo no exceda 20 tarjetas
+    db.get(`SELECT COUNT(*) AS count FROM flashcards WHERE deck_id = ?`, [deckId], (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (row.count >= 20) {
+        return res.status(400).json({ error: 'Límite alcanzado: un mazo no puede tener más de 20 tarjetas.' });
+      }
+
+      const front = item_type === 'flashcard' ? (parsed.front || '') : '';
+      const back = item_type === 'flashcard' ? (parsed.back || '') : '';
+
+      db.run(
+        `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', 2.5, 1, 0, 1, 0.5, 0)`,
+        [deckId, front, back, item_type, contentStr, hint || null, explanation || null],
+        function(err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.status(201).json(normalizeCard({
+            id: this.lastID, deck_id: Number(deckId), front, back,
+            item_type, content_json: contentStr, hint: hint || null, explanation: explanation || null, status: 'new',
+          }));
+        }
+      );
+    });
+  });
 };
 
 /**

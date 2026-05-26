@@ -64,15 +64,12 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
   }
 };
 
-/** Crea un nuevo mazo vacío vinculado a una materia (opcional). Inyecta automáticamente el `user_id` */
+/** Crea un nuevo mazo vacío vinculado a una materia (opcional). El user_id se obtiene del JWT en el backend. */
 export const createFlashcardDeck = async (payload: { subject_id?: number; title: string; description?: string }) => {
-  const userId = await getUserId();
-  const payloadWithUser = { ...payload, user_id: userId };
-  
   const response = await fetchWithFallback('/flashcard-decks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payloadWithUser),
+    body: JSON.stringify(payload),
   });
   const data = await parseJsonSafely(response);
   if (!response.ok) throw new Error(data?.error || 'Error al crear el mazo');

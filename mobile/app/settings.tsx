@@ -26,6 +26,7 @@ import {
   FaqModal,
   SendFeedbackModal,
   CreateGroupModal,
+  ZyrenInfoModal,
 } from '../src/components/settings';
 
 /**
@@ -87,6 +88,7 @@ export default function SettingsScreen() {
   const [scalesExpanded, setScalesExpanded] = useState(true);
   const [showWeeklyPicker, setShowWeeklyPicker] = useState(false);
   const [weeklyConfig, setWeeklyConfig] = useState<WeeklyDigestConfig | null>(null);
+  const [isZyrenInfoVisible, setIsZyrenInfoVisible] = useState(false);
   const {
     t,
     router,
@@ -811,6 +813,16 @@ export default function SettingsScreen() {
             right={<TouchableOpacity onPress={() => setIsFaqVisible(true)}><Text style={styles.openText}>{t('about.open')}</Text></TouchableOpacity>}
           />
           <SettingRow
+            title="Zyren — IA Académica"
+            desc="Conoce la inteligencia artificial de Threshold, su origen y capacidades"
+            right={
+              <TouchableOpacity style={styles.darkPill} onPress={() => setIsZyrenInfoVisible(true)}>
+                <Ionicons name="sparkles" size={14} color="#fff" style={{ marginRight: 4 }} />
+                <Text style={styles.darkPillText}>Info</Text>
+              </TouchableOpacity>
+            }
+          />
+          <SettingRow
             title={t('about.sendFeedback')} desc=""
             right={<TouchableOpacity style={styles.darkPill} onPress={() => setIsFeedbackVisible(true)}><Text style={styles.darkPillText}>{t('about.send')}</Text></TouchableOpacity>}
           />
@@ -946,6 +958,11 @@ export default function SettingsScreen() {
         isCreating={isCreatingGroup}
         onClose={() => setIsCreateGroupVisible(false)}
         onCreate={handleCreateGroup}
+      />
+
+      <ZyrenInfoModal
+        visible={isZyrenInfoVisible}
+        onClose={() => setIsZyrenInfoVisible(false)}
       />
 
     </SafeAreaView>
