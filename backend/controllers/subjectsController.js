@@ -66,10 +66,9 @@ exports.getSubjectById = (req, res) => {
       });
 
       if (user && user.active_grading_version_id) {
-        // Obtenemos la version activa
         const versionRow = await new Promise((resolve, reject) => {
           db.get(
-            `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code 
+            `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code, gs.type as system_type
              FROM grading_versions gv
              JOIN grading_systems gs ON gs.id = gv.grading_system_id
              WHERE gv.id = ?`,
@@ -83,11 +82,13 @@ exports.getSubjectById = (req, res) => {
         if (versionRow) {
           const scales = await gradingEngine.getScalesForVersion(versionRow.id);
           row.avg_score = gradingEngine.denormalizeGrade(row.normalized_avg_score, versionRow);
-          const eq = gradingEngine.getEquivalencies(row.normalized_avg_score, scales, versionRow.mode);
-          if (eq) {
-            row.display_label = eq.display_short_label || eq.label;
-            row.display_color = eq.color;
-            row.gpa_equivalent = eq.gpa_equivalent;
+          if (versionRow.system_type === 'letter') {
+            const eq = gradingEngine.getEquivalencies(row.normalized_avg_score, scales, versionRow.mode, versionRow);
+            if (eq) {
+              row.display_label = eq.display_short_label || eq.label;
+              row.display_color = eq.color;
+              row.gpa_equivalent = eq.gpa_equivalent;
+            }
           }
         }
       }
@@ -194,7 +195,7 @@ exports.getSubjectsByUser = (req, res) => {
       if (user && user.active_grading_version_id) {
         const versionRow = await new Promise((resolve, reject) => {
           db.get(
-            `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code 
+            `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code, gs.type as system_type
              FROM grading_versions gv
              JOIN grading_systems gs ON gs.id = gv.grading_system_id
              WHERE gv.id = ?`,
@@ -210,11 +211,13 @@ exports.getSubjectsByUser = (req, res) => {
           const scales = await gradingEngine.getScalesForVersion(versionRow.id);
           rows.forEach(row => {
             row.avg_score = gradingEngine.denormalizeGrade(row.normalized_avg_score, versionRow);
-            const eq = gradingEngine.getEquivalencies(row.normalized_avg_score, scales, versionRow.mode);
-            if (eq) {
-              row.display_label = eq.display_short_label || eq.label;
-              row.display_color = eq.color;
-              row.gpa_equivalent = eq.gpa_equivalent;
+            if (versionRow.system_type === 'letter') {
+              const eq = gradingEngine.getEquivalencies(row.normalized_avg_score, scales, versionRow.mode, versionRow);
+              if (eq) {
+                row.display_label = eq.display_short_label || eq.label;
+                row.display_color = eq.color;
+                row.gpa_equivalent = eq.gpa_equivalent;
+              }
             }
           });
         }

@@ -27,14 +27,17 @@ const denormalizeAssessment = (row, versionRow, scales) => {
     user_id: row.user_id
   };
 
-  // Denormalize grade to display label
+  // Denormalize grade to display label (only for letter-type systems)
   if (result.normalized_value !== null && versionRow && scales) {
     result.score = gradingEngine.denormalizeGrade(result.normalized_value, versionRow);
-    const eq = gradingEngine.getEquivalencies(result.normalized_value, scales, versionRow.mode);
-    if (eq) {
-      result.display_label = eq.display_short_label || eq.label;
-      result.display_color = eq.color;
-      result.gpa_equivalent = eq.gpa_equivalent;
+    const isLetterType = versionRow.system_type === 'letter';
+    if (isLetterType) {
+      const eq = gradingEngine.getEquivalencies(result.normalized_value, scales, versionRow.mode, versionRow);
+      if (eq) {
+        result.display_label = eq.display_short_label || eq.label;
+        result.display_color = eq.color;
+        result.gpa_equivalent = eq.gpa_equivalent;
+      }
     }
   }
 
@@ -83,7 +86,7 @@ exports.getAssessmentsBySubject = (req, res) => {
       if (user && user.active_grading_version_id) {
         versionRow = await new Promise((resolve, reject) => {
           db.get(
-            `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code 
+            `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code, gs.type as system_type
              FROM grading_versions gv
              JOIN grading_systems gs ON gs.id = gv.grading_system_id
              WHERE gv.id = ?`,
@@ -155,26 +158,26 @@ exports.getAssessmentsByUser = (req, res) => {
       if (user && user.active_grading_version_id) {
         versionRow = await new Promise((resolve, reject) => {
           db.get(
-            `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code 
-             FROM grading_versions gv
-             JOIN grading_systems gs ON gs.id = gv.grading_system_id
-             WHERE gv.id = ?`,
-            [user.active_grading_version_id],
-            (err, v) => {
-              if (err) return reject(err);
-              resolve(v);
-            }
-          );
-        });
-        
-        if (versionRow) {
-          scales = await gradingEngine.getScalesForVersion(versionRow.id);
+        `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code, gs.type as system_type
+         FROM grading_versions gv
+         JOIN grading_systems gs ON gs.id = gv.grading_system_id
+         WHERE gv.id = ?`,
+        [user.active_grading_version_id],
+        (err, v) => {
+          if (err) return reject(err);
+          resolve(v);
         }
-      }
+      );
+    });
+    
+    if (versionRow) {
+      scales = await gradingEngine.getScalesForVersion(versionRow.id);
+    }
+  }
 
-      // Always denormalize rows to ensure grade_value is populated
-      rows = rows.map(row => denormalizeAssessment(row, versionRow, scales));
-      console.log(`[GET] getAssessmentsByUser denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
+  // Always denormalize rows to ensure grade_value is populated
+  rows = rows.map(row => denormalizeAssessment(row, versionRow, scales));
+  console.log(`[GET] getAssessmentsByUser denormalizados:`, rows.map(r => ({ id: r.id, grade_value: r.grade_value, normalized_value: r.normalized_value, is_completed: r.is_completed })));
     } catch (error) {
       console.warn('[Assessments] Error denormalizing grades:', error.message);
       // Ensure rows still get basic denormalization
@@ -251,8 +254,12 @@ exports.createAssessment = (req, res) => {
 
             if (rawValue !== null) {
               const { normalizeGrade } = require('../services/gradingEngine');
-              const normalized = normalizeGrade(rawValue, version);
-              console.log(`[POST] 📊 Normalización: raw=${rawValue}, normalized=${normalized}, maxValue=${version.max_value}`);
+              const effectiveVersion = { ...version };
+              if (grade_value != null && finalOutOf && finalOutOf > 0) {
+                effectiveVersion.max_value = finalOutOf;
+              }
+              const normalized = normalizeGrade(rawValue, effectiveVersion);
+              console.log(`[POST] 📊 Normalización: raw=${rawValue}, normalized=${normalized}, maxValue=${effectiveVersion.max_value}`);
               
               db.run(`
                 INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
@@ -332,10 +339,10 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
         if (user && user.active_grading_version_id) {
           const versionRow = await new Promise((res, rej) => {
             db.get(
-              `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code 
-               FROM grading_versions gv
-               JOIN grading_systems gs ON gs.id = gv.grading_system_id
-               WHERE gv.id = ?`,
+          `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code, gs.type as system_type
+           FROM grading_versions gv
+           JOIN grading_systems gs ON gs.id = gv.grading_system_id
+           WHERE gv.id = ?`,
               [user.active_grading_version_id],
               (e, v) => {
                 if (e) rej(e);
@@ -348,11 +355,13 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
             const scales = await gradingEngine.getScalesForVersion(versionRow.id);
             if (row.normalized_value !== null && row.normalized_value !== undefined) {
               row.score = gradingEngine.denormalizeGrade(row.normalized_value, versionRow);
-              const eq = gradingEngine.getEquivalencies(row.normalized_value, scales, versionRow.mode);
-              if (eq) {
-                row.display_label = eq.display_short_label || eq.label;
-                row.display_color = eq.color;
-                row.gpa_equivalent = eq.gpa_equivalent;
+              if (versionRow.system_type === 'letter') {
+                const eq = gradingEngine.getEquivalencies(row.normalized_value, scales, versionRow.mode, versionRow);
+                if (eq) {
+                  row.display_label = eq.display_short_label || eq.label;
+                  row.display_color = eq.color;
+                  row.gpa_equivalent = eq.gpa_equivalent;
+                }
               }
             }
           }
@@ -480,9 +489,9 @@ exports.updateAssessment = (req, res) => {
 function handleAssessmentResultsUpdate(assessmentId, score, percentage, grade_value, res) {
   (async () => {
     try {
-      // Get current assessment to find userId
+      // Get current assessment to find userId and out_of
       const assessment = await new Promise((resolve, reject) => {
-        db.get('SELECT subject_id FROM assessments WHERE id = ?', [assessmentId], (err, row) => {
+        db.get('SELECT subject_id, out_of FROM assessments WHERE id = ?', [assessmentId], (err, row) => {
           if (err || !row) reject(err || new Error('Assessment not found'));
           else resolve(row);
         });
@@ -529,11 +538,20 @@ function handleAssessmentResultsUpdate(assessmentId, score, percentage, grade_va
           else rawValue = (percentage / 100) * version.max_value;
         }
 
+        // Use the assessment's out_of as the scale denominator for normalization
+        // when grade_value is provided directly, to avoid relying on potentially
+        // mismatched active_grading_version_id (which may point to a 0-100 version
+        // instead of the correct 0-5 version).
+        const effectiveVersion = { ...version };
+        if (grade_value != null && assessment.out_of && assessment.out_of > 0) {
+          effectiveVersion.max_value = assessment.out_of;
+        }
+
         console.log('[AssessmentsController] 📊 Raw value calculado:', { rawValue, gradeValue: grade_value, score, percentage });
 
         if (rawValue !== null) {
           const { normalizeGrade } = require('../services/gradingEngine');
-          const normalized = normalizeGrade(rawValue, version);
+          const normalized = normalizeGrade(rawValue, effectiveVersion);
           console.log(`[AssessmentsController] 📊 Normalización: raw=${rawValue}, normalized=${normalized}`);
           
           const existingResult = await new Promise((resolve, reject) => {

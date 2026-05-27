@@ -133,30 +133,36 @@ function denormalizeGrade(normalizedValue, version, roundMode = 'nearest') {
  * @param {string} mode              - 'continuous' | 'discrete'
  * @returns {object|null}
  */
-function getEquivalencies(normalizedValue, scales, mode = 'continuous') {
+function getEquivalencies(normalizedValue, scales, mode = 'continuous', version = null) {
   if (!scales || scales.length === 0) return null;
 
   const norm = parseFloat(normalizedValue);
-  // Convertimos a porcentaje para comparar con min_score/max_score
-  const asPercent = norm * 100;
 
-  // Ordenar por sort_order ascendente
+  // Denormalize to the version's raw scale so we compare against
+  // min_score/max_score stored in the same unit as the scale definition.
+  let referenceValue;
+  if (version) {
+    referenceValue = denormalizeGrade(normalizedValue, version);
+  } else {
+    // Fallback: treat as percentage (legacy behavior for US_LETTER 0-100)
+    referenceValue = norm * 100;
+  }
+
   const sorted = [...scales].sort((a, b) => a.sort_order - b.sort_order);
 
   let matched = null;
   for (const scale of sorted) {
-    if (asPercent >= parseFloat(scale.min_score) && asPercent <= parseFloat(scale.max_score)) {
+    if (referenceValue >= parseFloat(scale.min_score) && referenceValue <= parseFloat(scale.max_score)) {
       matched = scale;
       break;
     }
   }
 
-  // Si no hay match exacto (puede ocurrir en sistemas discretos con huecos), usar el más cercano
   if (!matched && mode === 'continuous') {
     let minDistance = Infinity;
     for (const scale of sorted) {
       const midpoint = (parseFloat(scale.min_score) + parseFloat(scale.max_score)) / 2;
-      const distance = Math.abs(asPercent - midpoint);
+      const distance = Math.abs(referenceValue - midpoint);
       if (distance < minDistance) {
         minDistance = distance;
         matched = scale;
@@ -172,7 +178,7 @@ function getEquivalencies(normalizedValue, scales, mode = 'continuous') {
     gpa_equivalent: matched.gpa_equivalent,
     color: matched.display_color || matched.color,
     is_passing: !!matched.is_passing,
-    is_unofficial_equivalency: true, // SIEMPRE marcado como aproximación
+    is_unofficial_equivalency: true,
   };
 }
 
