@@ -61,7 +61,11 @@
   "photoCount_zero": "0 fotos",
   "photo": "Foto",
   "linkPhoto": "Vincula una foto de pizarra a esta materia",
-  "deletePhotoTitle": "Eliminar Foto",
+  "deletePhotoTitle": "Eliminar foto",
   "deletePhotoConfirm": "¿Estás seguro de que deseas eliminar esta foto de forma permanente?",
-  "deletePhotoError": "Hubo un error al intentar eliminar la foto."
+  "deletePhotoError": "Hubo un error al intentar eliminar la foto.",
+  "deleteGroupTitle": "Eliminar grupo ({{count}} fotos)",
+  "deleteGroupConfirm": "¿Estás seguro de que deseas eliminar las {{count}} fotos de este grupo?",
+  "photoDeleted": "Foto eliminada",
+  "photosDeleted": "{{count}} fotos eliminadas"
 }

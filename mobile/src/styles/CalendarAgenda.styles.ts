@@ -42,7 +42,18 @@ export const calendarAgendaStyles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+  },
+  eventActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  menuButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyContainer: {
     alignItems: 'center',

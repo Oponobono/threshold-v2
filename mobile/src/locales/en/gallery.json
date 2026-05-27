@@ -61,7 +61,11 @@
   "photoCount_zero": "0 photos",
   "photo": "Photo",
   "linkPhoto": "Link a whiteboard photo to this subject",
-  "deletePhotoTitle": "Delete Photo",
+  "deletePhotoTitle": "Delete photo",
   "deletePhotoConfirm": "Are you sure you want to permanently delete this photo?",
-  "deletePhotoError": "There was an error trying to delete the photo."
+  "deletePhotoError": "There was an error trying to delete the photo.",
+  "deleteGroupTitle": "Delete group ({{count}} photos)",
+  "deleteGroupConfirm": "Are you sure you want to delete the {{count}} photos in this group?",
+  "photoDeleted": "Photo deleted",
+  "photosDeleted": "{{count}} photos deleted"
 }

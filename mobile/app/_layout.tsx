@@ -19,6 +19,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { flushOfflineQueue } from '../src/services/offlineQueue';
 import { hasValidSession } from '../src/services/api/auth/session';
 import { initializeApiClient } from '../src/services/api/client';
+import { requestPermissions } from '../src/services/notificationService';
 
 // Mantener el Splash Screen visible hasta que decidamos ocultarlo
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -67,6 +68,11 @@ export default function RootLayout() {
           console.log('[RootLayout] ❌ No hay sesión válida, navegando a welcome');
           setInitialRoute('welcome');
         }
+
+        // 🔷 3. Solicitar permiso de notificaciones al iniciar (no bloquea)
+        requestPermissions().then(granted => {
+          console.log(`[RootLayout] 📱 Permiso de notificaciones: ${granted ? 'concedido' : 'denegado'}`);
+        });
       } catch (e) {
         console.warn('[RootLayout] Error durante preparación:', e);
         setInitialRoute('welcome');
@@ -106,8 +112,10 @@ export default function RootLayout() {
       const type = data?.type as string | undefined;
       if (type === 'deadline') {
         router.push('/calendar');
-      } else if (type === 'duedeck') {
+      } else if (type === 'duedeck' || type === 'urgent_review') {
         router.push('/flashcards');
+      } else if (type === 'class') {
+        router.push('/');
       } else if (type === 'weekly_digest') {
         router.push('/');
       }

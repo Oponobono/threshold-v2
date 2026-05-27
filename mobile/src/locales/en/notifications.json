@@ -23,5 +23,9 @@
   "weeklyDigestTitle": "📊 Weekly Summary",
   "weeklyDigestBody": "Your academic performance summary for this week is now available.",
   "dueDeckTitle": "📚 Urgent review",
-  "dueDeckBody": "\"{{title}}\" has {{count}} card(s) pending review."
+  "dueDeckBody": "\"{{title}}\" has {{count}} card(s) pending review.",
+  "classAlertTitle": "📚 Class soon",
+  "classAlertBody": "\"{{name}}\" starts in {{minutes}} minutes",
+  "urgentReviewTitle": "🔬 Cards pending",
+  "urgentReviewBody": "You have {{count}} deck(s) with cards to review"
 }

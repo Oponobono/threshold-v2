@@ -147,6 +147,7 @@ export default function SubjectDetailScreen() {
             subtitle={subjectSubtitle}
             meta={subjectScheduleLabel}
             avgScore={(selectedSubject?.avg_score ?? 0) > SCALE_MAX * 2 ? ((selectedSubject?.avg_score ?? 0) / 100) * SCALE_MAX : (selectedSubject?.avg_score ?? 0)}
+            progress={securedPercent}
             displayLabel={selectedSubject?.display_label}
             displayColor={selectedSubject?.display_color}
             gpaEquivalent={selectedSubject?.gpa_equivalent}

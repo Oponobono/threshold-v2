@@ -41,27 +41,45 @@ export const SubjectTile = ({ subject }: { subject: Subject }) => {
 
 export const MetricCard = ({ title, value, subtext, icon, color, showMood, onPress }: any) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (showMood) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, { 
-            toValue: 1.15, 
-            duration: 150, 
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true 
-          }),
-          Animated.timing(pulseAnim, { 
-            toValue: 1, 
-            duration: 1000, 
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true 
-          }),
+          Animated.parallel([
+            Animated.timing(pulseAnim, { 
+              toValue: 1.3, 
+              duration: 250, 
+              easing: Easing.out(Easing.elastic(1)),
+              useNativeDriver: true 
+            }),
+            Animated.timing(pulseOpacity, { 
+              toValue: 0.6, 
+              duration: 250, 
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true 
+            }),
+          ]),
+          Animated.parallel([
+            Animated.timing(pulseAnim, { 
+              toValue: 1, 
+              duration: 600, 
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true 
+            }),
+            Animated.timing(pulseOpacity, { 
+              toValue: 1, 
+              duration: 600, 
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true 
+            }),
+          ]),
         ])
       ).start();
     } else {
       pulseAnim.setValue(1);
+      pulseOpacity.setValue(1);
     }
   }, [showMood, pulseAnim]);
 
@@ -76,7 +94,7 @@ export const MetricCard = ({ title, value, subtext, icon, color, showMood, onPre
         <Animated.View style={[
           styles.iconBox, 
           { backgroundColor: color + '20' },
-          showMood && { transform: [{ scale: pulseAnim }] }
+          showMood && { transform: [{ scale: pulseAnim }], opacity: pulseOpacity }
         ]}>
           <Ionicons name={icon as any} size={20} color={color} />
         </Animated.View>

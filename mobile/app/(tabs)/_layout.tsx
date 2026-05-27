@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Platform, BackHandler, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs, useNavigation, usePathname } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../src/styles/theme';
 import { useDataStore } from '../../src/store/useDataStore';
 import { useProgressiveDataLoading } from '../../src/hooks/useProgressiveDataLoading';
+import { useNotifications } from '../../src/hooks/useNotifications';
 import { Toast, toastRef } from '../../src/components/ui/Toast';
 
 export default function TabLayout() {
@@ -17,6 +19,16 @@ export default function TabLayout() {
   
   // 🚀 Carga progresiva: caché primero, luego servidor
   useProgressiveDataLoading();
+
+  // 📱 Notificaciones: calendar events, horarios de clase, repasos urgentes
+  const { assessments, schedules: allSchedules, predictions } = useDataStore();
+  const [notifDeadline, setNotifDeadline] = useState(true);
+  useEffect(() => {
+    AsyncStorage.getItem('notif_deadline').then(val => {
+      if (val !== null) setNotifDeadline(val === 'true');
+    });
+  }, []);
+  useNotifications(notifDeadline, false, null, assessments, allSchedules, [], predictions);
 
   // 🔒 Double Back to Exit — solo activo en el dashboard (tab index)
   const backPressedTimeRef = useRef<number>(0);

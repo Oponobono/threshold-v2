@@ -7,6 +7,8 @@ import { theme } from '../../src/styles/theme';
 import { useGallery } from '../../src/hooks/useGallery';
 import { GRID_COL_W, galleryStyles } from '../../src/styles/Gallery.styles';
 import { GalleryPhoto } from '../../src/types/gallery';
+import { deletePhoto } from '../../src/services/api';
+import { alertRef } from '../../src/components/ui/CustomAlert';
 
 import { GalleryHeader } from '../../src/components/gallery/GalleryHeader';
 import { SearchBar } from '../../src/components/gallery/SearchBar';
@@ -35,6 +37,43 @@ export default function GalleryScreen() {
     g.setViewerPhotos(photos);
     g.setViewerIndex(index);
     g.setViewerVisible(true);
+  };
+
+  const handleGridDelete = async (group: GalleryPhoto[]) => {
+    const ids = group.map((p) => p.id).filter(Boolean) as number[];
+    const count = ids.length;
+    if (count === 0) return;
+    alertRef.show({
+      title: count === 1 ? t('gallery.deletePhotoTitle') : t('gallery.deleteGroupTitle', { count }),
+      message: count === 1
+        ? t('gallery.deletePhotoConfirm')
+        : t('gallery.deleteGroupConfirm', { count }),
+      type: 'confirm',
+      buttons: [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await Promise.all(ids.map((id) => deletePhoto(id)));
+              g.handleGroupDeleted(group);
+              alertRef.show({
+                title: t('common.success'),
+                message: count === 1 ? t('gallery.photoDeleted') : t('gallery.photosDeleted', { count }),
+                type: 'success',
+              });
+            } catch (error) {
+              alertRef.show({
+                title: t('common.error'),
+                message: error instanceof Error ? error.message : t('gallery.deletePhotoError'),
+                type: 'error',
+              });
+            }
+          },
+        },
+      ],
+    });
   };
 
   const handleGridPress = (photo: GalleryPhoto, group: GalleryPhoto[]) => {
@@ -107,7 +146,9 @@ export default function GalleryScreen() {
             formatDate={g.formatDate}
             onPress={handleGridPress}
             onStar={g.toggleStar}
+            onDelete={handleGridDelete}
             onOcrPress={g.handleOcrPress}
+            t={t}
           />
         )}
         ListEmptyComponent={

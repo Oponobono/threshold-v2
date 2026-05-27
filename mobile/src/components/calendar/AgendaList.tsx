@@ -6,12 +6,16 @@ import { theme } from '../../styles/theme';
 import { calendarAgendaStyles } from '../../styles/CalendarAgenda.styles';
 import { calendarScreenStyles } from '../../styles/CalendarScreen.styles';
 import { ScheduleItem } from '../../types/calendar';
+import { alertRef } from '../ui/CustomAlert';
 
 interface AgendaListProps {
   selectedDayLabel: string;
   events: ScheduleItem[];
   onPressTask: (item: ScheduleItem) => void;
   onPressEvent: (item: ScheduleItem) => void;
+  onEditEvent?: (item: ScheduleItem) => void;
+  onDeleteEvent?: (item: ScheduleItem) => void;
+  onDeleteTask?: (item: ScheduleItem) => void;
   t: any;
 }
 
@@ -20,9 +24,35 @@ export const AgendaList: React.FC<AgendaListProps> = ({
   events,
   onPressTask,
   onPressEvent,
+  onEditEvent,
+  onDeleteEvent,
+  onDeleteTask,
   t,
 }) => {
   const router = useRouter();
+
+  const showActions = (item: ScheduleItem) => {
+    if (item.type === 'event') {
+      alertRef.show({
+        title: item.title,
+        type: 'confirm',
+        buttons: [
+          { text: t('calendar.edit'), style: 'default', onPress: () => onEditEvent?.(item) },
+          { text: t('calendar.delete'), style: 'destructive', onPress: () => onDeleteEvent?.(item) },
+          { text: t('common.cancel'), style: 'cancel' },
+        ],
+      });
+    } else if (item.type === 'task') {
+      alertRef.show({
+        title: item.title,
+        type: 'confirm',
+        buttons: [
+          { text: t('calendar.delete'), style: 'destructive', onPress: () => onDeleteTask?.(item) },
+          { text: t('common.cancel'), style: 'cancel' },
+        ],
+      });
+    }
+  };
 
   return (
     <>
@@ -63,28 +93,39 @@ export const AgendaList: React.FC<AgendaListProps> = ({
                   <Text style={calendarAgendaStyles.eventTitle} numberOfLines={1}>{item.title}</Text>
                   <Text style={calendarAgendaStyles.eventTime}>{item.time}</Text>
                 </View>
-                <View style={[
-                  calendarAgendaStyles.eventTypeBadge,
-                  {
-                    backgroundColor:
-                      item.type === 'task' ? '#FFE8CC' :
-                      item.type === 'event' ? '#E8E0D8' :
-                      '#DDEEFF'
-                  }
-                ]}>
-                  <Ionicons
-                    name={
-                      item.type === 'task' ? 'clipboard-outline' :
-                      item.type === 'event' ? 'calendar-outline' :
-                      'time-outline'
+                <View style={calendarAgendaStyles.eventActions}>
+                  <View style={[
+                    calendarAgendaStyles.eventTypeBadge,
+                    {
+                      backgroundColor:
+                        item.type === 'task' ? '#FFE8CC' :
+                        item.type === 'event' ? '#E8E0D8' :
+                        '#DDEEFF'
                     }
-                    size={14}
-                    color={
-                      item.type === 'task' ? '#FF9500' :
-                      item.type === 'event' ? '#A2845E' :
-                      '#2F80ED'
-                    }
-                  />
+                  ]}>
+                    <Ionicons
+                      name={
+                        item.type === 'task' ? 'clipboard-outline' :
+                        item.type === 'event' ? 'calendar-outline' :
+                        'time-outline'
+                      }
+                      size={14}
+                      color={
+                        item.type === 'task' ? '#FF9500' :
+                        item.type === 'event' ? '#A2845E' :
+                        '#2F80ED'
+                      }
+                    />
+                  </View>
+                  {(item.type === 'event' || item.type === 'task') && (
+                    <TouchableOpacity
+                      style={calendarAgendaStyles.menuButton}
+                      onPress={() => showActions(item)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.text.secondary} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </TouchableOpacity>
             )}

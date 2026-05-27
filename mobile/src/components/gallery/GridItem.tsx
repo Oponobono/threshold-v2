@@ -6,23 +6,28 @@ import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
 import { galleryStyles } from '../../styles/Gallery.styles';
 import { GalleryPhoto } from '../../types/gallery';
+import { alertRef } from '../ui/CustomAlert';
 
 interface GridItemProps {
   item: GalleryPhoto[];
   onPress: (photo: GalleryPhoto, group: GalleryPhoto[]) => void;
   onStar: (photo: GalleryPhoto) => void;
+  onDelete: (group: GalleryPhoto[]) => void;
   onOcrPress?: (ocrText: string) => void;
   formatDate: (d?: string) => string;
   colWidth: number;
+  t: any;
 }
 
 export const GridItem = memo(function GridItem({
   item,
   onPress,
   onStar,
+  onDelete,
   onOcrPress,
   formatDate,
   colWidth,
+  t,
 }: GridItemProps) {
   const firstItem = item[0];
   const [activeIndex, setActiveIndex] = useState(0);
@@ -31,6 +36,17 @@ export const GridItem = memo(function GridItem({
     const slideSize = event.nativeEvent.layoutMeasurement.width;
     const index = event.nativeEvent.contentOffset.x / slideSize;
     setActiveIndex(Math.round(index));
+  };
+
+  const showMenu = () => {
+    alertRef.show({
+      title: firstItem.subject_name || t('common.options'),
+      type: 'confirm',
+      buttons: [
+        { text: t('common.delete'), style: 'destructive', onPress: () => onDelete(item) },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    });
   };
 
   return (
@@ -84,6 +100,13 @@ export const GridItem = memo(function GridItem({
             size={14}
             color={item[activeIndex]?.es_favorita ? '#FFD700' : '#fff'}
           />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={showMenu}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={galleryStyles.gridMenuBtn}
+        >
+          <Ionicons name="ellipsis-vertical" size={14} color="#fff" />
         </TouchableOpacity>
       </View>
       <TouchableOpacity

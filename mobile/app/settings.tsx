@@ -7,6 +7,7 @@ import { theme } from '../src/styles/theme';
 import { settingsStyles as styles } from '../src/styles/Settings.styles';
 import { alertRef } from '../src/components/ui/CustomAlert';
 import * as Clipboard from 'expo-clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettingsLogic } from '../src/hooks/useSettingsLogic';
 import { useBackupLogic } from '../src/hooks/useBackupLogic';
@@ -14,8 +15,8 @@ import { EditProfileModal } from '../src/components/modals/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/modals/DeleteAccountModal';
 import { WeeklySummaryPicker } from '../src/components/settings/WeeklySummaryPicker';
-import { useNotifications } from '../src/hooks/useNotifications';
 import type { WeeklyDigestConfig } from '../src/services/notificationService';
+import { cancelAllDeadlineNotifications, cancelWeeklyDigest, scheduleWeeklyDigest } from '../src/services/notificationService';
 import {
   AddTermModal,
   ManageOverridesModal,
@@ -197,8 +198,6 @@ export default function SettingsScreen() {
     lmsAccounts,
     twoFactorEnabled,
   } = useSettingsLogic();
-
-  const {} = useNotifications(notifDeadline, notifWeekly, weeklyConfig);
 
   const {
     prefs: backupPrefs,
@@ -433,7 +432,7 @@ export default function SettingsScreen() {
           <SectionHeader title={t('notifications.title')} desc={t('notifications.desc')} icon="notifications-outline" />
           <SettingRow
             title={t('notifications.deadlineAlerts')} desc={t('notifications.deadlineAlertsDesc')}
-            right={<Switch value={notifDeadline} onValueChange={(v) => { setNotifDeadline(v); alertRef.show({ title: v ? t('settings.notifDeadlineEnabled') : t('settings.notifDeadlineDisabled'), message: v ? t('settings.notifDeadlineEnabledMsg') : t('settings.notifDeadlineDisabledMsg'), type: v ? 'success' : 'info', buttons: [{ text: t('common.ok') }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            right={<Switch value={notifDeadline} onValueChange={(v) => { setNotifDeadline(v); AsyncStorage.setItem('notif_deadline', String(v)); if (!v) cancelAllDeadlineNotifications(); alertRef.show({ title: v ? t('settings.notifDeadlineEnabled') : t('settings.notifDeadlineDisabled'), message: v ? t('settings.notifDeadlineEnabledMsg') : t('settings.notifDeadlineDisabledMsg'), type: v ? 'success' : 'info', buttons: [{ text: t('common.ok') }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
             title={t('notifications.weeklyDigest')}
@@ -443,7 +442,7 @@ export default function SettingsScreen() {
                   time: `${weeklyConfig.hour.toString().padStart(2, '0')}:${weeklyConfig.minute.toString().padStart(2, '0')}`,
                 })
               : t('notifications.weeklyDigestDesc')}
-            right={<Switch value={notifWeekly} onValueChange={(v) => { if (v) setShowWeeklyPicker(true); else { setNotifWeekly(false); alertRef.show({ title: t('settings.notifWeeklyDisabled'), message: t('settings.notifWeeklyDisabledMsg'), type: 'info', buttons: [{ text: t('common.ok') }] }); } }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            right={<Switch value={notifWeekly} onValueChange={(v) => { if (v) setShowWeeklyPicker(true); else { setNotifWeekly(false); AsyncStorage.setItem('notif_weekly', 'false'); cancelWeeklyDigest(); alertRef.show({ title: t('settings.notifWeeklyDisabled'), message: t('settings.notifWeeklyDisabledMsg'), type: 'info', buttons: [{ text: t('common.ok') }] }); } }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
             title={t('notifications.emailNotif')} desc={t('notifications.emailNotifDesc')}
@@ -949,6 +948,9 @@ export default function SettingsScreen() {
         onSave={(config) => {
           setWeeklyConfig(config);
           setNotifWeekly(true);
+          AsyncStorage.setItem('notif_weekly', 'true');
+          AsyncStorage.setItem('weekly_config', JSON.stringify(config));
+          scheduleWeeklyDigest(config);
         }}
         onClose={() => setShowWeeklyPicker(false)}
       />

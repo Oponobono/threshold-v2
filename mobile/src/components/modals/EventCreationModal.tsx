@@ -30,9 +30,10 @@ import { alertRef } from '../ui/CustomAlert';
 interface EventCreationModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (event: CalendarEventInput) => void;
+  onSave: (event: CalendarEventInput, eventId?: number) => void;
   selectedDate?: Date;
   subjects: any[];
+  editingEvent?: any | null;
 }
 
 export interface CalendarEventInput {
@@ -59,12 +60,15 @@ const EVENT_TYPES: Record<EventType, { label: string; color: string }> = {
   other: { label: 'Otro', color: '#A2845E' },
 };
 
+const EMPTY_DATE = new Date(2000, 0, 1);
+
 export const EventCreationModal: React.FC<EventCreationModalProps> = ({
   visible,
   onClose,
   onSave,
   selectedDate,
   subjects = [],
+  editingEvent,
 }) => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -105,6 +109,38 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
       }).start();
     }
   }, [visible, slideAnim]);
+
+  // Pre-fill form when editing an existing event
+  useEffect(() => {
+    if (visible && editingEvent) {
+      setTitle(editingEvent.title || '');
+      setEventType(editingEvent.eventType || 'task');
+      setSelectedSubjectId(editingEvent.subjectId);
+      setAllDay(editingEvent.allDay ?? true);
+      setDescription(editingEvent.description || '');
+      setCreateStudyPlan(editingEvent.createStudyPlan ?? false);
+
+      if (editingEvent.startDate) {
+        const [d, m, y] = editingEvent.startDate.split('-').map(Number);
+        setStartDate(new Date(y, m - 1, d));
+      }
+      if (editingEvent.endDate) {
+        const [d, m, y] = editingEvent.endDate.split('-').map(Number);
+        setEndDate(new Date(y, m - 1, d));
+      }
+      const parseTime = (t: string) => {
+        if (!t) return EMPTY_DATE;
+        const [h, min] = t.split(':').map(Number);
+        const d = new Date();
+        d.setHours(h, min, 0, 0);
+        return d;
+      };
+      setStartTime(parseTime(editingEvent.startTime));
+      setEndTime(parseTime(editingEvent.endTime));
+    } else if (visible && !editingEvent) {
+      resetForm();
+    }
+  }, [visible, editingEvent]);
 
   const handleDateChange = (date: Date, type: 'startDate' | 'endDate') => {
     if (type === 'startDate') {
@@ -172,7 +208,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
       createStudyPlan: eventType === 'exam' ? createStudyPlan : false,
     };
 
-    onSave(event);
+    onSave(event, editingEvent?.id);
     resetForm();
     onClose();
   };
@@ -220,7 +256,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
           <View style={styles.content}>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>{t('calendar.newEvent')}</Text>
+              <Text style={styles.headerTitle}>{editingEvent ? (t('calendar.editEvent') || 'Editar Evento') : t('calendar.newEvent')}</Text>
               <TouchableOpacity
                 onPress={onClose}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

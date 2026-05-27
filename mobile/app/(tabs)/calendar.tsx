@@ -14,7 +14,8 @@ import { AgendaList } from '../../src/components/calendar/AgendaList';
 import { AddEventMenu } from '../../src/components/calendar/AddEventMenu';
 import { TaskDetailModal } from '../../src/components/calendar/TaskDetailModal';
 import { EventDetailModal } from '../../src/components/calendar/EventDetailModal';
-import { createCalendarEvent, getCalendarEvents } from '../../src/services/api/calendar';
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getCalendarEvents } from '../../src/services/api/calendar';
+import { deleteAssessment } from '../../src/services/api';
 import { alertRef } from '../../src/components/ui/CustomAlert';
 import { calendarScreenStyles } from '../../src/styles/CalendarScreen.styles';
 
@@ -38,12 +39,97 @@ export default function CalendarScreen() {
 
   const [addMenuVisible, setAddMenuVisible] = useState(false);
   const [eventCreationVisible, setEventCreationVisible] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any>(null);
   const [taskCreationVisible, setTaskCreationVisible] = useState(false);
 
   const selectedDayLabel = new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum)
     .toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
 
   const subjects = useDataStore().subjects || [];
+
+  const handleEditEvent = (item: any) => {
+    const eventIdStr = item.id ? String(item.id).replace('event-', '') : null;
+    if (!eventIdStr) return;
+    const found = calendar.calendarEvents?.find((e: any) => String(e.id) === eventIdStr);
+    if (found) {
+      setEditingEvent(found);
+      setEventCreationVisible(true);
+    }
+  };
+
+  const handleDeleteEvent = (item: any) => {
+    const eventIdStr = item.id ? String(item.id).replace('event-', '') : null;
+    if (!eventIdStr) return;
+    alertRef.show({
+      title: t('calendar.delete') || 'Eliminar',
+      message: t('calendar.deleteConfirm') || '¿Estás seguro de eliminar este evento?',
+      type: 'confirm',
+      buttons: [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('calendar.delete') || 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCalendarEvent(Number(eventIdStr));
+              await calendar.reloadEventsForMonth();
+              alertRef.show({
+                title: t('common.success'),
+                message: t('calendar.eventDeleted') || 'Evento eliminado',
+                type: 'success',
+              });
+            } catch (error) {
+              console.error('Error deleting event:', error);
+              alertRef.show({
+                title: t('common.error'),
+                message: error instanceof Error ? error.message : 'Error al eliminar',
+                type: 'error',
+              });
+            }
+          },
+        },
+      ],
+    });
+  };
+
+  const handleDeleteTask = (item: any) => {
+    const assessmentIds = item.allAssessments?.map((a: any) => a.id) || [item.assessmentId];
+    const count = assessmentIds.filter(Boolean).length;
+    if (count === 0) return;
+    alertRef.show({
+      title: t('calendar.delete') || 'Eliminar',
+      message: count === 1
+        ? (t('calendar.deleteTaskConfirm') || '¿Estás seguro de eliminar esta tarea?')
+        : (t('calendar.deleteTasksConfirm', { count }) || `¿Estás seguro de eliminar ${count} tareas?`),
+      type: 'confirm',
+      buttons: [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('calendar.delete') || 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await Promise.all(assessmentIds.map((id: number) => deleteAssessment(id)));
+              await calendar.loadAllData(true);
+              await calendar.reloadEventsForMonth();
+              alertRef.show({
+                title: t('common.success'),
+                message: t('calendar.taskDeleted') || 'Tarea(s) eliminada(s)',
+                type: 'success',
+              });
+            } catch (error) {
+              console.error('Error deleting task:', error);
+              alertRef.show({
+                title: t('common.error'),
+                message: error instanceof Error ? error.message : 'Error al eliminar',
+                type: 'error',
+              });
+            }
+          },
+        },
+      ],
+    });
+  };
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
@@ -81,6 +167,9 @@ export default function CalendarScreen() {
             setSelectedEvent(item);
             setEventDetailVisible(true);
           }}
+          onEditEvent={handleEditEvent}
+          onDeleteEvent={handleDeleteEvent}
+          onDeleteTask={handleDeleteTask}
           t={t}
         />
       </ScrollView>
@@ -121,27 +210,37 @@ export default function CalendarScreen() {
 
       <EventCreationModal
         visible={eventCreationVisible}
-        onClose={() => setEventCreationVisible(false)}
-        onSave={async (event) => {
+        onClose={() => {
+          setEventCreationVisible(false);
+          setEditingEvent(null);
+        }}
+        onSave={async (event, eventId) => {
           try {
-            await createCalendarEvent(event);
+            if (eventId) {
+              await updateCalendarEvent(eventId, event);
+            } else {
+              await createCalendarEvent(event);
+            }
             await calendar.reloadEventsForMonth();
             alertRef.show({
               title: t('common.success'),
-              message: t('calendar.eventCreatedSuccess') || 'Evento creado exitosamente',
+              message: eventId
+                ? (t('calendar.eventUpdatedSuccess') || 'Evento actualizado')
+                : (t('calendar.eventCreatedSuccess') || 'Evento creado exitosamente'),
               type: 'success',
             });
           } catch (error) {
-            console.error('Error creando evento:', error);
+            console.error('Error guardando evento:', error);
             alertRef.show({
               title: t('common.error'),
-              message: error instanceof Error ? error.message : 'Error al crear el evento',
+              message: error instanceof Error ? error.message : 'Error al guardar el evento',
               type: 'error',
             });
           }
         }}
         selectedDate={new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum)}
         subjects={subjects}
+        editingEvent={editingEvent}
       />
 
       <CreateTaskModal

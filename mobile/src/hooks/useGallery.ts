@@ -78,6 +78,12 @@ export function useGallery(t: any) {
     setViewerPhotos((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
+  const handleGroupDeleted = useCallback((group: GalleryPhoto[]) => {
+    const ids = new Set(group.map((p) => p.id).filter(Boolean));
+    setPhotos((prev) => prev.filter((p) => p.id && !ids.has(p.id)));
+    setViewerPhotos((prev) => prev.filter((p) => p.id && !ids.has(p.id)));
+  }, []);
+
   const handleSave = useCallback(() => loadPhotos(true), [loadPhotos]);
 
   const handleOcrPress = useCallback((ocrText: string) => {
@@ -154,7 +160,7 @@ export function useGallery(t: any) {
     selectedOcrText, setSelectedOcrText,
     imagePhotos, starred, totalPhotoCount,
     loadPhotos, toggleStar,
-    handlePhotoDeleted, handleSave, handleOcrPress,
+    handlePhotoDeleted, handleGroupDeleted, handleSave, handleOcrPress,
     formatDate, subjects, loadAllData,
   };
 }

@@ -20,6 +20,13 @@ interface ScheduledInfo {
 const DEADLINE_PREFIX = 'deadline_';
 const WEEKLY_ID = 'weekly_digest';
 const DUEDECK_PREFIX = 'duedeck_';
+const CLASS_PREFIX = 'class_';
+const URGENT_REVIEW_ID = 'urgent_review';
+
+function toExpoWeekday(apiDayOfWeek: number): number {
+  // API: 1=Monday..7=Sunday → Expo: 1=Sunday..7=Saturday
+  return apiDayOfWeek === 7 ? 1 : apiDayOfWeek + 1;
+}
 
 // ── Init ────────────────────────────────────────────────────────────────────────
 
@@ -99,6 +106,88 @@ export async function cancelAllDeadlineNotifications(): Promise<void> {
       await Notifications.cancelScheduledNotificationAsync(n.identifier);
     }
   }
+}
+
+// ── Class schedule notifications ────────────────────────────────────
+
+export async function scheduleClassNotification(
+  scheduleId: number,
+  subjectName: string,
+  dayOfWeek: number,
+  startTime: string,
+  leadMinutes: number = 5,
+): Promise<string | undefined> {
+  const granted = await requestPermissions();
+  if (!granted) return undefined;
+
+  const [hour, minute] = startTime.split(':').map(Number);
+  let triggerHour = hour;
+  let triggerMinute = minute - leadMinutes;
+  if (triggerMinute < 0) {
+    triggerHour -= 1;
+    triggerMinute += 60;
+  }
+  if (triggerHour < 0) return undefined;
+
+  const id = await Notifications.scheduleNotificationAsync({
+    identifier: `${CLASS_PREFIX}${scheduleId}`,
+    content: {
+      title: i18n.t('notifications.classAlertTitle'),
+      body: i18n.t('notifications.classAlertBody', { name: subjectName, minutes: leadMinutes }),
+      data: { scheduleId, type: 'class' },
+      sound: true,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: toExpoWeekday(dayOfWeek),
+      hour: triggerHour,
+      minute: triggerMinute,
+    },
+  });
+  return id;
+}
+
+export async function cancelClassNotification(scheduleId: number): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(`${CLASS_PREFIX}${scheduleId}`);
+}
+
+export async function cancelAllClassNotifications(): Promise<void> {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
+    if (n.identifier.startsWith(CLASS_PREFIX)) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+}
+
+// ── Urgent review notifications ─────────────────────────────────────
+
+export async function scheduleUrgentReviewNotification(
+  dueCount: number,
+): Promise<string | undefined> {
+  const granted = await requestPermissions();
+  if (!granted) return undefined;
+
+  await cancelUrgentReviewNotification();
+
+  const id = await Notifications.scheduleNotificationAsync({
+    identifier: URGENT_REVIEW_ID,
+    content: {
+      title: i18n.t('notifications.urgentReviewTitle'),
+      body: i18n.t('notifications.urgentReviewBody', { count: dueCount }),
+      data: { type: 'urgent_review' },
+      sound: true,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 1,
+    },
+  });
+  return id;
+}
+
+export async function cancelUrgentReviewNotification(): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(URGENT_REVIEW_ID);
 }
 
 // ── Weekly digest ───────────────────────────────────────────────────────────────
