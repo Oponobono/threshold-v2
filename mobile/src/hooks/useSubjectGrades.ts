@@ -45,6 +45,7 @@ export function useSubjectGrades(
     delta?: number;
     evaluatedWeight?: number;
     remainingWeight?: number;
+    maxScale?: number;
   } | null>(null);
 
   // Efecto: Cargar datos de proyección del backend cuando la materia cambie o se actualicen assessments
@@ -178,13 +179,14 @@ export function useSubjectGrades(
   }, [targetGrade, accumulatedPoints, remainingPercentage]);
 
   const projectedGrade = useMemo(() => {
-    // Usar proyección del backend si está disponible
     if (projectionData?.projectedGrade !== undefined) {
-      console.log('[useSubjectGrades] 📊 Usando projectedGrade del backend:', projectionData.projectedGrade);
-      return projectionData.projectedGrade;
+      let val = projectionData.projectedGrade;
+      const maxScale = projectionData.maxScale ?? SCALE_MAX;
+      if (maxScale !== SCALE_MAX && val > 0) {
+        val = (val / maxScale) * SCALE_MAX;
+      }
+      return val;
     }
-    // Fallback: usar promedio actual si no hay datos de proyección
-    console.log('[useSubjectGrades] 📊 Usando fallback averageGrade:', averageGrade);
     return averageGrade;
   }, [projectionData, averageGrade]);
 
@@ -251,7 +253,12 @@ export function useSubjectGrades(
     remainingPercentage,
     requiredGrade,
     projectedGrade,
-    delta: projectionData?.delta ?? 0,
+    delta: projectionData?.delta !== undefined
+      ? (() => {
+          const maxScale = projectionData.maxScale ?? SCALE_MAX;
+          return maxScale !== SCALE_MAX ? (projectionData.delta! / maxScale) * SCALE_MAX : projectionData.delta!;
+        })()
+      : 0,
     currentEMA: projectionData?.currentEMA ?? null,
     securedPercent,
     deliveredText,

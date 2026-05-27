@@ -77,5 +77,6 @@
     "approvalThresholdLabel": "What is the minimum passing grade?",
     "credentialsCard": "Access credentials",
     "finishBtn": "Create Account"
-  }
+  },
+  "approvalWithValues": "Approval: {{passing}} / {{max}}"
 }

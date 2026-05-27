@@ -21,12 +21,12 @@ import { globalStyles } from '../src/styles/globalStyles';
 import { loginStyles } from '../src/styles/Login.styles';
 import { registerStyles as localStyles } from '../src/styles/Register.styles';
 import { theme } from '../src/styles/theme';
-import { CustomInput } from '../src/components/CustomInput';
-import { CustomButton } from '../src/components/CustomButton';
-import { MapuviaFooter } from '../src/components/MapuviaFooter';
+import { CustomInput } from '../src/components/ui/CustomInput';
+import { CustomButton } from '../src/components/ui/CustomButton';
+import { MapuviaFooter } from '../src/components/ui/MapuviaFooter';
 import { registerUser } from '../src/services/api';
 import { uploadFileToUploadthing } from '../src/services/uploadthing/storage';
-import { alertRef } from '../src/components/CustomAlert';
+import { alertRef } from '../src/components/ui/CustomAlert';
 import { fetchGradingSystems, type GradingSystem } from '../src/services/api/grading';
 
 const TOTAL_STEPS = 2;
@@ -503,7 +503,7 @@ export default function RegisterScreen() {
                   )}
                   {selectedSystem && (
                     <Text style={localStyles.chipSectionHint}>
-                      Aprobación: {selectedSystem.passing_value} / {selectedSystem.max_value}
+                      {t('register.approvalWithValues', { passing: selectedSystem.passing_value, max: selectedSystem.max_value })}
                     </Text>
                   )}
                   <View style={localStyles.thresholdRow}>

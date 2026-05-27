@@ -15,6 +15,10 @@ interface PerformanceCardProps {
   gradedAssessments: any[];
   onPressInfo?: () => void;
   t: any;
+  selectedSubject?: any;
+  globalGpaLetter?: { label: string; color: string } | null;
+  globalProjectedLetter?: { label: string; color: string } | null;
+  activeSystem?: { name: string } | null;
 }
 
 export const PerformanceCard: React.FC<PerformanceCardProps> = ({
@@ -26,20 +30,31 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
   gradedAssessments,
   onPressInfo,
   t,
+  selectedSubject,
+  globalGpaLetter,
+  globalProjectedLetter,
+  activeSystem,
 }) => {
+  const letterBadge = selectedSubject?.display_label
+    ? { label: selectedSubject.display_label, color: selectedSubject.display_color || '#5856D6' }
+    : (!selectedSubjectId && globalGpaLetter)
+      ? { label: globalGpaLetter.label, color: globalGpaLetter.color }
+      : null;
+
+  const projectedBadge = selectedSubjectId && selectedSubject?.display_label
+    ? null
+    : (!selectedSubjectId && globalProjectedLetter)
+      ? { label: globalProjectedLetter.label, color: globalProjectedLetter.color }
+      : null;
+
+  const scaleName = activeSystem?.name || t('grades.editScale', 'ESCALA AUTO');
   return (
     <View style={gradesStyles.card}>
-      <View style={[globalStyles.rowBetweenCenter, globalStyles.mb16]}>
+      <View style={[globalStyles.rowBetweenCenter, { marginBottom: 12 }]}>
         <Text style={gradesStyles.sectionTitle}>
           {t('grades.academicPerformance', 'Rendimiento general')}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TouchableOpacity style={gradesStyles.scaleBadge}>
-            <Ionicons name="settings-outline" size={12} color={theme.colors.text.secondary} style={{ marginRight: 4 }} />
-            <Text style={gradesStyles.scaleBadgeText}>
-              {t('grades.editScale', 'ESCALA AUTO')}
-            </Text>
-          </TouchableOpacity>
           {onPressInfo && (
             <TouchableOpacity onPress={onPressInfo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="information-circle-outline" size={20} color={theme.colors.text.secondary} />
@@ -48,10 +63,26 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
         </View>
       </View>
 
-      <View style={[globalStyles.rowCenter, { marginBottom: 20 }]}>
+      <View style={[gradesStyles.scaleBadgeRow]}>
+        <TouchableOpacity style={gradesStyles.scaleBadge}>
+          <Ionicons name="settings-outline" size={12} color={theme.colors.text.secondary} style={{ marginRight: 4 }} />
+          <Text style={gradesStyles.scaleBadgeText} numberOfLines={1}>
+            {scaleName}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={[globalStyles.rowCenter, { marginBottom: 16, marginTop: 12 }]}>
         <View style={[globalStyles.flex1, globalStyles.centerHorizontal]}>
           <Text style={gradesStyles.gpaMetricLabel}>{t('grades.termGpa')}</Text>
           <Text style={gradesStyles.gpaMetricValue}>{displayGPA}</Text>
+          {letterBadge && (
+            <View style={{ marginTop: 4 }}>
+              <Text style={[gradesStyles.projectedMetaText, { color: letterBadge.color, textTransform: 'none', fontSize: 12 }]}>
+                {letterBadge.label}
+              </Text>
+            </View>
+          )}
         </View>
         <View style={gradesStyles.gpaDivider} />
         <View style={[globalStyles.flex1, globalStyles.centerHorizontal]}>
@@ -67,6 +98,13 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
           >
             {displayProjectedGPA}
           </Text>
+          {projectedBadge && (
+            <View style={{ marginTop: 4 }}>
+              <Text style={[gradesStyles.projectedMetaText, { color: projectedBadge.color, textTransform: 'none', fontSize: 12 }]}>
+                {projectedBadge.label}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 

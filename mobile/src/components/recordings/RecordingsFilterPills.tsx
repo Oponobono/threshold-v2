@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
-import { AutoUploadIndicator } from '../AutoUploadIndicator';
+import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 
 const FILTERS = ['all', 'recording', 'video'] as const;
 type FilterValue = (typeof FILTERS)[number];

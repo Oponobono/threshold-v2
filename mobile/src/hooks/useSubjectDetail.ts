@@ -22,7 +22,7 @@ import {
 import { useSubjectGrades } from './useSubjectGrades';
 import { useAudioRecorder } from './useAudioRecorder';
 import { useDataStore } from '../store/useDataStore';
-import { useCustomAlert } from '../components/CustomAlert';
+import { useCustomAlert } from '../components/ui/CustomAlert';
 import { generatePdfFromImages } from '../utils/pdfGenerator';
 
 type DetailSubject = Subject & {

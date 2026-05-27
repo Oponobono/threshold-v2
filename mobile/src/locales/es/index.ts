@@ -24,6 +24,7 @@ import academic from './academic.json';
 import notifications from './notifications.json';
 import integrations from './integrations.json';
 import assessments from './assessments.json';
+import categories from './categories.json';
 
 const es = {
   about,
@@ -52,6 +53,7 @@ const es = {
   notifications,
   integrations,
   assessments,
+  categories,
 };
 
 export default es;

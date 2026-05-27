@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { gradesStyles } from '../../styles/Grades.styles';
 
@@ -19,6 +20,7 @@ export const ActionCard: React.FC<ActionCardProps> = ({
   buttonIcon,
   onPress,
 }) => {
+  const { t } = useTranslation();
   return (
     <View style={[gradesStyles.card, gradesStyles.bulkCard]}>
       <View style={gradesStyles.actionCardContent}>
@@ -31,7 +33,7 @@ export const ActionCard: React.FC<ActionCardProps> = ({
         </View>
         <Text style={gradesStyles.descText}>{description}</Text>
         <TouchableOpacity>
-          <Text style={gradesStyles.chooseFileText}>Ver más</Text>
+          <Text style={gradesStyles.chooseFileText}>{t('common.seeMore')}</Text>
         </TouchableOpacity>
       </View>
     </View>

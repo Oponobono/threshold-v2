@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Animated, Easing, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useRecordingsManager } from './useRecordingsManager';
-import type { GridMediaItem } from '../components/RecordingsGrid';
+import type { GridMediaItem } from '../components/recordings/RecordingsGrid';
 
 export function useRecordings() {
   const router = useRouter();

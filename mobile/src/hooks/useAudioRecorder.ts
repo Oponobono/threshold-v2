@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { alertRef } from '../components/CustomAlert';
+import { alertRef } from '../components/ui/CustomAlert';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useTranslation } from 'react-i18next';
@@ -491,10 +491,10 @@ export function useAudioRecorder() {
       
       // Show error to user
       alertRef.show({
-        title: 'Error al eliminar',
-        message: 'Ocurrió un error al eliminar la grabación. Por favor, intenta de nuevo.',
+        title: t('recordings.deleteErrorTitle'),
+        message: t('recordings.deleteError'),
         type: 'error',
-        buttons: [{ text: 'OK', style: 'cancel' }]
+        buttons: [{ text: t('common.ok'), style: 'cancel' }]
       });
     }
   }

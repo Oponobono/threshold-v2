@@ -3,8 +3,8 @@ import { View, ActivityIndicator } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { theme } from '../../src/styles/theme';
-import { VideoDetail } from '../../src/components/VideoDetail';
-import { RecordingDetail } from '../../src/components/RecordingDetail';
+import { VideoDetail } from '../../src/components/ai/VideoDetail';
+import { RecordingDetail } from '../../src/components/recordings/RecordingDetail';
 import { getYouTubeVideos, getAudioRecordings } from '../../src/services/api';
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import i18n from '../locales/i18n';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ export async function requestPermissions(): Promise<boolean> {
   if (finalStatus !== 'granted') return false;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'Recordatorios',
+      name: i18n.t('notifications.channelName'),
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 200, 100, 200],
     });
@@ -77,8 +78,8 @@ export async function scheduleDeadlineNotification(
   const id = await Notifications.scheduleNotificationAsync({
     identifier: deadlineId(eventId),
     content: {
-      title: '🔔 Recordatorio de fecha límite',
-      body: `"${title}" vence en ${leadMinutes} minutos`,
+      title: i18n.t('notifications.deadlineAlertTitle'),
+      body: i18n.t('notifications.deadlineAlertBody', { title, minutes: leadMinutes }),
       data: { eventId, type: 'deadline' },
       sound: true,
     },
@@ -114,8 +115,8 @@ export async function scheduleWeeklyDigest(
   const id = await Notifications.scheduleNotificationAsync({
     identifier: WEEKLY_ID,
     content: {
-      title: '📊 Resumen Semanal',
-      body: 'Tu resumen de rendimiento académico de esta semana ya está disponible.',
+      title: i18n.t('notifications.weeklyDigestTitle'),
+      body: i18n.t('notifications.weeklyDigestBody'),
       data: { type: 'weekly_digest', dayOfWeek: config.dayOfWeek, hour: config.hour, minute: config.minute },
       sound: true,
     },
@@ -146,8 +147,8 @@ export async function scheduleDueDeckNotification(
   const id = await Notifications.scheduleNotificationAsync({
     identifier: dueDeckId(deckId),
     content: {
-      title: '📚 Repaso urgente',
-      body: `"${deckTitle}" tiene ${dueCount} tarjeta(s) pendientes de repaso.`,
+      title: i18n.t('notifications.dueDeckTitle'),
+      body: i18n.t('notifications.dueDeckBody', { title: deckTitle, count: dueCount }),
       data: { deckId, type: 'duedeck' },
       sound: true,
     },

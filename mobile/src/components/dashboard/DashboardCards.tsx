@@ -6,12 +6,14 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { type Subject } from '../../services/api';
+import { SCALE_MAX } from '../../utils/grades';
 
 // ─── SubjectTile ──────────────────────────────────────────────────────────────
 export const SubjectTile = React.memo(({ subject }: { subject: Subject }) => {
   const { t } = useTranslation();
   const router = useRouter();
-  const avg = typeof subject.avg_score === 'number' ? subject.avg_score : 0;
+  const rawAvg = typeof subject.avg_score === 'number' ? subject.avg_score : 0;
+  const avg = rawAvg > SCALE_MAX * 2 ? (rawAvg / 100) * SCALE_MAX : rawAvg;
   const completion = typeof subject.completion_percent === 'number' ? subject.completion_percent : 0;
 
   return (

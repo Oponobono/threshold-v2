@@ -4,7 +4,8 @@ import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../store/useDataStore';
 import { Subject } from '../services/api/types';
 import { updateSubject } from '../services/api';
-import { alertRef } from '../components/CustomAlert';
+import { alertRef } from '../components/ui/CustomAlert';
+import { SCALE_MAX } from '../utils/grades';
 
 export const getStatusColor = (minNeeded: number, target: number) => {
   const maxScale = target <= 5 ? 5 : target <= 10 ? 10 : 100;
@@ -52,7 +53,9 @@ export function useSubjects(t: any) {
 
   useEffect(() => {
     if (selectedSubject) {
-      setCurrentGrade(selectedSubject.avg_score ? String(Math.round(selectedSubject.avg_score)) : '');
+      const raw = selectedSubject.avg_score || 0;
+      const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
+      setCurrentGrade(avg ? String(Math.round(avg)) : '');
       setRequiredPass(selectedSubject.target_grade ? String(selectedSubject.target_grade) : '60');
       setRemainingWeight('');
       setMinNeeded(null);

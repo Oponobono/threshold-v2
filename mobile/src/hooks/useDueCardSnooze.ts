@@ -23,34 +23,46 @@ export interface SnoozeOption {
  * Opciones de snooze basadas en principios de spaced repetition
  * y ciclos de aprendizaje efectivos.
  */
-export const SNOOZE_OPTIONS: SnoozeOption[] = [
+export const SNOOZE_OPTIONS: (SnoozeOption & { labelKey: string; descriptionKey: string; pedagogicalKey: string })[] = [
   {
-    label: 'En 30 min',
+    labelKey: 'flashcards.snooze.in30min',
+    label: '',
     minutes: 30,
-    description: 'Mantén el momentum - revisa en la próxima sesión corta',
+    descriptionKey: 'flashcards.snooze.in30minDesc',
+    description: '',
     icon: 'timer-outline',
-    pedagogical: 'Revisión inmediata para consolidar memoria a corto plazo',
+    pedagogicalKey: 'flashcards.snooze.in30minPed',
+    pedagogical: '',
   },
   {
-    label: 'En 4 horas',
+    labelKey: 'flashcards.snooze.in4hours',
+    label: '',
     minutes: 240,
-    description: 'Retoma después de otras actividades',
+    descriptionKey: 'flashcards.snooze.in4hoursDesc',
+    description: '',
     icon: 'clock-outline',
-    pedagogical: 'Intervalo óptimo para refuerzo antes de olvido (curva Ebbinghaus)',
+    pedagogicalKey: 'flashcards.snooze.in4hoursPed',
+    pedagogical: '',
   },
   {
-    label: 'Mañana',
+    labelKey: 'flashcards.snooze.tomorrow',
+    label: '',
     minutes: 1440,
-    description: 'Revisa en la próxima sesión de estudio',
+    descriptionKey: 'flashcards.snooze.tomorrowDesc',
+    description: '',
     icon: 'calendar-check',
-    pedagogical: 'Revisión del día siguiente consolida a memoria largo plazo',
+    pedagogicalKey: 'flashcards.snooze.tomorrowPed',
+    pedagogical: '',
   },
   {
-    label: 'En 3 días',
+    labelKey: 'flashcards.snooze.in3days',
+    label: '',
     minutes: 4320,
-    description: 'Retoma en la próxima sesión importante',
+    descriptionKey: 'flashcards.snooze.in3daysDesc',
+    description: '',
     icon: 'calendar-multiple',
-    pedagogical: 'Fase crítica de SM-2 antes del olvido (~70% retención)',
+    pedagogicalKey: 'flashcards.snooze.in3daysPed',
+    pedagogical: '',
   },
 ];
 

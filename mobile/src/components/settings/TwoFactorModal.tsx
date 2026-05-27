@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { settingsStyles as styles } from '../../styles/Settings.styles';
-import { alertRef } from '../CustomAlert';
+import { alertRef } from '../ui/CustomAlert';
 
 interface Props {
   visible: boolean;
@@ -23,10 +23,10 @@ export const TwoFactorModal: React.FC<Props> = ({ visible, onClose, onEnable, on
     try {
       if (isEnabled) {
         await onDisable();
-        alertRef.show({ title: t('common.success'), message: '2FA desactivado', type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('account.twoFactorDisabled'), type: 'success' });
       } else {
         await onEnable();
-        alertRef.show({ title: t('common.success'), message: '2FA activado', type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('account.twoFactorEnabled'), type: 'success' });
       }
       onClose();
     } catch (error: any) {
@@ -52,8 +52,8 @@ export const TwoFactorModal: React.FC<Props> = ({ visible, onClose, onEnable, on
             </View>
             <Text style={styles.modalDesc}>
               {isEnabled
-                ? 'La autenticación de dos factores está activa. Tu cuenta está protegida.'
-                : 'Activa la autenticación de dos factores para añadir una capa extra de seguridad a tu cuenta.'}
+                ? t('account.twoFactorActive')
+                : t('account.twoFactorInactive')}
             </Text>
           </View>
           <View style={styles.modalFooter}>

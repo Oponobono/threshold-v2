@@ -3,9 +3,10 @@ import {
   View, Text, TouchableOpacity, Animated, StyleSheet, ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { EvaluationItem, FlashcardContent } from '../../services/api/types';
-import { MarkdownWithCode } from '../MarkdownWithCode';
+import { MarkdownWithCode } from '../ui/MarkdownWithCode';
 
 interface Props {
   item: EvaluationItem;
@@ -20,6 +21,7 @@ interface Props {
 export const FlashcardView: React.FC<Props> = ({
   item, onReveal, onAnswer, onShowExplanation, isAnswered, selectedRating, onNext
 }) => {
+  const { t } = useTranslation();
   const content = item.content as FlashcardContent;
   const [isFlipped, setIsFlipped] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
@@ -183,7 +185,7 @@ export const FlashcardView: React.FC<Props> = ({
               disabled={isAnswered}
             >
               <Text style={s.ratingEmoji}>😓</Text>
-              <Text style={[s.ratingLabel, { color: '#FF9800' }]}>Difícil</Text>
+              <Text style={[s.ratingLabel, { color: '#FF9800' }]}>{t('evaluation.hard')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.ratingBtn, s.ratingEasy, selectedRating && selectedRating !== 'review' && { opacity: 0.3 }]}
@@ -191,7 +193,7 @@ export const FlashcardView: React.FC<Props> = ({
               disabled={isAnswered}
             >
               <Text style={s.ratingEmoji}>😊</Text>
-              <Text style={[s.ratingLabel, { color: '#4CAF50' }]}>Fácil</Text>
+              <Text style={[s.ratingLabel, { color: '#4CAF50' }]}>{t('evaluation.easy')}</Text>
             </TouchableOpacity>
           </View>
         )}

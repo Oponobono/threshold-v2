@@ -9,10 +9,10 @@ import { theme } from '../src/styles/theme';
 import { recordingsStyles } from '../src/styles/RecordingsScreen.styles';
 import { flashcardsStyles as flashcardStyles } from '../src/styles/FlashcardsModal.styles';
 
-import { PremiumLoading } from '../src/components/PremiumLoading';
-import { FlashcardImportModal } from '../src/components/FlashcardImportModal';
-import { SwipeableCard } from '../src/components/SwipeableCard';
-import { FlashcardStudyScreenStandalone } from '../src/components/FlashcardStudyScreenStandalone';
+import { PremiumLoading } from '../src/components/ui/PremiumLoading';
+import { FlashcardImportModal } from '../src/components/flashcards/FlashcardImportModal';
+import { SwipeableCard } from '../src/components/ui/SwipeableCard';
+import { FlashcardStudyScreenStandalone } from '../src/components/flashcards/FlashcardStudyScreenStandalone';
 import { FlashcardHeader } from '../src/components/flashcards/FlashcardHeader';
 import { FlashcardSearchBar } from '../src/components/flashcards/FlashcardSearchBar';
 import { FlashcardSubjectPills } from '../src/components/flashcards/FlashcardSubjectPills';
@@ -25,8 +25,10 @@ import { NewCardModal } from '../src/components/flashcards/NewCardModal';
 import { EditDeckModal } from '../src/components/flashcards/EditDeckModal';
 import { MenuModal } from '../src/components/flashcards/MenuModal';
 import { useFlashcards } from '../src/hooks/useFlashcards';
+import { useTranslation } from 'react-i18next';
 
 export default function FlashcardsScreen() {
+  const { t } = useTranslation();
   const {
     showSearch, showNewDeckModal, showImportModal, showMenuModal, showNewCardModal,
     showStudyModal, showEditDeckModal, subjects, activeDeck, editingDeck, studyDeckCards,
@@ -205,7 +207,7 @@ export default function FlashcardsScreen() {
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
                 <Ionicons name="people-outline" size={48} color={theme.colors.text.placeholder} />
                 <Text style={{ color: theme.colors.text.secondary, fontSize: 14, marginTop: 12, textAlign: 'center' }}>
-                  No perteneces a ningún grupo
+                  {t('flashcards.notInAnyGroup')}
                 </Text>
               </View>
             ) : (
@@ -249,7 +251,7 @@ export default function FlashcardsScreen() {
                               <Text style={flashcardStyles.deckTitle} numberOfLines={1}>{item.title}</Text>
                               {!isOwn && (
                                 <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
-                                  por @{item.owner_username || 'compañero'}
+                                  por @{item.owner_username || t('flashcards.classmate')}
                                 </Text>
                               )}
                               <Text style={flashcardStyles.deckMeta} numberOfLines={1}>{item.subject_name}</Text>

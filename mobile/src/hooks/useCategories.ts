@@ -6,7 +6,7 @@ import {
   deleteCategory,
   getCategoriesBySubject,
 } from '../services/api/assessmentCategories';
-import { useCustomAlert } from '../components/CustomAlert';
+import { useCustomAlert } from '../components/ui/CustomAlert';
 
 const CATEGORY_ACCENT_COLORS = [
   '#1A1A1A', '#444444', '#666666', '#888888', '#AAAAAA',
@@ -57,10 +57,7 @@ export function useCategories() {
   const handleDelete = (cat: AssessmentCategory) => {
     showAlert({
       title: t('categories.deleteTitle', 'Eliminar categoría'),
-      message: t(
-        'categories.deleteConfirm',
-        `¿Eliminar "${cat.name}"? Las evaluaciones asignadas quedarán sin categoría.`,
-      ).replace('{{name}}', cat.name),
+      message: t('categories.deleteConfirm', { name: cat.name }),
       type: 'confirm',
       buttons: [
         { text: t('common.cancel', 'Cancelar'), style: 'cancel' as const },

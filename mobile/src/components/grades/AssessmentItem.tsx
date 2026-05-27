@@ -66,7 +66,6 @@ export const AssessmentItem: React.FC<AssessmentItemProps> = ({
             <Text style={[gradesStyles.assessScore, { color: GRADE_COLORS(pct) }]}>
               {gradeVal!.toFixed(1)}/{SCALE_MAX}
             </Text>
-            <Text style={gradesStyles.assessPct}>{pct}%</Text>
           </>
         ) : (
           <Text style={[gradesStyles.assessStatus, { color: isTask && isCompleted ? '#34C759' : theme.colors.text.secondary }]}>

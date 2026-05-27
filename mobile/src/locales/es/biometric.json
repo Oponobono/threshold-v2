@@ -1,5 +1,15 @@
 {
   "promptEnroll": "Confirma tu identidad para activar Touch ID",
   "cancel": "Cancelar",
-  "promptLogin": "Usa Touch ID para iniciar sesión en Threshold"
+  "promptLogin": "Usa Touch ID para iniciar sesión en Threshold",
+  "enableTitle": "Activar Touch ID",
+  "promptEnrollQuestion": "¿Deseas iniciar sesión con tu huella dactilar la próxima vez?",
+  "notNow": "Ahora no",
+  "enable": "Activar",
+  "touchId": "Touch ID",
+  "serverConfigError": "Hubo un error al guardar la configuración en el servidor.",
+  "notConfiguredTitle": "Touch ID no configurado",
+  "notConfigured": "Inicia sesión con tu correo y contraseña primero para activar esta función.",
+  "verificationFailed": "No se pudo verificar tu huella. Intenta de nuevo o usa tu contraseña.",
+  "loginFailed": "No se pudo iniciar sesión con Touch ID."
 }

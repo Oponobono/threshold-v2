@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { theme } from '../../styles/theme';
-import { useCustomAlert } from '../CustomAlert';
+import { useCustomAlert } from '../ui/CustomAlert';
 import { galleryStyles } from '../../styles/Gallery.styles';
 
 interface OcrModalProps {

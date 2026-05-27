@@ -18,13 +18,13 @@ import { EmptyState } from '../../src/components/gallery/EmptyState';
 import { OcrModal } from '../../src/components/gallery/OcrModal';
 
 const ImageViewerModal = lazy(() =>
-  import('../../src/components/ImageViewerModal').then(m => ({ default: m.ImageViewerModal }))
+  import('../../src/components/modals/ImageViewerModal').then(m => ({ default: m.ImageViewerModal }))
 );
 const PhotoCaptureModal = lazy(() =>
-  import('../../src/components/PhotoCaptureModal').then(m => ({ default: m.PhotoCaptureModal }))
+  import('../../src/components/modals/PhotoCaptureModal').then(m => ({ default: m.PhotoCaptureModal }))
 );
 const DocumentScannerModal = lazy(() =>
-  import('../../src/components/DocumentScannerModal').then(m => ({ default: m.DocumentScannerModal }))
+  import('../../src/components/modals/DocumentScannerModal').then(m => ({ default: m.DocumentScannerModal }))
 );
 
 export default function GalleryScreen() {

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
-import { ThresholdDatePicker } from '../ThresholdDatePicker';
+import { ThresholdDatePicker } from '../ui/ThresholdDatePicker';
 import { Subject } from '../../services/api/types';
 
 interface Props {

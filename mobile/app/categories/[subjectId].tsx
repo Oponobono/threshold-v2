@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../../src/styles/theme';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { categoriesStyles as styles } from '../../src/styles/Categories.styles';
-import { CategoryFormModal } from '../../src/components/CategoryFormModal';
+import { CategoryFormModal } from '../../src/components/modals/CategoryFormModal';
 import { useCategories } from '../../src/hooks/useCategories';
 import { EmptyCategories } from '../../src/components/categories/EmptyCategories';
 import { CategoryCard } from '../../src/components/categories/CategoryCard';
@@ -64,10 +64,7 @@ export default function CategoriesScreen() {
             <View style={styles.infoBanner}>
               <Ionicons name="information-circle-outline" size={15} color={theme.colors.text.secondary} />
               <Text style={styles.infoBannerText}>
-                {t(
-                  'categories.infoBanner',
-                  'Las categorías agrupan evaluaciones y permiten definir pesos y reglas como "Eliminar la peor nota" antes de calcular tu promedio.',
-                )}
+                {t('categories.helpText')}
               </Text>
             </View>
 

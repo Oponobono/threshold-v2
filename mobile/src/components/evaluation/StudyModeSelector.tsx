@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { StudyMode } from '../../services/api/types';
 
@@ -19,10 +20,10 @@ interface ModeConfig {
 }
 
 const MODES: ModeConfig[] = [
-  { mode: 'flashcard', icon: '🃏', label: 'Flashcards', description: 'Frente y reverso clásico', color: '#5C6BC0', bg: '#EDE7F6' },
-  { mode: 'multiple_choice', icon: '🎯', label: 'ECAES', description: '4 opciones, 1 correcta', color: '#00897B', bg: '#E0F2F1' },
-  { mode: 'boolean', icon: '⚖️', label: 'V / F', description: 'Verdadero o Falso', color: '#F57C00', bg: '#FFF3E0' },
-  { mode: 'mixed', icon: '🔀', label: 'Mixto', description: 'Combina todos los tipos', color: '#D81B60', bg: '#FCE4EC' },
+  { mode: 'flashcard', icon: '🃏', label: 'Flashcards', description: 'Classic front and back', color: '#5C6BC0', bg: '#EDE7F6' },
+  { mode: 'multiple_choice', icon: '🎯', label: 'ECAES', description: '4 options, 1 correct', color: '#00897B', bg: '#E0F2F1' },
+  { mode: 'boolean', icon: '⚖️', label: 'V / F', description: 'True or False', color: '#F57C00', bg: '#FFF3E0' },
+  { mode: 'mixed', icon: '🔀', label: 'Mixed', description: 'Combines all types', color: '#D81B60', bg: '#FCE4EC' },
 ];
 
 interface Props {
@@ -30,11 +31,18 @@ interface Props {
   onSelect: (mode: StudyMode) => void;
 }
 
-export const StudyModeSelector: React.FC<Props> = ({ selected, onSelect }) => (
+export const StudyModeSelector: React.FC<Props> = ({ selected, onSelect }) => {
+  const { t } = useTranslation();
+  const translatedModes = MODES.map(m => ({
+    ...m,
+    label: t(`evaluation.mode.${m.mode}`, m.label),
+    description: t(`evaluation.mode.${m.mode}Desc`, m.description),
+  }));
+  return (
   <View>
-    <Text style={s.sectionTitle}>Tipo de estudio</Text>
+    <Text style={s.sectionTitle}>{t('evaluation.studyType')}</Text>
     <View style={s.grid}>
-      {MODES.map((cfg) => {
+      {translatedModes.map((cfg) => {
         const isActive = selected === cfg.mode;
         return (
           <TouchableOpacity
@@ -53,6 +61,7 @@ export const StudyModeSelector: React.FC<Props> = ({ selected, onSelect }) => (
     </View>
   </View>
 );
+};
 
 const s = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 10 },

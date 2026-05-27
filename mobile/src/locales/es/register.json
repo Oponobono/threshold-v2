@@ -77,5 +77,6 @@
     "approvalThresholdLabel": "¿Cuál es la nota mínima para aprobar?",
     "credentialsCard": "Credenciales de acceso",
     "finishBtn": "Crear cuenta"
-  }
+  },
+  "approvalWithValues": "Aprobación: {{passing}} / {{max}}"
 }

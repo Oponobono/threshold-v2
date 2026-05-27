@@ -1,0 +1,17 @@
+{
+  "trueOrFalse": "True or False?",
+  "why": "Why?",
+  "hard": "Hard",
+  "easy": "Easy",
+  "studyType": "Study type",
+  "mode": {
+    "flashcard": "Flashcards",
+    "flashcardDesc": "Classic front and back",
+    "multiple_choice": "ECAES",
+    "multiple_choiceDesc": "4 options, 1 correct",
+    "boolean": "T / F",
+    "booleanDesc": "True or False",
+    "mixed": "Mixed",
+    "mixedDesc": "Combines all types"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "trueOrFalse": "¿Verdadero o Falso?",
+  "why": "¿Por qué?",
+  "hard": "Difícil",
+  "easy": "Fácil",
+  "studyType": "Tipo de estudio",
+  "mode": {
+    "flashcard": "Flashcards",
+    "flashcardDesc": "Frente y reverso clásico",
+    "multiple_choice": "ECAES",
+    "multiple_choiceDesc": "4 opciones, 1 correcta",
+    "boolean": "V / F",
+    "booleanDesc": "Verdadero o Falso",
+    "mixed": "Mixto",
+    "mixedDesc": "Combina todos los tipos"
+  }
+}

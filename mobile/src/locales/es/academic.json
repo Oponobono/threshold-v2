@@ -29,5 +29,9 @@
   "addCustomScale": "Añadir escala personalizada",
   "termName": "Nombre del período",
   "overrideDesc": "Define un umbral de aprobación distinto para cada materia.",
-  "maxGrade": "Valor máximo"
+  "maxGrade": "Valor máximo",
+  "termPlaceholder": "Ej: Otoño 2026",
+  "scaleSpain": "España – Escala 0-10",
+  "scaleMexico": "México – Escala 0-10",
+  "scaleUSLetter": "EE.UU. – Escala de Letras A-F"
 }

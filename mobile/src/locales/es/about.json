@@ -70,5 +70,19 @@
   "masteryFair": "40–59%  —  Aceptable",
   "masteryLow": "20–39%  —  Bajo",
   "masteryCritical": "< 20%  —  Crítico",
-  "atomicCards": "Generador de Tarjetas Atómicas: Las tarjetas densas se fragmentan en micro-tarjetas basado en la Teoría de Carga Cognitiva (Sweller, 1988), reduciendo la sobrecarga y mejorando la retención."
+  "atomicCards": "Generador de Tarjetas Atómicas: Las tarjetas densas se fragmentan en micro-tarjetas basado en la Teoría de Carga Cognitiva (Sweller, 1988), reduciendo la sobrecarga y mejorando la retención.",
+
+  "dragonflyDesc1": "Elegida por MAPUVIA Labs como emblema de Threshold, la",
+  "dragonflyDesc2": "representa agilidad, precisión y visión panorámica de 360°.",
+  "dragonflyDesc3": "Así como este insecto percibe su entorno completo de un solo vistazo,",
+  "dragonflyDesc4": "Threshold le otorga al estudiante una perspectiva integral de su progreso académico, permitiéndole adaptarse y avanzar sin fricciones.",
+
+  "mapuviaDesc1": "MAPUVIA Labs es la división de investigación y desarrollo (I+D) de MAPUVIA, enfocada",
+  "mapuviaDesc2": "exclusivamente en la creación de software científico y académico. Opera como una incubadora especializada en transformar la educación y la investigación en",
+  "mapuviaDesc3": "Matriz corporativa de innovación tecnológica. MAPUVIA se dedica al desarrollo de servicios digitales y software general, creando ecosistemas que impulsan el progreso de personas y organizaciones en su cotidianidad.",
+
+  "thresholdDesc1": "Diseñada íntegramente por MAPUVIA Labs,",
+  "thresholdDesc2": "nace para eliminar la fragmentación en la vida académica del estudiante. Calificaciones, horarios y apuntes en un solo lugar, siempre a la mano.",
+
+  "retention": "Retención"
 }

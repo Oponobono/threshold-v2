@@ -10,7 +10,7 @@ import { gradesStyles } from '../../src/styles/Grades.styles';
 import { useGrades } from '../../src/hooks/useGrades';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { MasteryRadarCard } from '../../src/components/grades/MasteryRadarCard';
-import { MasteryRadar } from '../../src/components/MasteryRadar';
+import { MasteryRadar } from '../../src/components/ui/MasteryRadar';
 import { GradesHeader } from '../../src/components/grades/GradesHeader';
 import { FilterBar } from '../../src/components/grades/FilterBar';
 import { SubjectFilterBar } from '../../src/components/grades/SubjectFilterBar';
@@ -48,6 +48,10 @@ export default function GradesScreen() {
           displayProjectedGPA={g.displayProjectedGPA}
           displayDelta={g.displayDelta}
           selectedSubjectId={g.selectedSubjectId}
+          selectedSubject={g.selectedSubject}
+          globalGpaLetter={g.globalGpaLetter}
+          globalProjectedLetter={g.globalProjectedLetter}
+          activeSystem={g.activeSystem}
           globalGPA={null}
           gradedAssessments={g.gradedAssessments}
           onPressInfo={() => {

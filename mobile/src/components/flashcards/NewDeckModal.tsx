@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Modal, Pressable } from 'react-native';
-import { FlashcardNewDeckScreen } from '../FlashcardNewDeckScreen';
+import { FlashcardNewDeckScreen } from './FlashcardNewDeckScreen';
 import { flashcardsScreenStyles as styles } from '../../styles/FlashcardsScreen.styles';
 import type { Subject } from '../../services/api';
 

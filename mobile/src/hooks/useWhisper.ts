@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
+// eslint-disable-next-line import/no-unresolved
 import { initWhisper, WhisperContext } from 'whisper.rn';
 import { useTranslation } from 'react-i18next';
 

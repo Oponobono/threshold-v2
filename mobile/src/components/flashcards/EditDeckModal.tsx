@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { flashcardsScreenStyles as styles } from '../../styles/FlashcardsScreen.styles';
-import { useCustomAlert } from '../CustomAlert';
+import { useCustomAlert } from '../ui/CustomAlert';
 import type { FlashcardDeck, Subject } from '../../services/api';
 import { updateFlashcardDeck } from '../../services/api';
 

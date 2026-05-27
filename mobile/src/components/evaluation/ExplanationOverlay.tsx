@@ -10,8 +10,9 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
-import { MarkdownWithCode } from '../MarkdownWithCode';
+import { MarkdownWithCode } from '../ui/MarkdownWithCode';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ interface Props {
 export const ExplanationOverlay: React.FC<Props> = ({
   visible, explanation, onDismiss,
 }) => {
+  const { t } = useTranslation();
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim   = useRef(new Animated.Value(0.95)).current;
 
@@ -57,7 +59,7 @@ export const ExplanationOverlay: React.FC<Props> = ({
         <View style={s.explanationBox}>
           <Ionicons name="information-circle" size={18} color={theme.colors.info} style={{ marginTop: 2 }} />
           <View style={{ flex: 1 }}>
-            <Text style={s.explanationTitle}>¿Por qué?</Text>
+            <Text style={s.explanationTitle}>{t('evaluation.why')}</Text>
             <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
               <MarkdownWithCode style={{ body: { fontSize: 14, lineHeight: 21, color: theme.colors.text.primary } }}>
                 {explanation}

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, FlatList, RefreshControl } from 'react-native';
 import LottieView from 'lottie-react-native';
-import { alertRef } from '../../src/components/CustomAlert';
+import { alertRef } from '../../src/components/ui/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -16,15 +16,15 @@ import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { useCachePreload } from '../../src/hooks/useCachePreload';
 import { cacheService } from '../../src/services/cacheService';
 import { downloadProfileImage } from '../../src/services/profileImageCache';
-import { StudyTimerCard } from '../../src/components/StudyTimerCard';
-import { SnoozeModal } from '../../src/components/SnoozeModal';
+import { StudyTimerCard } from '../../src/components/timer/StudyTimerCard';
+import { SnoozeModal } from '../../src/components/modals/SnoozeModal';
 import { useDueCardSnooze, type SnoozeOption } from '../../src/hooks/useDueCardSnooze';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AudioRecorderModal } from '../../src/components/AudioRecorderModal';
-import { StudyTimerModal } from '../../src/components/StudyTimerModal';
-import { DocumentScannerModal } from '../../src/components/DocumentScannerModal';
-import { PhotoCaptureModal } from '../../src/components/PhotoCaptureModal';
-import { FlashcardsModal } from '../../src/components/FlashcardsModal';
+import { AudioRecorderModal } from '../../src/components/audio/AudioRecorderModal';
+import { StudyTimerModal } from '../../src/components/timer/StudyTimerModal';
+import { DocumentScannerModal } from '../../src/components/modals/DocumentScannerModal';
+import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal';
+import { FlashcardsModal } from '../../src/components/flashcards/FlashcardsModal';
 import { SubjectTile, MetricCard, ActionCircle, PerformanceRow } from '../../src/components/dashboard/DashboardWidgets';
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
 import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
@@ -329,7 +329,7 @@ export default function HybridDashboardScreen() {
       console.error('Error snoozing alert:', error);
       alertRef.show({
         title: 'Error',
-        message: 'No se pudo aplazar la revisión',
+        message: t('common.errors.snoozeFailed'),
         type: 'error',
         buttons: [{ text: 'Aceptar', style: 'default' }],
       });
@@ -557,14 +557,14 @@ export default function HybridDashboardScreen() {
                 <MetricCard 
                   title={t('dashboard.nextAssignment')} 
                   value={nextAssessment ? nextAssessment.name : "Nada pendiente"} 
-                  subtext={nextAssessment ? nextAssessment.date : "Tómate un descanso"} 
+                  subtext={nextAssessment ? nextAssessment.date : t('dashboard.takeABreak')} 
                   icon="document-text-outline" 
                   color={mood.color}
                   showMood={mood.show}
                   onPress={() => setSelectedMetric({
                     title: t('dashboard.nextAssignment'),
                     value: nextAssessment ? nextAssessment.name : "Nada pendiente",
-                    subtext: nextAssessment ? nextAssessment.date : "Tómate un descanso",
+                    subtext: nextAssessment ? nextAssessment.date : t('dashboard.takeABreak'),
                     icon: "document-text-outline",
                     color: mood.color
                   })}

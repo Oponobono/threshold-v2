@@ -8,24 +8,25 @@ import { useTranslation } from 'react-i18next';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { subjectDetailStyles as styles } from '../../src/styles/SubjectDetail.styles';
-import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
-import { SubjectRecentRecordings } from '../../src/components/SubjectRecentRecordings';
-import { DocumentScannerModal } from '../../src/components/DocumentScannerModal';
-import { PhotoCaptureModal } from '../../src/components/PhotoCaptureModal';
-import { ImageViewerModal } from '../../src/components/ImageViewerModal';
-import { SubjectGalleryGrid } from '../../src/components/SubjectGalleryGrid';
-import { SubjectDocumentsList } from '../../src/components/SubjectDocumentsList';
-import { FlashcardCreatorModal } from '../../src/components/FlashcardCreatorModal';
-import { SubjectStats } from '../../src/components/SubjectStats';
-import { SubjectThreshold } from '../../src/components/SubjectThreshold';
-import { SubjectInsights } from '../../src/components/SubjectInsights';
-import { SubjectAIFab } from '../../src/components/SubjectAIFab';
+import { SubjectHeroCard } from '../../src/components/subjects/SubjectHeroCard';
+import { SubjectRecentRecordings } from '../../src/components/subjects/SubjectRecentRecordings';
+import { DocumentScannerModal } from '../../src/components/modals/DocumentScannerModal';
+import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal';
+import { ImageViewerModal } from '../../src/components/modals/ImageViewerModal';
+import { SubjectGalleryGrid } from '../../src/components/subjects/SubjectGalleryGrid';
+import { SubjectDocumentsList } from '../../src/components/subjects/SubjectDocumentsList';
+import { FlashcardCreatorModal } from '../../src/components/flashcards/FlashcardCreatorModal';
+import { SubjectStats } from '../../src/components/subjects/SubjectStats';
+import { SubjectThreshold } from '../../src/components/subjects/SubjectThreshold';
+import { SubjectInsights } from '../../src/components/subjects/SubjectInsights';
+import { SubjectAIFab } from '../../src/components/subjects/SubjectAIFab';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
-import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
-import { SubjectYouTubeVideos } from '../../src/components/SubjectYouTubeVideos';
-import { PDFImportModal } from '../../src/components/PDFImportModal';
+import { AutoUploadIndicator } from '../../src/components/ui/AutoUploadIndicator';
+import { SubjectYouTubeVideos } from '../../src/components/subjects/SubjectYouTubeVideos';
+import { PDFImportModal } from '../../src/components/modals/PDFImportModal';
 import { useSubjectDetail } from '../../src/hooks/useSubjectDetail';
+import { SCALE_MAX } from '../../src/utils/grades';
 import type { Subject } from '../../src/services/api';
 
 export default function SubjectDetailScreen() {
@@ -145,7 +146,7 @@ export default function SubjectDetailScreen() {
             title={selectedSubject?.name || t('subjects.noSubjectSelected')}
             subtitle={subjectSubtitle}
             meta={subjectScheduleLabel}
-            avgScore={selectedSubject?.avg_score || 0}
+            avgScore={(selectedSubject?.avg_score ?? 0) > SCALE_MAX * 2 ? ((selectedSubject?.avg_score ?? 0) / 100) * SCALE_MAX : (selectedSubject?.avg_score ?? 0)}
             displayLabel={selectedSubject?.display_label}
             displayColor={selectedSubject?.display_color}
             gpaEquivalent={selectedSubject?.gpa_equivalent}

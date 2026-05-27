@@ -29,5 +29,9 @@
   "addCustomScale": "Add Custom Scale",
   "termName": "Term name",
   "overrideDesc": "Set a different passing threshold for each subject.",
-  "maxGrade": "Maximum value"
+  "maxGrade": "Maximum value",
+  "termPlaceholder": "e.g. Fall 2026",
+  "scaleSpain": "Spain – 0-10 Scale",
+  "scaleMexico": "Mexico – 0-10 Scale",
+  "scaleUSLetter": "USA – A-F Letter Scale"
 }

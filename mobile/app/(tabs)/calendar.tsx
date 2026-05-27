@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { useDataStore } from '../../src/store/useDataStore';
 import { useCalendar } from '../../src/hooks/useCalendar';
-import { EventCreationModal } from '../../src/components/EventCreationModal';
+import { EventCreationModal } from '../../src/components/modals/EventCreationModal';
 import { CreateTaskModal } from '../../src/components/dashboard/CreateTaskModal';
 import { CalendarHeader } from '../../src/components/calendar/CalendarHeader';
 import { CalendarGrid } from '../../src/components/calendar/CalendarGrid';
@@ -15,7 +15,7 @@ import { AddEventMenu } from '../../src/components/calendar/AddEventMenu';
 import { TaskDetailModal } from '../../src/components/calendar/TaskDetailModal';
 import { EventDetailModal } from '../../src/components/calendar/EventDetailModal';
 import { createCalendarEvent, getCalendarEvents } from '../../src/services/api/calendar';
-import { alertRef } from '../../src/components/CustomAlert';
+import { alertRef } from '../../src/components/ui/CustomAlert';
 import { calendarScreenStyles } from '../../src/styles/CalendarScreen.styles';
 
 export default function CalendarScreen() {

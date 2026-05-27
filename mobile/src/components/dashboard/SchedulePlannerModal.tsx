@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { globalStyles } from '../../styles/globalStyles';
 import { theme } from '../../styles/theme';
-import { alertRef } from '../CustomAlert';
+import { alertRef } from '../ui/CustomAlert';
 import { createSchedule, deleteSchedule, type Subject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 import { SubjectSelectorModal } from './SubjectSelectorModal';

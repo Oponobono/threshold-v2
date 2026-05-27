@@ -5,6 +5,7 @@ import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
 import { subjectsStyles } from '../../styles/Subjects.styles';
 import { getStatusColor, getStatus } from '../../hooks/useSubjects';
+import { SCALE_MAX } from '../../utils/grades';
 
 interface GradeCalculatorProps {
   selectedSubject: any;
@@ -76,7 +77,7 @@ export const GradeCalculator: React.FC<GradeCalculatorProps> = ({
 
           <View style={subjectsStyles.calcInputsRow}>
             {[
-              { value: currentGrade, setter: onCurrentGradeChange, placeholder: selectedSubject?.avg_score ? selectedSubject.avg_score.toFixed(1) : '0' },
+              { value: currentGrade, setter: onCurrentGradeChange, placeholder: selectedSubject?.avg_score ? (selectedSubject.avg_score > SCALE_MAX * 2 ? ((selectedSubject.avg_score / 100) * SCALE_MAX).toFixed(1) : selectedSubject.avg_score.toFixed(1)) : '0' },
               { value: requiredPass, setter: onRequiredPassChange, placeholder: selectedSubject?.target_grade ? `${selectedSubject.target_grade}` : '60' },
               { value: remainingWeight, setter: onRemainingWeightChange, placeholder: '%' },
             ].map((field, i) => (

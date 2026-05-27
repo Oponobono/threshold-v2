@@ -4,7 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { theme } from '../../styles/theme';
-import { alertRef } from '../CustomAlert';
+import { alertRef } from '../ui/CustomAlert';
 import { createSubject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 

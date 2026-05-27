@@ -231,5 +231,6 @@
     "settings": "Settings"
   },
   "noScheduleAssigned": "No schedule assigned â€” tap the grid to add",
-  "activeSession": "Active session"
+  "activeSession": "Active session",
+  "takeABreak": "Take a break"
 }

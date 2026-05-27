@@ -21,5 +21,17 @@
   "filterAudio": "Audio",
   "filterVideo": "Video",
   "adding": "Adding...",
-  "add": "Add"
+  "add": "Add",
+  "deleteRecording": "Delete recording",
+  "deleteLogOnly": "Only the log will be deleted. The physical file no longer exists.",
+  "deleteConfirm": "Are you sure? This action cannot be undone.",
+  "deleteErrorTitle": "Error deleting",
+  "deleteError": "An error occurred while deleting the recording. Please try again.",
+  "defaultName": "Recording",
+  "youtubeUrlRequired": "Please enter a YouTube link.",
+  "youtubeUrlInvalid": "Please enter a valid YouTube link (youtube.com or youtu.be).",
+  "invalidVideoId": "Could not extract a valid video ID.",
+  "defaultVideoTitle": "YouTube Video",
+  "unknownDate": "Unknown date",
+  "deleteVideoError": "Error deleting video"
 }

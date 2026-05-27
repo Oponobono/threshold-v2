@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../src/styles/theme';
 import { useDataStore } from '../../src/store/useDataStore';
 import { useProgressiveDataLoading } from '../../src/hooks/useProgressiveDataLoading';
-import { Toast, toastRef } from '../../src/components/Toast';
+import { Toast, toastRef } from '../../src/components/ui/Toast';
 
 export default function TabLayout() {
   const { t } = useTranslation();

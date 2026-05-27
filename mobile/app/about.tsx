@@ -4,11 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../src/styles/theme';
-import { AboutHero } from '../src/components/AboutHero';
-import { AboutThreshold } from '../src/components/AboutThreshold';
-import { AboutFeatures } from '../src/components/AboutFeatures';
-import { AboutDragonfly } from '../src/components/AboutDragonfly';
-import { AboutMapuvia } from '../src/components/AboutMapuvia';
+import { AboutHero, AboutThreshold, AboutFeatures, AboutDragonfly, AboutMapuvia } from '../src/components/about';
 
 /**
  * Pantalla "Acerca de" (AboutScreen)

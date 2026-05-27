@@ -18,10 +18,7 @@ export const EmptyCategories: React.FC<EmptyCategoriesProps> = ({ onAdd }) => {
       </View>
       <Text style={styles.emptyTitle}>{t('categories.emptyTitle', 'Sin categorías')}</Text>
       <Text style={styles.emptySubtitle}>
-        {t(
-          'categories.emptySubtitle',
-          'Agrupa tus evaluaciones por tipo (Exámenes, Tareas, Parciales) y asígnales un peso porcentual.',
-        )}
+        {t('categories.emptyHelp')}
       </Text>
       <TouchableOpacity style={styles.emptyAction} onPress={onAdd}>
         <Ionicons name="add" size={16} color={theme.colors.text.white} />

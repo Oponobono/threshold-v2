@@ -38,7 +38,7 @@ export const AddTermModal: React.FC<Props> = ({ visible, onClose, onSave }) => {
               style={styles.modalInput}
               value={termName}
               onChangeText={setTermName}
-              placeholder="Ej: Otoño 2026"
+              placeholder={t('academic.termPlaceholder')}
               placeholderTextColor={theme.colors.text.secondary}
               autoFocus
             />

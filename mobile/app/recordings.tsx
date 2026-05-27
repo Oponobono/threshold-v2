@@ -6,11 +6,11 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../src/styles/theme';
 import { recordingsStyles as styles } from '../src/styles/RecordingsScreen.styles';
 
-import { PremiumLoading } from '../src/components/PremiumLoading';
-import { RecordingsGrid } from '../src/components/RecordingsGrid';
-import { YouTubeAddModal } from '../src/components/YouTubeAddModal';
-import { FilterSortModal } from '../src/components/FilterSortModal';
-import { AudioRecorderBottomBar } from '../src/components/AudioRecorderBottomBar';
+import { PremiumLoading } from '../src/components/ui/PremiumLoading';
+import { RecordingsGrid } from '../src/components/recordings/RecordingsGrid';
+import { YouTubeAddModal } from '../src/components/modals/YouTubeAddModal';
+import { FilterSortModal } from '../src/components/modals/FilterSortModal';
+import { AudioRecorderBottomBar } from '../src/components/audio/AudioRecorderBottomBar';
 import { RecordingsHeader } from '../src/components/recordings/RecordingsHeader';
 import { RecordingsSearchBar } from '../src/components/recordings/RecordingsSearchBar';
 import { RecordingsFilterPills } from '../src/components/recordings/RecordingsFilterPills';

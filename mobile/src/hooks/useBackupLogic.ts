@@ -4,6 +4,7 @@
  * Gestiona preferencias de upload y download, estadísticas y ejecución manual/automática.
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   getBackupPreferences,
   saveBackupPreferences,
@@ -20,25 +21,26 @@ import {
   DownloadProgress,
 } from '../services/backup/downloadService';
 import { storageService } from '../services/storageService';
-import { alertRef } from '../components/CustomAlert';
+import { alertRef } from '../components/ui/CustomAlert';
 
 // ─── Helpers de formato ──────────────────────────────────────────────────────
 
-const formatRelativeTime = (isoDate: string | null): string => {
-  if (!isoDate) return 'Nunca';
+const formatRelativeTime = (isoDate: string | null, t: (key: string, options?: any) => string): string => {
+  if (!isoDate) return t('backup.never');
   const diff = Date.now() - new Date(isoDate).getTime();
   const mins = Math.floor(diff / 60000);
   const hours = Math.floor(mins / 60);
   const days = Math.floor(hours / 24);
-  if (mins < 1) return 'Hace un momento';
-  if (mins < 60) return `Hace ${mins} min`;
-  if (hours < 24) return `Hace ${hours}h`;
-  return `Hace ${days} día(s)`;
+  if (mins < 1) return t('backup.momentAgo');
+  if (mins < 60) return t('backup.minAgo', { mins });
+  if (hours < 24) return t('backup.hoursAgo', { hours });
+  return t('backup.daysAgo', { days });
 };
 
 // ─── Hook principal ──────────────────────────────────────────────────────────
 
 export const useBackupLogic = () => {
+  const { t } = useTranslation();
   const [prefs, setPrefs] = useState<BackupPreferences>({
     enabled: false,
     autoUpload: false,
@@ -102,30 +104,30 @@ export const useBackupLogic = () => {
     if (isUploading || isDownloading) return;
     if (!prefs.enabled) {
       alertRef.show({
-        title: 'Backup desactivado',
-        message: 'Activa el backup en la nube primero para poder respaldar tus archivos.',
+        title: t('backup.disabled'),
+        message: t('backup.enableFirst'),
         type: 'warning',
       });
       return;
     }
 
     setIsUploading(true);
-    setUploadProgress({ total: 0, done: 0, current: 'Iniciando...', errors: 0 });
+    setUploadProgress({ total: 0, done: 0, current: t('backup.starting'), errors: 0 });
 
     try {
       const result = await runBackup((p) => setUploadProgress(p));
 
       if (result.uploaded === 0 && result.errors === 0) {
-        alertRef.show({ title: '✅ Todo al día', message: 'No hay archivos nuevos que respaldar.', type: 'success' });
+        alertRef.show({ title: t('backup.allUpToDate'), message: t('backup.noNewFiles'), type: 'success' });
       } else if (result.errors === 0) {
-        alertRef.show({ title: '✅ Backup completo', message: `${result.uploaded} archivo(s) respaldados correctamente.`, type: 'success' });
+        alertRef.show({ title: t('backup.complete'), message: t('backup.uploadResult', { uploaded: result.uploaded }), type: 'success' });
       } else {
-        alertRef.show({ title: '⚠️ Backup parcial', message: `${result.uploaded} respaldados, ${result.errors} error(es).`, type: 'warning' });
+        alertRef.show({ title: t('backup.partial'), message: t('backup.uploadPartial', { uploaded: result.uploaded, errors: result.errors }), type: 'warning' });
       }
 
       await loadAll();
     } catch (error: any) {
-      alertRef.show({ title: 'Error', message: error?.message || 'No se pudo completar el backup.', type: 'error' });
+      alertRef.show({ title: t('common.error'), message: error?.message || t('backup.backupFailed'), type: 'error' });
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
@@ -138,15 +140,15 @@ export const useBackupLogic = () => {
     if (isDownloading || isUploading) return;
     if (!prefs.enabled) {
       alertRef.show({
-        title: 'Backup desactivado',
-        message: 'Activa el backup en la nube para poder descargar archivos.',
+        title: t('backup.disabled'),
+        message: t('backup.enableFirstDownload'),
         type: 'warning',
       });
       return;
     }
 
     setIsDownloading(true);
-    setDownloadProgress({ total: 0, done: 0, current: 'Iniciando descarga...', errors: 0, skipped: 0 });
+    setDownloadProgress({ total: 0, done: 0, current: t('backup.startingDownload'), errors: 0, skipped: 0 });
 
     try {
       const result = await downloadCloudItems((p) => setDownloadProgress(p));
@@ -157,27 +159,27 @@ export const useBackupLogic = () => {
 
       if (result.downloaded === 0 && result.errors === 0) {
         alertRef.show({
-          title: '✅ Sincronizado',
+          title: t('backup.synced'),
           message: result.skipped > 0
-            ? `${result.skipped} archivo(s) ya estaban en el dispositivo.`
-            : 'No hay archivos en la nube para descargar.',
+            ? t('backup.downloadSkipped', { skipped: result.skipped })
+            : t('backup.noCloudFiles'),
           type: 'success',
         });
       } else if (result.errors === 0) {
         alertRef.show({
-          title: '✅ Descarga completa',
-          message: `${result.downloaded} archivo(s) descargados.${result.skipped > 0 ? ` ${result.skipped} ya existían.` : ''}`,
+          title: t('backup.downloadComplete'),
+          message: t('backup.downloadResult', { downloaded: result.downloaded, skipped: result.skipped }),
           type: 'success',
         });
       } else {
         alertRef.show({
-          title: '⚠️ Descarga parcial',
-          message: `${result.downloaded} descargados, ${result.errors} error(es).`,
+          title: t('backup.downloadPartial'),
+          message: t('backup.downloadPartialResult', { downloaded: result.downloaded, errors: result.errors }),
           type: 'warning',
         });
       }
     } catch (error: any) {
-      alertRef.show({ title: 'Error', message: error?.message || 'No se pudo completar la descarga.', type: 'error' });
+      alertRef.show({ title: t('common.error'), message: error?.message || t('backup.downloadFailed'), type: 'error' });
     } finally {
       setIsDownloading(false);
       setDownloadProgress(null);
@@ -186,8 +188,8 @@ export const useBackupLogic = () => {
 
   // ─── Labels formateados ───────────────────────────────────────────────────
 
-  const lastUploadLabel = formatRelativeTime(prefs.lastRun);
-  const lastDownloadLabel = formatRelativeTime(prefs.lastDownload);
+  const lastUploadLabel = formatRelativeTime(prefs.lastRun, t);
+  const lastDownloadLabel = formatRelativeTime(prefs.lastDownload, t);
 
   const pendingCount =
     (Number(stats.photos.total) - Number(stats.photos.backed)) +

@@ -37,5 +37,12 @@
   "passwordsDontMatch": "Las contraseñas no coinciden",
   "fillAllFields": "Por favor, completa todos los campos requeridos",
   "enable": "Activar",
-  "disable": "Desactivar"
+  "disable": "Desactivar",
+  "twoFactorActive": "La autenticación de dos factores está activa. Tu cuenta está protegida.",
+  "twoFactorInactive": "Activa la autenticación de dos factores para añadir una capa extra de seguridad a tu cuenta.",
+  "twoFactorEnabled": "2FA activado",
+  "twoFactorDisabled": "2FA desactivado",
+  "deletionScheduled": "Tu solicitud de eliminación ha sido registrada. Tu cuenta será completamente eliminada el {{date}} si no la recuperas.",
+  "twoFactorEnableError": "Error al activar 2FA",
+  "twoFactorDisableError": "Error al desactivar 2FA"
 }

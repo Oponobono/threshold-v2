@@ -37,5 +37,12 @@
   "passwordsDontMatch": "Passwords do not match",
   "fillAllFields": "Please fill in all required fields",
   "enable": "Enable",
-  "disable": "Disable"
+  "disable": "Disable",
+  "twoFactorActive": "Two-factor authentication is active. Your account is protected.",
+  "twoFactorInactive": "Enable two-factor authentication to add an extra layer of security to your account.",
+  "twoFactorEnabled": "2FA enabled",
+  "twoFactorDisabled": "2FA disabled",
+  "deletionScheduled": "Your deletion request has been registered. Your account will be completely deleted on {{date}} if you don't recover it.",
+  "twoFactorEnableError": "Error enabling 2FA",
+  "twoFactorDisableError": "Error disabling 2FA"
 }

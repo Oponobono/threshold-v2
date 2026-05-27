@@ -3,7 +3,7 @@ import { Animated, Easing, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { setItemAsync, getItemAsync, deleteItemAsync } from 'expo-secure-store';
-import { alertRef } from '../components/CustomAlert';
+import { alertRef } from '../components/ui/CustomAlert';
 import { 
   loginUser, 
   trackGuestVisit, 
@@ -166,17 +166,17 @@ export const useLoginAuth = () => {
 
       if (available && !hasToken && userId) {
         alertRef.show({
-          title: 'Activar Touch ID',
-          message: '¿Deseas iniciar sesión con tu huella dactilar la próxima vez?',
+          title: t('biometric.enableTitle'),
+          message: t('biometric.promptEnrollQuestion'),
           type: 'confirm',
           buttons: [
-            { text: 'Ahora no', style: 'cancel', onPress: () => {
+            { text: t('biometric.notNow'), style: 'cancel', onPress: () => {
                 triggerAutoDownloadIfEnabled();
                 router.replace('/(tabs)');
               } 
             },
             {
-              text: 'Activar',
+              text: t('biometric.enable'),
               onPress: async () => {
                 const token = await enrollBiometricToken(email);
                 if (token) {
@@ -185,7 +185,7 @@ export const useLoginAuth = () => {
                     setBiometricReady(true);
                   } catch {
                     await revokeBiometricToken();
-                    alertRef.show({ title: 'Touch ID', message: 'Hubo un error al guardar la configuración en el servidor.', type: 'error' });
+                    alertRef.show({ title: t('biometric.touchId'), message: t('biometric.serverConfigError'), type: 'error' });
                   }
                 }
                 router.replace('/(tabs)');
@@ -219,8 +219,8 @@ export const useLoginAuth = () => {
   const handleTouchId = async () => {
     if (!biometricReady) {
       alertRef.show({
-        title: 'Touch ID no configurado',
-        message: 'Inicia sesión con tu correo y contraseña primero para activar esta función.',
+        title: t('biometric.notConfiguredTitle'),
+        message: t('biometric.notConfigured'),
         type: 'warning'
       });
       return;
@@ -232,7 +232,7 @@ export const useLoginAuth = () => {
 
       if (!result.success) {
         if (result.reason !== 'cancelled') {
-          alertRef.show({ title: 'Touch ID', message: 'No se pudo verificar tu huella. Intenta de nuevo o usa tu contraseña.', type: 'error' });
+          alertRef.show({ title: t('biometric.touchId'), message: t('biometric.verificationFailed'), type: 'error' });
         }
         setIsBiometricLoading(false);
         return;
@@ -242,7 +242,7 @@ export const useLoginAuth = () => {
       triggerAutoDownloadIfEnabled();
       router.replace('/(tabs)');
     } catch (error: any) {
-      alertRef.show({ title: 'Error', message: error.message || 'No se pudo iniciar sesión con Touch ID.', type: 'error' });
+      alertRef.show({ title: t('common.error'), message: error.message || t('biometric.loginFailed'), type: 'error' });
       setIsBiometricLoading(false);
       
       if (error.message && error.message.includes('fallida')) {

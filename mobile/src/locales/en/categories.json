@@ -1,0 +1,5 @@
+{
+  "screenTitle": "Categories",
+  "deleteTitle": "Delete category",
+  "deleteConfirm": "Delete \"{{name}}\"? Assigned assessments will be uncategorized."
+}

@@ -16,5 +16,12 @@
     "friday": "Friday",
     "saturday": "Saturday"
   },
-  "weeklyDigestDescFmt": "Summary every {day} at {time}"
+  "weeklyDigestDescFmt": "Summary every {day} at {time}",
+  "channelName": "Reminders",
+  "deadlineAlertTitle": "🔔 Deadline reminder",
+  "deadlineAlertBody": "\"{{title}}\" is due in {{minutes}} minutes",
+  "weeklyDigestTitle": "📊 Weekly Summary",
+  "weeklyDigestBody": "Your academic performance summary for this week is now available.",
+  "dueDeckTitle": "📚 Urgent review",
+  "dueDeckBody": "\"{{title}}\" has {{count}} card(s) pending review."
 }

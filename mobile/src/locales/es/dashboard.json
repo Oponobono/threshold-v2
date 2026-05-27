@@ -231,5 +231,6 @@
     "settings": "Ajustes"
   },
   "noScheduleAssigned": "Sin horario asignado – toca la grilla para añadir",
-  "activeSession": "Sesión activa"
+  "activeSession": "Sesión activa",
+  "takeABreak": "Tómate un descanso"
 }

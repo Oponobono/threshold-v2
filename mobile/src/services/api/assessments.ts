@@ -11,6 +11,7 @@ import { getUserId } from './auth';
 import { Assessment } from './types';
 import { cacheService, CACHE_KEYS } from '../../services/cacheService';
 import { offlineSyncService } from '../offlineSyncService';
+import i18n from '../../locales/i18n';
 
 /**
  * Obtiene evaluaciones por materia
@@ -101,7 +102,7 @@ export const updateAssessment = async (id: number, payload: Partial<Assessment>)
     if (isNetworkError) {
       console.warn(`[Assessments] Red no disponible, guardando actualización en cola offline:`, error);
       await offlineSyncService.addPendingOperation('PUT', `/assessments/${id}`, 'assessment', payload);
-      return { success: true, message: 'Guardado localmente, se sincronizará cuando recupere conexión' };
+      return { success: true, message: i18n.t('common.offlineSave') };
     }
     throw error;
   }

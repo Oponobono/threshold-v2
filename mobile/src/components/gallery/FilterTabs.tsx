@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { galleryStyles } from '../../styles/Gallery.styles';
-import { AutoUploadIndicator } from '../AutoUploadIndicator';
+import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 import { FilterTab } from '../../types/gallery';
 
 interface FilterTabsProps {

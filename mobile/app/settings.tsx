@@ -5,14 +5,14 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { globalStyles } from '../src/styles/globalStyles';
 import { theme } from '../src/styles/theme';
 import { settingsStyles as styles } from '../src/styles/Settings.styles';
-import { alertRef } from '../src/components/CustomAlert';
+import { alertRef } from '../src/components/ui/CustomAlert';
 import * as Clipboard from 'expo-clipboard';
 
 import { useSettingsLogic } from '../src/hooks/useSettingsLogic';
 import { useBackupLogic } from '../src/hooks/useBackupLogic';
-import { EditProfileModal } from '../src/components/EditProfileModal';
-import { ChangePasswordModal } from '../src/components/ChangePasswordModal';
-import { DeleteAccountModal } from '../src/components/DeleteAccountModal';
+import { EditProfileModal } from '../src/components/modals/EditProfileModal';
+import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModal';
+import { DeleteAccountModal } from '../src/components/modals/DeleteAccountModal';
 import { WeeklySummaryPicker } from '../src/components/settings/WeeklySummaryPicker';
 import { useNotifications } from '../src/hooks/useNotifications';
 import type { WeeklyDigestConfig } from '../src/services/notificationService';
@@ -360,7 +360,7 @@ export default function SettingsScreen() {
             <View key={system.id} style={styles.scaleRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.settingTitle}>{system.name}</Text>
-                <Text style={styles.settingDesc}>{system.min_value} – {system.max_value} (Aprobación: {system.passing_value})</Text>
+                <Text style={styles.settingDesc}>{t('settings.approvalFormat', { min: system.min_value, max: system.max_value, passing: system.passing_value })}</Text>
               </View>
               {selectedSystemId === system.id ? (
                 <View style={styles.activeBadge}>
@@ -433,7 +433,7 @@ export default function SettingsScreen() {
           <SectionHeader title={t('notifications.title')} desc={t('notifications.desc')} icon="notifications-outline" />
           <SettingRow
             title={t('notifications.deadlineAlerts')} desc={t('notifications.deadlineAlertsDesc')}
-            right={<Switch value={notifDeadline} onValueChange={(v) => { setNotifDeadline(v); alertRef.show({ title: v ? 'Notificaciones activadas' : 'Notificaciones desactivadas', message: v ? 'Recibirás alertas de tus fechas límite.' : 'Ya no recibirás alertas de fechas límite.', type: v ? 'success' : 'info', buttons: [{ text: 'OK' }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            right={<Switch value={notifDeadline} onValueChange={(v) => { setNotifDeadline(v); alertRef.show({ title: v ? t('settings.notifDeadlineEnabled') : t('settings.notifDeadlineDisabled'), message: v ? t('settings.notifDeadlineEnabledMsg') : t('settings.notifDeadlineDisabledMsg'), type: v ? 'success' : 'info', buttons: [{ text: t('common.ok') }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
             title={t('notifications.weeklyDigest')}
@@ -443,11 +443,11 @@ export default function SettingsScreen() {
                   time: `${weeklyConfig.hour.toString().padStart(2, '0')}:${weeklyConfig.minute.toString().padStart(2, '0')}`,
                 })
               : t('notifications.weeklyDigestDesc')}
-            right={<Switch value={notifWeekly} onValueChange={(v) => { if (v) setShowWeeklyPicker(true); else { setNotifWeekly(false); alertRef.show({ title: 'Resumen semanal desactivado', message: 'Ya no recibirás el resumen semanal.', type: 'info', buttons: [{ text: 'OK' }] }); } }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            right={<Switch value={notifWeekly} onValueChange={(v) => { if (v) setShowWeeklyPicker(true); else { setNotifWeekly(false); alertRef.show({ title: t('settings.notifWeeklyDisabled'), message: t('settings.notifWeeklyDisabledMsg'), type: 'info', buttons: [{ text: t('common.ok') }] }); } }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
           <SettingRow
             title={t('notifications.emailNotif')} desc={t('notifications.emailNotifDesc')}
-            right={<Switch value={notifEmail} onValueChange={(v) => { setNotifEmail(v); alertRef.show({ title: v ? 'Notificaciones por correo activadas' : 'Notificaciones por correo desactivadas', message: v ? 'Recibirás notificaciones por correo electrónico.' : 'Ya no recibirás notificaciones por correo electrónico.', type: v ? 'success' : 'info', buttons: [{ text: 'OK' }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            right={<Switch value={notifEmail} onValueChange={(v) => { setNotifEmail(v); alertRef.show({ title: v ? t('settings.notifEmailEnabled') : t('settings.notifEmailDisabled'), message: v ? t('settings.notifEmailEnabledMsg') : t('settings.notifEmailDisabledMsg'), type: v ? 'success' : 'info', buttons: [{ text: t('common.ok') }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
         </View>
 
@@ -555,7 +555,7 @@ export default function SettingsScreen() {
               {totalCount > 0 && (
                 <View style={{ paddingVertical: 12, marginTop: 8 }}>
                   <Text style={[styles.settingDesc, { fontWeight: '600', textAlign: 'center' }]}>
-                    {backedCount}/{totalCount} ítems respaldados
+                    {t('backup.itemsBackedUp', { count: backedCount, total: totalCount })}
                     {pendingCount > 0 && ` • ${pendingCount} pendiente(s)`}
                     {cloudItemsCount > 0 && ` • ${cloudItemsCount} en la nube`}
                   </Text>
@@ -569,7 +569,7 @@ export default function SettingsScreen() {
                   <Text style={styles.actionLabel} numberOfLines={2}>
                     {isUploading
                       ? `↑ Subiendo ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? 0}...`
-                      : `↑ Última subida: ${lastUploadLabel}`}
+                      : t('backup.lastUpload', { date: lastUploadLabel })}
                   </Text>
                   <TouchableOpacity
                     style={[styles.darkPill, (isBackupRunning) && { opacity: 0.45 }]}
@@ -594,7 +594,7 @@ export default function SettingsScreen() {
                   <Text style={styles.actionLabel} numberOfLines={2}>
                     {isDownloading
                       ? `↓ Descargando ${downloadProgress?.done ?? 0}/${downloadProgress?.total ?? 0}...`
-                      : `↓ Última descarga: ${lastDownloadLabel}`}
+                      : t('backup.lastDownload', { date: lastDownloadLabel })}
                   </Text>
                   <TouchableOpacity
                     style={[styles.darkPill, { backgroundColor: '#2C6EEB' }, (isBackupRunning) && { opacity: 0.45 }]}
@@ -685,7 +685,7 @@ export default function SettingsScreen() {
                   const name = lms.platform;
                   alertRef.show({
                     title: t('integrations.remove'),
-                    message: `¿Desvincular ${name}?`,
+                    message: t('settings.unlinkConfirm', { name }),
                     type: 'confirm',
                     buttons: [
                       { text: t('common.cancel'), style: 'cancel' },
@@ -786,7 +786,7 @@ export default function SettingsScreen() {
                 buttons: [
                   { text: t('common.cancel'), style: 'cancel' },
                   { text: t('settings.reset'), style: 'destructive', onPress: async () => {
-                    alertRef.show({ title: t('common.success'), message: 'Datos académicos restablecidos', type: 'success' });
+                    alertRef.show({ title: t('common.success'), message: t('settings.dataResetComplete'), type: 'success' });
                   }},
                 ]
               })}
@@ -813,7 +813,7 @@ export default function SettingsScreen() {
             right={<TouchableOpacity onPress={() => setIsFaqVisible(true)}><Text style={styles.openText}>{t('about.open')}</Text></TouchableOpacity>}
           />
           <SettingRow
-            title="Zyren — IA Académica"
+            title={t('settings.zyrenAITitle')}
             desc="Conoce la inteligencia artificial de Threshold, su origen y capacidades"
             right={
               <TouchableOpacity style={styles.darkPill} onPress={() => setIsZyrenInfoVisible(true)}>

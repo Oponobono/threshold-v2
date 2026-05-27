@@ -6,15 +6,16 @@
  * visuales (`AIContextCarousel`, `SubjectAIChatModal`) para representar los elementos
  * adjuntos al contexto del chat con la IA.
  */
-import { AIContextItemData, AIContextItemType } from '../components/AIContextItem';
+import { AIContextItemData, AIContextItemType } from '../components/ai/AIContextItem';
 import { RecordingItem } from '../hooks/useAudioRecorder';
 import { YouTubeVideo } from '../services/api/types';
+import i18n from '../locales/i18n';
 
 /** Mapea grabaciones de audio — hasText=true si existe transcript_uri o transcript_text */
 export function mapRecordings(recordings: RecordingItem[]): AIContextItemData[] {
   return recordings.map((r, i) => ({
     id: `rec_${r.id_string || r.id || i}`,
-    label: r.name || 'Grabación de voz',
+    label: r.name || i18n.t('recordings.defaultName'),
     uri: r.uri || r.local_uri,
     type: 'recording' as AIContextItemType,
     hasText: !!(

@@ -21,5 +21,17 @@
   "filterAudio": "Audio",
   "filterVideo": "Video",
   "adding": "Añadiendo...",
-  "add": "Añadir"
+  "add": "Añadir",
+  "deleteRecording": "Eliminar grabación",
+  "deleteLogOnly": "Se eliminará solo el registro. El archivo físico ya no existe.",
+  "deleteConfirm": "¿Estás seguro? Esta acción no se puede deshacer.",
+  "deleteErrorTitle": "Error al eliminar",
+  "deleteError": "Ocurrió un error al eliminar la grabación. Por favor, intenta de nuevo.",
+  "defaultName": "Grabación",
+  "youtubeUrlRequired": "Por favor, ingresa un enlace de YouTube.",
+  "youtubeUrlInvalid": "Por favor, ingresa un enlace válido de YouTube (youtube.com o youtu.be).",
+  "invalidVideoId": "No se pudo extraer un ID de video válido.",
+  "defaultVideoTitle": "Video de YouTube",
+  "unknownDate": "Fecha desconocida",
+  "deleteVideoError": "Error al eliminar el video"
 }

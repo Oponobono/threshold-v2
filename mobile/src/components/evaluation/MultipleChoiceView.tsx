@@ -15,7 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { EvaluationItem, MultipleChoiceContent } from '../../services/api/types';
-import { MarkdownWithCode } from '../MarkdownWithCode';
+import { MarkdownWithCode } from '../ui/MarkdownWithCode';
 
 interface Props {
   item: EvaluationItem;

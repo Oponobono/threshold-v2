@@ -70,5 +70,19 @@
   "masteryFair": "40–59%  —  Fair",
   "masteryLow": "20–39%  —  Low",
   "masteryCritical": "< 20%  —  Critical",
-  "atomicCards": "Atomic Card Generator: Dense cards are split into micro-cards based on Cognitive Load Theory (Sweller, 1988), reducing cognitive overload and improving retention."
+  "atomicCards": "Atomic Card Generator: Dense cards are split into micro-cards based on Cognitive Load Theory (Sweller, 1988), reducing cognitive overload and improving retention.",
+
+  "dragonflyDesc1": "Chosen by MAPUVIA Labs as the emblem of Threshold, the",
+  "dragonflyDesc2": "represents agility, precision, and 360° panoramic vision.",
+  "dragonflyDesc3": "Just as this insect perceives its entire environment in a single glance,",
+  "dragonflyDesc4": "Threshold gives the student a comprehensive perspective of their academic progress, allowing them to adapt and move forward without friction.",
+
+  "mapuviaDesc1": "MAPUVIA Labs is the research and development (R&D) division of MAPUVIA, focused",
+  "mapuviaDesc2": "exclusively on creating scientific and academic software. It operates as an incubator specialized in transforming education and research into",
+  "mapuviaDesc3": "Corporate hub of technological innovation. MAPUVIA is dedicated to developing digital services and general software, creating ecosystems that drive progress for people and organizations in their daily lives.",
+
+  "thresholdDesc1": "Designed entirely by MAPUVIA Labs,",
+  "thresholdDesc2": "was created to eliminate fragmentation in the student's academic life. Grades, schedules and notes in one place, always at hand.",
+
+  "retention": "Retention"
 }

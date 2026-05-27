@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { setItemAsync, getItemAsync } from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { alertRef } from '../components/CustomAlert';
+import { alertRef } from '../components/ui/CustomAlert';
 import { uploadFileToUploadthing } from '../services/uploadthing/storage';
 import { downloadProfileImage } from '../services/profileImageCache';
 import { cacheService } from '../services/cacheService';
@@ -212,7 +212,7 @@ export const useSettingsLogic = () => {
           '0-5.0': 'COL_0_5',
           '0-10': 'ES_0_10',
           '0-100': '0_100_PCT',
-          'A-F': 'US_GPA_4',
+          'A-F': 'US_LETTER',
         };
         const mappedCode = scaleMap[userProfile.grading_scale];
         if (mappedCode) {
@@ -373,7 +373,7 @@ export const useSettingsLogic = () => {
   const handlePickProfilePhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      alertRef.show({ title: t('common.error'), message: 'Se requiere acceso a la galería', type: 'warning' });
+      alertRef.show({ title: t('common.error'), message: t('settings.galleryPermissionRequired'), type: 'warning' });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -396,7 +396,7 @@ export const useSettingsLogic = () => {
       const uploadResult = await uploadFileToUploadthing(cropped.uri);
       setEditProfileImage(uploadResult.url);
     } catch (error: any) {
-      alertRef.show({ title: t('common.error'), message: error.message || 'Error al subir la foto', type: 'error' });
+      alertRef.show({ title: t('common.error'), message: error.message || t('settings.photoUploadError'), type: 'error' });
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -405,7 +405,7 @@ export const useSettingsLogic = () => {
   const handleRemoveProfilePhoto = () => {
     alertRef.show({
       title: t('common.confirm'),
-      message: '¿Eliminar foto de perfil?',
+      message: t('settings.deletePhotoConfirm'),
       type: 'confirm',
       buttons: [
         { text: t('common.cancel'), style: 'cancel' },
@@ -422,7 +422,7 @@ export const useSettingsLogic = () => {
     if (!profile?.share_pin && editPin.trim()) {
       const pinClean = editPin.trim().toUpperCase();
       if (pinClean.length < 4) {
-        alertRef.show({ title: t('common.error'), message: 'El PIN debe tener al menos 4 caracteres.', type: 'warning' });
+        alertRef.show({ title: t('common.error'), message: t('settings.pinMinLength'), type: 'warning' });
         return;
       }
     }
@@ -483,9 +483,9 @@ export const useSettingsLogic = () => {
       const userProfile = await getCurrentUserProfile();
       setProfile(userProfile);
       
-      alertRef.show({ title: t('common.success'), message: 'Configuraciones guardadas', type: 'success' });
+      alertRef.show({ title: t('common.success'), message: t('settings.configSaved'), type: 'success' });
     } catch (error: any) {
-      alertRef.show({ title: t('common.error'), message: error.message || 'Error guardando configuraciones', type: 'error' });
+      alertRef.show({ title: t('common.error'), message: error.message || t('settings.configSaveError'), type: 'error' });
     }
   };
 
@@ -545,7 +545,7 @@ export const useSettingsLogic = () => {
     if (deleteConfirmText !== confirmText && deleteConfirmText !== 'ELIMINAR') {
       alertRef.show({ 
         title: t('common.error'), 
-        message: `Debes escribir exactamente "${confirmText}" o "ELIMINAR"`, 
+        message: t('settings.typeConfirmExact', { username: confirmText }), 
         type: 'warning' 
       });
       return;
@@ -563,7 +563,7 @@ export const useSettingsLogic = () => {
       const deletionDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
       alertRef.show({
         title: t('common.success'),
-        message: `Tu solicitud de eliminación ha sido registrada. Tu cuenta será completamente eliminada el ${deletionDate.toLocaleDateString()} si no la recuperas.`,
+        message: t('account.deletionScheduled', { date: deletionDate.toLocaleDateString() }),
         type: 'success'
       });
       
@@ -594,7 +594,7 @@ export const useSettingsLogic = () => {
    */
   const handleJoinGroup = async () => {
     if (!pinToJoin.trim()) {
-      alertRef.show({ title: t('common.error'), message: 'Ingresa un PIN', type: 'warning' });
+      alertRef.show({ title: t('common.error'), message: t('settings.enterPin'), type: 'warning' });
       return;
     }
     
@@ -604,7 +604,7 @@ export const useSettingsLogic = () => {
       setPinToJoin('');
       const groups = await getUserGroups();
       setUserGroups(groups || []);
-      alertRef.show({ title: t('common.success'), message: 'Te has unido al grupo correctamente', type: 'success' });
+      alertRef.show({ title: t('common.success'), message: t('settings.joinedGroup'), type: 'success' });
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
     } finally {
@@ -623,19 +623,19 @@ export const useSettingsLogic = () => {
         await leaveGroup(group_pin_id);
         const groups = await getUserGroups();
         setUserGroups(groups || []);
-        alertRef.show({ title: t('common.success'), message: 'Has salido del grupo correctamente', type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('settings.leftGroup'), type: 'success' });
       } catch (error: any) {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }
     };
 
     alertRef.show({
-      title: 'Salir del grupo',
-      message: `¿Estás seguro que deseas abandonar el grupo ${group_pin_id}?`,
+      title: t('settings.leaveGroupTitle'),
+      message: t('settings.leaveGroupConfirm', { pin: group_pin_id }),
       type: 'confirm',
       buttons: [
         { text: t('settings.cancel'), style: 'cancel' },
-        { text: 'Salir', style: 'destructive', onPress: onConfirm },
+        { text: t('settings.leave'), style: 'destructive', onPress: onConfirm },
       ]
     });
   };
@@ -802,7 +802,7 @@ export const useSettingsLogic = () => {
         await createGradingPeriod(term);
         const periods = await getGradingPeriods();
         setGradingPeriods(periods);
-        alertRef.show({ title: t('common.success'), message: `Período "${term}" añadido`, type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('settings.periodAdded', { term }), type: 'success' });
       } catch (error: any) {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }
@@ -812,7 +812,7 @@ export const useSettingsLogic = () => {
         await deleteGradingPeriod(id);
         const periods = await getGradingPeriods();
         setGradingPeriods(periods);
-        alertRef.show({ title: t('common.success'), message: `Período "${name}" eliminado`, type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('settings.periodDeleted', { name }), type: 'success' });
       } catch (error: any) {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }
@@ -822,7 +822,7 @@ export const useSettingsLogic = () => {
         await saveThresholdOverrides(overrides);
         const updated = await getThresholdOverrides();
         setThresholdOverrides(updated);
-        alertRef.show({ title: t('common.success'), message: 'Excepciones guardadas', type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('settings.exceptionsSaved'), type: 'success' });
       } catch (error: any) {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }
@@ -839,7 +839,7 @@ export const useSettingsLogic = () => {
           }
           return [...prev, result];
         });
-        alertRef.show({ title: t('common.success'), message: `Escala "${name}" creada`, type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('settings.scaleCreated', { name }), type: 'success' });
       } catch (error: any) {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }
@@ -848,25 +848,25 @@ export const useSettingsLogic = () => {
       try {
         const result = await apiEnableTwoFactor();
         setTwoFactorEnabled(result.enabled);
-        alertRef.show({ title: t('common.success'), message: 'Autenticación de dos factores activada', type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('account.twoFactorEnabled'), type: 'success' });
       } catch (error: any) {
-        alertRef.show({ title: t('common.error'), message: error.message || 'Error al activar 2FA', type: 'error' });
+        alertRef.show({ title: t('common.error'), message: error.message || t('account.twoFactorEnableError'), type: 'error' });
       }
     },
     handleTwoFactorDisable: async () => {
       try {
         const result = await apiDisableTwoFactor();
         setTwoFactorEnabled(result.enabled);
-        alertRef.show({ title: t('common.success'), message: 'Autenticación de dos factores desactivada', type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('account.twoFactorDisabled'), type: 'success' });
       } catch (error: any) {
-        alertRef.show({ title: t('common.error'), message: error.message || 'Error al desactivar 2FA', type: 'error' });
+        alertRef.show({ title: t('common.error'), message: error.message || t('account.twoFactorDisableError'), type: 'error' });
       }
     },
     handleAddLms: async (platform: string, url: string, username: string) => {
       try {
         const account = await apiAddLmsAccount(platform, url, username);
         setLmsAccounts(prev => [...prev, account]);
-        alertRef.show({ title: t('common.success'), message: `LMS "${platform}" vinculado`, type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('settings.lmsLinked', { platform }), type: 'success' });
       } catch (error: any) {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }
@@ -876,7 +876,7 @@ export const useSettingsLogic = () => {
         const account = lmsAccounts[index];
         if (account?.id) await apiRemoveLmsAccount(account.id);
         setLmsAccounts(prev => prev.filter((_, i) => i !== index));
-        alertRef.show({ title: t('common.success'), message: 'LMS desvinculado', type: 'success' });
+        alertRef.show({ title: t('common.success'), message: t('settings.lmsUnlinked'), type: 'success' });
       } catch (error: any) {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }

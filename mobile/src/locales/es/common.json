@@ -43,6 +43,10 @@
     "Sáb",
     "Dom"
   ],
+  "months": [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ],
   "errors": {
     "enterPassword": "Ingresa tu contraseña",
     "groqApiKeyMissing": "Falta la API Key de Groq en el archivo .env.local",
@@ -63,10 +67,17 @@
     "noClearText": "(No se pudo extraer texto claro de la imagen)",
     "noTranscription": "(Aún no hay transcripción generada para este archivo.)",
     "localFileRead": "(Error al leer el archivo local)",
-    "processFailed": "Error: No pude procesar tu pregunta."
+    "processFailed": "Error: No pude procesar tu pregunta.",
+    "snoozeFailed": "No se pudo aplazar la revisión"
   },
   "title": "Título",
   "name": "Nombre",
   "sending": "Enviando...",
-  "all": "Todos"
+  "all": "Todos",
+  "seeMore": "Ver más",
+  "offline": "Sin conexión",
+  "offlineWithCount": "Sin conexión ({{count}} pendientes)",
+  "syncing": "Sincronizando...",
+  "syncComplete": "✓ Sincronización completada",
+  "offlineSave": "Guardado localmente, se sincronizará cuando recupere conexión"
 }

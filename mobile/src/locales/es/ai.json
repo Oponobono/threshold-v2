@@ -35,6 +35,9 @@
   "deckGeneratedToast": "Mazo \"{{title}}\" listo con {{count}} ítems ✅",
   "deckGeneratedAiMsg": "✅ **¡Mazo creado!** Generé **\"{{title}}\"** con **{{count}} ítems** de tipo *{{mode}}*. Encuéntralo en la sección de Flashcards ↓",
   "deckSuccessMsg": "✅ **¡Mazo creado exitosamente!**\n\n📚 **{{title}}**\nÍtems: {{count}}\nTipo: {{mode}}\n\nEncuéntralo en tu sección de Flashcards → ",
+  "fastModel": "Modelo Rápido ⚡",
+  "advancedModel": "Modelo Avanzado 🧠",
+  "networkError": "Error de red o del servidor desconectado",
   "groqLimitError": "⚠️ **Límite de procesamiento alcanzado en el Modelo Rápido ⚡**\n\nHemos superado temporalmente la capacidad de tokens permitida para el motor ultrarrápido de Zyren.\n\n**¿Cómo deseas continuar?**\n\n• **Usa el Modelo de Razonamiento Avanzado 🧠:** Cambia de motor pulsando el ícono del cerebro en la cabecera del chat para seguir estudiando sin interrupciones.\n• **Espera un momento ⏳:** En aproximadamente 1 minuto el canal rápido estará libre nuevamente y podrás seguir conversando.",
   "connectionError": "⚠️ **Inconveniente de conexión con Zyren ({{provider}})**\n\nNo pudimos procesar tu mensaje debido al siguiente inconveniente:\n*{{error}}*.\n\nPor favor, intenta de nuevo en unos instantes o cambia de modelo en la parte superior."
 }

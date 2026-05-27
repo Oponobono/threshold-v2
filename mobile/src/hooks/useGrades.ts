@@ -6,7 +6,10 @@ import { useSubjectGrades } from './useSubjectGrades';
 import { getUserId, getCurrentUserProfile } from '../services/api/auth';
 import { downloadReport, getGlobalGPAAnalytics } from '../services/api/analytics';
 import { normalizeGrade, parseWeight, SCALE_MAX } from '../utils/grades';
-import { alertRef } from '../components/CustomAlert';
+import { DEFAULT_GRADING_SYSTEMS, US_LETTER_SCALES } from '../services/api/gradingDefaults';
+import { fetchSystemScales } from '../services/api/grading';
+import { buildDisplayGrade, type DisplayGrade } from '../services/gradingEngineDisplay';
+import { alertRef } from '../components/ui/CustomAlert';
 
 export function useGrades(t: any) {
   const { subjects, assessments, refreshAssessments } = useDataStore();
@@ -24,9 +27,28 @@ export function useGrades(t: any) {
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayText, setOverlayText] = useState('');
 
+  const [activeSystem, setActiveSystem] = useState<any>(null);
+  const [activeScales, setActiveScales] = useState<any[]>([]);
+
   useEffect(() => {
     getCurrentUserProfile().then(p => setProfile(p)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!profile?.active_grading_version_id) return;
+    const system = DEFAULT_GRADING_SYSTEMS.find(
+      s => s.active_version_id === profile.active_grading_version_id
+    );
+    if (!system) return;
+    setActiveSystem(system);
+    if (system.code === 'US_LETTER') {
+      setActiveScales(US_LETTER_SCALES);
+    } else {
+      fetchSystemScales(system.id)
+        .then(data => { if (data?.scales?.length) setActiveScales(data.scales); })
+        .catch(() => {});
+    }
+  }, [profile]);
 
   useEffect(() => {
     getUserId().then(id => setUserId(id ? Number(id) : null));
@@ -95,6 +117,24 @@ export function useGrades(t: any) {
   const displayDelta = selectedSubjectId === null && globalGPA
     ? globalGPA.delta
     : engineDelta;
+
+  const globalGpaLetter = useMemo<DisplayGrade | null>(() => {
+    if (!activeSystem || !activeScales.length) return null;
+    const gpaNum = parseFloat(displayGPA);
+    if (isNaN(gpaNum) || gpaNum <= 0) return null;
+    const normalized = gpaNum / SCALE_MAX;
+    const rawValue = normalized * activeSystem.max_value;
+    return buildDisplayGrade(rawValue, normalized, activeSystem, activeScales);
+  }, [displayGPA, activeSystem, activeScales]);
+
+  const globalProjectedLetter = useMemo<DisplayGrade | null>(() => {
+    if (!activeSystem || !activeScales.length) return null;
+    const gpaNum = parseFloat(displayProjectedGPA);
+    if (isNaN(gpaNum) || gpaNum <= 0) return null;
+    const normalized = gpaNum / SCALE_MAX;
+    const rawValue = normalized * activeSystem.max_value;
+    return buildDisplayGrade(rawValue, normalized, activeSystem, activeScales);
+  }, [displayProjectedGPA, activeSystem, activeScales]);
 
   const handleRunSimulation = () => {
     const s = parseFloat(simScore);
@@ -185,7 +225,7 @@ export function useGrades(t: any) {
     subjects, filteredAssessments, gradedAssessments,
     selectedSubjectId, setSelectedSubjectId,
     userId,
-    displayGPA, displayProjectedGPA, displayDelta,
+    displayGPA, displayProjectedGPA, displayDelta, globalGpaLetter, globalProjectedLetter, activeSystem,
     termGpa, evaluatedPercentage, selectedSubject,
     simScore, setSimScore,
     simPossible, setSimPossible,

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { theme } from '../../styles/theme';
 import { settingsStyles as styles } from '../../styles/Settings.styles';
-import { alertRef } from '../CustomAlert';
+import { alertRef } from '../ui/CustomAlert';
 import type { WeeklyDigestConfig } from '../../services/notificationService';
 
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -27,10 +27,10 @@ export const WeeklySummaryPicker: React.FC<Props> = ({ visible, initialConfig, o
   const handleSave = () => {
     onSave({ dayOfWeek, hour, minute });
     alertRef.show({
-      title: 'Resumen semanal activado',
-      message: 'Recibirás un resumen semanal de tu rendimiento académico.',
+      title: t('settings.weeklySummaryEnabled'),
+      message: t('settings.weeklySummaryDesc'),
       type: 'success',
-      buttons: [{ text: 'OK' }],
+      buttons: [{ text: t('common.ok') }],
     });
     onClose();
   };

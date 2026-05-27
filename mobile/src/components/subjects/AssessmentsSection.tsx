@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
 import { subjectsStyles } from '../../styles/Subjects.styles';
+import { normalizeGrade, SCALE_MAX } from '../../utils/grades';
 
 interface AssessmentsSectionProps {
   subject: any;
@@ -73,7 +74,7 @@ export const AssessmentsSection: React.FC<AssessmentsSectionProps> = ({ subject,
             windowSize={5}
             renderItem={({ item: a, index }) => {
               const icon = ICON_MAP[a.type as string] || 'school-outline';
-              const score = a.score ?? a.grade_value;
+              const score = normalizeGrade(a);
               const color = BAR_COLORS[index % BAR_COLORS.length];
 
               return (
@@ -87,7 +88,7 @@ export const AssessmentsSection: React.FC<AssessmentsSectionProps> = ({ subject,
                   </View>
                   <View style={subjectsStyles.assessRight}>
                     <Text style={[subjectsStyles.assessScore, { color: a.display_color || color }]}>
-                      {score !== null && score !== undefined ? score : '—'}
+                      {score !== null && score !== undefined ? `${score.toFixed(1)}/${SCALE_MAX}` : '—'}
                     </Text>
                     {a.display_label && (
                       <View style={[subjectsStyles.assessScoreBadge, { backgroundColor: (a.display_color || color) + '20' }]}>
@@ -110,12 +111,11 @@ export const AssessmentsSection: React.FC<AssessmentsSectionProps> = ({ subject,
               </View>
               <View style={[subjectsStyles.sparkline, subjectsStyles.sparklineMain]}>
                 {assessments
-                  .filter((a: any) => (a.score !== null && a.score !== undefined) || (a.grade_value !== null && a.grade_value !== undefined))
+                  .filter((a: any) => normalizeGrade(a) !== null)
                   .slice(-6)
                   .map((a: any, i: number, arr: any[]) => {
-                    const scoreVal = a.score ?? a.grade_value ?? 0;
-                    const scale = scoreVal <= 5 ? 5 : 100;
-                    const barHeight = (scoreVal / scale) * 60;
+                    const scoreVal = normalizeGrade(a) ?? 0;
+                    const barHeight = (scoreVal / SCALE_MAX) * 60;
                     const isLast = i === arr.length - 1;
                     const c = BAR_COLORS[assessments.indexOf(a) % BAR_COLORS.length];
 

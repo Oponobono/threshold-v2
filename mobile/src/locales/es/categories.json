@@ -1,0 +1,5 @@
+{
+  "screenTitle": "Categorías",
+  "deleteTitle": "Eliminar categoría",
+  "deleteConfirm": "¿Eliminar \"{{name}}\"? Las evaluaciones asignadas quedarán sin categoría."
+}

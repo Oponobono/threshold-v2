@@ -1,10 +1,25 @@
 const fs = require('fs');
 const path = require('path');
 
+function getAllFiles(dir) {
+  let results = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const e of entries) {
+      const fp = path.join(dir, e.name);
+      if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules') {
+        results = results.concat(getAllFiles(fp));
+      } else if (e.isFile() && (e.name.endsWith('.tsx') || e.name.endsWith('.ts'))) {
+        results.push(fp);
+      }
+    }
+  } catch (_) {}
+  return results;
+}
+
 const dirs = [
   'app',
-  'src/components',
-  'src/components/dashboard',
+  'src',
 ];
 
 const spES = /[áéíóúñÁÉÍÓÚÑ¿¡]/;
@@ -12,9 +27,9 @@ const byFile = {};
 
 for (const dir of dirs) {
   if (!fs.existsSync(dir)) continue;
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.tsx') || f.endsWith('.ts'));
+  const files = getAllFiles(dir);
   for (const file of files) {
-    const content = fs.readFileSync(path.join(dir, file), 'utf8');
+    const content = fs.readFileSync(file, 'utf8');
     const lines = content.split('\n');
     lines.forEach((line, i) => {
       const trimmed = line.trim();
@@ -26,11 +41,12 @@ for (const dir of dirs) {
         !trimmed.startsWith('throw') &&
         !trimmed.includes("t('") &&
         !trimmed.includes('t("') &&
-        !trimmed.includes('console.')
+        !trimmed.includes('console.') &&
+        !trimmed.includes('import ') &&
+        !trimmed.includes('require(')
       ) {
-        const key = path.join(dir, file);
-        if (!byFile[key]) byFile[key] = [];
-        byFile[key].push((i+1) + ': ' + trimmed.substring(0, 100));
+        if (!byFile[file]) byFile[file] = [];
+        byFile[file].push((i+1) + ': ' + trimmed.substring(0, 120));
       }
     });
   }

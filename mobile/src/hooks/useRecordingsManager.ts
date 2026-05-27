@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo } from '../services/api';
 import { useAudioRecorder } from './useAudioRecorder';
-import { SubjectSection, GridMediaItem } from '../components/RecordingsGrid';
+import { SubjectSection, GridMediaItem } from '../components/recordings/RecordingsGrid';
 import { cacheService } from '../services/cacheService';
 
 /**
@@ -55,9 +55,9 @@ export const useRecordingsManager = () => {
 
   const handleAddYoutube = async (youtubeUrl: string) => {
     const trimmedUrl = youtubeUrl.trim();
-    if (!trimmedUrl) throw new Error('Por favor, ingresa un enlace de YouTube.');
+    if (!trimmedUrl) throw new Error(t('recordings.youtubeUrlRequired'));
     if (!trimmedUrl.includes('youtube.com') && !trimmedUrl.includes('youtu.be')) {
-      throw new Error('Por favor, ingresa un enlace válido de YouTube (youtube.com o youtu.be).');
+      throw new Error(t('recordings.youtubeUrlInvalid'));
     }
     
     setIsAddingYouTubeVideo(true);
@@ -70,10 +70,10 @@ export const useRecordingsManager = () => {
       }
 
       if (!videoId || videoId.length < 10) {
-        throw new Error('No se pudo extraer un ID de video válido.');
+        throw new Error(t('recordings.invalidVideoId'));
       }
 
-      let videoTitle = 'Video de YouTube';
+      let videoTitle = t('recordings.defaultVideoTitle');
       let thumbnailUrl = '';
       try {
         const metadataRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
@@ -108,7 +108,7 @@ export const useRecordingsManager = () => {
         deleteYouTubeVideo(video.id!)
           .catch((e) => {
             console.warn('[useRecordingsManager] Error deleting video:', e);
-            alert('Error al eliminar el video');
+            alert(t('recordings.deleteVideoError'));
           })
           .finally(() => {
             console.log('[useRecordingsManager] Video eliminado, recargando lista...');
@@ -176,7 +176,7 @@ export const useRecordingsManager = () => {
         
         section.items.push({
           id: recordingId,
-          name: rec.name || 'Grabación',
+          name: rec.name || t('recordings.defaultName'),
           type: 'recording',
           date: rec.date,
           created_at: rec.created_at,
@@ -191,7 +191,7 @@ export const useRecordingsManager = () => {
 
     if (activeFilter !== 'recording') {
       youTubeVideos.forEach((video) => {
-        const title = video.title || 'Video de YouTube';
+        const title = video.title || t('recordings.defaultVideoTitle');
         if (q && !title.toLowerCase().includes(q) && !(video.subject_name || '').toLowerCase().includes(q)) return;
         if (!passesDateFilter(video.created_at)) return;
         const subjectName = video.subject_name || UNCLASSIFIED;
@@ -200,7 +200,7 @@ export const useRecordingsManager = () => {
           id: video.id?.toString() || '',
           name: title,
           type: 'video',
-          date: video.created_at ? new Date(video.created_at).toLocaleString() : 'Fecha desconocida',
+          date: video.created_at ? new Date(video.created_at).toLocaleString() : t('recordings.unknownDate'),
           created_at: video.created_at,
           subject_name: video.subject_name,
           thumbnail_url: video.thumbnail_url || undefined,

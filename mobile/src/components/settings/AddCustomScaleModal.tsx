@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { settingsStyles as styles } from '../../styles/Settings.styles';
-import { alertRef } from '../CustomAlert';
+import { alertRef } from '../ui/CustomAlert';
 
 interface GradeBand {
   label: string;

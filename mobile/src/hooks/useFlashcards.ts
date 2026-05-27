@@ -4,7 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useFlashcardsManager } from './useFlashcardsManager';
 import { useDataStore } from '../store/useDataStore';
-import { useCustomAlert } from '../components/CustomAlert';
+import { useCustomAlert } from '../components/ui/CustomAlert';
 import {
   getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck, shareDeck, removeDeckFromGroup,
 } from '../services/api';

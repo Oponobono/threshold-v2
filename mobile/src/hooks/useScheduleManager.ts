@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
-import { alertRef } from '../components/CustomAlert';
+import { alertRef } from '../components/ui/CustomAlert';
 import { createSchedule, deleteSchedule, getTodaySchedules } from '../services/api';
 import { type Schedule } from '../services/api';
 import { useDataStore } from '../store/useDataStore';

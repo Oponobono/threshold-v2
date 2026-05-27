@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, ScrollView, TouchableWithoutFeedback } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { EvaluationItem, BooleanContent } from '../../services/api/types';
-import { MarkdownWithCode } from '../MarkdownWithCode';
+import { MarkdownWithCode } from '../ui/MarkdownWithCode';
 
 interface Props {
   item: EvaluationItem;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation, isAnswered, selectedAnswer, onNext }) => {
+  const { t } = useTranslation();
   const content = item.content as BooleanContent;
   const [hintVisible, setHintVisible] = useState(false);
   const hintAnim = useRef(new Animated.Value(0)).current;
@@ -81,7 +83,7 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation
         <View style={s.questionCard}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
             <View style={{ flex: 1, width: '100%' }}>
-              <Text style={s.questionLabel}>¿Verdadero o Falso?</Text>
+              <Text style={s.questionLabel}>{t('evaluation.trueOrFalse')}</Text>
               <View style={s.questionTextWrapper}>
                 <MarkdownWithCode>{content.question}</MarkdownWithCode>
               </View>

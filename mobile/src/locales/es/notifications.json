@@ -16,5 +16,12 @@
     "friday": "viernes",
     "saturday": "sábado"
   },
-  "weeklyDigestDescFmt": "Resumen cada {day} a las {time}"
+  "weeklyDigestDescFmt": "Resumen cada {day} a las {time}",
+  "channelName": "Recordatorios",
+  "deadlineAlertTitle": "🔔 Recordatorio de fecha límite",
+  "deadlineAlertBody": "\"{{title}}\" vence en {{minutes}} minutos",
+  "weeklyDigestTitle": "📊 Resumen Semanal",
+  "weeklyDigestBody": "Tu resumen de rendimiento académico de esta semana ya está disponible.",
+  "dueDeckTitle": "📚 Repaso urgente",
+  "dueDeckBody": "\"{{title}}\" tiene {{count}} tarjeta(s) pendientes de repaso."
 }

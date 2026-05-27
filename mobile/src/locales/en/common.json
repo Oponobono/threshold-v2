@@ -43,6 +43,10 @@
     "Sat",
     "Sun"
   ],
+  "months": [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ],
   "errors": {
     "enterPassword": "Enter your password",
     "groqApiKeyMissing": "Groq API Key is missing from .env.local file",
@@ -63,10 +67,17 @@
     "noClearText": "(Could not extract clear text from the image)",
     "noTranscription": "(No transcription generated for this file yet.)",
     "localFileRead": "(Error reading local file)",
-    "processFailed": "Error: Could not process your question."
+    "processFailed": "Error: Could not process your question.",
+    "snoozeFailed": "Could not snooze the review"
   },
   "title": "Title",
   "name": "Name",
   "sending": "Sending...",
-  "all": "All"
+  "all": "All",
+  "seeMore": "See more",
+  "offline": "Offline",
+  "offlineWithCount": "Offline ({{count}} pending)",
+  "syncing": "Syncing...",
+  "syncComplete": "✓ Sync complete",
+  "offlineSave": "Saved locally, will sync when connection is restored"
 }

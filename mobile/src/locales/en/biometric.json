@@ -1,5 +1,15 @@
 {
   "promptEnroll": "Confirm your identity to enable Touch ID",
   "cancel": "Cancel",
-  "promptLogin": "Use Touch ID to log into Threshold"
+  "promptLogin": "Use Touch ID to log into Threshold",
+  "enableTitle": "Enable Touch ID",
+  "promptEnrollQuestion": "Do you want to log in with your fingerprint next time?",
+  "notNow": "Not now",
+  "enable": "Enable",
+  "touchId": "Touch ID",
+  "serverConfigError": "There was an error saving the configuration on the server.",
+  "notConfiguredTitle": "Touch ID not configured",
+  "notConfigured": "Log in with your email and password first to activate this feature.",
+  "verificationFailed": "Could not verify your fingerprint. Try again or use your password.",
+  "loginFailed": "Could not log in with Touch ID."
 }

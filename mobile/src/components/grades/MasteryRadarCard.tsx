@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { globalStyles } from '../../styles/globalStyles';
 import { theme } from '../../styles/theme';
 import { gradesStyles } from '../../styles/Grades.styles';
-import { MasteryRadar } from '../MasteryRadar';
+import { MasteryRadar } from '../ui/MasteryRadar';
 
 interface MasteryRadarCardProps {
   userId: number;

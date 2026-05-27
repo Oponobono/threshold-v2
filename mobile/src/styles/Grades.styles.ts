@@ -242,6 +242,7 @@ export const gradesStyles = StyleSheet.create({
   gpaDivider: { width: 1, height: 50, backgroundColor: theme.colors.border },
 
   // Scale badge
+  scaleBadgeRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 4 },
   scaleBadge: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: theme.colors.inputBackground,

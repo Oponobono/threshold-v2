@@ -6,6 +6,7 @@
  */
 
 import { create } from 'zustand';
+import i18n from '../locales/i18n';
 
 export type ConnectivityState = 'online' | 'offline' | 'syncing' | 'success';
 
@@ -64,7 +65,7 @@ export const useConnectivityStore = create<ConnectivityStoreState>((set) => ({
   setSuccess: () => {
     set({
       state: 'success',
-      syncMessage: '✓ Sincronización completada',
+      syncMessage: i18n.t('common.syncComplete'),
       isSyncing: false,
       pendingCount: 0,
     });

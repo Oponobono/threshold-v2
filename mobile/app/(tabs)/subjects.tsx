@@ -7,13 +7,14 @@ import { useRouter } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { subjectsStyles as styles } from '../../src/styles/Subjects.styles';
-import { SubjectHeroCard } from '../../src/components/SubjectHeroCard';
-import { AutoUploadIndicator } from '../../src/components/AutoUploadIndicator';
+import { SubjectHeroCard } from '../../src/components/subjects/SubjectHeroCard';
+import { AutoUploadIndicator } from '../../src/components/ui/AutoUploadIndicator';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { useSubjects } from '../../src/hooks/useSubjects';
 import { SubjectPills } from '../../src/components/subjects/SubjectPills';
 import { GradeCalculator } from '../../src/components/subjects/GradeCalculator';
 import { AssessmentsSection } from '../../src/components/subjects/AssessmentsSection';
+import { SCALE_MAX } from '../../src/utils/grades';
 
 export default function SubjectsScreen() {
   const { t } = useTranslation();
@@ -62,7 +63,7 @@ export default function SubjectsScreen() {
               subtitle={g.selectedSubject.professor || t('subjects.noProfessor')}
               meta={`${g.selectedSubject.credits || 0} ${t('subjects.credits')}`}
               progress={g.selectedSubject.completion_percent || 0}
-              avgScore={g.selectedSubject.avg_score || 0}
+              avgScore={(g.selectedSubject.avg_score ?? 0) > SCALE_MAX * 2 ? ((g.selectedSubject.avg_score ?? 0) / 100) * SCALE_MAX : (g.selectedSubject.avg_score ?? 0)}
               displayLabel={g.selectedSubject.display_label}
               displayColor={g.selectedSubject.display_color}
               gpaEquivalent={g.selectedSubject.gpa_equivalent}

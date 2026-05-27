@@ -7,10 +7,10 @@ import { useRouter } from 'expo-router';
 import { globalStyles } from '../src/styles/globalStyles';
 import { loginStyles } from '../src/styles/Login.styles';
 import { theme } from '../src/styles/theme';
-import { CustomInput } from '../src/components/CustomInput';
-import { CustomButton } from '../src/components/CustomButton';
-import { FeatureCarousel } from '../src/components/FeatureCarousel';
-import { MapuviaFooter } from '../src/components/MapuviaFooter';
+import { CustomInput } from '../src/components/ui/CustomInput';
+import { CustomButton } from '../src/components/ui/CustomButton';
+import { FeatureCarousel } from '../src/components/ui/FeatureCarousel';
+import { MapuviaFooter } from '../src/components/ui/MapuviaFooter';
 import { useLoginAuth } from '../src/hooks/useLoginAuth';
 
 /**
