@@ -25,7 +25,7 @@ export const MasteryRadarCard: React.FC<MasteryRadarCardProps> = ({
     <View style={gradesStyles.card}>
       <View style={[globalStyles.rowBetweenCenter, globalStyles.mb16]}>
         <Text style={gradesStyles.sectionTitle}>
-          {t('grades.mastery', 'Dominio de Aprendizaje')}
+          {t('grades.mastery')}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <TouchableOpacity onPress={onPressInfo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

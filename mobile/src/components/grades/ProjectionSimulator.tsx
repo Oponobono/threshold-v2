@@ -52,7 +52,7 @@ export const ProjectionSimulator: React.FC<ProjectionSimulatorProps> = ({
 
       <View style={gradesStyles.simInputRow}>
         <View style={gradesStyles.simInputWrapper}>
-          <Text style={gradesStyles.simInputLabel}>{t('grades.scoreLabel', 'Nota')}</Text>
+          <Text style={gradesStyles.simInputLabel}>{t('grades.scoreLabel')}</Text>
           <TextInput
             style={gradesStyles.simInput}
             placeholder="0"
@@ -63,7 +63,7 @@ export const ProjectionSimulator: React.FC<ProjectionSimulatorProps> = ({
           />
         </View>
         <View style={gradesStyles.simInputWrapper}>
-          <Text style={gradesStyles.simInputLabel}>{t('grades.weightLabel', 'Peso (%)')}</Text>
+          <Text style={gradesStyles.simInputLabel}>{t('grades.weightLabel')}</Text>
           <TextInput
             style={gradesStyles.simInput}
             placeholder="0"
@@ -83,7 +83,7 @@ export const ProjectionSimulator: React.FC<ProjectionSimulatorProps> = ({
           <LineChart
             data={{
               labels: trendSeries.map((_, i) => {
-                if (i === trendSeries.length - 1) return 'Proy.';
+                if (i === trendSeries.length - 1) return t('grades.projectedLabel');
                 if (gradedAssessmentsLength === 0) return '';
                 if (gradedAssessmentsLength === 1) return i === 0 ? '0' : '1';
                 const startIndex = gradedAssessmentsLength - historicalGpasLength;

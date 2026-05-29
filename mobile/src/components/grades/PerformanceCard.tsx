@@ -52,7 +52,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
     <View style={gradesStyles.card}>
       <View style={[globalStyles.rowBetweenCenter, { marginBottom: 12 }]}>
         <Text style={gradesStyles.sectionTitle}>
-          {t('grades.academicPerformance', 'Rendimiento general')}
+          {t('grades.academicPerformance')}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {onPressInfo && (
@@ -114,7 +114,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
           <Text style={{ color: theme.colors.text.primary }}>
             {parseFloat(displayProjectedGPA) > 0
               ? `${displayProjectedGPA}${displayDelta ? ` (${displayDelta > 0 ? '+' : ''}${displayDelta.toFixed(2)} pts)` : ''}`
-              : t('grades.insufficientData', 'Faltan evaluaciones')}
+              : t('grades.insufficientData')}
           </Text>
         </Text>
       </View>

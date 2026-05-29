@@ -16,7 +16,7 @@ export const GradesHeader: React.FC<GradesHeaderProps> = ({ isExportingPdf, onDo
     <View style={gradesStyles.header}>
       <View style={globalStyles.row}>
         <Ionicons name="school-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
-        <Text style={gradesStyles.logoText}>{t('grades.title') || 'Calificaciones'}</Text>
+        <Text style={gradesStyles.logoText}>{t('grades.title')}</Text>
       </View>
       <View style={globalStyles.row}>
         <TouchableOpacity style={gradesStyles.termPill}>
