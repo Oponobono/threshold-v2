@@ -81,7 +81,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
     } catch (error: any) {
       console.error('[FlashcardImportModal] DocumentPicker error:', error);
       showAlert({
-        title: t('common.error') || 'Error',
+        title: t('common.error'),
         message: t('flashcards.filePickerError'),
         type: 'error',
       });
@@ -165,7 +165,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         });
       } else {
         showAlert({
-          title: t('common.error') || 'Error',
+          title: t('common.error'),
           message: t('flashcards.shareNotAvailable'),
           type: 'error',
         });
@@ -173,7 +173,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
     } catch (error: any) {
       console.error('Error compartiendo plantilla:', error);
       showAlert({
-        title: t('common.error') || 'Error',
+        title: t('common.error'),
         message: t('flashcards.shareTemplateFailed'),
         type: 'error',
       });
@@ -229,8 +229,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (file.size && file.size > maxSize) {
         showAlert({
-          title: t('common.error') || 'Error',
-          message: t('flashcards.fileTooLarge'),
+        title: t('common.error'),
+        message: t('flashcards.fileTooLarge'),
           type: 'error',
         });
         setIsProcessing(false);
@@ -247,8 +247,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       // Validar estructura básica
       if (!deckData.title || !deckData.title.trim()) {
         showAlert({
-          title: t('common.error') || 'Error',
-          message: t('flashcards.jsonMissingTitle'),
+        title: t('common.error'),
+        message: t('flashcards.jsonMissingTitle'),
           type: 'error',
         });
         setIsProcessing(false);
@@ -258,8 +258,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       // Validar límite de tarjetas
       if (deckData.cards && deckData.cards.length > 20) {
         showAlert({
-          title: t('common.error') || 'Error',
-          message: t('flashcards.maxCardsExceeded'),
+        title: t('common.error'),
+        message: t('flashcards.maxCardsExceeded'),
           type: 'error',
         });
         setIsProcessing(false);
@@ -273,8 +273,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
           const jsonSize = new TextEncoder().encode(JSON.stringify(card.data)).length;
           if (jsonSize > 50 * 1024) {
             showAlert({
-              title: t('common.error') || 'Error',
-              message: t('flashcards.cardTooLarge', { num: i + 1 }),
+            title: t('common.error'),
+            message: t('flashcards.cardTooLarge', { num: i + 1 }),
               type: 'error',
             });
             setIsProcessing(false);
@@ -290,8 +290,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
           const schemaError = validateCardSchema(card.type || 'flashcard', card.data);
           if (schemaError) {
             showAlert({
-              title: t('common.error') || 'Error',
-              message: t('flashcards.cardNumError', { num: i + 1, error: schemaError }),
+            title: t('common.error'),
+            message: t('flashcards.cardNumError', { num: i + 1, error: schemaError }),
               type: 'error',
             });
             setIsProcessing(false);
@@ -363,7 +363,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       await onImportSuccess?.();
       
       showAlert({
-        title: t('common.success') || 'Éxito',
+        title: t('common.success'),
         message: errorCount > 0
           ? t('flashcards.importCompleteWithErrors', { title: deckData.title, successCount, errorCount })
           : t('flashcards.importComplete', { title: deckData.title, successCount }),
@@ -385,7 +385,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       }
 
       showAlert({
-        title: t('common.error') || 'Error',
+        title: t('common.error'),
         message: errorMessage,
         type: 'error',
       });
@@ -396,7 +396,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   const handleConfirmSubject = async () => {
     if (!importedDeck || !selectedSubjectId) {
       showAlert({
-        title: t('common.error') || 'Error',
+        title: t('common.error'),
         message: t('flashcards.pleaseSelectSubject'),
         type: 'error',
       });
@@ -408,7 +408,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       await updateFlashcardDeck(importedDeck.id, { subject_id: selectedSubjectId });
       
       showAlert({
-        title: t('common.success') || 'Éxito',
+        title: t('common.success'),
         message: t('flashcards.importSuccess', { title: importedDeck.title, count: importedDeck.cardCount }),
         type: 'success',
       });
@@ -422,7 +422,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
     } catch (error: any) {
       console.error('[FlashcardImportModal] Error actualizando materia:', error);
       showAlert({
-        title: t('common.error') || 'Error',
+        title: t('common.error'),
         message: t('flashcards.subjectAssignmentError'),
         type: 'error',
       });
@@ -447,7 +447,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
           <View style={s.header}>
             <View style={s.headerLeft}>
               <Text style={s.headerTitle}>
-                {importedDeck ? t('flashcards.subject') : t('flashcards.importDeck') || 'Importar Mazo'}
+                {importedDeck ? t('flashcards.subject') : t('flashcards.importDeck')}
               </Text>
             </View>
             <TouchableOpacity 

@@ -63,8 +63,8 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
     if (Platform.OS === 'ios') {
       const options = [
         t('common.cancel'),
-        ...(isIncompleteTask ? [t('tasks.markDelivered', 'Marcar como entregada')] : []),
-        t('assessments.edit', 'Editar'),
+        ...(isIncompleteTask ? [t('tasks.markDelivered')] : []),
+              t('assessments.edit'),
         t('common.delete'),
       ];
       
@@ -106,20 +106,20 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
 
   const handleDelete = (id: number) => {
     showAlert({
-      title: t('common.deleteItem') || 'Eliminar',
-      message: t('assessments.deleteConfirm') || '¿Estás seguro de que quieres eliminar esta nota/evaluación?',
+      title: t('common.deleteItem'),
+      message: t('assessments.deleteConfirm'),
       type: 'confirm',
       buttons: [
-        { text: t('common.cancel') || 'Cancelar', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.delete') || 'Eliminar',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteAssessment(id);
               onDeleteAssessment?.(id);
             } catch (e: any) {
-              showAlert({ title: t('common.error') || 'Error', message: (t('common.errors.deleteFailed') || 'No se pudo eliminar: ') + `${e.message || 'Error de red'}`, type: 'error' });
+              showAlert({ title: t('common.error'), message: t('common.errors.deleteFailed') + `${e.message || t('common.networkError')}`, type: 'error' });
             }
           }
         }
@@ -177,7 +177,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
                   scoreText = `${formatGrade(grade)} / ${SCALE_MAX}`;
                 }
               } else if (assessment.type === 'task') {
-                scoreText = assessment.is_completed ? (t('common.done') || 'Completado') : t('subjects.pending');
+                scoreText = assessment.is_completed ? t('common.done') : t('subjects.pending');
               }
 
               return (
@@ -192,7 +192,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
                         {isPending && (
                           <View style={{ backgroundColor: theme.colors.warning, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                             <Text style={{ fontSize: 9, fontWeight: '600', color: '#FFF' }}>
-                              {t('common.syncing', 'SINCRONIZANDO')}
+                              {t('common.syncing')}
                             </Text>
                           </View>
                         )}
@@ -267,7 +267,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
                   >
                     <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} />
                     <Text style={{ color: theme.colors.primary, fontSize: 14, fontWeight: '500' }}>
-                      {t('tasks.markDelivered', 'Marcar como entregada')}
+                      {t('tasks.markDelivered')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -293,7 +293,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
                 >
                   <Ionicons name="pencil" size={18} color={theme.colors.primary} />
                   <Text style={{ color: theme.colors.primary, fontSize: 14, fontWeight: '500' }}>
-                    {t('assessments.edit', 'Editar')}
+                    {t('assessments.edit')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -313,7 +313,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
                 >
                   <Ionicons name="trash" size={18} color="#FF3B30" />
                   <Text style={{ color: '#FF3B30', fontSize: 14, fontWeight: '500' }}>
-                    {t('common.delete', 'Eliminar')}
+                    {t('common.delete')}
                   </Text>
                 </TouchableOpacity>
               </Pressable>

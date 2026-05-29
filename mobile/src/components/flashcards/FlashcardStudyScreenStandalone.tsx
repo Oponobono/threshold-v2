@@ -38,10 +38,10 @@ interface SessionStats {
   total: number;
 }
 
-const TYPE_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  flashcard:       { label: '🃏 Flashcard', color: '#5C6BC0', bg: '#EDE7F6' },
-  multiple_choice: { label: '🎯 ECAES',     color: '#00897B', bg: '#E0F2F1' },
-  boolean:         { label: '⚖️ V / F',     color: '#F57C00', bg: '#FFF3E0' },
+const TYPE_BADGE: Record<string, { labelKey: string; color: string; bg: string }> = {
+  flashcard:       { labelKey: 'flashcards.typeFlashcard', color: '#5C6BC0', bg: '#EDE7F6' },
+  multiple_choice: { labelKey: 'flashcards.typeECAES',     color: '#00897B', bg: '#E0F2F1' },
+  boolean:         { labelKey: 'flashcards.typeBoolean',   color: '#F57C00', bg: '#FFF3E0' },
 };
 
 export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
@@ -227,13 +227,13 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
 
   const handleDeleteCard = (cardId: number) => {
     showAlert({
-      title: t('flashcards.deleteItem', 'Eliminar ítem'),
-      message: t('flashcards.deleteItemConfirm', '¿Estás seguro de que deseas eliminar este ítem de evaluación?'),
+      title: t('flashcards.deleteItem'),
+      message: t('flashcards.deleteItemConfirm'),
       type: 'confirm',
       buttons: [
-        { text: t('common.cancel', 'Cancelar'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.delete', 'Eliminar'), style: 'destructive',
+          text: t('common.delete'), style: 'destructive',
           onPress: async () => {
             try {
               await deleteFlashcard(cardId);
@@ -266,12 +266,12 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       
       // Mostrar confirmación
       showAlert({
-        title: t('flashcards.snoozed', '✅ Tarjeta aplazada'),
-        message: t('flashcards.snoozeReappear', { label: option.label.toLowerCase(), defaultValue: `La revisión reaparecerá en ${option.label.toLowerCase()}` }),
+        title: t('flashcards.snoozed'),
+        message: t('flashcards.snoozeReappear', { label: option.label.toLowerCase() }),
         type: 'success',
         buttons: [
           {
-            text: t('flashcards.continueBtn', 'Continuar'),
+            text: t('flashcards.continueBtn'),
             onPress: () => {
               setShowSnoozeModal(false);
               // Avanzar a la siguiente tarjeta
@@ -289,8 +289,8 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       });
     } catch (error: any) {
       showAlert({
-        title: t('flashcards.snoozeError', 'Error al aplazar'),
-        message: error.message || t('flashcards.snoozeErrorMsg', 'No se pudo aplazar la tarjeta'),
+        title: t('flashcards.snoozeError'),
+        message: error.message || t('flashcards.snoozeErrorMsg'),
         type: 'error',
       });
     } finally {
@@ -325,9 +325,9 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       await generateDifferentiationCard(activeDeck.id, suggestion.conceptA, suggestion.conceptB, suggestion.reason);
       // Remove suggestion once card is created
       setConfusionSuggestions(prev => prev.filter(s => s.conceptA !== key));
-      showAlert({ title: t('flashcards.cardCreated', '✅ Tarjeta creada'), message: t('flashcards.cardCreatedMsg', { conceptA: suggestion.conceptA, conceptB: suggestion.conceptB, defaultValue: `Se añadió una tarjeta de contraste entre "${suggestion.conceptA}" y "${suggestion.conceptB}" a tu mazo.` }), type: 'success' });
+      showAlert({ title: t('flashcards.cardCreated'), message: t('flashcards.cardCreatedMsg', { conceptA: suggestion.conceptA, conceptB: suggestion.conceptB }), type: 'success' });
     } catch (e: any) {
-      showAlert({ title: t('common.error', 'Error'), message: e.message || t('flashcards.cardCreateError', 'No se pudo generar la tarjeta'), type: 'error' });
+      showAlert({ title: t('common.error'), message: e.message || t('flashcards.cardCreateError'), type: 'error' });
     } finally {
       setGeneratingDiff(null);
     }
@@ -344,21 +344,21 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.doneEmoji}>{pct >= 80 ? '🌟' : pct >= 50 ? '👍' : '💪'}</Text>
-          <Text style={s.doneTitle}>{t('flashcards.sessionCompleted', '¡Sesión completada!')}</Text>
-          <Text style={s.doneSubtitle}>{t('flashcards.itemsReviewed', { count: items.length, plural: items.length !== 1 ? 's' : '', defaultValue: `${items.length} ítem${items.length !== 1 ? 's' : ''} revisados` })}</Text>
+          <Text style={s.doneTitle}>{t('flashcards.sessionCompleted')}</Text>
+          <Text style={s.doneSubtitle}>{t('flashcards.itemsReviewed', { count: items.length, plural: items.length !== 1 ? 's' : '' })}</Text>
           {stats.total > 0 && (
             <View style={s.statsRow}>
               <View style={[s.statChip, { backgroundColor: '#E8F5E9' }]}>
                 <Text style={[s.statChipNum, { color: '#2E7D32' }]}>{stats.correct}</Text>
-                <Text style={[s.statChipLabel, { color: '#2E7D32' }]}>{t('flashcards.statCorrect', 'Correctas')}</Text>
+                <Text style={[s.statChipLabel, { color: '#2E7D32' }]}>{t('flashcards.statCorrect')}</Text>
               </View>
               <View style={[s.statChip, { backgroundColor: '#FFEBEE' }]}>
                 <Text style={[s.statChipNum, { color: '#C62828' }]}>{stats.incorrect}</Text>
-                <Text style={[s.statChipLabel, { color: '#C62828' }]}>{t('flashcards.statIncorrect', 'Incorrectas')}</Text>
+                <Text style={[s.statChipLabel, { color: '#C62828' }]}>{t('flashcards.statIncorrect')}</Text>
               </View>
               <View style={[s.statChip, { backgroundColor: '#F3E5F5' }]}>
                 <Text style={[s.statChipNum, { color: '#6A1B9A' }]}>{pct}%</Text>
-                <Text style={[s.statChipLabel, { color: '#6A1B9A' }]}>{t('flashcards.statAccuracy', 'Acierto')}</Text>
+                <Text style={[s.statChipLabel, { color: '#6A1B9A' }]}>{t('flashcards.statAccuracy')}</Text>
               </View>
             </View>
           )}
@@ -366,14 +366,14 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           {/* ── Confusion Detection Panel ── */}
           {isAnalyzingConfusions && (
             <View style={confusionStyles.banner}>
-              <Text style={confusionStyles.bannerTitle}>{t('flashcards.analyzingDeck', '🧠 Analizando tu mazo...')}</Text>
-              <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.searchingConfusions', 'Buscando conceptos que podrías confundir.')}</Text>
+              <Text style={confusionStyles.bannerTitle}>{t('flashcards.analyzingDeck')}</Text>
+              <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.searchingConfusions')}</Text>
             </View>
           )}
           {!isAnalyzingConfusions && confusionSuggestions.length > 0 && (
             <View style={confusionStyles.banner}>
-              <Text style={confusionStyles.bannerTitle}>{t('flashcards.confusionTitle', '⚠️ Conceptos Confundibles Detectados')}</Text>
-              <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.confusionSubtitle', { count: confusionSuggestions.length, plural: confusionSuggestions.length > 1 ? 'es' : '', defaultValue: `El análisis encontró ${confusionSuggestions.length} par${confusionSuggestions.length > 1 ? 'es' : ''} que suelen confundirse. Genera una tarjeta de contraste para fijar la diferencia.` })}</Text>
+              <Text style={confusionStyles.bannerTitle}>{t('flashcards.confusionTitle')}</Text>
+              <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.confusionSubtitle', { count: confusionSuggestions.length, plural: confusionSuggestions.length > 1 ? 'es' : '' })}</Text>
               {confusionSuggestions.map((s, i) => (
                 <View key={i} style={confusionStyles.suggestionRow}>
                   <View style={{ flex: 1 }}>
@@ -388,7 +388,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
                     disabled={generatingDiff !== null}
                   >
                     <Text style={confusionStyles.generateBtnText}>
-                      {generatingDiff === s.conceptA ? '...' : t('flashcards.differentiateBtn', '+ Diferenciar')}
+                      {generatingDiff === s.conceptA ? '...' : t('flashcards.differentiateBtn')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -400,7 +400,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
         {/* Botón anclado justo encima de la barra nativa del móvil */}
         <View style={{ paddingHorizontal: Math.max(insets.left, horizontalPadding, 20), paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12) }}>
           <TouchableOpacity style={s.backBtn} onPress={onBack}>
-            <Text style={s.backBtnText}>{t('flashcards.backToDecks', 'Volver a mazos')}</Text>
+            <Text style={s.backBtnText}>{t('flashcards.backToDecks')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -430,7 +430,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
         {/* Fila 2: Badge del Tipo de Tarjeta + Botones y Contador */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={[s.inlineBadge, { backgroundColor: badge.bg }]}>
-            <Text style={[s.inlineBadgeText, { color: badge.color }]}>{badge.label}</Text>
+            <Text style={[s.inlineBadgeText, { color: badge.color }]}>{t(badge.labelKey)}</Text>
           </View>
 
           <View style={s.headerRight}>

@@ -47,7 +47,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
       ? { label: globalProjectedLetter.label, color: globalProjectedLetter.color }
       : null;
 
-  const scaleName = activeSystem?.name || t('grades.editScale', 'ESCALA AUTO');
+  const scaleName = activeSystem ? t(activeSystem.name) : t('grades.editScale');
   return (
     <View style={gradesStyles.card}>
       <View style={[globalStyles.rowBetweenCenter, { marginBottom: 12 }]}>

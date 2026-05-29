@@ -46,7 +46,7 @@ export const CardReviewModal: React.FC<CardReviewModalProps> = ({
   onClose,
   onReviewComplete,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { showAlert } = useCustomAlert();
 
   // Timer state
@@ -141,7 +141,7 @@ export const CardReviewModal: React.FC<CardReviewModalProps> = ({
       setIsSubmitting(false);
       showAlert({
         title: t('error'),
-        message: error.message || t('error_recording_review'),
+        message: error.message || t('common.errorRecordingReview'),
         type: 'error',
       });
     }
@@ -156,11 +156,11 @@ export const CardReviewModal: React.FC<CardReviewModalProps> = ({
 
   // Quality assessment based on time
   const qualityHint = useMemo(() => {
-    if (elapsedTime < 3) return { label: '⚡ Perfect', color: '#4CAF50' };
-    if (elapsedTime < 8) return { label: '✓ Good', color: '#2196F3' };
-    if (elapsedTime < 15) return { label: '⏱ Acceptable', color: '#FF9800' };
-    return { label: '🐢 Slow', color: '#F44336' };
-  }, [elapsedTime]);
+    if (elapsedTime < 3) return { label: t('modals.qualityPerfect'), color: '#4CAF50' };
+    if (elapsedTime < 8) return { label: t('modals.qualityGood'), color: '#2196F3' };
+    if (elapsedTime < 15) return { label: t('modals.qualityAcceptable'), color: '#FF9800' };
+    return { label: t('modals.qualitySlow'), color: '#F44336' };
+  }, [elapsedTime, t]);
 
   if (!card) return null;
 
@@ -311,7 +311,7 @@ export const CardReviewModal: React.FC<CardReviewModalProps> = ({
                   <Text style={styles.nextReviewTitle}>{t('modals.nextReview')}</Text>
                 </View>
                 <Text style={styles.nextReviewDate}>
-                  {new Date(reviewResult.nextReviewDate).toLocaleDateString('es-ES', {
+                  {new Date(reviewResult.nextReviewDate).toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'es-ES', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',

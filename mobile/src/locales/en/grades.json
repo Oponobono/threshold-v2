@@ -36,6 +36,12 @@
   "activeTerm": "Fall 2026",
   "scoreLabel": "Score",
   "possibleLabel": "Possible",
+  "generating": "Generating...",
+  "exportPdf": "Export PDF",
+  "projectedLabel": "Proj.",
+  "performanceOverlay": "**Overall Performance**\n\n**Term GPA** — This is the real weighted average of all your graded assessments, calculated according to each one's percentage weight.\n\n**Projection** — Estimates your final grade if you maintain your current performance, using linear regression on your recent scores.\n\n**Delta (± pts)** — The difference between your current average and the projection. Positive = you are improving; negative = you need to recover.\n\n**Bar chart** — Each bar represents an assessment in chronological order. The last bar (darkest) is your most recent grade. The height reflects your normalized score.",
+  "masteryOverlay": "**Learning Mastery**\n\nThis radar illustrates your mastery level based on the spaced repetition algorithm of your *Flashcards*.\n\nIt visually shows in which areas or decks you are strongest and which need more attention and review.",
+  "projectionOverlay": "**Projection Simulator**\n\nThis graph shows how your GPA has evolved over time based on the actual weight of your submissions.\n\nThe **\"Proj.\"** point (orange) mathematically simulates your new weighted average if you get the score you entered.",
   "sample": {
     "a1Name": "Algebra Quiz 2",
     "a1Subject": "Math",

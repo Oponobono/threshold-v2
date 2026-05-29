@@ -61,13 +61,13 @@ export default function CalendarScreen() {
     const eventIdStr = item.id ? String(item.id).replace('event-', '') : null;
     if (!eventIdStr) return;
     alertRef.show({
-      title: t('calendar.delete') || 'Eliminar',
-      message: t('calendar.deleteConfirm') || '¿Estás seguro de eliminar este evento?',
+      title: t('calendar.delete'),
+      message: t('calendar.deleteConfirm'),
       type: 'confirm',
       buttons: [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('calendar.delete') || 'Eliminar',
+          text: t('calendar.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -75,7 +75,7 @@ export default function CalendarScreen() {
               await calendar.reloadEventsForMonth();
               alertRef.show({
                 title: t('common.success'),
-                message: t('calendar.eventDeleted') || 'Evento eliminado',
+                message: t('calendar.eventDeleted'),
                 type: 'success',
               });
             } catch (error) {
@@ -97,15 +97,15 @@ export default function CalendarScreen() {
     const count = assessmentIds.filter(Boolean).length;
     if (count === 0) return;
     alertRef.show({
-      title: t('calendar.delete') || 'Eliminar',
+      title: t('calendar.delete'),
       message: count === 1
-        ? (t('calendar.deleteTaskConfirm') || '¿Estás seguro de eliminar esta tarea?')
-        : (t('calendar.deleteTasksConfirm', { count }) || `¿Estás seguro de eliminar ${count} tareas?`),
+        ? t('calendar.deleteTaskConfirm')
+        : t('calendar.deleteTasksConfirm', { count }),
       type: 'confirm',
       buttons: [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('calendar.delete') || 'Eliminar',
+          text: t('calendar.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -114,7 +114,7 @@ export default function CalendarScreen() {
               await calendar.reloadEventsForMonth();
               alertRef.show({
                 title: t('common.success'),
-                message: t('calendar.taskDeleted') || 'Tarea(s) eliminada(s)',
+                message: t('calendar.taskDeleted'),
                 type: 'success',
               });
             } catch (error) {
@@ -225,8 +225,8 @@ export default function CalendarScreen() {
             alertRef.show({
               title: t('common.success'),
               message: eventId
-                ? (t('calendar.eventUpdatedSuccess') || 'Evento actualizado')
-                : (t('calendar.eventCreatedSuccess') || 'Evento creado exitosamente'),
+                ? t('calendar.eventUpdatedSuccess')
+                : t('calendar.eventCreatedSuccess'),
               type: 'success',
             });
           } catch (error) {

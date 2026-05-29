@@ -1,4 +1,8 @@
 {
+  "removedFromGroup": "Mazo quitado del grupo.",
+  "removeFromGroup": "Quitar del grupo",
+  "removeFromGroupConfirm": "¿Deseas quitar el mazo \"{{title}}\" del grupo?",
+  "removedFromGroup": "Mazo quitado del grupo.",
   "cancel": "Cancelar",
   "save": "Guardar",
   "select": "Seleccionar",
@@ -52,5 +56,9 @@
   "today": "Hoy",
   "thisWeek": "Esta semana",
   "thisMonth": "Este mes",
-  "apply": "Aplicar"
+  "apply": "Aplicar",
+  "qualityPerfect": "⚡ Perfecto",
+  "qualityGood": "✓ Bueno",
+  "qualityAcceptable": "⏱ Aceptable",
+  "qualitySlow": "🐢 Lento"
 }

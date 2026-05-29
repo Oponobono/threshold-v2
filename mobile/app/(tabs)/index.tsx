@@ -467,7 +467,7 @@ export default function HybridDashboardScreen() {
                   </>
                 ) : (
                   <>
-                    <Text style={styles.nextClassTitle} numberOfLines={1}>{todaySchedules.length > 0 ? "¡Terminaste por hoy!" : t('dashboard.noClasses')}</Text>
+                    <Text style={styles.nextClassTitle} numberOfLines={1}>{todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses')}</Text>
                     <Text style={styles.nextClassRoom} numberOfLines={1}>{t('dashboard.enjoyDay')}</Text>
                   </>
                 )}
@@ -491,7 +491,7 @@ export default function HybridDashboardScreen() {
           {predictions && predictions.dueCount > 0 && !snoozeManager.isCardSnoozed('due_cards_alert') ? (
             <View style={{ marginTop: 24 }}>
               <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
-                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t('dashboard.urgentReviews', 'Repasos Urgentes')}</Text>
+                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t('dashboard.urgentReviews')}</Text>
                 <View style={globalStyles.rowBetweenCenter}>
                   <TouchableOpacity
                     style={[styles.snoozeBtn, { marginRight: 10 }]}
@@ -502,7 +502,7 @@ export default function HybridDashboardScreen() {
                   </TouchableOpacity>
                   <View style={[styles.allChip, { backgroundColor: theme.colors.dangerTransparent, borderWidth: 1, borderColor: theme.colors.danger + '20', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                     <Text style={[styles.allChipText, { color: theme.colors.danger, fontWeight: '800' }]}>{predictions.dueCount}</Text>
-                    <Text style={[styles.allChipText, { color: theme.colors.danger, fontWeight: '500', fontSize: 10 }]}>{t('dashboard.decks', 'mazos')}</Text>
+                    <Text style={[styles.allChipText, { color: theme.colors.danger, fontWeight: '500', fontSize: 10 }]}>{t('dashboard.decks')}</Text>
                   </View>
                 </View>
               </View>
@@ -511,18 +511,18 @@ export default function HybridDashboardScreen() {
                   <MaterialCommunityIcons name="brain" size={24} color={theme.colors.danger} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.nextClassTitle} numberOfLines={1}>{t('dashboard.attentionRequired', 'Atención Requerida')}</Text>
+                  <Text style={styles.nextClassTitle} numberOfLines={1}>{t('dashboard.attentionRequired')}</Text>
                   <Text style={styles.nextClassRoom} numberOfLines={1}>
                     {predictions.dueCount === 1
-                      ? t('dashboard.deckToReview', '1 mazo listo para repasar.')
-                      : t('dashboard.decksToReview', `${predictions.dueCount} mazos listos para repasar.`, { count: predictions.dueCount })}
+                      ? t('dashboard.deckToReview')
+                      : t('dashboard.decksToReview', { count: predictions.dueCount })}
                   </Text>
                 </View>
                 <TouchableOpacity
                   style={[styles.openBtn, { borderColor: theme.colors.danger + '30', flexShrink: 0 }]}
                   onPress={() => setIsFlashcardsVisible(true)}
                 >
-                  <Text style={[styles.openBtnText, { color: theme.colors.danger }]}>{t('dashboard.reviewBtn', 'Repasar')}</Text>
+                  <Text style={[styles.openBtnText, { color: theme.colors.danger }]}>{t('dashboard.reviewBtn')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -556,7 +556,7 @@ export default function HybridDashboardScreen() {
               return (
                 <MetricCard 
                   title={t('dashboard.nextAssignment')} 
-                  value={nextAssessment ? nextAssessment.name : "Nada pendiente"} 
+                  value={nextAssessment ? nextAssessment.name : t('dashboard.nothingPending')} 
                   subtext={nextAssessment ? nextAssessment.date : t('dashboard.takeABreak')} 
                   icon="document-text-outline" 
                   color={mood.color}
@@ -824,9 +824,9 @@ export default function HybridDashboardScreen() {
                 duration_seconds: lastSessionDuration,
                 performance_rating: rating,
               });
-              showToast(t('common.success') + ': Progreso guardado');
+              showToast(t('dashboard.progressSaved'));
             } catch {
-              showToast('Error al guardar sesión de estudio');
+              showToast(t('dashboard.errorSavingSession'));
             }
           }}
         />

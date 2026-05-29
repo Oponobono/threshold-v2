@@ -94,21 +94,21 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
 
   const handleRemoveFromGroup = async (deck: FlashcardDeck, groupPin: string) => {
     showAlert({
-      title: t('modals.removeFromGroup', 'Quitar del grupo'),
-      message: t('modals.removeFromGroupConfirm', { title: deck.title, defaultValue: `¿Deseas quitar el mazo "${deck.title}" del grupo?` }),
+      title: t('modals.removeFromGroup'),
+      message: t('modals.removeFromGroupConfirm'),
       type: 'confirm',
       buttons: [
-        { text: t('common.cancel', 'Cancelar'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.delete', 'Quitar'),
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeDeckFromGroup(deck.id, groupPin);
-              setGroupDecks((prev: FlashcardDeck[]) => prev.filter((d) => d.id !== deck.id));
-              showAlert({ title: t('common.success', 'Éxito'), message: 'Mazo quitado del grupo.', type: 'success' });
+              await leaveGroup(deck.id, currentUserId);
+              onUpdate?.();
+              showAlert({ title: t('common.success'), message: t('modals.removedFromGroup'), type: 'success' });
             } catch (e: any) {
-              showAlert({ title: t('common.error', 'Error'), message: e.message, type: 'error' });
+              showAlert({ title: t('common.error'), message: e.message, type: 'error' });
             }
           },
         },
@@ -122,11 +122,11 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
     setIsSharing(true);
     try {
       const result = await shareDeck(shareDeckTarget.id, groupPinId ? { groupPinId } : { recipientPin: sharePin });
-      showAlert({ title: t('common.success', '¡Éxito!'), message: result.message, type: 'success' });
+      showAlert({ title: t('common.success'), message: result.message, type: 'success' });
       setShareDeckTarget(null);
       setSharePin('');
     } catch (error: any) {
-      showAlert({ title: t('common.error', 'Error'), message: error.message, type: 'error' });
+      showAlert({ title: t('common.error'), message: error.message, type: 'error' });
     } finally {
       setIsSharing(false);
     }
@@ -212,15 +212,15 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const handleDeleteDeck = (deck: FlashcardDeck) => {
     const isOwner = deck.user_id === currentUserId;
     showAlert({
-      title: isOwner ? t('modals.deleteDeck', 'Eliminar Mazo') : t('flashcards.removeShared', 'Quitar Mazo'),
+      title: isOwner ? t('modals.deleteDeck') : t('flashcards.removeShared'),
       message: isOwner
         ? t('modals.deleteDeckConfirm', { title: deck.title, defaultValue: `¿Estás seguro de que deseas eliminar el mazo "${deck.title}"? Esta acción no se puede deshacer.` })
         : t('flashcards.removeSharedConfirm', { title: deck.title, defaultValue: `¿Deseas quitar el mazo "${deck.title}" de tu lista?` }),
       type: 'confirm',
       buttons: [
-        { text: t('common.cancel', 'Cancelar'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.delete', 'Eliminar'),
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -232,7 +232,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 await refreshPredictions(userId);
               }
             } catch (e: any) {
-              showAlert({ title: t('common.error', 'Error'), message: e.message || 'Error al eliminar el mazo', type: 'error' });
+              showAlert({ title: t('common.error'), message: e.message || t('common.error'), type: 'error' });
             }
           },
         },
@@ -319,7 +319,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
             fontWeight: activeTab === 'mazos' ? '700' : '400',
             color: activeTab === 'mazos' ? theme.colors.primary : theme.colors.text.secondary,
             fontSize: 14,
-          }}>{t('flashcards.myDecks', 'Mis Mazos')}</Text>
+          }}>{t('flashcards.myDecks')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setActiveTab('grupos')}
@@ -333,7 +333,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
             fontWeight: activeTab === 'grupos' ? '700' : '400',
             color: activeTab === 'grupos' ? theme.colors.primary : theme.colors.text.secondary,
             fontSize: 14,
-          }}>{t('flashcards.groups', 'Grupos')}</Text>
+          }}>{t('flashcards.groups')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -391,13 +391,13 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                           {isShared && (
                             <View style={s.sharedBadge}>
                               <Ionicons name="people" size={10} color="#388E3C" />
-                              <Text style={s.sharedBadgeText}>{t('modals.shared', 'Compartido')}</Text>
+                              <Text style={s.sharedBadgeText}>{t('modals.shared')}</Text>
                             </View>
                           )}
                         </View>
                         {isShared && (
                           <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
-                            {t('flashcards.sharedBy', 'por')} @{item.owner_username || item.owner_name || t('flashcards.peer', 'compañero')}
+                            {t('flashcards.sharedBy')} @{item.owner_username || item.owner_name || t('flashcards.peer')}
                           </Text>
                         )}
                         <Text style={s.deckMeta} numberOfLines={1}>{item.subject_name}</Text>
@@ -438,7 +438,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           {groups.length === 0 ? (
             <View style={s.emptyState}>
               <Ionicons name="people-outline" size={48} color={theme.colors.text.placeholder} />
-              <Text style={s.emptyText}>{t('flashcards.noGroups', 'No perteneces a ningún grupo')}</Text>
+              <Text style={s.emptyText}>{t('flashcards.noGroups')}</Text>
             </View>
           ) : (
             <>
@@ -449,7 +449,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
               />
               {loadingGroups ? (
                 <View style={s.emptyState}>
-                  <Text style={s.emptyText}>{t('common.loading', 'Cargando...')}</Text>
+                  <Text style={s.emptyText}>{t('common.loading')}</Text>
                 </View>
               ) : (
                 <FlatList
@@ -479,7 +479,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                             <Text style={s.deckTitle} numberOfLines={1} ellipsizeMode="tail">{item.title}</Text>
                             {!isOwn && (
                               <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2 }}>
-                                {t('flashcards.sharedBy', 'por')} @{item.owner_username || t('flashcards.peer', 'compañero')}
+                                {t('flashcards.sharedBy')} @{item.owner_username || t('flashcards.peer')}
                               </Text>
                             )}
                             <Text style={s.deckMeta} numberOfLines={1}>{item.subject_name}</Text>
@@ -574,7 +574,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
             onPress={() => null}
           >
             <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text.primary }}>
-              {t('modals.shareDeck', 'Compartir mazo')}
+              {t('modals.shareDeck')}
             </Text>
             <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
               {t('modals.shareDeckDesc', {
@@ -594,7 +594,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 textAlign: 'center',
                 color: theme.colors.text.primary,
               }}
-              placeholder={t('modals.pinPlaceholder', 'PIN del usuario (Ej: ABC123)')}
+              placeholder={t('modals.pinPlaceholder')}
               placeholderTextColor={theme.colors.text.placeholder}
               value={sharePin}
               onChangeText={setSharePin}
@@ -604,7 +604,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
             {groups.length > 0 && (
               <>
                 <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center', marginTop: 4 }}>
-                  — {t('common.or', 'o')} comparte con un grupo —
+                  — {t('common.or')} comparte con un grupo —
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 36 }}>
                   {groups.map((g: any) => (
@@ -630,7 +630,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 onPress={() => { setShareDeckTarget(null); setSharePin(''); }}
               >
                 <Text style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>
-                  {t('modals.cancel', 'Cancelar')}
+                  {t('modals.cancel')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -642,7 +642,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 disabled={!sharePin.trim() || isSharing}
               >
                 <Text style={{ color: '#fff', fontWeight: '700' }}>
-                  {isSharing ? t('modals.sharing', 'Compartiendo...') : t('modals.share', 'Compartir')}
+                  {isSharing ? t('modals.sharing') : t('modals.share')}
                 </Text>
               </TouchableOpacity>
             </View>

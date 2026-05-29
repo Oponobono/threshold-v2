@@ -69,7 +69,7 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
       });
 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
-      alertRef.show({ title: t('common.success'), message: t('tasks.updateSuccess', 'Tarea actualizada'), type: 'success' });
+      alertRef.show({ title: t('common.success'), message: t('tasks.updateSuccess'), type: 'success' });
       
       await Promise.all([refreshSubjects(), refreshAssessments()]);
       handleClose();
@@ -91,7 +91,7 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
         <Pressable style={styles.sheetBackdrop} onPress={handleClose}>
           <Pressable style={styles.sheetContent} onPress={() => null}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{t('tasks.editTask', 'Editar Tarea')}</Text>
+            <Text style={styles.sheetTitle}>{t('tasks.editTask')}</Text>
             
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 10 }}>
               <Text style={styles.sheetLabel}>{t('dashboard.quickAddMenu.grade.subject')}</Text>
@@ -112,7 +112,7 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
 
               {categories.length > 0 && (
                 <>
-                  <Text style={styles.sheetLabel}>{t('categories.category', 'Categoría')}</Text>
+                  <Text style={styles.sheetLabel}>{t('categories.category')}</Text>
                   <TouchableOpacity 
                     style={styles.dropdownSelector} 
                     onPress={() => setIsCategorySelectorVisible(true)}
@@ -123,7 +123,7 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
                     ]}>
                       {selectedCategoryId 
                         ? categories.find(c => c.id === selectedCategoryId)?.name 
-                        : t('categories.none', 'Sin categoría')}
+                        : t('categories.none')}
                     </Text>
                     <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
                   </TouchableOpacity>
@@ -135,7 +135,7 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
                 value={taskName}
                 onChangeText={setTaskName}
                 style={styles.sheetInput}
-                placeholder={t('dashboard.quickAddMenu.newTaskPlaceholder', 'Nombre de la tarea')}
+                placeholder={t('dashboard.quickAddMenu.newTaskPlaceholder')}
                 placeholderTextColor={theme.colors.text.placeholder}
               />
             </ScrollView>
@@ -150,7 +150,7 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
                 disabled={isSaving}
               >
                 <Text style={styles.sheetSaveText}>
-                  {isSaving ? t('dashboard.newSubject.saving') : t('common.save', 'Guardar')}
+                  {isSaving ? t('dashboard.newSubject.saving') : t('common.save')}
                 </Text>
               </TouchableOpacity>
             </View>

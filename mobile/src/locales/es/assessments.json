@@ -7,6 +7,9 @@
   "score": "Puntaje:",
   "dueDate": "Fecha:",
   "weight": "Peso:",
+  "edit": "Editar",
+  "editGrade": "Editar Nota",
+  "updateSuccess": "Nota actualizada",
   "deleteConfirm": "¿Estás seguro de que quieres eliminar esta nota/evaluación?",
   "emptyState": "Sin evaluaciones aún"
 }

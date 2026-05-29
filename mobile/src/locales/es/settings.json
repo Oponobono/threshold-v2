@@ -26,6 +26,14 @@
     "passwordUpdateFailed": "Fallo al actualizar contraseña"
   },
   "collaboration": "Colaboración",
+  "collaborationDesc": "Conecta con tus compañeros y comparte mazos",
+  "joining": "Uniendo...",
+  "joinBtn": "Unirse",
+  "createGroupBtn": "Crear grupo",
+  "myGroups": "Mis grupos",
+  "groupPin": "PIN:",
+  "role": "Rol:",
+  "joinedOn": "Unido el",
   "joinGroup": "Unirse a un grupo",
   "sharePin": "PIN de Compartir",
   "fixed": "Fijo",
@@ -52,6 +60,7 @@
   "approvalFormat": "{{min}} – {{max}} (Aprobación: {{passing}})",
   "unlinkConfirm": "¿Desvincular {{name}}?",
   "zyrenAITitle": "Zyren — IA Académica",
+  "zyrenAIDesc": "Conoce la inteligencia artificial de Threshold, su origen y capacidades",
   "faq": [
     { "question": "¿Cómo puedo cambiar mi contraseña?", "answer": "Ve a Seguridad y cuenta > Cambiar contraseña desde la pantalla de configuración." },
     { "question": "¿Qué significa el PIN de perfil?", "answer": "Es un código único que compartes con compañeros para unirte a grupos de estudio colaborativos." },

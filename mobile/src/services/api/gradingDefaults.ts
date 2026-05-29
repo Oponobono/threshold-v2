@@ -1,11 +1,10 @@
 import type { GradingSystem } from './grading';
-import i18n from '../../locales/i18n';
 
 export const DEFAULT_GRADING_SYSTEMS: GradingSystem[] = [
   {
     id: 1,
     code: 'COL_0_5',
-    name: 'Colombia – Escala 0-5',
+    name: 'academic.scaleColombia',
     type: 'numeric',
     mode: 'continuous',
     direction: 'ascending',
@@ -23,7 +22,7 @@ export const DEFAULT_GRADING_SYSTEMS: GradingSystem[] = [
   {
     id: 2,
     code: 'ES_0_10',
-    name: i18n.t('academic.scaleSpain'),
+    name: 'academic.scaleSpain',
     type: 'numeric',
     mode: 'continuous',
     direction: 'ascending',
@@ -41,7 +40,7 @@ export const DEFAULT_GRADING_SYSTEMS: GradingSystem[] = [
   {
     id: 3,
     code: 'US_GPA_4',
-    name: 'EE.UU. – GPA 4.0',
+    name: 'academic.scaleUSGPA',
     type: 'gpa',
     mode: 'discrete',
     direction: 'ascending',
@@ -59,7 +58,7 @@ export const DEFAULT_GRADING_SYSTEMS: GradingSystem[] = [
   {
     id: 4,
     code: '0_100_PCT',
-    name: 'Porcentaje 0-100',
+    name: 'academic.scalePercent',
     type: 'numeric',
     mode: 'continuous',
     direction: 'ascending',
@@ -77,7 +76,7 @@ export const DEFAULT_GRADING_SYSTEMS: GradingSystem[] = [
   {
     id: 5,
     code: 'CL_1_7',
-    name: 'Chile – Escala 1-7',
+    name: 'academic.scaleChile',
     type: 'numeric',
     mode: 'continuous',
     direction: 'ascending',
@@ -95,7 +94,7 @@ export const DEFAULT_GRADING_SYSTEMS: GradingSystem[] = [
   {
     id: 6,
     code: 'MX_0_10',
-    name: i18n.t('academic.scaleMexico'),
+    name: 'academic.scaleMexico',
     type: 'numeric',
     mode: 'continuous',
     direction: 'ascending',
@@ -113,7 +112,7 @@ export const DEFAULT_GRADING_SYSTEMS: GradingSystem[] = [
   {
     id: 7,
     code: 'US_LETTER',
-    name: i18n.t('academic.scaleUSLetter'),
+    name: 'academic.scaleUSLetter',
     type: 'letter',
     mode: 'discrete',
     direction: 'ascending',

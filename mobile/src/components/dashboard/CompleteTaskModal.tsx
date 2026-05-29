@@ -54,7 +54,7 @@ export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalP
 
       alertRef.show({ 
         title: t('common.success'), 
-        message: t('tasks.completeSuccess', 'Tarea marcada como entregada'), 
+        message: t('tasks.completeSuccess'), 
         type: 'success' 
       });
       
@@ -81,10 +81,10 @@ export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalP
       <Pressable style={styles.sheetBackdrop} onPress={handleClose}>
         <Pressable style={styles.sheetContent} onPress={() => null}>
           <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{t('tasks.complete', 'Entregar Tarea')}</Text>
+          <Text style={styles.sheetTitle}>{t('tasks.complete')}</Text>
           
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 10 }}>
-            <Text style={styles.sheetLabel}>{t('tasks.taskName', 'Nombre de la tarea')}</Text>
+            <Text style={styles.sheetLabel}>{t('tasks.taskName')}</Text>
             <View style={[styles.sheetInput, { backgroundColor: theme.colors.border }]}>
               <Text style={{ color: theme.colors.text.primary, fontSize: 16 }}>{task?.name}</Text>
             </View>
@@ -125,7 +125,7 @@ export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalP
               disabled={isSaving}
             >
               <Text style={styles.sheetSaveText}>
-                {isSaving ? t('dashboard.newSubject.saving') : t('tasks.complete', 'Entregar')}
+                {isSaving ? t('dashboard.newSubject.saving') : t('tasks.complete')}
               </Text>
             </TouchableOpacity>
           </View>

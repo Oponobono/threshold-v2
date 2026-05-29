@@ -1,6 +1,8 @@
 {
   "success": "Success",
   "error": "Error",
+  "errorOccurred": "An error occurred",
+  "networkError": "Network error",
   "loading": "Loading...",
   "enterValidNumbers": "Enter valid numbers.",
   "enterValidScorePossible": "Enter valid score and possible values.",
@@ -9,6 +11,7 @@
   "cancel": "Cancel",
   "save": "Save",
   "saving": "Saving...",
+  "saveChanges": "Save changes",
   "delete": "Delete",
   "options": "Options",
   "share": "Share",
@@ -77,7 +80,12 @@
   "seeMore": "See more",
   "offline": "Offline",
   "offlineWithCount": "Offline ({{count}} pending)",
+  "remove": "Remove",
   "syncing": "Syncing...",
   "syncComplete": "✓ Sync complete",
-  "offlineSave": "Saved locally, will sync when connection is restored"
+  "offlineSave": "Saved locally, will sync when connection is restored",
+  "or": "or",
+  "info": "Info",
+  "tapToContinue": "Tap to continue",
+  "errorRecordingReview": "An error occurred while recording the review."
 }

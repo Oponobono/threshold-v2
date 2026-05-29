@@ -1,6 +1,8 @@
 {
   "success": "Éxito",
   "error": "Error",
+  "errorOccurred": "Ocurrió un error",
+  "networkError": "Error de red",
   "loading": "Cargando...",
   "enterValidNumbers": "Ingresa números válidos.",
   "enterValidScorePossible": "Ingresa puntaje y valor total válidos.",
@@ -9,6 +11,7 @@
   "cancel": "Cancelar",
   "save": "Guardar",
   "saving": "Guardando...",
+  "saveChanges": "Guardar cambios",
   "delete": "Eliminar",
   "options": "Opciones",
   "share": "Compartir",
@@ -77,7 +80,12 @@
   "seeMore": "Ver más",
   "offline": "Sin conexión",
   "offlineWithCount": "Sin conexión ({{count}} pendientes)",
+  "remove": "Quitar",
   "syncing": "Sincronizando...",
   "syncComplete": "✓ Sincronización completada",
-  "offlineSave": "Guardado localmente, se sincronizará cuando recupere conexión"
+  "offlineSave": "Guardado localmente, se sincronizará cuando recupere conexión",
+  "or": "o",
+  "info": "Info",
+  "tapToContinue": "Toca para continuar",
+  "errorRecordingReview": "Ocurrió un error al grabar la revisión."
 }

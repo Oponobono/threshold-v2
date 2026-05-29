@@ -61,7 +61,7 @@ export const SubjectThreshold: React.FC<SubjectThresholdProps> = ({
   const buildNeededText = () => {
     let text = finalNeededText;
     if (objectiveGrade) {
-      text += ` para alcanzar tu Threshold de ${objectiveGrade}`;
+      text += t('subjects.thresholdReach') + objectiveGrade;
     }
     return text;
   };

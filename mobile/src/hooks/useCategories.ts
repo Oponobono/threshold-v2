@@ -21,7 +21,7 @@ export function useCategories() {
   const router = useRouter();
   const params = useLocalSearchParams<{ subjectId?: string; subjectName?: string }>();
   const subjectId = params.subjectId ? Number(params.subjectId) : null;
-  const subjectName = params.subjectName ?? t('categories.screenTitle', 'Categorías');
+  const subjectName = params.subjectName ?? t('categories.screenTitle');
   const { showAlert } = useCustomAlert();
 
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
@@ -36,7 +36,7 @@ export function useCategories() {
       const data = await getCategoriesBySubject(subjectId);
       setCategories(data);
     } catch (e: any) {
-      showAlert({ title: t('common.error', 'Error'), message: e.message, type: 'error' });
+      showAlert({ title: t('common.error'), message: e.message, type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -56,20 +56,20 @@ export function useCategories() {
 
   const handleDelete = (cat: AssessmentCategory) => {
     showAlert({
-      title: t('categories.deleteTitle', 'Eliminar categoría'),
+      title: t('categories.deleteTitle'),
       message: t('categories.deleteConfirm', { name: cat.name }),
       type: 'confirm',
       buttons: [
-        { text: t('common.cancel', 'Cancelar'), style: 'cancel' as const },
+        { text: t('common.cancel'), style: 'cancel' as const },
         {
-          text: t('common.delete', 'Eliminar'),
+          text: t('common.delete'),
           style: 'destructive' as const,
           onPress: async () => {
             try {
               await deleteCategory(cat.id);
               setCategories(prev => prev.filter(c => c.id !== cat.id));
             } catch (e: any) {
-              showAlert({ title: t('common.error', 'Error'), message: e.message, type: 'error' });
+              showAlert({ title: t('common.error'), message: e.message, type: 'error' });
             }
           },
         },

@@ -3,6 +3,7 @@
   "desc": "Sincronización de calendario y herramientas externas",
   "calendarSync": "Sincronización con Google Calendar",
   "calendarSyncDesc": "Sincronización bidireccional con tu calendario académico",
+  "noAccounts": "No hay cuentas vinculadas",
   "linkedLms": "Plataformas LMS vinculadas",
   "lmsAccounts": [
     {

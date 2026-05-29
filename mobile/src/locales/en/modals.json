@@ -1,4 +1,8 @@
 {
+  "removedFromGroup": "Deck removed from group.",
+  "removeFromGroup": "Remove from group",
+  "removeFromGroupConfirm": "Do you want to remove the deck \"{{title}}\" from the group?",
+  "removedFromGroup": "Deck removed from the group.",
   "cancel": "Cancel",
   "save": "Save",
   "select": "Select",
@@ -52,5 +56,9 @@
   "today": "Today",
   "thisWeek": "This week",
   "thisMonth": "This month",
-  "apply": "Apply"
+  "apply": "Apply",
+  "qualityPerfect": "⚡ Perfect",
+  "qualityGood": "✓ Good",
+  "qualityAcceptable": "⏱ Acceptable",
+  "qualitySlow": "🐢 Slow"
 }

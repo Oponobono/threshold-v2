@@ -74,7 +74,7 @@ export default function SubjectsScreen() {
           <View style={[globalStyles.center, { paddingVertical: 40 }]}>
             <MaterialCommunityIcons name="book-open-variant" size={48} color="rgba(255,255,255,0.1)" />
             <Text style={[{ color: theme.colors.text.secondary }, globalStyles.mt16]}>
-              {t('subjects.selectSubjectToView', 'Selecciona una materia para ver detalles')}
+              {t('subjects.selectSubjectToView')}
             </Text>
           </View>
         )}
@@ -93,7 +93,7 @@ export default function SubjectsScreen() {
           onReset={g.handleReset}
           onSaveTarget={g.handleSaveTarget}
           onInfoPress={() => {
-            g.setOverlayText('**Calculadora de Salvavidas**\n\nEsta herramienta utiliza álgebra simple para responder la pregunta: *"¿Cuánto necesito sacar en el examen final para pasar?"*\n\nSi la nota necesaria es mayor a tu meta (ej. necesitas 4.15 para lograr 4.0), se pondrá en color naranja porque es un reto exigente.\n\nNo usa tendencias históricas como el simulador global, es solo un cálculo exacto.');
+            g.setOverlayText(t('subjects.calculatorOverlay'));
             g.setOverlayVisible(true);
           }}
           t={t}

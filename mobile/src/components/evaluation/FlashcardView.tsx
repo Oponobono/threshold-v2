@@ -107,13 +107,13 @@ export const FlashcardView: React.FC<Props> = ({
             ]}
             pointerEvents={activeFace === 'front' ? 'auto' : 'none'}
           >
-            <Text style={s.sideLabel}>Pregunta</Text>
+            <Text style={s.sideLabel}>{t('flashcards.question')}</Text>
             <View style={s.cardContentWrapper}>
               <MarkdownWithCode>{content.front}</MarkdownWithCode>
             </View>
             <View style={s.tapHint}>
               <Ionicons name="sync-outline" size={13} color={theme.colors.text.placeholder} />
-              <Text style={s.tapHintText}>Toca para revelar</Text>
+              <Text style={s.tapHintText}>{t('flashcards.tapToFlip')}</Text>
             </View>
             {/* TO para voltear ocupa toda la cara (renderizado al final de la tarjeta) */}
             <TouchableOpacity
@@ -132,7 +132,7 @@ export const FlashcardView: React.FC<Props> = ({
             ]}
             pointerEvents={activeFace === 'back' ? 'auto' : 'none'}
           >
-            <Text style={s.sideLabel}>Respuesta</Text>
+            <Text style={s.sideLabel}>{t('flashcards.answer')}</Text>
             <View style={s.cardContentWrapper}>
               <MarkdownWithCode>{content.back}</MarkdownWithCode>
             </View>
@@ -205,7 +205,7 @@ export const FlashcardView: React.FC<Props> = ({
             onPress={onNext}
           >
             <Ionicons name="chevron-forward-outline" size={14} color={theme.colors.text.placeholder} />
-            <Text style={{ fontSize: 12, color: theme.colors.text.placeholder }}>Toca para continuar</Text>
+            <Text style={{ fontSize: 12, color: theme.colors.text.placeholder }}>{t('flashcards.tapToContinue')}</Text>
           </TouchableOpacity>
         )}
 

@@ -1,0 +1,9 @@
+{
+  "markDelivered": "Mark as delivered",
+  "complete": "Complete Task",
+  "completeShort": "Complete",
+  "completeSuccess": "Task marked as delivered",
+  "editTask": "Edit Task",
+  "updateSuccess": "Task updated",
+  "taskName": "Task name"
+}

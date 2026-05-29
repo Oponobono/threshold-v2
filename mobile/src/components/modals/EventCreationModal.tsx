@@ -53,11 +53,11 @@ type EventType = 'exam' | 'task' | 'class' | 'other';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-const EVENT_TYPES: Record<EventType, { label: string; color: string }> = {
-  exam: { label: 'Examen', color: '#FF3B30' },
-  task: { label: 'Tarea', color: '#34C759' },
-  class: { label: 'Clase', color: '#007AFF' },
-  other: { label: 'Otro', color: '#A2845E' },
+const EVENT_TYPES: Record<EventType, { labelKey: string; color: string }> = {
+  exam: { labelKey: 'calendar.exam', color: '#FF3B30' },
+  task: { labelKey: 'calendar.task', color: '#34C759' },
+  class: { labelKey: 'calendar.class', color: '#007AFF' },
+  other: { labelKey: 'calendar.other', color: '#A2845E' },
 };
 
 const EMPTY_DATE = new Date(2000, 0, 1);
@@ -180,7 +180,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
     if (!title.trim()) {
       alertRef.show({
         title: t('common.error'),
-        message: t('calendar.eventNameRequired') || 'Ingresa el nombre del evento',
+        message: t('calendar.eventNameRequired'),
         type: 'warning',
       });
       return;
@@ -189,7 +189,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
     if (eventType !== 'other' && !selectedSubjectId) {
       alertRef.show({
         title: t('common.error'),
-        message: t('calendar.subjectRequired') || 'Selecciona una materia',
+        message: t('calendar.subjectRequired'),
         type: 'warning',
       });
       return;
@@ -256,7 +256,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
           <View style={styles.content}>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>{editingEvent ? (t('calendar.editEvent') || 'Editar Evento') : t('calendar.newEvent')}</Text>
+              <Text style={styles.headerTitle}>{editingEvent ? t('calendar.editEvent') : t('calendar.newEvent')}</Text>
               <TouchableOpacity
                 onPress={onClose}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -305,7 +305,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
                           styles.typePillText,
                           eventType === type && styles.typePillTextActive,
                         ]}>
-                          {config.label}
+                          {t(config.labelKey)}
                         </Text>
                       </TouchableOpacity>
                     )
@@ -387,7 +387,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
                 <>
                   {/* Inicio */}
                   <View style={styles.dateTimeRowContainer}>
-                    <Text style={styles.dateTimeRowLabel}>Inicio</Text>
+                    <Text style={styles.dateTimeRowLabel}>{t('calendar.startTime')}</Text>
                     <View style={styles.dateTimeButtonRow}>
                       <TouchableOpacity
                         style={[styles.dateTimeButton, { flex: 1 }]}
@@ -408,7 +408,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
 
                   {/* Fin */}
                   <View style={styles.dateTimeRowContainer}>
-                    <Text style={styles.dateTimeRowLabel}>Fin</Text>
+                    <Text style={styles.dateTimeRowLabel}>{t('calendar.endTime')}</Text>
                     <View style={styles.dateTimeButtonRow}>
                       <TouchableOpacity
                         style={[styles.dateTimeButton, { flex: 1 }]}

@@ -52,7 +52,7 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category, index, onE
           {category.weight != null && (
             <View style={styles.pill}>
               <Ionicons name="speedometer-outline" size={11} color={theme.colors.text.secondary} />
-              <Text style={styles.pillText}>{category.weight}% peso</Text>
+              <Text style={styles.pillText}>{t('categories.weightPostfix', { weight: category.weight })}</Text>
             </View>
           )}
 
@@ -60,7 +60,7 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category, index, onE
             <View style={[styles.pill, styles.pillWarning]}>
               <Ionicons name="arrow-down-circle-outline" size={11} color={theme.colors.warning} />
               <Text style={[styles.pillText, { color: theme.colors.warning }]}>
-                Elimina {dropCount} peor{dropCount > 1 ? 'es' : ''}
+                {t('categories.dropWorst', { count: dropCount })}
               </Text>
             </View>
           )}
@@ -68,7 +68,7 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category, index, onE
           {dropCount === 0 && category.weight == null && (
             <View style={styles.pill}>
               <Ionicons name="checkmark-circle-outline" size={11} color={theme.colors.text.secondary} />
-              <Text style={styles.pillText}>Sin reglas especiales</Text>
+              <Text style={styles.pillText}>{t('categories.noSpecialRules')}</Text>
             </View>
           )}
         </View>

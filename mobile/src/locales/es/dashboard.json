@@ -157,6 +157,7 @@
     "registerGrade": "Registrar calificación",
     "registerGradeSubtext": "Guarda una nueva nota en tu historial",
     "newTask": "Nueva tarea",
+    "newTaskPlaceholder": "Nombre de la tarea",
     "newTaskSubtext": "Agrega un recordatorio o pendiente",
     "takePhotoLabel": "Tomar foto",
     "takePhotoSubtext": "Captura la pizarra o tus apuntes",
@@ -232,5 +233,15 @@
   },
   "noScheduleAssigned": "Sin horario asignado – toca la grilla para añadir",
   "activeSession": "Sesión activa",
-  "takeABreak": "Tómate un descanso"
+  "takeABreak": "Tómate un descanso",
+  "urgentReviews": "Repasos Urgentes",
+  "decks": "mazos",
+  "attentionRequired": "Atención Requerida",
+  "deckToReview": "1 mazo listo para repasar.",
+  "decksToReview": "{{count}} mazos listos para repasar.",
+  "reviewBtn": "Repasar",
+  "doneForToday": "¡Terminaste por hoy!",
+  "nothingPending": "Nada pendiente",
+  "progressSaved": "Progreso guardado",
+  "errorSavingSession": "Error al guardar sesión de estudio"
 }

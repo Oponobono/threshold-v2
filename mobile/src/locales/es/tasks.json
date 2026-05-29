@@ -1,0 +1,9 @@
+{
+  "markDelivered": "Marcar como entregada",
+  "complete": "Entregar Tarea",
+  "completeShort": "Entregar",
+  "completeSuccess": "Tarea marcada como entregada",
+  "editTask": "Editar Tarea",
+  "updateSuccess": "Tarea actualizada",
+  "taskName": "Nombre de la tarea"
+}

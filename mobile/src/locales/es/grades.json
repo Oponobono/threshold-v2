@@ -36,6 +36,12 @@
   "activeTerm": "Otoño 2026",
   "scoreLabel": "Puntaje",
   "possibleLabel": "Total",
+  "generating": "Generando...",
+  "exportPdf": "Exportar PDF",
+  "projectedLabel": "Proy.",
+  "performanceOverlay": "**Rendimiento General**\n\n**Promedio del Semestre** — Es el promedio ponderado real de todas tus evaluaciones con nota, calculado según el peso porcentual de cada una.\n\n**Proyección** — Estima tu nota final si mantienes tu rendimiento actual, usando una regresión lineal sobre tus últimas calificaciones.\n\n**Delta (± pts)** — La diferencia entre tu promedio actual y la proyección. Positivo = vas mejorando; negativo = necesitas recuperar.\n\n**Gráfica de barras** — Cada barra representa una evaluación ordenada cronológicamente. La última barra (más oscura) es tu nota más reciente. La altura refleja tu calificación normalizada.",
+  "masteryOverlay": "**Dominio del Aprendizaje**\n\nEste radar ilustra tu nivel de dominio basado en el algoritmo de repetición espaciada de tus *Flashcards*.\n\nMuestra visualmente en qué áreas o mazos eres más fuerte y cuáles necesitan más atención y repaso.",
+  "projectionOverlay": "**Simulador de Proyección**\n\nEsta gráfica muestra cómo ha evolucionado tu promedio (GPA) a lo largo del tiempo basándose en el peso real de tus entregas.\n\nEl punto **\"Proy.\"** (color naranja) simula matemáticamente tu nuevo promedio ponderado en caso de obtener la nota que ingresaste.",
   "sample": {
     "a1Name": "Quiz 2 de Álgebra",
     "a1Subject": "Matemáticas",

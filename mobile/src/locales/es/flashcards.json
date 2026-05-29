@@ -61,6 +61,15 @@
   "downloadTemplate": "Descargar Plantilla",
   "decks": "Mazos",
   "editDeck": "Editar Mazo",
+  "myDecks": "Mis Mazos",
+  "groups": "Grupos",
+  "loading": "CARGANDO",
+  "cardsSuffix": " tarjetas",
+  "sharedBadge": "Compartido",
+  "byPrefix": "por @",
+  "typeFlashcard": "🃏 Flashcard",
+  "typeECAES": "🎯 ECAES",
+  "typeBoolean": "⚖️ V / F",
   "noSubject": "Sin materia",
   "deckUpdated": "Mazo actualizado",
   "deleteError": "Error al eliminar el mazo",
@@ -117,6 +126,8 @@
   "snoozeDescription": "Elige cuándo quieres que aparezca la revisión nuevamente. Esto mantiene tu momentum de aprendizaje.",
   "snoozeScience": "Los períodos están diseñados según ciencia del aprendizaje espaciado.",
   "notInAnyGroup": "No perteneces a ningún grupo",
+  "noGroups": "No perteneces a ningún grupo",
+  "removeShared": "Quitar Mazo",
   "classmate": "compañero",
   "snooze": {
     "in30min": "En 30 min",
@@ -203,5 +214,14 @@
     "gitExplanation": "`git push` envía los commits locales al repositorio remoto.",
     "fileName": "plantilla_mazo_threshold.json",
     "dialogTitle": "Compartir plantilla de mazo"
-  }
+  },
+  "shareDeck": "Compartir mazo",
+  "shareDeckDesc": "Comparte \"{{title}}\" con un usuario o un grupo",
+  "sharePinPlaceholder": "PIN del usuario (Ej: ABC123)",
+  "shareWithGroup": "— o comparte con un grupo —",
+  "sharing": "Compartiendo...",
+  "question": "Pregunta",
+  "answer": "Respuesta",
+  "tapToContinue": "Toca para continuar",
+  "itemsReviewed": "{{count}} ítem{{plural}} revisados"
 }

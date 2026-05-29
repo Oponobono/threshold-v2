@@ -1,6 +1,9 @@
 {
   "title": "Notifications",
   "desc": "Stay informed about upcoming deadlines",
+  "weeklyDigestConfig": "Configure weekly digest",
+  "weeklyDay": "Day of the week",
+  "weeklyTime": "Time of day",
   "deadlineAlerts": "Upcoming deadline alerts",
   "deadlineAlertsDesc": "Get push notifications for due dates",
   "weeklyDigest": "Weekly digest",

@@ -82,7 +82,7 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
         {isShared && (
           <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2, marginTop: 2 }}>
             <Ionicons name="people" size={10} color="#388E3C" />
-            {' '}{t('modals.shared', 'Compartido')} {t('flashcards.sharedBy', 'por')} @{(deck as any).owner_username || (deck as any).owner_name || t('flashcards.peer', 'compañero')}
+            {' '}{t('modals.shared')} {t('flashcards.sharedBy')} @{(deck as any).owner_username || (deck as any).owner_name || t('flashcards.peer')}
           </Text>
         )}
         <Text
@@ -93,7 +93,7 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
           }}
           numberOfLines={1}
         >
-          {(deck as any).subject_name || t('flashcards.noSubject', 'Sin materia')}
+          {(deck as any).subject_name || t('flashcards.noSubject')}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
           <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>

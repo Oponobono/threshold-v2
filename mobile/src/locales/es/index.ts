@@ -8,6 +8,7 @@ import calendar from './calendar.json';
 import common from './common.json';
 import dashboard from './dashboard.json';
 import documents from './documents.json';
+import evaluation from './evaluation.json';
 import features from './features.json';
 import flashcards from './flashcards.json';
 import gallery from './gallery.json';
@@ -37,6 +38,7 @@ const es = {
   common,
   dashboard,
   documents,
+  evaluation,
   features,
   flashcards,
   gallery,

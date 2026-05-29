@@ -41,21 +41,21 @@ export function useFlashcards() {
 
   const handleRemoveFromGroup = useCallback(async (deck: FlashcardDeck, groupPin: string) => {
     showAlert({
-      title: t('modals.removeFromGroup', 'Quitar del grupo'),
-      message: t('modals.removeFromGroupConfirm', { title: deck.title, defaultValue: `¿Deseas quitar el mazo "${deck.title}" del grupo?` }),
+      title: t('modals.removeFromGroup'),
+      message: t('modals.removeFromGroupConfirm', { title: deck.title }),
       type: 'confirm',
       buttons: [
-        { text: t('common.cancel', 'Cancelar'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.delete', 'Quitar'),
+          text: t('common.remove'),
           style: 'destructive',
           onPress: async () => {
             try {
               await removeDeckFromGroup(deck.id, groupPin);
               setGroupDecks((prev: any[]) => prev.filter((d: any) => d.id !== deck.id));
-              showAlert({ title: t('common.success', 'Éxito'), message: 'Mazo quitado del grupo.', type: 'success' });
+              showAlert({ title: t('common.success'), message: t('modals.removedFromGroup'), type: 'success' });
             } catch (e: any) {
-              showAlert({ title: t('common.error', 'Error'), message: e.message, type: 'error' });
+              showAlert({ title: t('common.error'), message: e.message, type: 'error' });
             }
           },
         },
@@ -69,11 +69,11 @@ export function useFlashcards() {
     setIsSharing(true);
     try {
       const result = await shareDeck(shareDeckTarget.id, groupPinId ? { groupPinId } : { recipientPin: sharePin });
-      showAlert({ title: t('common.success', '¡Éxito!'), message: result.message, type: 'success' });
+      showAlert({ title: t('common.success'), message: result.message, type: 'success' });
       setShareDeckTarget(null);
       setSharePin('');
     } catch (error: any) {
-      showAlert({ title: t('common.error', 'Error'), message: error.message, type: 'error' });
+      showAlert({ title: t('common.error'), message: error.message, type: 'error' });
     } finally {
       setIsSharing(false);
     }
@@ -131,7 +131,7 @@ export function useFlashcards() {
       setStudyDeckCards(Array.isArray(cards) ? cards : []);
       setShowStudyModal(true);
     } catch (e: any) {
-      showAlert({ title: t('common.error', 'Error'), message: e.message || 'Error al cargar las tarjetas', type: 'error' });
+      showAlert({ title: t('common.error'), message: e.message || t('flashcards.loadError'), type: 'error' });
     }
   }, [t, showAlert]);
 
@@ -142,13 +142,13 @@ export function useFlashcards() {
 
   const handleDeleteDeck = useCallback((deck: FlashcardDeck) => {
     showAlert({
-      title: t('modals.deleteDeck', 'Eliminar Mazo'),
-      message: t('modals.deleteDeckConfirm', { title: deck.title, defaultValue: `¿Estás seguro de que deseas eliminar el mazo "${deck.title}"? Esta acción no se puede deshacer.` }),
+      title: t('modals.deleteDeck'),
+      message: t('modals.deleteDeckConfirm', { title: deck.title }),
       type: 'confirm',
       buttons: [
-        { text: t('common.cancel', 'Cancelar'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.delete', 'Eliminar'),
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -159,7 +159,7 @@ export function useFlashcards() {
                 await refreshPredictions(userId);
               }
             } catch (e: any) {
-              showAlert({ title: t('common.error', 'Error'), message: e.message || 'Error al eliminar el mazo', type: 'error' });
+              showAlert({ title: t('common.error'), message: e.message || t('flashcards.deckDeleteError'), type: 'error' });
             }
           },
         },

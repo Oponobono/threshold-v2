@@ -66,7 +66,7 @@ export const ExplanationOverlay: React.FC<Props> = ({
               </MarkdownWithCode>
             </ScrollView>
             <TouchableOpacity onPress={onDismiss} activeOpacity={0.7} style={s.tapHint}>
-              <Text style={s.tapHintText}>Toca para continuar</Text>
+              <Text style={s.tapHintText}>{t('common.tapToContinue')}</Text>
               <Ionicons name="chevron-forward" size={10} color={theme.colors.text.placeholder} />
             </TouchableOpacity>
           </View>

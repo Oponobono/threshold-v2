@@ -264,12 +264,12 @@ export default function SettingsScreen() {
                   style={{ flexDirection: 'row', alignItems: 'center' }}
                   onPress={async () => {
                     await Clipboard.setStringAsync(profile.share_pin!);
-                    alertRef.show({ title: t('common.success'), message: 'PIN copiado al portapapeles', type: 'success' });
+                    alertRef.show({ title: t('common.success'), message: t('common.copiedToClipboard'), type: 'success' });
                   }}
                 >
                   <MaterialCommunityIcons name="link-variant" size={14} color={theme.colors.primary} />
                   <Text style={[styles.profileEmail, { color: theme.colors.primary, marginLeft: 4, fontWeight: '600' }]}>
-                    PIN: {profile.share_pin}
+                    {t('settings.groupPin')} {profile.share_pin}
                   </Text>
                   <Ionicons name="copy-outline" size={12} color={theme.colors.primary} style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
@@ -358,7 +358,7 @@ export default function SettingsScreen() {
           ) : gradingSystems.map(system => (
             <View key={system.id} style={styles.scaleRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.settingTitle}>{system.name}</Text>
+                <Text style={styles.settingTitle}>{system.is_custom ? system.name : t(system.name)}</Text>
                 <Text style={styles.settingDesc}>{t('settings.approvalFormat', { min: system.min_value, max: system.max_value, passing: system.passing_value })}</Text>
               </View>
               {selectedSystemId === system.id ? (
@@ -458,8 +458,8 @@ export default function SettingsScreen() {
 
           {/* ── Toggle principal ── */}
           <SettingRow
-            title={t('backup.enableCloud', 'Backup en la nube')}
-            desc={t('backup.enableCloudDesc', 'Guarda copias de tus archivos en Uploadthing')}
+            title={t('backup.enableCloud')}
+            desc={t('backup.enableCloudDesc')}
             right={
               <Switch
                 value={backupPrefs.enabled}
@@ -474,8 +474,8 @@ export default function SettingsScreen() {
             <>
               {/* ── Auto-upload toggle ── */}
               <SettingRow
-                title={t('backup.autoUpload', 'Auto-subida al guardar')}
-                desc={t('backup.autoUploadDesc', 'Sube archivos nuevos automáticamente al guardarlos')}
+                title={t('backup.autoUpload')}
+                desc={t('backup.autoUploadDesc')}
                 right={
                   <Switch
                     value={backupPrefs.autoUpload}
@@ -488,8 +488,8 @@ export default function SettingsScreen() {
 
               {/* ── Auto-download toggle ── */}
               <SettingRow
-                title={t('backup.autoDownload', 'Auto-descarga al iniciar sesión')}
-                desc={t('backup.autoDownloadDesc', 'Descarga tus archivos al entrar en un nuevo dispositivo')}
+                title={t('backup.autoDownload')}
+                desc={t('backup.autoDownloadDesc')}
                 right={
                   <Switch
                     value={backupPrefs.autoDownload}
@@ -502,8 +502,8 @@ export default function SettingsScreen() {
 
               {/* ── Toggles por tipo ── */}
               <SettingRow
-                title={t('backup.photos', 'Fotos de galería')}
-                desc={`${backupStats.photos.backed}/${backupStats.photos.total} en la nube`}
+                title={t('backup.photos')}
+                desc={t('backup.inCloud', { backed: backupStats.photos.backed, total: backupStats.photos.total })}
                 right={
                   <Switch
                     value={backupPrefs.includePhotos}
@@ -514,8 +514,8 @@ export default function SettingsScreen() {
                 }
               />
               <SettingRow
-                title={t('backup.audio', 'Grabaciones de audio')}
-                desc={`${backupStats.audio.backed}/${backupStats.audio.total} en la nube`}
+                title={t('backup.audio')}
+                desc={t('backup.inCloud', { backed: backupStats.audio.backed, total: backupStats.audio.total })}
                 right={
                   <Switch
                     value={backupPrefs.includeAudio}
@@ -526,8 +526,8 @@ export default function SettingsScreen() {
                 }
               />
               <SettingRow
-                title={t('backup.docs', 'Documentos')}
-                desc={`${backupStats.docs.backed}/${backupStats.docs.total} en la nube`}
+                title={t('backup.docs')}
+                desc={t('backup.inCloud', { backed: backupStats.docs.backed, total: backupStats.docs.total })}
                 right={
                   <Switch
                     value={backupPrefs.includeDocs}
@@ -538,8 +538,8 @@ export default function SettingsScreen() {
                 }
               />
               <SettingRow
-                title={t('backup.transcripts', 'Transcripciones')}
-                desc={`${backupStats.transcripts.backed}/${backupStats.transcripts.total} en la nube`}
+                title={t('backup.transcripts')}
+                desc={t('backup.inCloud', { backed: backupStats.transcripts.backed, total: backupStats.transcripts.total })}
                 right={
                   <Switch
                     value={backupPrefs.includeTranscripts}
@@ -555,8 +555,8 @@ export default function SettingsScreen() {
                 <View style={{ paddingVertical: 12, marginTop: 8 }}>
                   <Text style={[styles.settingDesc, { fontWeight: '600', textAlign: 'center' }]}>
                     {t('backup.itemsBackedUp', { count: backedCount, total: totalCount })}
-                    {pendingCount > 0 && ` • ${pendingCount} pendiente(s)`}
-                    {cloudItemsCount > 0 && ` • ${cloudItemsCount} en la nube`}
+                    {pendingCount > 0 && t('backup.pendingCount', { count: pendingCount })}
+                    {cloudItemsCount > 0 && t('backup.cloudCount', { count: cloudItemsCount })}
                   </Text>
                 </View>
               )}
@@ -567,7 +567,7 @@ export default function SettingsScreen() {
                 <View style={[styles.actionGridColumn, styles.actionGridColumnLeft]}>
                   <Text style={styles.actionLabel} numberOfLines={2}>
                     {isUploading
-                      ? `↑ Subiendo ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? 0}...`
+                      ? t('backup.uploadingProgress', { done: uploadProgress?.done ?? 0, total: uploadProgress?.total ?? 0 })
                       : t('backup.lastUpload', { date: lastUploadLabel })}
                   </Text>
                   <TouchableOpacity
@@ -582,8 +582,8 @@ export default function SettingsScreen() {
                     )}
                     <Text style={styles.darkPillText}>
                       {isUploading
-                        ? t('backup.backingUp', 'Subiendo...')
-                        : t('backup.backupNow', 'Respaldar')}
+                        ? t('backup.backingUp')
+                        : t('backup.backupNow')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -592,7 +592,7 @@ export default function SettingsScreen() {
                 <View style={[styles.actionGridColumn, styles.actionGridColumnRight]}>
                   <Text style={styles.actionLabel} numberOfLines={2}>
                     {isDownloading
-                      ? `↓ Descargando ${downloadProgress?.done ?? 0}/${downloadProgress?.total ?? 0}...`
+                      ? t('backup.downloadingProgress', { done: downloadProgress?.done ?? 0, total: downloadProgress?.total ?? 0 })
                       : t('backup.lastDownload', { date: lastDownloadLabel })}
                   </Text>
                   <TouchableOpacity
@@ -607,8 +607,8 @@ export default function SettingsScreen() {
                     )}
                     <Text style={styles.darkPillText}>
                       {isDownloading
-                        ? t('backup.downloading', 'Descargando...')
-                        : t('backup.downloadNow', 'Descargar')}
+                        ? t('backup.downloading')
+                        : t('backup.downloadNow')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -618,7 +618,7 @@ export default function SettingsScreen() {
 
           {!backupPrefs.enabled && (
             <Text style={[styles.settingDesc, { marginTop: 8, fontStyle: 'italic' }]}>
-              {t('backup.disabled', 'Activa el backup para gestionar tus archivos en la nube.')}
+              {t('backup.disabled')}
             </Text>
           )}
         </View>
@@ -669,7 +669,7 @@ export default function SettingsScreen() {
           <Text style={styles.subSectionTitle}>{t('integrations.linkedLms')}</Text>
           {lmsAccounts.length === 0 && (
             <Text style={[styles.settingDesc, { fontStyle: 'italic', marginBottom: 8 }]}>
-              {t('integrations.noAccounts', 'No hay cuentas vinculadas')}
+              {t('integrations.noAccounts')}
             </Text>
           )}
           {lmsAccounts.map((lms, i) => (
@@ -706,7 +706,7 @@ export default function SettingsScreen() {
         {/* ── COLLABORATION ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('settings.collaboration')} desc={t('settings.collaborationDesc', 'Conecta con tus compañeros y comparte mazos')} icon="people-outline" />
+          <SectionHeader title={t('settings.collaboration')} desc={t('settings.collaborationDesc')} icon="people-outline" />
           
           <Text style={styles.subSectionTitle}>{t('settings.joinGroup')}</Text>
           <View style={[styles.settingRow, { alignItems: 'center' }]}>
@@ -725,24 +725,24 @@ export default function SettingsScreen() {
               onPress={handleJoinGroup}
               disabled={isJoiningGroup}
             >
-              <Text style={styles.darkPillText}>{isJoiningGroup ? t('settings.joining', 'Uniendo...') : t('settings.joinBtn', 'Unirse')}</Text>
+              <Text style={styles.darkPillText}>{isJoiningGroup ? t('settings.joining') : t('settings.joinBtn')}</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity style={[styles.darkPill, { alignSelf: 'flex-start', marginTop: 12 }]} onPress={() => setIsCreateGroupVisible(true)}>
             <Ionicons name="add-circle-outline" size={16} color={theme.colors.text.inverse} style={{ marginRight: 4 }} />
-            <Text style={styles.darkPillText}>{t('settings.createGroupBtn', 'Crear grupo')}</Text>
+            <Text style={styles.darkPillText}>{t('settings.createGroupBtn')}</Text>
           </TouchableOpacity>
 
           {userGroups.length > 0 && (
             <>
-              <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>{t('settings.myGroups', 'Mis grupos')} ({userGroups.length})</Text>
+              <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>{t('settings.myGroups')} ({userGroups.length})</Text>
               {userGroups.map((group, i) => (
                 <View key={i} style={styles.lmsRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.settingTitle}>{group.name || group.group_pin_id}</Text>
                     <Text style={styles.settingDesc}>
-                      {t('settings.groupPin', 'PIN:')} {group.group_pin_id} • {t('settings.role', 'Rol:')} {group.role} • {t('settings.joinedOn', 'Unido el')} {new Date(group.joined_at!).toLocaleDateString()}
+                      {t('settings.groupPin')} {group.group_pin_id} • {t('settings.role')} {group.role} • {t('settings.joinedOn')} {new Date(group.joined_at!).toLocaleDateString()}
                     </Text>
                   </View>
                   <TouchableOpacity 
@@ -813,11 +813,11 @@ export default function SettingsScreen() {
           />
           <SettingRow
             title={t('settings.zyrenAITitle')}
-            desc="Conoce la inteligencia artificial de Threshold, su origen y capacidades"
+            desc={t('settings.zyrenAIDesc')}
             right={
               <TouchableOpacity style={styles.darkPill} onPress={() => setIsZyrenInfoVisible(true)}>
                 <Ionicons name="sparkles" size={14} color="#fff" style={{ marginRight: 4 }} />
-                <Text style={styles.darkPillText}>Info</Text>
+                <Text style={styles.darkPillText}>{t('common.info')}</Text>
               </TouchableOpacity>
             }
           />

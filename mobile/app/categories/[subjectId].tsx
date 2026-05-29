@@ -43,7 +43,7 @@ export default function CategoriesScreen() {
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>{subjectName}</Text>
-            <Text style={styles.headerSub}>{t('categories.screenSubtitle', 'Categorías de evaluación')}</Text>
+            <Text style={styles.headerSub}>{t('categories.screenSubtitle')}</Text>
           </View>
           <TouchableOpacity style={styles.headerAddBtn} onPress={handleAdd}>
             <Ionicons name="add" size={20} color={theme.colors.text.white} />
@@ -75,10 +75,10 @@ export default function CategoriesScreen() {
               <View style={styles.listWrap}>
                 <View style={styles.listHeader}>
                   <Text style={styles.listHeaderLabel}>
-                    {t('categories.totalLabel', 'CATEGORÍAS')}
+                    {t('categories.totalLabel')}
                   </Text>
                   <Text style={styles.listHeaderChip}>
-                    {categories.length} {categories.length === 1 ? 'grupo' : 'grupos'}
+                    {t('categories.groups', { count: categories.length })}
                   </Text>
                 </View>
 
@@ -98,7 +98,7 @@ export default function CategoriesScreen() {
 
                 <TouchableOpacity style={styles.addMoreBtn} onPress={handleAdd}>
                   <Ionicons name="add-circle-outline" size={18} color={theme.colors.text.secondary} />
-                  <Text style={styles.addMoreText}>{t('categories.addMore', 'Agregar otra categoría')}</Text>
+                  <Text style={styles.addMoreText}>{t('categories.addMore')}</Text>
                 </TouchableOpacity>
               </View>
             )}

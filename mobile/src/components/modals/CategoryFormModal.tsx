@@ -154,11 +154,11 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
               <View>
                 <Text style={styles.sheetTitle}>
                   {editing
-                    ? t('categories.editTitle', 'Editar categoría')
-                    : t('categories.createTitle', 'Nueva categoría')}
+                    ? t('categories.editTitle')
+                    : t('categories.createTitle')}
                 </Text>
                 <Text style={styles.sheetSubtitle}>
-                  {t('categories.formSubtitle', 'Define el nombre, peso y reglas de esta categoría.')}
+                  {t('categories.formSubtitle')}
                 </Text>
               </View>
               <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
@@ -169,14 +169,14 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             {/* ─── Name field ─────────────────────────────────────────────────── */}
             <FieldSection
               icon="pricetag-outline"
-              label={t('categories.nameLabel', 'Nombre')}
-              hint={t('categories.nameHint', 'Ej: Exámenes, Tareas, Proyectos, Quizzes')}
+              label={t('categories.nameLabel')}
+              hint={t('categories.nameHint')}
             >
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder={t('categories.namePlaceholder', 'Ej. Exámenes, Tareas...')}
+                placeholder={t('categories.namePlaceholder')}
                 placeholderTextColor={theme.colors.text.placeholder}
                 autoCapitalize="words"
                 returnKeyType="next"
@@ -187,8 +187,8 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             {/* ─── Weight toggle + field ───────────────────────────────────────── */}
             <FieldSection
               icon="speedometer-outline"
-              label={t('categories.weightLabel', 'Peso porcentual')}
-              hint={t('categories.weightHint', 'Si esta categoría representa un % específico del promedio final.')}
+              label={t('categories.weightLabel')}
+              hint={t('categories.weightHint')}
               right={
                 <Switch
                   value={hasWeight}
@@ -224,8 +224,8 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             {/* ─── Drop lowest toggle + stepper ────────────────────────────────── */}
             <FieldSection
               icon="arrow-down-circle-outline"
-              label={t('categories.dropLowestLabel', 'Eliminar la peor nota')}
-              hint={t('categories.dropLowestHint', 'Descarta las N notas más bajas de esta categoría antes de calcular el promedio.')}
+              label={t('categories.dropLowestLabel')}
+              hint={t('categories.dropLowestHint')}
               right={
                 <Switch
                   value={dropLowest}
@@ -238,7 +238,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
               {dropLowest && (
                 <View style={styles.stepperRow}>
                   <Text style={styles.stepperLabel}>
-                    {t('categories.dropCountLabel', 'Cantidad a eliminar:')}
+                    {t('categories.dropCountLabel')}
                   </Text>
                   <View style={styles.stepper}>
                     <TouchableOpacity
@@ -271,11 +271,11 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 color={theme.colors.text.white}
               />
               <Text style={styles.saveBtnText}>
-                {isSaving
-                  ? t('common.saving', 'Guardando…')
-                  : editing
-                    ? t('common.saveChanges', 'Guardar cambios')
-                    : t('categories.create', 'Crear categoría')}
+{isSaving
+                    ? t('common.saving')
+                    : editing
+                      ? t('common.saveChanges')
+                      : t('categories.create')}
               </Text>
             </TouchableOpacity>
           </ScrollView>

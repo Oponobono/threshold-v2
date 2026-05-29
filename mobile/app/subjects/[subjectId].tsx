@@ -160,7 +160,7 @@ export default function SubjectDetailScreen() {
             delta={delta}
             deliveredText={deliveredText}
             onPressInfo={() => {
-              setOverlayText('**Promedio Ponderado**\n\nEste número no es un promedio simple. Es el resultado exacto de calcular cada una de tus notas multiplicada por su peso o porcentaje real.\n\n**Nota Proyectada & Delta**\n\nUtiliza nuestro motor matemático (Media Móvil Exponencial) para predecir cuál será tu nota final al terminar el semestre si mantienes tu tendencia actual. El **Delta** (ej. +0.05 pts) indica si tu rendimiento está subiendo o bajando en comparación con tu promedio actual.\n\n**Tareas Completadas**\n\nMuestra el número de actividades y evaluaciones que ya has entregado frente al total planificado de esta materia en específico.');
+              setOverlayText(t('subjects.subjectStatsOverlay'));
               setOverlayVisible(true);
             }}
           />
@@ -172,7 +172,7 @@ export default function SubjectDetailScreen() {
             status={thresholdStatus}
             objectiveGrade={selectedSubject?.target_grade}
             onPressInfo={() => {
-              setOverlayText('**Threshold**\n\nEsta es la sección más importante de la aplicación. Aquí se muestra el porcentaje de tu materia que ya has "asegurado" con tus calificaciones actuales.\n\n**Tu Porcentaje Asegurado**\nEs el porcentaje de la nota final que ya está matemáticamente garantizado por las evaluaciones que has completado.\n\n**Tu Objetivo**\nMuestra exactamente qué nota necesitas en el porcentaje restante de la materia para alcanzar tu Threshold (nota objetivo). El cálculo considera todos tus pesos actuales y es 100% preciso.\n\n**Barra de Progreso**\nVisualiza visualmente cuánto falta para llegar al 100% y completar la materia.');
+              setOverlayText(t('subjects.thresholdOverlay'));
               setOverlayVisible(true);
             }}
           />

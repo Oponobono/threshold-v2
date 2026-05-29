@@ -61,6 +61,15 @@
   "downloadTemplate": "Download Template",
   "decks": "Decks",
   "editDeck": "Edit Deck",
+  "myDecks": "My Decks",
+  "groups": "Groups",
+  "loading": "LOADING",
+  "cardsSuffix": " cards",
+  "sharedBadge": "Shared",
+  "byPrefix": "by @",
+  "typeFlashcard": "🃏 Flashcard",
+  "typeECAES": "🎯 ECAES",
+  "typeBoolean": "⚖️ T / F",
   "noSubject": "No subject",
   "deckUpdated": "Deck updated",
   "deleteError": "Error deleting deck",
@@ -117,6 +126,8 @@
   "snoozeDescription": "Choose when you want the review to reappear. This keeps your learning momentum going.",
   "snoozeScience": "Periods are designed based on spaced learning science.",
   "notInAnyGroup": "Not in any group",
+  "noGroups": "You don't belong to any group",
+  "removeShared": "Remove Deck",
   "classmate": "classmate",
   "snooze": {
     "in30min": "In 30 min",
@@ -203,5 +214,14 @@
     "gitExplanation": "`git push` sends local commits to the remote repository.",
     "fileName": "threshold_deck_template.json",
     "dialogTitle": "Share deck template"
-  }
+  },
+  "shareDeck": "Share Deck",
+  "shareDeckDesc": "Share \"{{title}}\" with a user or group",
+  "sharePinPlaceholder": "User PIN (e.g. ABC123)",
+  "shareWithGroup": "— or share with a group —",
+  "sharing": "Sharing...",
+  "question": "Question",
+  "answer": "Answer",
+  "tapToContinue": "Tap to continue",
+  "itemsReviewed": "{{count}} item{{plural}} reviewed"
 }

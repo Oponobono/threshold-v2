@@ -3,6 +3,7 @@
   "desc": "Calendar sync, LMS links and external tools",
   "calendarSync": "Calendar Sync (Google Calendar)",
   "calendarSyncDesc": "Two-way sync with your academic calendar",
+  "noAccounts": "No linked accounts",
   "linkedLms": "Linked LMS Accounts",
   "lmsAccounts": [
     {

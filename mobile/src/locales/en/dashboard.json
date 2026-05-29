@@ -157,6 +157,7 @@
     "registerGrade": "Register Grade",
     "registerGradeSubtext": "Record a new grade in your history",
     "newTask": "New Task",
+    "newTaskPlaceholder": "Task name",
     "newTaskSubtext": "Add a reminder or pending item",
     "takePhotoLabel": "Take Photo",
     "takePhotoSubtext": "Capture whiteboard or your notes",
@@ -232,5 +233,15 @@
   },
   "noScheduleAssigned": "No schedule assigned â€” tap the grid to add",
   "activeSession": "Active session",
-  "takeABreak": "Take a break"
+  "takeABreak": "Take a break",
+  "urgentReviews": "Urgent Reviews",
+  "decks": "decks",
+  "attentionRequired": "Attention Required",
+  "deckToReview": "1 deck ready for review.",
+  "decksToReview": "{{count}} decks ready for review.",
+  "reviewBtn": "Review",
+  "doneForToday": "You're done for today!",
+  "nothingPending": "Nothing pending",
+  "progressSaved": "Progress saved",
+  "errorSavingSession": "Error saving study session"
 }

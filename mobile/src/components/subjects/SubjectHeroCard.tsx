@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
 import { subjectDetailStyles as styles } from '../../styles/SubjectDetail.styles';
@@ -50,6 +51,7 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
   onDelete,
   onPress,
 }) => {
+  const { t } = useTranslation();
   const Container = onPress ? TouchableOpacity : View;
   return (
     <Container 
@@ -82,7 +84,7 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ fontSize: 8, fontWeight: '800', color: theme.colors.text.secondary, textTransform: 'uppercase', marginBottom: -2 }}>
-              Promedio
+              {t('subjects.average')}
             </Text>
             <Text style={{ fontSize: 18, fontWeight: '900', color: displayColor || theme.colors.text.primary }}>
               {avgScore?.toFixed(1) || '0.0'}
@@ -121,7 +123,7 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={[styles.heroMeta, { fontSize: 10 }]}>{meta}</Text>
           <Text style={{ fontSize: 9, fontWeight: '800', color: theme.colors.text.secondary }}>
-            {Math.round(progress || 0)}% COMPLETADO
+            {Math.round(progress || 0)}% {t('subjects.completedBadge')}
           </Text>
         </View>
       </View>

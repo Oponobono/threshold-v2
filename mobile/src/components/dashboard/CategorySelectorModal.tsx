@@ -32,9 +32,9 @@ export const CategorySelectorModal = ({
     >
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
         <View style={[styles.sheetContent, { maxHeight: '60%' }]}>
-          <Text style={[styles.sheetTitle, { marginBottom: 16 }]}>{t('categories.selectCategory', 'Seleccionar categoría')}</Text>
+          <Text style={[styles.sheetTitle, { marginBottom: 16 }]}>{t('categories.selectCategory')}</Text>
           <FlatList
-            data={[{ id: null, name: t('categories.none', 'Sin categoría') } as any, ...categories]}
+            data={[{ id: null, name: t('categories.none') } as any, ...categories]}
             keyExtractor={(item, index) => item.id ? item.id.toString() : `none-${index}`}
             renderItem={({ item }) => (
               <TouchableOpacity 

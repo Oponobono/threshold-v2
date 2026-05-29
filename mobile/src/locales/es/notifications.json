@@ -1,6 +1,9 @@
 {
   "title": "Notificaciones",
   "desc": "Mantente al día con tus fechas importantes",
+  "weeklyDigestConfig": "Configurar resumen semanal",
+  "weeklyDay": "Día de la semana",
+  "weeklyTime": "Hora del día",
   "deadlineAlerts": "Alertas de fechas límite",
   "deadlineAlertsDesc": "Notificaciones push para entregas",
   "weeklyDigest": "Resumen semanal",

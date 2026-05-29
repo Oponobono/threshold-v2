@@ -145,7 +145,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
                     ]}>
                       {selectedCategoryId 
                         ? categories.find(c => c.id === selectedCategoryId)?.name 
-                        : t('categories.none', 'Sin categoría')}
+                        : t('categories.none')}
                     </Text>
                     <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
                   </TouchableOpacity>

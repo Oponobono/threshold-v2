@@ -16,13 +16,13 @@ export const EmptyCategories: React.FC<EmptyCategoriesProps> = ({ onAdd }) => {
       <View style={styles.emptyIconCircle}>
         <Ionicons name="layers-outline" size={28} color={theme.colors.text.secondary} />
       </View>
-      <Text style={styles.emptyTitle}>{t('categories.emptyTitle', 'Sin categorías')}</Text>
+      <Text style={styles.emptyTitle}>{t('categories.emptyTitle')}</Text>
       <Text style={styles.emptySubtitle}>
         {t('categories.emptyHelp')}
       </Text>
       <TouchableOpacity style={styles.emptyAction} onPress={onAdd}>
         <Ionicons name="add" size={16} color={theme.colors.text.white} />
-        <Text style={styles.emptyActionText}>{t('categories.addFirst', 'Crear primera categoría')}</Text>
+        <Text style={styles.emptyActionText}>{t('categories.addFirst')}</Text>
       </TouchableOpacity>
     </View>
   );

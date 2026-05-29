@@ -96,9 +96,11 @@
   "rescanErrorMessage": "Could not extract text from the selected documents. Check that the files are not corrupted.",
   "noContextTitle": "No context",
   "noContextMessage": "Select at least one file with processed text to generate flashcards.",
+  "calculatorOverlay": "**Grade Simulator**\n\nThis tool uses simple algebra to answer the question: *\"What do I need to score on the final exam to pass?\"*\n\nIf the required grade is higher than your target (e.g., you need 4.15 to achieve 4.0), it will appear in orange because it is a demanding challenge.\n\nIt does not use historical trends like the global simulator, it is just an exact calculation.",
   "targetSaved": "Grade target saved successfully.",
   "statusImpossible": "Impossible",
   "registered": "grades recorded",
+  "noAssessments": "No assessments",
   "selectSubjectToView": "Select a subject to view details",
   "selectSubjectFirst": "Select a subject first",
   "documentUploaded": "Document uploaded",
@@ -120,5 +122,11 @@
   "emptySubtitleNoCount": "I have access to your materials from {{subject}}.",
   "chatPlaceholder": "Ask a question...",
   "generateStudyMaterial": "🎓 Generate study material",
-  "generateWithZyren": "Generate with Zyren ✨"
+  "generateWithZyren": "Generate with Zyren ✨",
+  "average": "Average",
+  "completedBadge": "COMPLETED",
+  "completedTasks": "COMPLETED",
+  "thresholdReach": " to reach your Threshold of ",
+  "subjectStatsOverlay": "**Weighted Average**\n\nThis number is not a simple average. It is the exact result of calculating each of your grades multiplied by their actual weight or percentage.\n\n**Projected Grade & Delta**\n\nUses our mathematical engine (Exponential Moving Average) to predict what your final grade will be at the end of the semester if you maintain your current trend. The **Delta** (e.g. +0.05 pts) indicates whether your performance is rising or falling compared to your current average.\n\n**Completed Tasks**\n\nShows the number of activities and assessments you have submitted versus the total planned for this specific subject.",
+  "thresholdOverlay": "**Threshold**\n\nThis is the most important section of the application. It shows the percentage of your subject that you have already \"secured\" with your current grades.\n\n**Your Secured Percentage**\nThe percentage of the final grade that is already mathematically guaranteed by the assessments you have completed.\n\n**Your Objective**\nShows exactly what grade you need in the remaining percentage of the subject to reach your Threshold (target grade). The calculation considers all your current weights and is 100% accurate.\n\n**Progress Bar**\nVisually shows how much is left to reach 100% and complete the subject."
 }

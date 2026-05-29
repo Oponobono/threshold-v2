@@ -26,6 +26,14 @@
     "passwordUpdateFailed": "Failed to update password"
   },
   "collaboration": "Collaboration",
+  "collaborationDesc": "Connect with classmates and share decks",
+  "joining": "Joining...",
+  "joinBtn": "Join",
+  "createGroupBtn": "Create group",
+  "myGroups": "My groups",
+  "groupPin": "PIN:",
+  "role": "Role:",
+  "joinedOn": "Joined on",
   "joinGroup": "Join a group",
   "sharePin": "Share PIN",
   "fixed": "Fixed",
@@ -52,6 +60,7 @@
   "approvalFormat": "{{min}} – {{max}} (Approval: {{passing}})",
   "unlinkConfirm": "Unlink {{name}}?",
   "zyrenAITitle": "Zyren — Academic AI",
+  "zyrenAIDesc": "Learn about Threshold's artificial intelligence, its origin and capabilities",
   "faq": [
     { "question": "How do I change my password?", "answer": "Go to Security & Account > Change password from the settings screen." },
     { "question": "What is the profile PIN for?", "answer": "It is a unique code you share with classmates to join collaborative study groups." },

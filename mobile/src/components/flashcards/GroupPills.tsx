@@ -37,7 +37,7 @@ export const GroupPills: React.FC<Props> = ({ groups, activeGroupPin, onSelect }
             color={activeGroupPin === null ? theme.colors.white : theme.colors.text.secondary}
           />
           <Text style={[styles.pillText, activeGroupPin === null ? styles.pillTextActive : styles.pillTextInactive]}>
-            {t('common.all', 'Todos')}
+            {t('common.all')}
           </Text>
         </TouchableOpacity>
         {groups.map((group) => {

@@ -55,7 +55,7 @@ export default function GradesScreen() {
           globalGPA={null}
           gradedAssessments={g.gradedAssessments}
           onPressInfo={() => {
-            g.setOverlayText('**Rendimiento General**\n\n**Promedio del Semestre** — Es el promedio ponderado real de todas tus evaluaciones con nota, calculado según el peso porcentual de cada una.\n\n**Proyección** — Estima tu nota final si mantienes tu rendimiento actual, usando una regresión lineal sobre tus últimas calificaciones.\n\n**Delta (± pts)** — La diferencia entre tu promedio actual y la proyección. Positivo = vas mejorando; negativo = necesitas recuperar.\n\n**Gráfica de barras** — Cada barra representa una evaluación ordenada cronológicamente. La última barra (más oscura) es tu nota más reciente. La altura refleja tu calificación normalizada.');
+            g.setOverlayText(t('grades.performanceOverlay'));
             g.setOverlayVisible(true);
           }}
           t={t}
@@ -66,7 +66,7 @@ export default function GradesScreen() {
             userId={g.userId}
             selectedSubjectId={g.selectedSubjectId}
             onPressInfo={() => {
-              g.setOverlayText('**Dominio del Aprendizaje**\n\nEste radar ilustra tu nivel de dominio basado en el algoritmo de repetición espaciada de tus *Flashcards*.\n\nMuestra visualmente en qué áreas o mazos eres más fuerte y cuáles necesitan más atención y repaso.');
+              g.setOverlayText(t('grades.masteryOverlay'));
               g.setOverlayVisible(true);
             }}
             onExpand={() => setExpandedChart('mastery')}
@@ -93,7 +93,7 @@ export default function GradesScreen() {
             {g.filteredAssessments.length === 0 ? (
               <View style={gradesStyles.emptyAssessments}>
                 <Ionicons name="document-text-outline" size={32} color={theme.colors.text.secondary} style={{ opacity: 0.5, marginBottom: 8 }} />
-                <Text style={{ color: theme.colors.text.secondary, fontSize: 13 }}>{t('subjects.noAssessments', 'No hay evaluaciones')}</Text>
+                <Text style={{ color: theme.colors.text.secondary, fontSize: 13 }}>{t('subjects.noAssessments')}</Text>
               </View>
             ) : (
               <FlatList
@@ -132,7 +132,7 @@ export default function GradesScreen() {
           onRunSim={g.handleRunSimulation}
           onReset={g.handleResetSim}
           onPressInfo={() => {
-            g.setOverlayText('**Simulador de Proyección**\n\nEsta gráfica muestra cómo ha evolucionado tu promedio (GPA) a lo largo del tiempo basándose en el peso real de tus entregas.\n\nEl punto **"Proy."** (color naranja) simula matemáticamente tu nuevo promedio ponderado en caso de obtener la nota que ingresaste.');
+            g.setOverlayText(t('grades.projectionOverlay'));
             g.setOverlayVisible(true);
           }}
           onExpand={() => setExpandedChart('projection')}
@@ -142,7 +142,7 @@ export default function GradesScreen() {
         <ActionCard
           title={t('grades.bulkImport')}
           description={t('grades.bulkImportDesc')}
-          buttonLabel={t('grades.importCsv', 'Importar CSV')}
+          buttonLabel={t('grades.importCsv')}
           buttonIcon="cloud-upload-outline"
           onPress={() => {}}
         />
@@ -150,7 +150,7 @@ export default function GradesScreen() {
         <ActionCard
           title={t('grades.gpaReport')}
           description={t('grades.gpaReportDesc')}
-          buttonLabel={g.isExportingPdf ? 'Generando...' : 'Exportar PDF'}
+          buttonLabel={g.isExportingPdf ? t('grades.generating') : t('grades.exportPdf')}
           buttonIcon="cloud-download-outline"
           onPress={g.handleDownloadReport}
         />
@@ -190,7 +190,7 @@ export default function GradesScreen() {
               <LineChart
                 data={{
                   labels: g.trendSeries.map((_, i) => {
-                    if (i === g.trendSeries.length - 1) return 'Proy.';
+                    if (i === g.trendSeries.length - 1) return t('grades.projectedLabel');
                     if (g.gradedAssessments.length === 0) return '';
                     if (g.gradedAssessments.length === 1) return i === 0 ? '0' : '1';
                     const startIndex = g.gradedAssessments.length - g.historicalGpas.length;

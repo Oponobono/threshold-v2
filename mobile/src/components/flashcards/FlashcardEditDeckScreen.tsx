@@ -57,7 +57,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
     <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
       <View>
           <View style={[s.modalHeader, { justifyContent: 'space-between', marginBottom: 16 }]}>
-            <Text style={[s.modalTitle, { flex: 1, textAlign: 'left' }]}>{t('flashcards.editDeck', 'Editar Mazo')}</Text>
+            <Text style={[s.modalTitle, { flex: 1, textAlign: 'left' }]}>{t('flashcards.editDeck')}</Text>
             <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons name="close" size={24} color={theme.colors.text.primary} />
             </TouchableOpacity>
@@ -90,7 +90,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
               onPress={() => setDeckSubjectId(null)}
             >
               <Text style={[styles.subjectName, deckSubjectId === null && { color: theme.colors.primary, fontWeight: '700' }]}>
-                {t('flashcards.noSubject', 'Sin materia')}
+                {t('flashcards.noSubject')}
               </Text>
               {deckSubjectId === null && (
                 <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} style={{ marginLeft: 6 }} />
@@ -127,7 +127,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
             onPress={handleSaveDeck}
             disabled={isSavingDeck}
           >
-            <Text style={styles.submitBtnText}>{isSavingDeck ? '...' : t('common.save', 'Guardar')}</Text>
+            <Text style={styles.submitBtnText}>{isSavingDeck ? '...' : t('common.save')}</Text>
           </TouchableOpacity>
       </View>
     </ScrollView>

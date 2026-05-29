@@ -31,6 +31,10 @@
   "overrideDesc": "Set a different passing threshold for each subject.",
   "maxGrade": "Maximum value",
   "termPlaceholder": "e.g. Fall 2026",
+  "scaleColombia": "Colombia – 0-5 Scale",
+  "scaleUSGPA": "USA – GPA 4.0",
+  "scalePercent": "Percentage 0-100",
+  "scaleChile": "Chile – 1-7 Scale",
   "scaleSpain": "Spain – 0-10 Scale",
   "scaleMexico": "Mexico – 0-10 Scale",
   "scaleUSLetter": "USA – A-F Letter Scale"

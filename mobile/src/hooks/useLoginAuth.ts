@@ -55,12 +55,6 @@ export const useLoginAuth = () => {
           setRememberMe(true);
         }
 
-        // Restore persisted language preference
-        const savedLanguage = await getItemAsync('app_language');
-        if (savedLanguage === 'es' || savedLanguage === 'en') {
-          i18n.changeLanguage(savedLanguage);
-        }
-
         // Check biometric availability
         const available = await isBiometricAvailable();
         const hasToken = await hasBiometricTokenStored();

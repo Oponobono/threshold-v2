@@ -48,7 +48,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
     <View style={globalSectionStyles.sectionBlock}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={globalSectionStyles.sectionTitle}>
-          {t('analytics.statsTitle', 'Estadísticas')}
+          {t('analytics.statsTitle')}
         </Text>
         {onPressInfo && (
           <TouchableOpacity onPress={onPressInfo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -64,7 +64,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
         <View style={styles.col}>
           <View style={styles.titleContainer}>
             <Ionicons name="calculator-outline" size={16} color="#007AFF" />
-            <Text style={styles.colLabel}>{t('subjects.currentAverage', 'PROMEDIO')}</Text>
+            <Text style={styles.colLabel}>{t('subjects.currentAverage')}</Text>
           </View>
           <View style={styles.contentContainer}>
             <Text style={styles.colValue}>{formatGrade(averageGrade)}</Text>
@@ -83,7 +83,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
               size={16} 
               color="#34C759" 
             />
-            <Text style={styles.colLabel}>{t('subjects.projectedGrade', 'PROYECTADA')}</Text>
+            <Text style={styles.colLabel}>{t('subjects.projectedGrade')}</Text>
           </View>
           <View style={styles.contentContainer}>
             <View style={styles.projectedRow}>
@@ -106,7 +106,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
         <View style={styles.col}>
           <View style={styles.titleContainer}>
             <Ionicons name="checkmark-circle" size={16} color="#FF9500" />
-            <Text style={styles.colLabel}>{t('subjects.deliveredTasks', 'TAREAS')}</Text>
+            <Text style={styles.colLabel}>{t('subjects.deliveredTasks')}</Text>
           </View>
 
           <View style={styles.contentContainer}>
@@ -146,7 +146,7 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
               <Text style={styles.colValue}>{deliveredText}</Text>
             )}
           </View>
-          <Text style={styles.tasksSubLabel}>COMPLETADAS</Text>
+          <Text style={styles.tasksSubLabel}>{t('subjects.completedTasks')}</Text>
         </View>
 
       </View>

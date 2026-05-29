@@ -16,7 +16,7 @@ export const FlashcardHeader: React.FC<Props> = ({ showSearch, onToggleSearch, o
   return (
     <View style={styles.headerRow}>
       <Text style={styles.headerTitle}>
-        {t('flashcards.decks', 'Mazos')}
+        {t('flashcards.decks')}
       </Text>
       <View style={styles.headerActions}>
         <TouchableOpacity

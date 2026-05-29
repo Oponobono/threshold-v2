@@ -31,6 +31,10 @@
   "overrideDesc": "Define un umbral de aprobación distinto para cada materia.",
   "maxGrade": "Valor máximo",
   "termPlaceholder": "Ej: Otoño 2026",
+  "scaleColombia": "Colombia – Escala 0-5",
+  "scaleUSGPA": "EE.UU. – GPA 4.0",
+  "scalePercent": "Porcentaje 0-100",
+  "scaleChile": "Chile – Escala 1-7",
   "scaleSpain": "España – Escala 0-10",
   "scaleMexico": "México – Escala 0-10",
   "scaleUSLetter": "EE.UU. – Escala de Letras A-F"

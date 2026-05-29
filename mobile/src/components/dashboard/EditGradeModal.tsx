@@ -98,7 +98,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
       });
 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
-      alertRef.show({ title: t('common.success'), message: t('assessments.updateSuccess', 'Nota actualizada'), type: 'success' });
+      alertRef.show({ title: t('common.success'), message: t('assessments.updateSuccess'), type: 'success' });
       
       // Call callback with updated assessment ONLY if the backend returned a valid full object
       if (onAssessmentSaved && updatedAssessment?.id) {
@@ -131,7 +131,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
         <Pressable style={styles.sheetBackdrop} onPress={handleClose}>
           <Pressable style={styles.sheetContent} onPress={() => null}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{t('assessments.editGrade', 'Editar Nota')}</Text>
+            <Text style={styles.sheetTitle}>{t('assessments.editGrade')}</Text>
             
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 10 }}>
               <Text style={styles.sheetLabel}>{t('dashboard.quickAddMenu.grade.subject')}</Text>
@@ -152,7 +152,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
 
               {categories.length > 0 && (
                 <>
-                  <Text style={styles.sheetLabel}>{t('categories.category', 'Categoría')}</Text>
+                  <Text style={styles.sheetLabel}>{t('categories.category')}</Text>
                   <TouchableOpacity 
                     style={styles.dropdownSelector} 
                     onPress={() => setIsCategorySelectorVisible(true)}
@@ -163,7 +163,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
                     ]}>
                       {selectedCategoryId 
                         ? categories.find(c => c.id === selectedCategoryId)?.name 
-                        : t('categories.none', 'Sin categoría')}
+                        : t('categories.none')}
                     </Text>
                     <Ionicons name="chevron-down" size={18} color={theme.colors.text.placeholder} />
                   </TouchableOpacity>
@@ -215,7 +215,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
                 disabled={isSaving}
               >
                 <Text style={styles.sheetSaveText}>
-                  {isSaving ? t('dashboard.newSubject.saving') : t('common.save', 'Guardar')}
+                  {isSaving ? t('dashboard.newSubject.saving') : t('common.save')}
                 </Text>
               </TouchableOpacity>
             </View>

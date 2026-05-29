@@ -42,13 +42,13 @@ export const WeeklySummaryPicker: React.FC<Props> = ({ visible, initialConfig, o
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('notifications.weeklyDigestConfig', 'Configurar resumen semanal')}</Text>
+            <Text style={styles.modalTitle}>{t('notifications.weeklyDigestConfig')}</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={theme.colors.text.primary} />
             </TouchableOpacity>
           </View>
           <View style={styles.modalBody}>
-            <Text style={styles.modalLabel}>{t('notifications.weeklyDay', 'Día de la semana')}</Text>
+            <Text style={styles.modalLabel}>{t('notifications.weeklyDay')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 20 }}>
               {DAYS.map((day, index) => {
                 const isActive = dayOfWeek === index;
@@ -78,7 +78,7 @@ export const WeeklySummaryPicker: React.FC<Props> = ({ visible, initialConfig, o
               })}
             </ScrollView>
 
-            <Text style={styles.modalLabel}>{t('notifications.weeklyTime', 'Hora del día')}</Text>
+            <Text style={styles.modalLabel}>{t('notifications.weeklyTime')}</Text>
             <TouchableOpacity
               onPress={() => setShowTimePicker(true)}
               style={{

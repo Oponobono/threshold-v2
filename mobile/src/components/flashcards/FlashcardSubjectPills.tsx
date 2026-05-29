@@ -33,7 +33,7 @@ export const FlashcardSubjectPills: React.FC<Props> = ({ subjects, activeSubject
             color={activeSubjectId === null ? theme.colors.white : theme.colors.text.secondary}
           />
           <Text style={[styles.pillText, activeSubjectId === null ? styles.pillTextActive : styles.pillTextInactive]}>
-            {t('common.all', 'Todos')}
+            {t('common.all')}
           </Text>
         </TouchableOpacity>
         {subjects.map((subject) => {

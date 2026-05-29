@@ -99,7 +99,7 @@ export default function FlashcardsScreen() {
               fontWeight: activeTab === 'mazos' ? '700' : '400',
               color: activeTab === 'mazos' ? theme.colors.primary : theme.colors.text.secondary,
               fontSize: 14,
-            }}>Mis Mazos</Text>
+            }}>{t('flashcards.myDecks')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setActiveTab('grupos')}
@@ -113,7 +113,7 @@ export default function FlashcardsScreen() {
               fontWeight: activeTab === 'grupos' ? '700' : '400',
               color: activeTab === 'grupos' ? theme.colors.primary : theme.colors.text.secondary,
               fontSize: 14,
-            }}>Grupos</Text>
+            }}>{t('flashcards.groups')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -220,7 +220,7 @@ export default function FlashcardsScreen() {
                 {loadingGroups ? (
                   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <Text style={{ color: theme.colors.text.secondary, fontSize: 14 }}>
-                      Cargando...
+                      {t('flashcards.loading')}
                     </Text>
                   </View>
                 ) : (
@@ -365,10 +365,10 @@ export default function FlashcardsScreen() {
             onPress={() => null}
           >
             <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text.primary }}>
-              Compartir mazo
+              {t('flashcards.shareDeck')}
             </Text>
             <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
-              Comparte{shareDeckTarget ? ` "${shareDeckTarget.title}"` : ''} con un usuario o un grupo.
+              {t('flashcards.shareDeckDesc', { title: shareDeckTarget?.title ?? '' })}
             </Text>
             <TextInput
               style={{
@@ -382,7 +382,7 @@ export default function FlashcardsScreen() {
                 textAlign: 'center',
                 color: theme.colors.text.primary,
               }}
-              placeholder="PIN del usuario (Ej: ABC123)"
+              placeholder={t('flashcards.sharePinPlaceholder')}
               placeholderTextColor={theme.colors.text.placeholder}
               value={sharePin}
               onChangeText={setSharePin}
@@ -392,7 +392,7 @@ export default function FlashcardsScreen() {
             {groups.length > 0 && (
               <>
                 <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center', marginTop: 4 }}>
-                  — o comparte con un grupo —
+                  {t('flashcards.shareWithGroup')}
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 36 }}>
                   {groups.map((g) => (
@@ -417,7 +417,7 @@ export default function FlashcardsScreen() {
                 style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}
                 onPress={() => { setShareDeckTarget(null); setSharePin(''); }}
               >
-                <Text style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>Cancelar</Text>
+                <Text style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -428,7 +428,7 @@ export default function FlashcardsScreen() {
                 disabled={!sharePin.trim() || isSharing}
               >
                 <Text style={{ color: '#fff', fontWeight: '700' }}>
-                  {isSharing ? 'Compartiendo...' : 'Compartir'}
+                  {isSharing ? t('flashcards.sharing') : t('flashcards.shareDeck')}
                 </Text>
               </TouchableOpacity>
             </View>

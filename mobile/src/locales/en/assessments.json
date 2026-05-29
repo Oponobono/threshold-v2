@@ -7,6 +7,9 @@
   "score": "Score:",
   "dueDate": "Due:",
   "weight": "Weight:",
+  "edit": "Edit",
+  "editGrade": "Edit Grade",
+  "updateSuccess": "Grade updated",
   "deleteConfirm": "Are you sure you want to delete this grade/assessment?",
   "emptyState": "No assessments yet"
 }

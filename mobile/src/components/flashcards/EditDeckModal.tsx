@@ -38,18 +38,18 @@ export const EditDeckModal: React.FC<Props> = ({ visible, deck, subjects, onClos
         <View style={styles.editModalSheet}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.editModalHeader}>
-              <Text style={styles.editModalTitle}>{t('flashcards.editDeck', 'Editar Mazo')}</Text>
+              <Text style={styles.editModalTitle}>{t('flashcards.editDeck')}</Text>
               <TouchableOpacity style={styles.editModalClose} onPress={onClose}>
                 <Ionicons name="close" size={24} color={theme.colors.text.primary} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.editLabel}>{t('flashcards.deckName', 'Nombre del mazo')}</Text>
+            <Text style={styles.editLabel}>{t('flashcards.deckName')}</Text>
             <TextInput
               value={editing.title}
               onChangeText={(text) => setEditing({ ...editing, title: text })}
               style={styles.editInput}
-              placeholder={t('flashcards.deckNamePlaceholder', 'Nombre del mazo')}
+              placeholder={t('flashcards.deckNamePlaceholder')}
               placeholderTextColor={theme.colors.text.placeholder}
             />
 
@@ -72,7 +72,7 @@ export const EditDeckModal: React.FC<Props> = ({ visible, deck, subjects, onClos
                     editing.subject_id === null ? styles.subjectChipLabelActive : styles.subjectChipLabelInactive,
                   ]}
                 >
-                  {t('flashcards.noSubject', 'Sin materia')}
+                  {t('flashcards.noSubject')}
                 </Text>
               </TouchableOpacity>
               {subjects.map((sub) => (
@@ -107,14 +107,14 @@ export const EditDeckModal: React.FC<Props> = ({ visible, deck, subjects, onClos
                   });
                   onClose();
                   onSaved();
-                  showAlert({ title: t('common.success'), message: t('flashcards.deckUpdated', 'Mazo actualizado'), type: 'success' });
+                  showAlert({ title: t('common.success'), message: t('flashcards.deckUpdated'), type: 'success' });
                 } catch (e: any) {
                   showAlert({ title: t('common.error'), message: e.message, type: 'error' });
                 }
               }}
               style={styles.saveBtn}
             >
-              <Text style={styles.saveBtnText}>{t('common.save', 'Guardar')}</Text>
+              <Text style={styles.saveBtnText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
