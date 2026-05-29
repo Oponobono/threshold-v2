@@ -27,68 +27,193 @@ export const subjectsStyles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     borderWidth: 1, borderColor: theme.colors.border,
   },
-  pillsScroll: {
-    maxHeight: 46, flexGrow: 0, minHeight: 46,
-  },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, alignSelf: 'center',
-    paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20,
-    borderWidth: 1.5, borderColor: theme.colors.border,
-    backgroundColor: 'transparent',
-  },
-  pillActive: {
-    backgroundColor: theme.colors.text.primary,
-    borderColor: theme.colors.text.primary,
-  },
-  pillColor: {
-    width: 8, height: 8, borderRadius: 4,
-  },
-  pillText: {
-    fontSize: 13, fontWeight: '500', color: theme.colors.text.secondary, letterSpacing: -0.1,
-  },
-  pillTextActive: {
-    fontWeight: '700', color: theme.colors.white,
-  },
   scroll: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.sm, paddingBottom: 40 },
   section: { marginBottom: 12 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: theme.typography.sizes.md, fontWeight: '800', color: theme.colors.text.primary },
   sectionHint: { fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary },
-  subjectCard: {
+  // ── Semester Hero ──
+  semesterHero: {
     backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.lg, padding: theme.spacing.md,
-    marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border, ...globalStyles.shadow,
+    borderRadius: 24, padding: theme.spacing.lg,
+    marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border,
+    ...globalStyles.shadow,
   },
-  subjectCardSelected: { borderColor: theme.colors.primary, borderWidth: 1.5 },
-  subjectTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  codeCircle: {
-    width: 44, height: 44, borderRadius: 22,
+  semesterHeroTop: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+  },
+  semesterGpaCircle: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center', alignItems: 'center',
   },
-  codeText: { color: theme.colors.text.inverse, fontWeight: '800', fontSize: theme.typography.sizes.md },
-  subjectName: { fontSize: theme.typography.sizes.sm, fontWeight: '700', color: theme.colors.text.primary },
-  subjectProf: { fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary },
-  creditsText: { fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, fontWeight: '600' },
-  avgText: { fontSize: theme.typography.sizes.sm, fontWeight: '700' },
-  progressBar: {
-    height: 6, backgroundColor: theme.colors.inputBackground,
-    borderRadius: 3, marginBottom: 10, overflow: 'hidden',
+  semesterGpaValue: {
+    fontSize: 26, fontWeight: '900', color: theme.colors.text.inverse,
+    letterSpacing: -0.5,
   },
-  progressFill: { height: '100%', borderRadius: 3 },
-  subjectBottom: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  assessmentBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: theme.colors.text.primary,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.borderRadius.full,
+  semesterGpaLabel: {
+    fontSize: 8, fontWeight: '800', color: 'rgba(255,255,255,0.7)',
+    textTransform: 'uppercase', letterSpacing: 0.5, marginTop: -2,
   },
-  assessmentBtnText: { color: theme.colors.text.inverse, fontWeight: '700', fontSize: theme.typography.sizes.sm },
-  iconAction: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: theme.colors.inputBackground,
-    justifyContent: 'center', alignItems: 'center',
+  semesterHeroStats: { flex: 1, gap: 6 },
+  semesterHeroStatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  semesterHeroStatLabel: { fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600' },
+  semesterHeroStatValue: { fontSize: 13, fontWeight: '800', color: theme.colors.text.primary },
+  semesterHeroStatValueDanger: { fontSize: 13, fontWeight: '800', color: theme.colors.danger },
+  semesterMessage: {
+    marginTop: 12, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: theme.colors.border,
+    fontSize: 12, color: theme.colors.text.secondary,
+    lineHeight: 17,
+  },
+  semesterMessageHighlight: {
+    fontWeight: '700', color: theme.colors.text.primary,
+  },
+  // ── Critical Carousel ──
+  criticalSection: { marginBottom: 16 },
+  criticalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 10,
+  },
+  criticalTitle: {
+    fontSize: 13, fontWeight: '800', color: theme.colors.text.secondary,
+    textTransform: 'uppercase', letterSpacing: 1,
+  },
+  criticalBadge: {
+    backgroundColor: theme.colors.dangerTransparent,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: theme.borderRadius.full,
+  },
+  criticalBadgeText: { fontSize: 10, fontWeight: '800', color: theme.colors.danger },
+  criticalScroll: { flexGrow: 0 },
+  criticalCard: {
+    width: 190, backgroundColor: theme.colors.background,
+    borderRadius: 16, padding: 14,
     borderWidth: 1, borderColor: theme.colors.border,
+    ...globalStyles.shadow,
+    marginRight: 10,
   },
-  nextLabel: { flex: 1, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, textAlign: 'right' },
+  criticalCardTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  criticalCardDot: { width: 10, height: 10, borderRadius: 5 },
+  criticalCardName: { flex: 1, fontSize: 13, fontWeight: '700', color: theme.colors.text.primary },
+  criticalCardScore: { fontSize: 22, fontWeight: '900', color: theme.colors.danger, textAlign: 'center', marginBottom: 4 },
+  criticalCardDelta: { fontSize: 10, fontWeight: '700', color: theme.colors.text.secondary, textAlign: 'center', marginBottom: 8 },
+  criticalCardAction: {
+    backgroundColor: theme.colors.danger,
+    borderRadius: theme.borderRadius.full, paddingVertical: 6, alignItems: 'center',
+  },
+  criticalCardActionText: { color: theme.colors.white, fontWeight: '800', fontSize: 11 },
+  criticalEmpty: {
+    borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border,
+    borderStyle: 'dashed', paddingVertical: 24, alignItems: 'center',
+  },
+  criticalEmptyText: { fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600' },
+  // ── Timeline ──
+  timelineSection: { marginBottom: 16 },
+  timelineHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 12,
+  },
+  timelineTitle: {
+    fontSize: 13, fontWeight: '800', color: theme.colors.text.secondary,
+    textTransform: 'uppercase', letterSpacing: 1,
+  },
+  timelineCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: 16, padding: theme.spacing.md,
+    borderWidth: 1, borderColor: theme.colors.border,
+    ...globalStyles.shadow,
+  },
+  timelineItem: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    paddingVertical: 8,
+  },
+  timelineDot: {
+    width: 10, height: 10, borderRadius: 5,
+    marginTop: 4,
+  },
+  timelineLine: {
+    position: 'absolute', left: 4.5, top: 18, bottom: 0,
+    width: 1, backgroundColor: theme.colors.border,
+  },
+  timelineContent: { flex: 1 },
+  timelineName: { fontSize: 13, fontWeight: '700', color: theme.colors.text.primary },
+  timelineMeta: { fontSize: 10, color: theme.colors.text.secondary, marginTop: 1 },
+  timelineTime: { fontSize: 10, fontWeight: '600', color: theme.colors.text.secondary },
+  // ── Bento Grid ──
+  gridSection: { marginBottom: 16 },
+  gridHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 12,
+  },
+  gridTitle: {
+    fontSize: 13, fontWeight: '800', color: theme.colors.text.secondary,
+    textTransform: 'uppercase', letterSpacing: 1,
+  },
+  gridCount: { fontSize: 10, fontWeight: '800', color: theme.colors.text.secondary },
+  grid: {
+    flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6,
+  },
+  gridCol: {
+    width: '50%', padding: 6,
+  },
+  gridCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: 16, padding: 14,
+    borderWidth: 1, borderColor: theme.colors.border,
+    ...globalStyles.shadow,
+  },
+  gridTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 },
+  gridIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  gridScoreGroup: { alignItems: 'flex-end' },
+  gridScoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  gridScore: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  gridScoreMax: { fontSize: 10, fontWeight: '600', color: theme.colors.text.secondary },
+  gridDelta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  gridDeltaText: { fontSize: 11, fontWeight: '800' },
+  gridBody: { marginBottom: 6 },
+  gridName: { fontSize: 13, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 1 },
+  gridProf: { fontSize: 10, color: theme.colors.text.secondary, marginBottom: 4 },
+  gridMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  gridMetaBadge: { backgroundColor: theme.colors.primaryTransparent.light, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  gridMetaBadgeText: { fontSize: 9, fontWeight: '700', color: theme.colors.text.secondary },
+  gridTargetText: { fontSize: 9, color: theme.colors.text.secondary, fontWeight: '600' },
+  gridProgress: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  gridProgressTrack: { flex: 1, height: 4, backgroundColor: theme.colors.inputBackground, borderRadius: 2, overflow: 'hidden' },
+  gridProgressFill: { height: '100%', borderRadius: 2 },
+  gridProgressText: { fontSize: 10, fontWeight: '700', color: theme.colors.text.secondary, minWidth: 30, textAlign: 'right' },
+  // ── Schedule Grid ──
+  scheduleGridSection: { marginBottom: 16 },
+  scheduleGridHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 12,
+  },
+  scheduleGridTitle: {
+    fontSize: 13, fontWeight: '800', color: theme.colors.text.secondary,
+    textTransform: 'uppercase', letterSpacing: 1,
+  },
+  scheduleGridContainer: {
+    backgroundColor: theme.colors.background,
+    borderRadius: 16, padding: 10,
+    borderWidth: 1, borderColor: theme.colors.border,
+    ...globalStyles.shadow,
+  },
+  sgRow: { flexDirection: 'row' },
+  sgTimeCol: { width: 30, justifyContent: 'center', alignItems: 'center', height: 22 },
+  sgTimeText: { fontSize: 8, color: theme.colors.text.secondary, fontWeight: '600' },
+  sgDayCol: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 26 },
+  sgDayText: { fontSize: 8, fontWeight: '800', color: theme.colors.text.secondary },
+  sgCell: {
+    flex: 1, height: 22,
+    justifyContent: 'center', alignItems: 'center',
+    borderLeftWidth: 0.5, borderBottomWidth: 0.5,
+    borderColor: theme.colors.border + '30',
+  },
+  sgBlock: {
+    width: '50%', height: 5, borderRadius: 2.5,
+  },
   // ── Calculator ──
   calcCard: {
     backgroundColor: theme.colors.background,

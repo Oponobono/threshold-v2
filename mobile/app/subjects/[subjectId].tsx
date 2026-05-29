@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +25,9 @@ import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModa
 import { AutoUploadIndicator } from '../../src/components/ui/AutoUploadIndicator';
 import { SubjectYouTubeVideos } from '../../src/components/subjects/SubjectYouTubeVideos';
 import { PDFImportModal } from '../../src/components/modals/PDFImportModal';
+import { GradeCalculator } from '../../src/components/subjects/GradeCalculator';
 import { useSubjectDetail } from '../../src/hooks/useSubjectDetail';
+import { updateSubject } from '../../src/services/api';
 import { SCALE_MAX } from '../../src/utils/grades';
 import type { Subject } from '../../src/services/api';
 
@@ -79,7 +81,6 @@ export default function SubjectDetailScreen() {
     setOverlayText,
     setFlashcardBase64,
     setIsFlashcardModalVisible,
-    handleDeleteSubject,
     handleDeleteVideo,
     handleTakePhoto,
     handleOpenScanner,
@@ -100,6 +101,67 @@ export default function SubjectDetailScreen() {
     handleAssessmentUpdated,
     handleOpenCategories,
   } = useSubjectDetail();
+
+  // ── Grade Calculator State ──
+  const [calcCurrentGrade, setCalcCurrentGrade] = useState('');
+  const [calcRequiredPass, setCalcRequiredPass] = useState('60');
+  const [calcRemainingWeight, setCalcRemainingWeight] = useState('');
+  const [calcMinNeeded, setCalcMinNeeded] = useState<number | null>(null);
+  const [calcMaxAchievable, setCalcMaxAchievable] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (selectedSubject) {
+      const raw = selectedSubject.avg_score || 0;
+      const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
+      setCalcCurrentGrade(avg ? String(Math.round(avg)) : '');
+      setCalcRequiredPass(selectedSubject.target_grade ? String(selectedSubject.target_grade) : '60');
+      setCalcRemainingWeight('');
+      setCalcMinNeeded(null);
+      setCalcMaxAchievable(null);
+    }
+  }, [selectedSubject]);
+
+  const handleSimulate = () => {
+    const cg = parseFloat(calcCurrentGrade || (selectedSubject?.avg_score?.toString() || '0'));
+    const rp = parseFloat(calcRequiredPass || (selectedSubject?.target_grade?.toString() || '60'));
+    const rw = parseFloat(calcRemainingWeight);
+
+    if (isNaN(cg) || isNaN(rp) || isNaN(rw) || rw <= 0) {
+      return;
+    }
+
+    const doneWeight = 100 - rw;
+    const result = (rp - (cg * doneWeight) / 100) / (rw / 100);
+    const maxScale = rp <= 5 ? 5 : rp <= 10 ? 10 : 100;
+    const max = (cg * doneWeight / 100) + (maxScale * rw / 100);
+
+    setCalcMinNeeded(Number(result.toFixed(2)));
+    setCalcMaxAchievable(Number(max.toFixed(2)));
+  };
+
+  const handleReset = () => {
+    if (selectedSubject) {
+      const raw = selectedSubject.avg_score || 0;
+      const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
+      setCalcCurrentGrade(avg ? avg.toFixed(1) : '');
+      setCalcRequiredPass(selectedSubject.target_grade ? String(selectedSubject.target_grade) : '60');
+    }
+    setCalcRemainingWeight('');
+    setCalcMinNeeded(null);
+    setCalcMaxAchievable(null);
+  };
+
+  const handleSaveTarget = async () => {
+    if (!selectedSubject) return;
+    const rp = calcRequiredPass ? parseFloat(calcRequiredPass) : null;
+    if (rp === null || isNaN(rp)) return;
+
+    try {
+      await updateSubject(selectedSubject.id, { target_grade: rp });
+    } catch (error: any) {
+      console.error('Error saving target grade:', error.message);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -151,7 +213,18 @@ export default function SubjectDetailScreen() {
             displayLabel={selectedSubject?.display_label}
             displayColor={selectedSubject?.display_color}
             gpaEquivalent={selectedSubject?.gpa_equivalent}
-            onDelete={handleDeleteSubject}
+          />
+
+          <SubjectThreshold
+            securedPercent={securedPercent}
+            finalNeededText={finalNeededText}
+            subjectColor={selectedSubject?.color ?? undefined}
+            status={thresholdStatus}
+            objectiveGrade={selectedSubject?.target_grade}
+            onPressInfo={() => {
+              setOverlayText(t('subjects.thresholdOverlay'));
+              setOverlayVisible(true);
+            }}
           />
 
           <SubjectStats
@@ -165,16 +238,24 @@ export default function SubjectDetailScreen() {
             }}
           />
 
-          <SubjectThreshold
-            securedPercent={securedPercent}
-            finalNeededText={finalNeededText}
-            subjectColor={selectedSubject?.color ?? undefined}
-            status={thresholdStatus}
-            objectiveGrade={selectedSubject?.target_grade}
-            onPressInfo={() => {
-              setOverlayText(t('subjects.thresholdOverlay'));
+          <GradeCalculator
+            selectedSubject={selectedSubject}
+            currentGrade={calcCurrentGrade}
+            requiredPass={calcRequiredPass}
+            remainingWeight={calcRemainingWeight}
+            minNeeded={calcMinNeeded}
+            maxAchievable={calcMaxAchievable}
+            onCurrentGradeChange={setCalcCurrentGrade}
+            onRequiredPassChange={setCalcRequiredPass}
+            onRemainingWeightChange={setCalcRemainingWeight}
+            onSimulate={handleSimulate}
+            onReset={handleReset}
+            onSaveTarget={handleSaveTarget}
+            onInfoPress={() => {
+              setOverlayText(t('subjects.calculatorOverlay'));
               setOverlayVisible(true);
             }}
+            t={t}
           />
 
           <SubjectInsights
@@ -220,40 +301,46 @@ export default function SubjectDetailScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {isReady && (
-      <>
-      <DocumentScannerModal
-        isVisible={isScannerVisible}
-        onClose={() => setIsScannerVisible(false)}
-        subjects={selectedSubject ? [selectedSubject as Subject] : []}
-        onSave={handleScannerSave}
-      />
+      {isReady && isScannerVisible && (
+        <DocumentScannerModal
+          isVisible={isScannerVisible}
+          onClose={() => setIsScannerVisible(false)}
+          subjects={selectedSubject ? [selectedSubject as Subject] : []}
+          onSave={handleScannerSave}
+        />
+      )}
 
-      <PhotoCaptureModal
-        isVisible={isPhotoModalVisible}
-        onClose={() => setIsPhotoModalVisible(false)}
-        subjects={selectedSubject ? [selectedSubject as Subject] : []}
-        initialSubjectId={subjectId || undefined}
-        onSave={handlePhotoSave}
-      />
+      {isReady && isPhotoModalVisible && (
+        <PhotoCaptureModal
+          isVisible={isPhotoModalVisible}
+          onClose={() => setIsPhotoModalVisible(false)}
+          subjects={selectedSubject ? [selectedSubject as Subject] : []}
+          initialSubjectId={subjectId || undefined}
+          onSave={handlePhotoSave}
+        />
+      )}
 
-      <ImageViewerModal
-        isVisible={isViewerVisible}
-        photos={imagePhotos}
-        initialIndex={initialViewerIndex}
-        onClose={() => setIsViewerVisible(false)}
-        onPhotoDeleted={handleViewerPhotoDeleted}
-        onOCRSaved={handleViewerOCRSaved}
-      />
+      {isReady && isViewerVisible && (
+        <ImageViewerModal
+          isVisible={isViewerVisible}
+          photos={imagePhotos}
+          initialIndex={initialViewerIndex}
+          onClose={() => setIsViewerVisible(false)}
+          onPhotoDeleted={handleViewerPhotoDeleted}
+          onOCRSaved={handleViewerOCRSaved}
+        />
+      )}
 
-      <PDFImportModal
-        isVisible={isPDFImportVisible}
-        onClose={() => setIsPDFImportVisible(false)}
-        selectedSubjectId={subjectId || undefined}
-        onImportSuccess={handlePDFImportSuccess}
-      />
+      {isReady && isPDFImportVisible && (
+        <PDFImportModal
+          isVisible={isPDFImportVisible}
+          onClose={() => setIsPDFImportVisible(false)}
+          selectedSubjectId={subjectId || undefined}
+          onImportSuccess={handlePDFImportSuccess}
+        />
+      )}
 
-      {subjectId && profile?.id && (
+      {isReady && subjectId && profile?.id && (
         <FlashcardCreatorModal
           visible={isFlashcardModalVisible}
           onClose={handleFlashcardModalClose}
@@ -267,7 +354,7 @@ export default function SubjectDetailScreen() {
         />
       )}
 
-      {selectedSubject && (
+      {isReady && selectedSubject && (
         <SubjectAIFab
           subjectId={subjectId || undefined}
           userId={profile?.id || undefined}
@@ -280,7 +367,7 @@ export default function SubjectDetailScreen() {
         />
       )}
 
-      {selectedSubject && (
+      {isReady && selectedSubject && (
         <CreateGradeModal
           visible={isCreateGradeVisible}
           onClose={handleCloseCreateGrade}
@@ -288,7 +375,6 @@ export default function SubjectDetailScreen() {
           initialSubjectId={subjectId}
         />
       )}
-      </>)}
 
       <ExplanationOverlay
         visible={overlayVisible}

@@ -49,6 +49,7 @@ export const createSubject = async (payload: {
   professor?: string;
   color?: string;
   icon?: string;
+  credits?: number;
   target_grade?: number;
 }) => {
   const userId = await getUserId();
@@ -100,7 +101,7 @@ export const createSubject = async (payload: {
       avg_score: 0,
       normalized_avg_score: 0,
       completion_percent: 0,
-      credits: 0,
+      credits: payload.credits || 0,
       _isPending: true, // Bandera para UI
     } as any;
   }

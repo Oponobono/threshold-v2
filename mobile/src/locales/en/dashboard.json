@@ -209,6 +209,8 @@
     "namePlaceholder": "Ex: Calculus I",
     "professor": "Professor (optional)",
     "professorPlaceholder": "Ex: Dr. Smith",
+    "credits": "Credits (optional)",
+    "creditsPlaceholder": "Ex: 4",
     "targetGrade": "Target grade (optional)",
     "targetGradePlaceholder": "Ex: 4.5",
     "color": "Color",

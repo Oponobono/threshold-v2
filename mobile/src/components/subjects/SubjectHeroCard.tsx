@@ -18,7 +18,6 @@ interface SubjectHeroCardProps {
   displayLabel?: string | null;
   displayColor?: string | null;
   gpaEquivalent?: number | null;
-  onDelete?: () => void;
   onPress?: () => void;
 }
 
@@ -48,7 +47,6 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
   displayLabel,
   displayColor,
   gpaEquivalent,
-  onDelete,
   onPress,
 }) => {
   const { t } = useTranslation();
@@ -90,15 +88,6 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
               {avgScore?.toFixed(1) || '0.0'}
             </Text>
           </View>
-
-          {onDelete && (
-            <TouchableOpacity 
-              onPress={onDelete} 
-              style={{ padding: 4 }}
-            >
-              <Ionicons name="trash-outline" size={16} color="#FF2D55" />
-            </TouchableOpacity>
-          )}
 
           {onPress && (
             <View style={{ marginLeft: -2, marginRight: -4, opacity: 0.5 }}>

@@ -209,6 +209,8 @@
     "namePlaceholder": "Ej: Cálculo I",
     "professor": "Profesor (opcional)",
     "professorPlaceholder": "Ej: Dra. Sánchez",
+    "credits": "Créditos (opcional)",
+    "creditsPlaceholder": "Ej: 4",
     "targetGrade": "Nota objetivo (opcional)",
     "targetGradePlaceholder": "Ej: 4.5",
     "color": "Color",

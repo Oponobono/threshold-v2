@@ -1,5 +1,7 @@
 const { db } = require('../db');
 const learningAnalytics = require('../utils/learningAnalytics');
+const AcademicWorkflowEngine = require('../services/academicWorkflowEngine');
+const gradingEngine = require('../services/gradingEngine');
 
 /**
  * Registra o actualiza la visita de un dispositivo invitado
@@ -788,6 +790,165 @@ exports.getGlobalGPAAnalytics = (req, res) => {
  * - Actividad de estudio (intentos por día)
  * - Tasa de acierto temporal
  */
+/**
+ * GET /api/analytics/semester-summary/:userId
+ *
+ * Retorna resumen consolidado del semestre para el Hub de materias:
+ *  - GPA global, total de créditos, conteo de materias
+ *  - Materias aprobadas y en riesgo
+ *  - Materias críticas (promedio < 3.0) con delta
+ *  - Actividad reciente (últimas 5 evaluaciones entre todas las materias)
+ *
+ * Reutiliza AcademicWorkflowEngine y gradingEngine para que los
+ * avg_score coincidan exactamente con lo que devuelve GET /subjects/:userId.
+ */
+exports.getSemesterSummary = (req, res) => {
+  const { userId } = req.params;
+  if (!userId) return res.status(400).json({ error: 'userId es requerido' });
+
+  // ── 1. Subjects ────────────────────────────────────────────────────────────
+  db.all('SELECT * FROM subjects WHERE user_id = ?', [userId], async (err, subjects) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (!subjects || subjects.length === 0) {
+      return res.json({
+        overallGpa: 0, totalCredits: 0, subjectCount: 0,
+        approvedCount: 0, atRiskCount: 0,
+        criticalSubjects: [], recentActivity: [],
+      });
+    }
+
+    try {
+      const subjectIds = subjects.map(s => s.id);
+      const ph = subjectIds.map(() => '?').join(',');
+
+      // ── 2. Categories + Assessments ──────────────────────────────────────
+      const [categories, assessmentsRaw] = await Promise.all([
+        new Promise((resolve) =>
+          db.all(`SELECT * FROM assessment_categories WHERE subject_id IN (${ph})`, subjectIds, (e, rows) => resolve(rows || []))
+        ),
+        new Promise((resolve) =>
+          db.all(
+            `SELECT a.id, a.subject_id, a.category_id, a.weight, a.is_completed, ar.normalized_value
+             FROM assessments a
+             LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+             WHERE a.subject_id IN (${ph})`,
+            subjectIds,
+            (e, rows) => resolve(rows || [])
+          )
+        ),
+      ]);
+
+      // ── 3. Compute grades (same logic as subjectsController) ─────────────
+      const catsBySub = {};
+      const astsBySub = {};
+      subjectIds.forEach(sid => { catsBySub[sid] = []; astsBySub[sid] = []; });
+      categories.forEach(c => catsBySub[c.subject_id].push(c));
+      assessmentsRaw.forEach(a => {
+        let w = 0;
+        if (a.weight) w = parseFloat(String(a.weight).replace('%', ''));
+        a.weight = w;
+        astsBySub[a.subject_id].push(a);
+      });
+
+      subjects.forEach(row => {
+        const { normalized_avg_score } = AcademicWorkflowEngine.calculateSubjectGrade(
+          catsBySub[row.id] || [], astsBySub[row.id] || []
+        );
+        row.normalized_avg_score = normalized_avg_score || 0;
+        // completion percent
+        let comp = 0;
+        (astsBySub[row.id] || []).forEach(a => {
+          if (a.is_completed || (a.normalized_value != null)) comp += parseFloat(a.weight || 0);
+        });
+        row.completion_percent = comp;
+        row.avg_score = row.normalized_avg_score > 0 ? row.normalized_avg_score * 5 : 0;
+      });
+
+      // ── 4. Denormalize with user's grading version ──────────────────────
+      const user = await new Promise((resolve) =>
+        db.get('SELECT active_grading_version_id FROM users WHERE id = ?', [userId], (e, u) => resolve(u || {}))
+      );
+      if (user.active_grading_version_id) {
+        const versionRow = await new Promise((resolve) =>
+          db.get(
+            `SELECT gv.*, gs.direction, gs.mode, gs.code as system_code, gs.type as system_type
+             FROM grading_versions gv
+             JOIN grading_systems gs ON gs.id = gv.grading_system_id
+             WHERE gv.id = ?`,
+            [user.active_grading_version_id],
+            (e, v) => resolve(v)
+          )
+        );
+        if (versionRow) {
+          const scales = await gradingEngine.getScalesForVersion(versionRow.id);
+          subjects.forEach(row => {
+            row.avg_score = gradingEngine.denormalizeGrade(row.normalized_avg_score, versionRow);
+          });
+        }
+      }
+
+      // ── 5. Compute metrics ──────────────────────────────────────────────
+      const overallGpa = subjects.length > 0
+        ? subjects.reduce((s, r) => s + (r.avg_score || 0), 0) / subjects.length
+        : 0;
+      const totalCredits = subjects.reduce((s, r) => s + (r.credits || 0), 0);
+      const approvedCount = subjects.filter(r => (r.avg_score || 0) >= 3.0).length;
+      const atRiskCount = subjects.length - approvedCount;
+
+      const criticalSubjects = subjects
+        .filter(r => (r.avg_score || 0) < 3.0)
+        .sort((a, b) => (a.avg_score || 0) - (b.avg_score || 0))
+        .slice(0, 3)
+        .map(r => ({
+          id: r.id,
+          name: r.name,
+          avgScore: parseFloat((r.avg_score || 0).toFixed(2)),
+          delta: parseFloat(((r.avg_score || 0) - (r.target_grade || 3.0)).toFixed(2)),
+          color: r.color || '#FF2D55',
+          targetGrade: r.target_grade || 3.0,
+          icon: r.icon || 'book-outline',
+        }));
+
+      // ── 6. Recent activity (last 5 assessments across all subjects) ────
+      const recentActivity = await new Promise((resolve) =>
+        db.all(
+          `SELECT a.id, a.name, a.subject_id, a.date,
+                  s.name as subject_name, s.color as subject_color
+           FROM assessments a
+           JOIN subjects s ON a.subject_id = s.id
+           WHERE s.user_id = ? AND a.date IS NOT NULL
+           ORDER BY a.date DESC
+           LIMIT 5`,
+          [userId],
+          (e, rows) => resolve(rows || [])
+        )
+      );
+
+      res.json({
+        overallGpa: parseFloat(overallGpa.toFixed(2)),
+        totalCredits,
+        subjectCount: subjects.length,
+        approvedCount,
+        atRiskCount,
+        criticalSubjects,
+        recentActivity: recentActivity.map(a => ({
+          id: a.id,
+          name: a.name,
+          subjectId: a.subject_id,
+          subjectName: a.subject_name,
+          subjectColor: a.subject_color,
+          date: a.date,
+        })),
+      });
+
+    } catch (error) {
+      console.error('[getSemesterSummary] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+};
+
 exports.getProgressTrends = (req, res) => {
   const { userId } = req.params;
   const { days = 30 } = req.query;

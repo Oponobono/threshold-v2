@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { theme } from '../../styles/theme';
 import { alertRef } from '../ui/CustomAlert';
-import { createSubject } from '../../services/api';
+import { updateSubject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
+import type { Subject } from '../../services/api';
 
 const SUBJECT_COLORS = [
   '#E7EDF8', '#DDE7FF', '#EAF4EE', '#FCEFD9', '#F7E9EE', '#ECE8FF',
@@ -21,16 +22,17 @@ const SUBJECT_ICONS = [
   'dna', 'laptop', 'compass-outline', 'lightbulb-on-outline',
 ] as const;
 
-interface CreateSubjectModalProps {
+interface EditSubjectModalProps {
   visible: boolean;
+  subject: Subject | null;
   onClose: () => void;
 }
 
-export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps) => {
+export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModalProps) => {
   const { t } = useTranslation();
   const { loadAllData } = useDataStore();
-  
-  const [isSavingSubject, setIsSavingSubject] = useState(false);
+
+  const [isSaving, setIsSaving] = useState(false);
   const [subjectName, setSubjectName] = useState('');
   const [subjectProfessor, setSubjectProfessor] = useState('');
   const [subjectCredits, setSubjectCredits] = useState('');
@@ -38,53 +40,50 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
   const [selectedColor, setSelectedColor] = useState(SUBJECT_COLORS[0]);
   const [selectedIcon, setSelectedIcon] = useState<(typeof SUBJECT_ICONS)[number]>('book-outline');
 
-  const resetForm = () => {
-    setSubjectName('');
-    setSubjectProfessor('');
-    setSubjectCredits('');
-    setSubjectTarget('');
-    setSelectedColor(SUBJECT_COLORS[0]);
-    setSelectedIcon('book-outline');
-  };
-
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
+  useEffect(() => {
+    if (subject) {
+      setSubjectName(subject.name || '');
+      setSubjectProfessor(subject.professor || '');
+      setSubjectCredits(subject.credits != null ? String(subject.credits) : '');
+      setSubjectTarget(subject.target_grade != null ? String(subject.target_grade) : '');
+      setSelectedColor(subject.color || SUBJECT_COLORS[0]);
+      setSelectedIcon((subject.icon as any) || 'book-outline');
+    }
+  }, [subject]);
 
   const handleSave = async () => {
+    if (!subject?.id) return;
     if (!subjectName.trim()) {
       alertRef.show({ title: t('common.error'), message: t('dashboard.newSubject.errors.nameRequired'), type: 'warning' });
       return;
     }
 
     try {
-      setIsSavingSubject(true);
-      await createSubject({
+      setIsSaving(true);
+      await updateSubject(subject.id, {
         name: subjectName.trim(),
-        professor: subjectProfessor.trim() || undefined,
+        professor: subjectProfessor.trim() || null,
+        credits: subjectCredits ? Number(subjectCredits) : null,
+        target_grade: subjectTarget ? Number(subjectTarget) : null,
         color: selectedColor,
         icon: selectedIcon,
-        credits: subjectCredits ? Number(subjectCredits) : undefined,
-        target_grade: subjectTarget ? Number(subjectTarget) : undefined,
       });
 
       await loadAllData(true);
-      handleClose();
+      onClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.newSubject.errors.createFailed'), type: 'error' });
     } finally {
-      setIsSavingSubject(false);
+      setIsSaving(false);
     }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <Pressable style={styles.sheetBackdrop} onPress={handleClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
         <Pressable style={styles.sheetContent} onPress={() => null}>
           <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{t('dashboard.newSubject.title')}</Text>
-          <Text style={styles.sheetSubtitle}>{t('dashboard.newSubject.subtitle')}</Text>
+          <Text style={styles.sheetTitle}>{t('subjects.edit')} — {subject?.name}</Text>
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 10 }}>
             <Text style={styles.sheetLabel}>{t('dashboard.newSubject.name')}</Text>
@@ -151,16 +150,16 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
           </ScrollView>
 
           <View style={styles.sheetActions}>
-            <TouchableOpacity style={[styles.sheetCancelBtn, { flex: 1 }]} onPress={handleClose}>
+            <TouchableOpacity style={[styles.sheetCancelBtn, { flex: 1 }]} onPress={onClose}>
               <Text style={styles.sheetCancelText}>{t('dashboard.newSubject.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.sheetSaveBtn, { flex: 1 }, isSavingSubject && { opacity: 0.6 }]}
+              style={[styles.sheetSaveBtn, { flex: 1 }, isSaving && { opacity: 0.6 }]}
               onPress={handleSave}
-              disabled={isSavingSubject}
+              disabled={isSaving}
             >
               <Text style={styles.sheetSaveText}>
-                {isSavingSubject ? t('dashboard.newSubject.saving') : t('dashboard.newSubject.save')}
+                {isSaving ? t('dashboard.newSubject.saving') : t('subjects.saveThreshold')}
               </Text>
             </TouchableOpacity>
           </View>

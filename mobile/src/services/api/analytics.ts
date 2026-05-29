@@ -225,6 +225,53 @@ export const getProgressTrends = async (userId: number, days?: number): Promise<
   return data;
 };
 
+export interface CriticalSubjectItem {
+  id: number;
+  name: string;
+  avgScore: number;
+  delta: number;
+  color: string;
+  targetGrade: number;
+  icon: string;
+}
+
+export interface RecentActivityItem {
+  id: number;
+  name: string;
+  subjectId: number;
+  subjectName: string;
+  subjectColor: string;
+  date: string;
+}
+
+export interface SemesterSummary {
+  overallGpa: number;
+  totalCredits: number;
+  subjectCount: number;
+  approvedCount: number;
+  atRiskCount: number;
+  criticalSubjects: CriticalSubjectItem[];
+  recentActivity: RecentActivityItem[];
+}
+
+/**
+ * Obtiene resumen consolidado del semestre para el Hub de materias
+ * GET /api/analytics/semester-summary/:userId
+ */
+export const getSemesterSummary = async (): Promise<SemesterSummary> => {
+  const { getUserId } = await import('./auth');
+  const userId = await getUserId();
+  if (!userId) throw new Error('Usuario no autenticado');
+
+  const response = await fetchWithFallback(`/analytics/semester-summary/${userId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Error al obtener resumen del semestre');
+  const data = await parseJsonSafely(response);
+  return data;
+};
+
 export interface MasteryRadarItem {
   name: string;
   value: number;

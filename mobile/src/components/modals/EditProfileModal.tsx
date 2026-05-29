@@ -487,7 +487,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               >
                 <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
                 <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>
-                  {t('settings.save', 'Guardar cambios')}
+                  {t('settings.save', 'Guardar')}
                 </Text>
               </TouchableOpacity>
             </View>

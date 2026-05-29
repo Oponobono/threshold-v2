@@ -101,6 +101,7 @@ router.get('/analytics/deck-stats/:deckId/:userId', analyticsController.getDeckS
  *       400:
  *         description: userId requerido
  */
+router.get('/analytics/semester-summary/:userId', analyticsController.getSemesterSummary);
 router.get('/analytics/progress-trends/:userId', analyticsController.getProgressTrends);
 
 module.exports = router;

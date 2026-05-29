@@ -9,7 +9,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { getCurrentUserProfile, getPredictedSubject, getTodaySchedules, createStudySession, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
+import { getCurrentUserProfile, getPredictedSubject, getTodaySchedules, createStudySession, deleteSubject, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
 import { getGlobalGPAAnalytics } from '../../src/services/api/analytics';
 import { useDataStore } from '../../src/store/useDataStore';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
@@ -27,6 +27,7 @@ import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal
 import { FlashcardsModal } from '../../src/components/flashcards/FlashcardsModal';
 import { SubjectTile, MetricCard, ActionCircle, PerformanceRow } from '../../src/components/dashboard/DashboardWidgets';
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
+import { EditSubjectModal } from '../../src/components/dashboard/EditSubjectModal';
 import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
 import { CreateTaskModal } from '../../src/components/dashboard/CreateTaskModal';
 import { SchedulePlannerModal } from '../../src/components/dashboard/SchedulePlannerModal';
@@ -51,6 +52,8 @@ export default function HybridDashboardScreen() {
   const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions } = useDataStore();
   const { preloadRelatedData } = useCachePreload();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
+  const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const subjectsCarouselRef = useRef<FlatList<any> | null>(null);
 
   // Quick Add Menu states
@@ -151,6 +154,35 @@ export default function HybridDashboardScreen() {
       setIsRefreshing(false);
     }
   }, [loadData, profile?.id, refreshPredictions]);
+
+  const handleEditSubject = useCallback((subject: Subject) => {
+    setEditingSubject(subject);
+    setIsEditSubjectModalVisible(true);
+  }, []);
+
+  const handleDeleteSubject = useCallback((subject: Subject) => {
+    alertRef.show({
+      title: t('subjects.deleteSubjectTitle'),
+      message: t('subjects.deleteSubjectConfirm'),
+      type: 'confirm',
+      buttons: [
+        { text: t('common.cancel') || 'Cancelar', style: 'cancel' as const },
+        {
+          text: t('common.delete') || 'Eliminar',
+          style: 'destructive' as const,
+          onPress: async () => {
+            try {
+              await deleteSubject(subject.id);
+              await loadAllData(true);
+              alertRef.show({ title: t('subjects.deleteSubjectTitle'), message: t('subjects.deleteSubjectSuccess'), type: 'info' });
+            } catch {
+              alertRef.show({ title: t('subjects.error') || 'Error', message: t('subjects.deleteSubjectError'), type: 'error' });
+            }
+          },
+        },
+      ],
+    });
+  }, [t, loadAllData]);
 
   // Derivar el próximo examen directamente de los datos del store
   const nextAssessment = useMemo(() => {
@@ -420,7 +452,7 @@ export default function HybridDashboardScreen() {
               keyExtractor={(item) => item.__key}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.subjectsCarousel}
-              renderItem={({ item }) => <SubjectTile subject={item} />}
+              renderItem={({ item }) => <SubjectTile subject={item} onEdit={handleEditSubject} onDelete={handleDeleteSubject} />}
               ItemSeparatorComponent={() => <View style={{ width: SUBJECT_CARD_GAP }} />}
               initialScrollIndex={initialScrollIndex}
               getItemLayout={(_, index) => ({
@@ -715,6 +747,12 @@ export default function HybridDashboardScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <EditSubjectModal
+        visible={isEditSubjectModalVisible}
+        subject={editingSubject}
+        onClose={() => { setIsEditSubjectModalVisible(false); setEditingSubject(null); }}
+      />
 
       <CreateGradeModal
         visible={isGradeModalVisible}
