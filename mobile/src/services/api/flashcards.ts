@@ -11,6 +11,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { FlashcardDeck, Flashcard } from './types';
 import { cacheService, CACHE_KEYS } from '../../services/cacheService';
+import { offlineSyncService } from '../../services/offlineSyncService';
 
 /** Obtiene todos los mazos del usuario autenticado, incluyendo los recibidos por colaboración */
 export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
@@ -185,15 +186,27 @@ export const createEvaluationItem = async (payload: {
 
 /**
  * Actualiza el estado de repaso de una tarjeta según la calificación del alumno.
+ * Si no hay conexión, encola la operación para sincronizar después.
  * @param status - Nuevo estado: 'new' | 'learning' | 'review'
  */
 export const updateFlashcardStatus = async (cardId: number, status: string) => {
-  const response = await fetchWithFallback(`/flashcards/${cardId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
-  });
-  return await parseJsonSafely(response);
+  try {
+    const response = await fetchWithFallback(`/flashcards/${cardId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    return await parseJsonSafely(response);
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando updateFlashcardStatus para card ${cardId}`, error);
+    await offlineSyncService.addPendingOperation(
+      'PUT',
+      `/flashcards/${cardId}`,
+      'flashcard_status',
+      { status }
+    );
+    return { success: true, status, _isPending: true };
+  }
 };
 
 /**
@@ -307,6 +320,7 @@ export interface SnoozeStatus {
 
 /**
  * Snooze a card for a specified duration
+ * Si no hay conexión, encola la operación para sincronizar después.
  * @param cardId - ID de la tarjeta a snoozar
  * @param durationMinutes - Duración en minutos (30, 240, 1440, 4320)
  * @param reason - Razón opcional del snooze
@@ -315,19 +329,31 @@ export const snoozeCard = async (
   cardId: number,
   durationMinutes: number,
   reason?: string
-): Promise<{ success: boolean; snoozedUntil: string }> => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(
-    `/flashcards/${cardId}/snooze`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, durationMinutes, reason }),
-    }
-  );
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al snoozar tarjeta');
-  return data;
+): Promise<{ success: boolean; snoozedUntil: string; _isPending?: boolean }> => {
+  const userId = await getUserId().catch(() => null);
+  try {
+    const response = await fetchWithFallback(
+      `/flashcards/${cardId}/snooze`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, durationMinutes, reason }),
+      }
+    );
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al snoozar tarjeta');
+    return data;
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando snoozeCard para card ${cardId}`, error);
+    await offlineSyncService.addPendingOperation(
+      'POST',
+      `/flashcards/${cardId}/snooze`,
+      'flashcard_snooze',
+      { userId: userId || undefined, durationMinutes, reason }
+    );
+    const snoozedUntil = new Date(Date.now() + durationMinutes * 60000).toISOString();
+    return { success: true, snoozedUntil, _isPending: true };
+  }
 };
 
 /**
@@ -411,13 +437,23 @@ export const autoUnsnoozeExpired = async (): Promise<{ success: boolean; resumed
 
 /** Elimina una tarjeta individual de un mazo por su ID */
 export const deleteFlashcard = async (cardId: number) => {
-  const response = await fetchWithFallback(`/flashcards/${cardId}`, {
-    method: 'DELETE',
-  });
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al eliminar la tarjeta');
-  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK);
-  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK);
-  cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK);
-  return data;
+  try {
+    const response = await fetchWithFallback(`/flashcards/${cardId}`, {
+      method: 'DELETE',
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al eliminar la tarjeta');
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK);
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK);
+    cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK);
+    return data;
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando deleteFlashcard para card ${cardId}`, error);
+    await offlineSyncService.addPendingOperation(
+      'DELETE',
+      `/flashcards/${cardId}`,
+      'flashcard_delete'
+    );
+    return { success: true, _isPending: true };
+  }
 };

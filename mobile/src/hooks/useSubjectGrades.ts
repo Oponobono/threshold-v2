@@ -1,7 +1,9 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Assessment, Subject, UserProfile } from '../services/api';
 import { getProjectionAnalytics } from '../services/api/assessments';
+import { useConnectivityStore } from '../store/useConnectivityStore';
+import { calculateProjection } from '../utils/projectionEngine';
 import {
   parseDate,
   parseWeight,
@@ -48,13 +50,36 @@ export function useSubjectGrades(
     maxScale?: number;
   } | null>(null);
 
+  // Cliente offline: calcular proyección local cuando no hay conexión
+  const isOnline = useConnectivityStore((s) => s.isOnline);
+  const [offlineProjection] = useState(() => calculateProjection(assessments, selectedSubject, profile));
+  const offlineFallbackRef = useRef(false);
+
   // Efecto: Cargar datos de proyección del backend cuando la materia cambie o se actualicen assessments
   useEffect(() => {
     console.log('[useSubjectGrades] 🔍 Effect ejecutado - selectedSubject.id:', selectedSubject?.id, 'assessmentCount:', assessments.length);
-    
+
+    if (!isOnline) {
+      console.log('[useSubjectGrades] 📡 Modo offline: usando proyección local');
+      offlineFallbackRef.current = true;
+      const local = calculateProjection(assessments, selectedSubject, profile);
+      setProjectionData({
+        currentAverage: local.currentAverage,
+        currentEMA: local.currentEMA,
+        projectedGrade: local.projectedGrade,
+        delta: local.delta,
+        evaluatedWeight: local.evaluatedWeight,
+        remainingWeight: local.remainingWeight,
+        maxScale: SCALE_MAX,
+      });
+      return;
+    }
+
     if (!selectedSubject?.id) {
       console.log('[useSubjectGrades] ⚠️ selectedSubject.id no disponible:', selectedSubject?.id);
-      setProjectionData(null);
+      if (!offlineFallbackRef.current) {
+        setProjectionData(null);
+      }
       return;
     }
 
@@ -72,19 +97,38 @@ export function useSubjectGrades(
             remainingWeight: data.remainingWeight,
             assessmentCount: data.assessmentCount,
           });
+          offlineFallbackRef.current = false;
           setProjectionData(data);
         } else {
-          console.warn('[useSubjectGrades] ⚠️ getProjectionAnalytics retornó null');
-          setProjectionData(null);
+          console.warn('[useSubjectGrades] ⚠️ getProjectionAnalytics retornó null, usando local');
+          const local = calculateProjection(assessments, selectedSubject, profile);
+          setProjectionData({
+            currentAverage: local.currentAverage,
+            currentEMA: local.currentEMA,
+            projectedGrade: local.projectedGrade,
+            delta: local.delta,
+            evaluatedWeight: local.evaluatedWeight,
+            remainingWeight: local.remainingWeight,
+            maxScale: SCALE_MAX,
+          });
         }
       } catch (error) {
-        console.warn(`[useSubjectGrades] ⚠️ Error cargando proyección:`, error);
-        setProjectionData(null);
+        console.warn(`[useSubjectGrades] ⚠️ Error cargando proyección, usando local:`, error);
+        const local = calculateProjection(assessments, selectedSubject, profile);
+        setProjectionData({
+          currentAverage: local.currentAverage,
+          currentEMA: local.currentEMA,
+          projectedGrade: local.projectedGrade,
+          delta: local.delta,
+          evaluatedWeight: local.evaluatedWeight,
+          remainingWeight: local.remainingWeight,
+          maxScale: SCALE_MAX,
+        });
       }
     };
 
     loadProjection();
-  }, [selectedSubject?.id, assessments.length]);
+  }, [selectedSubject?.id, assessments.length, isOnline]);
 
   const gradedAssessments = useMemo(() => {
     // Only include assessments with actual grades/scores

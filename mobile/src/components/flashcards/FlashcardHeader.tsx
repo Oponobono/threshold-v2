@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { flashcardsScreenStyles as styles } from '../../styles/FlashcardsScreen.styles';
+import { offlineSyncService } from '../../services/offlineSyncService';
 
 interface Props {
   showSearch: boolean;
@@ -13,12 +14,27 @@ interface Props {
 
 export const FlashcardHeader: React.FC<Props> = ({ showSearch, onToggleSearch, onOpenMenu }) => {
   const { t } = useTranslation();
+  const pendingCount = offlineSyncService.getPendingFlashcardCount();
+
   return (
     <View style={styles.headerRow}>
       <Text style={styles.headerTitle}>
         {t('flashcards.decks')}
       </Text>
       <View style={styles.headerActions}>
+        {pendingCount > 0 && (
+          <View style={{
+            backgroundColor: theme.colors.warning,
+            borderRadius: 10,
+            paddingHorizontal: 7,
+            paddingVertical: 2,
+            marginRight: 4,
+          }}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+              {pendingCount}
+            </Text>
+          </View>
+        )}
         <TouchableOpacity
           style={[styles.backBtn, showSearch && styles.searchBtnActive]}
           onPress={onToggleSearch}

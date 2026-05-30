@@ -86,14 +86,27 @@ export const loadFromCacheSync = <T>(key: string, ttl: number): T | null => {
     const isExpired = Date.now() - entry.timestamp > ttl;
 
     if (isExpired) {
-      getStorage().remove(key);
-      return null;
+      // Stale-while-revalidate: devolver datos expirados en lugar de eliminarlos.
+      // Cuando el usuario está offline, es mejor mostrar datos antiguos que nada.
+      // El store decidirá cuándo refrescar basándose en isCacheEntryExpired().
+      console.log(`[Cache] ⚠️ Datos expirados para ${key}, sirviendo stale`);
     }
 
     return entry.data;
   } catch (error) {
     console.warn(`[Cache] ❌ Error cargando ${key}:`, error);
     return null;
+  }
+};
+
+export const isCacheEntryExpired = <T>(key: string, ttl: number): boolean => {
+  try {
+    const item = getStorage().getString(key);
+    if (!item) return true;
+    const entry: CacheEntry<T> = JSON.parse(item);
+    return Date.now() - entry.timestamp > ttl;
+  } catch {
+    return true;
   }
 };
 

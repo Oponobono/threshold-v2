@@ -106,8 +106,10 @@ export const loadPredictionsFromCache = async () => {
       if (timestamp) {
         const age = Date.now() - new Date(timestamp).getTime();
         if (age > PREDICTIONS_CACHE_TTL_MS) {
-          console.log(`[PredictionsCache] Cache expirado (${Math.round(age / 60000)}min > 30min), ignorando`);
-          return null;
+          // Stale-while-revalidate: devolver datos expirados en lugar de null
+          // cuando el usuario está offline, es mejor mostrar predicciones antiguas que nada
+          console.log(`[PredictionsCache] Cache expirado (${Math.round(age / 60000)}min > 30min), sirviendo stale`);
+          return JSON.parse(cached);
         }
       }
       console.log(`[PredictionsCache] Predicciones cargadas del cache`);

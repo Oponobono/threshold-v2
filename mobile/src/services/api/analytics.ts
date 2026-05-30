@@ -1,4 +1,5 @@
 import { fetchWithFallback, parseJsonSafely, activeBaseUrl } from './client';
+import { offlineSyncService } from '../../services/offlineSyncService';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
@@ -29,6 +30,7 @@ export interface CardReviewResponse {
   newRepetitions: number;
   retention: number;
   message: string;
+  _isPending?: boolean;
 }
 
 /**
@@ -57,14 +59,36 @@ export const recordCardReview = async (
   result: 'correct' | 'incorrect',
   responseTimeMs: number
 ): Promise<CardReviewResponse> => {
-  const response = await fetchWithFallback(`/flashcards/${cardId}/review`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, result, responseTimeMs }),
-  });
-  if (!response.ok) throw new Error('Error al registrar revisión de tarjeta');
-  const data = await parseJsonSafely(response);
-  return data;
+  try {
+    const response = await fetchWithFallback(`/flashcards/${cardId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, result, responseTimeMs }),
+    });
+    if (!response.ok) throw new Error('Error al registrar revisión de tarjeta');
+    const data = await parseJsonSafely(response);
+    return data;
+  } catch (error) {
+    console.warn(`[Analytics] Offline: encolando recordCardReview para card ${cardId}`, error);
+    await offlineSyncService.addPendingOperation(
+      'POST',
+      `/flashcards/${cardId}/review`,
+      'flashcard_review',
+      { userId, result, responseTimeMs }
+    );
+    return {
+      success: true,
+      cardId,
+      quality: 3,
+      nextReviewDate: new Date(Date.now() + 86400000).toISOString(),
+      newStability: 0,
+      newDifficulty: 0,
+      newRepetitions: 1,
+      retention: 0.9,
+      message: 'Revisión guardada localmente, pendiente de sincronización',
+      _isPending: true,
+    } as CardReviewResponse & { _isPending?: boolean };
+  }
 };
 
 /**

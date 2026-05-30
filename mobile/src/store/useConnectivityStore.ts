@@ -50,7 +50,7 @@ export const useConnectivityStore = create<ConnectivityStoreState>((set) => ({
     set({
       isSyncing,
       state: isSyncing ? 'syncing' : 'online',
-      syncMessage: isSyncing ? 'Sincronizando...' : '',
+      syncMessage: isSyncing ? i18n.t('common.syncing') : '',
     });
   },
 

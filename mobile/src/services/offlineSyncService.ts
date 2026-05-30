@@ -15,7 +15,7 @@ interface PendingOperation {
   timestamp: number;
   retries: number;
   maxRetries: number;
-  operationType: 'subject' | 'assessment' | 'schedule' | 'photo'; // Para logging
+  operationType: 'subject' | 'assessment' | 'schedule' | 'photo' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete';
 }
 
 let _storage: MMKV | null = null;
@@ -46,7 +46,7 @@ export const offlineSyncService = {
   addPendingOperation: async (
     type: 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
-    operationType: 'subject' | 'assessment' | 'schedule' | 'photo',
+    operationType: 'subject' | 'assessment' | 'schedule' | 'photo' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete',
     payload?: any
   ): Promise<string> => {
     return withWriteLock(async () => {
@@ -104,7 +104,7 @@ export const offlineSyncService = {
   /**
    * Obtiene operaciones pendientes de un tipo específico
    */
-  getPendingByType: (operationType: 'subject' | 'assessment' | 'schedule' | 'photo'): PendingOperation[] => {
+  getPendingByType: (operationType: 'subject' | 'assessment' | 'schedule' | 'photo' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete'): PendingOperation[] => {
     return offlineSyncService
       .getPendingOperations()
       .filter((op) => op.operationType === operationType);
@@ -145,7 +145,11 @@ export const offlineSyncService = {
 
           const response = await fetchFn(operation.endpoint, options);
 
-          if (response.ok || (response.status >= 200 && response.status < 300)) {
+          // 404 en DELETE se considera éxito (el recurso ya fue eliminado)
+          const okStatus = response.ok || (response.status >= 200 && response.status < 300);
+          const delete404 = operation.type === 'DELETE' && response.status === 404;
+
+          if (okStatus || delete404) {
             console.log(
               `[OfflineSync] ✅ ${operation.operationType} sincronizado (${operation.type} ${operation.endpoint})`
             );
@@ -212,6 +216,17 @@ export const offlineSyncService = {
     } catch (error) {
       console.error('[OfflineSync] Error limpiando cola:', error);
     }
+  },
+
+  /**
+   * Obtiene el total de operaciones de flashcards pendientes
+   */
+  getPendingFlashcardCount: (): number => {
+    return offlineSyncService
+      .getPendingOperations()
+      .filter((op) =>
+        ['flashcard_review', 'flashcard_status', 'flashcard_snooze', 'flashcard_delete'].includes(op.operationType)
+      ).length;
   },
 };
 
