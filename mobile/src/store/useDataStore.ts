@@ -105,7 +105,6 @@ export const useDataStore = create<DataState>((set, get) => ({
 
     // 🌐 Hay conexión: mostrar indicador de sincronización y refrescar
     set({ isSyncing: true, syncStatusMessage: 'Sincronizando datos...' });
-    useConnectivityStore.getState().setSyncing(true);
 
     try {
       console.log('[DataStore] 🔄 Actualizando desde servidor...');
@@ -162,16 +161,13 @@ export const useDataStore = create<DataState>((set, get) => ({
         get().preloadOfflineCache();
 
         // ✅ Sincronización exitosa
-        useConnectivityStore.getState().setSuccess();
       } else {
         // No se pudo obtener ningún dato del servidor a pesar de estar online
         console.warn('[DataStore] ⚠️ No se obtuvieron datos del servidor');
-        useConnectivityStore.getState().setSyncing(false);
       }
       
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
-      useConnectivityStore.getState().setSyncing(false);
     } finally {
       set({
         isInitialLoading: false,

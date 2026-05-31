@@ -150,7 +150,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
     try {
       const jsonString = JSON.stringify(templateDeck, null, 2);
       const fileName = t('flashcards.template.fileName');
-      const tempFilePath = `${FileSystem.cacheDirectory}${fileName}`;
+      const tempFilePath = `${FileSystem.documentDirectory}${fileName}`;
       
       // Guardar el archivo temporalmente
       await FileSystem.writeAsStringAsync(tempFilePath, jsonString, {

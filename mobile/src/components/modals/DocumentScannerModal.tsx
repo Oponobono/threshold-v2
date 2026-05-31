@@ -5,7 +5,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { documentScannerStyles as localStyles } from '../../styles/DocumentScannerModal.styles';
-import { Subject, createPhoto, createScannedDocument, extractTextFromImage } from '../../services/api';
+import { Subject, createPhoto, createScannedDocument } from '../../services/api';
+import { extractTextFromImageHybrid } from '../../services/hybridAIService';
 import { autoUploadIfEnabled } from '../../services/backup/backupService';
 import { AdvancedImageEnhancer, AdvancedImageEnhancerRef } from '../ai/AdvancedImageEnhancer';
 import * as Print from 'expo-print';
@@ -150,7 +151,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
         let ocrText: string | null = null;
         if (base64Img) {
           try {
-            ocrText = await extractTextFromImage(base64Img);
+            ocrText = await extractTextFromImageHybrid(base64Img);
           } catch (ocrErr) {
             console.warn('[DocumentScannerModal] OCR automático falló, se guardará sin texto:', ocrErr);
           }
@@ -215,7 +216,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
         return;
       }
 
-      const text = await extractTextFromImage(base64Data);
+      const text = await extractTextFromImageHybrid(base64Data);
       
       if (!text || text.trim() === '') {
         showAlert({ title: t('common.notice') || 'Sin texto', message: t('common.errors.noTextDetected') || 'No se detectó texto en la imagen.', type: 'info' });

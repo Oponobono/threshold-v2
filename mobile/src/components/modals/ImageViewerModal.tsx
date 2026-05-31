@@ -3,7 +3,8 @@ import { View, Modal, TouchableOpacity, Image, FlatList, Dimensions, Share, Plat
 import { useCustomAlert } from '../ui/CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { deletePhoto, extractTextFromImage, updatePhoto } from '../../services/api';
+import { deletePhoto, updatePhoto } from '../../services/api';
+import { extractTextFromImageHybrid } from '../../services/hybridAIService';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
 import { theme } from '../../styles/theme';
@@ -106,7 +107,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
       const base64Data = await FileSystem.readAsStringAsync(currentPhoto.local_uri, {
         encoding: 'base64',
       });
-      const text = await extractTextFromImage(base64Data);
+      const text = await extractTextFromImageHybrid(base64Data);
       
       if (!text || text.trim() === '') {
         showAlert({ title: t('common.notice') || 'Aviso', message: t('common.errors.noTextDetected') || 'No se detectó texto en la imagen.', type: 'info' });

@@ -15,19 +15,22 @@
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
-  View, Text, Modal, TouchableOpacity, ScrollView,
-  TextInput, KeyboardAvoidingView, Platform, StyleSheet,
+  View, Text, TouchableOpacity, ScrollView,
+  TextInput, Keyboard, Platform, StyleSheet,
   Animated, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { sendAIChatMessage, getChatHistory, clearChatHistory, processDocumentUpload, generateStudyMaterialFromChat } from '../../services/api/ai';
+import { getChatHistory, clearChatHistory, generateStudyMaterialFromChat } from '../../services/api/ai';
+import { sendHybridChatMessage, processDocumentUploadHybrid } from '../../services/hybridAIService';
 import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
+import { useLocalAIStore } from '../../store/useLocalAIStore';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
 import LottieView from 'lottie-react-native';
 import { useTranslation } from 'react-i18next';
+import { OfflineIndicator } from '../ui/OfflineIndicator';
 import { StudyModeSelector } from '../evaluation/StudyModeSelector';
 import { StudyMode } from '../../services/api/types';
 
@@ -122,6 +125,8 @@ export interface SubjectAIChatModalProps {
   isVisible: boolean;
   /** Callback para cerrar el modal */
   onClose: () => void;
+  /** Callback para volver al selector de contexto */
+  onGoBack?: () => void;
   /** ID de la materia */
   subjectId?: number;
   /** ID del usuario */
@@ -360,7 +365,7 @@ const TypingIndicator: React.FC = () => {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
-  isVisible, onClose, subjectName, subjectId, userId, contextText, contextItemCount,
+  isVisible, onClose, onGoBack, subjectName, subjectId, userId, contextText, contextItemCount,
 }) => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -376,6 +381,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [localContextText, setLocalContextText] = useState(contextText);
   const [uploadedDocContext, setUploadedDocContext] = useState('');
   
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(-100)).current;
 
@@ -554,6 +560,25 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     }
   }, [isVisible, subjectId, userId]);
 
+  /** Sincronizar padding con el teclado */
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
+  /** Forzar proveedor local si el modo offline está activo */
+  const forceOfflineMode = useLocalAIStore((s) => s.forceOfflineMode);
+  useEffect(() => {
+    if (forceOfflineMode) {
+      setCurrentProvider('local');
+    }
+  }, [forceOfflineMode]);
+
   /** Scroll automático al último mensaje */
   const scrollToBottom = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -583,7 +608,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
     try {
       const combinedContext = localContextText + uploadedDocContext;
-      const data = await sendAIChatMessage(combinedContext, updatedMessages.filter(m => !m.isDocument), sessionId, currentProvider);
+      const data = await sendHybridChatMessage(combinedContext, updatedMessages.filter(m => !m.isDocument), sessionId, currentProvider);
 
       if (data?.context_truncated) setIsTruncated(true);
 
@@ -741,7 +766,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       };
 
       // Procesar con Gemini
-      const processResult = await processDocumentUpload(fileObj, `Extrae la información completa y puntos clave de este documento para que sirva de contexto en nuestra conversación.`);
+      const processResult = await processDocumentUploadHybrid(fileObj, `Extrae la información completa y puntos clave de este documento para que sirva de contexto en nuestra conversación.`);
 
       const newDocText = `\n\n[DOCUMENTO SUBIDO: ${file.name}]\n${processResult.result}`;
 
@@ -789,20 +814,12 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     }
   }, [subjectId, showToast]);
 
+  if (!isVisible) return null;
+
   return (
-    <Modal
-      visible={isVisible}
-      animationType="slide"
-      transparent
-      statusBarTranslucent
-      onRequestClose={handleClose}
-    >
-      <View style={s.backdrop}>
-        <KeyboardAvoidingView
-          style={{ flex: 1, width: '100%', justifyContent: 'flex-end' }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
-        >
+    <View style={StyleSheet.absoluteFill}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose} />
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
           <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}>
 
             {/* Asa de arrastre */}
@@ -823,6 +840,12 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 <View style={s.aiIconWrap}>
                   <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
                 </View>
+                {/* Volver al selector de contexto */}
+                {onGoBack && (
+                  <TouchableOpacity style={s.goBackBtn} onPress={onGoBack} activeOpacity={0.7}>
+                    <Ionicons name="arrow-back" size={18} color={TXT_PRI} />
+                  </TouchableOpacity>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={s.title}>Zyren</Text>
                   <Text style={s.subtitle} numberOfLines={1}>{subjectName}</Text>
@@ -833,26 +856,39 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 </TouchableOpacity>
               </View>
 
+              <OfflineIndicator />
+
               {/* Fila Inferior */}
               <View style={s.headerBottomRow}>
                 {/* Selector de proveedor LLM compacto */}
                 <View style={s.providerSelector}>
                   <TouchableOpacity
-                    style={[s.providerOption, currentProvider === 'groq' && s.providerOptionActive]}
-                    onPress={() => setCurrentProvider('groq')}
+                    style={[s.providerOption, currentProvider === 'groq' && s.providerOptionActive, forceOfflineMode && s.providerOptionDisabled]}
+                    onPress={() => !forceOfflineMode && setCurrentProvider('groq')}
                     activeOpacity={0.7}
+                    disabled={forceOfflineMode}
                   >
-                    <Text style={[s.providerLabel, currentProvider === 'groq' && s.providerLabelActive]}>
+                    <Text style={[s.providerLabel, currentProvider === 'groq' && s.providerLabelActive, forceOfflineMode && s.providerLabelDisabled]}>
                       ⚡
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[s.providerOption, currentProvider === 'gemini' && s.providerOptionActive]}
-                    onPress={() => setCurrentProvider('gemini')}
+                    style={[s.providerOption, currentProvider === 'gemini' && s.providerOptionActive, forceOfflineMode && s.providerOptionDisabled]}
+                    onPress={() => !forceOfflineMode && setCurrentProvider('gemini')}
+                    activeOpacity={0.7}
+                    disabled={forceOfflineMode}
+                  >
+                    <Text style={[s.providerLabel, currentProvider === 'gemini' && s.providerLabelActive, forceOfflineMode && s.providerLabelDisabled]}>
+                      🧠
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.providerOption, currentProvider === 'local' && s.providerOptionActive]}
+                    onPress={() => setCurrentProvider('local')}
                     activeOpacity={0.7}
                   >
-                    <Text style={[s.providerLabel, currentProvider === 'gemini' && s.providerLabelActive]}>
-                      🧠
+                    <Text style={[s.providerLabel, currentProvider === 'local' && s.providerLabelActive]}>
+                      📱
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1036,9 +1072,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           )}
 
           </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+        </View>
+    </View>
   );
 };
 
@@ -1108,6 +1143,13 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: BORDER,
+  },
+  goBackBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: BORDER,
+    marginRight: 8,
   },
 
   // Lista de mensajes

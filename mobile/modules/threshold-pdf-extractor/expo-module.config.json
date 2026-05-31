@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["ThresholdPdfExtractorModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.thresholdpdfextractor.ThresholdPdfExtractorModule"]
+  }
+}

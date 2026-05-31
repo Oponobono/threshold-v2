@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
 import { gradesStyles } from '../../styles/Grades.styles';
+import { OfflineIndicator } from '../ui/OfflineIndicator';
 
 interface GradesHeaderProps {
   isExportingPdf: boolean;
@@ -14,9 +15,12 @@ interface GradesHeaderProps {
 export const GradesHeader: React.FC<GradesHeaderProps> = ({ isExportingPdf, onDownloadReport, t }) => {
   return (
     <View style={gradesStyles.header}>
-      <View style={globalStyles.row}>
-        <Ionicons name="school-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
-        <Text style={gradesStyles.logoText}>{t('grades.title')}</Text>
+      <View style={{ flex: 1 }}>
+        <View style={globalStyles.row}>
+          <Ionicons name="school-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+          <Text style={gradesStyles.logoText}>{t('grades.title')}</Text>
+        </View>
+        <OfflineIndicator />
       </View>
       <View style={globalStyles.row}>
         <TouchableOpacity style={gradesStyles.termPill}>

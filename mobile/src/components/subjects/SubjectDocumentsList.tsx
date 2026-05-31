@@ -5,7 +5,8 @@ import { theme } from '../../styles/theme';
 import { subjectDetailStyles as sectionStyles } from '../../styles/SubjectDetail.styles';
 import { documentListStyles as styles } from '../../styles/SubjectDocumentsList.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
-import { deleteScannedDocument, updateScannedDocument, extractTextFromImage, extractTextFromPDF, deletePhoto } from '../../services/api';
+import { deleteScannedDocument, updateScannedDocument, deletePhoto } from '../../services/api';
+import { extractTextFromImageHybrid, extractTextFromPDFHybrid } from '../../services/hybridAIService';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as WebBrowser from 'expo-web-browser';
@@ -201,9 +202,9 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
       // Llamar a la API de OCR o extracción de PDF según el tipo de archivo
       let ocrText = '';
       if (doc.local_uri.toLowerCase().endsWith('.pdf')) {
-        ocrText = await extractTextFromPDF(fileContent);
+        ocrText = await extractTextFromPDFHybrid(fileContent);
       } else {
-        ocrText = await extractTextFromImage(fileContent);
+        ocrText = await extractTextFromImageHybrid(fileContent);
       }
 
       if (!ocrText) {
@@ -265,9 +266,9 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
         
         let text = '';
         if (doc.local_uri.toLowerCase().endsWith('.pdf')) {
-          text = await extractTextFromPDF(fileContent);
+          text = await extractTextFromPDFHybrid(fileContent);
         } else {
-          text = await extractTextFromImage(fileContent);
+          text = await extractTextFromImageHybrid(fileContent);
         }
         
         if (text && text.trim().length > 0) {

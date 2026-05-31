@@ -4,6 +4,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
 import { galleryStyles } from '../../styles/Gallery.styles';
+import { OfflineIndicator } from '../ui/OfflineIndicator';
 
 interface GalleryHeaderProps {
   isSearchOpen: boolean;
@@ -22,9 +23,12 @@ export const GalleryHeader: React.FC<GalleryHeaderProps> = ({
 }) => {
   return (
     <View style={[galleryStyles.header, isSearchOpen && { paddingBottom: 8 }]}>
-      <View style={globalStyles.row}>
-        <Ionicons name="images-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
-        <Text style={galleryStyles.logoText}>{t('gallery.title') || 'Galería'}</Text>
+      <View style={{ flex: 1 }}>
+        <View style={globalStyles.row}>
+          <Ionicons name="images-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+          <Text style={galleryStyles.logoText}>{t('gallery.title') || 'Galería'}</Text>
+        </View>
+        <OfflineIndicator />
       </View>
       <View style={globalStyles.row}>
         <TouchableOpacity style={galleryStyles.iconBtn} onPress={onToggleSearch}>

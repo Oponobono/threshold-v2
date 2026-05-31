@@ -28,6 +28,64 @@ function toExpoWeekday(apiDayOfWeek: number): number {
   return apiDayOfWeek === 7 ? 1 : apiDayOfWeek + 1;
 }
 
+// ── Download progress notifications ──────────────────────────────────────────────
+
+const DOWNLOAD_NOTIF_ID = 'model_download';
+
+export async function showDownloadProgressNotification(title: string, progress: number): Promise<void> {
+  const granted = await requestPermissions();
+  if (!granted) return;
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: DOWNLOAD_NOTIF_ID,
+    content: {
+      title: `⬇️ ${title}`,
+      body: `${progress}%`,
+      data: { type: 'download_progress' },
+      sound: false,
+      ...(Platform.OS === 'android' ? { priority: Notifications.AndroidNotificationPriority.LOW } : {}),
+    },
+    trigger: { seconds: 1, channelId: 'default', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+  });
+}
+
+export async function updateDownloadProgressNotification(title: string, progress: number): Promise<void> {
+  const granted = await requestPermissions();
+  if (!granted) return;
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: DOWNLOAD_NOTIF_ID,
+    content: {
+      title: `⬇️ ${title}`,
+      body: `${progress}%`,
+      data: { type: 'download_progress' },
+      sound: false,
+      ...(Platform.OS === 'android' ? { priority: Notifications.AndroidNotificationPriority.LOW } : {}),
+    },
+    trigger: { seconds: 1, channelId: 'default', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+  });
+}
+
+export async function completeDownloadNotification(title: string): Promise<void> {
+  const granted = await requestPermissions();
+  if (!granted) return;
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: DOWNLOAD_NOTIF_ID,
+    content: {
+      title: `✅ ${title}`,
+      body: 'Descarga completada',
+      data: { type: 'download_complete' },
+      sound: true,
+    },
+    trigger: { seconds: 1, channelId: 'default', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+  });
+}
+
+export async function cancelDownloadNotification(): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(DOWNLOAD_NOTIF_ID);
+}
+
 // ── Init ────────────────────────────────────────────────────────────────────────
 
 Notifications.setNotificationHandler({

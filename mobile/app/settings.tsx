@@ -15,6 +15,8 @@ import { EditProfileModal } from '../src/components/modals/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/modals/DeleteAccountModal';
 import { WeeklySummaryPicker } from '../src/components/settings/WeeklySummaryPicker';
+import { LocalAIEngineSection } from '../src/components/settings/LocalAIEngineSection';
+import { OfflineIndicator } from '../src/components/ui/OfflineIndicator';
 import type { WeeklyDigestConfig } from '../src/services/notificationService';
 import { cancelAllDeadlineNotifications, cancelWeeklyDigest, scheduleWeeklyDigest } from '../src/services/notificationService';
 import {
@@ -227,6 +229,7 @@ export default function SettingsScreen() {
           <Text style={styles.logoText}>Threshold</Text>
         </View>
         <View style={globalStyles.row}>
+          <OfflineIndicator />
           <TouchableOpacity style={styles.cancelBtn} onPress={() => router.replace('/(tabs)')}>
             <Text style={styles.cancelText}>{t('settings.cancel')}</Text>
           </TouchableOpacity>
@@ -424,6 +427,11 @@ export default function SettingsScreen() {
             })}
           </View>
         </View>
+
+        {/* ─────────────────────────────────────────── */}
+        {/* ── LOCAL AI ENGINE ── */}
+        {/* ─────────────────────────────────────────── */}
+        <LocalAIEngineSection />
 
         {/* ─────────────────────────────────────────── */}
         {/* ── NOTIFICATIONS ── */}

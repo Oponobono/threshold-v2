@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
-  View, Text, Modal, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, ScrollView,
   Animated, Dimensions, StyleSheet,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -219,10 +219,12 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     onGenerateFlashcards?.(selected);
   }, [allItems, selectedIds, onGenerateFlashcards, checkTextReadiness, getToastMessage, showToast]);
 
+  if (!isVisible) return null;
+
   return (
-    <Modal visible={isVisible} animationType="slide" transparent statusBarTranslucent onRequestClose={handleClose}>
-      <View style={s.backdrop}>
-        <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+    <View style={StyleSheet.absoluteFill}>
+      <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={handleClose} />
+      <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
 
           {/* Handle */}
           <View style={s.handle} />
@@ -361,7 +363,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
 
         </View>
       </View>
-    </Modal>
   );
 };
 

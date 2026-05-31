@@ -1,12 +1,13 @@
 /**
  * llmProviderManager.ts
  *
- * Gestor de preferencias del proveedor de LLM (Groq o Gemini).
- * Almacena y recupera la preferencia del usuario.
+ * Gestor de preferencias del proveedor de LLM (Groq, Gemini o Local).
+ * Almacena y recupera la preferencia del usuario. Respeta forceOfflineMode.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLocalAIStore } from '../store/useLocalAIStore';
 
-export type LLMProvider = 'groq' | 'gemini';
+export type LLMProvider = 'groq' | 'gemini' | 'local';
 
 const STORAGE_KEY = '@threshold_llm_provider';
 const DEFAULT_PROVIDER: LLMProvider = 'groq';
@@ -40,8 +41,16 @@ export async function setPreferredLLMProvider(provider: LLMProvider): Promise<vo
 }
 
 /**
- * Obtiene información descriptiva sobre cada proveedor
+ * Resuelve el proveedor actual respetando forceOfflineMode.
+ * Si el modo offline forzado está activo, retorna siempre 'local'.
+ * De lo contrario, retorna la preferencia guardada o el default.
  */
+export async function resolveProvider(): Promise<LLMProvider> {
+  const offline = useLocalAIStore.getState().forceOfflineMode;
+  if (offline) return 'local';
+  return getPreferredLLMProvider();
+}
+
 export const LLM_PROVIDERS = {
   groq: {
     label: 'Groq',

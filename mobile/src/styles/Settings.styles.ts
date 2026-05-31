@@ -210,4 +210,147 @@ export const settingsStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: theme.borderRadius.full,
   },
+
+  // ── Local AI Engine ──
+  localAISection: {
+    marginTop: 0,
+  },
+  modelCard: {
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 12,
+  },
+  modelCardActive: {
+    borderColor: theme.colors.primary,
+    borderWidth: 1.5,
+  },
+  modelCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  modelCardTitle: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+  },
+  modelCardTag: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    marginTop: 1,
+  },
+  activeModelBadge: {
+    backgroundColor: theme.colors.primary + '25',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.borderRadius.full,
+  },
+  activeModelBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  modelCardDesc: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  modelCardMetrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 6,
+  },
+  modelCardMetric: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    flexShrink: 1,
+  },
+  modelCardMetricLabel: {
+    color: theme.colors.text.primary,
+    fontWeight: '600',
+  },
+  modelCardCapabilities: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 10,
+  },
+  modelCardCap: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.borderRadius.full,
+    overflow: 'hidden',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  progressBarBg: {
+    flex: 1,
+    height: 6,
+    backgroundColor: theme.colors.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    minWidth: 32,
+    textAlign: 'right',
+  },
+  modelCardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  downloadBtn: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 10,
+    borderRadius: theme.borderRadius.full,
+    alignItems: 'center',
+  },
+  downloadBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  deleteBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.inputBackground,
+  },
+  deleteBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.text.secondary,
+  },
+  storageBar: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  storageRow: {
+    flexDirection: 'column',
+  },
 });

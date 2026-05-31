@@ -8,6 +8,7 @@ import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { subjectsStyles as styles } from '../../src/styles/Subjects.styles';
 import { AutoUploadIndicator } from '../../src/components/ui/AutoUploadIndicator';
+import { OfflineIndicator } from '../../src/components/ui/OfflineIndicator';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { useSubjects } from '../../src/hooks/useSubjects';
 import { SubjectIcon } from '../../src/components/subjects/SubjectIcon';
@@ -49,10 +50,13 @@ export default function SubjectsScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <View style={styles.header}>
-        <View style={globalStyles.row}>
-          <Ionicons name="book-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
-          <Text style={styles.headerTitle}>{t('subjects.title') || 'Materias'}</Text>
-          <AutoUploadIndicator size={18} />
+        <View style={{ flex: 1 }}>
+          <View style={globalStyles.row}>
+            <Ionicons name="book-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+            <Text style={styles.headerTitle}>{t('subjects.title') || 'Materias'}</Text>
+            <AutoUploadIndicator size={18} />
+          </View>
+          <OfflineIndicator />
         </View>
       </View>
 

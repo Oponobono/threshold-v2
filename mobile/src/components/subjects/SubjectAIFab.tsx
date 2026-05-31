@@ -196,14 +196,16 @@ export const SubjectAIFab: React.FC<SubjectAIFabProps> = ({
       {/* Overlay de carga mientras se construye el contexto */}
       {isBuildingCtx && <BuildingContextOverlay />}
 
-      {/* FAB */}
-      <View style={[styles.fabContainer, { bottom: Math.max(24, 24 + insets.bottom - 10) }]}>
-        <TouchableOpacity activeOpacity={0.8} onPress={() => setIsContextModalVisible(true)}>
-          <Animated.View style={[styles.fabButton, { backgroundColor: 'transparent', elevation: 0, shadowOpacity: 0, transform: [{ scale: pulseAnim }] }]}>
-            <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 72, height: 72 }} />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
+      {/* FAB (oculto cuando algún modal está abierto) */}
+      {!isContextModalVisible && !isChatVisible && (
+        <View style={[styles.fabContainer, { bottom: Math.max(24, 24 + insets.bottom - 10) }]}>
+          <TouchableOpacity activeOpacity={0.8} onPress={() => setIsContextModalVisible(true)}>
+            <Animated.View style={[styles.fabButton, { backgroundColor: 'transparent', elevation: 0, shadowOpacity: 0, transform: [{ scale: pulseAnim }] }]}>
+              <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 72, height: 72 }} />
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Modal selector de contexto (Bento Grid) */}
       <SubjectAIContextModal
@@ -222,6 +224,7 @@ export const SubjectAIFab: React.FC<SubjectAIFabProps> = ({
       <SubjectAIChatModal
         isVisible={isChatVisible}
         onClose={() => setIsChatVisible(false)}
+        onGoBack={() => { setIsChatVisible(false); setIsContextModalVisible(true); }}
         subjectName={subjectName}
         subjectId={subjectId}
         userId={userId}

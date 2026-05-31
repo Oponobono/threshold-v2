@@ -1,5 +1,5 @@
 export { CodeHighlighter } from './CodeHighlighter';
-export { ConnectivityBanner } from './ConnectivityBanner';
+
 export { CustomAlertProvider, alertRef, useCustomAlert } from './CustomAlert';
 export { CustomButton } from './CustomButton';
 export { CustomInput } from './CustomInput';

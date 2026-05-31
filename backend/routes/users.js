@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const validateOwner = require('../middlewares/validateOwner');
+const { authLimiter } = require('../middlewares/rateLimiter');
 
 /**
  * @swagger
@@ -20,7 +22,7 @@ const userController = require('../controllers/userController');
  *       404:
  *         description: Usuario no encontrado
  */
-router.get('/users/:userId', userController.getUserProfile);
+router.get('/users/:userId', validateOwner, userController.getUserProfile);
 
 /**
  * @swagger
@@ -55,7 +57,7 @@ router.get('/users/:userId', userController.getUserProfile);
  *       200:
  *         description: Perfil actualizado
  */
-router.put('/users/:userId', userController.updateUserProfile);
+router.put('/users/:userId', validateOwner, userController.updateUserProfile);
 
 /**
  * @swagger
@@ -87,10 +89,10 @@ router.put('/users/:userId', userController.updateUserProfile);
  *       200:
  *         description: Contraseña actualizada
  */
-router.put('/users/:userId/password', userController.updatePassword);
+router.put('/users/:userId/password', validateOwner, authLimiter, userController.updatePassword);
 
 // Verificar contraseña (para confirmar eliminación de cuenta)
-router.post('/users/:userId/password-verify', userController.verifyPassword);
+router.post('/users/:userId/password-verify', validateOwner, authLimiter, userController.verifyPassword);
 
 /**
  * @swagger
@@ -108,7 +110,7 @@ router.post('/users/:userId/password-verify', userController.verifyPassword);
  *       200:
  *         description: Objeto con los conteos de materias, grabaciones, etc.
  */
-router.get('/users/:userId/deletion-data-count', userController.getDeletionDataCount);
+router.get('/users/:userId/deletion-data-count', validateOwner, userController.getDeletionDataCount);
 
 /**
  * @swagger
@@ -126,7 +128,7 @@ router.get('/users/:userId/deletion-data-count', userController.getDeletionDataC
  *       200:
  *         description: Token revocado
  */
-router.delete('/users/:userId/biometric', userController.revokeBiometric);
+router.delete('/users/:userId/biometric', validateOwner, userController.revokeBiometric);
 
 /**
  * @swagger
@@ -144,7 +146,7 @@ router.delete('/users/:userId/biometric', userController.revokeBiometric);
  *       200:
  *         description: Cuenta marcada para eliminación
  */
-router.delete('/users/:userId', userController.requestDeletion);
+router.delete('/users/:userId', validateOwner, userController.requestDeletion);
 
 /**
  * @swagger
@@ -162,7 +164,7 @@ router.delete('/users/:userId', userController.requestDeletion);
  *       200:
  *         description: Cuenta reactivada
  */
-router.post('/users/:userId/reactivate', userController.reactivateAccount);
+router.post('/users/:userId/reactivate', validateOwner, userController.reactivateAccount);
 
 /**
  * @swagger
@@ -192,6 +194,6 @@ router.post('/users/:userId/reactivate', userController.reactivateAccount);
  *       200:
  *         description: Foto de perfil actualizada
  */
-router.patch('/users/:userId/profile-image', userController.updateProfileImage);
+router.patch('/users/:userId/profile-image', validateOwner, userController.updateProfileImage);
 
 module.exports = router;

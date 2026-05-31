@@ -31,6 +31,7 @@ import { EditSubjectModal } from '../../src/components/dashboard/EditSubjectModa
 import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
 import { CreateTaskModal } from '../../src/components/dashboard/CreateTaskModal';
 import { SchedulePlannerModal } from '../../src/components/dashboard/SchedulePlannerModal';
+import { OfflineIndicator } from '../../src/components/ui/OfflineIndicator';
 
 
 
@@ -401,7 +402,7 @@ export default function HybridDashboardScreen() {
         
         {/* 1. HEADER */}
         <View style={styles.header}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={[styles.greetingText, { flexShrink: 1 }]}>
@@ -415,19 +416,20 @@ export default function HybridDashboardScreen() {
                 />
               </View>
               <Text style={styles.greetingSubtext}>{profileSubtitle}</Text>
+              <View style={{ marginTop: 6 }}><OfflineIndicator /></View>
             </View>
+            <TouchableOpacity
+              onPress={() => router.push('/settings')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('dashboard.openSettings')}
+            >
+              <Image 
+                source={{ uri: profileAvatarUri }} 
+                style={styles.avatar} 
+              />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={() => router.push('/settings')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={t('dashboard.openSettings')}
-          >
-            <Image 
-              source={{ uri: profileAvatarUri }} 
-              style={styles.avatar} 
-            />
-          </TouchableOpacity>
         </View>
 
         {/* 2. YOUR SUBJECTS */}

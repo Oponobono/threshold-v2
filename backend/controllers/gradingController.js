@@ -123,40 +123,62 @@ const createAssessmentResult = async (req, res) => {
       return res.status(400).json({ error: 'Se requieren assessment_id, raw_value y grading_system_id.' });
     }
 
-    // Obtener versión activa — snapshot inmutable
-    const version = await getActiveVersion(parseInt(grading_system_id), userId);
+    // 1. Validar IDOR Transversal: Verificar que el examen pertenezca a una materia del usuario
+    const verifyQuery = `
+      SELECT s.user_id 
+      FROM assessments a
+      JOIN subjects s ON a.subject_id = s.id
+      WHERE a.id = ?
+    `;
 
-    // Calcular y congelar el normalized_value
-    const normalized = normalizeGrade(parseFloat(raw_value), version);
+    db.get(verifyQuery, [assessment_id], async (err, row) => {
+      if (err) return res.status(500).json({ error: 'Error interno del servidor al verificar permisos.' });
+      if (!row) return res.status(404).json({ error: 'La evaluación especificada no existe.' });
 
-    db.run(
-      `INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-      [assessment_id, userId, raw_value, normalized, version.id],
-      function (err) {
-        if (err) {
-          console.error('[GradingController] Error creating assessment_result:', err.message);
-          return res.status(500).json({ error: 'Error guardando resultado.' });
-        }
-        // Registrar en audit trail (primer insert como creación)
-        appendGradeHistory({
-          assessmentResultId: this.lastID,
-          oldRawValue: null,
-          newRawValue: raw_value,
-          changedBy: userId,
-          reason: 'Creación inicial',
-        }).catch(console.error);
-
-        res.status(201).json({
-          id: this.lastID,
-          assessment_id,
-          user_id: userId,
-          raw_value,
-          normalized_value: normalized,
-          grading_version_id: version.id,
-        });
+      if (row.user_id !== userId) {
+        return res.status(403).json({ error: 'Forbidden: No tienes permiso para calificar esta evaluación.' });
       }
-    );
+
+      try {
+        // 2. Obtener versión activa — snapshot inmutable
+        const version = await getActiveVersion(parseInt(grading_system_id), userId);
+
+        // Calcular y congelar el normalized_value
+        const normalized = normalizeGrade(parseFloat(raw_value), version);
+
+        db.run(
+          `INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [assessment_id, userId, raw_value, normalized, version.id],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[GradingController] Error creating assessment_result:', insertErr.message);
+              return res.status(500).json({ error: 'Error guardando resultado.' });
+            }
+            // Registrar en audit trail (primer insert como creación)
+            appendGradeHistory({
+              assessmentResultId: this.lastID,
+              oldRawValue: null,
+              newRawValue: raw_value,
+              changedBy: userId,
+              reason: 'Creación inicial',
+            }).catch(console.error);
+
+            res.status(201).json({
+              id: this.lastID,
+              assessment_id,
+              user_id: userId,
+              raw_value,
+              normalized_value: normalized,
+              grading_version_id: version.id,
+            });
+          }
+        );
+      } catch (innerErr) {
+        console.error('[GradingController] Error in createAssessmentResult inner logic:', innerErr.message);
+        res.status(400).json({ error: innerErr.message });
+      }
+    });
   } catch (err) {
     console.error('[GradingController] Error in createAssessmentResult:', err.message);
     res.status(400).json({ error: err.message });
@@ -181,46 +203,55 @@ const updateAssessmentResult = async (req, res) => {
       return res.status(400).json({ error: 'Se requiere raw_value.' });
     }
 
-    // Obtener el resultado actual
-    const current = await new Promise((resolve, reject) => {
-      db.get(
-        `SELECT ar.*, gv.min_value, gv.max_value, gv.direction, gv.mode, gv.precision
-         FROM assessment_results ar
-         JOIN grading_versions gv ON gv.id = ar.grading_version_id
-         WHERE ar.id = ? AND ar.user_id = ?`,
-        [id, userId],
-        (err, row) => { if (err) reject(err); else resolve(row); }
-      );
-    });
+    // 1. Verificar que el resultado de la calificación realmente le pertenezca al usuario
+    db.get(
+      `SELECT ar.*, gv.min_value, gv.max_value, gv.direction, gv.mode, gv.precision
+       FROM assessment_results ar
+       JOIN grading_versions gv ON gv.id = ar.grading_version_id
+       WHERE ar.id = ?`,
+      [id],
+      async (err, current) => {
+        if (err) return res.status(500).json({ error: 'Error interno del servidor.' });
+        if (!current) return res.status(404).json({ error: 'Resultado no encontrado.' });
 
-    if (!current) return res.status(404).json({ error: 'Resultado no encontrado.' });
+        // Control de acceso estricto
+        if (current.user_id !== userId) {
+          return res.status(403).json({ error: 'Forbidden: No tienes autorización para modificar esta calificación.' });
+        }
 
-    // Recalcular normalized con la MISMA versión original (snapshot)
-    const newNormalized = normalizeGrade(parseFloat(raw_value), current);
+        try {
+          // Recalcular normalized con la MISMA versión original (snapshot)
+          const newNormalized = normalizeGrade(parseFloat(raw_value), current);
 
-    await new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE assessment_results SET raw_value = ?, normalized_value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [raw_value, newNormalized, id],
-        (err) => { if (err) reject(err); else resolve(); }
-      );
-    });
+          await new Promise((resolve, reject) => {
+            db.run(
+              `UPDATE assessment_results SET raw_value = ?, normalized_value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
+              [raw_value, newNormalized, id, userId],
+              (updateErr) => { if (updateErr) reject(updateErr); else resolve(); }
+            );
+          });
 
-    // Audit trail — APPEND-ONLY
-    await appendGradeHistory({
-      assessmentResultId: parseInt(id),
-      oldRawValue: current.raw_value,
-      newRawValue: raw_value,
-      changedBy: userId,
-      reason: reason || 'Corrección de nota',
-    });
+          // Audit trail — APPEND-ONLY
+          await appendGradeHistory({
+            assessmentResultId: parseInt(id),
+            oldRawValue: current.raw_value,
+            newRawValue: raw_value,
+            changedBy: userId,
+            reason: reason || 'Corrección de nota',
+          });
 
-    res.json({
-      id: parseInt(id),
-      raw_value,
-      normalized_value: newNormalized,
-      grading_version_id: current.grading_version_id,
-    });
+          res.json({
+            id: parseInt(id),
+            raw_value,
+            normalized_value: newNormalized,
+            grading_version_id: current.grading_version_id,
+          });
+        } catch (innerErr) {
+          console.error('[GradingController] Error in updateAssessmentResult inner logic:', innerErr.message);
+          res.status(400).json({ error: innerErr.message });
+        }
+      }
+    );
   } catch (err) {
     console.error('[GradingController] Error in updateAssessmentResult:', err.message);
     res.status(400).json({ error: err.message });
