@@ -25,13 +25,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         <View style={globalStyles.row}>
           <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
           <Text style={calendarScreenStyles.headerTitle}>{t('dashboard.tabs.calendar')}</Text>
-          <TouchableOpacity
-            onPress={onPressAdd}
-            style={calendarScreenStyles.addButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="add" size={24} color={theme.colors.primary} />
-          </TouchableOpacity>
         </View>
         <OfflineIndicator />
       </View>
@@ -42,6 +35,13 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             <Text style={calendarScreenStyles.todayPillText}>{t('calendar.today')}</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          onPress={onPressAdd}
+          style={calendarScreenStyles.addButton}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="add" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
       </View>
     </View>
   );

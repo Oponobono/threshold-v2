@@ -8,6 +8,7 @@
  */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
+import { offlineSyncService } from '../offlineSyncService';
 
 /** Representa un documento escaneado vinculado a una materia y guardado localmente */
 export interface ScannedDocument {
@@ -60,6 +61,13 @@ export const createScannedDocument = async (
     }
     return responseData;
   } catch (error: any) {
+    const isNetworkError = !error.message?.includes('Usuario no autenticado');
+    if (isNetworkError) {
+      console.warn('[Documents] Offline: encolando createScannedDocument', error);
+      const userId = await getUserId().catch(() => null);
+      await offlineSyncService.addPendingOperation('POST', '/scanned_documents', 'document', { ...data, user_id: userId });
+      return { id: -Date.now(), ...data, _isPending: true } as any;
+    }
     throw new Error(error.message || 'Error de red al crear el documento escaneado');
   }
 };
@@ -76,7 +84,9 @@ export const deleteScannedDocument = async (documentId: number | string): Promis
     }
     return data;
   } catch (error: any) {
-    throw new Error(error.message || 'Error de red al intentar eliminar el documento escaneado');
+    console.warn('[Documents] Offline: encolando deleteScannedDocument', error);
+    await offlineSyncService.addPendingOperation('DELETE', `/scanned_documents/${documentId}`, 'document');
+    return { success: true, _isPending: true };
   }
 };
 
@@ -98,7 +108,9 @@ export const updateScannedDocument = async (
     }
     return responseData;
   } catch (error: any) {
-    throw new Error(error.message || 'Error de red al actualizar el documento escaneado');
+    console.warn('[Documents] Offline: encolando updateScannedDocument', error);
+    await offlineSyncService.addPendingOperation('PUT', `/scanned_documents/${documentId}`, 'document', data);
+    return { ...data, _isPending: true } as any;
   }
 };
 

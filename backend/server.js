@@ -73,41 +73,32 @@ app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
-// Configurar Swagger
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+// Configurar Swagger (solo en desarrollo)
+if (secrets.NODE_ENV !== 'production') {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+}
 
 // 🏥 Health Check Endpoint (Completamente público, sin autenticación)
 // Usado por el cliente para detectar si el backend está disponible
 app.get('/health', (req, res) => {
-  const dbType = secrets.DATABASE_URL ? 'PostgreSQL' : 'SQLite';
-  res.json({ 
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    db: dbType,
-    env: secrets.NODE_ENV
-  });
+  res.json({ status: 'OK' });
 });
 
 // Ruta de estado (deprecated - usar /health)
 app.get('/api/status', (req, res) => {
-  const dbType = secrets.DATABASE_URL ? 'PostgreSQL' : 'SQLite';
-  res.json({ 
-    status: 'API funcionando correctamente', 
-    db: dbType,
-    env: secrets.NODE_ENV
-  });
+  res.json({ status: 'OK' });
 });
 
 // Registrar rutas públicas (Login, Registro)
 app.use('/api', authRoutes);
 
-// Uploadthing — ruta de subida de archivos (autenticada vía JWT, proxy al CDN)
-app.use('/api', uploadRoutes);
-
 // 🛡️ Fase 1: Escudo de Autenticación JWT
 // A partir de esta línea, TODAS las rutas requerirán un token válido
 const { authenticateToken } = require('./middlewares/authMiddleware');
 app.use('/api', authenticateToken);
+
+// Uploadthing — ruta de subida de archivos
+app.use('/api', uploadRoutes);
 
 // Rutas privadas
 app.use('/api', usersRoutes);

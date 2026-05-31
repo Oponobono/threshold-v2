@@ -16,6 +16,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { storageService } from '../storageService';
 import { detectAvailableBackend, resetBackendDetectionCache } from './backendDetector';
+import { useLocalAIStore } from '../../store/useLocalAIStore';
 
 /** Valida que un string tenga formato de dirección IPv4 válida */
 export const isValidIpv4 = (value: string): boolean => {
@@ -239,6 +240,36 @@ export const buildApiError = (message: string): Error => new Error(message);
  */
 export const fetchWithFallback = async (path: string, init?: RequestInit): Promise<Response> => {
   const method = init?.method?.toUpperCase() || 'GET';
+  
+  // 🛡️ Si el modo offline forzado está activo, no hacer llamadas de red
+  const isOffline = useLocalAIStore.getState().forceOfflineMode;
+  if (isOffline) {
+    const isCacheable = method === 'GET';
+    const cacheKey = `api_cache_${path}`;
+    if (isCacheable) {
+      try {
+        const cachedEntry = await storageService.getLocal(cacheKey);
+        if (cachedEntry) {
+          let data: string | undefined;
+          try {
+            const parsed = JSON.parse(cachedEntry);
+            data = parsed.data;
+          } catch {
+            data = cachedEntry;
+          }
+          if (data) {
+            console.log(`[Offline] Sirviendo desde cache: ${path}`);
+            return new Response(data, {
+              status: 200,
+              statusText: 'OK',
+              headers: new Headers({ 'Content-Type': 'application/json' })
+            });
+          }
+        }
+      } catch {}
+    }
+    throw buildApiError('Modo offline forzado — no hay conexión al servidor.');
+  }
   
   // 🛡️ Rutas excluidas de cache (IA, OCR, etc.)
   // Nota: YouTube videos INCLUYEN caché para fallback cuando hay error de conexión

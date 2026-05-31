@@ -51,7 +51,13 @@ export async function resolveProvider(): Promise<LLMProvider> {
   return getPreferredLLMProvider();
 }
 
-export const LLM_PROVIDERS = {
+export const LLM_PROVIDERS: Record<LLMProvider, {
+  label: string;
+  description: string;
+  icon: string;
+  advantages: string[];
+  limits: string;
+}> = {
   groq: {
     label: 'Groq',
     description: 'Mayor velocidad de respuesta',
@@ -65,6 +71,13 @@ export const LLM_PROVIDERS = {
     icon: '🧠',
     advantages: ['Mayor capacidad de contexto', 'Mejor comprensión', 'Análisis más profundos'],
     limits: 'Límite según plan de Google',
+  },
+  local: {
+    label: 'Local (on-device)',
+    description: 'Sin conexión a internet',
+    icon: '📱',
+    advantages: ['Funciona sin internet', 'Privacidad total', 'Sin límites de uso'],
+    limits: 'Requiere descarga de modelo (~2-3GB)',
   },
 };
 

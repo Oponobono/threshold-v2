@@ -47,6 +47,11 @@ exports.createYoutubeVideo = (req, res) => {
     return res.status(400).json({ error: 'Faltan campos requeridos: user_id, youtube_url, video_id' });
   }
 
+  const authenticatedUserId = req.user.id;
+  if (parseInt(user_id) !== authenticatedUserId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const query = `
     INSERT INTO youtube_videos (user_id, subject_id, youtube_url, video_id, title, thumbnail_url, duration)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -64,6 +69,7 @@ exports.createYoutubeVideo = (req, res) => {
 exports.updateYoutubeVideo = (req, res) => {
   const { id } = req.params;
   const { subject_id, title } = req.body;
+  const userId = req.user.id;
   
   const updateFields = [];
   const updateValues = [];
@@ -82,11 +88,12 @@ exports.updateYoutubeVideo = (req, res) => {
     return res.status(400).json({ error: 'No hay campos para actualizar' });
   }
   
-  updateValues.push(id);
-  const query = `UPDATE youtube_videos SET ${updateFields.join(', ')} WHERE id = ?`;
+  updateValues.push(id, userId);
+  const query = `UPDATE youtube_videos SET ${updateFields.join(', ')} WHERE id = ? AND user_id = ?`;
   
   db.run(query, updateValues, function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: 'Video no encontrado o acceso denegado' });
     res.json({ success: true, changes: this.changes });
   });
 };
@@ -96,7 +103,8 @@ exports.updateYoutubeVideo = (req, res) => {
  */
 exports.deleteYoutubeVideo = (req, res) => {
   const { id } = req.params;
-  db.run(`DELETE FROM youtube_videos WHERE id = ?`, [id], function(err) {
+  const userId = req.user.id;
+  db.run(`DELETE FROM youtube_videos WHERE id = ? AND user_id = ?`, [id, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, changes: this.changes });
   });
@@ -177,7 +185,13 @@ exports.upsertYoutubeTranscript = (req, res) => {
     return res.status(400).json({ error: 'Falta video_id' });
   }
 
-  db.get(`SELECT id FROM youtube_transcripts WHERE video_id = ?`, [video_id], (err, row) => {
+  const userId = req.user.id;
+
+  // Verificar propiedad
+  db.get('SELECT id FROM youtube_videos WHERE id = ? AND user_id = ?', [video_id, userId], (err, video) => {
+    if (err || !video) return res.status(403).json({ error: 'Video no encontrado o acceso denegado' });
+
+    db.get(`SELECT id FROM youtube_transcripts WHERE video_id = ?`, [video_id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
 
     if (row) {
@@ -224,4 +238,5 @@ exports.upsertYoutubeTranscript = (req, res) => {
       });
     }
   });
+});
 };

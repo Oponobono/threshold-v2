@@ -38,8 +38,8 @@ const aiLimiter = rateLimit({
  * Límite para Login/Registro: Previene ataques de fuerza bruta adivinando contraseñas.
  */
 const authLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // Ventana de 1 hora
-    max: 200, // DEV: 200 intentos fallidos por hora
+    windowMs: 15 * 60 * 1000, // Ventana de 15 minutos
+    max: 10, // Máximo 10 intentos por IP en 15 minutos
     message: { error: 'Demasiados intentos de inicio de sesión. Tu cuenta está temporalmente bloqueada.' },
     standardHeaders: true,
     legacyHeaders: false,

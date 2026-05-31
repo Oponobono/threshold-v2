@@ -32,6 +32,11 @@ exports.createAudioRecording = (req, res) => {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id, local_uri)' });
   }
 
+  const authenticatedUserId = req.user.id;
+  if (parseInt(user_id) !== authenticatedUserId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const query = `
     INSERT INTO audio_recordings (user_id, subject_id, name, local_uri, duration)
     VALUES (?, ?, ?, ?, ?)
@@ -55,16 +60,18 @@ exports.createAudioRecording = (req, res) => {
 exports.updateAudioRecording = (req, res) => {
   const { id } = req.params;
   const { subject_id, name } = req.body;
+  const userId = req.user.id;
   
   const query = `
     UPDATE audio_recordings 
     SET subject_id = COALESCE(?, subject_id),
         name = COALESCE(?, name)
-    WHERE id = ?
+    WHERE id = ? AND user_id = ?
   `;
   
-  db.run(query, [subject_id !== undefined ? subject_id : null, name !== undefined ? name : null, id], function(err) {
+  db.run(query, [subject_id !== undefined ? subject_id : null, name !== undefined ? name : null, id, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: 'Grabación no encontrada o acceso denegado' });
     res.json({ success: true, changes: this.changes });
   });
 };
@@ -74,20 +81,21 @@ exports.updateAudioRecording = (req, res) => {
  */
 exports.deleteAudioRecording = (req, res) => {
   const { id } = req.params;
+  const userId = req.user.id;
 
   // Obtener cloud_url del audio y de su transcripción antes de eliminar
   db.get(
     `SELECT ar.cloud_url as audio_url, at.cloud_url as transcript_url
      FROM audio_recordings ar
      LEFT JOIN audio_transcripts at ON at.recording_id = ar.id
-     WHERE ar.id = ?`,
-    [id],
+     WHERE ar.id = ? AND ar.user_id = ?`,
+    [id, userId],
     (err, row) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!row) {
         return res.json({ success: true, message: 'La grabación ya no existía.' });
       }
-      db.run(`DELETE FROM audio_recordings WHERE id = ?`, [id], function (deleteErr) {
+      db.run(`DELETE FROM audio_recordings WHERE id = ? AND user_id = ?`, [id, userId], function (deleteErr) {
         if (deleteErr) return res.status(500).json({ error: deleteErr.message });
 
         // Eliminar de Uploadthing en background (el CASCADE borra audio_transcripts de la BD)
@@ -113,7 +121,13 @@ exports.upsertAudioTranscript = (req, res) => {
     return res.status(400).json({ error: 'Falta recording_id' });
   }
 
-  db.get(`SELECT id FROM audio_transcripts WHERE recording_id = ?`, [recording_id], (err, row) => {
+  const userId = req.user.id;
+
+  // Verificar propiedad
+  db.get('SELECT id FROM audio_recordings WHERE id = ? AND user_id = ?', [recording_id, userId], (err, recording) => {
+    if (err || !recording) return res.status(403).json({ error: 'Grabación no encontrada o acceso denegado' });
+
+    db.get(`SELECT id FROM audio_transcripts WHERE recording_id = ?`, [recording_id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
 
     if (row) {
@@ -160,4 +174,5 @@ exports.upsertAudioTranscript = (req, res) => {
       });
     }
   });
+});
 };

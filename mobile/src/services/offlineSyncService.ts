@@ -15,7 +15,7 @@ interface PendingOperation {
   timestamp: number;
   retries: number;
   maxRetries: number;
-  operationType: 'subject' | 'assessment' | 'schedule' | 'photo' | 'audio' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete';
+  operationType: 'flashcard' | 'flashcard_deck' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete' | 'subject' | 'assessment' | 'schedule' | 'photo' | 'audio' | 'document' | 'grading' | 'calendar' | 'category' | 'group' | 'session' | 'card_log' | 'settings' | 'youtube' | 'profile' | 'biometric';
 }
 
 let _storage: MMKV | null = null;
@@ -82,7 +82,7 @@ export const offlineSyncService = {
   addPendingOperation: async (
     type: 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
-    operationType: 'subject' | 'assessment' | 'schedule' | 'photo' | 'audio' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete',
+    operationType: 'subject' | 'assessment' | 'schedule' | 'photo' | 'audio' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete' | 'flashcard_deck' | 'flashcard' | 'document' | 'grading' | 'calendar' | 'category' | 'group' | 'session' | 'card_log' | 'settings' | 'youtube' | 'profile' | 'biometric',
     payload?: any
   ): Promise<string> => {
     return withWriteLock(async () => {
@@ -140,7 +140,7 @@ export const offlineSyncService = {
   /**
    * Obtiene operaciones pendientes de un tipo específico
    */
-  getPendingByType: (operationType: 'subject' | 'assessment' | 'schedule' | 'photo' | 'audio' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete'): PendingOperation[] => {
+  getPendingByType: (operationType: 'subject' | 'assessment' | 'schedule' | 'photo' | 'audio' | 'flashcard_review' | 'flashcard_status' | 'flashcard_snooze' | 'flashcard_delete' | 'flashcard_deck' | 'flashcard' | 'document' | 'grading' | 'calendar' | 'category' | 'group' | 'session' | 'card_log' | 'settings' | 'youtube' | 'profile' | 'biometric'): PendingOperation[] => {
     return offlineSyncService
       .getPendingOperations()
       .filter((op) => op.operationType === operationType);

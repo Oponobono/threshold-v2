@@ -43,7 +43,8 @@ import { SubjectPickerModal } from '../subjects/SubjectPickerModal';
 import { AnimatedSubjectSelector } from '../animated/AnimatedSubjectSelector';
 import { WaveformBars } from '../audio/WaveformBars';
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
-import { transcribeWithWhisper, summarizeWithGroq } from '../../utils/groqHelpers';
+import { transcribeWithFallback, summarizeWithFallback } from '../../utils/groqHelpers';
+import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { formatTranscription } from '../../utils/transcriptionFormatter';
 
 // ---------------------------------------------------------------------------
@@ -368,17 +369,12 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // Transcription (Whisper via Groq)
   // ---------------------------------------------------------------------------
   const startTranscriptionFlow = async () => {
-    if (!GROQ_API_KEY) {
-      alertRef.show({ title: t('common.error') || 'Error', message: t('common.errors.groqApiKeyMissing'), type: 'error' });
-      return;
-    }
-
     setIsTranscribing(true);
     setTranscription(null);
     setSummary(null);
 
     try {
-      const text = await transcribeWithWhisper(audioUri, GROQ_API_KEY);
+      const text = await transcribeWithFallback(audioUri, GROQ_API_KEY);
       
       if (!text) {
         alertRef.show({ title: t('common.error') || 'Error', message: t('recordings.errors.noVoiceDetected'), type: 'warning' });
@@ -403,10 +399,6 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // Summary (Llama3 via Groq)
   // ---------------------------------------------------------------------------
   const startSummaryFlow = async () => {
-    if (!GROQ_API_KEY) {
-      alertRef.show({ title: t('common.error') || 'Error', message: t('common.errors.groqApiKeyMissing'), type: 'error' });
-      return;
-    }
     if (!transcription) {
       alertRef.show({ title: t('common.error') || 'Error', message: t('dashboard.audioRecorderModal.ai.emptyTranscription') || 'Primero genera la transcripción.', type: 'warning' });
       return;
@@ -414,7 +406,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
     setIsSummarizing(true);
     setSummary(null);
     try {
-      const result = await summarizeWithGroq(transcription, GROQ_API_KEY);
+      const result = await summarizeWithFallback(transcription, GROQ_API_KEY);
       setSummary(result);
       setShowTutorial(false);
       setActiveTab('summary');

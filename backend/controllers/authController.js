@@ -4,6 +4,9 @@ const { db } = require('../db');
 const { getUniqueSharePin } = require('../utils/pinHelper');
 const { JWT_SECRET } = require('../middlewares/authMiddleware');
 
+// Patrón de email válido
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * Registra un nuevo usuario
  */
@@ -25,6 +28,16 @@ exports.registerUser = async (req, res) => {
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Faltan campos requeridos (email, password)' });
+  }
+
+  // Validar formato de email
+  if (!EMAIL_REGEX.test(email)) {
+    return res.status(400).json({ error: 'El formato del email no es válido.' });
+  }
+
+  // Validar fortaleza de contraseña
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres.' });
   }
 
   try {

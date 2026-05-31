@@ -10,6 +10,8 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { AudioRecording } from './types';
+import { offlineSyncService } from '../offlineSyncService';
+import { storageService } from '../storageService';
 
 /**
  * Obtiene todas las grabaciones de audio del usuario
@@ -35,48 +37,71 @@ export const createAudioRecording = async (payload: {
 
   const payloadWithUser = { ...payload, user_id: Number(userId) };
 
-  const response = await fetchWithFallback('/audio-recordings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payloadWithUser),
-  });
+  try {
+    const response = await fetchWithFallback('/audio-recordings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payloadWithUser),
+    });
 
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo guardar la grabación en BD.');
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo guardar la grabación en BD.');
+    }
+
+    return data;
+  } catch (error) {
+    console.warn('[Audio] Offline: encolando createAudioRecording', error);
+    await offlineSyncService.addPendingOperation('POST', '/audio-recordings', 'audio', payloadWithUser);
+    return { id: -Date.now(), ...payloadWithUser, _isPending: true };
   }
-
-  return data;
 };
 
 /**
  * Actualiza una grabación (ej: asociar materia o renombrar)
  */
 export const updateAudioRecording = async (id: number, payload: { subject_id?: number | null; name?: string | null }) => {
-  const response = await fetchWithFallback(`/audio-recordings/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetchWithFallback(`/audio-recordings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo actualizar la grabación.');
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo actualizar la grabación.');
+    }
+
+    return data;
+  } catch (error) {
+    console.warn(`[Audio] Offline: encolando updateAudioRecording ${id}`, error);
+    await offlineSyncService.addPendingOperation('PUT', `/audio-recordings/${id}`, 'audio', payload);
+    return { ...payload, _isPending: true };
   }
-
-  return data;
 };
 
 /**
  * Elimina una grabación de la base de datos
  */
 export const deleteAudioRecording = async (id: number) => {
-  const response = await fetchWithFallback(`/audio-recordings/${id}`, { method: 'DELETE' });
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo eliminar la grabación.');
+  try {
+    const response = await fetchWithFallback(`/audio-recordings/${id}`, { method: 'DELETE' });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo eliminar la grabación.');
+    }
+    return data;
+  } catch (error) {
+    console.warn(`[Audio] Offline: encolando deleteAudioRecording ${id}`, error);
+    await offlineSyncService.addPendingOperation('DELETE', `/audio-recordings/${id}`, 'audio');
+    const userId = await getUserId();
+    if (userId) {
+      const cacheKey = `api_cache_/audio-recordings/${userId}`;
+      try { await storageService.removeLocal(cacheKey); } catch {}
+    }
+    return { success: true, _isPending: true };
   }
-  return data;
 };
 
 /**
@@ -91,16 +116,22 @@ export const upsertAudioTranscript = async (payload: {
   transcript_text?: string | null;
   summary_uri?: string | null;
 }) => {
-  const response = await fetchWithFallback('/audio-transcripts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetchWithFallback('/audio-transcripts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo guardar la transcripción.');
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo guardar la transcripción.');
+    }
+
+    return data;
+  } catch (error) {
+    console.warn('[Audio] Offline: encolando upsertAudioTranscript', error);
+    await offlineSyncService.addPendingOperation('POST', '/audio-transcripts', 'audio', payload);
+    return { ...payload, _isPending: true };
   }
-
-  return data;
 };

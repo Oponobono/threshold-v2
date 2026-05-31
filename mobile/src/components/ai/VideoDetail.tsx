@@ -38,18 +38,19 @@ import {
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 import { autoUploadIfEnabled } from '../../services/backup/backupService';
 import { formatTranscription } from '../../utils/transcriptionFormatter';
+import { summarizeWithFallback } from '../../utils/groqHelpers';
 
 // ---------------------------------------------------------------------------
 // Constants & Directories
 // ---------------------------------------------------------------------------
-const GROQ_API_KEY: string = process.env.EXPO_PUBLIC_GROK_API_KEY ?? process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
+const GROQ_API_KEY: string = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 const YOUTUBE_API_KEY: string = process.env.EXPO_PUBLIC_YOUTUBE_API_KEY ?? '';
 const TRANSCRIPTS_DIR = () => `${FileSystem.documentDirectory}Threshold/transcripts/`;
 
 // Groq helpers
 // ---------------------------------------------------------------------------
-async function transcribeYouTubeWithWhisper(videoId: string, apiKey: string): Promise<string> {
+async function transcribeYouTubeWithWhisper(videoId: string, apiKey?: string): Promise<string> {
   try {
     const result = await getYouTubeSubtitles(videoId, 'es');
     console.log('✓ YouTube captions fetched in', result.language);
@@ -97,40 +98,6 @@ async function transcribeYouTubeWithWhisper(videoId: string, apiKey: string): Pr
     console.error('✗ Error fetching YouTube captions:', error);
     throw new Error(`Error obteniendo subtítulos: ${error instanceof Error ? error.message : error}`);
   }
-}
-
-async function summarizeWithGroq(transcription: string, apiKey: string): Promise<string> {
-  const body = {
-    model: 'llama-3.3-70b-versatile',
-    messages: [
-      {
-        role: 'system',
-        content: 'Eres un asistente educativo experto especializado en crear material de estudio universitario altamente efectivo. A partir de la transcripción de este video de YouTube, genera un resumen estructurado siguiendo estas reglas:\n1. Extrae los conceptos fundamentales y ordénalos por temas usando títulos claros (###).\n2. Usa viñetas breves para desglosar los detalles importantes de cada tema.\n3. Identifica términos clave, definiciones o fechas y resáltalos en **negrita**.\n4. Elimina toda la "paja" (titubeos, saludos, anuncios de patrocinadores, repeticiones) y ve directo al grano.\n5. Finaliza con una sección de "Idea Central" de máximo 2 oraciones.\nTu tono debe ser académico, estructurado y directo. No agregues introducciones conversacionales (como "Aquí tienes el resumen").',
-      },
-      {
-        role: 'user',
-        content: `Resume el siguiente texto:\n\n${transcription}`,
-      },
-    ],
-    temperature: 0.3,
-  };
-
-  const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`Error de Groq ${response.status}: ${errBody}`);
-  }
-
-  const data = await response.json();
-  return data?.choices?.[0]?.message?.content ?? 'No se pudo generar el resumen.';
 }
 
 // ---------------------------------------------------------------------------
@@ -342,10 +309,6 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
   };
 
   const startSummaryFlow = async () => {
-    if (!GROQ_API_KEY) {
-      alertRef.show({ title: 'Error', message: t('common.errors.groqApiKeyMissing'), type: 'error' });
-      return;
-    }
     if (!transcription) {
       alertRef.show({ title: t('common.error') || 'Error', message: t('dashboard.audioRecorderModal.ai.emptyTranscription') || 'Primero genera la transcripción.', type: 'warning' });
       return;
@@ -353,7 +316,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
     setIsSummarizing(true);
     setSummary(null);
     try {
-      const result = await summarizeWithGroq(transcription, GROQ_API_KEY);
+      const result = await summarizeWithFallback(transcription, GROQ_API_KEY);
       setSummary(result);
       setShowTutorial(false);
       setActiveTab('summary');

@@ -67,26 +67,38 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
 
 /** Crea un nuevo mazo vacío vinculado a una materia (opcional). El user_id se obtiene del JWT en el backend. */
 export const createFlashcardDeck = async (payload: { subject_id?: number; title: string; description?: string }) => {
-  const response = await fetchWithFallback('/flashcard-decks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al crear el mazo');
-  return data;
+  try {
+    const response = await fetchWithFallback('/flashcard-decks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al crear el mazo');
+    return data;
+  } catch (error) {
+    console.warn('[Flashcards] Offline: encolando createFlashcardDeck', error);
+    await offlineSyncService.addPendingOperation('POST', '/flashcard-decks', 'flashcard_deck', payload);
+    return { id: -Date.now(), ...payload, _isPending: true };
+  }
 };
 
 /** Actualiza un mazo de flashcards (subject_id, title, description) */
 export const updateFlashcardDeck = async (deckId: number, payload: { subject_id?: number; title?: string; description?: string }) => {
-  const response = await fetchWithFallback(`/flashcard-decks/${deckId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al actualizar el mazo');
-  return data;
+  try {
+    const response = await fetchWithFallback(`/flashcard-decks/${deckId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al actualizar el mazo');
+    return data;
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando updateFlashcardDeck ${deckId}`, error);
+    await offlineSyncService.addPendingOperation('PUT', `/flashcard-decks/${deckId}`, 'flashcard_deck', payload);
+    return { ...payload, _isPending: true };
+  }
 };
 
 /** Obtiene todas las tarjetas de un mazo específico por su ID */
@@ -150,17 +162,23 @@ export const getCardById = async (cardId: number): Promise<Flashcard> => {
 
 /** Crea una tarjeta manualmente en un mazo con su texto de frente y reverso */
 export const createFlashcard = async (payload: { deck_id: number; front: string; back: string }) => {
-  const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/cards`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al crear tarjeta');
-  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id);
-  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + payload.deck_id);
-  cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + payload.deck_id);
-  return data;
+  try {
+    const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al crear tarjeta');
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id);
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + payload.deck_id);
+    cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + payload.deck_id);
+    return data;
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando createFlashcard para deck ${payload.deck_id}`, error);
+    await offlineSyncService.addPendingOperation('POST', `/flashcard-decks/${payload.deck_id}/cards`, 'flashcard', payload);
+    return { id: -Date.now(), ...payload, _isPending: true };
+  }
 };
 
 /** Crea un evaluation item (flashcard, multiple_choice, o boolean) con estructura polimórfica */
@@ -171,17 +189,23 @@ export const createEvaluationItem = async (payload: {
   hint?: string;
   explanation?: string;
 }) => {
-  const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/items`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al crear ítem');
-  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id);
-  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + payload.deck_id);
-  cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + payload.deck_id);
-  return data;
+  try {
+    const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al crear ítem');
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id);
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + payload.deck_id);
+    cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + payload.deck_id);
+    return data;
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando createEvaluationItem para deck ${payload.deck_id}`, error);
+    await offlineSyncService.addPendingOperation('POST', `/flashcard-decks/${payload.deck_id}/items`, 'flashcard', payload);
+    return { id: -Date.now(), ...payload, _isPending: true };
+  }
 };
 
 /**
@@ -288,18 +312,24 @@ export const removeDeckFromGroup = async (deckId: number, groupPinId: string): P
 
 /** Elimina un mazo completo o quita un mazo compartido de la lista */
 export const deleteFlashcardDeck = async (deckId: number) => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(`/flashcard-decks/${deckId}?user_id=${userId}`, {
-    method: 'DELETE',
-  });
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al eliminar el mazo');
-  cacheService.clearKey(CACHE_KEYS.FLASHCARD_DECKS);
-  cacheService.clearKey(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS);
-  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + deckId);
-  cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + deckId);
-  cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + deckId);
-  return data;
+  try {
+    const userId = await getUserId();
+    const response = await fetchWithFallback(`/flashcard-decks/${deckId}?user_id=${userId}`, {
+      method: 'DELETE',
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al eliminar el mazo');
+    cacheService.clearKey(CACHE_KEYS.FLASHCARD_DECKS);
+    cacheService.clearKey(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS);
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + deckId);
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + deckId);
+    cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + deckId);
+    return data;
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando deleteFlashcardDeck ${deckId}`, error);
+    await offlineSyncService.addPendingOperation('DELETE', `/flashcard-decks/${deckId}`, 'flashcard_deck');
+    return { success: true, _isPending: true };
+  }
 };
 
 
@@ -359,18 +389,24 @@ export const snoozeCard = async (
 /**
  * Reanuda (unsnooza) una tarjeta
  */
-export const unsnoozeCard = async (cardId: number): Promise<{ success: boolean }> => {
-  const userId = await getUserId();
-  const response = await fetchWithFallback(
-    `/flashcards/${cardId}/snooze?userId=${userId}`,
-    {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-    }
-  );
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al reanudar tarjeta');
-  return data;
+export const unsnoozeCard = async (cardId: number): Promise<{ success: boolean; _isPending?: boolean }> => {
+  try {
+    const userId = await getUserId();
+    const response = await fetchWithFallback(
+      `/flashcards/${cardId}/snooze?userId=${userId}`,
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+    const data = await parseJsonSafely(response);
+    if (!response.ok) throw new Error(data?.error || 'Error al reanudar tarjeta');
+    return data;
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando unsnoozeCard para card ${cardId}`, error);
+    await offlineSyncService.addPendingOperation('DELETE', `/flashcards/${cardId}/snooze`, 'flashcard_snooze');
+    return { success: true, _isPending: true };
+  }
 };
 
 /**

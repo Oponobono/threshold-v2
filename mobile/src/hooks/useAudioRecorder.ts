@@ -461,9 +461,11 @@ export function useAudioRecorder() {
       const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
       
       // 2. Delete from DB if it's a numeric ID (already synced)
+      let wasQueuedOffline = false;
       if (!isNaN(numericId) && numericId > 0) {
         try {
-          await deleteAudioRecording(numericId);
+          const result = await deleteAudioRecording(numericId);
+          wasQueuedOffline = !!(result as any)?._isPending;
         } catch (dbErr) {
           console.error('Error deleting from DB:', dbErr);
           throw dbErr; // Let the outer catch handle and revert
@@ -481,8 +483,12 @@ export function useAudioRecorder() {
         // Continue anyway - file might not exist locally
       }
 
-      // Refresh after a small delay to ensure everything is in sync
-      setTimeout(() => loadRecordings(), 500);
+      // Refresh after a small delay to ensure everything is in sync.
+      // Skip if the delete was queued offline — the optimistic update already
+      // removed the item from state, and re-reading from cache would bring it back.
+      if (!wasQueuedOffline) {
+        setTimeout(() => loadRecordings(), 500);
+      }
     } catch (error) {
       console.error('Error in deleteRecordingConfirmed:', error);
       

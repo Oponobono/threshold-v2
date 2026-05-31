@@ -16,7 +16,8 @@ import * as Sharing from 'expo-sharing';
 import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
-import { createFlashcardDeck, updateFlashcardDeck, createEvaluationItem, type Subject } from '../../services/api';
+import { type Subject } from '../../services/api';
+import { saveImportedDeck, updateLocalDeckSubject } from '../../services/localFlashcardService';
 
 export interface FlashcardImportModalProps {
   isVisible: boolean;
@@ -300,80 +301,52 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         }
       }
 
-      // Crear el mazo SIN subject_id (se asignará después)
-      const newDeck = await createFlashcardDeck({
-        title: deckData.title.trim(),
-        description: deckData.description?.trim() || undefined,
-        // subject_id es opcional
-      });
-
-      // Procesar las tarjetas si existen
-      let successCount = 0;
-      let errorCount = 0;
-
-      if (deckData.cards && Array.isArray(deckData.cards) && deckData.cards.length > 0) {
+      const cards: { type: 'flashcard' | 'multiple_choice' | 'boolean'; data: any; hint?: string; explanation?: string }[] = [];
+      if (deckData.cards && Array.isArray(deckData.cards)) {
         for (const card of deckData.cards) {
-          try {
-            const itemType = card.type || 'flashcard';
-            const validTypes = ['flashcard', 'multiple_choice', 'boolean'];
-            
-            if (!validTypes.includes(itemType)) {
-              console.warn(`[FlashcardImportModal] Tipo de ítem inválido: ${itemType}`);
-              errorCount++;
-              continue;
-            }
-
-            if (!card.data) {
-              console.warn('[FlashcardImportModal] Ítem sin campo "data"');
-              errorCount++;
-              continue;
-            }
-
-            // Normalizar las llaves del JSON si vienen en snake_case
-            const normalizedData = { ...card.data };
-            if (normalizedData.correct_index !== undefined) {
-              normalizedData.correctIndex = normalizedData.correct_index;
-              delete normalizedData.correct_index;
-            }
-            if (normalizedData.correct_answer !== undefined) {
-              normalizedData.correctAnswer = normalizedData.correct_answer;
-              delete normalizedData.correct_answer;
-            }
-
-            await createEvaluationItem({
-              deck_id: newDeck.id,
-              item_type: itemType as 'flashcard' | 'multiple_choice' | 'boolean',
-              content_json: normalizedData,
-              hint: card.hint,
-              explanation: card.explanation,
-            });
-
-            successCount++;
-          } catch (itemError: any) {
-            console.error('[FlashcardImportModal] Error creando ítem:', itemError);
-            errorCount++;
+          const itemType = card.type || 'flashcard';
+          if (!['flashcard', 'multiple_choice', 'boolean'].includes(itemType)) continue;
+          if (!card.data) continue;
+          const normalizedData = { ...card.data };
+          if (normalizedData.correct_index !== undefined) {
+            normalizedData.correctIndex = normalizedData.correct_index;
+            delete normalizedData.correct_index;
           }
+          if (normalizedData.correct_answer !== undefined) {
+            normalizedData.correctAnswer = normalizedData.correct_answer;
+            delete normalizedData.correct_answer;
+          }
+          cards.push({ type: itemType, data: normalizedData, hint: card.hint, explanation: card.explanation });
         }
       }
 
-      // Importación exitosa - cerrar modal
-      setIsProcessing(false);
-      
-      // Recarga la lista de mazos ANTES de cerrar
-      await onImportSuccess?.();
-      
-      showAlert({
-        title: t('common.success'),
-        message: errorCount > 0
-          ? t('flashcards.importCompleteWithErrors', { title: deckData.title, successCount, errorCount })
-          : t('flashcards.importComplete', { title: deckData.title, successCount }),
-        type: 'success',
+      const deck = saveImportedDeck(
+        deckData.title,
+        deckData.description,
+        cards,
+        null,
+      );
+
+      setImportedDeck({
+        id: deck.id,
+        title: deck.title,
+        description: deck.description,
+        cardCount: deck.card_count,
       });
-      
-      // Reset state y cerrar
-      setImportedDeck(null);
-      setSelectedSubjectId(null);
-      onClose();
+
+      setIsProcessing(false);
+
+      if (cards.length > 0) {
+        showAlert({
+          title: t('common.success'),
+          message: t('flashcards.importComplete', { title: deckData.title, successCount: cards.length }),
+          type: 'success',
+        });
+        onImportSuccess?.();
+        setImportedDeck(null);
+        setSelectedSubjectId(null);
+        onClose();
+      }
     } catch (error: any) {
       console.error('[FlashcardImportModal] Error importando:', error);
 
@@ -405,7 +378,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
 
     try {
       setIsProcessing(true);
-      await updateFlashcardDeck(importedDeck.id, { subject_id: selectedSubjectId });
+      updateLocalDeckSubject(importedDeck.id, selectedSubjectId);
       
       showAlert({
         title: t('common.success'),

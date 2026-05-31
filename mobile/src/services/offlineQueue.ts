@@ -18,7 +18,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { fetchWithFallback, parseJsonSafely } from './api/client';
+import { activeBaseUrl } from './api/client';
+import { storageService } from './storageService';
 import { getUserId } from './api/auth';
 
 const QUEUE_KEY = '@threshold_offline_card_logs';
@@ -86,11 +87,16 @@ export async function flushOfflineQueue(): Promise<{ sent: number; remaining: nu
   const remaining: QueuedCardLog[] = [];
   let sent = 0;
 
+  const token = await storageService.getSecure('jwt_token');
+  const base = activeBaseUrl || 'http://localhost:3000/api';
+  const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) authHeaders.Authorization = `Bearer ${token}`;
+
   for (const log of queue) {
     try {
-      const response = await fetchWithFallback('/learning/card_logs', {
+      const response = await fetch(`${base}/learning/card_logs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({
           card_id: log.card_id,
           user_id: log.user_id,
@@ -138,13 +144,18 @@ export const createCardLogWithFallback = async (
 
   if (netState.isConnected) {
     try {
-      const response = await fetchWithFallback('/learning/card_logs', {
+      const token = await storageService.getSecure('jwt_token');
+      const base = activeBaseUrl || 'http://localhost:3000/api';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const response = await fetch(`${base}/learning/card_logs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ ...logData, user_id: userId }),
       });
 
-      const data = await parseJsonSafely(response);
+      let data: any;
+      try { data = await response.json(); } catch { data = null; }
 
       if (response.ok) return data;
 

@@ -7,6 +7,7 @@ const { authLimiter } = require('../middlewares/rateLimiter');
 router.use('/login', authLimiter);
 router.use('/register', authLimiter);
 router.use('/biometric-login', authLimiter);
+router.use('/auth/enroll-biometric', authLimiter);
 /**
  * @swagger
  * /api/register:

@@ -105,14 +105,18 @@ export const useRecordingsManager = () => {
     (id: string) => {
       const video = youTubeVideos.find((v) => v.id?.toString() === id);
       if (video) {
-        deleteYouTubeVideo(video.id!)
+        const numericId = video.id!;
+        deleteYouTubeVideo(numericId)
+          .then((result) => {
+            if ((result as any)?._isPending) {
+              setYouTubeVideos((prev) => prev.filter((v) => v.id !== numericId));
+            } else {
+              loadYouTubeVideos();
+            }
+          })
           .catch((e) => {
             console.warn('[useRecordingsManager] Error deleting video:', e);
             alert(t('recordings.deleteVideoError'));
-          })
-          .finally(() => {
-            console.log('[useRecordingsManager] Video eliminado, recargando lista...');
-            loadYouTubeVideos();
           });
         return;
       }

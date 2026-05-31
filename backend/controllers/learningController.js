@@ -1,4 +1,5 @@
 const { db } = require('../db');
+const bcrypt = require('bcrypt');
 
 /**
  * Obtener sesiones de estudio de un usuario
@@ -230,7 +231,7 @@ exports.createGroup = (req, res) => {
     if (existing) return res.status(409).json({ error: 'El PIN del grupo ya está en uso.' });
 
     const isPublicVal = is_public !== false;
-    const pwd = password || null;
+    const pwd = password ? bcrypt.hashSync(password, 10) : null;
 
     db.run(
       `INSERT INTO groups (group_pin_id, name, creator_user_id, is_public, password) VALUES (?, ?, ?, ?, ?)`,
@@ -275,7 +276,7 @@ exports.joinGroup = (req, res) => {
     // Verificar contraseña si el grupo es privado
     if (!group.is_public) {
       if (!password) return res.status(400).json({ error: 'Este grupo es privado. Ingresa la contraseña.' });
-      if (password !== group.password) return res.status(403).json({ error: 'Contraseña incorrecta.' });
+      if (!bcrypt.compareSync(password, group.password)) return res.status(403).json({ error: 'Contraseña incorrecta.' });
     }
 
     // Verificar si ya es miembro

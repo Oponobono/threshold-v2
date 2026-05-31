@@ -34,6 +34,7 @@ import {
 } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 import { getUserGroups, getGroupDecks } from '../../services/api/learning/groups';
+import { deleteLocalDeck } from '../../services/localFlashcardService';
 import { GroupPills } from './GroupPills';
 
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
@@ -92,6 +93,8 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
     (g: any) => g.group_pin_id === activeGroupPin && g.role === 'creator'
   ) : false;
 
+  const [removingFromGroup, setRemovingFromGroup] = useState(false);
+
   const handleRemoveFromGroup = async (deck: FlashcardDeck, groupPin: string) => {
     showAlert({
       title: t('modals.removeFromGroup'),
@@ -103,12 +106,19 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
+            if (removingFromGroup) return;
+            setRemovingFromGroup(true);
             try {
-              await leaveGroup(deck.id, currentUserId);
-              onUpdate?.();
+              await removeDeckFromGroup(deck.id, groupPin);
               showAlert({ title: t('common.success'), message: t('modals.removedFromGroup'), type: 'success' });
+              // Refresh group decks
+              if (activeGroupPin) {
+                getGroupDecks(activeGroupPin).then(d => setGroupDecks(d || []));
+              }
             } catch (e: any) {
               showAlert({ title: t('common.error'), message: e.message, type: 'error' });
+            } finally {
+              setRemovingFromGroup(false);
             }
           },
         },
@@ -210,6 +220,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   };
 
   const handleDeleteDeck = (deck: FlashcardDeck) => {
+    const isLocal = (deck as any)._local === true;
     const isOwner = deck.user_id === currentUserId;
     showAlert({
       title: isOwner ? t('modals.deleteDeck') : t('flashcards.removeShared'),
@@ -224,13 +235,12 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteFlashcardDeck(deck.id);
-              await loadDecks();
-              // Refrescar predicciones después de eliminar el mazo
-              const userId = await getUserId();
-              if (userId) {
-                await refreshPredictions(userId);
+              if (isLocal) {
+                deleteLocalDeck(deck.id);
+              } else {
+                await deleteFlashcardDeck(deck.id);
               }
+              await loadDecks();
             } catch (e: any) {
               showAlert({ title: t('common.error'), message: e.message || t('common.error'), type: 'error' });
             }

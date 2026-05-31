@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Animated, Easing, Image, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Animated, Easing, Image, Platform, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +32,8 @@ export default function LoginScreen() {
     isLoading,
     isBiometricLoading,
     biometricReady,
+    syncProgress,
+    isSyncLoading,
     sloganOpacity,
     sloganTranslateY,
     handleLogin,
@@ -200,6 +202,43 @@ export default function LoginScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Sync Overlay */}
+      {isSyncLoading && (
+        <View style={{
+          ...StyleSheet.absoluteFillObject,
+          backgroundColor: 'rgba(249,249,247,0.97)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
+          <ActivityIndicator size="large" color="#C5A059" />
+          <Text style={{
+            marginTop: 20,
+            fontSize: 17,
+            fontWeight: '600',
+            color: '#1A1A1A',
+          }}>
+            {syncProgress?.label || 'Preparando tu cuenta...'}
+          </Text>
+          {syncProgress && syncProgress.total > 0 && (
+            <Text style={{
+              marginTop: 8,
+              fontSize: 14,
+              color: '#8A8A8E',
+            }}>
+              Paso {syncProgress.current + 1} de {syncProgress.total}
+            </Text>
+          )}
+          <Text style={{
+            marginTop: 4,
+            fontSize: 12,
+            color: '#B0B0B0',
+          }}>
+            Esto solo ocurre una vez
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

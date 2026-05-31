@@ -6,9 +6,10 @@ const gradingEngine = require('../services/gradingEngine');
  */
 exports.getSubjectById = (req, res) => {
   const { subjectId } = req.params;
+  const userId = req.user.id;
   
   // First get the subject
-  db.get('SELECT * FROM subjects WHERE id = ?', [subjectId], async (err, row) => {
+  db.get('SELECT * FROM subjects WHERE id = ? AND user_id = ?', [subjectId, userId], async (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Materia no encontrada' });
 
@@ -235,8 +236,14 @@ exports.getSubjectsByUser = (req, res) => {
  */
 exports.createSubject = (req, res) => {
   const { user_id, code, name, credits, professor, color, icon, target_grade } = req.body;
+  const authenticatedUserId = req.user.id;
+
   if (!user_id || !name) {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id, name)' });
+  }
+
+  if (parseInt(user_id) !== authenticatedUserId) {
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   const normalizedCode =
@@ -290,20 +297,27 @@ exports.createSubject = (req, res) => {
  */
 exports.deleteSubject = (req, res) => {
   const { subjectId } = req.params;
+  const userId = req.user.id;
   
-  const tables = ['assessments', 'schedules', 'photos', 'scanned_documents', 'audio_recordings', 'youtube_videos', 'flashcard_decks'];
-  let i = 0;
-  const next = () => {
-    if (i < tables.length) {
-      db.run(`DELETE FROM ${tables[i]} WHERE subject_id = ?`, [subjectId], () => { i++; next(); });
-    } else {
-      db.run(`DELETE FROM subjects WHERE id = ?`, [subjectId], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, message: 'Materia y elementos asociados eliminados correctamente' });
-      });
-    }
-  };
-  next();
+  // Verificar propiedad antes de borrar en cascada
+  db.get('SELECT id FROM subjects WHERE id = ? AND user_id = ?', [subjectId, userId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Materia no encontrada o acceso denegado' });
+
+    const tables = ['assessments', 'schedules', 'photos', 'scanned_documents', 'audio_recordings', 'youtube_videos', 'flashcard_decks'];
+    let i = 0;
+    const next = () => {
+      if (i < tables.length) {
+        db.run(`DELETE FROM ${tables[i]} WHERE subject_id = ?`, [subjectId], () => { i++; next(); });
+      } else {
+        db.run(`DELETE FROM subjects WHERE id = ? AND user_id = ?`, [subjectId, userId], function(err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ success: true, message: 'Materia y elementos asociados eliminados correctamente' });
+        });
+      }
+    };
+    next();
+  });
 };
 
 /**
@@ -328,13 +342,13 @@ exports.updateSubject = (req, res) => {
   }
 
   const columns = Object.keys(fieldsToUpdate).map(key => `${key} = ?`).join(', ');
-  const values = [...Object.values(fieldsToUpdate), subjectId];
+  const values = [...Object.values(fieldsToUpdate), subjectId, req.user.id];
 
-  const query = `UPDATE subjects SET ${columns} WHERE id = ?`;
+  const query = `UPDATE subjects SET ${columns} WHERE id = ? AND user_id = ?`;
 
   db.run(query, values, function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ error: 'Materia no encontrada' });
+    if (this.changes === 0) return res.status(404).json({ error: 'Materia no encontrada o acceso denegado' });
     res.json({ success: true, message: 'Materia actualizada' });
   });
 };

@@ -5,6 +5,7 @@
  */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
+import { offlineSyncService } from '../offlineSyncService';
 
 export interface CalendarEventData {
   title: string;
@@ -39,21 +40,27 @@ export const createCalendarEvent = async (event: CalendarEventData): Promise<Cal
     ...event,
   };
 
-  const response = await fetchWithFallback('/calendar/events', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetchWithFallback('/calendar/events', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await parseJsonSafely(response);
+    const data = await parseJsonSafely(response);
 
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo crear el evento.');
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo crear el evento.');
+    }
+
+    return data as CalendarEvent;
+  } catch (error) {
+    console.warn('[Calendar] Offline: encolando createCalendarEvent', error);
+    await offlineSyncService.addPendingOperation('POST', '/calendar/events', 'calendar', payload);
+    return { id: -Date.now(), ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), _isPending: true } as any;
   }
-
-  return data as CalendarEvent;
 };
 
 /**
@@ -122,21 +129,27 @@ export const updateCalendarEvent = async (
     ...updates,
   };
 
-  const response = await fetchWithFallback(`/calendar/events/${eventId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetchWithFallback(`/calendar/events/${eventId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await parseJsonSafely(response);
+    const data = await parseJsonSafely(response);
 
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo actualizar el evento.');
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo actualizar el evento.');
+    }
+
+    return data as CalendarEvent;
+  } catch (error) {
+    console.warn(`[Calendar] Offline: encolando updateCalendarEvent ${eventId}`, error);
+    await offlineSyncService.addPendingOperation('PUT', `/calendar/events/${eventId}`, 'calendar', payload);
+    return { id: eventId, ...updates, _isPending: true } as any;
   }
-
-  return data as CalendarEvent;
 };
 
 /**
@@ -148,15 +161,20 @@ export const deleteCalendarEvent = async (eventId: number): Promise<void> => {
     throw new Error('No hay sesión activa.');
   }
 
-  const response = await fetchWithFallback(`/calendar/events/${eventId}?user_id=${userId}`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  try {
+    const response = await fetchWithFallback(`/calendar/events/${eventId}?user_id=${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-  if (!response.ok) {
-    const data = await parseJsonSafely(response);
-    throw new Error(data?.error || 'No se pudo eliminar el evento.');
+    if (!response.ok) {
+      const data = await parseJsonSafely(response);
+      throw new Error(data?.error || 'No se pudo eliminar el evento.');
+    }
+  } catch (error) {
+    console.warn(`[Calendar] Offline: encolando deleteCalendarEvent ${eventId}`, error);
+    await offlineSyncService.addPendingOperation('DELETE', `/calendar/events/${eventId}`, 'calendar');
   }
 };

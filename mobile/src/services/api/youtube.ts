@@ -10,6 +10,8 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { YouTubeVideo } from './types';
+import { offlineSyncService } from '../offlineSyncService';
+import { storageService } from '../storageService';
 
 /**
  * Obtiene todos los videos de YouTube del usuario
@@ -37,48 +39,71 @@ export const createYouTubeVideo = async (payload: {
 
   const payloadWithUser = { ...payload, user_id: Number(userId) };
 
-  const response = await fetchWithFallback('/youtube-videos', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payloadWithUser),
-  });
+  try {
+    const response = await fetchWithFallback('/youtube-videos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payloadWithUser),
+    });
 
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo guardar el video en BD.');
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo guardar el video en BD.');
+    }
+
+    return data;
+  } catch (error) {
+    console.warn('[YouTube] Offline: encolando createYouTubeVideo', error);
+    await offlineSyncService.addPendingOperation('POST', '/youtube-videos', 'youtube', payloadWithUser);
+    return { id: -Date.now(), ...payloadWithUser, _isPending: true };
   }
-
-  return data;
 };
 
 /**
  * Actualiza un video de YouTube (ej: asociar materia, renombrar)
  */
 export const updateYouTubeVideo = async (id: number, payload: { subject_id?: number | null; title?: string | null }) => {
-  const response = await fetchWithFallback(`/youtube-videos/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetchWithFallback(`/youtube-videos/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo actualizar el video.');
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo actualizar el video.');
+    }
+
+    return data;
+  } catch (error) {
+    console.warn(`[YouTube] Offline: encolando updateYouTubeVideo ${id}`, error);
+    await offlineSyncService.addPendingOperation('PUT', `/youtube-videos/${id}`, 'youtube', payload);
+    return { ...payload, _isPending: true };
   }
-
-  return data;
 };
 
 /**
  * Elimina un video de YouTube de la base de datos
  */
 export const deleteYouTubeVideo = async (id: number) => {
-  const response = await fetchWithFallback(`/youtube-videos/${id}`, { method: 'DELETE' });
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo eliminar el video.');
+  try {
+    const response = await fetchWithFallback(`/youtube-videos/${id}`, { method: 'DELETE' });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo eliminar el video.');
+    }
+    return data;
+  } catch (error) {
+    console.warn(`[YouTube] Offline: encolando deleteYouTubeVideo ${id}`, error);
+    await offlineSyncService.addPendingOperation('DELETE', `/youtube-videos/${id}`, 'youtube');
+    const userId = await getUserId();
+    if (userId) {
+      const cacheKey = `api_cache_/youtube-videos/${userId}`;
+      try { await storageService.removeLocal(cacheKey); } catch {}
+    }
+    return { success: true, _isPending: true };
   }
-  return data;
 };
 
 /**
@@ -93,18 +118,24 @@ export const upsertYouTubeTranscript = async (payload: {
   transcript_text?: string | null;
   summary_uri?: string | null;
 }) => {
-  const response = await fetchWithFallback('/youtube-transcripts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetchWithFallback('/youtube-transcripts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo guardar la transcripción del video.');
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo guardar la transcripción del video.');
+    }
+
+    return data;
+  } catch (error) {
+    console.warn('[YouTube] Offline: encolando upsertYouTubeTranscript', error);
+    await offlineSyncService.addPendingOperation('POST', '/youtube-transcripts', 'youtube', payload);
+    return { ...payload, _isPending: true };
   }
-
-  return data;
 };
 
 /**

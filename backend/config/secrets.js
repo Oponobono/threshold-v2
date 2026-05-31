@@ -30,8 +30,9 @@ const secrets = {
     HOST: getSecret('HOST', '0.0.0.0'),
     
     // Autenticación
-    // En desarrollo usamos una llave por defecto. En producción, ES OBLIGATORIA.
-    JWT_SECRET: getSecret('JWT_SECRET', 'super-secret-default-key-change-me', isProd),
+    // ⚠️ En producción, JWT_SECRET es OBLIGATORIO. Configúralo en .env con un valor seguro.
+    // En desarrollo, si no está configurado, se usa un valor aleatorio por sesión.
+    JWT_SECRET: getSecret('JWT_SECRET', isProd ? null : require('crypto').randomBytes(32).toString('hex'), isProd),
     
     // Base de Datos
     DATABASE_URL: getSecret('DATABASE_URL', ''),

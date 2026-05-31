@@ -143,19 +143,25 @@ export const deleteSubject = async (subjectId: number | string) => {
  * Actualiza una materia existente
  */
 export const updateSubject = async (subjectId: number | string, payload: Partial<Subject>) => {
-  const response = await fetchWithFallback(`/subjects/${subjectId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetchWithFallback(`/subjects/${subjectId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudo actualizar la materia.');
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'No se pudo actualizar la materia.');
+    }
+
+    cacheService.clearKey(CACHE_KEYS.SUBJECTS);
+    return data;
+  } catch (error) {
+    console.warn('[Subjects] Red no disponible, guardando update en cola offline:', error);
+    await offlineSyncService.addPendingOperation('PUT', `/subjects/${subjectId}`, 'subject', payload);
+    return { ...payload, _isPending: true };
   }
-
-  cacheService.clearKey(CACHE_KEYS.SUBJECTS);
-  return data;
 };

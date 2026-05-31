@@ -21,6 +21,7 @@ import {
 import { getBackupPreferences, BACKUP_PREFS } from '../services/backup/backupService';
 import { downloadCloudItems } from '../services/backup/downloadService';
 import { storageService } from '../services/storageService';
+import { preloadAllUserData, PreloadProgress } from '../services/dataPreloader';
 
 /**
  * Hook personalizado que maneja toda la lógica de autenticación de la pantalla de Login.
@@ -38,6 +39,8 @@ export const useLoginAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isBiometricLoading, setIsBiometricLoading] = useState(false);
   const [biometricReady, setBiometricReady] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<PreloadProgress | null>(null);
+  const [isSyncLoading, setIsSyncLoading] = useState(false);
   const lastGuestToggleAtRef = useRef(0);
 
   // Animaciones para el slogan
@@ -84,6 +87,26 @@ export const useLoginAuth = () => {
    * Dispara la descarga automática en background si el usuario la tiene habilitada.
    * Se llama en cada login exitoso sin bloquear la navegación.
    */
+  const navigateAfterSync = () => {
+    setIsSyncLoading(true);
+    setSyncProgress({ phase: 'profile', label: 'Sincronizando datos...', current: 0, total: 1 });
+    preloadAllUserData(setSyncProgress)
+      .then((result) => {
+        if (!result.success) {
+          console.warn('[Preloader] Precarga fallida:', result.error);
+        }
+      })
+      .catch((err) => {
+        console.warn('[Preloader] Error inesperado:', err);
+      })
+      .finally(() => {
+        setIsSyncLoading(false);
+        setSyncProgress(null);
+        triggerAutoDownloadIfEnabled();
+        router.replace('/(tabs)');
+      });
+  };
+
   const triggerAutoDownloadIfEnabled = () => {
     getBackupPreferences().then((prefs) => {
       if (prefs.autoDownload) {
@@ -136,8 +159,7 @@ export const useLoginAuth = () => {
                     await setItemAsync('app_user_id', loginData.user.id.toString());
                   }
                   alertRef.show({ title: t('common.success'), message: t('login.accountRecovered'), type: 'success' });
-                  triggerAutoDownloadIfEnabled();
-                  router.replace('/(tabs)');
+                  navigateAfterSync();
                 } catch (error: any) {
                   alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
                 }
@@ -165,9 +187,8 @@ export const useLoginAuth = () => {
           type: 'confirm',
           buttons: [
             { text: t('biometric.notNow'), style: 'cancel', onPress: () => {
-                triggerAutoDownloadIfEnabled();
-                router.replace('/(tabs)');
-              } 
+                navigateAfterSync();
+              }
             },
             {
               text: t('biometric.enable'),
@@ -182,14 +203,13 @@ export const useLoginAuth = () => {
                     alertRef.show({ title: t('biometric.touchId'), message: t('biometric.serverConfigError'), type: 'error' });
                   }
                 }
-                router.replace('/(tabs)');
+                navigateAfterSync();
               },
             },
           ]
         });
       } else {
-        triggerAutoDownloadIfEnabled();
-        router.replace('/(tabs)');
+        navigateAfterSync();
       }
     } catch (error: any) {
       alertRef.show({ title: t('login.errors.loginTitle'), message: error.message, type: 'error' });
@@ -233,8 +253,7 @@ export const useLoginAuth = () => {
       }
 
       await biometricLogin(result.token);
-      triggerAutoDownloadIfEnabled();
-      router.replace('/(tabs)');
+      navigateAfterSync();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error.message || t('biometric.loginFailed'), type: 'error' });
       setIsBiometricLoading(false);
@@ -261,6 +280,8 @@ export const useLoginAuth = () => {
     isLoading,
     isBiometricLoading,
     biometricReady,
+    syncProgress,
+    isSyncLoading,
     sloganOpacity,
     sloganTranslateY,
     handleLogin,

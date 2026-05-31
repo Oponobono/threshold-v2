@@ -3,7 +3,7 @@ const { db } = require('../db');
 const { analyzeCardDensity, fragmentCard } = require('../utils/atomicCardGenerator');
 const { calculateSM2, calculateFSRS } = require('../utils/sm2Algorithm');
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Normaliza una fila de la BD al formato EvaluationItem que espera el frontend.
@@ -47,13 +47,17 @@ function normalizeCard(row) {
   };
 }
 
-// ─── Deck CRUD ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Deck CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Obtener todos los mazos de flashcards del usuario (propios y compartidos)
  */
 exports.getFlashcardDecks = (req, res) => {
-  const userId = req.query.user_id;
+  const requestUserId = req.query.user_id;
+  const userId = req.user.id;
+  if (requestUserId && parseInt(requestUserId) !== userId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   if (!userId) return res.status(400).json({ error: 'Se requiere user_id' });
   const query = `
     SELECT fd.*, s.name as subject_name, s.color as subject_color, s.icon as subject_icon,
@@ -96,14 +100,18 @@ exports.getFlashcardDecks = (req, res) => {
 };
 
 /**
- * Obtiene mazos con métricas de prioridad (tarjetas vencidas, promedio dominio)
+ * Obtiene mazos con mÃ©tricas de prioridad (tarjetas vencidas, promedio dominio)
  * Retorna mazos ordenados por urgencia
  */
 exports.getFlashcardDecksWithMetrics = (req, res) => {
-  const userId = req.query.user_id;
+  const requestUserId = req.query.user_id;
+  const userId = req.user.id;
+  if (requestUserId && parseInt(requestUserId) !== userId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   if (!userId) return res.status(400).json({ error: 'Se requiere user_id' });
 
-  // NOTA: Todas las métricas de conteo se calculan como subconsultas escalares
+  // NOTA: Todas las mÃ©tricas de conteo se calculan como subconsultas escalares
   // para evitar conflictos de GROUP BY con el LEFT JOIN de learning_analytics.
   // COALESCE(MAX(...)) en ORDER BY fue reemplazado por el alias 'deck_mastery'
   // ya calculado en el SELECT para evitar que SQLite descarte filas silenciosamente.
@@ -160,7 +168,7 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
       console.error('[FlashcardMetrics] Error:', err);
       return res.status(500).json({ error: err.message });
     }
-    console.log(`[FlashcardMetrics] userId=${userId} → ${(rows || []).length} mazos devueltos`);
+    console.log(`[FlashcardMetrics] userId=${userId} â†’ ${(rows || []).length} mazos devueltos`);
     res.json(rows || []);
   });
 };
@@ -183,412 +191,6 @@ exports.createFlashcardDeck = (req, res) => {
 };
 
 /**
- * Actualiza un mazo de flashcards (subject_id, title, description)
- */
-exports.updateFlashcardDeck = (req, res) => {
-  const { deckId } = req.params;
-  const { subject_id, title, description } = req.body;
-
-  const updateFields = [];
-  const params = [];
-
-  if (subject_id !== undefined) {
-    updateFields.push('subject_id = ?');
-    params.push(subject_id);
-  }
-  if (title !== undefined) {
-    updateFields.push('title = ?');
-    params.push(title);
-  }
-  if (description !== undefined) {
-    updateFields.push('description = ?');
-    params.push(description);
-  }
-
-  if (updateFields.length === 0) {
-    return res.status(400).json({ error: 'No hay campos para actualizar' });
-  }
-
-  params.push(deckId);
-
-  db.run(
-    `UPDATE flashcard_decks SET ${updateFields.join(', ')} WHERE id = ?`,
-    params,
-    function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      if (this.changes === 0) return res.status(404).json({ error: 'Mazo no encontrado' });
-      res.json({ success: true, message: 'Mazo actualizado' });
-    }
-  );
-};
-
-// ─── Card CRUD ────────────────────────────────────────────────────────────────
-
-/**
- * Obtener todas las tarjetas de un mazo (normalizadas al formato polimórfico)
- */
-exports.getCardsByDeck = (req, res) => {
-  const { deckId } = req.params;
-  db.all(`SELECT * FROM flashcards WHERE deck_id = ? ORDER BY created_at ASC`, [deckId], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows.map(normalizeCard));
-  });
-};
-
-/**
- * Obtiene una tarjeta específica por su ID
- */
-exports.getCardById = (req, res) => {
-  const { cardId } = req.params;
-  db.get(`SELECT * FROM flashcards WHERE id = ?`, [cardId], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'Tarjeta no encontrada' });
-    res.json(normalizeCard(row));
-  });
-};
-
-/**
- * Obtiene todas las tarjetas de un mazo ordenadas por prioridad de repaso
- * Prioridad: tarjetas vencidas, dominio bajo, tasa de fallos alta
- */
-exports.getCardsByDeckPrioritized = (req, res) => {
-  const { deckId } = req.params;
-  const { userId } = req.query;
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Se requiere userId' });
-  }
-
-  db.all(
-    `SELECT 
-       fc.*,
-       CASE 
-         WHEN COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) > 0
-         THEN CAST(COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) AS FLOAT) / 
-              CAST(COALESCE(COUNT(cl.id), 1) AS FLOAT)
-         ELSE 0
-       END as failure_rate,
-       CAST(COUNT(cl.id) AS INTEGER) as total_attempts
-     FROM flashcards fc
-     LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
-     WHERE fc.deck_id = ?
-     GROUP BY fc.id
-     ORDER BY 
-       CASE WHEN fc.next_review_date <= CURRENT_TIMESTAMP THEN 0 ELSE 1 END ASC,
-       CASE fc.status 
-         WHEN 'learning' THEN 0 
-         WHEN 'new' THEN 1 
-         WHEN 'review' THEN 2 
-         ELSE 3 
-       END ASC,
-       fc.fsrs_difficulty DESC,
-       failure_rate DESC,
-       fc.next_review_date ASC,
-       fc.created_at ASC`,
-    [userId, deckId],
-    (err, rows) => {
-      if (err) {
-        console.error('[CardsPrioritized] Error:', err);
-        return res.status(500).json({ error: err.message });
-      }
-      res.json(rows.map(normalizeCard));
-    }
-  );
-};
-
-/**
- * Crear una tarjeta legacy (front/back) — mantiene compatibilidad con FlashcardNewCardScreen
- */
-exports.createCard = (req, res) => {
-  const { deckId } = req.params;
-  const { front, back } = req.body;
-  if (!front || !back) return res.status(400).json({ error: 'Faltan campos requeridos (front, back).' });
-
-  const contentJson = JSON.stringify({ front, back });
-  
-  // NOTA: next_review_date se deja NULL intencionalmente.
-  // Según SM-2, las tarjetas sin primera revisión no tienen intervalo.
-  // Solo tras POST /flashcards/:cardId/review se asigna next_review_date.
-  
-  db.run(
-    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, status, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, 'flashcard', ?, 'new', 2.5, 1, 0, 1, 0.5, 0)`,
-    [deckId, front, back, contentJson],
-    function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json(normalizeCard({
-        id: this.lastID, deck_id: Number(deckId), front, back,
-        item_type: 'flashcard', content_json: contentJson, status: 'new', hint: null, explanation: null,
-      }));
-    }
-  );
-};
-
-/**
- * Valida que el content_json tenga la estructura correcta según su tipo.
- */
-function validateContentSchema(itemType, data) {
-  if (!data || typeof data !== 'object') {
-    return 'content_json debe ser un objeto';
-  }
-
-  switch (itemType) {
-    case 'flashcard':
-      if (!data.front || typeof data.front !== 'string') return 'flashcard requiere "front" (string)';
-      if (!data.back || typeof data.back !== 'string') return 'flashcard requiere "back" (string)';
-      if (data.front.length > 2000) return '"front" no puede exceder 2000 caracteres';
-      if (data.back.length > 2000) return '"back" no puede exceder 2000 caracteres';
-      break;
-
-    case 'multiple_choice':
-      if (!data.question || typeof data.question !== 'string') return 'multiple_choice requiere "question" (string)';
-      if (!Array.isArray(data.options) || data.options.length < 2 || data.options.length > 6) return 'multiple_choice requiere "options" (array de 2-6 elementos)';
-      if (typeof data.correctIndex !== 'number' || !Number.isInteger(data.correctIndex)) return 'multiple_choice requiere "correctIndex" (entero)';
-      if (data.correctIndex < 0 || data.correctIndex >= data.options.length) return `correctIndex (${data.correctIndex}) está fuera del rango de options (0-${data.options.length - 1})`;
-      if (data.options.some(o => typeof o !== 'string')) return 'Todos los elementos de "options" deben ser strings';
-      if (data.question.length > 2000) return '"question" no puede exceder 2000 caracteres';
-      break;
-
-    case 'boolean':
-      if (!data.question || typeof data.question !== 'string') return 'boolean requiere "question" (string)';
-      if (typeof data.correctAnswer !== 'boolean') return 'boolean requiere "correctAnswer" (true/false)';
-      if (data.question.length > 2000) return '"question" no puede exceder 2000 caracteres';
-      break;
-
-    default:
-      return `Tipo no soportado: ${itemType}`;
-  }
-
-  return null;
-}
-
-/**
- * Sanitiza un objeto eliminando claves peligrosas (__proto__, constructor, prototype)
- */
-function sanitizeJSON(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(sanitizeJSON);
-
-  const sanitized = {};
-  for (const key of Object.keys(obj)) {
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
-    sanitized[key] = typeof obj[key] === 'object' && obj[key] !== null ? sanitizeJSON(obj[key]) : obj[key];
-  }
-  return sanitized;
-}
-
-/**
- * Crear un ítem de evaluación polimórfico (flashcard | multiple_choice | boolean)
- * Body: { item_type, content_json: { ... }, hint?, explanation? }
- */
-exports.createEvaluationItem = (req, res) => {
-  const { deckId } = req.params;
-  const { item_type, content_json, hint, explanation } = req.body;
-
-  const validTypes = ['flashcard', 'multiple_choice', 'boolean'];
-  if (!item_type || !validTypes.includes(item_type)) {
-    return res.status(400).json({ error: `item_type debe ser uno de: ${validTypes.join(', ')}` });
-  }
-  if (!content_json) return res.status(400).json({ error: 'Se requiere content_json.' });
-
-  // Sanitizar contra prototype pollution
-  const safeContent = sanitizeJSON(content_json);
-
-  const contentStr = typeof safeContent === 'string' ? safeContent : JSON.stringify(safeContent);
-  let parsed;
-  try { parsed = JSON.parse(contentStr); } catch (_) {
-    return res.status(400).json({ error: 'content_json no es JSON válido.' });
-  }
-
-  // Límite de tamaño por carta (50KB)
-  if (contentStr.length > 50 * 1024) {
-    return res.status(400).json({ error: 'content_json excede el límite de 50KB por tarjeta.' });
-  }
-
-  // Validar esquema según tipo de ítem
-  const schemaError = validateContentSchema(item_type, parsed);
-  if (schemaError) {
-    return res.status(400).json({ error: `Error de validación: ${schemaError}` });
-  }
-
-  // Verificar que el mazo existe y pertenece al usuario autenticado
-  db.get(`SELECT id, user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!deck) return res.status(404).json({ error: 'Mazo no encontrado' });
-    if (deck.user_id !== req.user.id) {
-      return res.status(403).json({ error: 'No tienes permiso para modificar este mazo' });
-    }
-
-    // Verificar que el mazo no exceda 20 tarjetas
-    db.get(`SELECT COUNT(*) AS count FROM flashcards WHERE deck_id = ?`, [deckId], (err, row) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (row.count >= 20) {
-        return res.status(400).json({ error: 'Límite alcanzado: un mazo no puede tener más de 20 tarjetas.' });
-      }
-
-      const front = item_type === 'flashcard' ? (parsed.front || '') : '';
-      const back = item_type === 'flashcard' ? (parsed.back || '') : '';
-
-      db.run(
-        `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', 2.5, 1, 0, 1, 0.5, 0)`,
-        [deckId, front, back, item_type, contentStr, hint || null, explanation || null],
-        function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.status(201).json(normalizeCard({
-            id: this.lastID, deck_id: Number(deckId), front, back,
-            item_type, content_json: contentStr, hint: hint || null, explanation: explanation || null, status: 'new',
-          }));
-        }
-      );
-    });
-  });
-};
-
-/**
- * Registrar una revisión de tarjeta con SM-2 Algorithm
- * Body: { userId, result: 'correct'|'incorrect', responseTimeMs: number }
- */
-exports.recordCardReview = (req, res) => {
-  const { cardId } = req.params;
-  const { userId, result, responseTimeMs } = req.body;
-
-  console.log('[recordCardReview] Recibido:', { cardId, userId, result, responseTimeMs });
-
-  if (!userId || !result || typeof responseTimeMs !== 'number') {
-    const error = 'Se requieren: userId, result (correct|incorrect), responseTimeMs';
-    console.error('[recordCardReview] Validación fallida:', { userId, result, responseTimeMs }, error);
-    return res.status(400).json({ error });
-  }
-
-  if (!['correct', 'incorrect'].includes(result)) {
-    const error = 'result debe ser "correct" o "incorrect"';
-    console.error('[recordCardReview] Resultado inválido:', result, error);
-    return res.status(400).json({ error });
-  }
-
-  // Obtener FSRS actual de la tarjeta
-  db.get(
-    `SELECT fc.id, fc.deck_id, fc.fsrs_stability, fc.fsrs_difficulty, fc.fsrs_repetitions, fd.subject_id 
-     FROM flashcards fc
-     LEFT JOIN flashcard_decks fd ON fc.deck_id = fd.id
-     WHERE fc.id = ?`,
-    [cardId],
-    (err, card) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (!card) return res.status(404).json({ error: 'Tarjeta no encontrada' });
-
-      // ── Mapear resultado a calidad FSRS (0-5) ────────────────────────────
-      // result === 'correct' se mapea a quality (3-5 según tiempo)
-      // result === 'incorrect' se mapea a quality < 3
-      let quality = 1;
-      if (result === 'correct') {
-        if (responseTimeMs < 3000) quality = 5;        // Perfecto
-        else if (responseTimeMs < 8000) quality = 4;   // Bueno
-        else quality = 3;                              // Aceptable
-      } else {
-        quality = 1;                                   // Malo/Olvidado
-      }
-
-      // ── Calcular nuevo intervalo con FSRS ────────────────────────────────
-      const fsrsResult = calculateFSRS({
-        quality,
-        stability: card.fsrs_stability || 1,
-        difficulty: card.fsrs_difficulty || 0.5,
-        repetitions: card.fsrs_repetitions || 0,
-        interval: 1,  // Simplificado: se calcula dentro de calculateFSRS
-      });
-
-      const nextReviewDateStr = fsrsResult.nextReviewDate.toISOString();
-
-      console.log('[recordCardReview] FSRS calculado:', { quality, fsrsResult, nextReviewDateStr });
-
-      // ── Actualizar flashcard con nuevos valores FSRS ────────────────────
-      db.run(
-        `UPDATE flashcards 
-         SET fsrs_stability = ?, fsrs_difficulty = ?, fsrs_repetitions = ?, 
-             next_review_date = ?, status = 'review', last_review_timestamp = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [fsrsResult.newStability, fsrsResult.newDifficulty, fsrsResult.newRepetitions, nextReviewDateStr, cardId],
-        (updateErr) => {
-          if (updateErr) {
-            console.error('[recordCardReview] Error actualizando flashcard:', updateErr);
-            return res.status(500).json({ error: updateErr.message });
-          }
-
-          console.log('[recordCardReview] Flashcard actualizada exitosamente');
-
-          // ── Registrar en card_logs para análisis ───────────────────────
-          db.run(
-            `INSERT INTO card_logs (card_id, user_id, result, response_time_ms, difficulty_deduced)
-             VALUES (?, ?, ?, ?, ?)`,
-            [cardId, userId, result, responseTimeMs, quality >= 4 ? 'easy' : quality === 3 ? 'moderate' : 'difficult'],
-            (logErr) => {
-              if (logErr) console.warn('[CardLogs] Error registrando revisión:', logErr);
-            }
-          );
-
-          // ── Actualizar learning_analytics ──────────────────────────────
-          const isCorrect = result === 'correct' ? 1 : 0;
-          db.run(
-            `UPDATE learning_analytics 
-             SET total_reviews = total_reviews + 1,
-                 correct_reviews = correct_reviews + ?,
-                 incorrect_reviews = incorrect_reviews + ?,
-                 mastery_percentage = CASE 
-                   WHEN total_reviews + 1 > 0 THEN ROUND((correct_reviews + ?) * 100.0 / (total_reviews + 1), 1)
-                   ELSE 0
-                 END,
-                 last_updated = CURRENT_TIMESTAMP
-             WHERE user_id = ? AND subject_id = ?`,
-            [isCorrect, 1 - isCorrect, isCorrect, userId, card.subject_id || null],
-            (analyticsErr) => {
-              if (analyticsErr) console.warn('[Analytics] Error actualizando estadísticas:', analyticsErr);
-            }
-          );
-
-          // ── Retornar resultado con métricas FSRS ────────────────────────
-          res.json({
-            success: true,
-            cardId,
-            quality,
-            nextReviewDate: nextReviewDateStr,
-            newStability: fsrsResult.newStability,
-            newDifficulty: fsrsResult.newDifficulty,
-            newRepetitions: fsrsResult.newRepetitions,
-            retention: fsrsResult.retention,
-            message: `Revisión registrada (FSRS). Próxima revisión en ${fsrsResult.newInterval} días. Retención esperada: ${fsrsResult.retention}%.`,
-          });
-        }
-      );
-    }
-  );
-};
-
-/**
- * Actualizar el estado de una tarjeta
- */
-exports.updateCardStatus = (req, res) => {
-  const { cardId } = req.params;
-  const { status } = req.body;
-  db.run(`UPDATE flashcards SET status = ? WHERE id = ?`, [status, cardId], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
-  });
-};
-
-/**
- * Eliminar una tarjeta
- */
-exports.deleteCard = (req, res) => {
-  const { cardId } = req.params;
-  db.run(`DELETE FROM flashcards WHERE id = ?`, [cardId], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
-  });
-};
-
-/**
- * Eliminar un mazo completo o quitar un mazo compartido de la lista del usuario.
- *
  * FIX: La eliminación en cascada manual (flashcards → shared_decks → flashcard_decks)
  * fue reemplazada por un único DELETE en flashcard_decks, confiando en las
  * constraints ON DELETE CASCADE del schema. Esto es atómico y evita estados
@@ -597,8 +199,12 @@ exports.deleteCard = (req, res) => {
  */
 exports.deleteDeck = (req, res) => {
   const { deckId } = req.params;
-  const { user_id } = req.query;
+  const user_id = req.user.id;
+  const requestUserId = req.query.user_id;
 
+  if (requestUserId && parseInt(requestUserId) !== user_id) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   if (!user_id) return res.status(400).json({ error: 'Se requiere user_id para verificar permisos de eliminación.' });
 
   db.get(`SELECT user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
@@ -606,7 +212,7 @@ exports.deleteDeck = (req, res) => {
     if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
 
     if (deck.user_id === Number(user_id)) {
-      // Eliminar el mazo directamente — flashcards, shared_decks, card_logs,
+      // Eliminar el mazo directamente â€” flashcards, shared_decks, card_logs,
       // review_predictions y card_snoozes se eliminan en cascada por el schema.
       db.run(`DELETE FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], function(errDeck) {
         if (errDeck) {
@@ -626,7 +232,7 @@ exports.deleteDeck = (req, res) => {
         function(errUnshare) {
           if (errUnshare) return res.status(500).json({ error: errUnshare.message });
           if (this.changes === 0) {
-            return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo o no está compartido contigo.' });
+            return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo o no estÃ¡ compartido contigo.' });
           }
           res.json({ success: true, message: 'Mazo compartido quitado de tu lista exitosamente.' });
         }
@@ -640,7 +246,13 @@ exports.deleteDeck = (req, res) => {
  */
 exports.removeDeckFromGroup = (req, res) => {
   const { deckId } = req.params;
-  const { user_id, group_pin_id } = req.body;
+  const user_id = req.user.id;
+  const requestUserId = req.body.user_id;
+  const group_pin_id = req.body.group_pin_id;
+
+  if (requestUserId && parseInt(requestUserId) !== user_id) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   if (!user_id || !group_pin_id) {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id, group_pin_id).' });
@@ -687,13 +299,19 @@ exports.removeDeckFromGroup = (req, res) => {
  */
 exports.shareDeck = (req, res) => {
   const { deckId } = req.params;
-  const { user_id, recipient_pin, group_pin_id } = req.body;
+  const user_id = req.user.id;
+  const requestUserId = req.body.user_id;
+  const { recipient_pin, group_pin_id } = req.body;
+
+  if (requestUserId && parseInt(requestUserId) !== user_id) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   if (!user_id) {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id).' });
   }
 
-  // ── Compartir con un grupo ──────────────────────────────────────────────
+  // â”€â”€ Compartir con un grupo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (group_pin_id) {
     db.get(`SELECT id FROM group_memberships WHERE user_id = ? AND group_pin_id = ?`,
       [user_id, group_pin_id],
@@ -725,14 +343,14 @@ exports.shareDeck = (req, res) => {
     return;
   }
 
-  // ── Compartir con un usuario por PIN ────────────────────────────────────
+  // â”€â”€ Compartir con un usuario por PIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (!recipient_pin) {
     return res.status(400).json({ error: 'Faltan campos requeridos (recipient_pin o group_pin_id).' });
   }
 
   db.get(`SELECT id, username, name FROM users WHERE share_pin = ?`, [recipient_pin.trim().toUpperCase()], (err, recipient) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (!recipient) return res.status(404).json({ error: 'No se encontró ningún usuario con ese PIN.' });
+    if (!recipient) return res.status(404).json({ error: 'No se encontrÃ³ ningÃºn usuario con ese PIN.' });
     if (recipient.id === Number(user_id)) return res.status(400).json({ error: 'No puedes compartir un mazo contigo mismo.' });
 
     db.get(`SELECT id, title FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], (err2, deck) => {
@@ -763,10 +381,10 @@ exports.shareDeck = (req, res) => {
   });
 };
 
-// ─── AI Generation ────────────────────────────────────────────────────────────
+// â”€â”€â”€ AI Generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
- * Helper: Inserta un card en la BD de forma asíncrona
+ * Helper: Inserta un card en la BD de forma asÃ­ncrona
  */
 function insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count) {
   return new Promise((resolve, reject) => {
@@ -783,7 +401,7 @@ function insertSingleCard(deckId, front, back, itemType, contentStr, hint, expla
 
 /**
  * Helper: Inserta un array de items en la BD y devuelve el mazo completo
- * ¡AHORA CON FRAGMENTACIÓN ATÓMICA AUTOMÁTICA!
+ * Â¡AHORA CON FRAGMENTACIÃ“N ATÃ“MICA AUTOMÃTICA!
  */
 async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items) {
   try {
@@ -836,29 +454,29 @@ async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, des
 
   } catch (err) {
     db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], () => {
-      res.status(500).json({ error: 'Error al insertar ítems, mazo revertido', details: err.message });
+      res.status(500).json({ error: 'Error al insertar Ã­tems, mazo revertido', details: err.message });
     });
   }
 }
 
 /**
- * Construye el system prompt del LLM según el modo de generación.
+ * Construye el system prompt del LLM segÃºn el modo de generaciÃ³n.
  * mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed'
  */
 function buildSystemPrompt(mode, count) {
-  const base = `Actúa como un experto en pedagogía universitaria y diseño instruccional.
-Paso Previo: Analiza el texto, extrae los conceptos técnicos clave y descarta información irrelevante.
+  const base = `ActÃºa como un experto en pedagogÃ­a universitaria y diseÃ±o instruccional.
+Paso Previo: Analiza el texto, extrae los conceptos tÃ©cnicos clave y descarta informaciÃ³n irrelevante.
 
-CALIDAD ACADÉMICA Y REGLAS DE ORO:
-1. RIGOR: Usa terminología técnica precisa del texto. Si detectas que el usuario solicita temas relacionados (ej: "incluye hantavirus" cuando el texto trata sobre coronavirus), PUEDES incorporarlos como temas complementarios que enriquecen el aprendizaje académico.
-2. NO CIRCULARIDAD: La explicación JAMÁS debe ser una paráfrasis de la pregunta o respuesta. Debe aportar el "por qué" conceptual o un ejemplo de aplicación.
+CALIDAD ACADÃ‰MICA Y REGLAS DE ORO:
+1. RIGOR: Usa terminologÃ­a tÃ©cnica precisa del texto. Si detectas que el usuario solicita temas relacionados (ej: "incluye hantavirus" cuando el texto trata sobre coronavirus), PUEDES incorporarlos como temas complementarios que enriquecen el aprendizaje acadÃ©mico.
+2. NO CIRCULARIDAD: La explicaciÃ³n JAMÃS debe ser una parÃ¡frasis de la pregunta o respuesta. Debe aportar el "por quÃ©" conceptual o un ejemplo de aplicaciÃ³n.
 3. PISTAS (HINTS): Debe ser un andamiaje cognitivo (sugerir una ruta de pensamiento), no una respuesta parcial ni letras iniciales.
-4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico (ej. mala aplicación de una fórmula, confusión de conceptos similares o generalización excesiva). No rellenes con opciones aleatorias.
-5. EXCLUSIVIDAD SEMÁNTICA: En selección múltiple, las 4 opciones deben tener contenido semántico único. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.
-6. FORMATO DE CÓDIGO (OBLIGATORIO SI APLICA): Si la evaluación involucra programación, algoritmos, HTML, JSON o comandos, USA SIEMPRE bloques de código Markdown (\`\`\`lenguaje ... \`\`\`) dentro del "front", "back", "question", "options" o "explanation" para formatear los fragmentos de código.
+4. DISTRACTORES DE CALIDAD: Cada opciÃ³n incorrecta debe nacer de un error de razonamiento especÃ­fico (ej. mala aplicaciÃ³n de una fÃ³rmula, confusiÃ³n de conceptos similares o generalizaciÃ³n excesiva). No rellenes con opciones aleatorias.
+5. EXCLUSIVIDAD SEMÃNTICA: En selecciÃ³n mÃºltiple, las 4 opciones deben tener contenido semÃ¡ntico Ãºnico. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.
+6. FORMATO DE CÃ“DIGO (OBLIGATORIO SI APLICA): Si la evaluaciÃ³n involucra programaciÃ³n, algoritmos, HTML, JSON o comandos, USA SIEMPRE bloques de cÃ³digo Markdown (\`\`\`lenguaje ... \`\`\`) dentro del "front", "back", "question", "options" o "explanation" para formatear los fragmentos de cÃ³digo.
 
-IMPORTANTE: Debes responder EXCLUSIVAMENTE con un objeto JSON válido que contenga la clave "items", cuyo valor sea un array de objetos con los ítems generados según el formato indicado a continuación.
-No agregues ningún texto introductorio ni explicaciones fuera del JSON. La respuesta debe comenzar con { y terminar con }.`;
+IMPORTANTE: Debes responder EXCLUSIVAMENTE con un objeto JSON vÃ¡lido que contenga la clave "items", cuyo valor sea un array de objetos con los Ã­tems generados segÃºn el formato indicado a continuaciÃ³n.
+No agregues ningÃºn texto introductorio ni explicaciones fuera del JSON. La respuesta debe comenzar con { y terminar con }.`;
 
   if (mode === 'flashcard') {
     return `${base}
@@ -867,7 +485,7 @@ Genera exactamente ${count} FLASHCARDS.
 Formato del objeto JSON esperado:
 {
   "items": [
-    { "type": "flashcard", "data": { "front": "Pregunta conceptual que obligue a pensar.", "back": "Respuesta técnica y completa en máximo 3 oraciones." }, "hint": "Pista o andamiaje cognitivo.", "explanation": "Profundización teórica o ejemplo de aplicación." }
+    { "type": "flashcard", "data": { "front": "Pregunta conceptual que obligue a pensar.", "back": "Respuesta tÃ©cnica y completa en mÃ¡ximo 3 oraciones." }, "hint": "Pista o andamiaje cognitivo.", "explanation": "ProfundizaciÃ³n teÃ³rica o ejemplo de aplicaciÃ³n." }
   ]
 }`;
   }
@@ -875,11 +493,11 @@ Formato del objeto JSON esperado:
   if (mode === 'multiple_choice') {
     return `${base}
 
-Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES/SABER PRO).
+Genera exactamente ${count} PREGUNTAS DE SELECCIÃ“N MÃšLTIPLE (estilo ECAES/SABER PRO).
 Formato del objeto JSON esperado:
 {
   "items": [
-    { "type": "multiple_choice", "data": { "question": "Pregunta del problema.", "options": ["Opción A","Opción B","Opción C","Opción D"], "correctIndex": 0 }, "hint": "Pista para razonar.", "explanation": "Justificación de por qué la opción correcta lo es y por qué las otras no." }
+    { "type": "multiple_choice", "data": { "question": "Pregunta del problema.", "options": ["OpciÃ³n A","OpciÃ³n B","OpciÃ³n C","OpciÃ³n D"], "correctIndex": 0 }, "hint": "Pista para razonar.", "explanation": "JustificaciÃ³n de por quÃ© la opciÃ³n correcta lo es y por quÃ© las otras no." }
   ]
 }`;
   }
@@ -891,7 +509,7 @@ Genera exactamente ${count} PREGUNTAS DE VERDADERO O FALSO.
 Formato del objeto JSON esperado:
 {
   "items": [
-    { "type": "boolean", "data": { "question": "Afirmación con matiz técnico.", "correctAnswer": true }, "hint": "Pista o empujón cognitivo.", "explanation": "Argumento sólido que respalde la veracidad o falsedad." }
+    { "type": "boolean", "data": { "question": "AfirmaciÃ³n con matiz tÃ©cnico.", "correctAnswer": true }, "hint": "Pista o empujÃ³n cognitivo.", "explanation": "Argumento sÃ³lido que respalde la veracidad o falsedad." }
   ]
 }`;
   }
@@ -899,20 +517,20 @@ Formato del objeto JSON esperado:
   if (mode === 'mixed') {
     return `${base}
 
-Genera exactamente ${count} ÍTEMS MIXTOS (40% Flashcards, 40% Selección Múltiple, 20% V/F).
+Genera exactamente ${count} ÃTEMS MIXTOS (40% Flashcards, 40% SelecciÃ³n MÃºltiple, 20% V/F).
 Formato del objeto JSON esperado:
 {
   "items": [
-    { "type": "flashcard", "data": { "front": "Pregunta conceptual...", "back": "Respuesta completa..." }, "hint": "Pista...", "explanation": "Explicación..." },
-    { "type": "multiple_choice", "data": { "question": "Pregunta...", "options": ["A","B","C","D"], "correctIndex": 0 }, "hint": "Pista...", "explanation": "Explicación..." },
-    { "type": "boolean", "data": { "question": "Afirmación...", "correctAnswer": true }, "hint": "Pista...", "explanation": "Explicación..." }
+    { "type": "flashcard", "data": { "front": "Pregunta conceptual...", "back": "Respuesta completa..." }, "hint": "Pista...", "explanation": "ExplicaciÃ³n..." },
+    { "type": "multiple_choice", "data": { "question": "Pregunta...", "options": ["A","B","C","D"], "correctIndex": 0 }, "hint": "Pista...", "explanation": "ExplicaciÃ³n..." },
+    { "type": "boolean", "data": { "question": "AfirmaciÃ³n...", "correctAnswer": true }, "hint": "Pista...", "explanation": "ExplicaciÃ³n..." }
   ]
 }`;
   }
 
   return `${base}
 
-Genera exactamente ${count} ítems de tipo "${mode}".
+Genera exactamente ${count} Ã­tems de tipo "${mode}".
 Formato del objeto JSON esperado:
 {
   "items": [
@@ -933,18 +551,18 @@ exports.generateDeckFromText = async (req, res) => {
   }
 
   const groqApiKey = secrets.GROQ_API_KEY;
-  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no está configurada' });
+  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no estÃ¡ configurada' });
 
   // 1. Blindaje de longitud: truncar transcripciones largas para evitar rate limits (TPM)
   const trimmedText = text.length > 8000
-    ? text.substring(0, 8000) + '\n[...texto truncado por límite de tamaño de contexto...]'
+    ? text.substring(0, 8000) + '\n[...texto truncado por lÃ­mite de tamaÃ±o de contexto...]'
     : text;
 
   let response;
   let modelUsed = 'llama-3.3-70b-versatile';
 
   try {
-    console.log(`[Groq] Intentando generar ${count} ítems usando modelo principal: ${modelUsed}`);
+    console.log(`[Groq] Intentando generar ${count} Ã­tems usando modelo principal: ${modelUsed}`);
     response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
@@ -953,7 +571,7 @@ exports.generateDeckFromText = async (req, res) => {
         response_format: { type: "json_object" }, // Enforce JSON mode
         messages: [
           { role: 'system', content: buildSystemPrompt(mode, count) },
-          { role: 'user', content: `Genera exactamente ${count} ítems basados en este contenido:\n\n${trimmedText}` }
+          { role: 'user', content: `Genera exactamente ${count} Ã­tems basados en este contenido:\n\n${trimmedText}` }
         ],
         temperature: 0.2,
         max_tokens: 4000,
@@ -965,7 +583,7 @@ exports.generateDeckFromText = async (req, res) => {
       throw new Error(`Groq API returned ${response.status}: ${errText}`);
     }
   } catch (primaryError) {
-    console.warn(`[Groq] Modelo principal ${modelUsed} falló o superó límites de tasa:`, primaryError.message);
+    console.warn(`[Groq] Modelo principal ${modelUsed} fallÃ³ o superÃ³ lÃ­mites de tasa:`, primaryError.message);
     
     // 2. Fallback de seguridad: usar el modelo veloz con menor uso de recursos
     modelUsed = 'llama-3.1-8b-instant';
@@ -980,7 +598,7 @@ exports.generateDeckFromText = async (req, res) => {
           response_format: { type: "json_object" }, // Enforce JSON mode
           messages: [
             { role: 'system', content: buildSystemPrompt(mode, count) },
-            { role: 'user', content: `Genera exactamente ${count} ítems basados en este contenido:\n\n${trimmedText}` }
+            { role: 'user', content: `Genera exactamente ${count} Ã­tems basados en este contenido:\n\n${trimmedText}` }
           ],
           temperature: 0.2,
           max_tokens: 4000,
@@ -989,7 +607,7 @@ exports.generateDeckFromText = async (req, res) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('[Groq] Modelo secundario de fallback también falló:', errorData);
+        console.error('[Groq] Modelo secundario de fallback tambiÃ©n fallÃ³:', errorData);
         return res.status(500).json({ 
           error: 'Error al llamar a Groq API', 
           details: errorData,
@@ -997,9 +615,9 @@ exports.generateDeckFromText = async (req, res) => {
         });
       }
     } catch (fallbackError) {
-      console.error('[Groq] Falló conexión con Groq:', fallbackError);
+      console.error('[Groq] FallÃ³ conexiÃ³n con Groq:', fallbackError);
       return res.status(500).json({ 
-        error: 'Error de red o conexión con Groq API', 
+        error: 'Error de red o conexiÃ³n con Groq API', 
         details: fallbackError.message,
         primaryError: primaryError.message
       });
@@ -1022,7 +640,7 @@ exports.generateDeckFromText = async (req, res) => {
       parsed = JSON.parse(jsonString);
     } catch (parseError) {
       console.error('[Groq] Error parseando JSON de Groq. Contenido crudo:', raw);
-      return res.status(500).json({ error: 'Respuesta de Groq no es JSON válido', details: raw });
+      return res.status(500).json({ error: 'Respuesta de Groq no es JSON vÃ¡lido', details: raw });
     }
 
     let items;
@@ -1034,7 +652,7 @@ exports.generateDeckFromText = async (req, res) => {
       items = parsed.flashcards.map(c => ({ type: 'flashcard', data: { front: c.question || c.front, back: c.answer || c.back } }));
     } else {
       console.error('[Groq] Estructura inesperada en JSON:', parsed);
-      return res.status(500).json({ error: 'Estructura de respuesta inválida en JSON', details: parsed });
+      return res.status(500).json({ error: 'Estructura de respuesta invÃ¡lida en JSON', details: parsed });
     }
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con IA`;
@@ -1050,8 +668,8 @@ exports.generateDeckFromText = async (req, res) => {
       }
     );
   } catch (err) {
-    console.error('[Backend] Error procesando generación:', err);
-    res.status(500).json({ error: 'Error al generar ítems', details: err.message });
+    console.error('[Backend] Error procesando generaciÃ³n:', err);
+    res.status(500).json({ error: 'Error al generar Ã­tems', details: err.message });
   }
 };
 
@@ -1067,7 +685,7 @@ exports.generateDeckFromImage = async (req, res) => {
   }
 
   const groqApiKey = secrets.GROQ_API_KEY;
-  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no está configurada' });
+  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no estÃ¡ configurada' });
 
   let formattedBase64 = image_base64;
   if (!image_base64.startsWith('data:image')) {
@@ -1075,7 +693,7 @@ exports.generateDeckFromImage = async (req, res) => {
   }
 
   try {
-    console.log(`[Groq Vision] Intentando generar ${count} ítems basados en imagen con JSON mode...`);
+    console.log(`[Groq Vision] Intentando generar ${count} Ã­tems basados en imagen con JSON mode...`);
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
@@ -1085,7 +703,7 @@ exports.generateDeckFromImage = async (req, res) => {
         messages: [{
           role: 'user',
           content: [
-            { type: 'text', text: `Eres un experto en OCR académico y pedagogía.\n1. Transcribe mentalmente la imagen ignorando ruido visual.\n2. A partir de esa información, genera ítems de evaluación de NIVEL UNIVERSITARIO.\n\n${buildSystemPrompt(mode, count)}\n\nGenera exactamente ${count} ítems basados en la imagen.` },
+            { type: 'text', text: `Eres un experto en OCR acadÃ©mico y pedagogÃ­a.\n1. Transcribe mentalmente la imagen ignorando ruido visual.\n2. A partir de esa informaciÃ³n, genera Ã­tems de evaluaciÃ³n de NIVEL UNIVERSITARIO.\n\n${buildSystemPrompt(mode, count)}\n\nGenera exactamente ${count} Ã­tems basados en la imagen.` },
             { type: 'image_url', image_url: { url: formattedBase64 } }
           ]
         }],
@@ -1096,7 +714,7 @@ exports.generateDeckFromImage = async (req, res) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('[Groq Vision] Falló petición a API:', errorData);
+      console.error('[Groq Vision] FallÃ³ peticiÃ³n a API:', errorData);
       return res.status(500).json({ error: 'Error al llamar a Groq Vision API', details: errorData });
     }
 
@@ -1113,8 +731,8 @@ exports.generateDeckFromImage = async (req, res) => {
     let parsed;
     try { parsed = JSON.parse(jsonString); }
     catch (_) {
-      console.error('[Groq Vision] JSON inválido devuelto por vision:', raw);
-      return res.status(500).json({ error: 'Respuesta de Groq Vision no es JSON válido', details: raw });
+      console.error('[Groq Vision] JSON invÃ¡lido devuelto por vision:', raw);
+      return res.status(500).json({ error: 'Respuesta de Groq Vision no es JSON vÃ¡lido', details: raw });
     }
 
     let items;
@@ -1126,7 +744,7 @@ exports.generateDeckFromImage = async (req, res) => {
       items = parsed.flashcards.map(c => ({ type: 'flashcard', data: { front: c.question || c.front, back: c.answer || c.back } }));
     } else {
       console.error('[Groq Vision] Estructura inesperada en JSON:', parsed);
-      return res.status(500).json({ error: 'Estructura de respuesta inválida en JSON', details: parsed });
+      return res.status(500).json({ error: 'Estructura de respuesta invÃ¡lida en JSON', details: parsed });
     }
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con OCR + IA`;
@@ -1143,13 +761,13 @@ exports.generateDeckFromImage = async (req, res) => {
     );
   } catch (err) {
     console.error('[Backend] Error procesando imagen OCR:', err);
-    res.status(500).json({ error: 'Error al generar ítems con OCR', details: err.message });
+    res.status(500).json({ error: 'Error al generar Ã­tems con OCR', details: err.message });
   }
 };
 
 /**
  * Analiza confusiones en un mazo: detecta tarjetas que frecuentemente generan errores similares
- * Retorna sugerencias de diferenciación entre conceptos
+ * Retorna sugerencias de diferenciaciÃ³n entre conceptos
  */
 exports.analyzeDeckConfusions = (req, res) => {
   const { deckId } = req.params;
@@ -1190,14 +808,14 @@ exports.analyzeDeckConfusions = (req, res) => {
         return res.json({ confusions: [], message: 'No hay suficientes tarjetas con intentos para analizar confusiones' });
       }
 
-      // Paso 2: Detectar tarjetas problemáticas (failure_rate > 0.3)
+      // Paso 2: Detectar tarjetas problemÃ¡ticas (failure_rate > 0.3)
       const problematicCards = cards.filter(c => c.failure_rate > 0.3);
 
       if (problematicCards.length < 2) {
-        return res.json({ confusions: [], message: 'No hay suficientes tarjetas problemáticas' });
+        return res.json({ confusions: [], message: 'No hay suficientes tarjetas problemÃ¡ticas' });
       }
 
-      // Paso 3: Para cada par de tarjetas problemáticas, calcular correlación de errores
+      // Paso 3: Para cada par de tarjetas problemÃ¡ticas, calcular correlaciÃ³n de errores
       const confusions = [];
 
       for (let i = 0; i < problematicCards.length; i++) {
@@ -1221,7 +839,7 @@ exports.analyzeDeckConfusions = (req, res) => {
               if (!correlErr && correlation && correlation.length > 0) {
                 const corr = correlation[0];
                 if (corr.errors_card1 >= 2 && corr.errors_card2 >= 2) {
-                  // Hay correlación: este usuario falla en ambas
+                  // Hay correlaciÃ³n: este usuario falla en ambas
                   confusions.push({
                     card1_id: card1.id,
                     card1_preview: card1.front || (card1.content_json ? JSON.parse(card1.content_json).front : ''),
@@ -1239,7 +857,7 @@ exports.analyzeDeckConfusions = (req, res) => {
         }
       }
 
-      // Enviar respuesta con un pequeño delay para que las queries correlacionadas se completen
+      // Enviar respuesta con un pequeÃ±o delay para que las queries correlacionadas se completen
       setTimeout(() => {
         res.json({
           confusions: confusions.slice(0, 5), // Top 5 confusiones
@@ -1252,7 +870,7 @@ exports.analyzeDeckConfusions = (req, res) => {
 };
 
 /**
- * Genera una tarjeta de diferenciación entre dos conceptos
+ * Genera una tarjeta de diferenciaciÃ³n entre dos conceptos
  * Requiere Groq API para generar contenido
  */
 exports.generateDifferentiationCard = (req, res) => {
@@ -1289,13 +907,13 @@ exports.generateDifferentiationCard = (req, res) => {
 
       const groqApiKey = secrets.GROQ_API_KEY;
       if (!groqApiKey) {
-        return res.status(500).json({ error: 'Groq API Key no está configurada' });
+        return res.status(500).json({ error: 'Groq API Key no estÃ¡ configurada' });
       }
 
       try {
-        const prompt = `Eres un experto en pedagogía y diferenciación conceptual.
+        const prompt = `Eres un experto en pedagogÃ­a y diferenciaciÃ³n conceptual.
 
-El usuario está confundiendo dos conceptos en sus estudios:
+El usuario estÃ¡ confundiendo dos conceptos en sus estudios:
 
 **Concepto A:**
 Pregunta: ${content1.front}
@@ -1305,16 +923,16 @@ Respuesta: ${content1.back}
 Pregunta: ${content2.front}
 Respuesta: ${content2.back}
 
-Genera UNA tarjeta de diferenciación clara que ayude al usuario a distinguir estos dos conceptos.
+Genera UNA tarjeta de diferenciaciÃ³n clara que ayude al usuario a distinguir estos dos conceptos.
 La tarjeta debe:
 1. Resaltar las diferencias clave
 2. Usar ejemplos contrastantes
 3. Ser memorable y concisa
 
-Responde SOLO con un JSON válido en este formato:
+Responde SOLO con un JSON vÃ¡lido en este formato:
 {
-  "front": "pregunta de diferenciación",
-  "back": "explicación que destaca diferencias"
+  "front": "pregunta de diferenciaciÃ³n",
+  "back": "explicaciÃ³n que destaca diferencias"
 }`;
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -1352,7 +970,7 @@ Responde SOLO con un JSON válido en este formato:
           diffCard = JSON.parse(jsonStr);
         } catch (_) {
           return res.status(500).json({
-            error: 'Respuesta de Groq no es JSON válido',
+            error: 'Respuesta de Groq no es JSON vÃ¡lido',
             details: raw,
           });
         }
@@ -1361,7 +979,7 @@ Responde SOLO con un JSON válido en este formato:
           return res.status(500).json({ error: 'Tarjeta generada incompleta' });
         }
 
-        // Crear la tarjeta de diferenciación en el mazo
+        // Crear la tarjeta de diferenciaciÃ³n en el mazo
         db.get(
           `SELECT deck_id FROM flashcards WHERE id = ?`,
           [card1_id],
@@ -1369,7 +987,7 @@ Responde SOLO con un JSON válido en este formato:
             if (getErr) return res.status(500).json({ error: getErr.message });
 
             const nextReviewDate = new Date();
-            nextReviewDate.setDate(nextReviewDate.getDate() + 3); // Revisión en 3 días
+            nextReviewDate.setDate(nextReviewDate.getDate() + 3); // RevisiÃ³n en 3 dÃ­as
             const nextReviewDateStr = nextReviewDate.toISOString();
 
             const contentJson = JSON.stringify(diffCard);
@@ -1385,7 +1003,7 @@ Responde SOLO con un JSON válido en este formato:
                 diffCard.front,
                 diffCard.back,
                 contentJson,
-                `Diferenciación entre tarjetas ${card1_id} y ${card2_id}`,
+                `DiferenciaciÃ³n entre tarjetas ${card1_id} y ${card2_id}`,
                 'Estudia esta tarjeta para evitar confundir estos conceptos',
                 nextReviewDateStr,
               ],
@@ -1399,7 +1017,7 @@ Responde SOLO con un JSON válido en este formato:
                   newCardId: this.lastID,
                   front: diffCard.front,
                   back: diffCard.back,
-                  message: 'Tarjeta de diferenciación creada exitosamente',
+                  message: 'Tarjeta de diferenciaciÃ³n creada exitosamente',
                 });
               }
             );
@@ -1407,7 +1025,7 @@ Responde SOLO con un JSON válido en este formato:
         );
       } catch (err) {
         res.status(500).json({
-          error: 'Error generando tarjeta de diferenciación',
+          error: 'Error generando tarjeta de diferenciaciÃ³n',
           details: err.message,
         });
       }
@@ -1415,7 +1033,7 @@ Responde SOLO con un JSON válido en este formato:
   );
 };
 
-// ─── Snooze Management ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Snooze Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * POST /api/flashcards/:cardId/snooze
@@ -1613,7 +1231,7 @@ exports.autoUnsnoozeExpired = (req, res) => {
       }
       res.json({
         success: true,
-        message: `${this.changes} tarjetas snoozed han sido reanudadas automáticamente`,
+        message: `${this.changes} tarjetas snoozed han sido reanudadas automÃ¡ticamente`,
         resumedCount: this.changes,
       });
     }

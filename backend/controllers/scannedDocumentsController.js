@@ -45,6 +45,11 @@ exports.saveScannedDocument = (req, res) => {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id, local_uri)' });
   }
 
+  const authenticatedUserId = req.user.id;
+  if (parseInt(user_id) !== authenticatedUserId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const hasOcr = ocr_text && ocr_text.trim().length > 0;
   const query = hasOcr ? `
     INSERT INTO scanned_documents (user_id, subject_id, name, local_uri, ocr_text, extracted_at)
@@ -73,9 +78,10 @@ exports.saveScannedDocument = (req, res) => {
  */
 exports.deleteScannedDocument = (req, res) => {
   const { documentId } = req.params;
+  const userId = req.user.id;
   console.log(`[Backend] DELETE /scanned-documents/${documentId} recibido.`);
 
-  db.get(`SELECT * FROM scanned_documents WHERE id = ?`, [documentId], (err, row) => {
+  db.get(`SELECT * FROM scanned_documents WHERE id = ? AND user_id = ?`, [documentId, userId], (err, row) => {
     if (err) {
       console.error('[Backend] Error en db.get (scanned_documents):', err.message);
       return res.status(500).json({ error: err.message });
@@ -86,7 +92,7 @@ exports.deleteScannedDocument = (req, res) => {
     }
 
     console.log(`[Backend] Documento ${documentId} encontrado. Borrando de la BD.`);
-    db.run(`DELETE FROM scanned_documents WHERE id = ?`, [documentId], function (deleteErr) {
+    db.run(`DELETE FROM scanned_documents WHERE id = ? AND user_id = ?`, [documentId, userId], function (deleteErr) {
       if (deleteErr) {
         console.error('[Backend] Error en db.run (DELETE scanned_documents):', deleteErr.message);
         return res.status(500).json({ error: deleteErr.message });
@@ -112,6 +118,7 @@ exports.deleteScannedDocument = (req, res) => {
 exports.updateScannedDocument = (req, res) => {
   const { documentId } = req.params;
   const { name, ocr_text } = req.body;
+  const userId = req.user.id;
 
   if (!documentId) {
     return res.status(400).json({ error: 'ID de documento requerido' });
@@ -139,9 +146,9 @@ exports.updateScannedDocument = (req, res) => {
     return res.status(400).json({ error: 'No hay campos para actualizar' });
   }
 
-  values.push(documentId); // Para el WHERE clause
+  values.push(documentId, userId); // Para el WHERE clause
 
-  const query = `UPDATE scanned_documents SET ${updates.join(', ')} WHERE id = ?`;
+  const query = `UPDATE scanned_documents SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`;
 
   db.run(query, values, function(err) {
     if (err) return res.status(500).json({ error: err.message });

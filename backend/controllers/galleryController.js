@@ -6,6 +6,12 @@ const { deleteFromUploadthing } = require('../utils/uploadthingServer');
  */
 exports.getGalleryItems = (req, res) => {
   const { userId } = req.params;
+  const authenticatedUserId = req.user.id;
+  
+  if (parseInt(userId) !== authenticatedUserId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   console.log('[Gallery] Fetching items for userId:', userId);
   
   // Usamos consultas separadas y unimos en JS para evitar fallos si una tabla
@@ -64,6 +70,12 @@ exports.getGalleryItems = (req, res) => {
  */
 exports.addGalleryItem = (req, res) => {
   const { user_id, uri, subject, date, time, ocr_text } = req.body;
+  const authenticatedUserId = req.user.id;
+  
+  if (parseInt(user_id) !== authenticatedUserId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const query = `INSERT INTO gallery_items (user_id, uri, subject, date, time, ocr_text) VALUES (?, ?, ?, ?, ?, ?)`;
   db.run(query, [user_id, uri, subject, date, time, ocr_text], function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -76,7 +88,8 @@ exports.addGalleryItem = (req, res) => {
  */
 exports.getPhotosBySubject = (req, res) => {
   const { subjectId } = req.params;
-  db.all(`SELECT * FROM photos WHERE subject_id = ? ORDER BY created_at DESC`, [subjectId], (err, rows) => {
+  const userId = req.user.id;
+  db.all(`SELECT p.* FROM photos p JOIN subjects s ON p.subject_id = s.id WHERE p.subject_id = ? AND s.user_id = ? ORDER BY p.created_at DESC`, [subjectId, userId], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
@@ -89,6 +102,7 @@ exports.getPhotosBySubject = (req, res) => {
 exports.searchPhotosByTag = (req, res) => {
   const { subjectId } = req.params;
   const { tag } = req.query;
+  const userId = req.user.id;
 
   if (!tag || tag.trim().length === 0) {
     return res.status(400).json({ error: 'Se requiere un tag para buscar' });
@@ -96,13 +110,14 @@ exports.searchPhotosByTag = (req, res) => {
 
   // Buscar fotos que contengan el tag en su JSON array de tags
   const query = `
-    SELECT * FROM photos 
-    WHERE subject_id = ? AND LOWER(tags) LIKE ?
-    ORDER BY created_at DESC
+    SELECT p.* FROM photos p
+    JOIN subjects s ON p.subject_id = s.id
+    WHERE p.subject_id = ? AND s.user_id = ? AND LOWER(p.tags) LIKE ?
+    ORDER BY p.created_at DESC
   `;
 
   const searchPattern = `%"${tag.toLowerCase()}"%`;
-  db.all(query, [subjectId, searchPattern], (err, rows) => {
+  db.all(query, [subjectId, userId, searchPattern], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows || []);
   });
@@ -116,41 +131,47 @@ exports.searchPhotosByTag = (req, res) => {
  */
 exports.savePhoto = (req, res) => {
   const { subject_id, local_uri, es_favorita, ocr_text, group_id } = req.body;
+  const userId = req.user.id;
   console.log('[Gallery] Saving photo:', { subject_id, local_uri, group_id });
   
   if (!subject_id || !local_uri) {
     return res.status(400).json({ error: 'Faltan campos requeridos (subject_id, local_uri)' });
   }
 
-  const query = `
-    INSERT INTO photos (subject_id, local_uri, es_favorita, ocr_text, tags, group_id)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
+  db.get('SELECT id FROM subjects WHERE id = ? AND user_id = ?', [subject_id, userId], (err, row) => {
+    if (err || !row) return res.status(400).json({ error: 'Materia no encontrada o acceso denegado' });
 
-  // Generar tags a partir del OCR si existe
-  let tags = null;
-  if (ocr_text && ocr_text.trim().length > 0) {
-    tags = generateTagsFromOCR(ocr_text);
-  }
+    const query = `
+      INSERT INTO photos (subject_id, local_uri, es_favorita, ocr_text, tags, group_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
 
-  db.run(query, [subject_id, local_uri, es_favorita ? 1 : 0, ocr_text || null, tags, group_id || null], function(err) {
-    if (err) {
-      console.error('[Gallery] Save error:', err.message);
-      return res.status(500).json({ error: err.message });
+    // Generar tags a partir del OCR si existe
+    let tags = null;
+    if (ocr_text && ocr_text.trim().length > 0) {
+      tags = generateTagsFromOCR(ocr_text);
     }
-    console.log('[Gallery] Photo saved with ID:', this.lastID);
-    res.status(201).json({
-      id: this.lastID,
-      subject_id,
-      local_uri,
-      es_favorita: es_favorita || 0,
-      ocr_text: ocr_text || null,
-      tags: tags,
-      group_id: group_id || null,
-      message: 'Foto registrada en BD'
+
+    db.run(query, [subject_id, local_uri, es_favorita ? 1 : 0, ocr_text || null, tags, group_id || null], function(err) {
+      if (err) {
+        console.error('[Gallery] Save error:', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+      console.log('[Gallery] Photo saved with ID:', this.lastID);
+      res.status(201).json({
+        id: this.lastID,
+        subject_id,
+        local_uri,
+        es_favorita: es_favorita || 0,
+        ocr_text: ocr_text || null,
+        tags: tags,
+        group_id: group_id || null,
+        message: 'Foto registrada en BD'
+      });
     });
   });
 };
+
 
 /**
  * Marca o desmarca una foto como favorita
@@ -158,10 +179,11 @@ exports.savePhoto = (req, res) => {
 exports.toggleFavoritePhoto = (req, res) => {
   const { photoId } = req.params;
   const { es_favorita } = req.body;
+  const userId = req.user.id;
 
   db.run(
-    `UPDATE photos SET es_favorita = ? WHERE id = ?`,
-    [es_favorita ? 1 : 0, photoId],
+    `UPDATE photos SET es_favorita = ? WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`,
+    [es_favorita ? 1 : 0, photoId, userId],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true, changes: this.changes });
@@ -207,8 +229,8 @@ exports.updatePhoto = (req, res) => {
     return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
   }
 
-  updateValues.push(photoId);
-  const query = `UPDATE photos SET ${updateFields.join(', ')} WHERE id = ?`;
+  updateValues.push(photoId, userId);
+  const query = `UPDATE photos SET ${updateFields.join(', ')} WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`;
 
   db.run(query, updateValues, function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -221,9 +243,10 @@ exports.updatePhoto = (req, res) => {
  */
 exports.deletePhoto = (req, res) => {
   const { photoId } = req.params;
+  const userId = req.user.id;
   console.log(`[Backend] DELETE /photos/${photoId} recibido.`);
 
-  db.get(`SELECT local_uri FROM photos WHERE id = ?`, [photoId], async (err, row) => {
+  db.get(`SELECT p.local_uri FROM photos p JOIN subjects s ON p.subject_id = s.id WHERE p.id = ? AND s.user_id = ?`, [photoId, userId], async (err, row) => {
     if (err) {
       console.error('[Backend] Error en db.get (photos):', err.message);
       return res.status(500).json({ error: err.message });
@@ -235,7 +258,7 @@ exports.deletePhoto = (req, res) => {
     }
 
     console.log(`[Backend] Foto ${photoId} encontrada. Procediendo a borrar de la BD.`);
-    db.run(`DELETE FROM photos WHERE id = ?`, [photoId], async function (deleteErr) {
+    db.run(`DELETE FROM photos WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`, [photoId, userId], async function (deleteErr) {
       if (deleteErr) {
         console.error('[Backend] Error en db.run (DELETE photos):', deleteErr.message);
         return res.status(500).json({ error: deleteErr.message });

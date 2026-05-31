@@ -49,6 +49,7 @@ const denormalizeAssessment = (row, versionRow, scales) => {
  */
 exports.getAssessmentsBySubject = (req, res) => {
   const { subjectId } = req.params;
+  const userId = req.user.id;
   console.log(`[GET] getAssessmentsBySubject para subjectId=${subjectId}`);
   
   const query = `
@@ -56,10 +57,10 @@ exports.getAssessmentsBySubject = (req, res) => {
     FROM assessments a
     LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
     JOIN subjects s ON a.subject_id = s.id
-    WHERE a.subject_id = ?
+    WHERE a.subject_id = ? AND s.user_id = ?
     ORDER BY a.date ASC
   `;
-  db.all(query, [subjectId], async (err, rows) => {
+  db.all(query, [subjectId, userId], async (err, rows) => {
     if (err) {
       console.error(`[GET] Error en getAssessmentsBySubject:`, err.message);
       return res.status(500).json({ error: err.message });
@@ -121,6 +122,12 @@ exports.getAssessmentsBySubject = (req, res) => {
  */
 exports.getAssessmentsByUser = (req, res) => {
   const { userId } = req.params;
+  const authenticatedUserId = req.user.id;
+  
+  if (parseInt(userId) !== authenticatedUserId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   console.log(`[GET] getAssessmentsByUser para userId=${userId}`);
   
   const query = `
@@ -200,12 +207,13 @@ exports.createAssessment = (req, res) => {
   // Si se envía grade_value sin out_of, asumir escala 0-5
   const finalOutOf = out_of || (grade_value != null ? 5 : null);
   console.log('[POST] 📊 Configuración final:', { finalOutOf, gradeValueInput: grade_value });
+  const userId = req.user.id;
 
   // First get user_id from subject before inserting
-  db.get('SELECT user_id FROM subjects WHERE id = ?', [subject_id], (err, subject) => {
+  db.get('SELECT user_id FROM subjects WHERE id = ? AND user_id = ?', [subject_id, userId], (err, subject) => {
     if (err || !subject) {
-      console.error('[POST] ❌ Error obteniendo subject:', err?.message || 'Subject no encontrado');
-      return res.status(400).json({ error: 'Materia no encontrada' });
+      console.error('[POST] ❌ Error obteniendo subject:', err?.message || 'Subject no encontrado o acceso denegado');
+      return res.status(400).json({ error: 'Materia no encontrada o acceso denegado' });
     }
 
     const user_id = subject.user_id;
@@ -441,8 +449,8 @@ exports.updateAssessment = (req, res) => {
 
   // Si hay campos de assessments, actualizar la tabla assessments
   if (updates.length > 0) {
-    values.push(id);
-    const query = `UPDATE assessments SET ${updates.join(', ')} WHERE id = ?`;
+    values.push(id, req.user.id);
+    const query = `UPDATE assessments SET ${updates.join(', ')} WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`;
     console.log(`[AssessmentsController] Ejecutando UPDATE assessments:`, query, 'con', values);
 
     db.run(query, values, function(err) {
@@ -614,9 +622,10 @@ function handleAssessmentResultsUpdate(assessmentId, score, percentage, grade_va
  */
 exports.deleteAssessment = (req, res) => {
   const { id } = req.params;
-  db.run(`DELETE FROM assessments WHERE id = ?`, [id], function(err) {
+  const userId = req.user.id;
+  db.run(`DELETE FROM assessments WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`, [id, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ error: 'Evaluación no encontrada.' });
+    if (this.changes === 0) return res.status(404).json({ error: 'Evaluación no encontrada o acceso denegado.' });
     res.json({ message: 'Evaluación eliminada exitosamente' });
   });
 };
@@ -640,6 +649,7 @@ exports.deleteAssessment = (req, res) => {
  */
 exports.getProjectionAnalytics = (req, res) => {
   const { subjectId } = req.params;
+  const userId = req.user.id;
   
   if (!subjectId) {
     console.error(`[Analytics] ❌ subjectId es requerido`);
@@ -658,13 +668,13 @@ exports.getProjectionAnalytics = (req, res) => {
     FROM assessments a
     JOIN subjects s ON a.subject_id = s.id
     LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
-    WHERE a.subject_id = ? AND (a.grade_value IS NOT NULL OR ar.raw_value IS NOT NULL OR ar.normalized_value IS NOT NULL)
+    WHERE a.subject_id = ? AND s.user_id = ? AND (a.grade_value IS NOT NULL OR ar.raw_value IS NOT NULL OR ar.normalized_value IS NOT NULL)
     ORDER BY a.date ASC
   `;
 
   console.log(`[Analytics] 📝 SQL Query: ${query.split('\n')[0]}...`);
 
-  db.all(query, [subjectId], async (err, rows) => {
+  db.all(query, [subjectId, userId], async (err, rows) => {
     if (err) {
       console.error(`[Analytics] ❌ DB Error:`, err.message);
       return res.status(500).json({ error: `DB Error: ${err.message}` });

@@ -467,6 +467,10 @@ export const LocalAIEngineSection = () => {
                   <Text style={styles.modelCardMetricLabel}>{t('settings.localAI.ramMin')}: </Text>
                   {model.ramMin}
                 </Text>
+                <Text style={styles.modelCardMetric}>
+                  <Text style={styles.modelCardMetricLabel}>{t('settings.localAI.speed')}: </Text>
+                  {t(model.speedTag as any)}
+                </Text>
               </View>
 
               {/* Capacidades */}

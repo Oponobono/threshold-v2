@@ -1,4 +1,5 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { offlineSyncService } from '../offlineSyncService';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -153,17 +154,27 @@ export const createAssessmentResult = async (
   rawValue: number,
   gradingSystemId: number
 ): Promise<AssessmentResult> => {
-  const response = await fetchWithFallback('/assessment-results', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    const response = await fetchWithFallback('/assessment-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        assessment_id: assessmentId,
+        raw_value: rawValue,
+        grading_system_id: gradingSystemId,
+      })
+    });
+    if (!response.ok) throw new Error('Failed to create result');
+    return await parseJsonSafely(response);
+  } catch (error) {
+    console.warn('[Grading] Offline: encolando createAssessmentResult', error);
+    await offlineSyncService.addPendingOperation('POST', '/assessment-results', 'grading', {
       assessment_id: assessmentId,
       raw_value: rawValue,
       grading_system_id: gradingSystemId,
-    })
-  });
-  if (!response.ok) throw new Error('Failed to create result');
-  return await parseJsonSafely(response);
+    });
+    return { id: -Date.now(), assessment_id: assessmentId, raw_value: rawValue, grading_version_id: gradingSystemId, _isPending: true } as any;
+  }
 };
 
 /**
@@ -174,16 +185,22 @@ export const updateAssessmentResult = async (
   rawValue: number,
   reason?: string
 ): Promise<AssessmentResult> => {
-  const response = await fetchWithFallback(`/assessment-results/${resultId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      raw_value: rawValue,
-      reason,
-    })
-  });
-  if (!response.ok) throw new Error('Failed to update result');
-  return await parseJsonSafely(response);
+  try {
+    const response = await fetchWithFallback(`/assessment-results/${resultId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        raw_value: rawValue,
+        reason,
+      })
+    });
+    if (!response.ok) throw new Error('Failed to update result');
+    return await parseJsonSafely(response);
+  } catch (error) {
+    console.warn(`[Grading] Offline: encolando updateAssessmentResult ${resultId}`, error);
+    await offlineSyncService.addPendingOperation('PUT', `/assessment-results/${resultId}`, 'grading', { raw_value: rawValue, reason });
+    return { id: resultId, raw_value: rawValue, _isPending: true } as any;
+  }
 };
 
 /**

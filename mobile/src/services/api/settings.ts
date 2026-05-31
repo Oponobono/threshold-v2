@@ -1,5 +1,6 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { saveToCacheSync, loadFromCacheSync } from '../cacheService';
+import { offlineSyncService } from '../offlineSyncService';
 
 export interface GradingPeriod {
   id: number;
@@ -43,18 +44,29 @@ export const getGradingPeriods = async (): Promise<GradingPeriod[]> => {
 };
 
 export const createGradingPeriod = async (name: string, period_type: string = 'custom', start_date?: string, end_date?: string): Promise<any> => {
-  const response = await fetchWithFallback('/grading-periods', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, period_type, start_date: start_date || null, end_date: end_date || null }),
-  });
-  if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al crear período'); }
-  return await parseJsonSafely(response);
+  try {
+    const response = await fetchWithFallback('/grading-periods', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, period_type, start_date: start_date || null, end_date: end_date || null }),
+    });
+    if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al crear período'); }
+    return await parseJsonSafely(response);
+  } catch (error) {
+    console.warn('[Settings] Offline: encolando createGradingPeriod', error);
+    await offlineSyncService.addPendingOperation('POST', '/grading-periods', 'settings', { name, period_type, start_date, end_date });
+    return { id: -Date.now(), name, period_type, _isPending: true };
+  }
 };
 
 export const deleteGradingPeriod = async (id: number): Promise<void> => {
-  const response = await fetchWithFallback(`/grading-periods/${id}`, { method: 'DELETE' });
-  if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al eliminar período'); }
+  try {
+    const response = await fetchWithFallback(`/grading-periods/${id}`, { method: 'DELETE' });
+    if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al eliminar período'); }
+  } catch (error) {
+    console.warn(`[Settings] Offline: encolando deleteGradingPeriod ${id}`, error);
+    await offlineSyncService.addPendingOperation('DELETE', `/grading-periods/${id}`, 'settings');
+  }
 };
 
 const CACHE_KEY_THRESHOLD_OVERRIDES = 'cache:threshold_overrides';
@@ -73,25 +85,36 @@ export const getThresholdOverrides = async (): Promise<ThresholdOverride[]> => {
 };
 
 export const saveThresholdOverrides = async (overrides: { subjectId: number; threshold: string }[]): Promise<void> => {
-  const response = await fetchWithFallback('/threshold-overrides', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ overrides }),
-  });
-  if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al guardar excepciones'); }
+  try {
+    const response = await fetchWithFallback('/threshold-overrides', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ overrides }),
+    });
+    if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al guardar excepciones'); }
+  } catch (error) {
+    console.warn('[Settings] Offline: encolando saveThresholdOverrides', error);
+    await offlineSyncService.addPendingOperation('PUT', '/threshold-overrides', 'settings', { overrides });
+  }
 };
 
 export const createCustomGradingSystem = async (data: {
   name: string; min_value: number; max_value: number; passing_value: number;
   precision?: number; type?: string; mode?: string; direction?: string;
 }): Promise<any> => {
-  const response = await fetchWithFallback('/grading-systems/custom', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al crear escala'); }
-  return await parseJsonSafely(response);
+  try {
+    const response = await fetchWithFallback('/grading-systems/custom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al crear escala'); }
+    return await parseJsonSafely(response);
+  } catch (error) {
+    console.warn('[Settings] Offline: encolando createCustomGradingSystem', error);
+    await offlineSyncService.addPendingOperation('POST', '/grading-systems/custom', 'settings', data);
+    return { id: -Date.now(), ...data, _isPending: true };
+  }
 };
 
 export const getTwoFactorStatus = async (): Promise<TwoFactorStatus> => {
@@ -120,18 +143,29 @@ export const getLmsAccounts = async (): Promise<LmsAccount[]> => {
 };
 
 export const addLmsAccount = async (platform: string, instance_url: string, username: string): Promise<LmsAccount> => {
-  const response = await fetchWithFallback('/lms-accounts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ platform, instance_url, username }),
-  });
-  if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al vincular LMS'); }
-  return await parseJsonSafely(response);
+  try {
+    const response = await fetchWithFallback('/lms-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, instance_url, username }),
+    });
+    if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al vincular LMS'); }
+    return await parseJsonSafely(response);
+  } catch (error) {
+    console.warn('[Settings] Offline: encolando addLmsAccount', error);
+    await offlineSyncService.addPendingOperation('POST', '/lms-accounts', 'settings', { platform, instance_url, username });
+    return { id: -Date.now(), platform, instance_url, username, _isPending: true } as any;
+  }
 };
 
 export const removeLmsAccount = async (id: number): Promise<void> => {
-  const response = await fetchWithFallback(`/lms-accounts/${id}`, { method: 'DELETE' });
-  if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al desvincular LMS'); }
+  try {
+    const response = await fetchWithFallback(`/lms-accounts/${id}`, { method: 'DELETE' });
+    if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al desvincular LMS'); }
+  } catch (error) {
+    console.warn(`[Settings] Offline: encolando removeLmsAccount ${id}`, error);
+    await offlineSyncService.addPendingOperation('DELETE', `/lms-accounts/${id}`, 'settings');
+  }
 };
 
 export const exportDataCsv = async (): Promise<Blob> => {
@@ -147,10 +181,15 @@ export const exportDataPdf = async (): Promise<Blob> => {
 };
 
 export const sendFeedback = async (message: string): Promise<void> => {
-  const response = await fetchWithFallback('/feedback', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
-  });
-  if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al enviar feedback'); }
+  try {
+    const response = await fetchWithFallback('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al enviar feedback'); }
+  } catch (error) {
+    console.warn('[Settings] Offline: encolando sendFeedback', error);
+    await offlineSyncService.addPendingOperation('POST', '/feedback', 'settings', { message });
+  }
 };

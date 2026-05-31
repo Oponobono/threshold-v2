@@ -21,6 +21,7 @@ interface ModelInfo {
   label: string;
   labelTag: string;
   description: string;
+  speedTag: string;
   downloadSize: string;
   downloadSizeBytes: number;
   ramMin: string;
@@ -43,6 +44,7 @@ export const MODELS: Record<LocalModelId, ModelInfo> = {
     label: 'Modelo Esencial',
     labelTag: 'settings.localAI.essentialLabel',
     description: 'settings.localAI.essentialDesc',
+    speedTag: 'settings.localAI.essentialSpeed',
     downloadSize: '~800 MB',
     downloadSizeBytes: 800 * 1024 * 1024,
     ramMin: '1.5 GB',
@@ -55,6 +57,7 @@ export const MODELS: Record<LocalModelId, ModelInfo> = {
     label: 'Modelo Avanzado',
     labelTag: 'settings.localAI.advancedLabel',
     description: 'settings.localAI.advancedDesc',
+    speedTag: 'settings.localAI.advancedSpeed',
     downloadSize: '~2.0 GB',
     downloadSizeBytes: 2 * 1024 * 1024 * 1024,
     ramMin: '3 GB',
@@ -67,6 +70,7 @@ export const MODELS: Record<LocalModelId, ModelInfo> = {
     label: 'Qwen 2.5 (1.5B)',
     labelTag: 'settings.localAI.qwen15Label',
     description: 'settings.localAI.qwen15Desc',
+    speedTag: 'settings.localAI.qwen15Speed',
     downloadSize: '~1.1 GB',
     downloadSizeBytes: 1.1 * 1024 * 1024 * 1024,
     ramMin: '2 GB',
@@ -79,6 +83,7 @@ export const MODELS: Record<LocalModelId, ModelInfo> = {
     label: 'Qwen 2.5 (3B)',
     labelTag: 'settings.localAI.qwen3Label',
     description: 'settings.localAI.qwen3Desc',
+    speedTag: 'settings.localAI.qwen3Speed',
     downloadSize: '~2.2 GB',
     downloadSizeBytes: 2.2 * 1024 * 1024 * 1024,
     ramMin: '3.5 GB',
@@ -91,6 +96,7 @@ export const MODELS: Record<LocalModelId, ModelInfo> = {
     label: 'Phi-3.5 Mini (3.8B)',
     labelTag: 'settings.localAI.phiLabel',
     description: 'settings.localAI.phiDesc',
+    speedTag: 'settings.localAI.phiSpeed',
     downloadSize: '~2.4 GB',
     downloadSizeBytes: 2.4 * 1024 * 1024 * 1024,
     ramMin: '4 GB',
@@ -103,6 +109,7 @@ export const MODELS: Record<LocalModelId, ModelInfo> = {
     label: 'Gemma 2 (2B)',
     labelTag: 'settings.localAI.gemmaLabel',
     description: 'settings.localAI.gemmaDesc',
+    speedTag: 'settings.localAI.gemmaSpeed',
     downloadSize: '~1.6 GB',
     downloadSizeBytes: 1.6 * 1024 * 1024 * 1024,
     ramMin: '2.5 GB',

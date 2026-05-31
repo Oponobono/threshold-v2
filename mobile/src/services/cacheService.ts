@@ -30,8 +30,13 @@ export const CACHE_KEYS = {
   YOUTUBE_VIDEOS: 'cache:youtube_videos',
   FLASHCARD_DECKS: 'cache:flashcard_decks',
   FLASHCARD_DECKS_WITH_METRICS: 'cache:flashcard_decks_with_metrics',
+  CALENDAR_EVENTS: 'cache:calendar_events',
+  GRADING_SYSTEMS: 'cache:grading_systems',
+  YOUTUBE_VIDEOS_BY_SUBJECT: 'cache:youtube_videos_by_subject:',
+  AUDIO_RECORDINGS_BY_SUBJECT: 'cache:audio_recordings_by_subject:',
   PHOTOS_BY_SUBJECT: 'cache:photos_by_subject:',
   SCANNED_DOCUMENTS_BY_SUBJECT: 'cache:scanned_docs_by_subject:',
+  CATEGORIES_BY_SUBJECT: 'cache:categories_by_subject:',
   FLASHCARDS_BY_DECK: 'cache:flashcards_by_deck:',
   FLASHCARDS_PRIORITIZED_BY_DECK: 'cache:flashcards_prioritized_by_deck:',
   CARDS_NOT_SNOOZED_BY_DECK: 'cache:cards_not_snoozed_by_deck:',
@@ -57,8 +62,11 @@ const CACHE_TTL = {
   YOUTUBE_VIDEOS: 1000 * 60 * 60,
   FLASHCARD_DECKS: 1000 * 60 * 30,
   FLASHCARD_DECKS_WITH_METRICS: 1000 * 60 * 30,
+  CALENDAR_EVENTS: 1000 * 60 * 60,
+  GRADING_SYSTEMS: 1000 * 60 * 60 * 24,
   PHOTOS_BY_SUBJECT: 1000 * 60 * 60,
   SCANNED_DOCUMENTS_BY_SUBJECT: 1000 * 60 * 60,
+  CATEGORIES_BY_SUBJECT: 1000 * 60 * 60,
   FLASHCARDS_BY_DECK: 1000 * 60 * 30,
   FLASHCARDS_PRIORITIZED_BY_DECK: 1000 * 60 * 15,
   CARDS_NOT_SNOOZED_BY_DECK: 1000 * 60 * 15,
@@ -195,11 +203,20 @@ export const cacheService = {
   saveFlashcardDecksWithMetrics: async (decks: any[]) => saveToCacheSync(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, decks),
   loadFlashcardDecksWithMetrics: async () => loadFromCacheSync(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, CACHE_TTL.FLASHCARD_DECKS_WITH_METRICS),
 
+  saveCalendarEvents: async (events: any[]) => saveToCacheSync(CACHE_KEYS.CALENDAR_EVENTS, events),
+  loadCalendarEvents: async () => loadFromCacheSync(CACHE_KEYS.CALENDAR_EVENTS, CACHE_TTL.CALENDAR_EVENTS),
+
+  saveGradingSystems: async (systems: any[]) => saveToCacheSync(CACHE_KEYS.GRADING_SYSTEMS, systems),
+  loadGradingSystems: async () => loadFromCacheSync(CACHE_KEYS.GRADING_SYSTEMS, CACHE_TTL.GRADING_SYSTEMS),
+
   savePhotosBySubject: async (subjectId: number, photos: any[]) => saveToCacheSync(`${CACHE_KEYS.PHOTOS_BY_SUBJECT}${subjectId}`, photos),
   loadPhotosBySubject: async (subjectId: number) => loadFromCacheSync(`${CACHE_KEYS.PHOTOS_BY_SUBJECT}${subjectId}`, CACHE_TTL.PHOTOS_BY_SUBJECT),
 
   saveScannedDocumentsBySubject: async (subjectId: number, docs: any[]) => saveToCacheSync(`${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${subjectId}`, docs),
   loadScannedDocumentsBySubject: async (subjectId: number) => loadFromCacheSync(`${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${subjectId}`, CACHE_TTL.SCANNED_DOCUMENTS_BY_SUBJECT),
+
+  saveAssessmentCategoriesBySubject: async (subjectId: number, categories: any[]) => saveToCacheSync(`${CACHE_KEYS.CATEGORIES_BY_SUBJECT}${subjectId}`, categories),
+  loadAssessmentCategoriesBySubject: async (subjectId: number) => loadFromCacheSync(`${CACHE_KEYS.CATEGORIES_BY_SUBJECT}${subjectId}`, CACHE_TTL.CATEGORIES_BY_SUBJECT),
 
   saveFlashcardsByDeck: async (deckId: number, cards: any[]) => saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`, cards),
   loadFlashcardsByDeck: async (deckId: number) => loadFromCacheSync(`${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`, CACHE_TTL.FLASHCARDS_BY_DECK),

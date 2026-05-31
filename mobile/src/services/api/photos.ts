@@ -103,7 +103,9 @@ export const deletePhoto = async (photoId: number) => {
     }
     return data;
   } catch (error: any) {
-    throw new Error(error.message || 'Error de red al intentar eliminar la foto');
+    console.warn('[Photos] Offline: encolando deletePhoto', error);
+    await offlineSyncService.addPendingOperation('DELETE', `/photos/${photoId}`, 'photo');
+    return { success: true, _isPending: true };
   }
 };
 
@@ -127,7 +129,9 @@ export const updatePhoto = async (photoId: number, data: { ocr_text?: string; ta
 
     return result;
   } catch (error: any) {
-    throw new Error(error.message || 'Error de red al intentar actualizar la foto');
+    console.warn('[Photos] Offline: encolando updatePhoto', error);
+    await offlineSyncService.addPendingOperation('PUT', `/photos/${photoId}`, 'photo', data);
+    return { ...data, _isPending: true };
   }
 };
 
