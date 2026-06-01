@@ -155,12 +155,18 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
 
   let wavUri = audioUri;
   if (!audioUri.toLowerCase().endsWith('.wav')) {
+    const filePath = audioUri.replace(/^file:\/\//, '');
     try {
-      const filePath = audioUri.replace(/^file:\/\//, '');
       wavUri = await ThresholdPdfExtractor.audioToWav(filePath);
-      console.log('[GroqHelpers] Audio convertido a WAV:', wavUri);
+      console.log('[GroqHelpers] Audio convertido a WAV para Whisper:', wavUri);
     } catch (convErr: any) {
-      console.warn('[GroqHelpers] Error convirtiendo audio a WAV, usando original:', convErr);
+      // Si la conversión falla, lanzar un error claro en lugar de pasar
+      // un M4A incompatible a Whisper que fallaría silenciosamente.
+      throw new Error(
+        `No se pudo convertir el audio a WAV para transcripción offline. ` +
+        `Detalle: ${convErr?.message || convErr}. ` +
+        `Intenta con la transcripción en la nube si tienes conexión.`
+      );
     }
   }
 

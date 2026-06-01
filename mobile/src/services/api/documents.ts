@@ -9,7 +9,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { offlineSyncService } from '../offlineSyncService';
-import { cacheService } from '../../services/cacheService';
+import { cacheService, CACHE_KEYS } from '../cacheService';
 
 /** Representa un documento escaneado vinculado a una materia y guardado localmente */
 export interface ScannedDocument {

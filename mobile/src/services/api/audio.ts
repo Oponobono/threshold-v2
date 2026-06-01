@@ -12,6 +12,7 @@ import { getUserId } from './auth';
 import { AudioRecording } from './types';
 import { offlineSyncService } from '../offlineSyncService';
 import { storageService } from '../storageService';
+import { cacheService, CACHE_KEYS } from '../cacheService';
 
 /**
  * Obtiene todas las grabaciones de audio del usuario

@@ -6,7 +6,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { offlineSyncService } from '../offlineSyncService';
-import { cacheService } from '../cacheService';
+import { cacheService, CACHE_KEYS } from '../cacheService';
 
 export interface CalendarEventData {
   title: string;

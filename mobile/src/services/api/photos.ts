@@ -10,7 +10,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Photo } from './types';
 import { offlineSyncService } from '../offlineSyncService';
-import { cacheService } from '../../services/cacheService';
+import { cacheService, CACHE_KEYS } from '../cacheService';
 
 /**
  * Obtiene ítems de la galería
