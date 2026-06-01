@@ -53,11 +53,13 @@ export const createSchedule = async (payload: { subject_id: number, day_of_week:
     );
     
     // Retornar objeto temporal para que la UI sea optimista
-    return {
-      id: -1, // ID temporal
+    const optimisticSchedule = {
+      id: -Date.now(), // ID temporal único
       ...payload,
       _isPending: true, // Bandera para UI
     };
+    cacheService.addOptimisticItem(CACHE_KEYS.SCHEDULES, optimisticSchedule);
+    return optimisticSchedule;
   }
 };
 
@@ -76,6 +78,7 @@ export const deleteSchedule = async (id: number) => {
   } catch (error) {
     console.warn('[Schedules] Red no disponible, guardando eliminación en cola offline:', error);
     await offlineSyncService.addPendingOperation('DELETE', `/schedules/${id}`, 'schedule');
+    cacheService.removeOptimisticItem(CACHE_KEYS.SCHEDULES, id);
     return { success: true, _isPending: true };
   }
 };

@@ -52,6 +52,7 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
     setGradePercentage('');
     setSelectedSubjectId(initialSubjectId || null);
     setSelectedCategoryId(null);
+    setIsSavingGrade(false);
   };
 
   const handleClose = () => {

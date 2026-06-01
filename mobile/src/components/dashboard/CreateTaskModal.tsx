@@ -61,6 +61,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
     setTaskDate(`${d}-${m}-${y}`);
     setSelectedSubjectId(initialSubjectId || null);
     setSelectedCategoryId(null);
+    setIsSavingTask(false);
   };
 
   const handleClose = () => {

@@ -53,7 +53,12 @@ export const createAudioRecording = async (payload: {
   } catch (error) {
     console.warn('[Audio] Offline: encolando createAudioRecording', error);
     await offlineSyncService.addPendingOperation('POST', '/audio-recordings', 'audio', payloadWithUser);
-    return { id: -Date.now(), ...payloadWithUser, _isPending: true };
+    const optimisticAudio = { id: -Date.now(), ...payloadWithUser, _isPending: true };
+    cacheService.addOptimisticItem(CACHE_KEYS.AUDIO_RECORDINGS, optimisticAudio);
+    if (payloadWithUser.subject_id) {
+      cacheService.addOptimisticItem(`api_cache_/audio-recordings/subject/${payloadWithUser.subject_id}`, optimisticAudio);
+    }
+    return optimisticAudio;
   }
 };
 
@@ -77,6 +82,7 @@ export const updateAudioRecording = async (id: number, payload: { subject_id?: n
   } catch (error) {
     console.warn(`[Audio] Offline: encolando updateAudioRecording ${id}`, error);
     await offlineSyncService.addPendingOperation('PUT', `/audio-recordings/${id}`, 'audio', payload);
+    cacheService.updateOptimisticItem(CACHE_KEYS.AUDIO_RECORDINGS, id, payload);
     return { ...payload, _isPending: true };
   }
 };
@@ -100,6 +106,7 @@ export const deleteAudioRecording = async (id: number) => {
       const cacheKey = `api_cache_/audio-recordings/${userId}`;
       try { await storageService.removeLocal(cacheKey); } catch {}
     }
+    cacheService.removeOptimisticItem(CACHE_KEYS.AUDIO_RECORDINGS, id);
     return { success: true, _isPending: true };
   }
 };

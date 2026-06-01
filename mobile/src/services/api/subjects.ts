@@ -169,6 +169,7 @@ export const deleteSubject = async (subjectId: number | string) => {
   } catch (error) {
     console.warn('[Subjects] Red no disponible, guardando en cola offline:', error);
     await offlineSyncService.addPendingOperation('DELETE', `/subjects/${subjectId}`, 'subject');
+    cacheService.removeOptimisticItem(CACHE_KEYS.SUBJECTS, subjectId);
     return { success: true, _isPending: true };
   }
 };
@@ -196,6 +197,7 @@ export const updateSubject = async (subjectId: number | string, payload: Partial
   } catch (error) {
     console.warn('[Subjects] Red no disponible, guardando update en cola offline:', error);
     await offlineSyncService.addPendingOperation('PUT', `/subjects/${subjectId}`, 'subject', payload);
+    cacheService.updateOptimisticItem(CACHE_KEYS.SUBJECTS, subjectId, payload);
     return { ...payload, _isPending: true };
   }
 };

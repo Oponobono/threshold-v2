@@ -92,8 +92,16 @@ export const useDataStore = create<DataState>((set, get) => ({
     // Si no hay conexión, saltar la fase de servidor
     // Los datos del caché (via MMKV) ya están disponibles en el store
     if (!isOnline) {
-      console.log('[DataStore] 📡 Modo offline: usando datos del caché (stale-while-revalidate)');
+      console.log('[DataStore] 📡 Modo offline: recargando datos del caché (stale-while-revalidate)');
+      
+      const cachedSubjects = cacheService.loadSubjectsSync() as any[];
+      const cachedAssessments = cacheService.loadAssessmentsSync() as any[];
+      const cachedSchedules = cacheService.loadSchedulesSync() as any[];
+      
       set({
+        subjects: cachedSubjects || [],
+        assessments: cachedAssessments || [],
+        schedules: cachedSchedules || [],
         hasLoadedOnce: true,
         isInitialLoading: false,
         isRefreshing: false,
@@ -368,14 +376,17 @@ export const useDataStore = create<DataState>((set, get) => ({
     try {
       console.log('[DataStore] 🔄 Sincronizando operaciones offline pendientes...');
       
-      // Importar fetch desde el cliente
       // Sincronizar todas las operaciones pendientes
       const result = await offlineSyncService.syncPendingOperations(fetchWithFallback);
       
       console.log(`[DataStore] ✅ Sincronización completada: ${result.success} éxito, ${result.failed} fallos, ${result.pending} pendientes`);
       
-      // Si hubo éxitos, refrescar datos
+      // Si hubo éxitos, purgar items optimistas y refrescar datos
       if (result.success > 0) {
+        // 🧹 Purgar items con IDs temporales del caché MMKV
+        // ANTES de refrescar, para que loadAllData no mezcle datos viejos
+        cacheService.purgeOptimisticItems();
+        
         console.log('[DataStore] 🔄 Refrescando datos después de sincronización...');
         await get().loadAllData(true);
       }

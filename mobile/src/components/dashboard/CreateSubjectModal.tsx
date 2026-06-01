@@ -45,6 +45,7 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
     setSubjectTarget('');
     setSelectedColor(SUBJECT_COLORS[0]);
     setSelectedIcon('book-outline');
+    setIsSavingSubject(false);
   };
 
   const handleClose = () => {

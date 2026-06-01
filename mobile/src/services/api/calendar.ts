@@ -60,7 +60,9 @@ export const createCalendarEvent = async (event: CalendarEventData): Promise<Cal
   } catch (error) {
     console.warn('[Calendar] Offline: encolando createCalendarEvent', error);
     await offlineSyncService.addPendingOperation('POST', '/calendar/events', 'calendar', payload);
-    return { id: -Date.now(), ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), _isPending: true } as any;
+    const optimisticEvent = { id: -Date.now(), ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), _isPending: true };
+    cacheService.addOptimisticItem(CACHE_KEYS.CALENDAR_EVENTS, optimisticEvent);
+    return optimisticEvent as any;
   }
 };
 
@@ -163,6 +165,7 @@ export const updateCalendarEvent = async (
   } catch (error) {
     console.warn(`[Calendar] Offline: encolando updateCalendarEvent ${eventId}`, error);
     await offlineSyncService.addPendingOperation('PUT', `/calendar/events/${eventId}`, 'calendar', payload);
+    cacheService.updateOptimisticItem(CACHE_KEYS.CALENDAR_EVENTS, eventId, payload);
     return { id: eventId, ...updates, _isPending: true } as any;
   }
 };
@@ -191,5 +194,6 @@ export const deleteCalendarEvent = async (eventId: number): Promise<void> => {
   } catch (error) {
     console.warn(`[Calendar] Offline: encolando deleteCalendarEvent ${eventId}`, error);
     await offlineSyncService.addPendingOperation('DELETE', `/calendar/events/${eventId}`, 'calendar');
+    cacheService.removeOptimisticItem(CACHE_KEYS.CALENDAR_EVENTS, eventId);
   }
 };

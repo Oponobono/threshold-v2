@@ -43,7 +43,9 @@ export const SubjectTile = ({ subject, onEdit, onDelete }: SubjectTileProps) => 
           <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />
         </View>
         <View style={globalStyles.flex1}>
-          <Text style={styles.subjectTileName} numberOfLines={1}>{subject.name}</Text>
+          <Text style={styles.subjectTileName} numberOfLines={1}>
+            {subject.name || ((subject as any)._isPending ? t('common.pending') || 'Pendiente' : t('dashboard.newSubject.title') || 'Materia')}
+          </Text>
           <Text style={styles.subjectTileMeta} numberOfLines={1}>
             {subject.professor || t('dashboard.newSubject.noProfessor')}
           </Text>

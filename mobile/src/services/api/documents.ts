@@ -82,15 +82,15 @@ export const createScannedDocument = async (
       const userId = await getUserId().catch(() => null);
       await offlineSyncService.addPendingOperation('POST', '/scanned_documents', 'document', { ...data, user_id: userId });
       const optimisticDoc = { id: -Date.now(), ...data, user_id: userId, _isPending: true };
+      
       // Persistir en cache local por materia para visibilidad offline inmediata
       if (data.subject_id) {
-        const existing: any[] | null = await cacheService.loadScannedDocumentsBySubject(data.subject_id) as any[] | null;
-        if (existing) {
-          cacheService.saveScannedDocumentsBySubject(data.subject_id, [optimisticDoc, ...existing]);
-        } else {
-          cacheService.saveScannedDocumentsBySubject(data.subject_id, [optimisticDoc]);
-        }
+        cacheService.addOptimisticItem(`${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${data.subject_id}`, optimisticDoc);
       }
+      
+      // Persistir en cache global de galería
+      cacheService.addOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, optimisticDoc);
+      
       return optimisticDoc as any;
     }
     throw new Error(error.message || 'Error de red al crear el documento escaneado');
@@ -111,6 +111,7 @@ export const deleteScannedDocument = async (documentId: number | string): Promis
   } catch (error: any) {
     console.warn('[Documents] Offline: encolando deleteScannedDocument', error);
     await offlineSyncService.addPendingOperation('DELETE', `/scanned_documents/${documentId}`, 'document');
+    cacheService.removeOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, documentId);
     return { success: true, _isPending: true };
   }
 };
@@ -135,6 +136,7 @@ export const updateScannedDocument = async (
   } catch (error: any) {
     console.warn('[Documents] Offline: encolando updateScannedDocument', error);
     await offlineSyncService.addPendingOperation('PUT', `/scanned_documents/${documentId}`, 'document', data);
+    cacheService.updateOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, documentId, data);
     return { ...data, _isPending: true } as any;
   }
 };

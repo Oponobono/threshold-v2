@@ -111,6 +111,7 @@ export const updateAssessment = async (id: number, payload: Partial<Assessment>)
     if (isNetworkError) {
       console.warn(`[Assessments] Red no disponible, guardando actualización en cola offline:`, error);
       await offlineSyncService.addPendingOperation('PUT', `/assessments/${id}`, 'assessment', payload);
+      cacheService.updateOptimisticItem(CACHE_KEYS.ASSESSMENTS, id, payload);
       return { success: true, message: 'Guardado localmente' };
     }
     throw error;
@@ -134,6 +135,7 @@ export const deleteAssessment = async (id: number) => {
   } catch (error) {
     console.warn('[Assessments] Red no disponible, guardando eliminación en cola offline:', error);
     await offlineSyncService.addPendingOperation('DELETE', `/assessments/${id}`, 'assessment');
+    cacheService.removeOptimisticItem(CACHE_KEYS.ASSESSMENTS, id);
     return { success: true, _isPending: true };
   }
 };

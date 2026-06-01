@@ -175,14 +175,34 @@ async function persistHydrate(store: { setState: (s: Partial<LocalAIState>) => v
   if (_initialized) { _hydrationResolve(); return; }
   _initialized = true;
   try {
-    const [modelsRaw, activeRaw, forcedRaw, providerRaw] = await Promise.all([
+    const FileSystem = require('expo-file-system/legacy');
+    const [modelsRaw, activeRaw, forcedRaw, providerRaw, whisperRaw] = await Promise.all([
       AsyncStorage.getItem(STORAGE_KEY_MODELS),
       AsyncStorage.getItem(STORAGE_KEY_ACTIVE),
       AsyncStorage.getItem(STORAGE_KEY_FORCED),
       AsyncStorage.getItem(STORAGE_KEY_PROVIDER),
+      AsyncStorage.getItem(STORAGE_KEY_WHISPER),
     ]);
+
+    let parsedModels = modelsRaw ? JSON.parse(modelsRaw) : {};
+    
+    // Reconstruir rutas absolutas para evitar problemas de UUID en iOS/Android
+    const baseDir = `${FileSystem.documentDirectory}models/`;
+    for (const key of Object.keys(parsedModels)) {
+      if (key !== 'whisper' && MODELS[key as LocalModelId]) {
+        parsedModels[key] = `${baseDir}${MODELS[key as LocalModelId].filename}`;
+      }
+    }
+
+    if (whisperRaw === 'true') {
+      parsedModels['whisper'] = `${baseDir}${WHISPER_MODEL.filename}`;
+    } else if (parsedModels['whisper']) {
+      // Reconstruir whisper de todos modos si estaba en modelsRaw
+      parsedModels['whisper'] = `${baseDir}${WHISPER_MODEL.filename}`;
+    }
+
     store.setState({
-      downloadedModels: modelsRaw ? JSON.parse(modelsRaw) : {},
+      downloadedModels: parsedModels,
       activeModelId: (activeRaw as LocalModelId) || null,
       forceOfflineMode: forcedRaw === 'true',
       activeProvider: (providerRaw as AIProvider) || 'cloud',

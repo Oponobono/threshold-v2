@@ -67,13 +67,13 @@ export const createPhoto = async (photoData: {
       ...photoData,
       _isPending: true, // Bandera para UI
     };
-    // Persistir en cache local por materia para visibilidad offline inmediata
-    const existing: any[] | null = await cacheService.loadPhotosBySubject(photoData.subject_id) as any[] | null;
-    if (existing) {
-      cacheService.savePhotosBySubject(photoData.subject_id, [optimisticPhoto, ...existing]);
-    } else {
-      cacheService.savePhotosBySubject(photoData.subject_id, [optimisticPhoto]);
-    }
+    
+    // Persistir en cache local por materia
+    cacheService.addOptimisticItem(`${CACHE_KEYS.PHOTOS_BY_SUBJECT}${photoData.subject_id}`, optimisticPhoto);
+    
+    // Persistir en cache global de galería
+    cacheService.addOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, optimisticPhoto);
+    
     return optimisticPhoto;
   }
 };
@@ -127,6 +127,8 @@ export const deletePhoto = async (photoId: number) => {
   } catch (error: any) {
     console.warn('[Photos] Offline: encolando deletePhoto', error);
     await offlineSyncService.addPendingOperation('DELETE', `/photos/${photoId}`, 'photo');
+    // Para remover optimísticamente no tenemos el subjectId, pero removeOptimisticItem de Gallery Items sirve
+    cacheService.removeOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, photoId);
     return { success: true, _isPending: true };
   }
 };
@@ -153,6 +155,7 @@ export const updatePhoto = async (photoId: number, data: { ocr_text?: string; ta
   } catch (error: any) {
     console.warn('[Photos] Offline: encolando updatePhoto', error);
     await offlineSyncService.addPendingOperation('PUT', `/photos/${photoId}`, 'photo', data);
+    cacheService.updateOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, photoId, data);
     return { ...data, _isPending: true };
   }
 };

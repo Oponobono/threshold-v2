@@ -256,24 +256,37 @@ exports.createSubject = (req, res) => {
       .join('') ||
     'SB';
 
-  const query = `
-    INSERT INTO subjects (user_id, code, name, credits, professor, color, icon, target_grade)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `;
+  db.get('SELECT * FROM subjects WHERE user_id = ? AND LOWER(name) = LOWER(?)', [user_id, name], (err, existingSubject) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    if (existingSubject) {
+      // Return existing subject to prevent duplicates on offline sync retries
+      return res.status(200).json({
+        ...existingSubject,
+        avg_score: 0,
+        completion_percent: 0,
+        message: 'Materia existente recuperada',
+      });
+    }
 
-  db.run(
-    query,
-    [
-      user_id,
-      normalizedCode,
-      name,
-      credits || null,
-      professor || null,
-      color || '#CCCCCC',
-      icon || 'book-outline',
-      target_grade || null,
-    ],
-    function(err) {
+    const query = `
+      INSERT INTO subjects (user_id, code, name, credits, professor, color, icon, target_grade)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    db.run(
+      query,
+      [
+        user_id,
+        normalizedCode,
+        name,
+        credits || null,
+        professor || null,
+        color || '#CCCCCC',
+        icon || 'book-outline',
+        target_grade || null,
+      ],
+      function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({
       id: this.lastID,
@@ -290,6 +303,7 @@ exports.createSubject = (req, res) => {
       message: 'Materia creada',
     });
   });
+});
 };
 
 /**

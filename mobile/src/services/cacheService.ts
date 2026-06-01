@@ -260,4 +260,187 @@ export const cacheService = {
   clearKey: (key: string) => clearCacheKeySync(key),
 
   clear: async () => clearAllData(),
+
+  /**
+   * Purga de items optimistas del caché MMKV.
+   * Después de una sincronización exitosa, los objetos con IDs temporales
+   * (negativos) y flag `_isPending` deben eliminarse porque el servidor
+   * ya asignó IDs reales y `loadAllData(true)` traerá los datos correctos.
+   *
+   * Dos estrategias:
+   * 1. Para llaves de tipo lista: filtrar items con id < 0 o _isPending.
+   * 2. Para llaves dinámicas con IDs negativos en el nombre: borrarlas.
+   */
+  purgeOptimisticItems: (): void => {
+    try {
+      const storage = getStorage();
+      const allKeys = storage.getAllKeys();
+
+      // --- Estrategia 1: Filtrar items optimistas de listas cacheadas ---
+      const listKeys = [
+        CACHE_KEYS.SUBJECTS,
+        CACHE_KEYS.ASSESSMENTS,
+        CACHE_KEYS.SCHEDULES,
+        CACHE_KEYS.FLASHCARD_DECKS,
+        CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS,
+        CACHE_KEYS.CALENDAR_EVENTS,
+        CACHE_KEYS.AUDIO_RECORDINGS,
+        CACHE_KEYS.YOUTUBE_VIDEOS,
+        CACHE_KEYS.GALLERY_ITEMS,
+      ];
+
+      for (const key of listKeys) {
+        const raw = storage.getString(key);
+        if (!raw) continue;
+        try {
+          const entry: CacheEntry<any[]> = JSON.parse(raw);
+          if (!Array.isArray(entry.data)) continue;
+          const before = entry.data.length;
+          entry.data = entry.data.filter(
+            (item: any) => !(item?.id < 0 || item?._isPending === true)
+          );
+          if (entry.data.length < before) {
+            storage.set(key, JSON.stringify(entry));
+            console.log(
+              `[Cache] 🧹 Purgados ${before - entry.data.length} items optimistas de ${key}`
+            );
+          }
+        } catch {
+          // JSON corrupto, ignorar
+        }
+      }
+
+      // --- Estrategia 2: Borrar llaves con IDs negativos en el nombre ---
+      // Ejemplo: cache:photos_by_subject:-1717000000
+      const dynamicPrefixes = [
+        CACHE_KEYS.PHOTOS_BY_SUBJECT,
+        CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT,
+        CACHE_KEYS.YOUTUBE_VIDEOS_BY_SUBJECT,
+        CACHE_KEYS.AUDIO_RECORDINGS_BY_SUBJECT,
+        CACHE_KEYS.CATEGORIES_BY_SUBJECT,
+        CACHE_KEYS.FLASHCARDS_BY_DECK,
+        CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK,
+        CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK,
+      ];
+
+      let orphanedCount = 0;
+      for (const key of allKeys) {
+        for (const prefix of dynamicPrefixes) {
+          if (key.startsWith(prefix)) {
+            const suffix = key.slice(prefix.length);
+            // Si el suffix es un número negativo, es un ID temporal
+            if (/^-\d+$/.test(suffix)) {
+              storage.remove(key);
+              orphanedCount++;
+            }
+            break;
+          }
+        }
+      }
+
+      if (orphanedCount > 0) {
+        console.log(
+          `[Cache] 🧹 Eliminadas ${orphanedCount} llaves huérfanas con IDs temporales`
+        );
+      }
+
+      // También purgar items optimistas dentro de llaves dinámicas con IDs reales
+      // (ej: cache:flashcards_by_deck:42 podría tener cards con id negativo)
+      for (const key of allKeys) {
+        for (const prefix of dynamicPrefixes) {
+          if (key.startsWith(prefix)) {
+            const suffix = key.slice(prefix.length);
+            if (/^-\d+$/.test(suffix)) break; // ya borrada arriba
+            const raw = storage.getString(key);
+            if (!raw) break;
+            try {
+              const entry: CacheEntry<any[]> = JSON.parse(raw);
+              if (!Array.isArray(entry.data)) break;
+              const before = entry.data.length;
+              entry.data = entry.data.filter(
+                (item: any) => !(item?.id < 0 || item?._isPending === true)
+              );
+              if (entry.data.length < before) {
+                storage.set(key, JSON.stringify(entry));
+                console.log(
+                  `[Cache] 🧹 Purgados ${before - entry.data.length} items optimistas de ${key}`
+                );
+              }
+            } catch {
+              // ignorar
+            }
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[Cache] Error durante purga de items optimistas:', error);
+    }
+  },
+
+  /**
+   * INYECCIÓN OPTIMISTA
+   * Métodos utilitarios para manipular listas cacheadas sin conexión.
+   */
+  addOptimisticItem: <T>(key: string, item: T): void => {
+    try {
+      const raw = getStorage().getString(key);
+      let data: any[] = [];
+      if (raw) {
+        try {
+          const entry = JSON.parse(raw);
+          if (Array.isArray(entry.data)) {
+            data = entry.data;
+          }
+        } catch { }
+      }
+      data.unshift(item);
+      saveToCacheSync(key, data);
+      console.log(`[Cache] ➕ Item optimista inyectado en ${key}`);
+    } catch (error) {
+      console.warn(`[Cache] Error inyectando item en ${key}:`, error);
+    }
+  },
+
+  updateOptimisticItem: <T>(key: string, id: string | number, updates: Partial<T>): void => {
+    try {
+      const raw = getStorage().getString(key);
+      if (!raw) return;
+      const entry = JSON.parse(raw);
+      if (Array.isArray(entry.data)) {
+        let updated = false;
+        entry.data = entry.data.map((item: any) => {
+          if (String(item.id) === String(id) || String(item.deck_id) === String(id) || String(item.subject_id) === String(id)) {
+            updated = true;
+            return { ...item, ...updates, _isPending: true };
+          }
+          return item;
+        });
+        if (updated) {
+          saveToCacheSync(key, entry.data);
+          console.log(`[Cache] ✏️ Item ${id} actualizado optimísticamente en ${key}`);
+        }
+      }
+    } catch (error) {
+      console.warn(`[Cache] Error actualizando item en ${key}:`, error);
+    }
+  },
+
+  removeOptimisticItem: (key: string, id: string | number): void => {
+    try {
+      const raw = getStorage().getString(key);
+      if (!raw) return;
+      const entry = JSON.parse(raw);
+      if (Array.isArray(entry.data)) {
+        const initialLength = entry.data.length;
+        entry.data = entry.data.filter((item: any) => String(item.id) !== String(id) && String(item.deck_id) !== String(id));
+        if (entry.data.length < initialLength) {
+          saveToCacheSync(key, entry.data);
+          console.log(`[Cache] 🗑️ Item ${id} eliminado optimísticamente de ${key}`);
+        }
+      }
+    } catch (error) {
+      console.warn(`[Cache] Error eliminando item en ${key}:`, error);
+    }
+  },
 };

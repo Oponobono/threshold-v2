@@ -51,6 +51,11 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
     }
   }, [subject]);
 
+  const handleClose = () => {
+    setIsSaving(false);
+    onClose();
+  };
+
   const handleSave = async () => {
     if (!subject?.id) return;
     if (!subjectName.trim()) {
@@ -70,7 +75,7 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
       });
 
       await loadAllData(true);
-      onClose();
+      handleClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.newSubject.errors.createFailed'), type: 'error' });
     } finally {
@@ -79,8 +84,8 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={handleClose}>
         <Pressable style={styles.sheetContent} onPress={() => null}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>{t('subjects.edit')} — {subject?.name}</Text>
@@ -150,7 +155,7 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
           </ScrollView>
 
           <View style={styles.sheetActions}>
-            <TouchableOpacity style={[styles.sheetCancelBtn, { flex: 1 }]} onPress={onClose}>
+            <TouchableOpacity style={[styles.sheetCancelBtn, { flex: 1 }]} onPress={handleClose}>
               <Text style={styles.sheetCancelText}>{t('dashboard.newSubject.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity

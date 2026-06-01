@@ -88,7 +88,10 @@ export const createFlashcardDeck = async (payload: { subject_id?: number; title:
   } catch (error) {
     console.warn('[Flashcards] Offline: encolando createFlashcardDeck', error);
     await offlineSyncService.addPendingOperation('POST', '/flashcard-decks', 'flashcard_deck', payload);
-    return { id: -Date.now(), ...payload, _isPending: true };
+    const optimisticDeck = { id: -Date.now(), ...payload, _isPending: true };
+    cacheService.addOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS, optimisticDeck);
+    cacheService.addOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, optimisticDeck);
+    return optimisticDeck;
   }
 };
 
@@ -106,6 +109,8 @@ export const updateFlashcardDeck = async (deckId: number, payload: { subject_id?
   } catch (error) {
     console.warn(`[Flashcards] Offline: encolando updateFlashcardDeck ${deckId}`, error);
     await offlineSyncService.addPendingOperation('PUT', `/flashcard-decks/${deckId}`, 'flashcard_deck', payload);
+    cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS, deckId, payload);
+    cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, deckId, payload);
     return { ...payload, _isPending: true };
   }
 };
@@ -186,7 +191,9 @@ export const createFlashcard = async (payload: { deck_id: number; front: string;
   } catch (error) {
     console.warn(`[Flashcards] Offline: encolando createFlashcard para deck ${payload.deck_id}`, error);
     await offlineSyncService.addPendingOperation('POST', `/flashcard-decks/${payload.deck_id}/cards`, 'flashcard', payload);
-    return { id: -Date.now(), ...payload, _isPending: true };
+    const optimisticCard = { id: -Date.now(), ...payload, _isPending: true };
+    cacheService.addOptimisticItem(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id, optimisticCard);
+    return optimisticCard;
   }
 };
 
@@ -213,7 +220,9 @@ export const createEvaluationItem = async (payload: {
   } catch (error) {
     console.warn(`[Flashcards] Offline: encolando createEvaluationItem para deck ${payload.deck_id}`, error);
     await offlineSyncService.addPendingOperation('POST', `/flashcard-decks/${payload.deck_id}/items`, 'flashcard', payload);
-    return { id: -Date.now(), ...payload, _isPending: true };
+    const optimisticCard = { id: -Date.now(), ...payload, _isPending: true };
+    cacheService.addOptimisticItem(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id, optimisticCard);
+    return optimisticCard;
   }
 };
 
