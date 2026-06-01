@@ -176,13 +176,41 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
 /**
  * Crear un nuevo mazo de flashcards
  */
+/**
+ * Helper para sanitizar texto (remover etiquetas HTML)
+ */
+function sanitizeText(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(/<[^>]*>?/gm, '');
+}
+
+/**
+ * Helper para sanitizar un objeto (remover HTML de todos sus strings)
+ */
+function sanitizeObject(obj) {
+  if (typeof obj === 'string') return sanitizeText(obj);
+  if (Array.isArray(obj)) return obj.map(sanitizeObject);
+  if (obj !== null && typeof obj === 'object') {
+    const newObj = {};
+    for (const key in obj) {
+      newObj[key] = sanitizeObject(obj[key]);
+    }
+    return newObj;
+  }
+  return obj;
+}
+
 exports.createFlashcardDeck = (req, res) => {
   const { subject_id, title, description } = req.body;
   const userId = req.user.id;
   if (!title) return res.status(400).json({ error: 'Faltan campos requeridos (title).' });
+  
+  const safeTitle = sanitizeText(title);
+  const safeDescription = sanitizeText(description);
+
   db.run(
     `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
-    [subject_id || null, userId, title, description || ''],
+    [subject_id || null, userId, safeTitle, safeDescription || ''],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({ id: this.lastID, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 });
@@ -497,7 +525,10 @@ exports.createCard = (req, res) => {
   const { front, back } = req.body;
   if (!front || !back) return res.status(400).json({ error: 'Faltan campos requeridos (front, back).' });
 
-  const contentJson = JSON.stringify({ front, back });
+  const safeFront = sanitizeText(front);
+  const safeBack = sanitizeText(back);
+
+  const contentJson = JSON.stringify({ front: safeFront, back: safeBack });
   
   // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
   const nextReviewDate = new Date();
@@ -506,7 +537,7 @@ exports.createCard = (req, res) => {
   
   db.run(
     `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
-    [deckId, front, back, contentJson, nextReviewDateStr],
+    [deckId, safeFront, safeBack, contentJson, nextReviewDateStr],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json(normalizeCard({
@@ -537,9 +568,15 @@ exports.createEvaluationItem = (req, res) => {
     return res.status(400).json({ error: 'content_json no es JSON válido.' });
   }
 
+  // Sanitización contra inyecciones
+  const safeParsed = sanitizeObject(parsed);
+  const safeContentStr = JSON.stringify(safeParsed);
+  const safeHint = hint ? sanitizeText(hint) : null;
+  const safeExplanation = explanation ? sanitizeText(explanation) : null;
+
   // Para flashcard legacy, extraer front/back
-  const front = item_type === 'flashcard' ? (parsed.front || '') : '';
-  const back = item_type === 'flashcard' ? (parsed.back || '') : '';
+  const front = item_type === 'flashcard' ? (safeParsed.front || '') : '';
+  const back = item_type === 'flashcard' ? (safeParsed.back || '') : '';
 
   // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
   const nextReviewDate = new Date();
@@ -548,12 +585,12 @@ exports.createEvaluationItem = (req, res) => {
 
   db.run(
     `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
-    [deckId, front, back, item_type, contentStr, hint || null, explanation || null, nextReviewDateStr],
+    [deckId, front, back, item_type, safeContentStr, safeHint, safeExplanation, nextReviewDateStr],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json(normalizeCard({
         id: this.lastID, deck_id: Number(deckId), front, back,
-        item_type, content_json: contentStr, hint: hint || null, explanation: explanation || null, status: 'new',
+        item_type, content_json: safeContentStr, hint: safeHint, explanation: safeExplanation, status: 'new',
       }));
     }
   );

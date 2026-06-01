@@ -184,6 +184,14 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   /**
    * Sanitiza un objeto eliminando claves peligrosas (__proto__, constructor, prototype)
    */
+  /**
+   * Elimina etiquetas HTML para evitar inyección de scripts (XSS)
+   */
+  const sanitizeText = (text: string | null | undefined): string => {
+    if (!text) return '';
+    return text.replace(/<[^>]*>?/gm, '');
+  };
+
   const sanitizeJSON = (obj: any): any => {
     if (!obj || typeof obj !== 'object') return obj;
     if (Array.isArray(obj)) return obj.map(sanitizeJSON);
@@ -316,13 +324,23 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
             normalizedData.correctAnswer = normalizedData.correct_answer;
             delete normalizedData.correct_answer;
           }
-          cards.push({ type: itemType, data: normalizedData, hint: card.hint, explanation: card.explanation });
+          const safeData: any = {};
+          for (const key in normalizedData) {
+            if (typeof normalizedData[key] === 'string') {
+              safeData[key] = sanitizeText(normalizedData[key]);
+            } else if (Array.isArray(normalizedData[key])) {
+              safeData[key] = normalizedData[key].map((item: any) => typeof item === 'string' ? sanitizeText(item) : item);
+            } else {
+              safeData[key] = normalizedData[key];
+            }
+          }
+          cards.push({ type: itemType, data: safeData, hint: sanitizeText(card.hint), explanation: sanitizeText(card.explanation) });
         }
       }
 
       const deck = saveImportedDeck(
-        deckData.title,
-        deckData.description,
+        sanitizeText(deckData.title),
+        sanitizeText(deckData.description),
         cards,
         null,
       );
