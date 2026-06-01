@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { Animated, TextInput, ActionSheetIOS, Platform } from 'react-native';
+import { Animated, TextInput, ActionSheetIOS, Platform, InteractionManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useFlashcardsManager } from './useFlashcardsManager';
@@ -230,7 +230,7 @@ export function useFlashcards() {
 
   useFocusEffect(
     useCallback(() => {
-      const loadAll = async () => {
+      const task = InteractionManager.runAfterInteractions(async () => {
         try {
           const userId = await getUserId();
           setCurrentUserId(userId ? Number(userId) : null);
@@ -247,9 +247,9 @@ export function useFlashcards() {
           console.warn('Error loading subjects:', e);
         }
         await loadDecks();
-      };
-      loadAll();
+      });
       return () => {
+        task.cancel();
         cancelAllDueDeckNotifications();
         dueNotifScheduled.current.clear();
       };

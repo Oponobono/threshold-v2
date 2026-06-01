@@ -19,7 +19,7 @@ export const useRecordingsManager = () => {
 
   // ── YouTube videos
   const [youTubeVideos, setYouTubeVideos] = useState<YouTubeVideo[]>([]);
-  const [isLoadingVideos, setIsLoadingVideos] = useState(false);
+  const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [isAddingYouTubeVideo, setIsAddingYouTubeVideo] = useState(false);
 
   // ── Search & filter
@@ -30,19 +30,27 @@ export const useRecordingsManager = () => {
 
   const loadYouTubeVideos = useCallback(async () => {
     setIsLoadingVideos(true);
+
+    // Fase 1: Cache-first — mostrar datos instantáneos desde MMKV
+    try {
+      const cached = cacheService.loadYouTubeVideos() as unknown as YouTubeVideo[] | null;
+      if (cached && cached.length > 0) {
+        setYouTubeVideos(cached);
+        setIsLoadingVideos(false);
+      }
+    } catch (_) {}
+
+    // Fase 2: Refresh desde la red
     try {
       const videos = await getYouTubeVideos();
       setYouTubeVideos(videos);
-      // Guardar en caché para usar como fallback si hay error después
       await cacheService.saveYouTubeVideos(videos);
       console.log(`[useRecordingsManager] ✅ Cargados ${videos.length} videos de YouTube`);
     } catch (e) {
       console.warn('[useRecordingsManager] ⚠️ Error loading YouTube videos:', e);
-      // Intentar cargar desde caché como fallback
       try {
         const cachedVideos: YouTubeVideo[] | null = await cacheService.loadYouTubeVideos() as YouTubeVideo[] | null;
         if (cachedVideos && cachedVideos.length > 0) {
-          console.log(`[useRecordingsManager] ✅ Cargados ${cachedVideos.length} videos desde caché`);
           setYouTubeVideos(cachedVideos);
         }
       } catch (cacheError) {

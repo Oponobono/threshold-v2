@@ -4,6 +4,7 @@
     "slug": "threshold",
     "version": "1.0.0",
     "orientation": "portrait",
+    "backgroundColor": "#0E0E18",
     "icon": "./src/images/ThresholdIcons/android/playstore/appicononline.png",
     "scheme": "threshold",
     "userInterfaceStyle": "automatic",

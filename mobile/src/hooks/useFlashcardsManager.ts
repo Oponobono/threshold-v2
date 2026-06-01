@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getFlashcardDecksWithMetrics, type FlashcardDeck, type Subject } from '../services/api';
+import { cacheService } from '../services/cacheService';
 
 export interface FlashcardsManagerResult {
   decks: FlashcardDeck[];
@@ -27,7 +28,7 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
   const { t } = useTranslation();
 
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubjectId, setActiveSubjectId] = useState<number | null>(null);
 
@@ -41,18 +42,23 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
   const loadDecks = useCallback(async () => {
     const generation = ++loadGenRef.current;
     setIsLoading(true);
+
+    // Fase 1: Cache-first — mostrar datos instantáneos desde MMKV
+    const cached = cacheService.loadFlashcardDecksWithMetrics() as unknown as FlashcardDeck[] | null;
+    if (cached && cached.length > 0 && generation === loadGenRef.current) {
+      setDecks(cached);
+      setIsLoading(false);
+    }
+
+    // Fase 2: Refresh desde la red
     try {
       const data = await getFlashcardDecksWithMetrics();
-      // Solo actualizar si esta sigue siendo la carga más reciente
       if (generation === loadGenRef.current) {
         setDecks(Array.isArray(data) ? data : []);
       }
     } catch (e) {
       console.warn('[useFlashcardsManager] Error cargando mazos:', e);
-      // NO reiniciar a [] — preservar la lista actual para no perder mazos
-      // por errores de red transitorios o condiciones de carrera
       if (generation === loadGenRef.current && decks.length === 0) {
-        // Solo resetear si realmente no había nada antes (primera carga fallida)
         setDecks([]);
       }
     } finally {
