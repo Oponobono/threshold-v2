@@ -20,6 +20,8 @@ yarn.lock
 # ==================== DATABASE ====================
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
 *.db
 database.sqlite
 
