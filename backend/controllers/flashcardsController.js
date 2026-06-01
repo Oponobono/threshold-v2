@@ -422,7 +422,358 @@ exports.shareDeck = (req, res) => {
   });
 };
 
-// â”€â”€â”€ AI Generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Card CRUD ────────────────────────────────────────────────────────────────
+
+/**
+ * Obtener todas las tarjetas de un mazo (normalizadas al formato polimórfico)
+ */
+exports.getCardsByDeck = (req, res) => {
+  const { deckId } = req.params;
+  db.all(`SELECT * FROM flashcards WHERE deck_id = ? ORDER BY created_at ASC`, [deckId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows.map(normalizeCard));
+  });
+};
+
+/**
+ * Obtiene una tarjeta específica por su ID
+ */
+exports.getCardById = (req, res) => {
+  const { cardId } = req.params;
+  db.get(`SELECT * FROM flashcards WHERE id = ?`, [cardId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Tarjeta no encontrada' });
+    res.json(normalizeCard(row));
+  });
+};
+
+/**
+ * Obtiene todas las tarjetas de un mazo ordenadas por prioridad de repaso
+ * Prioridad: tarjetas vencidas, dominio bajo, tasa de fallos alta
+ */
+exports.getCardsByDeckPrioritized = (req, res) => {
+  const { deckId } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Se requiere userId' });
+  }
+
+  db.all(
+    `SELECT 
+       fc.*,
+       CASE 
+         WHEN COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) > 0
+         THEN CAST(COALESCE(SUM(CASE WHEN cl.result = 'incorrect' THEN 1 ELSE 0 END), 0) AS FLOAT) / 
+              CAST(COALESCE(COUNT(cl.id), 1) AS FLOAT)
+         ELSE 0
+       END as failure_rate,
+       CAST(COUNT(cl.id) AS INTEGER) as total_attempts
+     FROM flashcards fc
+     LEFT JOIN card_logs cl ON fc.id = cl.card_id AND cl.user_id = ?
+     WHERE fc.deck_id = ?
+     GROUP BY fc.id
+     ORDER BY 
+       CASE WHEN fc.next_review_date <= datetime('now') THEN 0 ELSE 1 END ASC,
+       fc.next_review_date ASC,
+       failure_rate DESC,
+       fc.created_at ASC`,
+    [userId, deckId],
+    (err, rows) => {
+      if (err) {
+        console.error('[CardsPrioritized] Error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json(rows.map(normalizeCard));
+    }
+  );
+};
+
+/**
+ * Crear una tarjeta legacy (front/back) — mantiene compatibilidad con FlashcardNewCardScreen
+ */
+exports.createCard = (req, res) => {
+  const { deckId } = req.params;
+  const { front, back } = req.body;
+  if (!front || !back) return res.status(400).json({ error: 'Faltan campos requeridos (front, back).' });
+
+  const contentJson = JSON.stringify({ front, back });
+  
+  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
+  const nextReviewDate = new Date();
+  nextReviewDate.setDate(nextReviewDate.getDate() + 7);
+  const nextReviewDateStr = nextReviewDate.toISOString();
+  
+  db.run(
+    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
+    [deckId, front, back, contentJson, nextReviewDateStr],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.status(201).json(normalizeCard({
+        id: this.lastID, deck_id: Number(deckId), front, back,
+        item_type: 'flashcard', content_json: contentJson, status: 'new', hint: null, explanation: null,
+      }));
+    }
+  );
+};
+
+/**
+ * Crear un ítem de evaluación polimórfico (flashcard | multiple_choice | boolean)
+ * Body: { item_type, content_json: { ... }, hint?, explanation? }
+ */
+exports.createEvaluationItem = (req, res) => {
+  const { deckId } = req.params;
+  const { item_type, content_json, hint, explanation } = req.body;
+
+  const validTypes = ['flashcard', 'multiple_choice', 'boolean'];
+  if (!item_type || !validTypes.includes(item_type)) {
+    return res.status(400).json({ error: `item_type debe ser uno de: ${validTypes.join(', ')}` });
+  }
+  if (!content_json) return res.status(400).json({ error: 'Se requiere content_json.' });
+
+  const contentStr = typeof content_json === 'string' ? content_json : JSON.stringify(content_json);
+  let parsed;
+  try { parsed = JSON.parse(contentStr); } catch (_) {
+    return res.status(400).json({ error: 'content_json no es JSON válido.' });
+  }
+
+  // Para flashcard legacy, extraer front/back
+  const front = item_type === 'flashcard' ? (parsed.front || '') : '';
+  const back = item_type === 'flashcard' ? (parsed.back || '') : '';
+
+  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
+  const nextReviewDate = new Date();
+  nextReviewDate.setDate(nextReviewDate.getDate() + 7);
+  const nextReviewDateStr = nextReviewDate.toISOString();
+
+  db.run(
+    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
+    [deckId, front, back, item_type, contentStr, hint || null, explanation || null, nextReviewDateStr],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.status(201).json(normalizeCard({
+        id: this.lastID, deck_id: Number(deckId), front, back,
+        item_type, content_json: contentStr, hint: hint || null, explanation: explanation || null, status: 'new',
+      }));
+    }
+  );
+};
+
+/**
+ * Registrar una revisión de tarjeta con SM-2 Algorithm
+ * Body: { userId, result: 'correct'|'incorrect', responseTimeMs: number }
+ */
+exports.recordCardReview = (req, res) => {
+  const { cardId } = req.params;
+  const { userId, result, responseTimeMs } = req.body;
+
+  if (!userId || !result || typeof responseTimeMs !== 'number') {
+    return res.status(400).json({ error: 'Se requieren: userId, result (correct|incorrect), responseTimeMs' });
+  }
+
+  if (!['correct', 'incorrect'].includes(result)) {
+    return res.status(400).json({ error: 'result debe ser "correct" o "incorrect"' });
+  }
+
+  // Obtener FSRS actual de la tarjeta
+  db.get(
+    `SELECT fc.id, fc.deck_id, fc.fsrs_stability, fc.fsrs_difficulty, fc.fsrs_repetitions, fd.subject_id 
+     FROM flashcards fc
+     LEFT JOIN flashcard_decks fd ON fc.deck_id = fd.id
+     WHERE fc.id = ?`,
+    [cardId],
+    (err, card) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!card) return res.status(404).json({ error: 'Tarjeta no encontrada' });
+
+      // ── Mapear resultado a calidad FSRS (0-5) ────────────────────────────
+      // result === 'correct' se mapea a quality (3-5 según tiempo)
+      // result === 'incorrect' se mapea a quality < 3
+      let quality = 1;
+      if (result === 'correct') {
+        if (responseTimeMs < 3000) quality = 5;        // Perfecto
+        else if (responseTimeMs < 8000) quality = 4;   // Bueno
+        else quality = 3;                              // Aceptable
+      } else {
+        quality = 1;                                   // Malo/Olvidado
+      }
+
+      // ── Calcular nuevo intervalo con FSRS ────────────────────────────────
+      const fsrsResult = calculateFSRS({
+        quality,
+        stability: card.fsrs_stability || 1,
+        difficulty: card.fsrs_difficulty || 0.5,
+        repetitions: card.fsrs_repetitions || 0,
+        interval: 1,  // Simplificado: se calcula dentro de calculateFSRS
+      });
+
+      const nextReviewDateStr = fsrsResult.nextReviewDate.toISOString();
+
+      // ── Actualizar flashcard con nuevos valores FSRS ────────────────────
+      db.run(
+        `UPDATE flashcards 
+         SET fsrs_stability = ?, fsrs_difficulty = ?, fsrs_repetitions = ?, 
+             next_review_date = ?, status = 'review', last_review_timestamp = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [fsrsResult.newStability, fsrsResult.newDifficulty, fsrsResult.newRepetitions, nextReviewDateStr, cardId],
+        (updateErr) => {
+          if (updateErr) return res.status(500).json({ error: updateErr.message });
+
+          // ── Registrar en card_logs para análisis ───────────────────────
+          db.run(
+            `INSERT INTO card_logs (card_id, user_id, result, response_time_ms, difficulty_deduced)
+             VALUES (?, ?, ?, ?, ?)`,
+            [cardId, userId, result, responseTimeMs, quality >= 4 ? 'easy' : quality === 3 ? 'moderate' : 'difficult'],
+            (logErr) => {
+              if (logErr) console.warn('[CardLogs] Error registrando revisión:', logErr);
+            }
+          );
+
+          // ── Actualizar learning_analytics ──────────────────────────────
+          const isCorrect = result === 'correct' ? 1 : 0;
+          db.run(
+            `UPDATE learning_analytics 
+             SET total_reviews = total_reviews + 1,
+                 correct_reviews = correct_reviews + ?,
+                 incorrect_reviews = incorrect_reviews + ?,
+                 mastery_percentage = CASE 
+                   WHEN total_reviews + 1 > 0 THEN ROUND((correct_reviews + ?) * 100.0 / (total_reviews + 1), 1)
+                   ELSE 0
+                 END,
+                 last_updated = CURRENT_TIMESTAMP
+             WHERE user_id = ? AND subject_id = ?`,
+            [isCorrect, 1 - isCorrect, isCorrect, userId, card.subject_id || null],
+            (analyticsErr) => {
+              if (analyticsErr) console.warn('[Analytics] Error actualizando estadísticas:', analyticsErr);
+            }
+          );
+
+          // ── Retornar resultado con métricas FSRS ────────────────────────
+          res.json({
+            success: true,
+            cardId,
+            quality,
+            nextReviewDate: nextReviewDateStr,
+            newStability: fsrsResult.newStability,
+            newDifficulty: fsrsResult.newDifficulty,
+            newRepetitions: fsrsResult.newRepetitions,
+            retention: fsrsResult.retention,
+            message: `Revisión registrada (FSRS). Próxima revisión en ${fsrsResult.newInterval} días. Retención esperada: ${fsrsResult.retention}%.`,
+          });
+        }
+      );
+    }
+  );
+};
+
+/**
+ * Actualizar el estado de una tarjeta
+ */
+exports.updateCardStatus = (req, res) => {
+  const { cardId } = req.params;
+  const { status } = req.body;
+  db.run(`UPDATE flashcards SET status = ? WHERE id = ?`, [status, cardId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+};
+
+/**
+ * Eliminar una tarjeta
+ */
+exports.deleteCard = (req, res) => {
+  const { cardId } = req.params;
+  db.run(`DELETE FROM flashcards WHERE id = ?`, [cardId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+};
+
+/**
+ * Eliminar un mazo completo o quitar un mazo compartido de la lista del usuario
+ */
+exports.deleteDeck = (req, res) => {
+  const { deckId } = req.params;
+  const { user_id } = req.query;
+
+  if (!user_id) return res.status(400).json({ error: 'Se requiere user_id para verificar permisos de eliminación.' });
+
+  db.get(`SELECT user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
+
+    if (deck.user_id === Number(user_id)) {
+      db.run(`DELETE FROM flashcards WHERE deck_id = ?`, [deckId], (errCards) => {
+        if (errCards) return res.status(500).json({ error: errCards.message });
+        db.run(`DELETE FROM shared_decks WHERE deck_id = ?`, [deckId], (errShared) => {
+          if (errShared) return res.status(500).json({ error: errShared.message });
+          db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], function(errDeck) {
+            if (errDeck) return res.status(500).json({ error: errDeck.message });
+            res.json({ success: true, message: 'Mazo y todo su contenido eliminado permanentemente.' });
+          });
+        });
+      });
+    } else {
+      db.run(
+        `DELETE FROM shared_decks WHERE deck_id = ? AND shared_to_user_id = ?`,
+        [deckId, user_id],
+        function(errUnshare) {
+          if (errUnshare) return res.status(500).json({ error: errUnshare.message });
+          if (this.changes === 0) {
+            return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo o no está compartido contigo.' });
+          }
+          res.json({ success: true, message: 'Mazo compartido quitado de tu lista exitosamente.' });
+        }
+      );
+    }
+  });
+};
+
+/**
+ * Comparte un mazo con otro usuario usando su PIN
+ */
+exports.shareDeck = (req, res) => {
+  const { deckId } = req.params;
+  const { user_id, recipient_pin } = req.body;
+
+  if (!user_id || !recipient_pin) {
+    return res.status(400).json({ error: 'Faltan campos requeridos (user_id, recipient_pin).' });
+  }
+
+  db.get(`SELECT id, username, name FROM users WHERE share_pin = ?`, [recipient_pin.trim().toUpperCase()], (err, recipient) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!recipient) return res.status(404).json({ error: 'No se encontró ningún usuario con ese PIN.' });
+    if (recipient.id === Number(user_id)) return res.status(400).json({ error: 'No puedes compartir un mazo contigo mismo.' });
+
+    db.get(`SELECT id, title FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], (err2, deck) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      if (!deck) return res.status(403).json({ error: 'No tienes permiso para compartir este mazo.' });
+
+      db.get(`SELECT id FROM shared_decks WHERE deck_id = ? AND shared_to_user_id = ?`, [deckId, recipient.id], (checkErr, existing) => {
+        if (checkErr) return res.status(500).json({ error: checkErr.message });
+        if (existing) {
+          return res.status(200).json({
+            message: `El mazo ya estaba compartido con @${recipient.username || recipient.name}.`,
+            recipient_name: recipient.name || recipient.username,
+          });
+        }
+        db.run(
+          `INSERT INTO shared_decks (deck_id, shared_by_user_id, shared_to_user_id) VALUES (?, ?, ?)`,
+          [deckId, user_id, recipient.id],
+          function(insertErr) {
+            if (insertErr) return res.status(500).json({ error: insertErr.message });
+            res.status(201).json({
+              message: `Mazo "${deck.title}" compartido exitosamente con @${recipient.username || recipient.name}.`,
+              recipient_name: recipient.name || recipient.username,
+            });
+          }
+        );
+      });
+    });
+  });
+};
+
+// ─── AI Generation  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Helper: Inserta un card en la BD de forma asÃ­ncrona
