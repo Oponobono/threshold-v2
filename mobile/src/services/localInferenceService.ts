@@ -167,6 +167,16 @@ export async function runInference(options: InferenceOptions): Promise<Inference
   } catch (error: any) {
     store.setInferenceStatus('error');
     store.setErrorMessage(error?.message || 'Error de inferencia');
+
+    // Intentar fallback automático al modelo essential si el actual falló
+    const essentialId = 'essential';
+    if (store.activeModelId && store.activeModelId !== essentialId && store.downloadedModels[essentialId]) {
+      console.warn(`[LocalInference] ⚠️ Modelo "${store.activeModelId}" falló, intentando fallback a essential...`);
+      await unloadModel();
+      store.setActiveModel(essentialId);
+      return runInference(options);
+    }
+
     throw error;
   }
 }

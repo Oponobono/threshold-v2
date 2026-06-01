@@ -184,6 +184,7 @@
       "percentage": "Percentage (%)",
       "percentagePlaceholder": "Ex: 20",
       "success": "Grade saved for {{subject}}",
+      "offlineSuccess": "Grade saved offline for {{subject}} — will sync when connected",
       "save": "Save grade",
       "errorSave": "We could not save this grade. Please try again."
     },
@@ -195,6 +196,7 @@
       "dateFormat": "MM-DD-YYYY",
       "save": "Save Task",
       "success": "Task saved successfully",
+      "offlineSuccess": "Task saved offline — will sync when connected",
       "errorSave": "We could not save this task. Please try again."
     },
     "errors": {

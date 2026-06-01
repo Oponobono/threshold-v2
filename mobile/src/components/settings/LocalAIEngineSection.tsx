@@ -142,6 +142,21 @@ export const LocalAIEngineSection = () => {
       return;
     }
 
+    // Verificar espacio disponible en disco
+    try {
+      const freeBytes = await FileSystem.getFreeDiskStorageAsync?.();
+      if (freeBytes !== undefined && freeBytes < model.downloadSizeBytes * 1.2) {
+        const freeMB = Math.round(freeBytes / (1024 * 1024));
+        alertRef.show({
+          title: t('common.error'),
+          message: t('settings.localAI.insufficientStorage') || `Espacio insuficiente. Disponible: ~${freeMB} MB, necesario: ~${model.downloadSize}`,
+          type: 'error',
+          buttons: [{ text: t('common.ok') }],
+        });
+        return;
+      }
+    } catch (_) {}
+
     setDownloadingId(modelId);
     setDownloadProgress(modelId, 0, 'downloading');
 
@@ -276,6 +291,21 @@ export const LocalAIEngineSection = () => {
       alertRef.show({ title: t('common.error'), message: t('common.networkError'), type: 'error', buttons: [{ text: t('common.ok') }] });
       return;
     }
+
+    // Verificar espacio disponible en disco
+    try {
+      const freeBytes = await FileSystem.getFreeDiskStorageAsync?.();
+      if (freeBytes !== undefined && freeBytes < WHISPER_MODEL.downloadSizeBytes * 1.2) {
+        const freeMB = Math.round(freeBytes / (1024 * 1024));
+        alertRef.show({
+          title: t('common.error'),
+          message: t('settings.localAI.insufficientStorage') || `Espacio insuficiente. Disponible: ~${freeMB} MB, necesario: ~${WHISPER_MODEL.downloadSize}`,
+          type: 'error',
+          buttons: [{ text: t('common.ok') }],
+        });
+        return;
+      }
+    } catch (_) {}
 
     setWhisperDownloading(true);
     setDownloadProgress('whisper', 0, 'downloading');

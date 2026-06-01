@@ -26,6 +26,60 @@ function getSystemPrompt(): string {
   return `Eres Zyren, un asistente académico especializado en análisis, interpretación y transformación de material académico en conocimiento estructurado. Responde en el mismo idioma en que te hablan (español o inglés). Tus respuestas deben ser claras, concisas y académicamente rigurosas.`;
 }
 
+function getChatTemplate(modelId: string): {
+  beforeSystem: string;
+  afterSystem: string;
+  beforeUser: string;
+  afterUser: string;
+  beforeAssistant: string;
+  afterAssistant: string;
+  stop: string[];
+} {
+  if (modelId.startsWith('qwen')) {
+    return {
+      beforeSystem: '<|im_start|>system\n',
+      afterSystem: '<|im_end|>\n',
+      beforeUser: '<|im_start|>user\n',
+      afterUser: '<|im_end|>\n',
+      beforeAssistant: '<|im_start|>assistant\n',
+      afterAssistant: '<|im_end|>',
+      stop: ['<|im_end|>', '<|im_start|>'],
+    };
+  }
+  if (modelId === 'phi3_5') {
+    return {
+      beforeSystem: '<|system|>\n',
+      afterSystem: '<|end|>\n',
+      beforeUser: '<|user|>\n',
+      afterUser: '<|end|>\n',
+      beforeAssistant: '<|assistant|>\n',
+      afterAssistant: '<|end|>',
+      stop: ['<|end|>', '<|user|>'],
+    };
+  }
+  if (modelId === 'gemma2_2b') {
+    return {
+      beforeSystem: '<bos>',
+      afterSystem: '',
+      beforeUser: '<start_of_turn>user\n',
+      afterUser: '<end_of_turn>\n',
+      beforeAssistant: '<start_of_turn>model\n',
+      afterAssistant: '<end_of_turn>',
+      stop: ['<end_of_turn>', '<start_of_turn>'],
+    };
+  }
+  // Llama 3 (essential, advanced) and default
+  return {
+    beforeSystem: '<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n',
+    afterSystem: '<|eot_id|>',
+    beforeUser: '<|start_header_id|>user<|end_header_id|>\n\n',
+    afterUser: '<|eot_id|>',
+    beforeAssistant: '<|start_header_id|>assistant<|end_header_id|>\n\n',
+    afterAssistant: '<|eot_id|>',
+    stop: ['<|eot_id|>', '<|start_header_id|>'],
+  };
+}
+
 async function ensureLocalModel(): Promise<void> {
   if (isReady()) return;
   await hydrationDone;
@@ -38,15 +92,22 @@ async function ensureLocalModel(): Promise<void> {
 }
 
 function buildChatPrompt(messages: { role: string; content: string }[], contextText?: string): string {
-  let prompt = getSystemPrompt() + '\n\n';
+  const store = useLocalAIStore.getState();
+  const modelId = store.activeModelId || 'essential';
+  const tmpl = getChatTemplate(modelId);
+
+  let prompt = tmpl.beforeSystem + getSystemPrompt() + tmpl.afterSystem;
   if (contextText) {
-    prompt += `Contexto académico:\n${contextText}\n\n`;
+    prompt += tmpl.beforeUser + `Contexto académico:\n${contextText}` + tmpl.afterUser;
   }
   for (const msg of messages) {
-    const role = msg.role === 'assistant' ? 'Zyren' : 'Usuario';
-    prompt += `${role}: ${msg.content}\n`;
+    if (msg.role === 'assistant') {
+      prompt += tmpl.beforeAssistant + msg.content + tmpl.afterAssistant;
+    } else {
+      prompt += tmpl.beforeUser + msg.content + tmpl.afterUser;
+    }
   }
-  prompt += `Zyren:`;
+  prompt += tmpl.beforeAssistant;
   return prompt;
 }
 
@@ -73,11 +134,13 @@ export async function sendHybridChatMessage(
   if (resolved === 'local') {
     await ensureLocalModel();
     const prompt = buildChatPrompt(messages, contextText);
+    const store = useLocalAIStore.getState();
+    const tmpl = getChatTemplate(store.activeModelId || 'essential');
     const result = await runInference({
       prompt,
       maxTokens: 1024,
       temperature: 0.7,
-      stop: ['Usuario:', '\n\nUsuario'],
+      stop: tmpl.stop,
     });
     // Normalizar al mismo formato que el endpoint cloud
     return {

@@ -1,5 +1,5 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
-import { saveToCacheSync, loadFromCacheSync } from '../cacheService';
+import { cacheService, saveToCacheSync, loadFromCacheSync } from '../cacheService';
 import { offlineSyncService } from '../offlineSyncService';
 
 export interface GradingPeriod {
@@ -37,10 +37,24 @@ export interface TwoFactorStatus {
 }
 
 export const getGradingPeriods = async (): Promise<GradingPeriod[]> => {
-  const response = await fetchWithFallback('/grading-periods');
-  if (!response.ok) throw new Error('Error al obtener períodos');
-  const data = await parseJsonSafely(response);
-  return data?.periods || [];
+  try {
+    const response = await fetchWithFallback('/grading-periods');
+    if (!response.ok) throw new Error('Error al obtener períodos');
+    const data = await parseJsonSafely(response);
+    const periods = data?.periods || [];
+    if (periods.length > 0) {
+      await cacheService.saveGradingSystems(periods);
+    }
+    return periods;
+  } catch (error) {
+    console.warn('[Settings] Network error, loading grading periods from cache:', error);
+    const cached = await cacheService.loadGradingSystems();
+    if (cached) {
+      console.log('[Settings] ✅ Loaded grading periods from cache (offline mode)');
+      return cached as GradingPeriod[];
+    }
+    throw error;
+  }
 };
 
 export const createGradingPeriod = async (name: string, period_type: string = 'custom', start_date?: string, end_date?: string): Promise<any> => {

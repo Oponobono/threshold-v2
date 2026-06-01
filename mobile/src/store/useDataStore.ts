@@ -186,7 +186,11 @@ export const useDataStore = create<DataState>((set, get) => ({
         await cacheService.saveSubjects(data);
       }
     } catch (error) {
-      console.error('Error refreshing subjects:', error);
+      console.error('Error refreshing subjects, fallback to cache:', error);
+      const cached = await cacheService.loadSubjects();
+      if (cached) {
+        set({ subjects: cached as any[] });
+      }
     }
   },
 
@@ -198,7 +202,11 @@ export const useDataStore = create<DataState>((set, get) => ({
         await cacheService.saveAssessments(data);
       }
     } catch (error) {
-      console.error('Error refreshing assessments:', error);
+      console.error('Error refreshing assessments, fallback to cache:', error);
+      const cached = await cacheService.loadAssessments();
+      if (cached) {
+        set({ assessments: cached as Assessment[] });
+      }
     }
   },
 

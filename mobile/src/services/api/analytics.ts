@@ -1,5 +1,6 @@
 import { fetchWithFallback, parseJsonSafely, activeBaseUrl } from './client';
 import { offlineSyncService } from '../../services/offlineSyncService';
+import { cacheService } from '../cacheService';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
@@ -37,13 +38,26 @@ export interface CardReviewResponse {
  * Obtiene las tarjetas de mayor urgencia para revisión predictiva (FSRS)
  */
 export const getPredictions = async (userId: string | number): Promise<PredictionResponse> => {
-  const response = await fetchWithFallback(`/analytics/predictions/${userId}`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) throw new Error('Error al obtener predicciones');
-  const data = await parseJsonSafely(response);
-  return data;
+  try {
+    const response = await fetchWithFallback(`/analytics/predictions/${userId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) throw new Error('Error al obtener predicciones');
+    const data = await parseJsonSafely(response);
+    if (data) {
+      await cacheService.savePredictions(data);
+    }
+    return data;
+  } catch (error) {
+    console.warn('[Analytics] Network error, falling back to cached predictions:', error);
+    const cached = await cacheService.loadPredictions();
+    if (cached) {
+      console.log('[Analytics] ✅ Loaded predictions from cache (offline mode)');
+      return cached as PredictionResponse;
+    }
+    throw error;
+  }
 };
 
 /**
@@ -287,13 +301,26 @@ export const getSemesterSummary = async (): Promise<SemesterSummary> => {
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');
 
-  const response = await fetchWithFallback(`/analytics/semester-summary/${userId}`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) throw new Error('Error al obtener resumen del semestre');
-  const data = await parseJsonSafely(response);
-  return data;
+  try {
+    const response = await fetchWithFallback(`/analytics/semester-summary/${userId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) throw new Error('Error al obtener resumen del semestre');
+    const data = await parseJsonSafely(response);
+    if (data) {
+      await cacheService.saveSemesterSummary(data);
+    }
+    return data;
+  } catch (error) {
+    console.warn('[Analytics] Network error, falling back to cached semester summary:', error);
+    const cached = await cacheService.loadSemesterSummary();
+    if (cached) {
+      console.log('[Analytics] ✅ Loaded semester summary from cache (offline mode)');
+      return cached as SemesterSummary;
+    }
+    throw error;
+  }
 };
 
 export interface MasteryRadarItem {
@@ -348,6 +375,9 @@ export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
       throw new Error(`Error al obtener GPA global: ${errorMsg}`);
     }
     
+    if (data) {
+      await cacheService.saveGlobalGPAAnalytics(data);
+    }
     return data || {
       currentAverage: 0,
       projectedGrade: 0,
@@ -360,6 +390,12 @@ export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`[getGlobalGPAAnalytics] Network error:`, errorMsg);
+    console.warn('[Analytics] Falling back to cached global GPA');
+    const cached = await cacheService.loadGlobalGPAAnalytics();
+    if (cached) {
+      console.log('[Analytics] ✅ Loaded global GPA from cache (offline mode)');
+      return cached as GlobalGPAAnalytics;
+    }
     throw error;
   }
 };

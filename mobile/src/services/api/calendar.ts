@@ -6,6 +6,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { offlineSyncService } from '../offlineSyncService';
+import { cacheService } from '../cacheService';
 
 export interface CalendarEventData {
   title: string;
@@ -83,15 +84,29 @@ export const getCalendarEvents = async (
     url += `&endDate=${endDate}`;
   }
 
-  const response = await fetchWithFallback(url);
+  try {
+    const response = await fetchWithFallback(url);
 
-  if (!response.ok) {
-    const errorData = await parseJsonSafely(response);
-    throw new Error(errorData?.error || 'Error al obtener eventos.');
+    if (!response.ok) {
+      const errorData = await parseJsonSafely(response);
+      throw new Error(errorData?.error || 'Error al obtener eventos.');
+    }
+
+    const data = await parseJsonSafely(response);
+    const events = Array.isArray(data) ? data : [];
+    if (events.length > 0) {
+      await cacheService.saveCalendarEvents(events);
+    }
+    return events;
+  } catch (error) {
+    console.warn('[Calendar] Network error, falling back to cache:', error);
+    const cached = await cacheService.loadCalendarEvents();
+    if (cached && Array.isArray(cached)) {
+      console.log('[Calendar] ✅ Loaded events from cache (offline mode)');
+      return cached as CalendarEvent[];
+    }
+    throw error;
   }
-
-  const data = await parseJsonSafely(response);
-  return Array.isArray(data) ? data : [];
 };
 
 /**

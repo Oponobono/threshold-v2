@@ -81,7 +81,17 @@ export const createScannedDocument = async (
       console.warn('[Documents] Offline: encolando createScannedDocument', error);
       const userId = await getUserId().catch(() => null);
       await offlineSyncService.addPendingOperation('POST', '/scanned_documents', 'document', { ...data, user_id: userId });
-      return { id: -Date.now(), ...data, _isPending: true } as any;
+      const optimisticDoc = { id: -Date.now(), ...data, user_id: userId, _isPending: true };
+      // Persistir en cache local por materia para visibilidad offline inmediata
+      if (data.subject_id) {
+        const existing: any[] | null = await cacheService.loadScannedDocumentsBySubject(data.subject_id) as any[] | null;
+        if (existing) {
+          cacheService.saveScannedDocumentsBySubject(data.subject_id, [optimisticDoc, ...existing]);
+        } else {
+          cacheService.saveScannedDocumentsBySubject(data.subject_id, [optimisticDoc]);
+        }
+      }
+      return optimisticDoc as any;
     }
     throw new Error(error.message || 'Error de red al crear el documento escaneado');
   }

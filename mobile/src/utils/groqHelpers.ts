@@ -116,7 +116,8 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
   }
 
   const { useLocalAIStore } = require('../store/useLocalAIStore');
-  const storedPath = useLocalAIStore.getState().downloadedModels['whisper'];
+  const store = useLocalAIStore.getState();
+  const storedPath = store.downloadedModels['whisper'];
 
   let modelPath: string;
   if (storedPath) {
@@ -131,13 +132,22 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
 
   const info = await FileSystem.getInfoAsync(modelPath);
   if (!info.exists) {
-    if (!useLocalAIStore.getState().forceOfflineMode) {
+    if (!store.forceOfflineMode) {
       console.log('[GroqHelpers] Descargando modelo Whisper Tiny (~75 MB)...');
+
+      const dir = modelPath.substring(0, modelPath.lastIndexOf('/'));
+      const dirInfo = await FileSystem.getInfoAsync(dir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      }
+
       const download = FileSystem.createDownloadResumable(WHISPER_TINY_URL, modelPath, {});
       const result = await download.downloadAsync();
       if (!result?.uri) {
         throw new Error('No se pudo descargar el modelo Whisper. Verifica tu conexión a internet.');
       }
+
+      useLocalAIStore.getState().markModelDownloaded('whisper', result.uri);
     } else {
       throw new Error('Whisper Tiny no está descargado. Descárgalo desde Configuración > Motor de IA local.');
     }

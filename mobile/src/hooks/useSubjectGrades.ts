@@ -52,7 +52,6 @@ export function useSubjectGrades(
 
   // Cliente offline: calcular proyección local cuando no hay conexión
   const isOnline = useConnectivityStore((s) => s.isOnline);
-  const [offlineProjection] = useState(() => calculateProjection(assessments, selectedSubject, profile));
   const offlineFallbackRef = useRef(false);
 
   // Efecto: Cargar datos de proyección del backend cuando la materia cambie o se actualicen assessments

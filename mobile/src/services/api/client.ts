@@ -17,6 +17,7 @@ import Constants from 'expo-constants';
 import { storageService } from '../storageService';
 import { detectAvailableBackend, resetBackendDetectionCache } from './backendDetector';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
+import { useConnectivityStore } from '../../store/useConnectivityStore';
 
 /** Valida que un string tenga formato de dirección IPv4 válida */
 export const isValidIpv4 = (value: string): boolean => {
@@ -242,7 +243,9 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
   const method = init?.method?.toUpperCase() || 'GET';
   
   // 🛡️ Si el modo offline forzado está activo, no hacer llamadas de red
-  const isOffline = useLocalAIStore.getState().forceOfflineMode;
+  const forceOffline = useLocalAIStore.getState().forceOfflineMode;
+  const isGloballyOffline = !useConnectivityStore.getState().isOnline;
+  const isOffline = forceOffline || isGloballyOffline;
   if (isOffline) {
     const isCacheable = method === 'GET';
     const cacheKey = `api_cache_${path}`;
@@ -321,7 +324,7 @@ const cacheKey = `api_cache_${path}`;
         console.warn(`[⚠ API] ${method} ${path} → ${response.status} (${base.split('/api')[0]})`);
       }
       
-      // ✅ Interceptar 304 Not Modified y servir desde caché
+      // ✅ Interceptar 304 Not Modified y servir desde caché (incluso expirado — stale-while-revalidate)
       if (response.status === 304 && isCacheable) {
         console.log(`[Cache] 304 Not Modified interceptado para ${path}. Sirviendo caché local.`);
         const cachedEntry = await storageService.getLocal(cacheKey);
@@ -329,14 +332,14 @@ const cacheKey = `api_cache_${path}`;
           try {
             const parsed = JSON.parse(cachedEntry);
             const age = Date.now() - (parsed.timestamp || 0);
-            if (age <= API_CACHE_TTL_MS) {
-              return new Response(parsed.data, {
-                status: 200,
-                statusText: 'OK',
-                headers: new Headers({ 'Content-Type': 'application/json' })
-              });
+            if (age > API_CACHE_TTL_MS) {
+              console.log(`[Cache] Cache expirado para ${path} (${Math.round(age / 60000)}min), sirviendo stale`);
             }
-            console.log(`[Cache] Cache expirado para ${path}, ignorando 304`);
+            return new Response(parsed.data, {
+              status: 200,
+              statusText: 'OK',
+              headers: new Headers({ 'Content-Type': 'application/json' })
+            });
           } catch {
             // old format without TTL wrapper, serve it anyway
             return new Response(cachedEntry, {
@@ -371,30 +374,29 @@ const cacheKey = `api_cache_${path}`;
   }
 
   // 🛡️ Fallback: Si no hay conexión (fallaron las URLs) y es cacheable, devolvemos del cache local
+  // Stale-while-revalidate: servimos datos incluso si expiraron, porque estando offline
+  // es mejor mostrar datos antiguos que una pantalla vacía.
   if (isCacheable) {
     try {
       const cachedEntry = await storageService.getLocal(cacheKey);
       if (cachedEntry) {
-        let data: string | undefined;
+        let data: string;
         try {
           const parsed = JSON.parse(cachedEntry);
           const age = Date.now() - (parsed.timestamp || 0);
-          if (age <= API_CACHE_TTL_MS) {
-            data = parsed.data;
-          } else {
-            console.log(`[Cache Fallback] Cache expirado para ${path} (${Math.round(age / 60000)}min)`);
+          if (age > API_CACHE_TTL_MS) {
+            console.log(`[Cache Fallback] Cache expirado para ${path} (${Math.round(age / 60000)}min), sirviendo stale`);
           }
+          data = parsed.data;
         } catch {
           data = cachedEntry; // old format
         }
-        if (data) {
-          console.log(`[Cache Fallback] Modo Offline. Sirviendo desde cache: ${path}`);
-          return new Response(data, {
-            status: 200,
-            statusText: 'OK',
-            headers: new Headers({ 'Content-Type': 'application/json' })
-          });
-        }
+        console.log(`[Cache Fallback] Modo Offline. Sirviendo desde cache: ${path}`);
+        return new Response(data, {
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers({ 'Content-Type': 'application/json' })
+        });
       }
     } catch (cacheError) {
       console.error('[Cache Fallback] Error leyendo de cache', cacheError);

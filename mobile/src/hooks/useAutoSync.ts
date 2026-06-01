@@ -4,6 +4,7 @@ import { useDataStore } from '../store/useDataStore';
 import { useConnectivityStore } from '../store/useConnectivityStore';
 import { offlineSyncService } from '../services/offlineSyncService';
 import { useLocalAIStore } from '../store/useLocalAIStore';
+import { performCleanup } from '../services/cacheCleanupService';
 
 export const useAutoSync = () => {
   const { syncPendingOperations, loadAllData } = useDataStore();
@@ -11,7 +12,7 @@ export const useAutoSync = () => {
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const wasOnlineRef = useRef<boolean | null>(null);
   const syncInProgressRef = useRef<boolean>(false);
-  const offlineTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const offlineTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     unsubscribeRef.current = NetInfo.addEventListener((state) => {
@@ -21,13 +22,13 @@ export const useAutoSync = () => {
 
       setOnline(isOnline);
 
-      // Gestionar el toggle automático del modo Offline de la IA tras 60s
+      // Gestionar el toggle automático del modo Offline de la IA tras 10s (estándar UX móvil)
       if (!isOnline) {
         if (!offlineTimeoutRef.current) {
           offlineTimeoutRef.current = setTimeout(() => {
-            console.log('[AutoSync] 60s sin red - activando modo offline IA local automáticamente');
+            console.log('[AutoSync] 10s sin red - activando modo offline IA local automáticamente');
             useLocalAIStore.getState().setForceOfflineMode(true);
-          }, 60000);
+          }, 10000);
         }
       } else {
         if (offlineTimeoutRef.current) {
@@ -58,6 +59,7 @@ export const useAutoSync = () => {
           })
           .then(() => {
             console.log('[AutoSync] ✅ Datos refrescados exitosamente');
+            performCleanup();
           })
           .catch((error) => {
             console.error('[AutoSync] ❌ Error en sincronización automática:', error);

@@ -6,6 +6,8 @@ import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { theme } from '../../styles/theme';
 import { alertRef } from '../ui/CustomAlert';
 import { createAssessment, type Subject } from '../../services/api';
+import { useDataStore } from '../../store/useDataStore';
+import { useConnectivityStore } from '../../store/useConnectivityStore';
 import { ThresholdDatePicker } from '../ui/ThresholdDatePicker';
 import { SubjectSelectorModal } from './SubjectSelectorModal';
 import { CategorySelectorModal } from './CategorySelectorModal';
@@ -21,6 +23,7 @@ interface CreateTaskModalProps {
 
 export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, onTaskCreated }: CreateTaskModalProps) => {
   const { t } = useTranslation();
+  const isOnline = useConnectivityStore(s => s.isOnline);
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
@@ -83,7 +86,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
 
     try {
       setIsSavingTask(true);
-      await createAssessment({
+      const result = await createAssessment({
         subject_id: selectedSubjectId,
         name: taskName.trim(),
         date: taskDate,
@@ -92,8 +95,22 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
         category_id: selectedCategoryId || undefined,
       });
 
-      alertRef.show({ title: t('common.success'), message: t('dashboard.quickAddMenu.task.success'), type: 'success' });
-      await onTaskCreated();
+      if (isOnline) {
+        await onTaskCreated();
+      } else {
+        useDataStore.setState(state => ({
+          assessments: [result, ...state.assessments.filter(a => a.id !== (result as any).id)]
+        }));
+      }
+
+      alertRef.show({
+        title: t('common.success'),
+        message: isOnline
+          ? t('dashboard.quickAddMenu.task.success')
+          : t('dashboard.quickAddMenu.task.offlineSuccess'),
+        type: 'success',
+      });
+
       handleClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.quickAddMenu.task.errorSave'), type: 'error' });

@@ -22,6 +22,8 @@ import {
 import { useSubjectGrades } from './useSubjectGrades';
 import { useAudioRecorder } from './useAudioRecorder';
 import { useDataStore } from '../store/useDataStore';
+import { useConnectivityStore } from '../store/useConnectivityStore';
+import { cacheService } from '../services/cacheService';
 import { useCustomAlert } from '../components/ui/CustomAlert';
 import { generatePdfFromImages } from '../utils/pdfGenerator';
 
@@ -114,6 +116,8 @@ export function useSubjectDetail() {
       if (!hadInitialDataRef.current) setIsLoading(true);
       // Resetear para próximas navegaciones
       hadInitialDataRef.current = false;
+      const isOnline = useConnectivityStore.getState().isOnline;
+
       try {
         const [profileRes, subjectRes, photosRes, docsRes, , schedulesRes, , videosRes] =
           await Promise.allSettled([
@@ -129,24 +133,53 @@ export function useSubjectDetail() {
 
         if (!mounted) return;
 
-        if (profileRes.status === 'fulfilled') setProfile(profileRes.value);
-        // Solo actualizar selectedSubject si la respuesta trae datos válidos
+        if (profileRes.status === 'fulfilled') {
+          setProfile(profileRes.value);
+        } else if (!isOnline) {
+          const cached: UserProfile | null = await cacheService.loadProfile() as UserProfile | null;
+          if (cached) setProfile(cached);
+        }
+
         if (subjectRes.status === 'fulfilled' && subjectRes.value) {
           setSelectedSubject(subjectRes.value as DetailSubject);
         }
-        // Para photos y docs: solo actualizar si hay datos (evitar pisar caché con [])
+
         if (photosRes.status === 'fulfilled' && photosRes.value != null) {
           setPhotos(photosRes.value);
+        } else if (photosRes.status === 'rejected' && !isOnline) {
+          const cached: any[] | null = await cacheService.loadPhotosBySubject(subjectId) as any[] | null;
+          if (cached) setPhotos(cached);
         }
+
         if (docsRes.status === 'fulfilled' && docsRes.value != null) {
           setScannedDocuments(docsRes.value);
+        } else if (docsRes.status === 'rejected' && !isOnline) {
+          const cached: ScannedDocument[] | null = await cacheService.loadScannedDocumentsBySubject(subjectId) as ScannedDocument[] | null;
+          if (cached) setScannedDocuments(cached);
         }
-        if (schedulesRes.status === 'fulfilled') setSubjectSchedules(schedulesRes.value || []);
+
+        if (schedulesRes.status === 'fulfilled') {
+          setSubjectSchedules(schedulesRes.value || []);
+        } else if (schedulesRes.status === 'rejected' && !isOnline) {
+          const store = useDataStore.getState();
+          const cached = store.schedules.filter(s => s.subject_id === subjectId);
+          if (cached.length > 0) setSubjectSchedules(cached);
+        }
+
         if (videosRes.status === 'fulfilled') {
           const videoList = Array.isArray(videosRes.value) ? videosRes.value : [];
           const filtered = videoList.filter(v => v.subject_id == subjectId);
           setAllSubjectVideos(filtered);
           setRecentVideos(filtered.slice(0, 3));
+        } else if (videosRes.status === 'rejected' && !isOnline) {
+          const cached: any[] | null = await cacheService.loadYouTubeVideos() as any[] | null;
+          if (cached) {
+            const filtered: YouTubeVideo[] = cached.filter((v: any) => v.subject_id === subjectId);
+            if (filtered.length > 0) {
+              setAllSubjectVideos(filtered);
+              setRecentVideos(filtered.slice(0, 3));
+            }
+          }
         }
       } catch (err) {
         console.error('Error loading subject data:', err);

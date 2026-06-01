@@ -14,6 +14,7 @@ import '../src/locales/i18n';
 import { useColorScheme } from '@/src/hooks/use-color-scheme';
 import { CustomAlertProvider } from '../src/components/ui/CustomAlert';
 import { useAutoSync } from '../src/hooks/useAutoSync';
+import { useCacheCleanup } from '../src/hooks/useCacheCleanup';
 
 import NetInfo from '@react-native-community/netinfo';
 import { flushOfflineQueue } from '../src/services/offlineQueue';
@@ -50,6 +51,9 @@ export default function RootLayout() {
 
   // Activar sincronización automática cuando recupere internet
   useAutoSync();
+
+  // Limpieza automática de caché al iniciar y periódicamente
+  useCacheCleanup();
 
   useEffect(() => {
     async function prepare() {

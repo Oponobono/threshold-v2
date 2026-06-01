@@ -32,6 +32,8 @@ export const CACHE_KEYS = {
   FLASHCARD_DECKS_WITH_METRICS: 'cache:flashcard_decks_with_metrics',
   CALENDAR_EVENTS: 'cache:calendar_events',
   GRADING_SYSTEMS: 'cache:grading_systems',
+  GLOBAL_GPA: 'cache:global_gpa',
+  SEMESTER_SUMMARY: 'cache:semester_summary',
   YOUTUBE_VIDEOS_BY_SUBJECT: 'cache:youtube_videos_by_subject:',
   AUDIO_RECORDINGS_BY_SUBJECT: 'cache:audio_recordings_by_subject:',
   PHOTOS_BY_SUBJECT: 'cache:photos_by_subject:',
@@ -63,6 +65,8 @@ const CACHE_TTL = {
   FLASHCARD_DECKS: 1000 * 60 * 30,
   FLASHCARD_DECKS_WITH_METRICS: 1000 * 60 * 30,
   CALENDAR_EVENTS: 1000 * 60 * 60,
+  GLOBAL_GPA: 1000 * 60 * 15,
+  SEMESTER_SUMMARY: 1000 * 60 * 15,
   GRADING_SYSTEMS: 1000 * 60 * 60 * 24,
   PHOTOS_BY_SUBJECT: 1000 * 60 * 60,
   SCANNED_DOCUMENTS_BY_SUBJECT: 1000 * 60 * 60,
@@ -205,6 +209,12 @@ export const cacheService = {
 
   saveCalendarEvents: async (events: any[]) => saveToCacheSync(CACHE_KEYS.CALENDAR_EVENTS, events),
   loadCalendarEvents: async () => loadFromCacheSync(CACHE_KEYS.CALENDAR_EVENTS, CACHE_TTL.CALENDAR_EVENTS),
+
+  saveGlobalGPAAnalytics: async (data: any) => saveToCacheSync(CACHE_KEYS.GLOBAL_GPA, data),
+  loadGlobalGPAAnalytics: async () => loadFromCacheSync(CACHE_KEYS.GLOBAL_GPA, CACHE_TTL.GLOBAL_GPA),
+
+  saveSemesterSummary: async (data: any) => saveToCacheSync(CACHE_KEYS.SEMESTER_SUMMARY, data),
+  loadSemesterSummary: async () => loadFromCacheSync(CACHE_KEYS.SEMESTER_SUMMARY, CACHE_TTL.SEMESTER_SUMMARY),
 
   saveGradingSystems: async (systems: any[]) => saveToCacheSync(CACHE_KEYS.GRADING_SYSTEMS, systems),
   loadGradingSystems: async () => loadFromCacheSync(CACHE_KEYS.GRADING_SYSTEMS, CACHE_TTL.GRADING_SYSTEMS),

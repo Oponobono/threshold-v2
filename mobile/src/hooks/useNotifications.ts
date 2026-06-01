@@ -42,6 +42,10 @@ export function useNotifications(
       now.setHours(0, 0, 0, 0);
 
       const scheduleAll = async () => {
+        // Cancelar notificaciones previas antes de reprogramar
+        // Esto evita notificaciones stale cuando datos cambian offline
+        await cancelAllDeadlineNotifications();
+
         // Schedule assessments (tasks, exams, trabajos)
         for (const a of assessments || []) {
           if (a.is_completed || !a.date) continue;

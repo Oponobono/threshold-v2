@@ -68,7 +68,15 @@ export const createAssessment = async (payload: Assessment) => {
     if (isNetworkError) {
       console.warn('[Assessments] Red no disponible, guardando en cola offline:', error);
       await offlineSyncService.addPendingOperation('POST', '/assessments', 'assessment', payload);
-      return { id: -1, ...payload, _isPending: true };
+      const optimisticAssessment = { id: -Date.now(), ...payload, _isPending: true };
+      // Persistir en cache local para visibilidad offline inmediata
+      const existing: any[] | null = await cacheService.loadAssessments() as any[] | null;
+      if (existing) {
+        cacheService.saveAssessments([optimisticAssessment, ...existing]);
+      } else {
+        cacheService.saveAssessments([optimisticAssessment]);
+      }
+      return optimisticAssessment;
     }
     throw error; // errores del servidor se relanzan
   }

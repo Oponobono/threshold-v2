@@ -184,6 +184,7 @@
       "percentage": "Porcentaje (%)",
       "percentagePlaceholder": "Ej: 20",
       "success": "Nota guardada para {{subject}}",
+      "offlineSuccess": "Nota guardada sin conexión para {{subject}} — se sincronizará al conectar",
       "save": "Guardar nota",
       "errorSave": "No pudimos guardar esta nota. Inténtalo de nuevo."
     },
@@ -195,6 +196,7 @@
       "dateFormat": "DD-MM-AAAA",
       "save": "Guardar tarea",
       "success": "Tarea guardada con éxito",
+      "offlineSuccess": "Tarea guardada sin conexión — se sincronizará al conectar",
       "errorSave": "No pudimos guardar esta tarea. Inténtalo de nuevo."
     },
     "errors": {

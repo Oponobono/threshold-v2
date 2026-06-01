@@ -8,6 +8,7 @@ import { globalStyles } from '../../styles/globalStyles';
 import { alertRef } from '../ui/CustomAlert';
 import { createAssessment, type Subject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
+import { useConnectivityStore } from '../../store/useConnectivityStore';
 import { SubjectSelectorModal } from './SubjectSelectorModal';
 import { CategorySelectorModal } from './CategorySelectorModal';
 import { getCategoriesBySubject, type AssessmentCategory } from '../../services/api/assessmentCategories';
@@ -22,6 +23,7 @@ interface CreateGradeModalProps {
 export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId }: CreateGradeModalProps) => {
   const { t } = useTranslation();
   const { refreshSubjects, refreshAssessments } = useDataStore();
+  const isOnline = useConnectivityStore(s => s.isOnline);
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
@@ -65,7 +67,7 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
 
     try {
       setIsSavingGrade(true);
-      await createAssessment({
+      const result = await createAssessment({
         subject_id: selectedSubjectId,
         name: gradeName.trim(),
         grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
@@ -75,10 +77,23 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
         category_id: selectedCategoryId || undefined,
       });
 
+      if (isOnline) {
+        await Promise.all([refreshSubjects(), refreshAssessments()]);
+      } else {
+        useDataStore.setState(state => ({
+          assessments: [result, ...state.assessments.filter(a => a.id !== (result as any).id)]
+        }));
+      }
+
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
-      alertRef.show({ title: t('common.success'), message: t('dashboard.quickAddMenu.grade.success', { subject: subjectName }), type: 'success' });
-      
-      await Promise.all([refreshSubjects(), refreshAssessments()]);
+      alertRef.show({
+        title: t('common.success'),
+        message: isOnline
+          ? t('dashboard.quickAddMenu.grade.success', { subject: subjectName })
+          : t('dashboard.quickAddMenu.grade.offlineSuccess', { subject: subjectName }),
+        type: 'success',
+      });
+
       handleClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.quickAddMenu.grade.errorSave'), type: 'error' });

@@ -61,6 +61,15 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
       console.log('[Flashcards] ✅ Loaded decks with metrics from cache (offline mode)');
       return cached;
     }
+    // Fallback to localFlashcardService if no cached metrics either
+    try {
+      const { getLocalDecks } = require('../localFlashcardService');
+      const local = getLocalDecks();
+      if (local && local.length > 0) {
+        console.log(`[Flashcards] ✅ Loaded ${local.length} local decks as fallback`);
+        return local as any;
+      }
+    } catch (_) {}
     throw error;
   }
 };
@@ -328,6 +337,18 @@ export const deleteFlashcardDeck = async (deckId: number) => {
   } catch (error) {
     console.warn(`[Flashcards] Offline: encolando deleteFlashcardDeck ${deckId}`, error);
     await offlineSyncService.addPendingOperation('DELETE', `/flashcard-decks/${deckId}`, 'flashcard_deck');
+    // Remove from cache immediately for offline visibility
+    const cached = await cacheService.loadFlashcardDecks() as FlashcardDeck[] | null;
+    if (cached) {
+      cacheService.saveFlashcardDecks(cached.filter(d => d.id !== deckId));
+    }
+    const cachedMetrics = await cacheService.loadFlashcardDecksWithMetrics() as FlashcardDeck[] | null;
+    if (cachedMetrics) {
+      cacheService.saveFlashcardDecksWithMetrics(cachedMetrics.filter(d => d.id !== deckId));
+    }
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK + deckId);
+    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK + deckId);
+    cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK + deckId);
     return { success: true, _isPending: true };
   }
 };
@@ -479,17 +500,15 @@ export const deleteFlashcard = async (cardId: number) => {
     });
     const data = await parseJsonSafely(response);
     if (!response.ok) throw new Error(data?.error || 'Error al eliminar la tarjeta');
-    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_BY_DECK);
-    cacheService.clearKey(CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK);
-    cacheService.clearKey(CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK);
-    return data;
-  } catch (error) {
-    console.warn(`[Flashcards] Offline: encolando deleteFlashcard para card ${cardId}`, error);
-    await offlineSyncService.addPendingOperation(
-      'DELETE',
-      `/flashcards/${cardId}`,
-      'flashcard_delete'
-    );
-    return { success: true, _isPending: true };
-  }
-};
+      return data;
+    } catch (error) {
+      console.warn(`[Flashcards] Offline: encolando delete card ${cardId}`, error);
+      await offlineSyncService.addPendingOperation(
+        'DELETE',
+        `/flashcards/${cardId}`,
+        'flashcard_delete'
+      );
+      return { success: true, _isPending: true };
+    }
+  };
+

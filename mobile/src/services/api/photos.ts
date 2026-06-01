@@ -62,11 +62,19 @@ export const createPhoto = async (photoData: {
     );
     
     // Retornar objeto temporal para que la UI sea optimista
-    return {
-      id: -1, // ID temporal
+    const optimisticPhoto = {
+      id: -Date.now(), // ID temporal único
       ...photoData,
       _isPending: true, // Bandera para UI
     };
+    // Persistir en cache local por materia para visibilidad offline inmediata
+    const existing: any[] | null = await cacheService.loadPhotosBySubject(photoData.subject_id) as any[] | null;
+    if (existing) {
+      cacheService.savePhotosBySubject(photoData.subject_id, [optimisticPhoto, ...existing]);
+    } else {
+      cacheService.savePhotosBySubject(photoData.subject_id, [optimisticPhoto]);
+    }
+    return optimisticPhoto;
   }
 };
 

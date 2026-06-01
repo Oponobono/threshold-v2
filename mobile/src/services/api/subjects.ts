@@ -115,8 +115,8 @@ export const createSubject = async (payload: {
     );
     
     // Retornar objeto temporal con datos del payload para que la UI sea optimista
-    return {
-      id: -1, // ID temporal
+    const optimisticSubject = {
+      id: -Date.now(), // ID temporal único
       user_id: Number(userId),
       name: payload.name,
       code: '',
@@ -129,7 +129,15 @@ export const createSubject = async (payload: {
       completion_percent: 0,
       credits: payload.credits || 0,
       _isPending: true, // Bandera para UI
-    } as any;
+    };
+    // Persistir en cache local para visibilidad offline inmediata
+    const existing = cacheService.loadSubjectsSync() as any[] | null;
+    if (existing) {
+      cacheService.saveSubjects([optimisticSubject, ...existing]);
+    } else {
+      cacheService.saveSubjects([optimisticSubject]);
+    }
+    return optimisticSubject as any;
   }
 };
 
