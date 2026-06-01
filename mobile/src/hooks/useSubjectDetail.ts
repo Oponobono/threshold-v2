@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -44,15 +44,25 @@ export function useSubjectDetail() {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }, [params.subjectId]);
 
+  // ── Hydratación instantánea desde el store Zustand (ya cargado por MMKV) ────
+  // Esto evita que la pantalla muestre datos vacíos mientras la red responde.
+  const immediateSubject = useMemo(() => {
+    if (!subjectId) return null;
+    return (storeSubjects.find(s => s.id === subjectId) as DetailSubject) ?? null;
+  }, [subjectId, storeSubjects]);
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState<DetailSubject | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<DetailSubject | null>(immediateSubject);
   const [subjectSchedules, setSubjectSchedules] = useState<any[]>([]);
   const [photos, setPhotos] = useState<any[]>([]);
   const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>([]);
   const [allSubjects] = useState<Subject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Si ya tenemos el sujeto en caché, no mostramos el spinner de carga inicial.
+  const [isLoading, setIsLoading] = useState(immediateSubject === null);
   const [isDetailLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  // Ref para saber si ya tenemos datos al entrar (evita closure stale en effect)
+  const hadInitialDataRef = useRef(immediateSubject !== null);
 
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
@@ -86,13 +96,24 @@ export function useSubjectDetail() {
 
   const recentRecordings = useMemo(() => allSubjectRecordings.slice(0, 3), [allSubjectRecordings]);
 
-  // Data loading
+  // Sync immediateSubject → selectedSubject cuando cambia el subjectId
+  // (navegación entre materias sin desmontar el componente)
+  useEffect(() => {
+    if (immediateSubject && !selectedSubject) {
+      setSelectedSubject(immediateSubject);
+    }
+  }, [immediateSubject, selectedSubject]);
+
+  // Data loading — Network First con fallback al caché ya aplicado en cada API
   useEffect(() => {
     let mounted = true;
 
     const loadAllData = async () => {
       if (!subjectId) return;
-      setIsLoading(true);
+      // Solo mostrar spinner si no tenemos datos de caché previos
+      if (!hadInitialDataRef.current) setIsLoading(true);
+      // Resetear para próximas navegaciones
+      hadInitialDataRef.current = false;
       try {
         const [profileRes, subjectRes, photosRes, docsRes, , schedulesRes, , videosRes] =
           await Promise.allSettled([
@@ -109,9 +130,17 @@ export function useSubjectDetail() {
         if (!mounted) return;
 
         if (profileRes.status === 'fulfilled') setProfile(profileRes.value);
-        if (subjectRes.status === 'fulfilled') setSelectedSubject(subjectRes.value as DetailSubject);
-        if (photosRes.status === 'fulfilled') setPhotos(photosRes.value || []);
-        if (docsRes.status === 'fulfilled') setScannedDocuments(docsRes.value || []);
+        // Solo actualizar selectedSubject si la respuesta trae datos válidos
+        if (subjectRes.status === 'fulfilled' && subjectRes.value) {
+          setSelectedSubject(subjectRes.value as DetailSubject);
+        }
+        // Para photos y docs: solo actualizar si hay datos (evitar pisar caché con [])
+        if (photosRes.status === 'fulfilled' && photosRes.value != null) {
+          setPhotos(photosRes.value);
+        }
+        if (docsRes.status === 'fulfilled' && docsRes.value != null) {
+          setScannedDocuments(docsRes.value);
+        }
         if (schedulesRes.status === 'fulfilled') setSubjectSchedules(schedulesRes.value || []);
         if (videosRes.status === 'fulfilled') {
           const videoList = Array.isArray(videosRes.value) ? videosRes.value : [];

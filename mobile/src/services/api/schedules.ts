@@ -81,11 +81,29 @@ export const deleteSchedule = async (id: number) => {
 };
 
 /**
- * Obtiene horarios por materia
+ * Obtiene horarios por materia.
+ * Fallback offline: busca en el caché MMKV de schedules globales.
  */
 export const getSchedulesBySubject = async (subjectId: number): Promise<any[]> => {
-  const response = await fetchWithFallback(`/schedules/subject/${subjectId}`);
-  return (await parseJsonSafely(response)) || [];
+  try {
+    const response = await fetchWithFallback(`/schedules/subject/${subjectId}`);
+    const data = await parseJsonSafely(response);
+    if (response.ok && Array.isArray(data)) {
+      return data;
+    }
+    throw new Error(`HTTP ${response.status}`);
+  } catch (error) {
+    console.warn(`[Schedules] getSchedulesBySubject(${subjectId}) falló, buscando en caché MMKV...`);
+    try {
+      const cached = cacheService.loadSchedulesSync() as any[] | null;
+      if (Array.isArray(cached)) {
+        return cached.filter(s => String(s.subject_id) === String(subjectId));
+      }
+    } catch (cacheError) {
+      console.error('[Schedules] Error al leer caché MMKV:', cacheError);
+    }
+    return [];
+  }
 };
 
 /**

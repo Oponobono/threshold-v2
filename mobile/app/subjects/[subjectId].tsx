@@ -354,7 +354,8 @@ export default function SubjectDetailScreen() {
         />
       )}
 
-      {isReady && selectedSubject && (
+      {/* FAB de Zyren: aparece en cuanto la materia está disponible (caché MMKV instantáneo) */}
+      {!!selectedSubject && (
         <SubjectAIFab
           subjectId={subjectId || undefined}
           userId={profile?.id || undefined}

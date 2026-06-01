@@ -9,6 +9,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { offlineSyncService } from '../offlineSyncService';
+import { cacheService } from '../../services/cacheService';
 
 /** Representa un documento escaneado vinculado a una materia y guardado localmente */
 export interface ScannedDocument {
@@ -22,20 +23,34 @@ export interface ScannedDocument {
   created_at?: string;
 }
 
-/** Obtiene todos los documentos escaneados de una materia específica */
+/** Obtiene todos los documentos escaneados de una materia específica.
+ * Fallback offline: lee del caché MMKV por materia.
+ */
 export const getScannedDocumentsBySubject = async (subjectId: number | string): Promise<ScannedDocument[]> => {
   try {
     const response = await fetchWithFallback(`/scanned_documents/subject/${subjectId}`);
     const data = await parseJsonSafely(response);
     if (!response.ok) {
-      const errorMsg = data?.error || `HTTP ${response.status}: ${response.statusText}`;
-      console.warn(`[getScannedDocumentsBySubject] Server error for subject ${subjectId}:`, errorMsg);
-      return [];
+      throw new Error(`HTTP ${response.status}`);
     }
-    return data || [];
+    const docs: ScannedDocument[] = data || [];
+    // Persistir datos frescos en caché MMKV para uso offline
+    if (docs.length > 0) {
+      await cacheService.saveScannedDocumentsBySubject(Number(subjectId), docs);
+    }
+    return docs;
   } catch (error: any) {
-    const errorMsg = error instanceof Error ? error.message : (error && typeof error === 'object' ? JSON.stringify(error) : String(error) || 'Unknown network error');
-    console.warn(`[getScannedDocumentsBySubject] Network error for subject ${subjectId}:`, errorMsg);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.warn(`[getScannedDocumentsBySubject] Red no disponible (${errorMsg}), leyendo caché MMKV...`);
+    try {
+      const cached = await cacheService.loadScannedDocumentsBySubject(Number(subjectId));
+      if (Array.isArray(cached)) {
+        console.log(`[getScannedDocumentsBySubject] ✅ ${cached.length} docs desde caché para materia ${subjectId}`);
+        return cached as ScannedDocument[];
+      }
+    } catch (cacheError) {
+      console.error('[getScannedDocumentsBySubject] Error leyendo caché:', cacheError);
+    }
     return [];
   }
 };

@@ -242,8 +242,49 @@ exports.deleteDeck = (req, res) => {
 };
 
 /**
- * Elimina un mazo compartido de un grupo (solo owner del mazo o admin del grupo)
+ * Actualiza un mazo de flashcards existente (título, descripción, subject_id)
  */
+exports.updateFlashcardDeck = (req, res) => {
+  const { deckId } = req.params;
+  const userId = req.user.id;
+  const { title, description, subject_id } = req.body;
+
+  if (!title && description === undefined && subject_id === undefined) {
+    return res.status(400).json({ error: 'No hay campos para actualizar.' });
+  }
+
+  db.get(`SELECT user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
+    if (Number(deck.user_id) !== Number(userId)) {
+      return res.status(403).json({ error: 'No tienes permiso para editar este mazo.' });
+    }
+
+    const fields = [];
+    const values = [];
+    if (title !== undefined)       { fields.push('title = ?');       values.push(title); }
+    if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+    if (subject_id !== undefined)  { fields.push('subject_id = ?');  values.push(subject_id); }
+
+    values.push(deckId);
+
+    db.run(
+      `UPDATE flashcard_decks SET ${fields.join(', ')} WHERE id = ?`,
+      values,
+      function(updateErr) {
+        if (updateErr) return res.status(500).json({ error: updateErr.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Mazo no encontrado.' });
+
+        db.get(`SELECT * FROM flashcard_decks WHERE id = ?`, [deckId], (fetchErr, updated) => {
+          if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+          res.json(updated);
+        });
+      }
+    );
+  });
+};
+
+
 exports.removeDeckFromGroup = (req, res) => {
   const { deckId } = req.params;
   const user_id = req.user.id;

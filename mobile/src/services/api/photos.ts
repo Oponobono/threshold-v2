@@ -10,6 +10,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Photo } from './types';
 import { offlineSyncService } from '../offlineSyncService';
+import { cacheService } from '../../services/cacheService';
 
 /**
  * Obtiene ítems de la galería
@@ -70,21 +71,34 @@ export const createPhoto = async (photoData: {
 };
 
 /**
- * Obtiene las fotos de una materia específica
+ * Obtiene las fotos de una materia específica.
+ * Fallback offline: lee del caché MMKV por materia.
  */
 export const getPhotosBySubject = async (subjectId: number): Promise<Photo[]> => {
   try {
     const response = await fetchWithFallback(`/photos/${subjectId}`);
     const data = await parseJsonSafely(response);
     if (!response.ok) {
-      const errorMsg = data?.error || `HTTP ${response.status}: ${response.statusText}`;
-      console.warn(`[getPhotosBySubject] Server error for subject ${subjectId}:`, errorMsg);
-      return [];
+      throw new Error(`HTTP ${response.status}`);
     }
-    return data || [];
+    const photos: Photo[] = data || [];
+    // Persistir datos frescos en caché MMKV para uso offline
+    if (photos.length > 0) {
+      await cacheService.savePhotosBySubject(subjectId, photos);
+    }
+    return photos;
   } catch (error: any) {
-    const errorMsg = error instanceof Error ? error.message : (error && typeof error === 'object' ? JSON.stringify(error) : String(error) || 'Unknown network error');
-    console.warn(`[getPhotosBySubject] Network error for subject ${subjectId}:`, errorMsg);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.warn(`[getPhotosBySubject] Red no disponible (${errorMsg}), leyendo caché MMKV...`);
+    try {
+      const cached = await cacheService.loadPhotosBySubject(subjectId);
+      if (Array.isArray(cached)) {
+        console.log(`[getPhotosBySubject] ✅ ${cached.length} fotos desde caché para materia ${subjectId}`);
+        return cached as Photo[];
+      }
+    } catch (cacheError) {
+      console.error('[getPhotosBySubject] Error leyendo caché:', cacheError);
+    }
     return [];
   }
 };

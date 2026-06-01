@@ -13,12 +13,38 @@ import { cacheService, CACHE_KEYS } from '../../services/cacheService';
 import { offlineSyncService } from '../offlineSyncService';
 
 /**
- * Obtiene una materia específica
+ * Obtiene una materia específica.
+ * Estrategia: Network First con fallback al caché MMKV de subjects cuando la red falla.
+ * Esto garantiza que la pantalla de detalle de materia no quede vacía en modo offline.
  */
 export const getSubjectById = async (subjectId: number | string): Promise<Subject | null> => {
-  const response = await fetchWithFallback(`/subject/${subjectId}`);
-  if (!response.ok) return null;
-  return await parseJsonSafely(response);
+  try {
+    const response = await fetchWithFallback(`/subject/${subjectId}`);
+    if (response.ok) {
+      const data = await parseJsonSafely(response);
+      return data;
+    }
+    // Si la respuesta no es ok, intentar caché MMKV
+    throw new Error(`HTTP ${response.status}`);
+  } catch (error) {
+    // Fallback: buscar en el caché MMKV de subjects
+    console.warn(`[Subjects] getSubjectById(${subjectId}) falló (${(error as Error)?.message}), buscando en caché MMKV...`);
+    try {
+      const cached = cacheService.loadSubjectsSync() as Subject[] | null;
+      if (Array.isArray(cached)) {
+        const found = cached.find(s => String(s.id) === String(subjectId)) ?? null;
+        if (found) {
+          console.log(`[Subjects] ✅ Materia ${subjectId} encontrada en caché MMKV`);
+        } else {
+          console.warn(`[Subjects] ⚠️ Materia ${subjectId} NO encontrada en caché MMKV`);
+        }
+        return found;
+      }
+    } catch (cacheError) {
+      console.error('[Subjects] Error al leer caché MMKV:', cacheError);
+    }
+    return null;
+  }
 };
 
 /**
