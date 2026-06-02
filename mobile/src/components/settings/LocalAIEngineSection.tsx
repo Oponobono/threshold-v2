@@ -460,8 +460,6 @@ export const LocalAIEngineSection = () => {
           borderRadius: 8,
           padding: 12,
           marginBottom: 12,
-          borderLeftWidth: 3,
-          borderLeftColor: '#D4A056',
         }}>
           <Text style={{ color: '#E8D5B7', fontSize: 13, lineHeight: 19, marginBottom: 6 }}>
             {t('settings.localAI.offlineBannerPrivacy')}
@@ -509,8 +507,6 @@ export const LocalAIEngineSection = () => {
           padding: 12,
           marginTop: 16,
           marginBottom: 8,
-          borderLeftWidth: 3,
-          borderLeftColor: deviceTier === 'low' ? '#D45656' : '#56D46A',
         }}>
           <Text style={{ color: '#E8D5B7', fontSize: 13, fontWeight: '600', marginBottom: 4 }}>
             {deviceTier === 'low'
@@ -743,8 +739,6 @@ export const LocalAIEngineSection = () => {
         padding: 12,
         marginTop: 16,
         marginBottom: 8,
-        borderLeftWidth: 3,
-        borderLeftColor: '#56D46A',
       }}>
         <Text style={{ color: '#E8D5B7', fontSize: 13, fontWeight: '600', marginBottom: 10 }}>
           {t('settings.localAI.storageTitle')}
@@ -826,13 +820,8 @@ export const LocalAIEngineSection = () => {
           </Text>
         )}
 
-        <View style={{ marginTop: 12, marginBottom: 0 }}>
-          <Text style={{ 
-            color: '#C4B8A8', 
-            fontSize: 11, 
-            fontWeight: '600',
-            marginBottom: 8,
-          }}>
+        <View style={{ marginTop: 14, marginBottom: 4 }}>
+          <Text style={[styles.subSectionTitle, { marginTop: 0, marginBottom: 8 }]}>
             {t('settings.localAI.offlineCapabilitiesTitle')}
           </Text>
           {[
@@ -842,13 +831,8 @@ export const LocalAIEngineSection = () => {
             'capabilityFlashcards',
           ].map((cap) => (
             <View key={cap} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4, gap: 6 }}>
-              <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 20 }}>{'•'}</Text>
-              <Text style={{ 
-                color: '#C4B8A8', 
-                fontSize: 12, 
-                lineHeight: 20,
-                flex: 1,
-              }}>
+              <Text style={{ color: theme.colors.text.secondary, fontSize: 12, lineHeight: 20 }}>{'•'}</Text>
+              <Text style={[styles.settingDesc, { flex: 1, lineHeight: 20 }]}>
                 {t(`settings.localAI.${cap}`)}
               </Text>
             </View>
@@ -856,22 +840,11 @@ export const LocalAIEngineSection = () => {
         </View>
 
         <TouchableOpacity
-          style={{
-            marginTop: 12,
-            paddingVertical: 8,
-            paddingHorizontal: 12,
-            backgroundColor: 'rgba(212, 86, 86, 0.9)',
-            borderRadius: 4,
-            alignSelf: 'flex-start',
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
+          style={[styles.darkPill, { backgroundColor: theme.colors.danger, marginTop: 8 }]}
           onPress={handlePurgeCache}
         >
-          <Ionicons name="trash-outline" size={13} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 11 }}>
-            {t('settings.localAI.purgeCache')}
-          </Text>
+          <Ionicons name="trash-outline" size={14} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={styles.darkPillText}>{t('settings.localAI.purgeCache')}</Text>
         </TouchableOpacity>
       </View>
     </View>
