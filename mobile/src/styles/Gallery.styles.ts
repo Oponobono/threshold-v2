@@ -147,7 +147,7 @@ export const galleryStyles = StyleSheet.create({
   },
   subjectDot: { width: 8, height: 8, borderRadius: 4 },
   ocrOverlay: {
-    position: 'absolute', top: 8, right: 8,
+    position: 'absolute', top: 8, right: 38,
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: theme.colors.background + 'ee',
     paddingHorizontal: 7, paddingVertical: 3,
