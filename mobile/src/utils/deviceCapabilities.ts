@@ -48,6 +48,8 @@ async function getProcMeminfo(): Promise<RamInfo | null> {
 
   return null;
 }
+
+function getNativeRamMB(): number | null {
   if (Platform.OS === 'android') {
     try {
       const { RNDeviceInfo } = NativeModules;
@@ -60,7 +62,7 @@ async function getProcMeminfo(): Promise<RamInfo | null> {
       }
     } catch {}
   }
-  
+
   if (Platform.OS === 'ios') {
     try {
       // En iOS, intentar obtener del NativeModules
@@ -71,7 +73,7 @@ async function getProcMeminfo(): Promise<RamInfo | null> {
       }
     } catch {}
   }
-  
+
   return null;
 }
 
