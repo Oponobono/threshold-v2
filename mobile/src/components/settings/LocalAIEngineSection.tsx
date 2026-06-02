@@ -514,8 +514,11 @@ export const LocalAIEngineSection = () => {
             ? t('settings.localAI.midRamTitle', '📱 Dispositivo de gama media')
             : t('settings.localAI.highRamTitle', '📱 Dispositivo de gama alta')}
         </Text>
+        <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17, marginBottom: 4 }}>
+          <Text style={{ fontWeight: '600' }}>Total:</Text> {deviceRamGB}GB · <Text style={{ fontWeight: '600' }}>Disponible:</Text> {deviceAvailableRamGB}GB
+        </Text>
         <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17, marginBottom: 6 }}>
-          <Text style={{ fontWeight: '600' }}>Total:</Text> {deviceRamGB}GB · <Text style={{ fontWeight: '600' }}>Disponible:</Text> {deviceAvailableRamGB}GB · <Text style={{ fontWeight: '600', color: '#56D46A' }}>Utilizable:</Text> {deviceUsableRamGB}GB
+          <Text style={{ fontWeight: '600', color: '#56D46A' }}>Utilizable:</Text> {deviceUsableRamGB}GB
         </Text>
         <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17 }}>
           {deviceTier === 'low'
@@ -640,7 +643,7 @@ export const LocalAIEngineSection = () => {
                 {!isCompatible && !isDownloaded ? (
                   <View style={{ flex: 1, paddingVertical: 4 }}>
                     <Text style={{ fontSize: 11, color: '#FF5050', textAlign: 'center' }}>
-                      {t('settings.localAI.incompatibleRam', `Requiere ${model.ramMin}GB · Tienes ${deviceUsableRamGB}GB utilizable`)}
+                      {t('settings.localAI.incompatibleRam', `Requiere ${model.ramMin} · Tienes ${deviceUsableRamGB}GB utilizable`)}
                     </Text>
                   </View>
                 ) : isDownloaded ? (
