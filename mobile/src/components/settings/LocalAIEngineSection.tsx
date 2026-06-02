@@ -512,22 +512,18 @@ export const LocalAIEngineSection = () => {
             ? t('settings.localAI.lowRamTitle', '📱 Dispositivo de gama baja')
             : deviceTier === 'mid'
             ? t('settings.localAI.midRamTitle', '📱 Dispositivo de gama media')
-            : deviceTier === 'high'
-            ? t('settings.localAI.highRamTitle', '📱 Dispositivo de gama alta')
-            : t('settings.localAI.detectingDeviceTitle', '📱 Detectando capacidades...')}
+            : t('settings.localAI.highRamTitle', '📱 Dispositivo de gama alta')}
         </Text>
         <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17, marginBottom: 6 }}>
-          <Text style={{ fontWeight: '600' }}>Total:</Text> {deviceRamGB || '?'}GB · <Text style={{ fontWeight: '600' }}>Disponible:</Text> {deviceAvailableRamGB || '?'}GB · <Text style={{ fontWeight: '600', color: '#56D46A' }}>Utilizable:</Text> {deviceUsableRamGB || '?'}GB
+          <Text style={{ fontWeight: '600' }}>Total:</Text> {deviceRamGB}GB · <Text style={{ fontWeight: '600' }}>Disponible:</Text> {deviceAvailableRamGB}GB · <Text style={{ fontWeight: '600', color: '#56D46A' }}>Utilizable:</Text> {deviceUsableRamGB}GB
         </Text>
-        {deviceTier && (
-          <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17 }}>
-            {deviceTier === 'low'
-              ? t('settings.localAI.lowRamDesc', 'Solo modelos esenciales (Llama 3.2 1B) para evitar cierres por falta de memoria.')
-              : deviceTier === 'mid'
-              ? t('settings.localAI.midRamDesc', 'Compatible con modelos de hasta 2B de parámetros.')
-              : t('settings.localAI.highRamDesc', 'Compatible con todos los modelos disponibles.')}
-          </Text>
-        )}
+        <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17 }}>
+          {deviceTier === 'low'
+            ? t('settings.localAI.lowRamDesc', 'Solo modelos esenciales (Llama 3.2 1B) para evitar cierres por falta de memoria.')
+            : deviceTier === 'mid'
+            ? t('settings.localAI.midRamDesc', 'Compatible con modelos de hasta 2B de parámetros.')
+            : t('settings.localAI.highRamDesc', 'Compatible con todos los modelos disponibles.')}
+        </Text>
         <TouchableOpacity
           style={{
             marginTop: 8,

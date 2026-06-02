@@ -224,7 +224,7 @@ async function persistHydrate(store: { setState: (s: Partial<LocalAIState>) => v
 
     // Detectar capacidades del dispositivo para validar modelos
     getDeviceCapabilities().then((caps) => {
-      console.log('[useLocalAIStore] Device capabilities detected:', {
+      console.log('[Device Capabilities] Detectadas:', {
         tier: caps.tier,
         totalRamGB: caps.totalRamGB,
         availableRamGB: caps.availableRamGB,
@@ -243,18 +243,10 @@ async function persistHydrate(store: { setState: (s: Partial<LocalAIState>) => v
       if (currentId && !caps.compatibleModels.includes(currentId)) {
         const recommended = caps.recommendedModel;
         store.getState().setActiveModel(recommended);
-        console.warn(`[useLocalAIStore] Dispositivo ${caps.tier} (${caps.usableRamGB}GB utilizable): modelo ${currentId} no compatible, cambiando a ${recommended}`);
+        console.warn(`[Device Capabilities] Dispositivo ${caps.tier} (${caps.usableRamGB}GB utilizable): modelo ${currentId} no compatible, cambiando a ${recommended}`);
       }
     }).catch((err) => {
-      console.error('[useLocalAIStore] Error getting device capabilities:', err);
-      // Fallback: asignar valores por defecto basados en la RAM estimada
-      store.setState({
-        deviceTier: 'mid',
-        deviceCompatibleModels: ['essential', 'advanced'],
-        deviceRamGB: 4,
-        deviceAvailableRamGB: 3,
-        deviceUsableRamGB: 2.4,
-      });
+      console.warn('[Device Capabilities] Error al detectar, usando valores por defecto:', err);
     });
   } catch {
     // Si falla, igual resolvemos para no bloquear
@@ -278,11 +270,11 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
     downloadedBytes: 0,
     errorMessage: null,
     storageUsedBytes: 0,
-    deviceTier: null,
-    deviceCompatibleModels: [],
-    deviceRamGB: 0,
-    deviceAvailableRamGB: 0,
-    deviceUsableRamGB: 0,
+    deviceTier: 'mid', // Valor por defecto inicial (se actualizará cuando se detecten capacidades reales)
+    deviceCompatibleModels: ['essential', 'advanced'],
+    deviceRamGB: 4,
+    deviceAvailableRamGB: 3,
+    deviceUsableRamGB: 2.4,
 
   setDeviceTier: (tier) => set({ deviceTier: tier }),
 
