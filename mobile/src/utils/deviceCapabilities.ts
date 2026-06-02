@@ -18,11 +18,18 @@ async function getAndroidTotalRamMB(): Promise<number> {
 
   // Intentar leer /proc/meminfo vía expo-file-system
   try {
-    const content = await FileSystem.readAsStringAsync('/proc/meminfo');
+    const content = await FileSystem.readAsStringAsync('file:///proc/meminfo');
     const match = content.match(/MemTotal:\s*(\d+)\s*kB/);
     if (match) {
       return Math.round(parseInt(match[1], 10) / 1024);
     }
+  } catch {}
+
+  // Intento con polyfill de OS si existe
+  try {
+    const os = require('os');
+    const totalMem = os?.totalmem?.();
+    if (totalMem && totalMem > 0) return Math.round(totalMem / (1024 * 1024));
   } catch {}
 
   // Fallback: inferir del API level
