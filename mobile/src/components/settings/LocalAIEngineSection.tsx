@@ -58,6 +58,9 @@ export const LocalAIEngineSection = () => {
   const downloadedModels = useLocalAIStore((s) => s.downloadedModels);
   const storageUsedBytes = useLocalAIStore((s) => s.storageUsedBytes);
   const inferenceStatus = useLocalAIStore((s) => s.inferenceStatus);
+  const deviceTier = useLocalAIStore((s) => s.deviceTier);
+  const deviceCompatibleModels = useLocalAIStore((s) => s.deviceCompatibleModels);
+  const deviceRamGB = useLocalAIStore((s) => s.deviceRamGB);
 
   const setForceOfflineMode = useLocalAIStore((s) => s.setForceOfflineMode);
   const setActiveModel = useLocalAIStore((s) => s.setActiveModel);
@@ -493,6 +496,37 @@ export const LocalAIEngineSection = () => {
       </View>
 
       {/* ─────────────────────────── */}
+      {/* Banner de Capacidades del Dispositivo */}
+      {/* ─────────────────────────── */}
+      {deviceTier && (
+        <View style={{
+          backgroundColor: deviceTier === 'low' ? '#2A2020' : '#1E2A20',
+          borderRadius: 8,
+          padding: 12,
+          marginTop: 16,
+          marginBottom: 8,
+          borderLeftWidth: 3,
+          borderLeftColor: deviceTier === 'low' ? '#D45656' : '#56D46A',
+        }}>
+          <Text style={{ color: '#E8D5B7', fontSize: 13, fontWeight: '600', marginBottom: 4 }}>
+            {deviceTier === 'low'
+              ? t('settings.localAI.lowRamTitle', '📱 Dispositivo de gama baja')
+              : deviceTier === 'mid'
+              ? t('settings.localAI.midRamTitle', '📱 Dispositivo de gama media')
+              : t('settings.localAI.highRamTitle', '📱 Dispositivo de gama alta')}
+          </Text>
+          <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17 }}>
+            {t('settings.localAI.ramDetected', `RAM detectada: ~${deviceRamGB}GB · `)}
+            {deviceTier === 'low'
+              ? t('settings.localAI.lowRamDesc', 'Solo modelos esenciales (Llama 3.2 1B) para evitar cierres por falta de memoria.')
+              : deviceTier === 'mid'
+              ? t('settings.localAI.midRamDesc', 'Compatible con modelos de hasta 2B de parámetros.')
+              : t('settings.localAI.highRamDesc', 'Compatible con todos los modelos disponibles.')}
+          </Text>
+        </View>
+      )}
+
+      {/* ─────────────────────────── */}
       {/* BLOQUE 2: Catálogo de Modelos */}
       {/* ─────────────────────────── */}
       <View style={{ marginTop: 16 }}>
@@ -503,16 +537,28 @@ export const LocalAIEngineSection = () => {
           const isDownloading = isDownloadingModel(modelId);
           const isActive = activeModelId === modelId;
           const progress = typeof downloadProgress === 'object' ? (downloadProgress[modelId] || 0) : 0;
+          const isCompatible = deviceCompatibleModels.length === 0 || deviceCompatibleModels.includes(modelId);
 
           return (
             <View
               key={modelId}
-              style={[styles.modelCard, isActive && styles.modelCardActive]}
+              style={[
+                styles.modelCard,
+                isActive && styles.modelCardActive,
+                !isCompatible && { opacity: 0.5, borderColor: 'rgba(255,80,80,0.3)' },
+              ]}
             >
               {/* Header */}
               <View style={styles.modelCardHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.modelCardTitle}>{model.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.modelCardTitle}>{model.label}</Text>
+                    {!isCompatible && (
+                      <Text style={{ fontSize: 10, color: '#FF5050', fontWeight: '700' }}>
+                        ⚠️
+                      </Text>
+                    )}
+                  </View>
                   <Text style={styles.modelCardTag}>{t(model.labelTag)}</Text>
                 </View>
                 {isActive && (
@@ -560,7 +606,13 @@ export const LocalAIEngineSection = () => {
 
               {/* Acciones */}
               <View style={styles.modelCardActions}>
-                {isDownloaded ? (
+                {!isCompatible && !isDownloaded ? (
+                  <View style={{ flex: 1, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 11, color: '#FF5050', textAlign: 'center' }}>
+                      {t('settings.localAI.incompatibleRam', `Requiere ${model.ramMin} RAM · tu dispositivo tiene ~${deviceRamGB}GB`)}
+                    </Text>
+                  </View>
+                ) : isDownloaded ? (
                   <>
                     {!isActive ? (
                       <TouchableOpacity

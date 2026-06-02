@@ -1,10 +1,11 @@
 import { cacheService, saveToCacheSync, loadFromCacheSync, CACHE_KEYS } from './cacheService';
-import { useDataStore } from '../store/useDataStore';
+import { getUserId } from './api';
 
-let _localIdCounter = -1;
+let _localIdCounter = -Date.now();
 
 function nextLocalId(): number {
-  return _localIdCounter--;
+  _localIdCounter -= 1;
+  return _localIdCounter;
 }
 
 export interface LocalCard {
@@ -38,19 +39,19 @@ function saveLocalDecks(decks: LocalDeck[]): void {
   saveToCacheSync(LOCAL_DECKS_KEY, decks);
 }
 
-export function saveImportedDeck(
+export async function saveImportedDeck(
   title: string,
   description: string | undefined,
   cards: LocalCard[],
   subject_id: number | null,
-): LocalDeck {
+): Promise<LocalDeck> {
   const deck: LocalDeck = {
     id: nextLocalId(),
     title: title.trim(),
     description: description?.trim() || '',
     subject_id,
     card_count: cards.length,
-    user_id: useDataStore.getState().userProfile?.id || 0,
+    user_id: Number(await getUserId()) || 0,
     created_at: new Date().toISOString(),
     review_count: 0,
     learning_count: 0,

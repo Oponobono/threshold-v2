@@ -28,6 +28,8 @@ import { useLocalAIStore } from '../../store/useLocalAIStore';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
+import { MarkdownWithCode } from '../ui/MarkdownWithCode';
+import { Image as RNImage } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useTranslation } from 'react-i18next';
 import { OfflineIndicator } from '../ui/OfflineIndicator';
@@ -187,9 +189,10 @@ const parseMarkdownTable = (text: string) => {
 };
 
 // ─── Burbuja de mensaje ───────────────────────────────────────────────────────
-const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
+const MessageBubble: React.FC<{ msg: Message; onOpenImage: (src: string) => void }> = ({ msg, onOpenImage }) => {
   const { t } = useTranslation();
   const isUser = msg.role === 'user';
+  const localMarkdownRules = useMemo(() => createMarkdownRenderRules(onOpenImage), [onOpenImage]);
   
   if (msg.isDocument) {
     return (
@@ -283,9 +286,9 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
                   <View>
                     {parts.map((part, idx) => 
                       part.type === 'text' ? (
-                        <Markdown key={`text-${idx}`} style={markdownStyles}>
+                        <MarkdownWithCode key={`text-${idx}`} style={markdownStyles} rules={localMarkdownRules}>
                           {part.content}
-                        </Markdown>
+                        </MarkdownWithCode>
                       ) : (
                         <ScrollableTable
                           key={`table-${idx}`}
@@ -298,9 +301,9 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
                 );
               } else {
                 return (
-                  <Markdown style={markdownStyles}>
+                  <MarkdownWithCode style={markdownStyles} rules={localMarkdownRules}>
                     {msg.content}
-                  </Markdown>
+                  </MarkdownWithCode>
                 );
               }
             })()}
@@ -310,6 +313,39 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
             {msg.content}
           </Text>
         )}
+      </View>
+    </View>
+  );
+};
+
+// ─── Indicador de "Zyren está procesando..." ─────────────────────────────────
+const ThinkingIndicator: React.FC = () => {
+  const { t } = useTranslation();
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1200, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
+  return (
+    <View style={[s.bubbleRow, s.bubbleRowAI]}>
+      <View style={s.aiAvatar}>
+        <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 26, height: 26 }} />
+      </View>
+      <View style={[s.bubble, s.bubbleAI, { paddingVertical: 12, paddingHorizontal: 16 }]}>
+        <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pulseAnim }}>
+          <Ionicons name="cog-outline" size={14} color={TXT_SEC} />
+          <Text style={{ fontSize: 12, color: TXT_SEC, fontStyle: 'italic' }}>
+            {t('ai.thinking', 'Zyren está procesando e indexando las ideas clave...')}
+          </Text>
+        </Animated.View>
       </View>
     </View>
   );
@@ -380,7 +416,13 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [localContextText, setLocalContextText] = useState(contextText);
   const [uploadedDocContext, setUploadedDocContext] = useState('');
-  
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
+  const [isThinking, setIsThinking] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const streamAccumulated = useRef('');
+
+  const streamingMarkdownRules = useMemo(() => createMarkdownRenderRules(setLightboxImage), []);
+
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(-100)).current;
@@ -606,13 +648,44 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     setInputText('');
     setIsLoading(true);
 
+    const isLocalProvider = currentProvider === 'local';
+
+    if (isLocalProvider) {
+      setIsThinking(true);
+      setStreamingContent(null);
+      streamAccumulated.current = '';
+    }
+
     try {
       const combinedContext = localContextText + uploadedDocContext;
-      const data = await sendHybridChatMessage(combinedContext, updatedMessages.filter(m => !m.isDocument), sessionId, currentProvider);
+
+      const onLocalToken = (token: string, accumulated: string, reasoning: string) => {
+        streamAccumulated.current = accumulated;
+        const thinkMatch = accumulated.match(/<think>([\s\S]*?)<\/think>/);
+        if (thinkMatch) {
+          setIsThinking(false);
+          const afterThink = accumulated.substring(accumulated.indexOf('</think>') + 8).trim();
+          setStreamingContent(afterThink || '…');
+        } else if (reasoning || accumulated.includes('<think>')) {
+          setIsThinking(true);
+        } else {
+          setIsThinking(false);
+          setStreamingContent(accumulated);
+        }
+      };
+
+      const data = await sendHybridChatMessage(
+        combinedContext,
+        updatedMessages.filter(m => !m.isDocument),
+        sessionId,
+        currentProvider,
+        isLocalProvider ? onLocalToken : undefined,
+      );
 
       if (data?.context_truncated) setIsTruncated(true);
 
       let replyContent: string = data?.reply?.content || t('subjects.couldNotProcess');
+      const cleanReply = replyContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim() || replyContent;
 
       console.log('[AIChatModal] 📥 Respuesta recibida del backend:', {
         hasData: !!data,
@@ -672,10 +745,13 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           }
         } else {
           // Respuesta normal del chat sin generación de mazo
-          setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);
+          setMessages(prev => [...prev, { role: 'assistant', content: cleanReply }]);
           setIsLoading(false);
         }
       }
+      setIsThinking(false);
+      setStreamingContent(null);
+      streamAccumulated.current = '';
     } catch (err: any) {
       console.warn('[AIChatModal] ❌ Capturado error en handleSend:', {
         message: err.message,
@@ -706,6 +782,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       }]);
     } finally {
       setIsLoading(false);
+      setIsThinking(false);
+      setStreamingContent(null);
+      streamAccumulated.current = '';
     }
   }, [inputText, isLoading, messages, localContextText, uploadedDocContext, sessionId, currentProvider, handleGenerateMaterial, showToast]);
 
@@ -997,11 +1076,28 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                   ))}
                 </View>
               ) : (
-                messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)
+                messages.map((msg, i) => <MessageBubble key={i} msg={msg} onOpenImage={setLightboxImage} />)
               )}
 
-              {/* Indicador de "pensando..." */}
-              {isLoading && <TypingIndicator />}
+              {/* Indicador de "Zyren está procesando..." (modo local pensante) */}
+              {isLoading && isThinking && <ThinkingIndicator />}
+
+              {/* Streaming de tokens parciales (modo local, después de </think>) */}
+              {isLoading && streamingContent && !isThinking && (
+                <View style={[s.bubbleRow, s.bubbleRowAI]}>
+                  <View style={s.aiAvatar}>
+                    <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 26, height: 26 }} />
+                  </View>
+                  <View style={[s.bubble, s.bubbleAI]}>
+                    <Markdown style={markdownStyles} rules={streamingMarkdownRules}>
+                      {streamingContent}
+                    </Markdown>
+                  </View>
+                </View>
+              )}
+
+              {/* Indicador de "pensando..." (modo cloud) */}
+              {isLoading && !isThinking && !streamingContent && <TypingIndicator />}
             </ScrollView>
 
             {/* Input de texto */}
@@ -1073,9 +1169,88 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
           </View>
         </View>
+
+        {/* ─── Lightbox de imágenes ───────────────────────────────────── */}
+        {lightboxImage && (
+          <TouchableOpacity
+            activeOpacity={1}
+            style={s.lightboxOverlay}
+            onPress={() => setLightboxImage(null)}
+          >
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <RNImage
+                source={{ uri: lightboxImage }}
+                style={{
+                  width: 300,
+                  height: 400,
+                  borderRadius: 14,
+                }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
     </View>
   );
 };
+
+// ─── Render rules personalizados para Markdown (imágenes) ────────────────────
+const CHAT_BUBBLE_MAX_WIDTH = '78%';
+
+const ChatImage: React.FC<{ src: string; alt: string; onOpen: () => void }> = ({ src, alt, onOpen }) => {
+  const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  if (failed) {
+    return (
+      <View style={{ marginVertical: 8, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
+        <Text style={{ fontSize: 11, color: TXT_SEC, textAlign: 'center', fontStyle: 'italic' }}>
+          {alt || '(imagen no disponible)'}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPress={onOpen} style={{ marginVertical: 8, alignItems: 'center' }}>
+      <RNImage
+        source={{ uri: src }}
+        style={{
+          width: 260,
+          height: 180,
+          borderRadius: 10,
+          backgroundColor: 'rgba(255,255,255,0.05)',
+        }}
+        resizeMode="contain"
+        onLoad={() => setLoading(false)}
+        onError={() => { setFailed(true); setLoading(false); }}
+      />
+      {loading ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={PRIMARY} />
+        </View>
+      ) : null}
+      {alt ? (
+        <Text style={{ fontSize: 11, color: TXT_SEC, marginTop: 4, textAlign: 'center', fontStyle: 'italic' }}>
+          {alt}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+};
+
+const createMarkdownRenderRules = (onOpenImage: (src: string) => void): any => ({
+  image: (node: any, children: any, parent: any, styles: any) => {
+    const src: string = node?.attributes?.src || '';
+    const alt: string = node?.attributes?.alt || '';
+    if (!src) return null;
+
+    const isLikelyImage = /\.(png|jpg|jpeg|gif|webp|svg|bmp)(\?|$)/i.test(src) || src.startsWith('http');
+    if (!isLikelyImage) return null;
+
+    return <ChatImage key={node.key} src={src} alt={alt} onOpen={() => onOpenImage(src)} />;
+  },
+});
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
@@ -1344,8 +1519,18 @@ const s = StyleSheet.create({
     shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
   },
   genConfirmBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+
+  // Lightbox
+  lightboxOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
 });
 
+// ─── Markdown ─────────────────────────────────────────────────────────────────
 const markdownStyles = StyleSheet.create({
   body: {
     fontSize: 14,

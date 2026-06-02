@@ -24,7 +24,16 @@ export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
     }
     // Cache the result on success
     if (data && Array.isArray(data)) {
-      await cacheService.saveFlashcardDecks(data);
+      let mergedData = [...data];
+      try {
+        const { getLocalDecks } = require('../localFlashcardService');
+        const local = getLocalDecks();
+        if (local && local.length > 0) {
+          mergedData = [...local, ...mergedData];
+        }
+      } catch (_) {}
+      await cacheService.saveFlashcardDecks(mergedData);
+      return mergedData;
     }
     return data || [];
   } catch (error) {
@@ -50,7 +59,16 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
     }
     // Cache the result on success
     if (data && Array.isArray(data)) {
-      await cacheService.saveFlashcardDecksWithMetrics(data);
+      let mergedData = [...data];
+      try {
+        const { getLocalDecks } = require('../localFlashcardService');
+        const local = getLocalDecks();
+        if (local && local.length > 0) {
+          mergedData = [...local, ...mergedData];
+        }
+      } catch (_) {}
+      await cacheService.saveFlashcardDecksWithMetrics(mergedData);
+      return mergedData;
     }
     return data || [];
   } catch (error) {
@@ -118,6 +136,12 @@ export const updateFlashcardDeck = async (deckId: number, payload: { subject_id?
 /** Obtiene todas las tarjetas de un mazo específico por su ID */
 export const getFlashcards = async (deckId: number): Promise<Flashcard[]> => {
   try {
+    // If it's a local deck (deckId < 0), skip network and just load from cache
+    if (deckId < 0) {
+      const cached = await cacheService.loadFlashcardsByDeck(deckId) as Flashcard[] | null;
+      return cached || [];
+    }
+
     const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards`);
     const data = await parseJsonSafely(response);
     if (!response.ok) {
@@ -143,6 +167,12 @@ export const getFlashcards = async (deckId: number): Promise<Flashcard[]> => {
 /** Obtiene todas las tarjetas de un mazo ordenadas por prioridad de repaso */
 export const getFlashcardsPrioritized = async (deckId: number): Promise<Flashcard[]> => {
   try {
+    // If it's a local deck (deckId < 0), skip network and just load from cache
+    if (deckId < 0) {
+      const cached = await cacheService.loadFlashcardsPrioritizedByDeck(deckId) as Flashcard[] | null;
+      return cached || [];
+    }
+
     const userId = await getUserId();
     const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards/prioritized?userId=${userId}`);
     const data = await parseJsonSafely(response);
@@ -461,6 +491,12 @@ export const getSnoozeStatus = async (cardId: number): Promise<SnoozeStatus> => 
  */
 export const getCardsNotSnoozed = async (deckId: number): Promise<Flashcard[]> => {
   try {
+    // If it's a local deck (deckId < 0), skip network and just load from cache
+    if (deckId < 0) {
+      const cached = await cacheService.loadCardsNotSnoozedByDeck(deckId) as Flashcard[] | null;
+      return cached || [];
+    }
+
     const userId = await getUserId();
     const response = await fetchWithFallback(
       `/flashcard-decks/${deckId}/cards/not-snoozed?userId=${userId}`

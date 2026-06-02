@@ -10,6 +10,7 @@
  */
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getDeviceCapabilities } from '../utils/deviceCapabilities';
 
 export type LocalModelId = 'essential' | 'advanced' | 'qwen_1_5b' | 'qwen_3b' | 'phi3_5' | 'gemma2_2b';
 export type DownloadStatus = 'none' | 'downloading' | 'downloaded' | 'error' | 'paused';
@@ -140,6 +141,12 @@ export interface LocalAIState {
   errorMessage: string | null;
   // Espacio usado por modelos (bytes)
   storageUsedBytes: number;
+  // Tier del dispositivo detectado
+  deviceTier: 'low' | 'mid' | 'high' | null;
+  // Modelos compatibles con este dispositivo
+  deviceCompatibleModels: LocalModelId[];
+  // RAM total del dispositivo en GB
+  deviceRamGB: number;
 
   // Acciones
   setForceOfflineMode: (enabled: boolean) => void;
@@ -151,6 +158,8 @@ export interface LocalAIState {
   setInferenceStatus: (status: InferenceStatus) => void;
   setErrorMessage: (msg: string | null) => void;
   setStorageUsedBytes: (bytes: number) => void;
+  setDeviceTier: (tier: 'low' | 'mid' | 'high') => void;
+  setDeviceCompatibleModels: (models: LocalModelId[]) => void;
   reset: () => void;
 }
 
@@ -207,6 +216,22 @@ async function persistHydrate(store: { setState: (s: Partial<LocalAIState>) => v
       forceOfflineMode: forcedRaw === 'true',
       activeProvider: (providerRaw as AIProvider) || 'cloud',
     });
+
+    // Detectar capacidades del dispositivo para validar modelos
+    getDeviceCapabilities().then((caps) => {
+      store.setState({
+        deviceTier: caps.tier,
+        deviceCompatibleModels: caps.compatibleModels,
+        deviceRamGB: caps.totalRamGB,
+      });
+      // Si el modelo activo no es compatible, cambiar al recomendado
+      const currentId = store.getState().activeModelId;
+      if (currentId && !caps.compatibleModels.includes(currentId)) {
+        const recommended = caps.recommendedModel;
+        store.getState().setActiveModel(recommended);
+        console.warn(`[useLocalAIStore] Dispositivo ${caps.tier} (${caps.totalRamGB}GB): modelo ${currentId} no compatible, cambiando a ${recommended}`);
+      }
+    }).catch(() => {});
   } catch {
     // Si falla, igual resolvemos para no bloquear
   } finally {
@@ -229,6 +254,13 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
     downloadedBytes: 0,
     errorMessage: null,
     storageUsedBytes: 0,
+    deviceTier: null,
+    deviceCompatibleModels: [],
+    deviceRamGB: 0,
+
+  setDeviceTier: (tier) => set({ deviceTier: tier }),
+
+  setDeviceCompatibleModels: (models) => set({ deviceCompatibleModels: models }),
 
   setForceOfflineMode: (enabled) => {
     set({ forceOfflineMode: enabled });
@@ -245,6 +277,11 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
   },
 
   setActiveModel: (modelId) => {
+    const state = get();
+    if (modelId && state.deviceCompatibleModels.length > 0 && !state.deviceCompatibleModels.includes(modelId)) {
+      console.warn(`[useLocalAIStore] Modelo ${modelId} no compatible con este dispositivo (${state.deviceTier}, ${state.deviceRamGB}GB RAM)`);
+      return;
+    }
     set({ activeModelId: modelId });
     if (modelId) {
       AsyncStorage.setItem(STORAGE_KEY_ACTIVE, modelId);
@@ -305,6 +342,9 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
       downloadedBytes: 0,
       errorMessage: null,
       storageUsedBytes: 0,
+      deviceTier: null,
+      deviceCompatibleModels: [],
+      deviceRamGB: 0,
     });
     AsyncStorage.multiRemove([STORAGE_KEY_MODELS, STORAGE_KEY_ACTIVE, STORAGE_KEY_FORCED, STORAGE_KEY_PROVIDER, STORAGE_KEY_WHISPER]);
   },

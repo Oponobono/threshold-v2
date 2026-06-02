@@ -20,8 +20,13 @@ export type ChatMessage = {
  *
  * @param item - Objeto que contiene el ID, rol (usuario/bot) y el texto del mensaje.
  */
+function stripThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+}
+
 export const ChatMessageBubble: React.FC<{ item: ChatMessage }> = ({ item }) => {
   const isUser = item.role === 'user';
+  const displayContent = isUser ? item.content : stripThinkTags(item.content);
   return (
     <View style={[styles.messageBubble, isUser ? styles.messageUser : styles.messageBot]}>
       {!isUser && (
@@ -31,7 +36,7 @@ export const ChatMessageBubble: React.FC<{ item: ChatMessage }> = ({ item }) => 
       )}
       <View style={[styles.messageContent, isUser ? styles.messageContentUser : styles.messageContentBot]}>
         <Text style={[styles.messageText, isUser ? styles.messageTextUser : styles.messageTextBot]}>
-          {item.content}
+          {displayContent}
         </Text>
       </View>
     </View>

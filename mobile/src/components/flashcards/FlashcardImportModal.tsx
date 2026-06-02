@@ -338,7 +338,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         }
       }
 
-      const deck = saveImportedDeck(
+      const deck = await saveImportedDeck(
         sanitizeText(deckData.title),
         sanitizeText(deckData.description),
         cards,

@@ -220,13 +220,20 @@ export const CodeHighlighter: React.FC<CodeHighlighterProps> = ({
 
   return (
     <View style={s.codeBlockContainer}>
-      <Text style={s.codeText}>
-        {tokens.map((token, idx) => (
-          <Text key={idx} style={{ color: getColorForToken(token.type) }}>
-            {token.text}
-          </Text>
-        ))}
-      </Text>
+      {language && language !== 'plaintext' && (
+        <View style={s.headerBar}>
+          <Text style={s.languageText}>{language}</Text>
+        </View>
+      )}
+      <View style={s.codeWrapper}>
+        <Text style={s.codeText}>
+          {tokens.map((token, idx) => (
+            <Text key={idx} style={{ color: getColorForToken(token.type) }}>
+              {token.text}
+            </Text>
+          ))}
+        </Text>
+      </View>
     </View>
   );
 };
@@ -240,6 +247,24 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
     backgroundColor: '#111E25',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.03)',
+  },
+  languageText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    fontFamily: 'monospace',
+    textTransform: 'uppercase',
+  },
+  codeWrapper: {
     padding: 14,
   },
   codeText: {

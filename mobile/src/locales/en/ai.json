@@ -39,5 +39,6 @@
   "advancedModel": "Advanced Model 🧠",
   "networkError": "Network or server error",
   "groqLimitError": "⚠️ **Processing limit reached on Fast Model ⚡**\n\nWe have temporarily exceeded the token capacity allowed for Zyren's ultra-fast engine.\n\n**How would you like to proceed?**\n\n• **Use the Advanced Reasoning Model 🧠:** Switch engine by tapping the brain icon in the chat header to continue studying without interruptions.\n• **Wait a moment ⏳:** In about 1 minute the fast channel will be free again and you can continue chatting.",
-  "connectionError": "⚠️ **Connection issue with Zyren ({{provider}})**\n\nWe couldn't process your message due to the following issue:\n*{{error}}*.\n\nPlease try again in a moment or switch the model at the top."
+  "connectionError": "⚠️ **Connection issue with Zyren ({{provider}})**\n\nWe couldn't process your message due to the following issue:\n*{{error}}*.\n\nPlease try again in a moment or switch the model at the top.",
+  "thinking": "Zyren is analyzing and indexing the key ideas..."
 }

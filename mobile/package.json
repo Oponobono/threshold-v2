@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "postinstall": "node -e \"try{const s='node_modules/@react-native/debugger-frontend/dist/third-party/front_end/core/i18n/locales';const f=require('fs');const d=f.readdirSync(s);if(!d.includes('es-419.json')){f.copyFileSync(s+'/en-US.json',s+'/es-419.json');console.log('postinstall: created es-419.json fallback for debugger')}}catch(e){}\""
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -59,7 +60,6 @@
     "lottie-react-native": "~7.3.1",
     "pdf-lib": "^1.17.1",
     "react": "19.1.0",
-    "whisper.rn": "~0.6.0",
     "react-dom": "19.1.0",
     "react-i18next": "^17.0.4",
     "react-native": "0.81.5",
@@ -81,14 +81,17 @@
     "react-native-youtube-iframe": "^2.4.1",
     "uploadthing": "^7.7.4",
     "victory-native": "^36.9.2",
+    "whisper.rn": "~0.6.0",
     "youtube-transcript": "^1.3.1",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@babel/helper-define-polyfill-provider": "^0.6.8",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "jest": "^30.4.2",
     "typescript": "~5.9.2"
   },
   "private": true

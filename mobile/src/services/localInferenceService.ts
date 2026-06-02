@@ -1,21 +1,14 @@
-/**
- * localInferenceService.ts
- *
- * Servicio de inferencia local usando llama.rn.
- * Proporciona una interfaz unificada para cargar modelos GGUF,
- * ejecutar prompts con gramáticas GBNF, y gestionar el ciclo de vida
- * del contexto de inferencia.
- *
- * Dependencias nativas:
- *   - llama.rn: bindings de llama.cpp para React Native
- *   - expo-file-system: para localizar modelos descargados
- */
 import * as FileSystem from 'expo-file-system/legacy';
 import { getGrammar, GrammarType } from '../utils/gbnfGrammars';
 import { useLocalAIStore, MODELS, hydrationDone } from '../store/useLocalAIStore';
+import { getDeviceCapabilities, clearCapabilitiesCache } from '../utils/deviceCapabilities';
 
 let llamaContext: any = null;
 let currentModelPath: string | null = null;
+let onTokenCallback: ((token: string, accumulated: string, reasoning: string) => void) | null = null;
+let streamBuffer = '';
+let streamFlushTimer: ReturnType<typeof setTimeout> | null = null;
+const STREAM_INTERVAL_MS = 16;
 
 export interface InferenceOptions {
   prompt: string;
@@ -31,25 +24,20 @@ export interface InferenceResult {
   modelName: string;
 }
 
-/**
- * Obtiene la ruta del directorio donde se almacenan los modelos descargados.
- */
+export interface StreamCallbacks {
+  onToken?: (token: string, accumulated: string, reasoning: string) => void;
+}
+
 export function getModelsDirectory(): string {
   return `${FileSystem.documentDirectory}models/`;
 }
 
-/**
- * Obtiene la ruta completa de un modelo por su ID.
- */
 export function getModelPath(modelId: string): string {
   const info = MODELS[modelId as keyof typeof MODELS];
   if (!info) return '';
   return `${getModelsDirectory()}${info.filename}`;
 }
 
-/**
- * Verifica si un modelo está disponible localmente.
- */
 export async function isModelAvailable(modelId: string): Promise<boolean> {
   const path = getModelPath(modelId);
   if (!path) return false;
@@ -61,10 +49,6 @@ export async function isModelAvailable(modelId: string): Promise<boolean> {
   }
 }
 
-/**
- * Carga un modelo GGUF en memoria y retorna el contexto de inferencia.
- * Lanza un error si falla, con el mensaje real del problema.
- */
 export async function loadModel(modelId: string): Promise<boolean> {
   const store = useLocalAIStore.getState();
   const filePath = store.downloadedModels[modelId];
@@ -72,13 +56,11 @@ export async function loadModel(modelId: string): Promise<boolean> {
     throw new Error('Modelo no encontrado. Descárgalo primero.');
   }
 
-  // Si ya está cargado, no recargar
   if (llamaContext && currentModelPath === filePath) {
     store.setInferenceStatus('ready');
     return true;
   }
 
-  // Liberar contexto anterior
   if (llamaContext) {
     try { await llamaContext.release(); } catch {}
     llamaContext = null;
@@ -88,28 +70,28 @@ export async function loadModel(modelId: string): Promise<boolean> {
   store.setInferenceStatus('loading_model');
 
   try {
+    const caps = await getDeviceCapabilities();
+
     const { initLlama } = require('llama.rn');
 
+    const contextParams: any = {
+      model: filePath,
+      n_ctx: 2048,
+      n_gpu_layers: 99,
+      n_threads: caps.recommendedThreads,
+      use_mlock: false,
+      use_mmap: true,
+      cache_type_k: 'q8_0',
+      cache_type_v: 'q8_0',
+      flash_attn_type: 'auto',
+    };
+
     try {
-      llamaContext = await initLlama({
-        model: filePath,
-        n_ctx: 2048,
-        n_gpu_layers: 99,
-        n_threads: 6,
-        use_mlock: false,
-        use_mmap: true,
-      });
-      console.log('[LocalInference] GPU activada (n_gpu_layers=99)');
+      llamaContext = await initLlama(contextParams);
     } catch (gpuErr: any) {
       console.warn('[LocalInference] GPU no disponible, usando CPU:', gpuErr?.message || gpuErr);
-      llamaContext = await initLlama({
-        model: filePath,
-        n_ctx: 2048,
-        n_gpu_layers: 0,
-        n_threads: 6,
-        use_mlock: false,
-        use_mmap: true,
-      });
+      contextParams.n_gpu_layers = 0;
+      llamaContext = await initLlama(contextParams);
     }
 
     currentModelPath = filePath;
@@ -122,9 +104,6 @@ export async function loadModel(modelId: string): Promise<boolean> {
   }
 }
 
-/**
- * Libera el contexto del modelo actual de memoria.
- */
 export async function unloadModel(): Promise<void> {
   if (llamaContext) {
     try { await llamaContext.release(); } catch {}
@@ -134,11 +113,30 @@ export async function unloadModel(): Promise<void> {
   useLocalAIStore.getState().setInferenceStatus('idle');
 }
 
-/**
- * Ejecuta inferencia sobre el modelo cargado actualmente.
- * Aplica gramática GBNF si se especifica para garantizar JSON válido.
- */
-export async function runInference(options: InferenceOptions): Promise<InferenceResult> {
+function flushStreamBuffer(): void {
+  if (streamFlushTimer) {
+    clearTimeout(streamFlushTimer);
+    streamFlushTimer = null;
+  }
+  if (streamBuffer && onTokenCallback) {
+    onTokenCallback('', streamBuffer, '');
+    streamBuffer = '';
+  }
+}
+
+export function setStreamCallbacks(callbacks: StreamCallbacks): void {
+  onTokenCallback = callbacks.onToken || null;
+}
+
+export function clearStreamCallbacks(): void {
+  flushStreamBuffer();
+  onTokenCallback = null;
+}
+
+export async function runInference(
+  options: InferenceOptions,
+  streamCallbacks?: StreamCallbacks,
+): Promise<InferenceResult> {
   const store = useLocalAIStore.getState();
   store.setInferenceStatus('running');
   store.setErrorMessage(null);
@@ -156,19 +154,37 @@ export async function runInference(options: InferenceOptions): Promise<Inference
     }
   }
 
+  if (streamCallbacks?.onToken) {
+    onTokenCallback = streamCallbacks.onToken;
+  }
+
   const grammar = options.grammarType ? getGrammar(options.grammarType) : '';
   const modelInfo = store.activeModelId ? MODELS[store.activeModelId] : null;
 
   try {
-    const result = await llamaContext.completion({
-      prompt: options.prompt,
-      grammar: grammar || undefined,
-      nPredict: options.maxTokens || 512,
-      temperature: options.temperature ?? 0.7,
-      stop: options.stop || ['</s>', '<|end|>', '<|eot_id|>'],
-    });
+    const result = await llamaContext.completion(
+      {
+        prompt: options.prompt,
+        grammar: grammar || undefined,
+        n_predict: options.maxTokens || 512,
+        temperature: options.temperature ?? 0.7,
+        stop: options.stop || ['</s>', '<|end|>', '<|eot_id|>'],
+      },
+      onTokenCallback
+        ? (data: any) => {
+            if (data?.token) {
+              streamBuffer += data.token;
+              if (!streamFlushTimer) {
+                streamFlushTimer = setTimeout(() => flushStreamBuffer(), STREAM_INTERVAL_MS);
+              }
+            }
+          }
+        : undefined,
+    );
 
-    const totalTime = result.timings?.predictMs || 1;
+    flushStreamBuffer();
+
+    const totalTime = result.timings?.predictedMs || 1;
     const tokens = result.tokensEvaluated || 1;
     const tokensPerSecond = (tokens / totalTime) * 1000;
 
@@ -180,32 +196,28 @@ export async function runInference(options: InferenceOptions): Promise<Inference
       modelName: modelInfo?.label || 'desconocido',
     };
   } catch (error: any) {
+    flushStreamBuffer();
     store.setInferenceStatus('error');
     store.setErrorMessage(error?.message || 'Error de inferencia');
 
-    // Intentar fallback automático al modelo essential si el actual falló
     const essentialId = 'essential';
     if (store.activeModelId && store.activeModelId !== essentialId && store.downloadedModels[essentialId]) {
       console.warn(`[LocalInference] ⚠️ Modelo "${store.activeModelId}" falló, intentando fallback a essential...`);
       await unloadModel();
       store.setActiveModel(essentialId);
-      return runInference(options);
+      return runInference(options, streamCallbacks);
     }
 
     throw error;
   }
 }
 
-/**
- * Verifica si el motor local está listo para inferencia.
- */
 export function isReady(): boolean {
   return useLocalAIStore.getState().inferenceStatus === 'ready' && llamaContext !== null;
 }
 
-/**
- * Libera recursos al cerrar la app.
- */
 export async function cleanup(): Promise<void> {
+  clearStreamCallbacks();
   await unloadModel();
+  clearCapabilitiesCache();
 }

@@ -6,10 +6,11 @@ import { CodeHighlighter } from './CodeHighlighter';
 interface Props {
   children: string;
   style?: any;
+  rules?: any;
 }
 
-export const MarkdownWithCode: React.FC<Props> = ({ children, style }) => {
-  const rules = {
+export const MarkdownWithCode: React.FC<Props> = ({ children, style, rules: customRules }) => {
+  const baseRules = {
     fence: (node: ASTNode) => {
       const sourceInfo = (node as any).sourceInfo?.trim();
       const language = sourceInfo || undefined;
@@ -30,6 +31,8 @@ export const MarkdownWithCode: React.FC<Props> = ({ children, style }) => {
       );
     },
   };
+
+  const rules = { ...baseRules, ...customRules };
 
   return (
     <View style={s.markdownContainer}>

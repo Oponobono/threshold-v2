@@ -369,7 +369,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 />
               }
               renderItem={({ item }) => {
-                const isShared = item.user_id != null && item.user_id !== currentUserId;
+                const isShared = item.user_id != null && item.user_id !== currentUserId && !(item as any)._local;
                 const duedeckIds = getDuedeckIds();
                 const isDue = duedeckIds.has(item.id);
                 return (

@@ -131,6 +131,7 @@ export function useSubjects(t: any) {
         name: cs.name,
         avg_score: cs.avgScore,
         target_grade: cs.targetGrade,
+        delta: cs.delta,
         color: cs.color,
         icon: cs.icon,
       }));

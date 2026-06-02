@@ -180,19 +180,21 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
   }
 
   const context = await initWhisper({ filePath: modelPath });
-  const { promise } = context.transcribe(wavUri, {
-    language: 'es',
-    tokenTimestamps: true,
-  });
-  const result = await promise;
-
-  if (wavUri !== audioUri) {
-    try {
-      await FileSystem.deleteAsync(wavUri, { idempotent: true });
-    } catch (_) {}
+  try {
+    const { promise } = context.transcribe(wavUri, {
+      language: 'es',
+      tokenTimestamps: true,
+    });
+    const result = await promise;
+    return result?.result || '';
+  } finally {
+    try { await context.release(); } catch {}
+    if (wavUri !== audioUri) {
+      try {
+        await FileSystem.deleteAsync(wavUri, { idempotent: true });
+      } catch (_) {}
+    }
   }
-
-  return result?.result || '';
 }
 
 export async function transcribeWithFallback(

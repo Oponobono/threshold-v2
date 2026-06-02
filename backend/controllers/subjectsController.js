@@ -1,5 +1,4 @@
 const { db } = require('../db');
-const gradingEngine = require('../services/gradingEngine');
 
 /**
  * Obtener una materia específica por su ID
@@ -102,6 +101,7 @@ exports.getSubjectById = (req, res) => {
 };
 
 const AcademicWorkflowEngine = require('../services/academicWorkflowEngine');
+const gradingEngine = require('../services/gradingEngine');
 
 /**
  * Obtener todas las materias de un usuario
@@ -220,8 +220,49 @@ exports.getSubjectsByUser = (req, res) => {
                 row.gpa_equivalent = eq.gpa_equivalent;
               }
             }
+
+            // Calcular nota proyectada y delta para consistencia con detalle
+            const subAsts = assessmentsBySub[row.id] || [];
+            const gradedAsts = subAsts
+              .filter(a => a.normalized_value !== null && a.normalized_value !== undefined)
+              .map(a => ({
+                grade_value: gradingEngine.denormalizeGrade(a.normalized_value, versionRow),
+                weight: a.weight || 0,
+              }));
+            if (gradedAsts.length > 0) {
+              const proj = gradingEngine.calculateProjectedGrade(gradedAsts, 5.0);
+              row.projected_grade = proj.projectedGrade;
+              row.delta = proj.delta;
+            } else {
+              row.projected_grade = row.avg_score;
+              row.delta = 0;
+            }
+          });
+        } else {
+          // Fallback sin grading version: rough estimate
+          rows.forEach(row => {
+            const subAsts = assessmentsBySub[row.id] || [];
+            const gradedAsts = subAsts
+              .filter(a => a.normalized_value !== null && a.normalized_value !== undefined)
+              .map(a => a.normalized_value * 5);
+            row.projected_grade = gradedAsts.length > 0
+              ? parseFloat((gradedAsts.reduce((s, v) => s + v, 0) / gradedAsts.length).toFixed(2))
+              : 0;
+            row.delta = parseFloat((row.projected_grade - row.avg_score).toFixed(2));
           });
         }
+      } else {
+        // Sin versión de calificación activa: rough estimate
+        rows.forEach(row => {
+          const subAsts = assessmentsBySub[row.id] || [];
+          const gradedAsts = subAsts
+            .filter(a => a.normalized_value !== null && a.normalized_value !== undefined)
+            .map(a => a.normalized_value * 5);
+          row.projected_grade = gradedAsts.length > 0
+            ? parseFloat((gradedAsts.reduce((s, v) => s + v, 0) / gradedAsts.length).toFixed(2))
+            : 0;
+          row.delta = parseFloat((row.projected_grade - row.avg_score).toFixed(2));
+        });
       }
     } catch (error) {
       console.warn('[Subjects] Error denormalizing grades:', error.message);

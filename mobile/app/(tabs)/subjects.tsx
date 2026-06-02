@@ -127,8 +127,7 @@ export default function SubjectsScreen() {
                   {g.criticalSubjects.map((subject, idx) => {
                     const raw = subject.avg_score ?? 0;
                     const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
-                    const target = subject.target_grade ?? 3.0;
-                    const delta = avg - target;
+                    const delta = subject.delta ?? parseFloat((avg - 3.0).toFixed(2));
                     const color = subject.color || '#FF2D55';
 
                     return (
@@ -200,8 +199,7 @@ export default function SubjectsScreen() {
               {g.filteredSubjects.map((subject, index) => {
                 const raw = subject.avg_score ?? 0;
                 const avgScore = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
-                const target = subject.target_grade ?? 3.0;
-                const delta = avgScore - target;
+                const delta = subject.delta ?? parseFloat((avgScore - 3.0).toFixed(2));
                 const isPositive = delta >= 0;
                 const cardColor = subject.color || '#5856D6';
                 const isLow = avgScore < 3.0;
