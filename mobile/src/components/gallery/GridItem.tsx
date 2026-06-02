@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { View, Text, TouchableOpacity, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +18,40 @@ interface GridItemProps {
   colWidth: number;
   t: any;
 }
+
+const PhotoWithFallback = memo(function PhotoWithFallback({
+  uri,
+  cloudUri,
+  style,
+  contentFit,
+  transition,
+}: {
+  uri: string;
+  cloudUri?: string | null;
+  style: any;
+  contentFit?: any;
+  transition?: number;
+}) {
+  const [sourceUri, setSourceUri] = useState(uri);
+  const [triedCloud, setTriedCloud] = useState(false);
+
+  const handleError = useCallback(() => {
+    if (!triedCloud && cloudUri) {
+      setSourceUri(cloudUri);
+      setTriedCloud(true);
+    }
+  }, [triedCloud, cloudUri]);
+
+  return (
+    <Image
+      source={{ uri: sourceUri }}
+      style={style}
+      contentFit={contentFit}
+      transition={transition}
+      onError={handleError}
+    />
+  );
+});
 
 export const GridItem = memo(function GridItem({
   item,
@@ -62,8 +96,9 @@ export const GridItem = memo(function GridItem({
           keyExtractor={(p) => p.id?.toString() || Math.random().toString()}
           renderItem={({ item: p }) => (
             <TouchableOpacity activeOpacity={0.88} onPress={() => onPress(p, item)} style={{ width: colWidth, height: 110 }}>
-              <Image
-                source={{ uri: p.local_uri }}
+              <PhotoWithFallback
+                uri={p.local_uri}
+                cloudUri={p.cloud_url}
                 style={galleryStyles.gridImageFull}
                 contentFit="cover"
                 transition={200}

@@ -136,7 +136,7 @@ export const getFlashcards = async (deckId: number): Promise<Flashcard[]> => {
       console.log(`[Flashcards] ✅ Loaded ${cached.length} cards from cache (offline mode)`);
       return cached;
     }
-    throw error;
+    return []; // Return empty array offline instead of throwing to allow adding cards to new decks
   }
 };
 
@@ -162,7 +162,7 @@ export const getFlashcardsPrioritized = async (deckId: number): Promise<Flashcar
       console.log(`[Flashcards] ✅ Loaded ${cached.length} prioritized cards from cache (offline mode)`);
       return cached;
     }
-    throw error;
+    return []; // Return empty array offline instead of throwing to allow adding cards to new decks
   }
 };
 
@@ -482,7 +482,7 @@ export const getCardsNotSnoozed = async (deckId: number): Promise<Flashcard[]> =
       console.log(`[Flashcards] ✅ Loaded ${cached.length} non-snoozed cards from cache (offline mode)`);
       return cached;
     }
-    throw error;
+    return []; // Return empty array offline
   }
 };
 

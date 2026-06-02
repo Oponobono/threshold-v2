@@ -43,7 +43,7 @@ export function useSubjectDetail() {
   const subjectId = useMemo(() => {
     const raw = Array.isArray(params.subjectId) ? params.subjectId[0] : params.subjectId;
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    return Number.isFinite(parsed) && parsed !== 0 ? parsed : null;
   }, [params.subjectId]);
 
   // ── Hydratación instantánea desde el store Zustand (ya cargado por MMKV) ────
@@ -250,10 +250,16 @@ export function useSubjectDetail() {
               setIsLoading(true);
               await deleteSubject(subjectId);
               router.back();
-              showAlert({ title: t('subjects.deleteSubjectTitle'), message: t('subjects.deleteSubjectSuccess'), type: 'info' });
+              // Evitar freeze de Modal de React Native usando un timeout para permitir 
+              // que la animación de navegación y el dismiss del primer Modal terminen.
+              setTimeout(() => {
+                alertRef.show({ title: t('subjects.deleteSubjectTitle'), message: t('subjects.deleteSubjectSuccess'), type: 'info' });
+              }, 400);
             } catch {
               setIsLoading(false);
-              showAlert({ title: t('subjects.error') || 'Error', message: t('subjects.deleteSubjectError'), type: 'error' });
+              setTimeout(() => {
+                alertRef.show({ title: t('subjects.error') || 'Error', message: t('subjects.deleteSubjectError'), type: 'error' });
+              }, 400);
             }
           },
         },

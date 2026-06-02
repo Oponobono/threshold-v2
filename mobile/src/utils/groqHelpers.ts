@@ -153,15 +153,24 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
     }
   }
 
+  const filePath = audioUri.replace(/^file:\/\//, '');
+  let fileInfo = await FileSystem.getInfoAsync(filePath);
+  if (!fileInfo.exists && audioUri.startsWith('file://')) {
+    fileInfo = await FileSystem.getInfoAsync(audioUri);
+  }
+  if (!fileInfo.exists) {
+    throw new Error(
+      `Audio file not found: ${filePath}. ` +
+      `Intenta con la transcripción en la nube si tienes conexión.`
+    );
+  }
+
   let wavUri = audioUri;
   if (!audioUri.toLowerCase().endsWith('.wav')) {
-    const filePath = audioUri.replace(/^file:\/\//, '');
     try {
       wavUri = await ThresholdPdfExtractor.audioToWav(filePath);
       console.log('[GroqHelpers] Audio convertido a WAV para Whisper:', wavUri);
     } catch (convErr: any) {
-      // Si la conversión falla, lanzar un error claro en lugar de pasar
-      // un M4A incompatible a Whisper que fallaría silenciosamente.
       throw new Error(
         `No se pudo convertir el audio a WAV para transcripción offline. ` +
         `Detalle: ${convErr?.message || convErr}. ` +
@@ -191,8 +200,9 @@ export async function transcribeWithFallback(
   apiKey?: string,
 ): Promise<string> {
   const { useLocalAIStore } = require('../store/useLocalAIStore');
-  if (useLocalAIStore.getState().forceOfflineMode) {
-    console.warn('[GroqHelpers] Modo offline forzado, usando Whisper local...');
+  const store = useLocalAIStore.getState();
+  if (store.forceOfflineMode || store.activeProvider === 'local') {
+    console.warn('[GroqHelpers] Usando Whisper local (offline forzado o provider local)...');
     return transcribeWithWhisperLocal(audioUri);
   }
 
@@ -221,8 +231,9 @@ export async function summarizeWithFallback(
   apiKey?: string,
 ): Promise<string> {
   const { useLocalAIStore } = require('../store/useLocalAIStore');
-  if (useLocalAIStore.getState().forceOfflineMode) {
-    console.warn('[GroqHelpers] Modo offline forzado, usando resumen local...');
+  const store = useLocalAIStore.getState();
+  if (store.forceOfflineMode || store.activeProvider === 'local') {
+    console.warn('[GroqHelpers] Usando resumen local (offline forzado o provider local)...');
     return summarizeWithLocalLLM(transcription);
   }
 
@@ -255,7 +266,9 @@ async function summarizeWithLocalLLM(transcription: string): Promise<string> {
     throw new Error('No hay modelo local activo. Actívalo en Configuración > Motor de IA local.');
   }
 
+  console.time('[LocalLLM] loadModel');
   await loadModel(store.activeModelId);
+  console.timeEnd('[LocalLLM] loadModel');
 
   const prompt = `Eres un asistente educativo experto especializado en crear material de estudio universitario. A partir de la transcripción proporcionada, genera un resumen estructurado siguiendo estas reglas:
 1. Extrae los conceptos fundamentales y ordénalos por temas usando títulos claros (###).
@@ -267,18 +280,14 @@ No agregues introducciones conversacionales.
 Transcripción:
 ${transcription}`;
 
+  console.time('[LocalLLM] runInference');
   const result = await runInference({
     prompt,
-    grammarType: 'summary',
     temperature: 0.3,
-    maxTokens: 1024,
+    maxTokens: 384,
   });
+  console.timeEnd('[LocalLLM] runInference');
 
-  try {
-    const parsed = JSON.parse(result.text);
-    const parts = [parsed.title, ...(parsed.keyPoints || []), parsed.conclusion].filter(Boolean);
-    return parts.join('\n\n');
-  } catch {
-    return result.text;
-  }
+  console.log('[LocalLLM] Tokens generados (aprox):', result.text.split(/\s+/).length);
+  return result.text.trim();
 }

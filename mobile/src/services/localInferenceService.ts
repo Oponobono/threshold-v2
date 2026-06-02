@@ -89,14 +89,29 @@ export async function loadModel(modelId: string): Promise<boolean> {
 
   try {
     const { initLlama } = require('llama.rn');
-    llamaContext = await initLlama({
-      model: filePath,
-      n_ctx: 2048,
-      n_gpu_layers: 0,
-      n_threads: 4,
-      use_mlock: false,
-      use_mmap: true,
-    });
+
+    try {
+      llamaContext = await initLlama({
+        model: filePath,
+        n_ctx: 2048,
+        n_gpu_layers: 99,
+        n_threads: 6,
+        use_mlock: false,
+        use_mmap: true,
+      });
+      console.log('[LocalInference] GPU activada (n_gpu_layers=99)');
+    } catch (gpuErr: any) {
+      console.warn('[LocalInference] GPU no disponible, usando CPU:', gpuErr?.message || gpuErr);
+      llamaContext = await initLlama({
+        model: filePath,
+        n_ctx: 2048,
+        n_gpu_layers: 0,
+        n_threads: 6,
+        use_mlock: false,
+        use_mmap: true,
+      });
+    }
+
     currentModelPath = filePath;
     store.setInferenceStatus('ready');
     return true;

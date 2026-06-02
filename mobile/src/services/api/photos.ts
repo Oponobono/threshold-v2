@@ -14,12 +14,30 @@ import { cacheService, CACHE_KEYS } from '../cacheService';
 
 /**
  * Obtiene ítems de la galería
+ * Fallback offline: lee del caché MMKV de galería + items optimistas
  */
 export const getGalleryItems = async () => {
   const userId = await getUserId();
   if (!userId) return [];
-  const response = await fetchWithFallback(`/gallery/${userId}`);
-  return (await parseJsonSafely(response)) || [];
+  try {
+    const response = await fetchWithFallback(`/gallery/${userId}`);
+    const data = await parseJsonSafely(response);
+    if (Array.isArray(data)) {
+      await cacheService.saveGalleryItems(data);
+    }
+    return data || [];
+  } catch (error) {
+    console.warn('[getGalleryItems] Red no disponible, leyendo caché MMKV...');
+    try {
+      const cached = await cacheService.loadGalleryItems();
+      if (Array.isArray(cached)) {
+        return cached;
+      }
+    } catch (cacheError) {
+      console.error('[getGalleryItems] Error leyendo caché:', cacheError);
+    }
+    return [];
+  }
 };
 
 /**

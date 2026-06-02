@@ -146,13 +146,16 @@ export function useAudioRecorder() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const isPlayingRef = useRef(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const playingUriRef = useRef<string | null>(null);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   useEffect(() => {
     loadRecordings();
     return () => {
-      if (sound) {
-        sound.unloadAsync().catch(() => {});
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
         setSound(null);
         setPlayingId(null);
       }
@@ -402,14 +405,14 @@ export function useAudioRecorder() {
     isPlayingRef.current = true;
 
     try {
-      // Detener reproducción anterior ANTES de crear una nueva
-      if (sound) {
+      if (soundRef.current) {
         try {
-          await sound.stopAsync();
-          await sound.unloadAsync();
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
         } catch (stopErr) {
           console.warn('[useAudioRecorder] Error deteniendo audio anterior:', stopErr);
         }
+        soundRef.current = null;
         setSound(null);
         setPlayingId(null);
       }
@@ -431,47 +434,80 @@ export function useAudioRecorder() {
         }
       }
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: targetUri },
-        { shouldPlay: true }
-      );
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+      });
+
+      let newSound: Audio.Sound;
+      try {
+        const result = await Audio.Sound.createAsync(
+          { uri: targetUri },
+          { shouldPlay: true }
+        );
+        newSound = result.sound;
+      } catch (firstErr) {
+        if (targetUri.startsWith('file://')) {
+          const rawPath = targetUri.replace(/^file:\/\//, '');
+          console.warn('[useAudioRecorder] Reintentando playback sin prefijo file://:', rawPath);
+          const fallbackResult = await Audio.Sound.createAsync(
+            { uri: rawPath },
+            { shouldPlay: true }
+          );
+          newSound = fallbackResult.sound;
+        } else {
+          throw firstErr;
+        }
+      }
 
       setSound(newSound);
+      soundRef.current = newSound;
+      playingUriRef.current = targetUri;
       setPlayingId(id);
-      // isPlayingRef.current se mantiene en true hasta que termina la reproducción
 
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
           setPlayingId(null);
           setSound(null);
-          isPlayingRef.current = false; // Solo reset cuando termina la reproducción
+          soundRef.current = null;
+          playingUriRef.current = null;
+          isPlayingRef.current = false;
         }
       });
     } catch (error) {
       console.error('Error playing sound', error);
+      soundRef.current = null;
+      playingUriRef.current = null;
       alertRef.show({ title: 'Error', message: 'No se pudo reproducir el audio.', type: 'error' });
-      isPlayingRef.current = false; // Reset en caso de error
+      isPlayingRef.current = false;
     }
   }
 
   async function stopSound() {
-    if (sound) {
+    if (soundRef.current) {
       try {
-        await sound.stopAsync();
-        await sound.unloadAsync();
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
       } catch (err) {
         console.warn('[useAudioRecorder] Error stopping sound:', err);
       }
+      soundRef.current = null;
+      playingUriRef.current = null;
       setSound(null);
       setPlayingId(null);
     }
-    isPlayingRef.current = false; // Reset siempre después de detener
+    isPlayingRef.current = false;
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
   // deleteRecordingConfirmed: runs the actual deletion without showing any dialog.
   // The calling component is responsible for showing the confirmation prompt.
   async function deleteRecordingConfirmed(id: number | string, uri: string) {
+    if (playingId === String(id) || uri === playingUriRef.current) {
+      await stopSound();
+    }
+
     // 1. Optimistic update: remove from UI immediately
     const previousRecordings = [...recordings];
     setRecordings((prev) =>
@@ -543,17 +579,19 @@ export function useAudioRecorder() {
   // ── Cleanup helper ─────────────────────────────────────────────────────────
   const cleanupAudio = useCallback(async () => {
     isPlayingRef.current = false;
-    if (sound) {
+    if (soundRef.current) {
       try {
-        await sound.stopAsync();
-        await sound.unloadAsync();
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
       } catch (err) {
         console.warn('[useAudioRecorder] Cleanup error:', err);
       }
+      soundRef.current = null;
+      playingUriRef.current = null;
       setSound(null);
       setPlayingId(null);
     }
-  }, [sound]);
+  }, []);
 
   return {
     recording,

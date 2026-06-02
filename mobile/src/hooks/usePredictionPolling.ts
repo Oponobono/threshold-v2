@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useDataStore } from '../store/useDataStore';
 
 const PREDICTIONS_CACHE_KEY = '@threshold_predictions_cache';
 const PREDICTIONS_TIMESTAMP_KEY = '@threshold_predictions_timestamp';
@@ -19,6 +18,7 @@ export const usePredictionPolling = (
   userId: string | number | null | undefined,
   enabled: boolean = true
 ) => {
+  const { useDataStore } = require('../store/useDataStore') as typeof import('../store/useDataStore');
   const { refreshPredictions, loadCachedPredictions } = useDataStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initializedRef = useRef(false);

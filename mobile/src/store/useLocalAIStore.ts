@@ -130,8 +130,8 @@ export interface LocalAIState {
   activeProvider: AIProvider;
   // Estado de inferencia del modelo local
   inferenceStatus: InferenceStatus;
-  // Progreso de descarga (0-100)
-  downloadProgress: number;
+  // Progreso de descarga por modelo (0-100)
+  downloadProgress: Record<string, number>;
   // Estado de descarga por modelo
   downloadStatus: Record<string, DownloadStatus>;
   // Bytes descargados durante la transferencia
@@ -224,7 +224,7 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
     forceOfflineMode: false,
     activeProvider: 'cloud',
     inferenceStatus: 'idle',
-    downloadProgress: 0,
+    downloadProgress: {},
     downloadStatus: {},
     downloadedBytes: 0,
     errorMessage: null,
@@ -283,7 +283,7 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
       ? WHISPER_MODEL.downloadSizeBytes
       : MODELS[modelId as LocalModelId].downloadSizeBytes;
     set({
-      downloadProgress: progress,
+      downloadProgress: { ...get().downloadProgress, [modelId]: progress },
       downloadStatus: { ...get().downloadStatus, [modelId]: status },
       downloadedBytes: Math.round((progress / 100) * sizeBytes),
     });
@@ -300,7 +300,7 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
       forceOfflineMode: false,
       activeProvider: 'cloud',
       inferenceStatus: 'idle',
-      downloadProgress: 0,
+      downloadProgress: {},
       downloadStatus: {},
       downloadedBytes: 0,
       errorMessage: null,

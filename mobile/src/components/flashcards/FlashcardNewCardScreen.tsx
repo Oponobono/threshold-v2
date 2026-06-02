@@ -14,10 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { flashcardsStyles as s } from '../../styles/FlashcardsModal.styles';
-import { FlashcardDeck } from '../../services/api';
+import { FlashcardDeck, createEvaluationItem } from '../../services/api';
 import { EvaluationItemType } from '../../services/api/types';
 import { useCustomAlert } from '../ui/CustomAlert';
-import { fetchWithFallback, parseJsonSafely } from '../../services/api/client';
 
 interface Props {
   activeDeck: FlashcardDeck | null;
@@ -89,18 +88,14 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
         contentJson = { question: boolQuestion.trim(), correctAnswer: boolAnswer };
       }
 
-      const response = await fetchWithFallback(`/flashcard-decks/${activeDeck.id}/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          item_type: selectedType,
-          content_json: contentJson,
-          hint: hint.trim() || null,
-          explanation: explanation.trim() || null,
-        }),
+      await createEvaluationItem({
+        deck_id: activeDeck.id,
+        item_type: selectedType,
+        content_json: contentJson,
+        hint: hint.trim() || undefined,
+        explanation: explanation.trim() || undefined,
       });
-      const data = await parseJsonSafely(response);
-      if (!response.ok) throw new Error(data?.error || t('flashcards.createItemError'));
+
       onCardCreated();
     } catch (e: any) {
       showAlert({ title: t('common.error'), message: e.message, type: 'error' });

@@ -124,70 +124,86 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
 
     try {
       setIsProcessing(true);
-      
+
+      // ── Exportar imagen del canvas Skia (puede fallar si el canvas no renderizó aún) ──
       let finalImageUri = capturedImage;
       let base64Img = '';
       if (enhancerRef.current) {
-        const processedUri = await enhancerRef.current.exportProcessedImage();
-        if (processedUri) {
-          finalImageUri = processedUri;
+        try {
+          const processedUri = await enhancerRef.current.exportProcessedImage();
+          if (processedUri) finalImageUri = processedUri;
+          const b64 = await enhancerRef.current.exportBase64();
+          base64Img = b64 || '';
+        } catch (enhancerErr) {
+          // Canvas aún no estaba listo — usamos la URI original del escáner directamente
+          console.warn('[Scanner] Canvas export falló, usando URI original del escáner:', enhancerErr);
+          finalImageUri = capturedImage;
+          base64Img = '';
         }
-        base64Img = await enhancerRef.current.exportBase64() || '';
       }
-      
-      if (exportFormat === 'pdf') {
-        const imgSrc = base64Img ? `data:image/jpeg;base64,${base64Img}` : finalImageUri;
-        const html = `
-          <html>
-            <body style="margin: 0; padding: 0;">
-              <img src="${imgSrc}" style="width: 100%;" />
-            </body>
-          </html>
-        `;
-        const { uri: pdfUri } = await Print.printToFileAsync({ html });
 
-        // Extraer OCR del texto de la imagen para alimentar el contexto IA.
-        // Se intenta en background y si falla no interrumpe el guardado.
+      console.log('[Scanner] handleSave — formato:', exportFormat, '| base64 disponible:', base64Img.length > 0, '| uri:', finalImageUri?.substring(0, 60));
+
+      if (exportFormat === 'pdf') {
+        // ── Ruta PDF (genera archivo local con expo-print) ──
+        const imgSrc = base64Img ? `data:image/jpeg;base64,${base64Img}` : finalImageUri;
+        const html = `<html><body style="margin:0;padding:0;"><img src="${imgSrc}" style="width:100%;"/></body></html>`;
+
+        let pdfUri: string;
+        try {
+          const { uri } = await Print.printToFileAsync({ html });
+          pdfUri = uri;
+        } catch (pdfErr) {
+          console.error('[Scanner] Print.printToFileAsync falló:', pdfErr);
+          throw new Error('No se pudo generar el PDF.');
+        }
+
+        // OCR en background — no bloquea el guardado si falla
         let ocrText: string | null = null;
         if (base64Img) {
           try {
             ocrText = await extractTextFromImageHybrid(base64Img);
           } catch (ocrErr) {
-            console.warn('[DocumentScannerModal] OCR automático falló, se guardará sin texto:', ocrErr);
+            console.warn('[Scanner] OCR automático falló, documento se guarda sin texto:', ocrErr);
           }
         }
-        
+
+        // Guardar documento — maneja offline internamente (encola en offlineSyncService)
         const docData = await createScannedDocument({
           subject_id: selectedSubjectId,
           local_uri: pdfUri,
           name: `Documento Escaneado ${new Date().toLocaleDateString()}`,
-          ocr_text: ocrText,   // null si el OCR falló — el backend lo acepta
+          ocr_text: ocrText,
         });
-        
-        // Auto subida si está habilitada
-        if (docData?.id) {
-          await autoUploadIfEnabled(
-            pdfUri,
-            'document',
-            docData.id,
-            `document_${docData.id}.pdf`,
-            'application/pdf'
-          ).catch(err => console.warn('[DocumentScannerModal] Auto-upload error:', err));
+        console.log('[Scanner] PDF guardado. ID:', docData?.id ?? 'pendiente offline');
+
+        // Auto-subida opcional en background
+        if (docData?.id && (docData.id as number) > 0) {
+          autoUploadIfEnabled(pdfUri, 'document', docData.id as number, `document_${docData.id}.pdf`, 'application/pdf')
+            .catch(err => console.warn('[Scanner] Auto-upload error:', err));
         }
-        
+
         finalImageUri = pdfUri;
+
       } else {
-        // Para imágenes de galería se guarda como foto, sin OCR automático
-        await createPhoto({
+        // ── Ruta IMAGEN — guardar foto con URI local ──
+        // createPhoto maneja offline internamente (encola en offlineSyncService y actualiza caché)
+        const photoData = await createPhoto({
           subject_id: selectedSubjectId,
           local_uri: finalImageUri,
         });
+        console.log('[Scanner] Foto guardada. ID:', photoData?.id ?? 'pendiente offline');
       }
-      
+
       if (onSave) onSave(finalImageUri, selectedSubjectId, base64Img || undefined);
-      showAlert({ title: t('common.success'), message: t('dashboard.documentScannerModal.success', { subject: subjects.find(s => s.id === selectedSubjectId)?.name }), type: 'success' });
+      showAlert({
+        title: t('common.success'),
+        message: t('dashboard.documentScannerModal.success', { subject: subjects.find(s => s.id === selectedSubjectId)?.name }),
+        type: 'success',
+      });
       resetAndClose();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[Scanner] handleSave — error inesperado:', error?.message ?? error);
       showAlert({ title: t('common.error'), message: t('dashboard.documentScannerModal.error'), type: 'error' });
     } finally {
       setIsProcessing(false);

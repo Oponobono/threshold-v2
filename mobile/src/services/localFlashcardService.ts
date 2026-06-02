@@ -1,4 +1,5 @@
 import { cacheService, saveToCacheSync, loadFromCacheSync, CACHE_KEYS } from './cacheService';
+import { useDataStore } from '../store/useDataStore';
 
 let _localIdCounter = -1;
 
@@ -49,7 +50,7 @@ export function saveImportedDeck(
     description: description?.trim() || '',
     subject_id,
     card_count: cards.length,
-    user_id: 0,
+    user_id: useDataStore.getState().userProfile?.id || 0,
     created_at: new Date().toISOString(),
     review_count: 0,
     learning_count: 0,

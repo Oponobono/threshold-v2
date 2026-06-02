@@ -66,6 +66,7 @@ export const LocalAIEngineSection = () => {
   const setDownloadProgress = useLocalAIStore((s) => s.setDownloadProgress);
 
   const [downloadingId, setDownloadingId] = useState<LocalModelId | null>(null);
+  const downloadResumables = React.useRef<Record<string, FileSystem.DownloadResumable>>({});
 
   // Calcular almacenamiento usado
   useEffect(() => {
@@ -189,12 +190,15 @@ export const LocalAIEngineSection = () => {
         },
       );
 
+      downloadResumables.current[modelId] = downloadResumable;
+
       await showDownloadProgressNotification(model.label, 0);
 
       const result = await downloadResumable.downloadAsync();
       if (result?.uri) {
         markModelDownloaded(modelId, result.uri);
         setDownloadingId(null);
+        delete downloadResumables.current[modelId];
         await completeDownloadNotification(model.label);
         alertRef.show({
           title: t('common.success'),
@@ -204,8 +208,12 @@ export const LocalAIEngineSection = () => {
         });
       }
     } catch (error: any) {
+      if (error?.message?.includes('cancelled') || error?.message?.includes('canceled')) {
+        return; // Fue cancelado intencionalmente
+      }
       setDownloadProgress(modelId, 0, 'error');
       setDownloadingId(null);
+      delete downloadResumables.current[modelId];
       await cancelDownloadNotification();
       alertRef.show({
         title: t('common.error'),
@@ -262,6 +270,12 @@ export const LocalAIEngineSection = () => {
                 await FileSystem.deleteAsync(filePath, { idempotent: true });
               } catch {}
             }
+            // También eliminar whisper
+            const whisperPath = `${FileSystem.documentDirectory}models/${WHISPER_MODEL.filename}`;
+            try {
+              await FileSystem.deleteAsync(whisperPath, { idempotent: true });
+            } catch {}
+
             useLocalAIStore.getState().reset();
             alertRef.show({
               title: t('common.success'),
@@ -273,6 +287,23 @@ export const LocalAIEngineSection = () => {
         },
       ],
     });
+  };
+
+  const handleCancelDownload = async (modelId: LocalModelId | 'whisper') => {
+    const resumable = downloadResumables.current[modelId];
+    if (resumable) {
+      try {
+        await resumable.pauseAsync();
+      } catch (e) {}
+      delete downloadResumables.current[modelId];
+    }
+    setDownloadProgress(modelId, 0, 'none');
+    if (modelId === 'whisper') {
+      setWhisperDownloading(false);
+    } else {
+      setDownloadingId(null);
+    }
+    await cancelDownloadNotification();
   };
 
   const isDownloadingModel = (modelId: LocalModelId): boolean => {
@@ -338,12 +369,15 @@ export const LocalAIEngineSection = () => {
         },
       );
 
+      downloadResumables.current['whisper'] = downloadResumable;
+
       await showDownloadProgressNotification(t('settings.localAI.whisperTitle'), 0);
 
       const result = await downloadResumable.downloadAsync();
       if (result?.uri) {
         markModelDownloaded('whisper', result.uri);
         setWhisperDownloading(false);
+        delete downloadResumables.current['whisper'];
         await completeDownloadNotification(t('settings.localAI.whisperTitle'));
         alertRef.show({
           title: t('common.success'),
@@ -353,8 +387,12 @@ export const LocalAIEngineSection = () => {
         });
       }
     } catch (error: any) {
+      if (error?.message?.includes('cancelled') || error?.message?.includes('canceled')) {
+        return; // Cancelado intencionalmente
+      }
       setDownloadProgress('whisper', 0, 'error');
       setWhisperDownloading(false);
+      delete downloadResumables.current['whisper'];
       await cancelDownloadNotification();
       alertRef.show({
         title: t('common.error'),
@@ -464,7 +502,7 @@ export const LocalAIEngineSection = () => {
           const isDownloaded = isModelDownloaded(modelId);
           const isDownloading = isDownloadingModel(modelId);
           const isActive = activeModelId === modelId;
-          const progress = downloadProgress;
+          const progress = typeof downloadProgress === 'object' ? (downloadProgress[modelId] || 0) : 0;
 
           return (
             <View
@@ -541,12 +579,14 @@ export const LocalAIEngineSection = () => {
                   </>
                 ) : (
                   <TouchableOpacity
-                    style={[styles.downloadBtn, isDownloading && { opacity: 0.6 }]}
-                    onPress={() => handleDownload(modelId)}
-                    disabled={isDownloading}
+                    style={[
+                      styles.downloadBtn, 
+                      isDownloading && { backgroundColor: theme.colors.danger, borderColor: theme.colors.danger, opacity: 1 }
+                    ]}
+                    onPress={() => isDownloading ? handleCancelDownload(modelId) : handleDownload(modelId)}
                   >
                     <Text style={styles.downloadBtnText}>
-                      {isDownloading ? t('settings.localAI.downloading') : t('settings.localAI.download')}
+                      {isDownloading ? t('common.cancel', 'Cancelar') : t('common.download', 'Descargar')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -574,9 +614,9 @@ export const LocalAIEngineSection = () => {
           {whisperDownloading && (
             <View style={styles.progressContainer}>
               <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${downloadProgress}%` }]} />
+                <View style={[styles.progressBarFill, { width: `${typeof downloadProgress === 'object' ? (downloadProgress['whisper'] || 0) : 0}%` }]} />
               </View>
-              <Text style={styles.progressText}>{downloadProgress}%</Text>
+              <Text style={styles.progressText}>{typeof downloadProgress === 'object' ? (downloadProgress['whisper'] || 0) : 0}%</Text>
             </View>
           )}
 
@@ -590,12 +630,14 @@ export const LocalAIEngineSection = () => {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[styles.downloadBtn, whisperDownloading && { opacity: 0.6 }]}
-                onPress={handleWhisperDownload}
-                disabled={whisperDownloading}
+                style={[
+                  styles.downloadBtn, 
+                  whisperDownloading && { backgroundColor: theme.colors.danger, borderColor: theme.colors.danger, opacity: 1 }
+                ]}
+                onPress={() => whisperDownloading ? handleCancelDownload('whisper') : handleWhisperDownload()}
               >
                 <Text style={styles.downloadBtnText}>
-                  {whisperDownloading ? t('settings.localAI.downloading') : t('settings.localAI.download')}
+                  {whisperDownloading ? t('common.cancel', 'Cancelar') : t('common.download', 'Descargar')}
                 </Text>
               </TouchableOpacity>
             )}

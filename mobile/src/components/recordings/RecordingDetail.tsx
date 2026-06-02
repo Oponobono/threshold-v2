@@ -54,11 +54,6 @@ const GROQ_API_KEY: string = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 const AUDIO_DIR = () => `${FileSystem.documentDirectory}Threshold/audio/`;
 const TRANSCRIPTS_DIR = () => `${FileSystem.documentDirectory}Threshold/transcripts/`;
 
-function getLocalKey(recordingData: AudioRecording | null, id: string): string {
-  if (recordingData?.id) return recordingData.id.toString();
-  return id.replace(/\.m4a$/, '');
-}
-
 // ---------------------------------------------------------------------------
 // RecordingDetail Component
 // ---------------------------------------------------------------------------
@@ -111,9 +106,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   const [studyDeck, setStudyDeck] = useState<{ id: number; title: string; cards: any[] } | null>(null);
   const [showStudyScreen, setShowStudyScreen] = useState(false);
 
-  const [audioUri, setAudioUri] = useState<string>(
-    `${AUDIO_DIR()}${recordingId.endsWith('.m4a') ? recordingId : `${recordingId}.m4a`}`
-  );
+  const [audioUri, setAudioUri] = useState<string>('');
 
   const recordingTitle = recordingData?.name
     || (() => {
@@ -179,23 +172,55 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       if (rec) { 
         setRecordingData(rec); 
         setSelectedSubjectId(rec.subject_id ?? null); 
-        
-        // Determinar mejor URI de audio (Caché local -> Fallback a Nube)
-        let bestUri = rec.local_uri;
-        if (bestUri) {
+      }
+      
+      // Determinar mejor URI de audio (Caché local -> Fallback a Nube -> Búsqueda)
+      let bestUri = rec?.local_uri || '';
+      if (bestUri) {
+        try {
+          let info = await FileSystem.getInfoAsync(bestUri);
+          if (!info.exists && bestUri.startsWith('file://')) {
+            info = await FileSystem.getInfoAsync(bestUri.replace(/^file:\/\//, ''));
+          }
+          if (!info.exists && rec?.cloud_url) {
+            console.log(`[RecordingDetail] Fallback a cloud_url para audio: ${rec?.id}`);
+            bestUri = rec.cloud_url;
+          } else if (!info.exists) {
+            bestUri = '';
+          }
+        } catch {
+          bestUri = '';
+        }
+      }
+      
+      if (!bestUri) {
+        const dir = AUDIO_DIR();
+        const candidates = [
+          ...(rec?.local_uri ? [rec.local_uri] : []),
+          `${dir}${recordingId}`,
+          `${dir}rec_${recordingId}.m4a`,
+          `${dir}${recordingId}.m4a`,
+          recordingId,
+        ];
+        for (const candidate of candidates) {
           try {
-            const info = await FileSystem.getInfoAsync(bestUri);
-            if (!info.exists && rec.cloud_url) {
-              console.log(`[RecordingDetail] Fallback a cloud_url para audio: ${rec.id}`);
-              bestUri = rec.cloud_url;
+            let info = await FileSystem.getInfoAsync(candidate);
+            if (!info.exists && candidate.startsWith('file://')) {
+              info = await FileSystem.getInfoAsync(candidate.replace(/^file:\/\//, ''));
+            }
+            if (info.exists) {
+              bestUri = candidate;
+              break;
             }
           } catch {}
         }
-        setAudioUri(bestUri || `${AUDIO_DIR()}${recordingId.endsWith('.m4a') ? recordingId : `${recordingId}.m4a`}`);
       }
+      
+      setAudioUri(bestUri);
 
-      const key = rec?.id?.toString() ?? recordingId.replace(/\.m4a$/, '');
-      await loadPersistedTexts(key, rec);
+      const fileKey = recordingId.replace(/\.m4a$/, '');
+      const serverKey = rec?.id?.toString() ?? null;
+      await loadPersistedTexts(fileKey, serverKey, rec);
     } catch (e) {
       console.error('loadInitialData:', e);
     } finally {
@@ -203,41 +228,51 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
     }
   };
 
-  const loadPersistedTexts = async (key: string, rec: AudioRecording | null) => {
+  const loadPersistedTexts = async (fileKey: string, serverKey: string | null, rec: AudioRecording | null) => {
     const dir = TRANSCRIPTS_DIR();
-    let localTranscriptFound = false;
-    try {
-      const ti = await FileSystem.getInfoAsync(`${dir}transcript_${key}.json`);
-      if (ti.exists) {
-        const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}transcript_${key}.json`));
-        if (parsed.text) { 
-          setTranscription(parsed.text); 
-          setShowTutorial(false); 
-          localTranscriptFound = true;
-        }
+    const tryLoadText = async (): Promise<boolean> => {
+      const candidates = [fileKey, serverKey].filter(Boolean) as string[];
+      for (const k of candidates) {
+        try {
+          const fi = await FileSystem.getInfoAsync(`${dir}transcript_${k}.json`);
+          if (fi.exists) {
+            const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}transcript_${k}.json`));
+            if (parsed.text) {
+              setTranscription(parsed.text);
+              setShowTutorial(false);
+              return true;
+            }
+          }
+        } catch {}
       }
-    } catch (e) { console.warn('transcript file:', e); }
+      return false;
+    };
 
-    // Fallback a la BD del servidor si no hay caché local
+    const tryLoadSummary = async (): Promise<boolean> => {
+      const candidates = [fileKey, serverKey].filter(Boolean) as string[];
+      for (const k of candidates) {
+        try {
+          const fi = await FileSystem.getInfoAsync(`${dir}summary_${k}.json`);
+          if (fi.exists) {
+            const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}summary_${k}.json`));
+            if (parsed.text) {
+              setSummary(parsed.text);
+              return true;
+            }
+          }
+        } catch {}
+      }
+      return false;
+    };
+
+    const localTranscriptFound = await tryLoadText();
     if (!localTranscriptFound && rec?.transcript_text) {
       console.log(`[RecordingDetail] Fallback a transcript_text del servidor para: ${rec.id}`);
       setTranscription(rec.transcript_text);
       setShowTutorial(false);
     }
 
-    let localSummaryFound = false;
-    try {
-      const si = await FileSystem.getInfoAsync(`${dir}summary_${key}.json`);
-      if (si.exists) {
-        const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}summary_${key}.json`));
-        if (parsed.text) { 
-          setSummary(parsed.text); 
-          localSummaryFound = true;
-        }
-      }
-    } catch (e) { console.warn('summary file:', e); }
-
-    // Fallback a la BD del servidor para el resumen si no hay caché local
+    const localSummaryFound = await tryLoadSummary();
     if (!localSummaryFound && (rec as any)?.summary_text) {
       console.log(`[RecordingDetail] Fallback a summary_text del servidor para audio: ${rec?.id}`);
       setSummary((rec as any).summary_text);
@@ -248,13 +283,14 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // Persist text locally + optionally register in DB
   // ---------------------------------------------------------------------------
   const saveTextToFile = async (text: string, type: 'transcript' | 'summary') => {
-    const key = getLocalKey(recordingData, recordingId);
+    const key = recordingId.replace(/\.m4a$/, '');
     const dir = TRANSCRIPTS_DIR();
     const fileUri = `${dir}${type}_${key}.json`;
     try {
       const di = await FileSystem.getInfoAsync(dir);
       if (!di.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify({ text, date: new Date().toISOString() }));
+      console.log(`[RecordingDetail] ${type} guardado localmente en: ${fileUri}`);
       if (recordingData?.id) {
         await upsertAudioTranscript({
           recording_id: recordingData.id,
@@ -331,11 +367,26 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
       });
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUri },
-        // 100ms interval (10fps) prevents UI thread locks while keeping slider smooth
-        { shouldPlay: true, progressUpdateIntervalMillis: 100 },
-      );
+      let sound: Audio.Sound;
+      try {
+        const result = await Audio.Sound.createAsync(
+          { uri: audioUri },
+          { shouldPlay: true, progressUpdateIntervalMillis: 100 },
+        );
+        sound = result.sound;
+      } catch (firstErr) {
+        if (audioUri.startsWith('file://')) {
+          const rawPath = audioUri.replace(/^file:\/\//, '');
+          console.warn('[RecordingDetail] Reintentando playback sin prefijo file://:', rawPath);
+          const fallbackResult = await Audio.Sound.createAsync(
+            { uri: rawPath },
+            { shouldPlay: true, progressUpdateIntervalMillis: 100 },
+          );
+          sound = fallbackResult.sound;
+        } else {
+          throw firstErr;
+        }
+      }
       soundRef.current = sound;
       setIsPlaying(true);
       setPositionMs(0);

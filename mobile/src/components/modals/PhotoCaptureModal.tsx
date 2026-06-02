@@ -3,6 +3,7 @@ import { View, Text, Modal, TouchableOpacity, Image, ActivityIndicator, StyleShe
 import { useCustomAlert } from '../ui/CustomAlert';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
@@ -102,21 +103,43 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     try {
       setIsProcessing(true);
       let successCount = 0;
+
+      const photosDir = `${FileSystem.documentDirectory}Threshold/photos/`;
+      const dirInfo = await FileSystem.getInfoAsync(photosDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(photosDir, { intermediates: true });
+      }
+
+      // Copiar cada foto a un directorio permanente
+      const permanentUris: string[] = [];
+      for (const imageUri of capturedImages) {
+        const ext = imageUri.includes('.png') ? '.png' : '.jpg';
+        const permName = `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`;
+        const permUri = `${photosDir}${permName}`;
+        try {
+          await FileSystem.copyAsync({ from: imageUri, to: permUri });
+          permanentUris.push(permUri);
+          console.log('[PhotoCaptureModal] Foto copiada a:', permUri);
+        } catch (copyErr) {
+          console.warn('[PhotoCaptureModal] Error copiando foto, usando URI original:', copyErr);
+          permanentUris.push(imageUri);
+        }
+      }
       
       // Generar un group_id si hay múltiples fotos para mostrarlas agrupadas en la galería
       const groupId = capturedImages.length > 1 ? `grp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}` : null;
 
-      for (const imageUri of capturedImages) {
+      for (const permUri of permanentUris) {
         try {
           const photoData = await createPhoto({
             subject_id: selectedSubjectId,
-            local_uri: imageUri,
+            local_uri: permUri,
             group_id: groupId,
           });
           
           if (photoData?.id) {
             await autoUploadIfEnabled(
-              imageUri,
+              permUri,
               'photo',
               photoData.id,
               `photo_${photoData.id}.jpg`,
@@ -130,7 +153,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
       }
       
       if (successCount > 0) {
-        if (onSave) onSave(capturedImages[0], selectedSubjectId);
+        if (onSave) onSave(permanentUris[0], selectedSubjectId);
         showAlert({ 
           title: t('common.success'), 
           message: t('dashboard.quickAddMenu.takePhoto.success') || `${successCount} foto(s) guardada(s)`, 

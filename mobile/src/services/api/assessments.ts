@@ -11,6 +11,8 @@ import { getUserId } from './auth';
 import { Assessment } from './types';
 import { cacheService, CACHE_KEYS } from '../../services/cacheService';
 import { offlineSyncService } from '../offlineSyncService';
+import { useConnectivityStore } from '../../store/useConnectivityStore';
+import { useLocalAIStore } from '../../store/useLocalAIStore';
 
 
 
@@ -64,12 +66,18 @@ export const createAssessment = async (payload: Assessment) => {
     console.log('[API/Assessments] createAssessment success:', data);
     return data;
   } catch (error: any) {
-    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network');
+    const isOfflineMode = useConnectivityStore.getState().isOnline === false;
+    const isForceOffline = useLocalAIStore.getState().forceOfflineMode;
+    const isNetworkError = isOfflineMode || isForceOffline ||
+      error.message?.includes('fetch') ||
+      error.message?.includes('Network') ||
+      error.message?.includes('conexión') ||
+      error.message?.includes('servidor') ||
+      error.message?.includes('Modo offline');
     if (isNetworkError) {
       console.warn('[Assessments] Red no disponible, guardando en cola offline:', error);
       await offlineSyncService.addPendingOperation('POST', '/assessments', 'assessment', payload);
       const optimisticAssessment = { id: -Date.now(), ...payload, _isPending: true };
-      // Persistir en cache local para visibilidad offline inmediata
       const existing: any[] | null = await cacheService.loadAssessments() as any[] | null;
       if (existing) {
         cacheService.saveAssessments([optimisticAssessment, ...existing]);
@@ -78,7 +86,7 @@ export const createAssessment = async (payload: Assessment) => {
       }
       return optimisticAssessment;
     }
-    throw error; // errores del servidor se relanzan
+    throw error;
   }
 };
 
@@ -107,7 +115,14 @@ export const updateAssessment = async (id: number, payload: Partial<Assessment>)
     console.log(`[API/Assessments] updateAssessment (id:${id}) success:`, data);
     return data;
   } catch (error: any) {
-    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network');
+    const isOfflineMode = useConnectivityStore.getState().isOnline === false;
+    const isForceOffline = useLocalAIStore.getState().forceOfflineMode;
+    const isNetworkError = isOfflineMode || isForceOffline ||
+      error.message?.includes('fetch') ||
+      error.message?.includes('Network') ||
+      error.message?.includes('conexión') ||
+      error.message?.includes('servidor') ||
+      error.message?.includes('Modo offline');
     if (isNetworkError) {
       console.warn(`[Assessments] Red no disponible, guardando actualización en cola offline:`, error);
       await offlineSyncService.addPendingOperation('PUT', `/assessments/${id}`, 'assessment', payload);

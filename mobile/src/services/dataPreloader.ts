@@ -1,5 +1,7 @@
 import { getUserId } from './api/auth';
-import { getSubjects, getAllAssessments, getAllSchedules } from './api/subjects';
+import { getSubjects } from './api/subjects';
+import { getAllAssessments } from './api/assessments';
+import { getAllSchedules } from './api/schedules';
 import { getGalleryItems, getPhotosBySubject } from './api/photos';
 import { getAudioRecordings } from './api/audio';
 import { getYouTubeVideos } from './api/youtube';

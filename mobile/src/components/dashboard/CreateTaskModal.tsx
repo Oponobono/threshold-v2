@@ -7,7 +7,7 @@ import { theme } from '../../styles/theme';
 import { alertRef } from '../ui/CustomAlert';
 import { createAssessment, type Subject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
-import { useConnectivityStore } from '../../store/useConnectivityStore';
+
 import { ThresholdDatePicker } from '../ui/ThresholdDatePicker';
 import { SubjectSelectorModal } from './SubjectSelectorModal';
 import { CategorySelectorModal } from './CategorySelectorModal';
@@ -23,7 +23,7 @@ interface CreateTaskModalProps {
 
 export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, onTaskCreated }: CreateTaskModalProps) => {
   const { t } = useTranslation();
-  const isOnline = useConnectivityStore(s => s.isOnline);
+
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
@@ -96,19 +96,19 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
         category_id: selectedCategoryId || undefined,
       });
 
-      if (isOnline) {
-        await onTaskCreated();
-      } else {
+      if ((result as any)._isPending) {
         useDataStore.setState(state => ({
           assessments: [result, ...state.assessments.filter(a => a.id !== (result as any).id)]
         }));
+      } else {
+        await onTaskCreated();
       }
 
       alertRef.show({
         title: t('common.success'),
-        message: isOnline
-          ? t('dashboard.quickAddMenu.task.success')
-          : t('dashboard.quickAddMenu.task.offlineSuccess'),
+        message: (result as any)._isPending
+          ? t('dashboard.quickAddMenu.task.offlineSuccess')
+          : t('dashboard.quickAddMenu.task.success'),
         type: 'success',
       });
 
