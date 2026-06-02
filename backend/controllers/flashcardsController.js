@@ -502,7 +502,7 @@ exports.getCardsByDeckPrioritized = (req, res) => {
      WHERE fc.deck_id = ?
      GROUP BY fc.id
      ORDER BY 
-       CASE WHEN fc.next_review_date <= datetime('now') THEN 0 ELSE 1 END ASC,
+       CASE WHEN fc.next_review_date <= CURRENT_TIMESTAMP THEN 0 ELSE 1 END ASC,
        fc.next_review_date ASC,
        failure_rate DESC,
        fc.created_at ASC`,
