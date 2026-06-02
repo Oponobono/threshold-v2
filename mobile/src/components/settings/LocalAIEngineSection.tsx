@@ -500,24 +500,26 @@ export const LocalAIEngineSection = () => {
       {/* ─────────────────────────── */}
       {/* Banner de Capacidades del Dispositivo */}
       {/* ─────────────────────────── */}
-      {deviceTier && (
-        <View style={{
-          backgroundColor: deviceTier === 'low' ? '#2A2020' : '#1E2A20',
-          borderRadius: 8,
-          padding: 12,
-          marginTop: 16,
-          marginBottom: 8,
-        }}>
-          <Text style={{ color: '#E8D5B7', fontSize: 13, fontWeight: '600', marginBottom: 4 }}>
-            {deviceTier === 'low'
-              ? t('settings.localAI.lowRamTitle', '📱 Dispositivo de gama baja')
-              : deviceTier === 'mid'
-              ? t('settings.localAI.midRamTitle', '📱 Dispositivo de gama media')
-              : t('settings.localAI.highRamTitle', '📱 Dispositivo de gama alta')}
-          </Text>
-          <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17, marginBottom: 6 }}>
-            <Text style={{ fontWeight: '600' }}>Total:</Text> {deviceRamGB}GB · <Text style={{ fontWeight: '600' }}>Disponible:</Text> {deviceAvailableRamGB}GB · <Text style={{ fontWeight: '600', color: '#56D46A' }}>Utilizable:</Text> {deviceUsableRamGB}GB
-          </Text>
+      <View style={{
+        backgroundColor: deviceTier === 'low' ? '#2A2020' : '#1E2A20',
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 16,
+        marginBottom: 8,
+      }}>
+        <Text style={{ color: '#E8D5B7', fontSize: 13, fontWeight: '600', marginBottom: 4 }}>
+          {deviceTier === 'low'
+            ? t('settings.localAI.lowRamTitle', '📱 Dispositivo de gama baja')
+            : deviceTier === 'mid'
+            ? t('settings.localAI.midRamTitle', '📱 Dispositivo de gama media')
+            : deviceTier === 'high'
+            ? t('settings.localAI.highRamTitle', '📱 Dispositivo de gama alta')
+            : t('settings.localAI.detectingDeviceTitle', '📱 Detectando capacidades...')}
+        </Text>
+        <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17, marginBottom: 6 }}>
+          <Text style={{ fontWeight: '600' }}>Total:</Text> {deviceRamGB || '?'}GB · <Text style={{ fontWeight: '600' }}>Disponible:</Text> {deviceAvailableRamGB || '?'}GB · <Text style={{ fontWeight: '600', color: '#56D46A' }}>Utilizable:</Text> {deviceUsableRamGB || '?'}GB
+        </Text>
+        {deviceTier && (
           <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17 }}>
             {deviceTier === 'low'
               ? t('settings.localAI.lowRamDesc', 'Solo modelos esenciales (Llama 3.2 1B) para evitar cierres por falta de memoria.')
@@ -525,39 +527,39 @@ export const LocalAIEngineSection = () => {
               ? t('settings.localAI.midRamDesc', 'Compatible con modelos de hasta 2B de parámetros.')
               : t('settings.localAI.highRamDesc', 'Compatible con todos los modelos disponibles.')}
           </Text>
-          <TouchableOpacity
-            style={{
-              marginTop: 8,
-              paddingVertical: 6,
-              paddingHorizontal: 10,
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: 4,
-              alignSelf: 'flex-start',
-            }}
-            onPress={async () => {
-              setIsRefreshingRam(true);
-              try {
-                const caps = await refreshDeviceCapabilities();
-                if (caps) {
-                  alertRef?.current?.show({
-                    title: t('settings.localAI.ramDetected', 'Información de RAM'),
-                    message: `${t('common.total', 'Total')}: ${caps.totalRamGB}GB\n${t('common.available', 'Disponible')}: ${caps.availableRamGB}GB\n${t('common.usable', 'Utilizable')}: ${caps.usableRamGB}GB\n\n${t('common.tier', 'Nivel')}: ${caps.tier}\n${t('common.compatible', 'Modelos compatibles')}: ${caps.compatibleModels.join(', ')}`,
-                    buttons: [{ text: 'OK' }],
-                  });
-                }
-              } finally {
-                setIsRefreshingRam(false);
+        )}
+        <TouchableOpacity
+          style={{
+            marginTop: 8,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: 4,
+            alignSelf: 'flex-start',
+          }}
+          onPress={async () => {
+            setIsRefreshingRam(true);
+            try {
+              const caps = await refreshDeviceCapabilities();
+              if (caps) {
+                alertRef?.current?.show({
+                  title: t('settings.localAI.ramDetected', 'Información de RAM'),
+                  message: `${t('common.total', 'Total')}: ${caps.totalRamGB}GB\n${t('common.available', 'Disponible')}: ${caps.availableRamGB}GB\n${t('common.usable', 'Utilizable')}: ${caps.usableRamGB}GB\n\n${t('common.tier', 'Nivel')}: ${caps.tier}\n${t('common.compatible', 'Modelos compatibles')}: ${caps.compatibleModels.join(', ')}`,
+                  buttons: [{ text: 'OK' }],
+                });
               }
-            }}
-            disabled={isRefreshingRam}
-          >
-            <Text style={{ color: '#C4B8A8', fontSize: 11, fontWeight: '500' }}>
-              {isRefreshingRam ? '⟳ ' : '↻ '}
-              {t('common.refresh', 'Refrescar')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+            } finally {
+              setIsRefreshingRam(false);
+            }
+          }}
+          disabled={isRefreshingRam}
+        >
+          <Text style={{ color: '#C4B8A8', fontSize: 11, fontWeight: '500' }}>
+            {isRefreshingRam ? '⟳ ' : '↻ '}
+            {t('common.refresh', 'Refrescar')}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* ─────────────────────────── */}
       {/* BLOQUE 2: Catálogo de Modelos */}

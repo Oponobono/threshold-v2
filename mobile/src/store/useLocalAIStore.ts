@@ -224,6 +224,13 @@ async function persistHydrate(store: { setState: (s: Partial<LocalAIState>) => v
 
     // Detectar capacidades del dispositivo para validar modelos
     getDeviceCapabilities().then((caps) => {
+      console.log('[useLocalAIStore] Device capabilities detected:', {
+        tier: caps.tier,
+        totalRamGB: caps.totalRamGB,
+        availableRamGB: caps.availableRamGB,
+        usableRamGB: caps.usableRamGB,
+        compatibleModels: caps.compatibleModels,
+      });
       store.setState({
         deviceTier: caps.tier,
         deviceCompatibleModels: caps.compatibleModels,
@@ -238,7 +245,17 @@ async function persistHydrate(store: { setState: (s: Partial<LocalAIState>) => v
         store.getState().setActiveModel(recommended);
         console.warn(`[useLocalAIStore] Dispositivo ${caps.tier} (${caps.usableRamGB}GB utilizable): modelo ${currentId} no compatible, cambiando a ${recommended}`);
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error('[useLocalAIStore] Error getting device capabilities:', err);
+      // Fallback: asignar valores por defecto basados en la RAM estimada
+      store.setState({
+        deviceTier: 'mid',
+        deviceCompatibleModels: ['essential', 'advanced'],
+        deviceRamGB: 4,
+        deviceAvailableRamGB: 3,
+        deviceUsableRamGB: 2.4,
+      });
+    });
   } catch {
     // Si falla, igual resolvemos para no bloquear
   } finally {
