@@ -821,8 +821,9 @@ export const LocalAIEngineSection = () => {
         )}
       </View>
 
-      {/* Capacidades Offline */}
-      <View style={{ marginTop: 14, marginBottom: 4 }}>
+      <>
+        {/* Capacidades Offline */}
+        <View style={{ marginTop: 14, marginBottom: 4 }}>
           <Text style={[styles.subSectionTitle, { marginTop: 0, marginBottom: 8 }]}>
             {t('settings.localAI.offlineCapabilitiesTitle')}
           </Text>
@@ -848,7 +849,7 @@ export const LocalAIEngineSection = () => {
           <Ionicons name="trash-outline" size={14} color="#fff" style={{ marginRight: 6 }} />
           <Text style={styles.darkPillText}>{t('settings.localAI.purgeCache')}</Text>
         </TouchableOpacity>
-      </View>
+      </>
     </View>
   );
 };
