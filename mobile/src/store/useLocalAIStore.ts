@@ -147,6 +147,10 @@ export interface LocalAIState {
   deviceCompatibleModels: LocalModelId[];
   // RAM total del dispositivo en GB
   deviceRamGB: number;
+  // RAM disponible (libre) del dispositivo en GB
+  deviceAvailableRamGB: number;
+  // RAM utilizable por los modelos (disponible - 20% seguridad) en GB
+  deviceUsableRamGB: number;
 
   // Acciones
   setForceOfflineMode: (enabled: boolean) => void;
@@ -158,6 +162,7 @@ export interface LocalAIState {
   setInferenceStatus: (status: InferenceStatus) => void;
   setErrorMessage: (msg: string | null) => void;
   setStorageUsedBytes: (bytes: number) => void;
+  refreshDeviceCapabilities: () => Promise<DeviceCapabilities | null>;
   setDeviceTier: (tier: 'low' | 'mid' | 'high') => void;
   setDeviceCompatibleModels: (models: LocalModelId[]) => void;
   reset: () => void;
@@ -223,13 +228,15 @@ async function persistHydrate(store: { setState: (s: Partial<LocalAIState>) => v
         deviceTier: caps.tier,
         deviceCompatibleModels: caps.compatibleModels,
         deviceRamGB: caps.totalRamGB,
+        deviceAvailableRamGB: caps.availableRamGB,
+        deviceUsableRamGB: caps.usableRamGB,
       });
       // Si el modelo activo no es compatible, cambiar al recomendado
       const currentId = store.getState().activeModelId;
       if (currentId && !caps.compatibleModels.includes(currentId)) {
         const recommended = caps.recommendedModel;
         store.getState().setActiveModel(recommended);
-        console.warn(`[useLocalAIStore] Dispositivo ${caps.tier} (${caps.totalRamGB}GB): modelo ${currentId} no compatible, cambiando a ${recommended}`);
+        console.warn(`[useLocalAIStore] Dispositivo ${caps.tier} (${caps.usableRamGB}GB utilizable): modelo ${currentId} no compatible, cambiando a ${recommended}`);
       }
     }).catch(() => {});
   } catch {
@@ -257,6 +264,8 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
     deviceTier: null,
     deviceCompatibleModels: [],
     deviceRamGB: 0,
+    deviceAvailableRamGB: 0,
+    deviceUsableRamGB: 0,
 
   setDeviceTier: (tier) => set({ deviceTier: tier }),
 
@@ -330,6 +339,27 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
   setErrorMessage: (msg) => set({ errorMessage: msg }),
   setStorageUsedBytes: (bytes) => set({ storageUsedBytes: bytes }),
 
+  // Función para refrescar la detección de RAM (útil para debugging)
+  refreshDeviceCapabilities: async () => {
+    try {
+      const caps = await getDeviceCapabilities();
+      set({
+        deviceRamGB: caps.totalRamGB,
+        deviceAvailableRamGB: caps.availableRamGB,
+        deviceUsableRamGB: caps.usableRamGB,
+        deviceTier: caps.tier,
+        deviceCompatibleModels: caps.compatibleModels,
+      });
+      console.log(
+        `[useLocalAIStore] Capacidades refrescadas - Total: ${caps.totalRamGB}GB | Available: ${caps.availableRamGB}GB | Usable: ${caps.usableRamGB}GB | Tier: ${caps.tier} | Compatibles: ${caps.compatibleModels.join(', ')}`
+      );
+      return caps;
+    } catch (error) {
+      console.error('[useLocalAIStore] Error al refrescar capacidades:', error);
+      return null;
+    }
+  },
+
   reset: () => {
     set({
       downloadedModels: {},
@@ -345,6 +375,8 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
       deviceTier: null,
       deviceCompatibleModels: [],
       deviceRamGB: 0,
+      deviceAvailableRamGB: 0,
+      deviceUsableRamGB: 0,
     });
     AsyncStorage.multiRemove([STORAGE_KEY_MODELS, STORAGE_KEY_ACTIVE, STORAGE_KEY_FORCED, STORAGE_KEY_PROVIDER, STORAGE_KEY_WHISPER]);
   },

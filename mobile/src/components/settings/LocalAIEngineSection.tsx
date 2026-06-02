@@ -49,6 +49,7 @@ const SettingRow = ({ title, desc, right }: { title: string; desc?: string; righ
 
 export const LocalAIEngineSection = () => {
   const { t } = useTranslation();
+  const [isRefreshingRam, setIsRefreshingRam] = useState(false);
   const isOnline = useConnectivityStore((s) => s.isOnline);
 
   const forceOfflineMode = useLocalAIStore((s) => s.forceOfflineMode);
@@ -61,12 +62,15 @@ export const LocalAIEngineSection = () => {
   const deviceTier = useLocalAIStore((s) => s.deviceTier);
   const deviceCompatibleModels = useLocalAIStore((s) => s.deviceCompatibleModels);
   const deviceRamGB = useLocalAIStore((s) => s.deviceRamGB);
+  const deviceAvailableRamGB = useLocalAIStore((s) => s.deviceAvailableRamGB);
+  const deviceUsableRamGB = useLocalAIStore((s) => s.deviceUsableRamGB);
 
   const setForceOfflineMode = useLocalAIStore((s) => s.setForceOfflineMode);
   const setActiveModel = useLocalAIStore((s) => s.setActiveModel);
   const markModelDownloaded = useLocalAIStore((s) => s.markModelDownloaded);
   const markModelRemoved = useLocalAIStore((s) => s.markModelRemoved);
   const setDownloadProgress = useLocalAIStore((s) => s.setDownloadProgress);
+  const refreshDeviceCapabilities = useLocalAIStore((s) => s.refreshDeviceCapabilities);
 
   const [downloadingId, setDownloadingId] = useState<LocalModelId | null>(null);
   const downloadResumables = React.useRef<Record<string, FileSystem.DownloadResumable>>({});
@@ -515,14 +519,47 @@ export const LocalAIEngineSection = () => {
               ? t('settings.localAI.midRamTitle', '📱 Dispositivo de gama media')
               : t('settings.localAI.highRamTitle', '📱 Dispositivo de gama alta')}
           </Text>
+          <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17, marginBottom: 6 }}>
+            <Text style={{ fontWeight: '600' }}>Total:</Text> {deviceRamGB}GB · <Text style={{ fontWeight: '600' }}>Disponible:</Text> {deviceAvailableRamGB}GB · <Text style={{ fontWeight: '600', color: '#56D46A' }}>Utilizable:</Text> {deviceUsableRamGB}GB
+          </Text>
           <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17 }}>
-            {t('settings.localAI.ramDetected', `RAM detectada: ~${deviceRamGB}GB · `)}
             {deviceTier === 'low'
               ? t('settings.localAI.lowRamDesc', 'Solo modelos esenciales (Llama 3.2 1B) para evitar cierres por falta de memoria.')
               : deviceTier === 'mid'
               ? t('settings.localAI.midRamDesc', 'Compatible con modelos de hasta 2B de parámetros.')
               : t('settings.localAI.highRamDesc', 'Compatible con todos los modelos disponibles.')}
           </Text>
+          <TouchableOpacity
+            style={{
+              marginTop: 8,
+              paddingVertical: 6,
+              paddingHorizontal: 10,
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: 4,
+              alignSelf: 'flex-start',
+            }}
+            onPress={async () => {
+              setIsRefreshingRam(true);
+              try {
+                const caps = await refreshDeviceCapabilities();
+                if (caps) {
+                  alertRef?.current?.show({
+                    title: t('settings.localAI.ramDetected', 'Información de RAM'),
+                    message: `${t('common.total', 'Total')}: ${caps.totalRamGB}GB\n${t('common.available', 'Disponible')}: ${caps.availableRamGB}GB\n${t('common.usable', 'Utilizable')}: ${caps.usableRamGB}GB\n\n${t('common.tier', 'Nivel')}: ${caps.tier}\n${t('common.compatible', 'Modelos compatibles')}: ${caps.compatibleModels.join(', ')}`,
+                    buttons: [{ text: 'OK' }],
+                  });
+                }
+              } finally {
+                setIsRefreshingRam(false);
+              }
+            }}
+            disabled={isRefreshingRam}
+          >
+            <Text style={{ color: '#C4B8A8', fontSize: 11, fontWeight: '500' }}>
+              {isRefreshingRam ? '⟳ ' : '↻ '}
+              {t('common.refresh', 'Refrescar')}
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -609,7 +646,7 @@ export const LocalAIEngineSection = () => {
                 {!isCompatible && !isDownloaded ? (
                   <View style={{ flex: 1, paddingVertical: 4 }}>
                     <Text style={{ fontSize: 11, color: '#FF5050', textAlign: 'center' }}>
-                      {t('settings.localAI.incompatibleRam', `Requiere ${model.ramMin} RAM · tu dispositivo tiene ~${deviceRamGB}GB`)}
+                      {t('settings.localAI.incompatibleRam', `Requiere ${model.ramMin}GB · Tienes ${deviceUsableRamGB}GB utilizable`)}
                     </Text>
                   </View>
                 ) : isDownloaded ? (
