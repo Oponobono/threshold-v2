@@ -819,8 +819,10 @@ export const LocalAIEngineSection = () => {
             {t('settings.localAI.noModelsDownloaded', 'Descarga modelos para usar el motor de IA local.')}
           </Text>
         )}
+      </View>
 
-        <View style={{ marginTop: 14, marginBottom: 4 }}>
+      {/* Capacidades Offline */}
+      <View style={{ marginTop: 14, marginBottom: 4 }}>
           <Text style={[styles.subSectionTitle, { marginTop: 0, marginBottom: 8 }]}>
             {t('settings.localAI.offlineCapabilitiesTitle')}
           </Text>
