@@ -737,84 +737,102 @@ export const LocalAIEngineSection = () => {
       {/* ─────────────────────────── */}
       {/* BLOQUE 3: Almacenamiento */}
       {/* ─────────────────────────── */}
-      <View style={styles.storageBar}>
-        <View style={styles.storageRow}>
-          <Text style={[styles.subSectionTitle, { marginTop: 0, marginBottom: 12 }]}>📦 {t('settings.localAI.storageTitle')}</Text>
-          
-          {/* Total de almacenamiento usado */}
-          <View style={{
-            backgroundColor: 'rgba(86, 212, 106, 0.1)',
-            borderRadius: 8,
-            padding: 12,
-            marginBottom: 12,
-            borderLeftWidth: 3,
-            borderLeftColor: '#56D46A',
+      <View style={{
+        backgroundColor: '#1E2A20',
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 16,
+        marginBottom: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: '#56D46A',
+      }}>
+        <Text style={{ color: '#E8D5B7', fontSize: 13, fontWeight: '600', marginBottom: 10 }}>
+          {t('settings.localAI.storageTitle')}
+        </Text>
+        
+        {/* Mostrar total de almacenamiento */}
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ color: '#C4B8A8', fontSize: 12, marginBottom: 4 }}>
+            {t('settings.localAI.storageUsed', 'Almacenamiento utilizado')}
+          </Text>
+          <Text style={{ 
+            color: '#56D46A', 
+            fontSize: 16, 
+            fontWeight: '600',
           }}>
-            <Text style={{ color: '#C4B8A8', fontSize: 12, marginBottom: 4 }}>
-              {t('settings.localAI.storageUsed', 'Almacenamiento utilizado')}
-            </Text>
-            <Text style={{ color: '#56D46A', fontSize: 20, fontWeight: '700' }}>
-              {formatBytes(storageUsedBytes)}
-            </Text>
-          </View>
-
-          {/* Desglose de modelos descargados */}
-          {(Object.keys(downloadedModels).length > 0) && (
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ color: '#C4B8A8', fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
-                {t('settings.localAI.downloadedModels', 'Modelos descargados')}:
-              </Text>
-              {Object.entries(downloadedModels).map(([modelId]) => {
-                const isWhisper = modelId === 'whisper';
-                const size = isWhisper 
-                  ? WHISPER_MODEL.downloadSizeBytes 
-                  : MODELS[modelId as LocalModelId]?.downloadSizeBytes || 0;
-                const name = isWhisper 
-                  ? 'Whisper Tiny (STT)' 
-                  : MODELS[modelId as LocalModelId]?.name || modelId;
-                
-                return (
-                  <View key={modelId} style={{ 
-                    flexDirection: 'row', 
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingVertical: 8,
-                    paddingHorizontal: 8,
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    borderRadius: 4,
-                    marginBottom: 6,
-                  }}>
-                    <Text style={{ color: '#E8D5B7', fontSize: 12, flex: 1 }}>
-                      {name}
-                    </Text>
-                    <Text style={{ color: '#C4B8A8', fontSize: 11, fontWeight: '500' }}>
-                      {formatBytes(size)}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Mensaje cuando no hay modelos descargados */}
-          {Object.keys(downloadedModels).length === 0 && (
-            <View style={{
-              backgroundColor: 'rgba(212, 86, 86, 0.1)',
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 12,
-              borderLeftWidth: 3,
-              borderLeftColor: '#D45656',
-            }}>
-              <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17 }}>
-                {t('settings.localAI.noModelsDownloaded', 'No hay modelos descargados. Descarga modelos para usar el motor de IA local.')}
-              </Text>
-            </View>
-          )}
+            {formatBytes(storageUsedBytes)}
+          </Text>
         </View>
 
-        <View style={{ marginTop: 14, marginBottom: 4 }}>
-          <Text style={[styles.subSectionTitle, { marginTop: 0, marginBottom: 8 }]}>
+        {/* Desglose de modelos descargados */}
+        {(Object.keys(downloadedModels).length > 0) && (
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ 
+              color: '#C4B8A8', 
+              fontSize: 11, 
+              fontWeight: '600',
+              marginBottom: 8,
+            }}>
+              {t('settings.localAI.downloadedModels', 'Modelos descargados')}
+            </Text>
+            {Object.entries(downloadedModels).map(([modelId], idx) => {
+              const isWhisper = modelId === 'whisper';
+              const size = isWhisper 
+                ? WHISPER_MODEL.downloadSizeBytes 
+                : MODELS[modelId as LocalModelId]?.downloadSizeBytes || 0;
+              const name = isWhisper 
+                ? 'Whisper Tiny' 
+                : MODELS[modelId as LocalModelId]?.name || modelId;
+              const isLast = idx === Object.keys(downloadedModels).length - 1;
+              
+              return (
+                <View key={modelId} style={{ 
+                  flexDirection: 'row', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: 8,
+                  borderBottomWidth: isLast ? 0 : 1,
+                  borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+                }}>
+                  <Text style={{ 
+                    color: '#C4B8A8', 
+                    fontSize: 12,
+                    flex: 1,
+                  }}>
+                    {name}
+                  </Text>
+                  <Text style={{ 
+                    color: '#C4B8A8', 
+                    fontSize: 11,
+                    fontWeight: '500',
+                    marginLeft: 12,
+                  }}>
+                    {formatBytes(size)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Mensaje cuando no hay modelos descargados */}
+        {Object.keys(downloadedModels).length === 0 && (
+          <Text style={{ 
+            color: '#C4B8A8', 
+            fontSize: 12,
+            lineHeight: 17,
+          }}>
+            {t('settings.localAI.noModelsDownloaded', 'Descarga modelos para usar el motor de IA local.')}
+          </Text>
+        )}
+
+        <View style={{ marginTop: 12, marginBottom: 0 }}>
+          <Text style={{ 
+            color: '#C4B8A8', 
+            fontSize: 11, 
+            fontWeight: '600',
+            marginBottom: 8,
+          }}>
             {t('settings.localAI.offlineCapabilitiesTitle')}
           </Text>
           {[
@@ -824,8 +842,13 @@ export const LocalAIEngineSection = () => {
             'capabilityFlashcards',
           ].map((cap) => (
             <View key={cap} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4, gap: 6 }}>
-              <Text style={{ color: theme.colors.text.secondary, fontSize: 12, lineHeight: 20 }}>{'•'}</Text>
-              <Text style={[styles.settingDesc, { flex: 1, lineHeight: 20 }]}>
+              <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 20 }}>{'•'}</Text>
+              <Text style={{ 
+                color: '#C4B8A8', 
+                fontSize: 12, 
+                lineHeight: 20,
+                flex: 1,
+              }}>
                 {t(`settings.localAI.${cap}`)}
               </Text>
             </View>
@@ -833,11 +856,22 @@ export const LocalAIEngineSection = () => {
         </View>
 
         <TouchableOpacity
-          style={[styles.darkPill, { backgroundColor: theme.colors.danger, marginTop: 8 }]}
+          style={{
+            marginTop: 12,
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            backgroundColor: 'rgba(212, 86, 86, 0.9)',
+            borderRadius: 4,
+            alignSelf: 'flex-start',
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
           onPress={handlePurgeCache}
         >
-          <Ionicons name="trash-outline" size={14} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.darkPillText}>{t('settings.localAI.purgeCache')}</Text>
+          <Ionicons name="trash-outline" size={13} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 11 }}>
+            {t('settings.localAI.purgeCache')}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
