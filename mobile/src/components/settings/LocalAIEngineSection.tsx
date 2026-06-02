@@ -739,10 +739,78 @@ export const LocalAIEngineSection = () => {
       {/* ─────────────────────────── */}
       <View style={styles.storageBar}>
         <View style={styles.storageRow}>
-          <Text style={[styles.subSectionTitle, { marginTop: 0, marginBottom: 2 }]}>{t('settings.localAI.storageTitle')}</Text>
-          <Text style={[styles.settingDesc, { lineHeight: 18 }]}>
-            {t('settings.localAI.storageDesc', { size: formatBytes(storageUsedBytes) })}
-          </Text>
+          <Text style={[styles.subSectionTitle, { marginTop: 0, marginBottom: 12 }]}>📦 {t('settings.localAI.storageTitle')}</Text>
+          
+          {/* Total de almacenamiento usado */}
+          <View style={{
+            backgroundColor: 'rgba(86, 212, 106, 0.1)',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 12,
+            borderLeftWidth: 3,
+            borderLeftColor: '#56D46A',
+          }}>
+            <Text style={{ color: '#C4B8A8', fontSize: 12, marginBottom: 4 }}>
+              {t('settings.localAI.storageUsed', 'Almacenamiento utilizado')}
+            </Text>
+            <Text style={{ color: '#56D46A', fontSize: 20, fontWeight: '700' }}>
+              {formatBytes(storageUsedBytes)}
+            </Text>
+          </View>
+
+          {/* Desglose de modelos descargados */}
+          {(Object.keys(downloadedModels).length > 0) && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ color: '#C4B8A8', fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
+                {t('settings.localAI.downloadedModels', 'Modelos descargados')}:
+              </Text>
+              {Object.entries(downloadedModels).map(([modelId]) => {
+                const isWhisper = modelId === 'whisper';
+                const size = isWhisper 
+                  ? WHISPER_MODEL.downloadSizeBytes 
+                  : MODELS[modelId as LocalModelId]?.downloadSizeBytes || 0;
+                const name = isWhisper 
+                  ? 'Whisper Tiny (STT)' 
+                  : MODELS[modelId as LocalModelId]?.name || modelId;
+                
+                return (
+                  <View key={modelId} style={{ 
+                    flexDirection: 'row', 
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingVertical: 8,
+                    paddingHorizontal: 8,
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: 4,
+                    marginBottom: 6,
+                  }}>
+                    <Text style={{ color: '#E8D5B7', fontSize: 12, flex: 1 }}>
+                      {name}
+                    </Text>
+                    <Text style={{ color: '#C4B8A8', fontSize: 11, fontWeight: '500' }}>
+                      {formatBytes(size)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Mensaje cuando no hay modelos descargados */}
+          {Object.keys(downloadedModels).length === 0 && (
+            <View style={{
+              backgroundColor: 'rgba(212, 86, 86, 0.1)',
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 12,
+              borderLeftWidth: 3,
+              borderLeftColor: '#D45656',
+            }}>
+              <Text style={{ color: '#C4B8A8', fontSize: 12, lineHeight: 17 }}>
+                {t('settings.localAI.noModelsDownloaded', 'No hay modelos descargados. Descarga modelos para usar el motor de IA local.')}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={{ marginTop: 14, marginBottom: 4 }}>
