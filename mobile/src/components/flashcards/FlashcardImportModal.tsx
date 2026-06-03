@@ -17,7 +17,7 @@ import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { type Subject } from '../../services/api';
-import { saveImportedDeck, updateLocalDeckSubject } from '../../services/localFlashcardService';
+import { saveImportedDeck, updateLocalDeckSubject, prepareDeckForSync, exportDeckToJSON } from '../../services/localFlashcardService';
 
 export interface FlashcardImportModalProps {
   isVisible: boolean;
@@ -65,6 +65,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [importedDeck, setImportedDeck] = useState<ImportedDeck | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [deckTitle, setDeckTitle] = useState<string>('');
 
   const handleLaunchPicker = async () => {
     try {
@@ -100,6 +101,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
     const t_ = t;
     const templateDeck: any = {
       _info: t_('flashcards.template.supportedLanguages', { count: languagesList.length, languages: languagesList.join(', ') }),
+      _security: 'IMPORTANTE: No incluir "user_id" en este archivo. El ID del usuario será asignado automáticamente según la cuenta que realice la importación.',
       title: t_('flashcards.template.title'),
       description: t_('flashcards.template.description'),
       cards: [
@@ -253,6 +255,13 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       // Sanitizar contra prototype pollution
       const deckData: DeckJSON = sanitizeJSON(rawData);
 
+      // SEGURIDAD: Eliminar cualquier user_id del JSON importado
+      // El user_id siempre será el del usuario autenticado, nunca del JSON
+      if ('user_id' in deckData) {
+        console.warn('[FlashcardImportModal] JSON contiene user_id, será ignorado por seguridad');
+        delete (deckData as any).user_id;
+      }
+
       // Validar estructura básica
       if (!deckData.title || !deckData.title.trim()) {
         showAlert({
@@ -345,6 +354,18 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         null,
       );
 
+      // OFFLINE-FIRST: Preparar mazo para sincronizar cuando vuelva online
+      try {
+        const userId = Number(await import('../../services/api').then(m => m.getUserId())) || 0;
+        if (userId > 0) {
+          await prepareDeckForSync(deck.id, userId);
+          console.log('[FlashcardImportModal] Mazo importado preparado para sincronizar');
+        }
+      } catch (syncErr) {
+        // Si hay error preparando sync, no importa - el mazo se sincronizará manualmente
+        console.warn('[FlashcardImportModal] Error preparando sync:', syncErr);
+      }
+
       setImportedDeck({
         id: deck.id,
         title: deck.title,
@@ -354,17 +375,15 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
 
       setIsProcessing(false);
 
-      if (cards.length > 0) {
+      if (cards.length === 0) {
         showAlert({
-          title: t('common.success'),
-          message: t('flashcards.importComplete', { title: deckData.title, successCount: cards.length }),
-          type: 'success',
+          title: t('common.warning'),
+          message: t('flashcards.noCardsImported'),
+          type: 'warning',
         });
-        onImportSuccess?.();
         setImportedDeck(null);
-        setSelectedSubjectId(null);
-        onClose();
       }
+      // Si hay tarjetas, NO cerrar - mostrar pantalla de selección de materia
     } catch (error: any) {
       console.error('[FlashcardImportModal] Error importando:', error);
 
@@ -385,18 +404,16 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   };
 
   const handleConfirmSubject = async () => {
-    if (!importedDeck || !selectedSubjectId) {
-      showAlert({
-        title: t('common.error'),
-        message: t('flashcards.pleaseSelectSubject'),
-        type: 'error',
-      });
-      return;
-    }
+    if (!importedDeck) return;
 
+    // La materia es opcional, el usuario puede confirmar sin seleccionar
     try {
       setIsProcessing(true);
-      updateLocalDeckSubject(importedDeck.id, selectedSubjectId);
+      
+      // Si se seleccionó materia, actualizarla
+      if (selectedSubjectId) {
+        updateLocalDeckSubject(importedDeck.id, selectedSubjectId);
+      }
       
       showAlert({
         title: t('common.success'),
@@ -522,24 +539,25 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
                 disabled={isProcessing}
                 style={{
                   marginTop: 12,
-                  backgroundColor: '#E3F2FD',
+                  backgroundColor: 'transparent',
+                  borderWidth: 1,
+                  borderColor: theme.colors.primary,
                   borderRadius: 12,
                   paddingVertical: 12,
-                  paddingHorizontal: 11,
+                  paddingHorizontal: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 8,
                   opacity: isProcessing ? 0.6 : 1,
-                  alignSelf: 'center',
                 }}
               >
-                <Ionicons name="download-outline" size={18} color="#2196F3" />
+                <Ionicons name="download-outline" size={18} color={theme.colors.primary} />
                 <Text
                   style={{
                     fontSize: 14,
-                    fontWeight: '700',
-                    color: '#2196F3',
+                    fontWeight: '600',
+                    color: theme.colors.primary,
                   }}
                 >
                   {t('flashcards.downloadTemplate')}
@@ -630,6 +648,51 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
                   marginBottom: 16,
                 }}
               >
+                {/* Option: No Subject */}
+                <TouchableOpacity
+                  onPress={() => setSelectedSubjectId(null)}
+                  disabled={isProcessing}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 11,
+                    backgroundColor:
+                      selectedSubjectId === null
+                        ? `${theme.colors.primary}15`
+                        : 'transparent',
+                    borderBottomWidth: subjects.length > 0 ? 1 : 0,
+                    borderBottomColor: theme.colors.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: theme.colors.text.secondary,
+                      marginRight: 10,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      fontWeight: selectedSubjectId === null ? '600' : '500',
+                      color:
+                        selectedSubjectId === null
+                          ? theme.colors.primary
+                          : theme.colors.text.secondary,
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    {t('flashcards.noSubject')}
+                  </Text>
+                  {selectedSubjectId === null && (
+                    <Ionicons name="checkmark" size={16} color={theme.colors.primary} />
+                  )}
+                </TouchableOpacity>
+
+                {/* Subject Options */}
                 {subjects.map((subject, index) => (
                   <TouchableOpacity
                     key={subject.id}

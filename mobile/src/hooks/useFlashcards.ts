@@ -14,6 +14,7 @@ import {
   cancelAllDueDeckNotifications,
 } from '../services/notificationService';
 import { getUserGroups, getGroupDecks } from '../services/api/learning/groups';
+import { exportDeckToJSON, getLocalDecks } from '../services/localFlashcardService';
 
 export function useFlashcards() {
   const { t } = useTranslation();
@@ -167,6 +168,46 @@ export function useFlashcards() {
     });
   }, [t, showAlert, loadDecks, refreshPredictions]);
 
+  const handleExportDeck = useCallback(async (deck: FlashcardDeck) => {
+    try {
+      // Intenta exportar desde el backend si está online
+      try {
+        const response = await fetch(`/api/flashcard-decks/${deck.id}/export`);
+        if (response.ok) {
+          const deckJSON = await response.json();
+          // Éxito - usar JSON del backend
+          console.log('[useFlashcards] Mazo exportado desde backend');
+          return deckJSON;
+        }
+      } catch (onlineErr) {
+        // Si falla online, intenta exportar localmente
+        console.warn('[useFlashcards] Export backend falló, intentando localmente:', onlineErr);
+      }
+
+      // OFFLINE-FIRST: Exportar desde cache local si está offline
+      if (deck.id < 0 || deck._local) {
+        const localDecks = getLocalDecks();
+        const localDeck = localDecks.find(d => d.id === deck.id);
+        
+        if (localDeck) {
+          const deckJSON = await exportDeckToJSON(deck.id);
+          console.log('[useFlashcards] Mazo exportado localmente (offline)');
+          return deckJSON;
+        }
+      }
+
+      throw new Error('No se pudo exportar el mazo');
+    } catch (e: any) {
+      console.error('[useFlashcards] Error exportando mazo:', e);
+      showAlert({
+        title: t('common.error'),
+        message: e.message || t('flashcards.exportError'),
+        type: 'error',
+      });
+      return null;
+    }
+  }, [t, showAlert]);
+
   const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
     const isOwner = deck.user_id === currentUserId;
     const pillWidth = isOwner ? 152 : 101;
@@ -286,7 +327,7 @@ export function useFlashcards() {
     setShowNewDeckModal, setShowImportModal, setShowMenuModal, setShowNewCardModal,
     setShowStudyModal, setShowEditDeckModal, setActiveDeck, setEditingDeck,
     setStudyDeckCards,
-    handleOpenMenu, handleOpenStudy, handleOpenEditDeck, handleDeleteDeck,
+    handleOpenMenu, handleOpenStudy, handleOpenEditDeck, handleDeleteDeck, handleExportDeck,
     renderSwipeActions, handleRefresh, toggleSearch,
     // Share
     shareDeckTarget, setShareDeckTarget,

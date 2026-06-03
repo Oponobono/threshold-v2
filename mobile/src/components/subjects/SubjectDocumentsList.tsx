@@ -194,6 +194,17 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
     try {
       setOcrInProgress(prev => new Set([...prev, docId]));
 
+      // Verificar si el archivo existe antes de leerlo
+      const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
+      if (!fileInfo.exists) {
+        showAlert({
+          title: t('common.error') || 'Error',
+          message: t('common.errors.fileNotFound') || 'El archivo ya no existe en el dispositivo.',
+          type: 'error',
+        });
+        return;
+      }
+
       // Leer el archivo PDF/imagen
       const fileContent = await FileSystem.readAsStringAsync(doc.local_uri, {
         encoding: FileSystem.EncodingType.Base64,
@@ -260,6 +271,12 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
       const docId = doc.id || documents.indexOf(doc);
       try {
         setOcrInProgress(prev => new Set([...prev, docId]));
+        const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
+        if (!fileInfo.exists) {
+          console.warn(`[SubjectDocumentsList] Archivo no encontrado para rescan: ${doc.local_uri}`);
+          continue;
+        }
+
         const fileContent = await FileSystem.readAsStringAsync(doc.local_uri, {
           encoding: FileSystem.EncodingType.Base64,
         });

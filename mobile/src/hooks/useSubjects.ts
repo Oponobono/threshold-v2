@@ -5,6 +5,25 @@ import { useDataStore } from '../store/useDataStore';
 import { getSemesterSummary, SemesterSummary } from '../services/api/analytics';
 import { SCALE_MAX } from '../utils/grades';
 
+export interface UnifiedActivityItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  date: number;
+  subjectId: number;
+  subjectName?: string;
+  subjectColor?: string;
+  type: 'assessment' | 'flashcard' | 'study' | 'calendar';
+  relativeTime?: string;
+}
+
+export const ACTIVITY_CONFIG = {
+  assessment: { icon: 'clipboard-outline', color: '#3498db', label: 'Evaluación' },
+  flashcard:  { icon: 'flash-outline',     color: '#e67e22', label: 'Repaso FSRS' },
+  study:      { icon: 'book-open-outline', color: '#2ecc71', label: 'Sesión' },
+  calendar:   { icon: 'calendar-outline',  color: '#9b59b6', label: 'Evento' },
+};
+
 export const getStatusColor = (minNeeded: number, target: number) => {
   const maxScale = target <= 5 ? 5 : target <= 10 ? 10 : 100;
   if (minNeeded > maxScale) return '#FF2D55';
@@ -52,12 +71,11 @@ function parseDateOrFail(dateStr: string): number {
   return NaN;
 }
 
-function getRelativeTime(dateStr: string, t: any): string {
-  const then = parseDateOrFail(dateStr);
-  if (isNaN(then)) return '—';
+function getRelativeTime(then: number, t: any): string {
+  if (isNaN(then) || then <= 0) return '—';
   const now = Date.now();
   const diffMs = now - then;
-  if (diffMs < 0) return '—';
+  if (diffMs < 0) return t('subjects.timeJustNow'); // Future time? Just say now
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return t('subjects.timeJustNow');
   if (diffMin < 60) return t('subjects.timeMinutesAgo', { count: diffMin });
@@ -68,7 +86,7 @@ function getRelativeTime(dateStr: string, t: any): string {
 }
 
 export function useSubjects(t: any) {
-  const { subjects, assessments, loadAllData } = useDataStore();
+  const { subjects, assessments, loadAllData, predictions, calendarEvents, flashcardDecks, userStats } = useDataStore();
 
   const [search, setSearch] = useState('');
   const [overlayVisible, setOverlayVisible] = useState(false);
@@ -86,11 +104,56 @@ export function useSubjects(t: any) {
     }, [loadAllData])
   );
 
-  const filteredSubjects = subjects.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
-    (s.professor && s.professor.toLowerCase().includes(search.toLowerCase()))
-  );
+  // ── Pending FSRS cards per subject (real data from predictions engine) ──
+  const pendingBySubject = useMemo(() => {
+    const map = new Map<number, number>();
+    if (!predictions?.cards) return map;
+    for (const card of predictions.cards) {
+      if (card.subjectId !== undefined) {
+        map.set(card.subjectId, (map.get(card.subjectId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [predictions]);
+
+  // ── Next upcoming assessment per subject (real data from assessments) ──
+  const nextMilestoneBySubject = useMemo(() => {
+    const map = new Map<number, string>();
+    const now = Date.now();
+    const upcoming = assessments
+      .filter(a => {
+        const dateStr = a.due_date || a.grading_date;
+        if (!dateStr || a.is_completed) return false;
+        const ts = parseDateOrFail(dateStr);
+        return !isNaN(ts) && ts > now;
+      })
+      .sort((a, b) => {
+        const tA = parseDateOrFail((a.due_date || a.grading_date) ?? '');
+        const tB = parseDateOrFail((b.due_date || b.grading_date) ?? '');
+        return tA - tB;
+      });
+    for (const a of upcoming) {
+      if (!map.has(a.subject_id)) {
+        const dateStr = a.due_date || a.grading_date || '';
+        const d = new Date(parseDateOrFail(dateStr));
+        const label = `${a.name} (${d.toLocaleDateString('es', { month: 'short', day: 'numeric' })})`;
+        map.set(a.subject_id, label);
+      }
+    }
+    return map;
+  }, [assessments]);
+
+  const filteredSubjects = subjects
+    .filter(s =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
+      (s.professor && s.professor.toLowerCase().includes(search.toLowerCase()))
+    )
+    .map(s => ({
+      ...s,
+      pending_flashcards: pendingBySubject.get(s.id),
+      next_milestone: nextMilestoneBySubject.get(s.id),
+    }));
 
   const localCriticalSubjects = useMemo(() => {
     return subjects
@@ -108,21 +171,7 @@ export function useSubjects(t: any) {
     return subjects.reduce((sum, s) => sum + (s.credits || 0), 0);
   }, [subjects]);
 
-  const localRecentActivity = useMemo(() => {
-    return [...assessments]
-      .filter(a => a.date)
-      .sort((a, b) => parseDateOrFail(b.date || '') - parseDateOrFail(a.date || ''))
-      .slice(0, 5)
-      .map(a => {
-        const subject = subjects.find(s => s.id === a.subject_id);
-        return {
-          ...a,
-          subjectName: subject?.name || '—',
-          subjectColor: subject?.color || '#5856D6',
-          relativeTime: getRelativeTime(a.date || '', t),
-        };
-      });
-  }, [assessments, subjects, t]);
+  const totalCredits = semesterSummary?.totalCredits ?? localTotalCredits;
 
   const criticalSubjects = useMemo(() => {
     if (semesterSummary?.criticalSubjects) {
@@ -138,27 +187,108 @@ export function useSubjects(t: any) {
     }
     return localCriticalSubjects;
   }, [semesterSummary, localCriticalSubjects]);
-
-  const totalCredits = semesterSummary?.totalCredits ?? localTotalCredits;
-
   const recentActivity = useMemo(() => {
-    if (semesterSummary?.recentActivity) {
-      return semesterSummary.recentActivity.map(ra => ({
-        id: ra.id,
-        name: ra.name,
-        subject_id: ra.subjectId,
-        subjectName: ra.subjectName,
-        subjectColor: ra.subjectColor,
-        date: ra.date,
-        relativeTime: getRelativeTime(ra.date, t),
-      }));
+    const items: UnifiedActivityItem[] = [];
+    const now = Date.now();
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+    // 1. Assessments (pasado reciente)
+    assessments.forEach(as => {
+      const ts = parseDateOrFail(as.date || '');
+      if (ts > 0 && ts <= now && ts > now - SEVEN_DAYS_MS) {
+        items.push({
+          id: `asm-${as.id}`,
+          title: as.name,
+          subtitle: `Nota: ${as.score ?? 'Pendiente'} (${as.weight ?? 0}%)`,
+          date: ts,
+          subjectId: as.subject_id,
+          type: 'assessment'
+        });
+      }
+    });
+
+    // 2. Flashcard Decks (repasados recientemente)
+    flashcardDecks.forEach(deck => {
+      // Usamos timestamp the última actualización si no hay last_reviewed_at
+      const lastReviewed = deck.last_reviewed_at ? new Date(deck.last_reviewed_at).getTime() : 0;
+      if (lastReviewed > now - SEVEN_DAYS_MS && lastReviewed <= now) {
+        items.push({
+          id: `fc-${deck.id}`,
+          title: `Repaso: ${deck.title}`,
+          subtitle: `${deck.review_count || 0} tarjetas memorizadas`,
+          date: lastReviewed,
+          subjectId: deck.subject_id || 0,
+          type: 'flashcard'
+        });
+      }
+    });
+
+    // 3. UserStats (Sesiones de estudio)
+    if (userStats?.recent_activity) {
+      userStats.recent_activity.forEach((session: any, idx: number) => {
+        const ts = new Date(session.review_date).getTime();
+        if (ts > now - SEVEN_DAYS_MS && ts <= now) {
+          const acc = session.total_attempts > 0 ? Math.round((session.correct_attempts / session.total_attempts) * 100) : 0;
+          items.push({
+            id: `study-${idx}-${ts}`,
+            title: 'Sesión de Repaso',
+            subtitle: `${session.total_attempts} tarjetas revisadas • ${acc}% de acierto`,
+            date: ts,
+            subjectId: 0,
+            type: 'study'
+          });
+        }
+      });
     }
-    return localRecentActivity;
-  }, [semesterSummary, localRecentActivity, t]);
+
+    // 4. Calendar Events (pasado reciente)
+    calendarEvents.forEach(ev => {
+      const ts = parseDateOrFail(ev.startDate || '');
+      if (ts > 0 && ts <= now && ts > now - SEVEN_DAYS_MS) {
+        items.push({
+          id: `cal-${ev.id}`,
+          title: ev.title,
+          subtitle: ev.eventType === 'class' ? 'Clase' : ev.eventType === 'exam' ? 'Examen' : 'Tarea',
+          date: ts,
+          subjectId: ev.subjectId || 0,
+          type: 'calendar'
+        });
+      }
+    });
+
+    // Enriquecer con metadata de la materia y ordenar
+    const sorted = items
+      .map(item => {
+        const subject = subjects.find(s => s.id === item.subjectId);
+        return {
+          ...item,
+          subjectName: subject?.name || 'General',
+          subjectColor: subject?.color || '#5856D6',
+          relativeTime: getRelativeTime(item.date, t),
+        };
+      })
+      .sort((a, b) => b.date - a.date)
+      .slice(0, 10); // Mostrar máximo los 10 eventos más recientes
+
+    return sorted;
+  }, [assessments, flashcardDecks, userStats, calendarEvents, subjects, t]);
+
+  // ── Hero footer: motor de aprendizaje ──
+  const dueDecksToday = useMemo(() => {
+    // Mazos que tienen last_reviewed_at en algún momento y aún tienen cards pendientes (vía predictions)
+    const dueIds = useDataStore.getState().getDuedeckIds();
+    return dueIds.size;
+  }, [predictions]);
+
+  const studyStreak = useMemo(() => {
+    if (!userStats?.study_streak) return 0;
+    return userStats.study_streak as number;
+  }, [userStats]);
 
   return {
     subjects, filteredSubjects, criticalSubjects,
     totalCredits, recentActivity,
+    dueDecksToday, studyStreak,
     search, setSearch,
     overlayVisible, setOverlayVisible,
     overlayText, setOverlayText,

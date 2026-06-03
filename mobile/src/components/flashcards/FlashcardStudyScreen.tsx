@@ -236,7 +236,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
           text: t('common.delete'), style: 'destructive',
           onPress: async () => {
             try {
-              await deleteFlashcard(cardId);
+              await deleteFlashcard(cardId, activeDeck?.id);
               const updated = items.filter(c => c.id !== cardId);
               setItems(updated);
               if (updated.length === 0) { setSessionDone(true); return; }

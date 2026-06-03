@@ -50,6 +50,31 @@ router.get('/flashcard-decks/with-metrics', flashcardsController.getFlashcardDec
 
 /**
  * @swagger
+ * /api/flashcard-decks/{deckId}/export:
+ *   get:
+ *     summary: Exporta un mazo como JSON seguro (sin user_id)
+ *     tags: [Flashcards]
+ *     parameters:
+ *       - in: path
+ *         name: deckId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del mazo a exportar
+ *     responses:
+ *       200:
+ *         description: JSON del mazo exportado (sin user_id)
+ *       403:
+ *         description: No tienes permiso para exportar este mazo
+ *       404:
+ *         description: Mazo no encontrado
+ *       500:
+ *         description: Error interno
+ */
+router.get('/flashcard-decks/:deckId/export', flashcardsController.exportDeck);
+
+/**
+ * @swagger
  * /api/flashcard-decks:
  *   post:
  *     summary: Crea un nuevo mazo de flashcards

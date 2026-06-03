@@ -101,10 +101,35 @@ export const EditDeckModal: React.FC<Props> = ({ visible, deck, subjects, onClos
             <TouchableOpacity
               onPress={async () => {
                 try {
-                  await updateFlashcardDeck(editing.id, {
-                    subject_id: editing.subject_id || undefined,
-                    title: editing.title,
-                  });
+                  // Validar que el título no esté vacío
+                  if (!editing.title || !editing.title.trim()) {
+                    showAlert({ title: t('common.error'), message: t('flashcards.deckNameRequired'), type: 'error' });
+                    return;
+                  }
+
+                  // Construir payload - incluir subject_id incluso si es null para permitir deseleccionar
+                  const payload: any = {
+                    title: editing.title.trim(),
+                  };
+                  
+                  // Enviar subject_id solo si se ha modificado (para evitar problemas con undefined)
+                  if ('subject_id' in editing) {
+                    payload.subject_id = editing.subject_id;
+                    if (editing.subject_id) {
+                      const subject = subjects.find(s => s.id === editing.subject_id);
+                      if (subject) {
+                        payload.subject_name = subject.name;
+                        payload.subject_color = subject.color;
+                        payload.subject_icon = subject.icon;
+                      }
+                    } else {
+                      payload.subject_name = null;
+                      payload.subject_color = null;
+                      payload.subject_icon = null;
+                    }
+                  }
+
+                  await updateFlashcardDeck(editing.id, payload);
                   onClose();
                   onSaved();
                   showAlert({ title: t('common.success'), message: t('flashcards.deckUpdated'), type: 'success' });

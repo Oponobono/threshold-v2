@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, Pressable, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
@@ -11,6 +12,7 @@ import { useDataStore } from '../../store/useDataStore';
 import { SubjectSelectorModal } from './SubjectSelectorModal';
 import { CategorySelectorModal } from './CategorySelectorModal';
 import { getCategoriesBySubject, type AssessmentCategory } from '../../services/api/assessmentCategories';
+import { AssessmentFileManager } from '../grades/AssessmentFileManager';
 
 interface EditGradeModalProps {
   visible: boolean;
@@ -32,6 +34,10 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
   const [gradeName, setGradeName] = useState('');
   const [gradeValue, setGradeValue] = useState('');
   const [gradePercentage, setGradePercentage] = useState('');
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [gradingDate, setGradingDate] = useState<Date | null>(null);
+  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
+  const [showGradingDatePicker, setShowGradingDatePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Initialize form when assessment changes
@@ -44,6 +50,21 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
       setGradeValue(assessment.grade_value?.toString() || assessment.score?.toString() || '');
       setGradePercentage(assessment.weight?.toString() || assessment.percentage?.toString() || '');
       setSelectedCategoryId(assessment.category_id || null);
+      
+      // Parse dates from assessment
+      if (assessment.due_date) {
+        const parsedDueDate = new Date(assessment.due_date);
+        setDueDate(isNaN(parsedDueDate.getTime()) ? null : parsedDueDate);
+      } else {
+        setDueDate(null);
+      }
+      
+      if (assessment.grading_date) {
+        const parsedGradingDate = new Date(assessment.grading_date);
+        setGradingDate(isNaN(parsedGradingDate.getTime()) ? null : parsedGradingDate);
+      } else {
+        setGradingDate(null);
+      }
     }
   }, [assessment, visible]);
 
@@ -61,6 +82,34 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
     onClose();
   };
 
+  const handleDueDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDueDatePicker(false);
+    }
+    if (event.type === 'set' && selectedDate) {
+      setDueDate(selectedDate);
+    }
+  };
+
+  const handleGradingDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowGradingDatePicker(false);
+    }
+    if (event.type === 'set' && selectedDate) {
+      setGradingDate(selectedDate);
+    }
+  };
+
+  const formatDateForDisplay = (date: Date | null) => {
+    if (!date) return t('assessments.selectDate');
+    return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const formatDateForAPI = (date: Date | null) => {
+    if (!date) return null;
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD
+  };
+
   const handleSaveGrade = async () => {
     if (!assessment?.id || !selectedSubjectId || !gradeName.trim() || !gradeValue.trim() || !gradePercentage.trim()) {
       alertRef.show({ title: t('common.error'), message: t('dashboard.quickAddMenu.errors.fillFields'), type: 'warning' });
@@ -76,6 +125,8 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
         weight: gradePercentage ? gradePercentage.replace(',', '.') : '0',
         category_id: selectedCategoryId || undefined,
         is_completed: true,
+        due_date: formatDateForAPI(dueDate) || undefined,
+        grading_date: formatDateForAPI(gradingDate) || undefined,
       };
       console.log('[EditGradeModal] 📤 Enviando UPDATE assessment:', {
         assessmentId: assessment.id,
@@ -179,6 +230,44 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
                 placeholderTextColor={theme.colors.text.placeholder}
               />
 
+              <Text style={styles.sheetLabel}>{t('assessments.dueDate')}</Text>
+              <TouchableOpacity 
+                style={styles.sheetInput} 
+                onPress={() => setShowDueDatePicker(true)}
+              >
+                <Text style={dueDate ? styles.sheetInputText : [styles.sheetInputText, { color: theme.colors.text.placeholder }]}>
+                  {formatDateForDisplay(dueDate)}
+                </Text>
+              </TouchableOpacity>
+
+              {showDueDatePicker && (
+                <DateTimePicker
+                  value={dueDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleDueDateChange}
+                />
+              )}
+
+              <Text style={styles.sheetLabel}>{t('assessments.gradingDate')}</Text>
+              <TouchableOpacity 
+                style={styles.sheetInput} 
+                onPress={() => setShowGradingDatePicker(true)}
+              >
+                <Text style={gradingDate ? styles.sheetInputText : [styles.sheetInputText, { color: theme.colors.text.placeholder }]}>
+                  {formatDateForDisplay(gradingDate)}
+                </Text>
+              </TouchableOpacity>
+
+              {showGradingDatePicker && (
+                <DateTimePicker
+                  value={gradingDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleGradingDateChange}
+                />
+              )}
+
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={globalStyles.flex1}>
                   <Text style={styles.sheetLabel}>{t('dashboard.quickAddMenu.grade.grade')}</Text>
@@ -203,6 +292,10 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
                   />
                 </View>
               </View>
+
+              {assessment?.id && (
+                <AssessmentFileManager assessmentId={assessment.id} />
+              )}
             </ScrollView>
 
             <View style={styles.sheetActions}>

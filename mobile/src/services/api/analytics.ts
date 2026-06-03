@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely, activeBaseUrl } from './client';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { cacheService } from '../cacheService';
+import { storageService } from '../storageService';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
@@ -225,13 +226,29 @@ export interface GlobalGPAAnalytics {
  * Obtiene estadísticas globales del usuario
  */
 export const getUserStats = async (userId: number): Promise<UserStats> => {
-  const response = await fetchWithFallback(`/analytics/user-stats/${userId}`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) throw new Error('Error al obtener estadísticas del usuario');
-  const data = await parseJsonSafely(response);
-  return data;
+  const CACHE_KEY = `app_api_cache:USER_STATS_${userId}`;
+  try {
+    const response = await fetchWithFallback(`/analytics/user-stats/${userId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await parseJsonSafely(response);
+    if (data) {
+      await storageService.saveLocal(CACHE_KEY, JSON.stringify({ data: JSON.stringify(data), timestamp: Date.now() }));
+    }
+    return data;
+  } catch (error) {
+    console.warn('[Analytics] getUserStats falló, usando caché:', error);
+    const cached = await storageService.getLocal(CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        return JSON.parse(parsed.data || parsed);
+      } catch {}
+    }
+    throw error;
+  }
 };
 
 /**

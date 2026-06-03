@@ -1,5 +1,6 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { offlineSyncService } from '../offlineSyncService';
+import { cacheService } from '../../services/cacheService';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -108,10 +109,18 @@ export const fetchGradingSystems = async (): Promise<GradingSystem[]> => {
     console.log('[API] Parsed grading systems data:', data);
     
     const systems = data?.systems || [];
+    if (systems.length > 0) {
+      await cacheService.saveGradingSystems(systems);
+    }
     console.log('[API] Returning', systems.length, 'grading systems');
     return systems;
   } catch (error) {
-    console.error('[API] Error fetching grading systems:', error);
+    console.warn('[Grading] fetchGradingSystems falló, usando caché MMKV:', error);
+    const cached = await cacheService.loadGradingSystems() as GradingSystem[] | null;
+    if (Array.isArray(cached) && cached.length > 0) {
+      console.log(`[Grading] ✅ ${cached.length} sistemas de calificación desde caché`);
+      return cached;
+    }
     throw error;
   }
 };
@@ -122,9 +131,22 @@ export const fetchGradingSystems = async (): Promise<GradingSystem[]> => {
 export const fetchSystemScales = async (
   systemId: number
 ): Promise<{ version: GradingVersion; scales: GradingScale[] }> => {
-  const response = await fetchWithFallback(`/grading-systems/${systemId}/scales`);
-  if (!response.ok) throw new Error('Failed to fetch scales');
-  return await parseJsonSafely(response);
+  try {
+    const response = await fetchWithFallback(`/grading-systems/${systemId}/scales`);
+    if (!response.ok) throw new Error('Failed to fetch scales');
+    return await parseJsonSafely(response);
+  } catch (error) {
+    console.warn(`[Grading] fetchSystemScales(${systemId}) falló, buscando sistemas cacheados...`);
+    const cachedSystems = await cacheService.loadGradingSystems() as GradingSystem[] | null;
+    if (Array.isArray(cachedSystems)) {
+      const system = cachedSystems.find(s => s.id === systemId);
+      // Solo un fallback básico, ya que scale data might not be in the basic GradingSystem object
+      if (system) {
+        console.warn(`[Grading] Fallback precario: devolviendo system simulado offline`);
+      }
+    }
+    throw error;
+  }
 };
 
 /**

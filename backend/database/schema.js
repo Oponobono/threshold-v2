@@ -195,6 +195,10 @@ const tableSchema = {
         score REAL,
         normalized_value REAL,
         percentage REAL,
+        due_date TEXT,
+        grading_date TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects(id)
       )
@@ -213,7 +217,11 @@ const tableSchema = {
         grade_value REAL,
         score REAL,
         normalized_value REAL,
-        percentage REAL
+        percentage REAL,
+        due_date TEXT,
+        grading_date TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `,
     columns: [
@@ -225,7 +233,11 @@ const tableSchema = {
       { name: 'grade_value', type: 'REAL' },
       { name: 'score', type: 'REAL' },
       { name: 'normalized_value', type: 'REAL' },
-      { name: 'percentage', type: 'REAL' }
+      { name: 'percentage', type: 'REAL' },
+      { name: 'due_date', type: 'TEXT' },
+      { name: 'grading_date', type: 'TEXT' },
+      { name: 'created_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'updated_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' }
     ]
   },
   gallery_items: {
@@ -1263,6 +1275,42 @@ const tableSchema = {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `
+  },
+  assessment_files: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS assessment_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        assessment_id INTEGER NOT NULL,
+        file_name TEXT NOT NULL,
+        file_type TEXT,
+        local_uri TEXT,
+        cloud_url TEXT,
+        file_size INTEGER,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS assessment_files (
+        id SERIAL PRIMARY KEY,
+        assessment_id INTEGER NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+        file_name TEXT NOT NULL,
+        file_type TEXT,
+        local_uri TEXT,
+        cloud_url TEXT,
+        file_size INTEGER,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'file_type', type: 'TEXT' },
+      { name: 'local_uri', type: 'TEXT' },
+      { name: 'cloud_url', type: 'TEXT' },
+      { name: 'file_size', type: 'INTEGER' },
+      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' }
+    ]
   },
 };
 

@@ -1,6 +1,7 @@
 {
   "success": "Success",
   "error": "Error",
+  "warning": "Warning",
   "errorOccurred": "An error occurred",
   "networkError": "Network error",
   "loading": "Loading...",

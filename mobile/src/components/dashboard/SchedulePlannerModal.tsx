@@ -170,7 +170,11 @@ export const SchedulePlannerModal = ({ visible, onClose, subjects, allSchedules,
         }}
       >
         <Pressable style={styles.sheetBackdrop} onPress={handleCloseSchedulePlanner}>
-          <Animated.View style={[styles.sheetContent, { paddingBottom: Math.max(insets.bottom + 8, 20), transform: [{ translateY: scheduleSheetAnim }] }]}>
+          <Animated.View
+            style={[styles.sheetContent, { paddingBottom: Math.max(insets.bottom + 8, 20), transform: [{ translateY: scheduleSheetAnim }] }]}
+          >
+            <Pressable onPress={(e) => e.stopPropagation()}>
+
             <View style={styles.sheetHandle} />
 
             <View style={[globalStyles.rowBetweenCenter, { marginBottom: 14 }]}>
@@ -288,6 +292,7 @@ export const SchedulePlannerModal = ({ visible, onClose, subjects, allSchedules,
                 </Text>
               </TouchableOpacity>
             </View>
+            </Pressable>
           </Animated.View>
         </Pressable>
       </Modal>

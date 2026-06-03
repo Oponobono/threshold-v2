@@ -30,7 +30,7 @@ interface EditSubjectModalProps {
 
 export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModalProps) => {
   const { t } = useTranslation();
-  const { loadAllData } = useDataStore();
+  const { refreshSubjects } = useDataStore();
 
   const [isSaving, setIsSaving] = useState(false);
   const [subjectName, setSubjectName] = useState('');
@@ -74,7 +74,7 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
         icon: selectedIcon,
       });
 
-      await loadAllData(true);
+      await refreshSubjects();
       handleClose();
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error?.message || t('dashboard.newSubject.errors.createFailed'), type: 'error' });
@@ -164,7 +164,7 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
               disabled={isSaving}
             >
               <Text style={styles.sheetSaveText}>
-                {isSaving ? t('dashboard.newSubject.saving') : t('subjects.saveThreshold')}
+                {isSaving ? t('dashboard.newSubject.saving') : t('common.save')}
               </Text>
             </TouchableOpacity>
           </View>

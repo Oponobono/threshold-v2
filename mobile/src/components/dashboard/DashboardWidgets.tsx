@@ -33,7 +33,7 @@ export const SubjectTile = ({ subject, onEdit, onDelete }: SubjectTileProps) => 
         onPress={() => router.push(`/subjects/${subject.id}`)}
       >
         <TouchableOpacity
-          style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, padding: 4 }}
+          style={{ position: 'absolute', top: 14, right: 8, zIndex: 10, padding: 4 }}
           onPress={() => setMenuVisible(true)}
         >
           <Ionicons name="ellipsis-vertical" size={14} color={theme.colors.text.secondary} />

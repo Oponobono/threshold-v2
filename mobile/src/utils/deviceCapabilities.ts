@@ -1,5 +1,6 @@
 import { Platform, NativeModules } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Device from 'expo-device';
 import { LocalModelId } from '../store/useLocalAIStore';
 
 export interface DeviceCapabilities {
@@ -21,7 +22,43 @@ interface RamInfo {
 }
 
 /**
- * Lee RAM total y disponible de /proc/meminfo (Android)
+ * Intento 1 (más preciso): expo-device
+ * Device.totalMemory devuelve la RAM física real en bytes
+ * en Android e iOS sin necesidad de permisos adicionales.
+ */
+async function getExpoDeviceRam(): Promise<RamInfo | null> {
+  try {
+    const totalBytes = await Device.totalMemory;
+    if (totalBytes && totalBytes > 0) {
+      const totalMB = Math.round(totalBytes / (1024 * 1024));
+      if (totalMB >= 512 && totalMB <= 32768) {
+        // Para RAM disponible, leer /proc/meminfo solo para MemAvailable.
+        // Si falla, estimamos el 55% como libre (promedio real en Android en reposo).
+        let availableMB = Math.round(totalMB * 0.55);
+        try {
+          if (Platform.OS === 'android') {
+            const content = await FileSystem.readAsStringAsync('file:///proc/meminfo');
+            const memAvailMatch = content.match(/MemAvailable:\s*(\d+)\s*kB/);
+            if (memAvailMatch) {
+              const parsed = Math.round(parseInt(memAvailMatch[1], 10) / 1024);
+              if (parsed > 0 && parsed <= totalMB) {
+                availableMB = parsed;
+              }
+            }
+          }
+        } catch (_) {}
+        console.log(`[RAM Detection] expo-device - Total: ${totalMB}MB, Available: ${availableMB}MB`);
+        return { totalMB, availableMB };
+      }
+    }
+  } catch (e) {
+    console.warn('[RAM Detection] expo-device failed:', e);
+  }
+  return null;
+}
+
+/**
+ * Intento 2 (fallback): /proc/meminfo completo
  * MemTotal: RAM física total del dispositivo
  * MemAvailable: RAM estimada disponible para nuevos procesos
  */
@@ -49,36 +86,12 @@ async function getProcMeminfo(): Promise<RamInfo | null> {
   return null;
 }
 
-function getNativeRamMB(): number | null {
-  if (Platform.OS === 'android') {
-    try {
-      const { RNDeviceInfo } = NativeModules;
-      if (RNDeviceInfo?.getTotalMemory) {
-        // react-native-device-info suele estar disponible
-        const totalMemBytes = RNDeviceInfo.getTotalMemory?.();
-        if (totalMemBytes && totalMemBytes > 0) {
-          return Math.round(totalMemBytes / (1024 * 1024));
-        }
-      }
-    } catch {}
-  }
-
-  if (Platform.OS === 'ios') {
-    try {
-      // En iOS, intentar obtener del NativeModules
-      const { PlatformConstants } = NativeModules;
-      if (PlatformConstants?.osVersion) {
-        // iOS no expone directamente memoria total, usaremos disponible como aproximación
-        return null; // Fallback a otros métodos
-      }
-    } catch {}
-  }
-
-  return null;
-}
-
 async function getRamInfo(): Promise<RamInfo> {
-  // Intento 1: Leer /proc/meminfo (fuente más precisa en dispositivos físicos Android)
+  // Intento 1: expo-device (más preciso, funciona en Android e iOS)
+  const expoRam = await getExpoDeviceRam();
+  if (expoRam) return expoRam;
+
+  // Intento 2: /proc/meminfo (fallback Android)
   const procInfo = await getProcMeminfo();
   if (procInfo) {
     console.log(
@@ -87,45 +100,19 @@ async function getRamInfo(): Promise<RamInfo> {
     return procInfo;
   }
 
-  // Intento 2: Módulos nativos (react-native-device-info)
-  const nativeRam = getNativeRamMB();
-  if (nativeRam !== null) {
-    console.log(`[RAM Detection] Native module - Total: ${nativeRam}MB`);
-    // Sin RAM disponible, asumimos 70% de la total como disponible
-    const estimatedAvailable = Math.round(nativeRam * 0.7);
-    return { totalMB: nativeRam, availableMB: estimatedAvailable };
-  }
-
-  // Intento 3: Polyfill de OS
-  try {
-    const os = require('os');
-    const totalMem = os?.totalmem?.();
-    const freeMem = os?.freemem?.();
-    if (totalMem && totalMem > 0) {
-      const totalMB = Math.round(totalMem / (1024 * 1024));
-      const availableMB = freeMem ? Math.round(freeMem / (1024 * 1024)) : Math.round(totalMB * 0.7);
-
-      if (totalMB >= 512 && totalMB <= 16384) {
-        console.log(
-          `[RAM Detection] os module - Total: ${totalMB}MB, Available: ${availableMB}MB (WARNING: puede no ser preciso)`
-        );
-        return { totalMB, availableMB };
-      }
-    }
-  } catch {}
-
-  // Intento 4: Fallback para Android - inferir del API level
+  // Intento 3: Fallback para Android - inferir del API level
   if (Platform.OS === 'android') {
     try {
       const apiLevel = typeof Platform.Version === 'number'
         ? Platform.Version
         : parseInt(String(Platform.Version), 10);
       let estimatedTotal = 4096;
-      if (apiLevel >= 31) estimatedTotal = 6144; // Android 12+
-      else if (apiLevel >= 29) estimatedTotal = 4096; // Android 10-11
-      else estimatedTotal = 3072; // Android 9-
+      if (apiLevel >= 33) estimatedTotal = 8192;       // Android 13+
+      else if (apiLevel >= 31) estimatedTotal = 6144;  // Android 12
+      else if (apiLevel >= 29) estimatedTotal = 4096;  // Android 10-11
+      else estimatedTotal = 3072;                       // Android 9-
 
-      const estimatedAvailable = Math.round(estimatedTotal * 0.65);
+      const estimatedAvailable = Math.round(estimatedTotal * 0.55);
       console.log(
         `[RAM Detection] API level ${apiLevel} fallback - Total: ${estimatedTotal}MB, Available: ${estimatedAvailable}MB (ESTIMATE)`
       );
@@ -134,8 +121,8 @@ async function getRamInfo(): Promise<RamInfo> {
   }
 
   // Fallback final seguro
-  console.log('[RAM Detection] Using default fallback - Total: 4096MB, Available: 2560MB');
-  return { totalMB: 4096, availableMB: 2560 };
+  console.log('[RAM Detection] Using default fallback - Total: 4096MB, Available: 2240MB');
+  return { totalMB: 4096, availableMB: 2240 };
 }
 
 function getCpuCoreCount(): number {

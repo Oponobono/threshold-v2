@@ -10,7 +10,7 @@ import { subjectsStyles as styles } from '../../src/styles/Subjects.styles';
 import { AutoUploadIndicator } from '../../src/components/ui/AutoUploadIndicator';
 import { OfflineIndicator } from '../../src/components/ui/OfflineIndicator';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
-import { useSubjects } from '../../src/hooks/useSubjects';
+import { useSubjects, ACTIVITY_CONFIG } from '../../src/hooks/useSubjects';
 import { SubjectIcon } from '../../src/components/subjects/SubjectIcon';
 import { ScheduleGrid } from '../../src/components/subjects/ScheduleGrid';
 import { SCALE_MAX } from '../../src/utils/grades';
@@ -80,35 +80,65 @@ export default function SubjectsScreen() {
         {g.subjects.length > 0 && (
           <>
             <View style={styles.semesterHero}>
-              <View style={styles.semesterHeroTop}>
-                <View style={styles.semesterGpaCircle}>
-                  <Text style={styles.semesterGpaValue}>{overallGpa.toFixed(1)}</Text>
-                  <Text style={styles.semesterGpaLabel}>{t('subjects.semesterGpa')}</Text>
+              <View style={styles.gpaAmbientGlow} />
+              <View style={styles.heroContentRow}>
+                <View style={styles.gpaContainer}>
+                  <View style={styles.semesterGpaCircle}>
+                    <Text style={styles.semesterGpaValue}>{overallGpa.toFixed(1)}</Text>
+                    <Text style={styles.semesterGpaLabel}>{t('subjects.semesterGpa')}</Text>
+                  </View>
                 </View>
-                <View style={styles.semesterHeroStats}>
-                  <View style={styles.semesterHeroStatRow}>
-                    <Text style={styles.semesterHeroStatLabel}>{t('subjects.totalSubjects')}</Text>
-                    <Text style={styles.semesterHeroStatValue}>{g.subjects.length}</Text>
+
+                <View style={styles.miniGridContainer}>
+                  <View style={styles.miniCard}>
+                    <Text style={styles.miniCardTitle}>{t('subjects.totalSubjects', { defaultValue: 'MATERIAS' })}</Text>
+                    <Text style={styles.miniCardValue}>{g.subjects.length}</Text>
                   </View>
-                  <View style={styles.semesterHeroStatRow}>
-                    <Text style={styles.semesterHeroStatLabel}>{t('subjects.semesterCredits', 'Créditos')}</Text>
-                    <Text style={styles.semesterHeroStatValue}>{g.totalCredits}</Text>
+
+                  <View style={styles.miniCard}>
+                    <Text style={styles.miniCardTitle}>{t('subjects.semesterCredits', { defaultValue: 'CRÉDITOS' })}</Text>
+                    <Text style={styles.miniCardValue}>
+                      {g.totalCredits}
+                      <Text style={styles.miniCardSub}>cr</Text>
+                    </Text>
                   </View>
-                  <View style={styles.semesterHeroStatRow}>
-                    <Text style={styles.semesterHeroStatLabel}>{t('subjects.semesterApproved')}</Text>
-                    <Text style={styles.semesterHeroStatValue}>{approvedCount}</Text>
+
+                  <View style={styles.miniCard}>
+                    <Text style={styles.miniCardTitle}>{t('subjects.semesterApproved', { defaultValue: 'APROBADAS' })}</Text>
+                    <Text style={styles.miniCardValue}>{approvedCount}</Text>
                   </View>
-                  <View style={styles.semesterHeroStatRow}>
-                    <Text style={styles.semesterHeroStatLabel}>{t('subjects.semesterAtRisk')}</Text>
-                    <Text style={[styles.semesterHeroStatValue, atRiskCount > 0 && styles.semesterHeroStatValueDanger]}>
+
+                  <View style={atRiskCount > 0 ? styles.miniCardInRisk : styles.miniCard}>
+                    <Text style={atRiskCount > 0 ? styles.miniCardTitleRisk : styles.miniCardTitle}>
+                      {t('subjects.semesterAtRisk', { defaultValue: 'EN RIESGO' })}
+                    </Text>
+                    <Text style={atRiskCount > 0 ? styles.miniCardValueRisk : styles.miniCardValue}>
                       {atRiskCount}
                     </Text>
                   </View>
                 </View>
               </View>
-              <Text style={styles.semesterMessage}>
-                <Text style={styles.semesterMessageHighlight}>{semesterMessage}</Text>
-              </Text>
+
+              {/* ── Motor de aprendizaje: footer del hero ── */}
+              <View style={styles.heroEngineRow}>
+                <View style={styles.heroEngineChip}>
+                  <Text style={styles.heroEngineIcon}>⚡</Text>
+                  <Text style={styles.heroEngineText}>
+                    {g.dueDecksToday > 0
+                      ? `${g.dueDecksToday} mazo${g.dueDecksToday !== 1 ? 's' : ''} para hoy`
+                      : 'Sin repasos pendientes'}
+                  </Text>
+                </View>
+                {g.studyStreak > 0 && (
+                  <>
+                    <Text style={styles.heroEngineSep}>·</Text>
+                    <View style={styles.heroEngineChip}>
+                      <Text style={styles.heroEngineIcon}>🔥</Text>
+                      <Text style={styles.heroEngineText}>Racha: {g.studyStreak} día{g.studyStreak !== 1 ? 's' : ''}</Text>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
 
             {g.criticalSubjects.length > 0 && (
@@ -127,7 +157,7 @@ export default function SubjectsScreen() {
                   {g.criticalSubjects.map((subject, idx) => {
                     const raw = subject.avg_score ?? 0;
                     const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
-                    const delta = subject.delta ?? parseFloat((avg - 3.0).toFixed(2));
+                    const delta = (subject as any).delta ?? parseFloat((avg - 3.0).toFixed(2));
                     const color = subject.color || '#FF2D55';
 
                     return (
@@ -161,26 +191,34 @@ export default function SubjectsScreen() {
                   <Text style={styles.timelineTitle}>{t('subjects.recentActivityTitle')}</Text>
                 </View>
                 <View style={styles.timelineCard}>
-                  {g.recentActivity.map((item, idx, arr) => (
-                    <View key={item.id || idx} style={[styles.timelineItem, idx < arr.length - 1 && { position: 'relative' }]}>
-                      <View style={[styles.timelineDot, { backgroundColor: item.subjectColor }]} />
-                      {idx < arr.length - 1 && <View style={styles.timelineLine} />}
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineName} numberOfLines={1}>
-                          {item.name || t('subjects.noAssessments')}
-                        </Text>
-                        <Text style={styles.timelineMeta}>{item.subjectName}</Text>
-                      </View>
-                      <Text style={styles.timelineTime}>{item.relativeTime}</Text>
-                    </View>
-                  ))}
+                  <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    {g.recentActivity.map((item, idx, arr) => {
+                      const config = ACTIVITY_CONFIG[item.type];
+                      return (
+                        <View key={item.id || idx} style={[styles.timelineItem, idx < arr.length - 1 && { position: 'relative' }]}>
+                          <View style={[styles.timelineDot, { backgroundColor: item.subjectColor, justifyContent: 'center', alignItems: 'center' }]}>
+                            <Ionicons name={config.icon as any} size={10} color="#FFFFFF" />
+                          </View>
+                          {idx < arr.length - 1 && <View style={styles.timelineLine} />}
+                          <View style={styles.timelineContent}>
+                            <Text style={styles.timelineName} numberOfLines={1}>
+                              {item.title}
+                            </Text>
+                            <Text style={styles.timelineMeta}>
+                              <Text style={{ color: config.color, fontWeight: '600' }}>{config.label}</Text> • {item.subjectName}
+                            </Text>
+                            {item.subtitle ? <Text style={[styles.timelineMeta, { marginTop: 2 }]} numberOfLines={1}>{item.subtitle}</Text> : null}
+                          </View>
+                          <Text style={styles.timelineTime}>{item.relativeTime}</Text>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
                 </View>
               </View>
             )}
-
-            <ScheduleGrid />
-          </>
-        )}
+            </>
+          )}
 
         {g.filteredSubjects.length === 0 ? (
           <View style={[globalStyles.center, { paddingVertical: 60 }]}>
@@ -199,7 +237,7 @@ export default function SubjectsScreen() {
               {g.filteredSubjects.map((subject, index) => {
                 const raw = subject.avg_score ?? 0;
                 const avgScore = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
-                const delta = subject.delta ?? parseFloat((avgScore - 3.0).toFixed(2));
+                const delta = (subject as any).delta ?? parseFloat((avgScore - 3.0).toFixed(2));
                 const isPositive = delta >= 0;
                 const cardColor = subject.color || '#5856D6';
                 const isLow = avgScore < 3.0;
@@ -212,8 +250,8 @@ export default function SubjectsScreen() {
                       onPress={() => router.push(`/subjects/${subject.id}`)}
                     >
                       <View style={styles.gridTopRow}>
-                        <View style={[styles.gridIcon, { backgroundColor: cardColor + '18' }]}>
-                          <SubjectIcon iconName={subject.icon} color={cardColor} size={18} />
+                        <View style={[styles.gridIcon, { backgroundColor: cardColor }]}>
+                          <SubjectIcon iconName={subject.icon} color="#FFFFFF" size={18} />
                         </View>
 
                         <View style={styles.gridScoreGroup}>
@@ -233,13 +271,26 @@ export default function SubjectsScreen() {
                               {isPositive ? '+' : ''}{delta.toFixed(2)}
                             </Text>
                           </View>
+                          {((subject as any).due_cards || (subject as any).pending_flashcards) ? (
+                            <View style={styles.dueMiniBadge}>
+                              <Text style={styles.dueMiniText}>
+                                {((subject as any).due_cards || (subject as any).pending_flashcards) === 1
+                                  ? '1 mazo pendiente'
+                                  : `${(subject as any).due_cards || (subject as any).pending_flashcards} mazos pendientes`}
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={{ height: 20, marginTop: 4 }} />
+                          )}
                         </View>
                       </View>
 
                       <View style={styles.gridBody}>
                         <Text style={styles.gridName} numberOfLines={1}>{subject.name}</Text>
                         {subject.professor && (
-                          <Text style={styles.gridProf} numberOfLines={1}>{subject.professor}</Text>
+                          <Text style={styles.gridProf} numberOfLines={1}>
+                            Prof. {subject.professor}{(subject as any).room ? ` • Aula ${(subject as any).room}` : ''}
+                          </Text>
                         )}
                       </View>
 
@@ -249,8 +300,14 @@ export default function SubjectsScreen() {
                             <Text style={styles.gridMetaBadgeText}>{subject.credits} {t('subjects.credits')}</Text>
                           </View>
                         ) : null}
-                        <Text style={styles.gridTargetText}>{t('subjects.requiredPass')}: {target.toFixed(1)}</Text>
+                        <Text style={styles.gridTargetText}>{t('subjects.requiredPass')}: {(subject.target_grade ?? 3.0).toFixed(1)}</Text>
                       </View>
+
+                      {((subject as any).next_milestone || (subject as any).next_assessment) && (
+                        <Text style={styles.gridNextMilestone} numberOfLines={1}>
+                          {t('subjects.nextMilestone', 'Próximo hito')}: {((subject as any).next_milestone || (subject as any).next_assessment)}
+                        </Text>
+                      )}
 
                       <View style={styles.gridProgress}>
                         <View style={styles.gridProgressTrack}>
@@ -270,6 +327,8 @@ export default function SubjectsScreen() {
             </View>
           </View>
         )}
+
+        {g.subjects.length > 0 && <ScheduleGrid />}
       </ScrollView>
 
       <ExplanationOverlay

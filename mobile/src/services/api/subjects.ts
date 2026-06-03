@@ -53,17 +53,27 @@ export const getSubjectById = async (subjectId: number | string): Promise<Subjec
 export const getSubjects = async () => {
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');
-  const response = await fetchWithFallback(`/subjects/${userId}`);
-  if (!response.ok) {
-    const errorData = await parseJsonSafely(response);
-    throw new Error(errorData?.error || 'Error al obtener materias.');
+  try {
+    const response = await fetchWithFallback(`/subjects/${userId}`);
+    if (!response.ok) {
+      const errorData = await parseJsonSafely(response);
+      throw new Error(errorData?.error || `HTTP ${response.status}`);
+    }
+    const data = await parseJsonSafely(response);
+    if (Array.isArray(data)) {
+      cacheService.saveSubjects(data);
+      return data;
+    }
+    return [];
+  } catch (error) {
+    console.warn('[Subjects] getSubjects falló, usando caché MMKV:', error);
+    const cached = cacheService.loadSubjectsSync() as any[] | null;
+    if (Array.isArray(cached) && cached.length > 0) {
+      console.log(`[Subjects] ✅ ${cached.length} materias desde caché MMKV`);
+      return cached;
+    }
+    throw error;
   }
-  const data = await parseJsonSafely(response);
-  if (Array.isArray(data)) {
-    cacheService.saveSubjects(data);
-    return data;
-  }
-  return [];
 };
 
 /**

@@ -30,13 +30,27 @@ export const getAssessments = async (subjectId: number) => {
 export const getAllAssessments = async (): Promise<any[]> => {
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');
-  const response = await fetchWithFallback(`/assessments/user/${userId}`);
-  if (!response.ok) {
-    const errorData = await parseJsonSafely(response);
-    throw new Error(errorData?.error || 'Error al obtener evaluaciones.');
+  try {
+    const response = await fetchWithFallback(`/assessments/user/${userId}`);
+    if (!response.ok) {
+      const errorData = await parseJsonSafely(response);
+      throw new Error(errorData?.error || `HTTP ${response.status}`);
+    }
+    const data = await parseJsonSafely(response);
+    if (Array.isArray(data)) {
+      cacheService.saveAssessments(data);
+      return data;
+    }
+    return [];
+  } catch (error) {
+    console.warn('[Assessments] getAllAssessments falló, usando caché MMKV:', error);
+    const cached = cacheService.loadAssessmentsSync() as any[] | null;
+    if (Array.isArray(cached) && cached.length > 0) {
+      console.log(`[Assessments] ✅ ${cached.length} evaluaciones desde caché MMKV`);
+      return cached;
+    }
+    throw error;
   }
-  const data = await parseJsonSafely(response);
-  return Array.isArray(data) ? data : [];
 };
 
 /**

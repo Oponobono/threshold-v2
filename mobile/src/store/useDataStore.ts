@@ -20,6 +20,9 @@ interface DataState {
   assessments: Assessment[];
   schedules: Schedule[];
   predictions: PredictionResponse | null;
+  calendarEvents: any[];
+  flashcardDecks: any[];
+  userStats: any | null;
 
   // Estado de carga
   isInitialLoading: boolean;
@@ -59,6 +62,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   assessments: trySync(() => cacheService.loadAssessmentsSync(), []) as any[],
   schedules: trySync(() => cacheService.loadSchedulesSync(), []) as any[],
   predictions: trySync<PredictionResponse | null>(() => cacheService.loadPredictionsSync() as PredictionResponse | null, null),
+  calendarEvents: trySync(() => cacheService.loadCalendarEventsSync() || [], []) as any[],
+  flashcardDecks: trySync(() => cacheService.loadFlashcardDecksSync() || [], []) as any[],
+  userStats: trySync(() => cacheService.loadUserStatsSync() || null, null),
 
   isInitialLoading: false,
   isRefreshing: false,
@@ -97,11 +103,17 @@ export const useDataStore = create<DataState>((set, get) => ({
       const cachedSubjects = cacheService.loadSubjectsSync() as any[];
       const cachedAssessments = cacheService.loadAssessmentsSync() as any[];
       const cachedSchedules = cacheService.loadSchedulesSync() as any[];
+      const cachedCalendar = (cacheService as any).loadCalendarEventsSync?.() || [];
+      const cachedDecks = (cacheService as any).loadFlashcardDecksSync?.() || [];
+      const cachedStats = (cacheService as any).loadUserStatsSync?.() || null;
       
       set({
         subjects: cachedSubjects || [],
         assessments: cachedAssessments || [],
         schedules: cachedSchedules || [],
+        calendarEvents: cachedCalendar || [],
+        flashcardDecks: cachedDecks || [],
+        userStats: cachedStats || null,
         hasLoadedOnce: true,
         isInitialLoading: false,
         isRefreshing: false,

@@ -175,6 +175,12 @@ export const cacheService = {
   loadSchedulesSync: () => loadFromCacheSync(CACHE_KEYS.SCHEDULES, CACHE_TTL.SCHEDULES),
   loadPredictionsSync: () => loadFromCacheSync(CACHE_KEYS.PREDICTIONS, CACHE_TTL.PREDICTIONS),
   loadProfileSync: () => loadFromCacheSync(CACHE_KEYS.PROFILE, CACHE_TTL.PROFILE),
+  loadCalendarEventsSync: () => loadFromCacheSync(CACHE_KEYS.CALENDAR_EVENTS, CACHE_TTL.CALENDAR_EVENTS),
+  loadFlashcardDecksSync: () => loadFromCacheSync(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, CACHE_TTL.FLASHCARD_DECKS_WITH_METRICS),
+  loadUserStatsSync: () => {
+    // We don't have a specific USER_STATS cache key yet, but if it exists, read it. Or read from analytics.
+    return loadFromCacheSync('app_api_cache:USER_STATS', 1000 * 60 * 60 * 24);
+  },
 
   // ── Async wrappers (backwards compatibility, resuelven síncronamente) ───────
   saveSubjects: async (subjects: any[]) => saveToCacheSync(CACHE_KEYS.SUBJECTS, subjects),

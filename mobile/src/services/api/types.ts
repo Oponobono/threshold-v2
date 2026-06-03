@@ -67,6 +67,8 @@ export type Assessment = {
   display_color?: string | null;
   gpa_equivalent?: number | null;
   category_id?: number | null;
+  due_date?: string | null;
+  grading_date?: string | null;
 };
 
 /** Foto de la galería vinculada a una materia */

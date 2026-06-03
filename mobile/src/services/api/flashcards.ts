@@ -113,23 +113,72 @@ export const createFlashcardDeck = async (payload: { subject_id?: number; title:
   }
 };
 
-/** Actualiza un mazo de flashcards (subject_id, title, description) */
-export const updateFlashcardDeck = async (deckId: number, payload: { subject_id?: number; title?: string; description?: string }) => {
+/** Actualiza un mazo de flashcards (subject_id, title, description) - con soporte offline */
+export const updateFlashcardDeck = async (deckId: number, payload: { subject_id?: number | null; title?: string; description?: string; subject_name?: string | null; subject_color?: string | null; subject_icon?: string | null }) => {
+  // Enrich the payload with subject details for optimistic UI updates
+  const enrichedPayload: any = { ...payload };
+  if ('subject_id' in payload && !('subject_name' in payload)) {
+    if (payload.subject_id) {
+      const subjects = cacheService.loadSubjectsSync() as any[];
+      const subject = subjects?.find(s => s.id === payload.subject_id);
+      if (subject) {
+        enrichedPayload.subject_name = subject.name;
+        enrichedPayload.subject_color = subject.color;
+        enrichedPayload.subject_icon = subject.icon;
+      }
+    } else {
+      enrichedPayload.subject_name = null;
+      enrichedPayload.subject_color = null;
+      enrichedPayload.subject_icon = null;
+    }
+  }
+
   try {
+    // OFFLINE-FIRST: Si es un mazo local (ID negativo), actualizar localmente
+    if (deckId < 0) {
+      console.log(`[Flashcards] Mazo local ${deckId}, actualizando localmente`);
+      const { updateLocalDeck } = await import('../localFlashcardService');
+      updateLocalDeck(deckId, payload);
+      
+      // Actualizar cache de decks
+      cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS, deckId, enrichedPayload);
+      cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, deckId, enrichedPayload);
+      
+      return { id: deckId, ...enrichedPayload, _local: true };
+    }
+
     const response = await fetchWithFallback(`/flashcard-decks/${deckId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const data = await parseJsonSafely(response);
-    if (!response.ok) throw new Error(data?.error || 'Error al actualizar el mazo');
-    return data;
+    if (!response.ok) {
+      console.error(`[Flashcards] Error updating deck ${deckId}:`, data);
+      throw new Error(data?.error || 'Error al actualizar el mazo');
+    }
+    
+    // Actualizar cache con los datos del servidor + info de la materia
+    if (data && data.id) {
+      const cacheUpdate = { ...data, ...enrichedPayload };
+      cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS, deckId, cacheUpdate);
+      cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, deckId, cacheUpdate);
+    }
+    
+    console.log(`[Flashcards] Deck ${deckId} updated successfully:`, { title: data?.title, subject_id: data?.subject_id });
+    return { ...data, ...enrichedPayload };
   } catch (error) {
-    console.warn(`[Flashcards] Offline: encolando updateFlashcardDeck ${deckId}`, error);
+    console.warn(`[Flashcards] Error updating deck ${deckId}, queueing offline operation:`, error);
+    
+    // Si es local, lanzar el error (no enqueuear)
+    if (deckId < 0) {
+      throw error;
+    }
+
     await offlineSyncService.addPendingOperation('PUT', `/flashcard-decks/${deckId}`, 'flashcard_deck', payload);
-    cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS, deckId, payload);
-    cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, deckId, payload);
-    return { ...payload, _isPending: true };
+    cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS, deckId, enrichedPayload);
+    cacheService.updateOptimisticItem(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, deckId, enrichedPayload);
+    throw error;
   }
 };
 
@@ -227,7 +276,7 @@ export const createFlashcard = async (payload: { deck_id: number; front: string;
   }
 };
 
-/** Crea un evaluation item (flashcard, multiple_choice, o boolean) con estructura polimórfica */
+/** Crea un evaluation item (flashcard, multiple_choice, o boolean) con estructura polimórfica - con soporte offline */
 export const createEvaluationItem = async (payload: { 
   deck_id: number; 
   item_type: 'flashcard' | 'multiple_choice' | 'boolean'; 
@@ -236,6 +285,25 @@ export const createEvaluationItem = async (payload: {
   explanation?: string;
 }) => {
   try {
+    // OFFLINE-FIRST: Si es un mazo local (ID negativo), crear tarjeta localmente
+    if (payload.deck_id < 0) {
+      console.log(`[Flashcards] Mazo local ${payload.deck_id}, agregando tarjeta localmente`);
+      const { addLocalCard } = await import('../localFlashcardService');
+      
+      const cardData = {
+        type: payload.item_type,
+        data: payload.content_json,
+        hint: payload.hint,
+        explanation: payload.explanation,
+      };
+      
+      addLocalCard(payload.deck_id, cardData);
+      
+      const optimisticCard = { id: -Date.now(), ...payload, _local: true, _isPending: true };
+      cacheService.addOptimisticItem(CACHE_KEYS.FLASHCARDS_BY_DECK + payload.deck_id, optimisticCard);
+      return optimisticCard;
+    }
+
     const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -537,23 +605,33 @@ export const autoUnsnoozeExpired = async (): Promise<{ success: boolean; resumed
   return data;
 };
 
-/** Elimina una tarjeta individual de un mazo por su ID */
-export const deleteFlashcard = async (cardId: number) => {
+/** Elimina una tarjeta individual de un mazo por su ID - con soporte offline */
+export const deleteFlashcard = async (cardId: number, deckId?: number) => {
   try {
+    // OFFLINE-FIRST: Si es una tarjeta local (ID negativo), eliminar localmente
+    if (cardId < 0) {
+      console.log(`[Flashcards] Tarjeta local ${cardId}, eliminando localmente`);
+      if (!deckId) throw new Error('deckId es requerido para tarjetas locales');
+      
+      const { deleteLocalCard } = await import('../localFlashcardService');
+      deleteLocalCard(deckId, cardId);
+      return { success: true, _local: true, _isPending: true };
+    }
+
     const response = await fetchWithFallback(`/flashcards/${cardId}`, {
       method: 'DELETE',
     });
     const data = await parseJsonSafely(response);
     if (!response.ok) throw new Error(data?.error || 'Error al eliminar la tarjeta');
-      return data;
-    } catch (error) {
-      console.warn(`[Flashcards] Offline: encolando delete card ${cardId}`, error);
-      await offlineSyncService.addPendingOperation(
-        'DELETE',
-        `/flashcards/${cardId}`,
-        'flashcard_delete'
-      );
-      return { success: true, _isPending: true };
-    }
-  };
+    return data;
+  } catch (error) {
+    console.warn(`[Flashcards] Offline: encolando delete card ${cardId}`, error);
+    await offlineSyncService.addPendingOperation(
+      'DELETE',
+      `/flashcards/${cardId}`,
+      'flashcard_delete'
+    );
+    return { success: true, _isPending: true };
+  }
+};
 

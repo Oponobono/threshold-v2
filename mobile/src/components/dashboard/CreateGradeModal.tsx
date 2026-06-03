@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, Pressable, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
@@ -32,6 +33,10 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
   const [gradeName, setGradeName] = useState('');
   const [gradeValue, setGradeValue] = useState('');
   const [gradePercentage, setGradePercentage] = useState('');
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [gradingDate, setGradingDate] = useState<Date | null>(null);
+  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
+  const [showGradingDatePicker, setShowGradingDatePicker] = useState(false);
   const [isSavingGrade, setIsSavingGrade] = useState(false);
 
   React.useEffect(() => {
@@ -49,6 +54,10 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
     setGradeName('');
     setGradeValue('');
     setGradePercentage('');
+    setDueDate(null);
+    setGradingDate(null);
+    setShowDueDatePicker(false);
+    setShowGradingDatePicker(false);
     setSelectedSubjectId(initialSubjectId || null);
     setSelectedCategoryId(null);
     setIsSavingGrade(false);
@@ -57,6 +66,34 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
   const handleClose = () => {
     resetForm();
     onClose();
+  };
+
+  const handleDueDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDueDatePicker(false);
+    }
+    if (event.type === 'set' && selectedDate) {
+      setDueDate(selectedDate);
+    }
+  };
+
+  const handleGradingDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowGradingDatePicker(false);
+    }
+    if (event.type === 'set' && selectedDate) {
+      setGradingDate(selectedDate);
+    }
+  };
+
+  const formatDateForDisplay = (date: Date | null) => {
+    if (!date) return t('assessments.selectDate');
+    return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const formatDateForAPI = (date: Date | null) => {
+    if (!date) return null;
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD
   };
 
   const handleSaveGrade = async () => {
@@ -75,6 +112,8 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
         is_completed: true,
         type: 'grade',
         category_id: selectedCategoryId || undefined,
+        due_date: formatDateForAPI(dueDate) || undefined,
+        grading_date: formatDateForAPI(gradingDate) || undefined,
       });
 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
@@ -163,6 +202,44 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
                 placeholder={t('dashboard.quickAddMenu.grade.namePlaceholder')}
                 placeholderTextColor={theme.colors.text.placeholder}
               />
+
+              <Text style={styles.sheetLabel}>{t('assessments.dueDate')}</Text>
+              <TouchableOpacity 
+                style={styles.sheetInput} 
+                onPress={() => setShowDueDatePicker(true)}
+              >
+                <Text style={dueDate ? styles.sheetInputText : [styles.sheetInputText, { color: theme.colors.text.placeholder }]}>
+                  {formatDateForDisplay(dueDate)}
+                </Text>
+              </TouchableOpacity>
+
+              {showDueDatePicker && (
+                <DateTimePicker
+                  value={dueDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleDueDateChange}
+                />
+              )}
+
+              <Text style={styles.sheetLabel}>{t('assessments.gradingDate')}</Text>
+              <TouchableOpacity 
+                style={styles.sheetInput} 
+                onPress={() => setShowGradingDatePicker(true)}
+              >
+                <Text style={gradingDate ? styles.sheetInputText : [styles.sheetInputText, { color: theme.colors.text.placeholder }]}>
+                  {formatDateForDisplay(gradingDate)}
+                </Text>
+              </TouchableOpacity>
+
+              {showGradingDatePicker && (
+                <DateTimePicker
+                  value={gradingDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleGradingDateChange}
+                />
+              )}
 
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={globalStyles.flex1}>

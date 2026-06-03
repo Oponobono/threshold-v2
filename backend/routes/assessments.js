@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const assessmentsController = require('../controllers/assessmentsController');
+const assessmentFilesController = require('../controllers/assessmentFilesController');
 
 /**
  * @swagger
@@ -192,5 +193,87 @@ router.put('/assessments/:id', assessmentsController.updateAssessment);
  *         description: Evaluación eliminada exitosamente
  */
 router.delete('/assessments/:id', assessmentsController.deleteAssessment);
+
+/**
+ * @swagger
+ * /api/assessments/{assessmentId}/files:
+ *   post:
+ *     summary: Subir un archivo a una evaluación
+ *     tags: [Assessment Files]
+ *     parameters:
+ *       - name: assessmentId
+ *         in: path
+ *         required: true
+ *         type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file_name
+ *             properties:
+ *               file_name:
+ *                 type: string
+ *               file_type:
+ *                 type: string
+ *               local_uri:
+ *                 type: string
+ *               file_size:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Archivo subido exitosamente
+ *       400:
+ *         description: Campos requeridos faltantes
+ *       403:
+ *         description: Acceso denegado
+ */
+router.post('/assessments/:assessmentId/files', assessmentFilesController.uploadAssessmentFile);
+
+/**
+ * @swagger
+ * /api/assessments/{assessmentId}/files:
+ *   get:
+ *     summary: Obtener archivos de una evaluación
+ *     tags: [Assessment Files]
+ *     parameters:
+ *       - name: assessmentId
+ *         in: path
+ *         required: true
+ *         type: integer
+ *     responses:
+ *       200:
+ *         description: Lista de archivos
+ *       403:
+ *         description: Acceso denegado
+ */
+router.get('/assessments/:assessmentId/files', assessmentFilesController.getAssessmentFiles);
+
+/**
+ * @swagger
+ * /api/assessments/{assessmentId}/files/{fileId}:
+ *   delete:
+ *     summary: Eliminar un archivo de una evaluación
+ *     tags: [Assessment Files]
+ *     parameters:
+ *       - name: assessmentId
+ *         in: path
+ *         required: true
+ *         type: integer
+ *       - name: fileId
+ *         in: path
+ *         required: true
+ *         type: integer
+ *     responses:
+ *       200:
+ *         description: Archivo eliminado exitosamente
+ *       404:
+ *         description: Archivo no encontrado
+ *       403:
+ *         description: Acceso denegado
+ */
+router.delete('/assessments/:assessmentId/files/:fileId', assessmentFilesController.deleteAssessmentFile);
 
 module.exports = router;

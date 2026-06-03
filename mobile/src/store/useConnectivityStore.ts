@@ -6,6 +6,6 @@ interface ConnectivityStoreState {
 }
 
 export const useConnectivityStore = create<ConnectivityStoreState>((set) => ({
-  isOnline: true,
+  isOnline: false,
   setOnline: (isOnline: boolean) => set({ isOnline }),
 }));

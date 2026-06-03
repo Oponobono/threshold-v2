@@ -203,7 +203,14 @@ function sanitizeObject(obj) {
 exports.createFlashcardDeck = (req, res) => {
   const { subject_id, title, description } = req.body;
   const userId = req.user.id;
+  
   if (!title) return res.status(400).json({ error: 'Faltan campos requeridos (title).' });
+  
+  // SEGURIDAD: Ignorar cualquier user_id enviado desde el cliente
+  // El user_id siempre será el del usuario autenticado
+  if (req.body.user_id && Number(req.body.user_id) !== Number(userId)) {
+    console.warn(`[CreateDeck] Intento de asignar user_id diferente: ${req.body.user_id} vs ${userId}`);
+  }
   
   const safeTitle = sanitizeText(title);
   const safeDescription = sanitizeText(description);
@@ -213,7 +220,94 @@ exports.createFlashcardDeck = (req, res) => {
     [subject_id || null, userId, safeTitle, safeDescription || ''],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
+      console.log(`[CreateDeck] Mazo creado: ID=${this.lastID}, user_id=${userId}, title=${safeTitle}`);
       res.status(201).json({ id: this.lastID, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 });
+    }
+  );
+};
+
+/**
+ * Exporta un mazo como JSON seguro (sin exponer user_id)
+ * SEGURIDAD: El JSON exportado NO incluye user_id para evitar vulnerabilidades
+ * El usuario que importa este JSON será dueño del mazo resultante
+ */
+exports.exportDeck = (req, res) => {
+  const { deckId } = req.params;
+  const userId = req.user.id;
+
+  db.get(
+    `SELECT id, title, description, user_id FROM flashcard_decks WHERE id = ?`,
+    [deckId],
+    (err, deck) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
+
+      // Validar permiso: solo el propietario puede exportar
+      if (Number(deck.user_id) !== Number(userId)) {
+        return res.status(403).json({ error: 'No tienes permiso para exportar este mazo.' });
+      }
+
+      // Obtener todas las tarjetas del mazo
+      db.all(
+        `SELECT id, item_type, content_json, hint, explanation, front, back 
+         FROM flashcards WHERE deck_id = ? ORDER BY id ASC`,
+        [deckId],
+        (errCards, cards) => {
+          if (errCards) {
+            console.error('[ExportDeck] Error obteniendo tarjetas:', errCards);
+            return res.status(500).json({ error: errCards.message });
+          }
+
+          // Construir el JSON de exportación SIN user_id
+          const exportData = {
+            title: deck.title,
+            description: deck.description || '',
+            // NOTA: NO incluir subject_id - será seleccionado durante importación
+            cards: (cards || []).map(card => {
+              const itemType = card.item_type || 'flashcard';
+              let content = null;
+
+              // Parsear content_json si existe
+              if (card.content_json) {
+                try {
+                  content = JSON.parse(card.content_json);
+                } catch (e) {
+                  console.warn(`[ExportDeck] Error parseando content_json para tarjeta ${card.id}:`, e);
+                }
+              }
+
+              // Fallback para tarjetas antiguas sin content_json
+              if (!content && itemType === 'flashcard') {
+                content = {
+                  front: card.front || '',
+                  back: card.back || '',
+                };
+              }
+
+              const cardExport = {
+                type: itemType,
+              };
+
+              if (content) {
+                cardExport.data = content;
+              }
+
+              if (card.hint) {
+                cardExport.hint = card.hint;
+              }
+
+              if (card.explanation) {
+                cardExport.explanation = card.explanation;
+              }
+
+              return cardExport;
+            }),
+          };
+
+          console.log(`[ExportDeck] Mazo ${deckId} exportado: ${exportData.cards.length} tarjetas`);
+          res.json(exportData);
+        }
+      );
     }
   );
 };
@@ -275,12 +369,21 @@ exports.deleteDeck = (req, res) => {
 exports.updateFlashcardDeck = (req, res) => {
   const { deckId } = req.params;
   const userId = req.user.id;
-  const { title, description, subject_id } = req.body;
+  let { title, description, subject_id } = req.body;
+
+  // Validación inicial
+  if (title !== undefined && typeof title === 'string') {
+    title = title.trim();
+    if (!title) {
+      return res.status(400).json({ error: 'El título del mazo no puede estar vacío.' });
+    }
+  }
 
   if (!title && description === undefined && subject_id === undefined) {
     return res.status(400).json({ error: 'No hay campos para actualizar.' });
   }
 
+  // Verificar que el mazo exista y pertenezca al usuario
   db.get(`SELECT user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
@@ -288,27 +391,46 @@ exports.updateFlashcardDeck = (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para editar este mazo.' });
     }
 
-    const fields = [];
-    const values = [];
-    if (title !== undefined)       { fields.push('title = ?');       values.push(title); }
-    if (description !== undefined) { fields.push('description = ?'); values.push(description); }
-    if (subject_id !== undefined)  { fields.push('subject_id = ?');  values.push(subject_id); }
+    // Si subject_id se proporciona, validar que exista y pertenezca al usuario
+    if (subject_id !== undefined && subject_id !== null) {
+      db.get(`SELECT id FROM subjects WHERE id = ? AND user_id = ?`, [subject_id, userId], (subjErr, subject) => {
+        if (subjErr) return res.status(500).json({ error: subjErr.message });
+        if (!subject) {
+          return res.status(400).json({ error: 'La materia seleccionada no existe o no pertenece a ti.' });
+        }
+        performUpdate();
+      });
+    } else {
+      performUpdate();
+    }
 
-    values.push(deckId);
+    function performUpdate() {
+      const fields = [];
+      const values = [];
+      if (title !== undefined)       { fields.push('title = ?');       values.push(title); }
+      if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+      if (subject_id !== undefined)  { fields.push('subject_id = ?');  values.push(subject_id); }
 
-    db.run(
-      `UPDATE flashcard_decks SET ${fields.join(', ')} WHERE id = ?`,
-      values,
-      function(updateErr) {
-        if (updateErr) return res.status(500).json({ error: updateErr.message });
-        if (this.changes === 0) return res.status(404).json({ error: 'Mazo no encontrado.' });
+      values.push(deckId);
 
-        db.get(`SELECT * FROM flashcard_decks WHERE id = ?`, [deckId], (fetchErr, updated) => {
-          if (fetchErr) return res.status(500).json({ error: fetchErr.message });
-          res.json(updated);
-        });
-      }
-    );
+      db.run(
+        `UPDATE flashcard_decks SET ${fields.join(', ')} WHERE id = ?`,
+        values,
+        function(updateErr) {
+          if (updateErr) {
+            console.error('[FlashcardsController] Error al actualizar mazo:', updateErr);
+            return res.status(500).json({ error: updateErr.message });
+          }
+          if (this.changes === 0) return res.status(404).json({ error: 'Mazo no encontrado.' });
+
+          db.get(`SELECT * FROM flashcard_decks WHERE id = ?`, [deckId], (fetchErr, updated) => {
+            if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+            console.log('[FlashcardsController] Mazo actualizado:', { deckId, title: updated.title, subject_id: updated.subject_id });
+            res.json(updated);
+          });
+        }
+      );
+    }
   });
 };
 

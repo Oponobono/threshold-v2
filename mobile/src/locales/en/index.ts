@@ -26,6 +26,7 @@ import notifications from './notifications.json';
 import integrations from './integrations.json';
 import assessments from './assessments.json';
 import categories from './categories.json';
+import tasks from './tasks.json';
 
 const en = {
   about,
@@ -56,6 +57,7 @@ const en = {
   integrations,
   assessments,
   categories,
+  tasks,
 };
 
 export default en;

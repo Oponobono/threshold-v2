@@ -351,6 +351,8 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
   // Función para refrescar la detección de RAM (útil para debugging)
   refreshDeviceCapabilities: async () => {
     try {
+      const { clearCapabilitiesCache } = require('../utils/deviceCapabilities');
+      clearCapabilitiesCache();
       const caps = await getDeviceCapabilities();
       set({
         deviceRamGB: caps.totalRamGB,

@@ -919,16 +919,16 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 <View style={s.aiIconWrap}>
                   <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.title}>Zyren</Text>
+                  <Text style={s.subtitle} numberOfLines={1}>{subjectName}</Text>
+                </View>
                 {/* Volver al selector de contexto */}
                 {onGoBack && (
                   <TouchableOpacity style={s.goBackBtn} onPress={onGoBack} activeOpacity={0.7}>
                     <Ionicons name="arrow-back" size={18} color={TXT_PRI} />
                   </TouchableOpacity>
                 )}
-                <View style={{ flex: 1 }}>
-                  <Text style={s.title}>Zyren</Text>
-                  <Text style={s.subtitle} numberOfLines={1}>{subjectName}</Text>
-                </View>
                 {/* Cerrar */}
                 <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.7}>
                   <Ionicons name="close" size={18} color={TXT_PRI} />
@@ -1385,6 +1385,7 @@ const s = StyleSheet.create({
   bubble: {
     maxWidth: '78%', borderRadius: 18,
     paddingHorizontal: 14, paddingVertical: 10,
+    flexShrink: 1,
   },
   bubbleUser: {
     backgroundColor: USER_BG,
@@ -1396,7 +1397,7 @@ const s = StyleSheet.create({
     borderBottomLeftRadius: 4,
     borderWidth: 1, borderColor: `${PRIMARY}25`,
   },
-  bubbleText: { fontSize: 14, lineHeight: 21 },
+  bubbleText: { fontSize: 14, lineHeight: 21, flexShrink: 1 },
   bubbleTextUser: { color: TXT_PRI },
   bubbleTextAI:   { color: TXT_PRI },
 
