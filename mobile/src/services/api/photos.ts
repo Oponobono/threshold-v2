@@ -21,6 +21,10 @@ export const getGalleryItems = async () => {
   if (!userId) return [];
   try {
     const response = await fetchWithFallback(`/gallery/${userId}`);
+    const isOfflineCache = response.headers.get('X-Offline-Cache') === 'true' || response.headers.get('x-offline-cache') === 'true';
+    if (isOfflineCache) {
+      throw new Error('Offline mode - use MMKV cache for optimistic UI');
+    }
     const data = await parseJsonSafely(response);
     if (Array.isArray(data)) {
       await cacheService.saveGalleryItems(data);
@@ -103,6 +107,10 @@ export const createPhoto = async (photoData: {
 export const getPhotosBySubject = async (subjectId: number): Promise<Photo[]> => {
   try {
     const response = await fetchWithFallback(`/photos/${subjectId}`);
+    const isOfflineCache = response.headers.get('X-Offline-Cache') === 'true' || response.headers.get('x-offline-cache') === 'true';
+    if (isOfflineCache) {
+      throw new Error('Offline mode - use MMKV cache for optimistic UI');
+    }
     const data = await parseJsonSafely(response);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);

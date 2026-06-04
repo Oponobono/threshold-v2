@@ -25,9 +25,16 @@ class ThresholdPdfExtractorModule : Module() {
         PDFBoxResourceLoader.init(context)
       }
 
-      val file = File(filePath)
+      // Strip file:/// or file:// prefix so Android's File class gets a raw path
+      val path = when {
+        filePath.startsWith("file:///") -> filePath.removePrefix("file://")
+        filePath.startsWith("file://")  -> filePath.removePrefix("file://")
+        else -> filePath
+      }
+
+      val file = File(path)
       if (!file.exists()) {
-        throw Exception("PDF file not found: $filePath")
+        throw Exception("PDF file not found: $path (original: $filePath)")
       }
 
       val document = PDDocument.load(file)

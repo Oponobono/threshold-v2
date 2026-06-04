@@ -141,7 +141,18 @@ export function useSubjectDetail() {
         }
 
         if (subjectRes.status === 'fulfilled' && subjectRes.value) {
-          setSelectedSubject(subjectRes.value as DetailSubject);
+          const fetchedSubject = subjectRes.value as DetailSubject;
+          // Guard: solo actualizar si la materia devuelta sigue existiendo en el
+          // store Zustand (en memoria). Si fue eliminada offline, _purgeFromStore()
+          // ya la quitó del store aunque MMKV todavía la tenga stale.
+          const existsInStore = useDataStore
+            .getState()
+            .subjects.some(s => String(s.id) === String(fetchedSubject.id));
+          if (existsInStore) {
+            setSelectedSubject(fetchedSubject);
+          } else {
+            console.warn(`[useSubjectDetail] Materia ${fetchedSubject.id} ignorada — ya no existe en el store (eliminada offline)`);
+          }
         }
 
         if (photosRes.status === 'fulfilled' && photosRes.value != null) {

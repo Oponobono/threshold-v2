@@ -10,6 +10,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { offlineSyncService } from '../offlineSyncService';
 import { cacheService, CACHE_KEYS } from '../cacheService';
+import { extractTextFromPdfLocal } from '../localPDFService';
 
 /** Representa un documento escaneado vinculado a una materia y guardado localmente */
 export interface ScannedDocument {
@@ -29,6 +30,10 @@ export interface ScannedDocument {
 export const getScannedDocumentsBySubject = async (subjectId: number | string): Promise<ScannedDocument[]> => {
   try {
     const response = await fetchWithFallback(`/scanned_documents/subject/${subjectId}`);
+    const isOfflineCache = response.headers.get('X-Offline-Cache') === 'true' || response.headers.get('x-offline-cache') === 'true';
+    if (isOfflineCache) {
+      throw new Error('Offline mode - use MMKV cache for optimistic UI');
+    }
     const data = await parseJsonSafely(response);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -97,8 +102,35 @@ export const createScannedDocument = async (
   }
 };
 
+/**
+ * Elimina un documento de todos los cachés relevantes:
+ * - GALLERY_ITEMS (caché global)
+ * - El caché por materia específica si se provee subjectId
+ * Se llama tanto en eliminaciones online como offline para garantizar consistencia.
+ */
+const _removeDocumentFromAllCaches = (documentId: number | string, subjectId?: number | string): void => {
+  // 1. Quitar del caché global de galería
+  cacheService.removeOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, documentId);
+
+  // 2. Quitar del caché por materia específica
+  if (subjectId != null) {
+    cacheService.removeOptimisticItem(
+      `${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${subjectId}`,
+      documentId
+    );
+  } else {
+    // Fallback: barrer todos los cachés por materia si no tenemos el subjectId
+    for (let sid = 1; sid <= 200; sid++) {
+      cacheService.removeOptimisticItem(
+        `${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${sid}`,
+        documentId
+      );
+    }
+  }
+};
+
 /** Elimina un documento escaneado de la base de datos por su ID */
-export const deleteScannedDocument = async (documentId: number | string): Promise<any> => {
+export const deleteScannedDocument = async (documentId: number | string, subjectId?: number | string): Promise<any> => {
   try {
     const response = await fetchWithFallback(`/scanned_documents/${documentId}`, {
       method: 'DELETE',
@@ -107,11 +139,13 @@ export const deleteScannedDocument = async (documentId: number | string): Promis
     if (!response.ok) {
       throw new Error(data?.error || 'Error al eliminar el documento escaneado');
     }
+    // Limpiar también el caché local aunque la red funcione
+    _removeDocumentFromAllCaches(documentId, subjectId);
     return data;
   } catch (error: any) {
     console.warn('[Documents] Offline: encolando deleteScannedDocument', error);
     await offlineSyncService.addPendingOperation('DELETE', `/scanned_documents/${documentId}`, 'document');
-    cacheService.removeOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, documentId);
+    _removeDocumentFromAllCaches(documentId, subjectId);
     return { success: true, _isPending: true };
   }
 };
@@ -191,6 +225,15 @@ export const extractTextFromPDF = async (base64Pdf: string): Promise<string> => 
     }
     return data?.text || '';
   } catch (error: any) {
+    console.warn('[PDF Extract] Falló backend, intentando extracción local offline...', error);
+    try {
+      const localText = await extractTextFromPdfLocal(base64Pdf);
+      if (localText && localText.trim().length > 0) {
+        return localText;
+      }
+    } catch (localErr) {
+      console.error('[PDF Extract] Extracción local también falló:', localErr);
+    }
     throw new Error(error.message || 'Error de red al invocar el servicio de extracción PDF');
   }
 };

@@ -265,6 +265,25 @@ export const cacheService = {
 
   clearKey: (key: string) => clearCacheKeySync(key),
 
+  /**
+   * Limpia todos los cachés por materia cuando una materia es eliminada.
+   * Evita que datos de la materia eliminada contaminen la UI de otras materias.
+   */
+  clearSubjectRelatedCaches: (subjectId: number | string): void => {
+    const sid = String(subjectId);
+    const prefixes = [
+      CACHE_KEYS.PHOTOS_BY_SUBJECT,
+      CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT,
+      CACHE_KEYS.AUDIO_RECORDINGS_BY_SUBJECT,
+      CACHE_KEYS.YOUTUBE_VIDEOS_BY_SUBJECT,
+      CACHE_KEYS.CATEGORIES_BY_SUBJECT,
+    ];
+    for (const prefix of prefixes) {
+      clearCacheKeySync(`${prefix}${sid}`);
+    }
+    console.log(`[Cache] Cachés de materia ${sid} limpiados completamente`);
+  },
+
   clear: async () => clearAllData(),
 
   /**

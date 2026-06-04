@@ -251,7 +251,7 @@ export default function SubjectsScreen() {
                     >
                       <View style={styles.gridTopRow}>
                         <View style={[styles.gridIcon, { backgroundColor: cardColor }]}>
-                          <SubjectIcon iconName={subject.icon} color="#FFFFFF" size={18} />
+                          <SubjectIcon iconName={subject.icon} color={theme.colors.text.primary} size={18} />
                         </View>
 
                         <View style={styles.gridScoreGroup}>

@@ -156,7 +156,7 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
                  await deletePhoto(docId as number);
                } else {
                  console.log('[SubjectDocumentsList] Borrando como documento escaneado...');
-                 await deleteScannedDocument(docId);
+                 await deleteScannedDocument(docId, doc?.subject_id);
                }
                
                // Eliminar archivo físico para liberar espacio

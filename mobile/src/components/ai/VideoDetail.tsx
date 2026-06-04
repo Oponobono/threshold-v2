@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
   Text,
@@ -11,13 +12,14 @@ import {
   Modal,
 } from 'react-native';
 import { alertRef } from '../ui/CustomAlert';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
 
+import { useConnectivityStore } from '../../store/useConnectivityStore';
 import { theme } from '../../styles/theme';
 import { detailStyles as styles } from '../../styles/RecordingDetailScreen.styles';
 import { AITabType } from '../recordings/RecordingAITabs';
@@ -131,6 +133,8 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
   const [activeTab, setActiveTab] = useState<AITabType>('transcription');
   const [showTutorial, setShowTutorial] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const isOnline = useConnectivityStore(state => state.isOnline);
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [videoData, setVideoData] = useState<YouTubeVideo | null>(null);
@@ -368,26 +372,94 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       >
         {videoData?.video_id && (
           <View style={{ alignItems: 'center', marginBottom: 12 }}>
-            <View style={{ width: '100%', borderRadius: 12, overflow: 'hidden', aspectRatio: 16/9 }}>
-              <YoutubePlayer
-                height={Dimensions.get('window').width * 9 / 16}
-                play={false}
-                videoId={videoData.video_id}
-              onChangeState={(event: string) => {
-                console.log('YouTube player state:', event);
-              }}
-              onError={(error: string) => {
-                console.error('YouTube player error:', error);
-                Alert.alert('Error', t('youtube.errors.videoLoadFailed'));
-              }}
-              webViewProps={{
-                javaScriptEnabled: true,
-                domStorageEnabled: true,
-                mediaPlaybackRequiresUserAction: false,
-                allowsFullscreenVideo: true,
-              }}
-            />
-          </View>
+            <View style={{ width: '100%', borderRadius: 12, overflow: 'hidden', aspectRatio: 16/9, backgroundColor: theme.colors.card }}>
+              {isOnline ? (
+                <YoutubePlayer
+                  height={Dimensions.get('window').width * 9 / 16}
+                  play={false}
+                  videoId={videoData.video_id}
+                  onChangeState={(event: string) => {
+                    console.log('YouTube player state:', event);
+                  }}
+                  onError={(error: string) => {
+                    console.error('YouTube player error:', error);
+                    Alert.alert('Error', t('youtube.errors.videoLoadFailed') || 'Error cargando el video');
+                  }}
+                  webViewProps={{
+                    javaScriptEnabled: true,
+                    domStorageEnabled: true,
+                    mediaPlaybackRequiresUserAction: false,
+                    allowsFullscreenVideo: true,
+                  }}
+                />
+              ) : (
+                <LinearGradient
+                  colors={['#0D0D0D', '#1A1A2E', '#16213E']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ flex: 1, justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden' }}
+                >
+                  {/* Faded YouTube brand mark */}
+                  <MaterialCommunityIcons
+                    name="youtube"
+                    size={140}
+                    color="rgba(255,255,255,0.04)"
+                    style={{ position: 'absolute', bottom: -20, right: -20 }}
+                  />
+
+                  {/* Icon stack */}
+                  <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <View style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 32,
+                      backgroundColor: 'rgba(255,255,255,0.07)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.10)',
+                    }}>
+                      <Ionicons name="wifi-outline" size={28} color="rgba(255,255,255,0.45)" />
+                    </View>
+                    {/* Disconnection slash */}
+                    <View style={{
+                      position: 'absolute',
+                      width: 2,
+                      height: 72,
+                      backgroundColor: 'rgba(255,255,255,0.18)',
+                      transform: [{ rotate: '45deg' }],
+                      borderRadius: 1,
+                    }} />
+                  </View>
+
+                  {/* Status badge */}
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    borderRadius: 20,
+                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.12)',
+                    marginBottom: 12,
+                  }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF9500' }} />
+                    <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                      Sin conexión
+                    </Text>
+                  </View>
+
+                  <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2, textAlign: 'center' }}>
+                    Reproducción no disponible
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.38)', fontSize: 12, marginTop: 6, textAlign: 'center', paddingHorizontal: 32, lineHeight: 18 }}>
+                    El contenido guardado — transcripción y resumen — sigue disponible abajo.
+                  </Text>
+                </LinearGradient>
+              )}
+            </View>
           </View>
         )}
 

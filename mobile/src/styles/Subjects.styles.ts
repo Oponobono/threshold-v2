@@ -282,7 +282,6 @@ export const subjectsStyles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     borderRadius: 16, padding: 14,
     borderWidth: 1, borderColor: theme.colors.border,
-    ...globalStyles.shadow,
   },
   gridTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 },
   gridIcon: {

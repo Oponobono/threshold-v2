@@ -265,7 +265,10 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
             return new Response(data, {
               status: 200,
               statusText: 'OK',
-              headers: new Headers({ 'Content-Type': 'application/json' })
+              headers: new Headers({ 
+                'Content-Type': 'application/json',
+                'X-Offline-Cache': 'true'
+              })
             });
           }
         }
@@ -312,9 +315,21 @@ const cacheKey = `api_cache_${path}`;
   const customInit = { ...init, headers };
 
   for (const base of candidates) {
+    let timeoutId: NodeJS.Timeout | undefined;
     try {
       const fullUrl = `${base}${path}`;
-      const response = await fetch(fullUrl, customInit);
+      let requestInit = customInit;
+      
+      // Aplicar timeout rápido (2s) a IPs locales para evitar bloquear la app
+      // si el servidor local está apagado y queremos saltar rápido a Render.
+      if (base.includes('192.168') || base.includes('10.0') || base.includes('localhost') || base.includes('127.0')) {
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 2000);
+        requestInit = { ...customInit, signal: controller.signal as any };
+      }
+
+      const response = await fetch(fullUrl, requestInit);
+      if (timeoutId) clearTimeout(timeoutId);
       
       // ✅ Solo actualizar activeBaseUrl si la conexión fue exitosa
       if (response.ok) {
@@ -367,6 +382,7 @@ const cacheKey = `api_cache_${path}`;
       
       return response;
     } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.warn(`[✗ API] Fallo conectando a ${base}${path} — ${errorMsg}`);
       lastError = error;
@@ -395,7 +411,10 @@ const cacheKey = `api_cache_${path}`;
         return new Response(data, {
           status: 200,
           statusText: 'OK',
-          headers: new Headers({ 'Content-Type': 'application/json' })
+          headers: new Headers({ 
+            'Content-Type': 'application/json',
+            'X-Offline-Cache': 'true'
+          })
         });
       }
     } catch (cacheError) {

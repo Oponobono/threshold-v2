@@ -166,6 +166,16 @@ export const getPredictedSubject = async (): Promise<Subject | null> => {
  * Elimina una materia
  */
 export const deleteSubject = async (subjectId: number | string) => {
+  // Importación dinámica para evitar dependencia circular
+  const { useDataStore } = await import('../../store/useDataStore');
+
+  const _purgeFromStore = () => {
+    const sid = String(subjectId);
+    useDataStore.setState(state => ({
+      subjects: state.subjects.filter(s => String(s.id) !== sid),
+    }));
+  };
+
   try {
     const response = await fetchWithFallback(`/subjects/${subjectId}`, {
       method: 'DELETE',
@@ -174,12 +184,18 @@ export const deleteSubject = async (subjectId: number | string) => {
       const errorData = await parseJsonSafely(response);
       throw new Error(errorData?.error || 'No se pudo eliminar la materia.');
     }
+    // Limpiar caché MMKV y store Zustand en memoria
     cacheService.clearKey(CACHE_KEYS.SUBJECTS);
+    cacheService.clearSubjectRelatedCaches(subjectId);
+    _purgeFromStore();
     return await parseJsonSafely(response);
   } catch (error) {
     console.warn('[Subjects] Red no disponible, guardando en cola offline:', error);
     await offlineSyncService.addPendingOperation('DELETE', `/subjects/${subjectId}`, 'subject');
+    // Eliminar de MMKV, cachés secundarios y del store Zustand en memoria
     cacheService.removeOptimisticItem(CACHE_KEYS.SUBJECTS, subjectId);
+    cacheService.clearSubjectRelatedCaches(subjectId);
+    _purgeFromStore();
     return { success: true, _isPending: true };
   }
 };

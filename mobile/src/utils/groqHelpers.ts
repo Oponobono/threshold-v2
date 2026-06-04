@@ -27,7 +27,17 @@ export async function transcribeWithWhisper(audioUri: string, apiKey: string): P
 
   if (!response.ok) {
     const errBody = await response.text();
-    throw new Error(`Error de Groq Whisper ${response.status}: ${errBody}`);
+    let errorMsg = errBody;
+    try {
+      const json = JSON.parse(errBody);
+      if (json.error?.message) errorMsg = json.error.message;
+    } catch {}
+    
+    const lowerMsg = errorMsg.toLowerCase();
+    if (lowerMsg.includes('invalid') && (lowerMsg.includes('api') || lowerMsg.includes('key') || lowerMsg.includes('groq'))) {
+      throw new Error('La clave de API de Groq no es válida. Por favor, verifica tu configuración en la sección Motor de IA Local.');
+    }
+    throw new Error(`Error de Groq Whisper ${response.status}: ${errorMsg}`);
   }
 
   const rawTranscription = (await response.text()).trim();
@@ -86,18 +96,34 @@ export async function summarizeWithGroq(transcription: string, apiKey: string): 
     temperature: 0.3,
   };
 
+  let safeKey = apiKey ? apiKey.trim() : '';
+  if (safeKey.startsWith('ggsk_')) {
+    safeKey = safeKey.substring(1); // Auto-fix "ggsk_" typo
+  }
+  console.log(`[GroqHelpers] summarizeWithGroq - Key starts with: ${safeKey.substring(0, 8)}... Length: ${safeKey.length}`);
+
   const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${safeKey}`,
     },
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errBody = await response.text();
-    throw new Error(`Error de Groq ${response.status}: ${errBody}`);
+    let errorMsg = errBody;
+    try {
+      const json = JSON.parse(errBody);
+      if (json.error?.message) errorMsg = json.error.message;
+    } catch {}
+    
+    const lowerMsg = errorMsg.toLowerCase();
+    if (lowerMsg.includes('invalid') && (lowerMsg.includes('api') || lowerMsg.includes('key') || lowerMsg.includes('groq'))) {
+      throw new Error('La clave de API de Groq no es válida. Por favor, verifica tu configuración en la sección Motor de IA Local.');
+    }
+    throw new Error(`Error de Groq ${response.status}: ${errorMsg}`);
   }
 
   const data = await response.json();
