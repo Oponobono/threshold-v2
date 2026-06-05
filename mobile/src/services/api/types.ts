@@ -88,8 +88,8 @@ export interface FlashcardDeck {
   user_id?: string;
   subject_id?: string | null;
   title: string;
-  description: string;
-  created_at: string;
+  description?: string;
+  created_at?: string;
   card_count?: number;
   review_count?: number;
   learning_count?: number;
@@ -105,9 +105,9 @@ export interface Flashcard {
   id: string;
   deck_id: string;
   front: string;
-  back: string;
-  status: string;
-  created_at: string;
+  back?: string;
+  status?: string;
+  created_at?: string;
 }
 
 export type EvaluationItemType = 'flashcard' | 'multiple_choice' | 'boolean';

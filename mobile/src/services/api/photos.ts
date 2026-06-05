@@ -88,7 +88,7 @@ export const createPhoto = async (photoData: {
 
 export const getPhotosBySubject = async (subjectId: string): Promise<Photo[]> => {
   // Siempre retorna datos locales inmediatamente
-  const localData = await photoRepository.getBySubject(subjectId) as Promise<Photo[]>;
+  const localData = await photoRepository.getBySubject(subjectId) as Photo[];
   
   // Actualizar desde la nube en background si auto-upload activo
   (async () => {

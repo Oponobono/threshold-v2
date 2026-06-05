@@ -10,7 +10,7 @@
  */
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getDeviceCapabilities } from '../utils/deviceCapabilities';
+import { getDeviceCapabilities, type DeviceCapabilities } from '../utils/deviceCapabilities';
 
 export type LocalModelId = 'essential' | 'advanced' | 'qwen_1_5b' | 'qwen_3b' | 'phi3_5' | 'gemma2_2b';
 export type DownloadStatus = 'none' | 'downloading' | 'downloaded' | 'error' | 'paused';

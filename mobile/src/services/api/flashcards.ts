@@ -197,7 +197,7 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
 export const createEvaluationItem = async (payload: { deck_id: string; item_type: 'flashcard' | 'multiple_choice' | 'boolean'; content_json: any; hint?: string; explanation?: string; id?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
-  const item: any = { id, deck_id: payload.deck_id, status: 'new', created_at: new Date().toISOString(), ...payload };
+  const item: any = { id, status: 'new', created_at: new Date().toISOString(), ...payload };
 
   await flashcardRepository.create(item);
 

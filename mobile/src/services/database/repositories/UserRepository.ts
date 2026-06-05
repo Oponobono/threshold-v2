@@ -20,7 +20,7 @@ export class UserRepository extends BaseRepository<User> {
   private static instance: UserRepository;
 
   private constructor() {
-    super('users', databaseService);
+    super('users');
   }
 
   static getInstance(): UserRepository {
