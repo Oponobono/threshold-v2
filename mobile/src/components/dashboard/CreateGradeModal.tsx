@@ -108,7 +108,7 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
         subject_id: selectedSubjectId as string,
         name: gradeName.trim(),
         grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
-        weight: gradePercentage ? gradePercentage.replace(',', '.') : '0',
+        weight: gradePercentage ? Number(gradePercentage.replace(',', '.')) : 0,
         is_completed: 1 as unknown as number,
         type: 'grade',
         category_id: selectedCategoryId || undefined,

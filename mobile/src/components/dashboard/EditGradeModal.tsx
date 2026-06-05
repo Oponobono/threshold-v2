@@ -120,7 +120,7 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
         subject_id: selectedSubjectId as string,
         name: gradeName.trim(),
         grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
-        weight: gradePercentage ? gradePercentage.replace(',', '.') : '0',
+        weight: gradePercentage ? Number(gradePercentage.replace(',', '.')) : 0,
         category_id: selectedCategoryId || undefined,
         is_completed: 1 as unknown as number,
         due_date: formatDateForAPI(dueDate) || undefined,
