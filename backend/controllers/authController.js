@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { getUniqueSharePin } = require('../utils/pinHelper');
 const { JWT_SECRET } = require('../middlewares/authMiddleware');
@@ -12,6 +13,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 exports.registerUser = async (req, res) => {
   const { 
+    id: clientId,
     email, 
     password,
     name,
@@ -45,8 +47,9 @@ exports.registerUser = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, saltRounds);
     const sharePin = await getUniqueSharePin();
 
-    const query = `INSERT INTO users (email, password_hash, name, lastname, username, major, university, semester, study_goal, reference_language, share_pin, profile_image, active_grading_version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    db.run(query, [email, passwordHash, name, lastname, username, major, university, semester || null, study_goal || null, reference_language || null, sharePin, profile_image || null, active_grading_version_id || 3], function (err) {
+    const userId = clientId || uuidv4();
+    const query = `INSERT INTO users (id, email, password_hash, name, lastname, username, major, university, semester, study_goal, reference_language, share_pin, profile_image, active_grading_version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    db.run(query, [userId, email, passwordHash, name, lastname, username, major, university, semester || null, study_goal || null, reference_language || null, sharePin, profile_image || null, active_grading_version_id || 3], function (err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
           return res.status(409).json({ error: 'El correo ya está registrado.' });
@@ -54,27 +57,23 @@ exports.registerUser = async (req, res) => {
         return res.status(500).json({ error: 'Error interno del servidor.' });
       }
 
-      const newUserId = this.lastID;
-
       // ── Insertar registro por defecto en learning_analytics ────────────────
       const analyticsQuery = `
-        INSERT INTO learning_analytics (user_id, subject_id, total_cards, total_reviews, correct_reviews, incorrect_reviews, avg_response_time_ms, mastery_percentage)
-        VALUES (?, ?, 0, 0, 0, 0, 0, 0)
+        INSERT INTO learning_analytics (id, user_id, subject_id, total_cards, total_reviews, correct_reviews, incorrect_reviews, avg_response_time_ms, mastery_percentage)
+        VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0)
       `;
-      db.run(analyticsQuery, [newUserId, null], (analyticsErr) => {
+      db.run(analyticsQuery, [uuidv4(), userId, null], (analyticsErr) => {
         if (analyticsErr) {
-          console.warn(`[Analytics] Advertencia: No se pudo crear registro de analytics para userId=${newUserId}:`, analyticsErr.message);
-          // No interrumpir el registro si falla analytics
+          console.warn(`[Analytics] Advertencia: No se pudo crear registro de analytics para userId=${userId}:`, analyticsErr.message);
         } else {
-          console.log(`[Analytics] ✅ Registro de analytics creado para userId=${newUserId}`);
+          console.log(`[Analytics] ✅ Registro de analytics creado para userId=${userId}`);
         }
 
-        // Firmar token JWT
-        const token = jwt.sign({ id: newUserId, email }, JWT_SECRET, { expiresIn: '30d' });
+        const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '30d' });
 
         res.status(201).json({ 
           message: 'Usuario registrado exitosamente', 
-          userId: newUserId,
+          userId,
           token
         });
       });

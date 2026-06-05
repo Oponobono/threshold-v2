@@ -22,6 +22,7 @@ import {
 } from '../services/backup/downloadService';
 import { storageService } from '../services/storageService';
 import { alertRef } from '../components/ui/CustomAlert';
+import { syncService } from '../services/database';
 
 // ─── Helpers de formato ──────────────────────────────────────────────────────
 
@@ -100,7 +101,7 @@ export const useBackupLogic = () => {
 
   // ─── Backup (Upload) manual ───────────────────────────────────────────────
 
-  const handleBackupNow = useCallback(async () => {
+  const handleBackupNow = useCallback(async (type: 'datos' | 'multimedia' | 'ambos' = 'ambos') => {
     if (isUploading || isDownloading) return;
     if (!prefs.enabled) {
       alertRef.show({
@@ -115,14 +116,52 @@ export const useBackupLogic = () => {
     setUploadProgress({ total: 0, done: 0, current: t('backup.starting'), errors: 0 });
 
     try {
-      const result = await runBackup((p) => setUploadProgress(p));
+      let dataMessage = '';
+      
+      // 1. Respaldar Datos (JSON / SQLite)
+      if (type === 'datos' || type === 'ambos') {
+        const syncResult = await syncService.sync();
+        if (syncResult.success > 0 || syncResult.failed > 0) {
+          dataMessage = `Datos sincronizados (${syncResult.success} subidos).`;
+        } else {
+          dataMessage = 'Tus datos ya están sincronizados.';
+        }
+        
+        if (type === 'datos') {
+          alertRef.show({ title: t('backup.complete'), message: dataMessage, type: 'success' });
+          return;
+        }
+      }
 
-      if (result.uploaded === 0 && result.errors === 0) {
-        alertRef.show({ title: t('backup.allUpToDate'), message: t('backup.noNewFiles'), type: 'success' });
-      } else if (result.errors === 0) {
-        alertRef.show({ title: t('backup.complete'), message: t('backup.uploadResult', { uploaded: result.uploaded }), type: 'success' });
-      } else {
-        alertRef.show({ title: t('backup.partial'), message: t('backup.uploadPartial', { uploaded: result.uploaded, errors: result.errors }), type: 'warning' });
+      // 2. Respaldar Multimedia (Archivos en Uploadthing)
+      if (type === 'multimedia' || type === 'ambos') {
+        const overridePrefs = {
+          includeDocs: true,
+          includeTranscripts: true,
+          includePhotos: true,
+          includeAudio: true,
+        };
+        const result = await runBackup((p) => setUploadProgress(p), overridePrefs);
+
+        if (result.uploaded === 0 && result.errors === 0) {
+          alertRef.show({ 
+            title: t('backup.allUpToDate'), 
+            message: type === 'ambos' ? `${dataMessage} No hay multimedia nueva.` : 'No hay multimedia nueva por respaldar.', 
+            type: 'success' 
+          });
+        } else if (result.errors === 0) {
+          alertRef.show({ 
+            title: t('backup.complete'), 
+            message: type === 'ambos' ? `${dataMessage} ${result.uploaded} archivos subidos.` : t('backup.uploadResult', { uploaded: result.uploaded }), 
+            type: 'success' 
+          });
+        } else {
+          alertRef.show({ 
+            title: t('backup.partial'), 
+            message: t('backup.uploadPartial', { uploaded: result.uploaded, errors: result.errors }), 
+            type: 'warning' 
+          });
+        }
       }
 
       await loadAll();

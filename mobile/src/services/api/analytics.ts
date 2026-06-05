@@ -1,8 +1,7 @@
 import { fetchWithFallback, parseJsonSafely, activeBaseUrl } from './client';
-import { offlineSyncService } from '../../services/offlineSyncService';
-import { cacheService } from '../cacheService';
 import { storageService } from '../storageService';
-import * as FileSystem from 'expo-file-system';
+import { syncService } from '../database';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 export interface PredictionItem {
@@ -47,15 +46,15 @@ export const getPredictions = async (userId: string | number): Promise<Predictio
     if (!response.ok) throw new Error('Error al obtener predicciones');
     const data = await parseJsonSafely(response);
     if (data) {
-      await cacheService.savePredictions(data);
+      await storageService.saveLocal('app:cache:predictions', JSON.stringify(data));
     }
     return data;
   } catch (error) {
     console.warn('[Analytics] Network error, falling back to cached predictions:', error);
-    const cached = await cacheService.loadPredictions();
+    const cached = await storageService.getLocal('app:cache:predictions');
     if (cached) {
       console.log('[Analytics] ✅ Loaded predictions from cache (offline mode)');
-      return cached as PredictionResponse;
+      return JSON.parse(cached) as PredictionResponse;
     }
     throw error;
   }
@@ -85,12 +84,7 @@ export const recordCardReview = async (
     return data;
   } catch (error) {
     console.warn(`[Analytics] Offline: encolando recordCardReview para card ${cardId}`, error);
-    await offlineSyncService.addPendingOperation(
-      'POST',
-      `/flashcards/${cardId}/review`,
-      'flashcard_review',
-      { userId, result, responseTimeMs }
-    );
+    await syncService.enqueueCreate('card-review', String(cardId), { userId, result, responseTimeMs });
     return {
       success: true,
       cardId,
@@ -326,15 +320,15 @@ export const getSemesterSummary = async (): Promise<SemesterSummary> => {
     if (!response.ok) throw new Error('Error al obtener resumen del semestre');
     const data = await parseJsonSafely(response);
     if (data) {
-      await cacheService.saveSemesterSummary(data);
+      await storageService.saveLocal('app:cache:semester_summary', JSON.stringify(data));
     }
     return data;
   } catch (error) {
     console.warn('[Analytics] Network error, falling back to cached semester summary:', error);
-    const cached = await cacheService.loadSemesterSummary();
+    const cached = await storageService.getLocal('app:cache:semester_summary');
     if (cached) {
       console.log('[Analytics] ✅ Loaded semester summary from cache (offline mode)');
-      return cached as SemesterSummary;
+      return JSON.parse(cached) as SemesterSummary;
     }
     throw error;
   }
@@ -393,7 +387,7 @@ export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
     }
     
     if (data) {
-      await cacheService.saveGlobalGPAAnalytics(data);
+      await storageService.saveLocal('app:cache:global_gpa', JSON.stringify(data));
     }
     return data || {
       currentAverage: 0,
@@ -408,10 +402,10 @@ export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`[getGlobalGPAAnalytics] Network error:`, errorMsg);
     console.warn('[Analytics] Falling back to cached global GPA');
-    const cached = await cacheService.loadGlobalGPAAnalytics();
+    const cached = await storageService.getLocal('app:cache:global_gpa');
     if (cached) {
       console.log('[Analytics] ✅ Loaded global GPA from cache (offline mode)');
-      return cached as GlobalGPAAnalytics;
+      return JSON.parse(cached) as GlobalGPAAnalytics;
     }
     throw error;
   }

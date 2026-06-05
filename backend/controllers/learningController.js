@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const bcrypt = require('bcrypt');
 
@@ -20,20 +21,21 @@ exports.getStudySessions = (req, res) => {
  * Guardar una nueva sesión de estudio
  */
 exports.createStudySession = (req, res) => {
-  const { user_id, subject_id, session_type, config_value, duration_seconds, performance_rating } = req.body;
+  const { id: clientId, user_id, subject_id, session_type, config_value, duration_seconds, performance_rating } = req.body;
   
   if (!user_id || !session_type || duration_seconds === undefined) {
     return res.status(400).json({ error: 'Faltan campos requeridos para la sesión de estudio.' });
   }
 
+  const sessionId = clientId || uuidv4();
   const query = `
-    INSERT INTO study_sessions (user_id, subject_id, session_type, config_value, duration_seconds, performance_rating)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO study_sessions (id, user_id, subject_id, session_type, config_value, duration_seconds, performance_rating)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [user_id, subject_id || null, session_type, config_value || null, duration_seconds, performance_rating || null], function(err) {
+  db.run(query, [sessionId, user_id, subject_id || null, session_type, config_value || null, duration_seconds, performance_rating || null], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: this.lastID, message: 'Sesión de estudio guardada.' });
+    res.status(201).json({ id: sessionId, message: 'Sesión de estudio guardada.' });
   });
 };
 
@@ -56,7 +58,7 @@ const cardResultProcessor = require('../utils/cardResultProcessor');
 
 exports.createCardLog = async (req, res) => {
   try {
-    const { card_id, user_id, subject_id, result, response_time_ms, question_word_count } = req.body;
+    const { id: clientId, card_id, user_id, subject_id, result, response_time_ms, question_word_count } = req.body;
     
     if (!card_id || !user_id) {
       return res.status(400).json({ error: 'Faltan campos requeridos (card_id, user_id).' });
@@ -104,13 +106,15 @@ exports.createCardLog = async (req, res) => {
       );
     });
 
-    const logId = await new Promise((resolve, reject) => {
+    const logId = clientId || uuidv4();
+    await new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO card_logs 
-         (card_id, user_id, result, response_time_ms, 
+         (id, card_id, user_id, result, response_time_ms, 
           difficulty_deduced, normalized_time_ms, text_length_words)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
+          logId,
           processingResult.logEntry.card_id,
           processingResult.logEntry.user_id,
           processingResult.logEntry.result,
@@ -121,7 +125,7 @@ exports.createCardLog = async (req, res) => {
         ],
         function(err) {
           if (err) reject(err);
-          else resolve(this.lastID);
+          else resolve();
         }
       );
     });
@@ -219,7 +223,7 @@ exports.getGroups = (req, res) => {
  * Crea un nuevo grupo colaborativo
  */
 exports.createGroup = (req, res) => {
-  const { creator_user_id, group_pin_id, name, is_public, password } = req.body;
+  const { id: clientId, creator_user_id, group_pin_id, name, is_public, password } = req.body;
 
   if (!creator_user_id || !group_pin_id || !name) {
     return res.status(400).json({ error: 'Faltan campos requeridos (creator_user_id, group_pin_id, name).' });
@@ -240,13 +244,14 @@ exports.createGroup = (req, res) => {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
 
         // Auto-inscribir al creador como miembro con rol 'creator'
+        const membershipId = clientId || uuidv4();
         db.run(
-          `INSERT INTO group_memberships (user_id, group_pin_id, role) VALUES (?, ?, 'creator')`,
-          [creator_user_id, group_pin_id],
+          `INSERT INTO group_memberships (id, user_id, group_pin_id, role) VALUES (?, ?, ?, 'creator')`,
+          [membershipId, creator_user_id, group_pin_id],
           function(memberErr) {
             if (memberErr) return res.status(500).json({ error: memberErr.message });
             res.status(201).json({
-              id: this.lastID,
+              id: membershipId,
               group_pin_id,
               name,
               message: 'Grupo creado exitosamente.',
@@ -262,7 +267,7 @@ exports.createGroup = (req, res) => {
  * Unirse a un grupo mediante PIN
  */
 exports.joinGroup = (req, res) => {
-  const { user_id, group_pin_id, password } = req.body;
+  const { id: clientId, user_id, group_pin_id, password } = req.body;
   
   if (!user_id || !group_pin_id) {
     return res.status(400).json({ error: 'Faltan campos requeridos.' });
@@ -284,13 +289,14 @@ exports.joinGroup = (req, res) => {
       if (err2) return res.status(500).json({ error: err2.message });
       if (row) return res.status(400).json({ error: 'Ya eres miembro de este grupo.' });
 
+      const membershipId = clientId || uuidv4();
       db.run(
-        `INSERT INTO group_memberships (user_id, group_pin_id, role) VALUES (?, ?, 'member')`,
-        [user_id, group_pin_id],
+        `INSERT INTO group_memberships (id, user_id, group_pin_id, role) VALUES (?, ?, ?, 'member')`,
+        [membershipId, user_id, group_pin_id],
         function(insertErr) {
           if (insertErr) return res.status(500).json({ error: insertErr.message });
           res.status(201).json({
-            id: this.lastID,
+            id: membershipId,
             group_pin_id,
             name: group.name,
             message: `Te has unido exitosamente al grupo "${group.name}".`,

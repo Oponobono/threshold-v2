@@ -1,9 +1,10 @@
-// Definición centralizada del esquema de la base de datos
+const { v4: uuidv4 } = require('uuid');
+
 const tableSchema = {
   users: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         name TEXT,
@@ -26,7 +27,7 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
+        id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         name TEXT,
@@ -69,8 +70,8 @@ const tableSchema = {
   deleted_users: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS deleted_users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        original_user_id INTEGER,
+        id TEXT PRIMARY KEY,
+        original_user_id TEXT,
         email TEXT,
         name TEXT,
         lastname TEXT,
@@ -79,8 +80,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS deleted_users (
-        id SERIAL PRIMARY KEY,
-        original_user_id INTEGER,
+        id TEXT PRIMARY KEY,
+        original_user_id TEXT,
         email TEXT,
         name TEXT,
         lastname TEXT,
@@ -109,8 +110,8 @@ const tableSchema = {
   subjects: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS subjects (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         code TEXT NOT NULL DEFAULT '',
         name TEXT NOT NULL,
         credits INTEGER,
@@ -124,8 +125,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS subjects (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
         code TEXT NOT NULL DEFAULT '',
         name TEXT NOT NULL,
         credits INTEGER,
@@ -146,8 +147,8 @@ const tableSchema = {
   photos: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS photos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subject_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL,
         local_uri TEXT NOT NULL,
         es_favorita INTEGER DEFAULT 0,
         ocr_text TEXT,
@@ -160,8 +161,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS photos (
-        id SERIAL PRIMARY KEY,
-        subject_id INTEGER NOT NULL REFERENCES subjects (id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL REFERENCES subjects (id) ON DELETE CASCADE,
         local_uri TEXT NOT NULL,
         es_favorita INTEGER DEFAULT 0,
         ocr_text TEXT,
@@ -182,9 +183,9 @@ const tableSchema = {
   assessments: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS assessments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT NOT NULL,
         name TEXT NOT NULL,
         type TEXT,
         date TEXT,
@@ -205,9 +206,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS assessments (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        subject_id INTEGER NOT NULL REFERENCES subjects(id),
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT NOT NULL REFERENCES subjects(id),
         name TEXT NOT NULL,
         type TEXT,
         date TEXT,
@@ -225,11 +226,11 @@ const tableSchema = {
       )
     `,
     columns: [
-      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'user_id', type: 'TEXT NOT NULL' },
       { name: 'out_of', type: 'INTEGER' },
       { name: 'is_completed', type: 'INTEGER DEFAULT 0' },
       { name: 'period_id', type: 'INTEGER' },
-      { name: 'category_id', type: 'INTEGER' },
+      { name: 'category_id', type: 'TEXT' },
       { name: 'grade_value', type: 'REAL' },
       { name: 'score', type: 'REAL' },
       { name: 'normalized_value', type: 'REAL' },
@@ -243,8 +244,8 @@ const tableSchema = {
   gallery_items: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS gallery_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         uri TEXT NOT NULL,
         subject TEXT,
         date TEXT,
@@ -258,8 +259,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS gallery_items (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
         uri TEXT NOT NULL,
         subject TEXT,
         date TEXT,
@@ -274,9 +275,9 @@ const tableSchema = {
   scanned_documents: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS scanned_documents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
         name TEXT,
         local_uri TEXT NOT NULL,
         ocr_text TEXT,
@@ -290,9 +291,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS scanned_documents (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
         name TEXT,
         local_uri TEXT NOT NULL,
         ocr_text TEXT,
@@ -312,9 +313,9 @@ const tableSchema = {
   audio_recordings: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS audio_recordings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
         name TEXT,
         local_uri TEXT NOT NULL,
         duration INTEGER,
@@ -327,9 +328,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS audio_recordings (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
         name TEXT,
         local_uri TEXT NOT NULL,
         duration INTEGER,
@@ -347,8 +348,8 @@ const tableSchema = {
   audio_transcripts: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS audio_transcripts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        recording_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        recording_id TEXT NOT NULL,
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
@@ -361,8 +362,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS audio_transcripts (
-        id SERIAL PRIMARY KEY,
-        recording_id INTEGER NOT NULL REFERENCES audio_recordings(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        recording_id TEXT NOT NULL REFERENCES audio_recordings(id) ON DELETE CASCADE,
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
@@ -382,9 +383,9 @@ const tableSchema = {
   youtube_videos: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS youtube_videos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
         youtube_url TEXT NOT NULL,
         video_id TEXT NOT NULL,
         title TEXT,
@@ -397,9 +398,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS youtube_videos (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
         youtube_url TEXT NOT NULL,
         video_id TEXT NOT NULL,
         title TEXT,
@@ -412,8 +413,8 @@ const tableSchema = {
   youtube_transcripts: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS youtube_transcripts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        video_id INTEGER NOT NULL UNIQUE,
+        id TEXT PRIMARY KEY,
+        video_id TEXT NOT NULL UNIQUE,
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
@@ -426,8 +427,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS youtube_transcripts (
-        id SERIAL PRIMARY KEY,
-        video_id INTEGER NOT NULL UNIQUE REFERENCES youtube_videos(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        video_id TEXT NOT NULL UNIQUE REFERENCES youtube_videos(id) ON DELETE CASCADE,
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
@@ -447,9 +448,9 @@ const tableSchema = {
   flashcard_decks: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS flashcard_decks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
         title TEXT NOT NULL,
         description TEXT,
         is_public BOOLEAN DEFAULT 0,
@@ -461,9 +462,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS flashcard_decks (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT REFERENCES subjects(id) ON DELETE CASCADE,
         title TEXT NOT NULL,
         description TEXT,
         is_public INTEGER DEFAULT 0,
@@ -479,8 +480,8 @@ const tableSchema = {
   flashcards: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS flashcards (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        deck_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        deck_id TEXT NOT NULL,
         front TEXT NOT NULL DEFAULT '',
         back TEXT NOT NULL DEFAULT '',
         item_type TEXT NOT NULL DEFAULT 'flashcard',
@@ -498,8 +499,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS flashcards (
-        id SERIAL PRIMARY KEY,
-        deck_id INTEGER NOT NULL REFERENCES flashcard_decks(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        deck_id TEXT NOT NULL REFERENCES flashcard_decks(id) ON DELETE CASCADE,
         front TEXT NOT NULL DEFAULT '',
         back TEXT NOT NULL DEFAULT '',
         item_type TEXT NOT NULL DEFAULT 'flashcard',
@@ -523,28 +524,25 @@ const tableSchema = {
       { name: 'content_json', type: 'TEXT' },
       { name: 'hint', type: 'TEXT' },
       { name: 'explanation', type: 'TEXT' },
-      // SM-2 Spaced Repetition Fields
       { name: 'sm2_ease_factor', type: 'REAL DEFAULT 2.5' },
       { name: 'sm2_interval', type: 'INTEGER DEFAULT 1' },
       { name: 'sm2_repetitions', type: 'INTEGER DEFAULT 0' },
       { name: 'next_review_date', type: 'TIMESTAMP' },
-      // FSRS (Free Spaced Repetition Scheduler) Fields - Modern alternative to SM-2
       { name: 'fsrs_stability', type: 'REAL DEFAULT 1' },
       { name: 'fsrs_difficulty', type: 'REAL DEFAULT 0.5' },
       { name: 'fsrs_repetitions', type: 'INTEGER DEFAULT 0' },
-      // Cognitive Load & Atomicity
       { name: 'word_count', type: 'INTEGER DEFAULT 0' },
       { name: 'is_atomic', type: 'INTEGER DEFAULT 1' },
-      { name: 'parent_card_id', type: 'INTEGER' },
+      { name: 'parent_card_id', type: 'TEXT' },
       { name: 'atomic_index', type: 'INTEGER' }
     ]
   },
   card_logs: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS card_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        card_id INTEGER NOT NULL,
-        user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        card_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
         result VARCHAR(20),
         response_time_ms INTEGER,
         difficulty_deduced VARCHAR(20),
@@ -557,9 +555,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS card_logs (
-        id SERIAL PRIMARY KEY,
-        card_id INTEGER NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id),
+        id TEXT PRIMARY KEY,
+        card_id TEXT NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id),
         result VARCHAR(20),
         response_time_ms INTEGER,
         difficulty_deduced VARCHAR(20),
@@ -577,9 +575,9 @@ const tableSchema = {
   learning_analytics: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS learning_analytics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
         total_cards INTEGER DEFAULT 0,
         total_reviews INTEGER DEFAULT 0,
         correct_reviews INTEGER DEFAULT 0,
@@ -594,9 +592,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS learning_analytics (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject_id TEXT REFERENCES subjects(id) ON DELETE CASCADE,
         total_cards INTEGER DEFAULT 0,
         total_reviews INTEGER DEFAULT 0,
         correct_reviews INTEGER DEFAULT 0,
@@ -611,8 +609,8 @@ const tableSchema = {
   card_difficulty_analytics: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS card_difficulty_analytics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        card_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        card_id TEXT NOT NULL,
         total_attempts INTEGER DEFAULT 0,
         failure_rate REAL DEFAULT 0,
         avg_response_time_ms REAL DEFAULT 0,
@@ -624,8 +622,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS card_difficulty_analytics (
-        id SERIAL PRIMARY KEY,
-        card_id INTEGER NOT NULL UNIQUE REFERENCES flashcards(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        card_id TEXT NOT NULL UNIQUE REFERENCES flashcards(id) ON DELETE CASCADE,
         total_attempts INTEGER DEFAULT 0,
         failure_rate REAL DEFAULT 0,
         avg_response_time_ms REAL DEFAULT 0,
@@ -637,9 +635,9 @@ const tableSchema = {
   review_predictions: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS review_predictions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        card_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        card_id TEXT NOT NULL,
         predicted_next_review DATETIME,
         prediction_confidence REAL,
         notification_sent INTEGER DEFAULT 0,
@@ -650,9 +648,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS review_predictions (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        card_id INTEGER NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        card_id TEXT NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
         predicted_next_review TIMESTAMP,
         prediction_confidence REAL,
         notification_sent INTEGER DEFAULT 0,
@@ -663,9 +661,9 @@ const tableSchema = {
   subject_threshold_overrides: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT NOT NULL,
         threshold REAL NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -675,17 +673,17 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
         threshold REAL NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, subject_id)
       )
     `,
     columns: [
-      { name: 'user_id', type: 'INTEGER NOT NULL' },
-      { name: 'subject_id', type: 'INTEGER NOT NULL' },
+      { name: 'user_id', type: 'TEXT NOT NULL' },
+      { name: 'subject_id', type: 'TEXT NOT NULL' },
       { name: 'threshold', type: 'REAL NOT NULL' }
     ]
   },
@@ -693,7 +691,7 @@ const tableSchema = {
     sqlite: `
       CREATE TABLE IF NOT EXISTS two_factor_auth (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL UNIQUE,
+        user_id TEXT NOT NULL UNIQUE,
         enabled INTEGER DEFAULT 0,
         secret TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -704,7 +702,7 @@ const tableSchema = {
     postgres: `
       CREATE TABLE IF NOT EXISTS two_factor_auth (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         enabled INTEGER DEFAULT 0,
         secret TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -712,7 +710,7 @@ const tableSchema = {
       )
     `,
     columns: [
-      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'user_id', type: 'TEXT NOT NULL' },
       { name: 'enabled', type: 'INTEGER DEFAULT 0' },
       { name: 'secret', type: 'TEXT' }
     ]
@@ -721,7 +719,7 @@ const tableSchema = {
     sqlite: `
       CREATE TABLE IF NOT EXISTS lms_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
         platform TEXT NOT NULL,
         instance_url TEXT NOT NULL,
         username TEXT NOT NULL,
@@ -732,7 +730,7 @@ const tableSchema = {
     postgres: `
       CREATE TABLE IF NOT EXISTS lms_accounts (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         platform TEXT NOT NULL,
         instance_url TEXT NOT NULL,
         username TEXT NOT NULL,
@@ -740,7 +738,7 @@ const tableSchema = {
       )
     `,
     columns: [
-      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'user_id', type: 'TEXT NOT NULL' },
       { name: 'platform', type: 'TEXT NOT NULL' },
       { name: 'instance_url', type: 'TEXT NOT NULL' },
       { name: 'username', type: 'TEXT NOT NULL' }
@@ -750,7 +748,7 @@ const tableSchema = {
     sqlite: `
       CREATE TABLE IF NOT EXISTS feedback_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
         message TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -759,22 +757,22 @@ const tableSchema = {
     postgres: `
       CREATE TABLE IF NOT EXISTS feedback_messages (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         message TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `,
     columns: [
-      { name: 'user_id', type: 'INTEGER NOT NULL' },
+      { name: 'user_id', type: 'TEXT NOT NULL' },
       { name: 'message', type: 'TEXT NOT NULL' }
     ]
   },
   card_snoozes: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS card_snoozes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        card_id INTEGER NOT NULL UNIQUE,
-        user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        card_id TEXT NOT NULL UNIQUE,
+        user_id TEXT NOT NULL,
         snoozed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         resume_at DATETIME NOT NULL,
         snooze_duration_minutes INTEGER NOT NULL,
@@ -785,9 +783,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS card_snoozes (
-        id SERIAL PRIMARY KEY,
-        card_id INTEGER NOT NULL UNIQUE REFERENCES flashcards(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        card_id TEXT NOT NULL UNIQUE REFERENCES flashcards(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         snoozed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         resume_at TIMESTAMP NOT NULL,
         snooze_duration_minutes INTEGER NOT NULL,
@@ -798,8 +796,8 @@ const tableSchema = {
   schedules: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS schedules (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subject_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL,
         day_of_week INTEGER NOT NULL,
         start_time TEXT NOT NULL,
         end_time TEXT NOT NULL,
@@ -808,8 +806,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS schedules (
-        id SERIAL PRIMARY KEY,
-        subject_id INTEGER NOT NULL REFERENCES subjects(id),
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL REFERENCES subjects(id),
         day_of_week INTEGER NOT NULL,
         start_time TEXT NOT NULL,
         end_time TEXT NOT NULL
@@ -819,9 +817,9 @@ const tableSchema = {
   calendar_events: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS calendar_events (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
         title TEXT NOT NULL,
         event_type TEXT NOT NULL,
         description TEXT,
@@ -839,9 +837,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS calendar_events (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
         title TEXT NOT NULL,
         event_type TEXT NOT NULL,
         description TEXT,
@@ -856,8 +854,8 @@ const tableSchema = {
       )
     `,
     columns: [
-      { name: 'user_id', type: 'INTEGER NOT NULL' },
-      { name: 'subject_id', type: 'INTEGER' },
+      { name: 'user_id', type: 'TEXT NOT NULL' },
+      { name: 'subject_id', type: 'TEXT' },
       { name: 'title', type: 'TEXT NOT NULL' },
       { name: 'event_type', type: 'TEXT NOT NULL' },
       { name: 'description', type: 'TEXT' },
@@ -874,9 +872,9 @@ const tableSchema = {
   study_sessions: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS study_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
         session_type VARCHAR(20) NOT NULL,
         config_value INTEGER,
         duration_seconds INTEGER NOT NULL,
@@ -888,9 +886,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS study_sessions (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        subject_id INTEGER REFERENCES subjects(id),
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT REFERENCES subjects(id),
         session_type VARCHAR(20) NOT NULL,
         config_value INTEGER,
         duration_seconds INTEGER NOT NULL,
@@ -902,8 +900,8 @@ const tableSchema = {
   group_memberships: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS group_memberships (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         group_pin_id TEXT NOT NULL,
         role VARCHAR(20) DEFAULT 'member',
         joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -912,8 +910,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS group_memberships (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
         group_pin_id TEXT NOT NULL,
         role VARCHAR(20) DEFAULT 'member',
         joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -924,10 +922,10 @@ const tableSchema = {
   groups: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS groups (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         group_pin_id TEXT UNIQUE NOT NULL,
         name TEXT NOT NULL,
-        creator_user_id INTEGER NOT NULL,
+        creator_user_id TEXT NOT NULL,
         is_public INTEGER DEFAULT 1,
         password TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -936,10 +934,10 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS groups (
-        id SERIAL PRIMARY KEY,
+        id TEXT PRIMARY KEY,
         group_pin_id TEXT UNIQUE NOT NULL,
         name TEXT NOT NULL,
-        creator_user_id INTEGER NOT NULL REFERENCES users(id),
+        creator_user_id TEXT NOT NULL REFERENCES users(id),
         is_public BOOLEAN DEFAULT TRUE,
         password TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -950,10 +948,10 @@ const tableSchema = {
   shared_decks: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS shared_decks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        deck_id INTEGER NOT NULL,
-        shared_by_user_id INTEGER NOT NULL,
-        shared_to_user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        deck_id TEXT NOT NULL,
+        shared_by_user_id TEXT NOT NULL,
+        shared_to_user_id TEXT NOT NULL,
         shared_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (deck_id) REFERENCES flashcard_decks(id) ON DELETE CASCADE,
         FOREIGN KEY (shared_by_user_id) REFERENCES users(id),
@@ -963,10 +961,10 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS shared_decks (
-        id SERIAL PRIMARY KEY,
-        deck_id INTEGER NOT NULL REFERENCES flashcard_decks(id) ON DELETE CASCADE,
-        shared_by_user_id INTEGER NOT NULL REFERENCES users(id),
-        shared_to_user_id INTEGER NOT NULL REFERENCES users(id),
+        id TEXT PRIMARY KEY,
+        deck_id TEXT NOT NULL REFERENCES flashcard_decks(id) ON DELETE CASCADE,
+        shared_by_user_id TEXT NOT NULL REFERENCES users(id),
+        shared_to_user_id TEXT NOT NULL REFERENCES users(id),
         shared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(deck_id, shared_to_user_id)
       )
@@ -975,9 +973,9 @@ const tableSchema = {
   shared_group_decks: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS shared_group_decks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        deck_id INTEGER NOT NULL,
-        shared_by_user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        deck_id TEXT NOT NULL,
+        shared_by_user_id TEXT NOT NULL,
         group_pin_id TEXT NOT NULL,
         shared_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (deck_id) REFERENCES flashcard_decks(id) ON DELETE CASCADE,
@@ -987,9 +985,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS shared_group_decks (
-        id SERIAL PRIMARY KEY,
-        deck_id INTEGER NOT NULL REFERENCES flashcard_decks(id) ON DELETE CASCADE,
-        shared_by_user_id INTEGER NOT NULL REFERENCES users(id),
+        id TEXT PRIMARY KEY,
+        deck_id TEXT NOT NULL REFERENCES flashcard_decks(id) ON DELETE CASCADE,
+        shared_by_user_id TEXT NOT NULL REFERENCES users(id),
         group_pin_id TEXT NOT NULL,
         shared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(deck_id, group_pin_id)
@@ -999,9 +997,9 @@ const tableSchema = {
   ai_chat_sessions: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS ai_chat_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        subject_id INTEGER,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
         title TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id),
@@ -1010,9 +1008,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS ai_chat_sessions (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT REFERENCES subjects(id) ON DELETE CASCADE,
         title TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -1021,8 +1019,8 @@ const tableSchema = {
   ai_chat_messages: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS ai_chat_messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
         role VARCHAR(20) NOT NULL,
         content TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1031,8 +1029,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS ai_chat_messages (
-        id SERIAL PRIMARY KEY,
-        session_id INTEGER NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
         role VARCHAR(20) NOT NULL,
         content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1051,7 +1049,7 @@ const tableSchema = {
         country_code TEXT,
         is_system_seeded INTEGER DEFAULT 0,
         is_custom INTEGER DEFAULT 0,
-        created_by_user_id INTEGER,
+        created_by_user_id TEXT,
         based_on_system_id INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
@@ -1067,7 +1065,7 @@ const tableSchema = {
         country_code TEXT,
         is_system_seeded INTEGER DEFAULT 0,
         is_custom INTEGER DEFAULT 0,
-        created_by_user_id INTEGER REFERENCES users(id),
+        created_by_user_id TEXT REFERENCES users(id),
         based_on_system_id INTEGER REFERENCES grading_systems(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -1149,7 +1147,7 @@ const tableSchema = {
     sqlite: `
       CREATE TABLE IF NOT EXISTS grading_periods (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         period_type TEXT NOT NULL,
         start_date DATETIME,
@@ -1162,7 +1160,7 @@ const tableSchema = {
     postgres: `
       CREATE TABLE IF NOT EXISTS grading_periods (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         period_type TEXT NOT NULL,
         start_date TIMESTAMP,
@@ -1175,8 +1173,8 @@ const tableSchema = {
   assessment_categories: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS assessment_categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subject_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL,
         name TEXT NOT NULL,
         weight REAL,
         drop_lowest INTEGER DEFAULT 0,
@@ -1186,8 +1184,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS assessment_categories (
-        id SERIAL PRIMARY KEY,
-        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         weight REAL,
         drop_lowest INTEGER DEFAULT 0,
@@ -1198,9 +1196,9 @@ const tableSchema = {
   assessment_results: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS assessment_results (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        assessment_id INTEGER NOT NULL,
-        user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
         raw_value REAL,
         normalized_value DECIMAL(6,5),
         grading_version_id INTEGER NOT NULL,
@@ -1213,9 +1211,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS assessment_results (
-        id SERIAL PRIMARY KEY,
-        assessment_id INTEGER NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         raw_value REAL,
         normalized_value DECIMAL(6,5),
         grading_version_id INTEGER NOT NULL REFERENCES grading_versions(id),
@@ -1227,11 +1225,11 @@ const tableSchema = {
   grade_history: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS grade_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        assessment_result_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        assessment_result_id TEXT NOT NULL,
         old_raw_value REAL,
         new_raw_value REAL,
-        changed_by INTEGER,
+        changed_by TEXT,
         changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         reason TEXT,
         FOREIGN KEY (assessment_result_id) REFERENCES assessment_results(id) ON DELETE CASCADE
@@ -1239,11 +1237,11 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS grade_history (
-        id SERIAL PRIMARY KEY,
-        assessment_result_id INTEGER NOT NULL REFERENCES assessment_results(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        assessment_result_id TEXT NOT NULL REFERENCES assessment_results(id) ON DELETE CASCADE,
         old_raw_value REAL,
         new_raw_value REAL,
-        changed_by INTEGER,
+        changed_by TEXT,
         changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         reason TEXT
       )
@@ -1252,9 +1250,9 @@ const tableSchema = {
   subject_grade_snapshots: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS subject_grade_snapshots (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subject_id INTEGER NOT NULL,
-        user_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
         final_raw_value REAL,
         final_normalized_value DECIMAL(6,5),
         grading_version_id INTEGER NOT NULL,
@@ -1266,9 +1264,9 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS subject_grade_snapshots (
-        id SERIAL PRIMARY KEY,
-        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         final_raw_value REAL,
         final_normalized_value DECIMAL(6,5),
         grading_version_id INTEGER NOT NULL REFERENCES grading_versions(id),
@@ -1279,8 +1277,8 @@ const tableSchema = {
   assessment_files: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS assessment_files (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        assessment_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL,
         file_name TEXT NOT NULL,
         file_type TEXT,
         local_uri TEXT,
@@ -1293,8 +1291,8 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS assessment_files (
-        id SERIAL PRIMARY KEY,
-        assessment_id INTEGER NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
         file_name TEXT NOT NULL,
         file_type TEXT,
         local_uri TEXT,

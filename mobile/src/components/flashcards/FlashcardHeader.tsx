@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { flashcardsScreenStyles as styles } from '../../styles/FlashcardsScreen.styles';
-import { offlineSyncService } from '../../services/offlineSyncService';
+import { syncQueueRepository } from '../../services/database';
 
 interface Props {
   showSearch: boolean;
@@ -14,7 +14,11 @@ interface Props {
 
 export const FlashcardHeader: React.FC<Props> = ({ showSearch, onToggleSearch, onOpenMenu }) => {
   const { t } = useTranslation();
-  const pendingCount = offlineSyncService.getPendingFlashcardCount();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    syncQueueRepository.countPending().then(setPendingCount);
+  }, []);
 
   return (
     <View style={styles.headerRow}>

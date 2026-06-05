@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const secrets = require('../config/secrets');
 const { db } = require('../db');
 
@@ -48,18 +49,19 @@ exports.createYoutubeVideo = (req, res) => {
   }
 
   const authenticatedUserId = req.user.id;
-  if (parseInt(user_id) !== authenticatedUserId) {
+  if (String(user_id) !== String(authenticatedUserId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
+  const ytVideoId = req.body.id || uuidv4();
   const query = `
-    INSERT INTO youtube_videos (user_id, subject_id, youtube_url, video_id, title, thumbnail_url, duration)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO youtube_videos (id, user_id, subject_id, youtube_url, video_id, title, thumbnail_url, duration)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `;
   
-  db.run(query, [user_id, subject_id || null, youtube_url, video_id, title || null, thumbnail_url || null, duration || null], function(err) {
+  db.run(query, [ytVideoId, user_id, subject_id || null, youtube_url, video_id, title || null, thumbnail_url || null, duration || null], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ success: true, id: this.lastID });
+    res.status(201).json({ success: true, id: ytVideoId });
   });
 };
 
@@ -179,7 +181,7 @@ exports.getYoutubeCaptions = async (req, res) => {
  * Upsert transcripción/resumen de YouTube
  */
 exports.upsertYoutubeTranscript = (req, res) => {
-  const { video_id, transcript_uri, transcript_text, summary_uri, summary_text } = req.body;
+  const { id: clientId, video_id, transcript_uri, transcript_text, summary_uri, summary_text } = req.body;
   
   if (!video_id) {
     return res.status(400).json({ error: 'Falta video_id' });
@@ -228,13 +230,14 @@ exports.upsertYoutubeTranscript = (req, res) => {
         res.json({ success: true, id: row.id, action: 'updated' });
       });
     } else {
+      const transcriptId = clientId || uuidv4();
       const insertQuery = `
-        INSERT INTO youtube_transcripts (video_id, transcript_uri, transcript_text, summary_uri, summary_text)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO youtube_transcripts (id, video_id, transcript_uri, transcript_text, summary_uri, summary_text)
+        VALUES (?, ?, ?, ?, ?, ?)
       `;
-      db.run(insertQuery, [video_id, transcript_uri, transcript_text || null, summary_uri, summary_text || null], function(insertErr) {
+      db.run(insertQuery, [transcriptId, video_id, transcript_uri, transcript_text || null, summary_uri, summary_text || null], function(insertErr) {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
-        res.status(201).json({ success: true, id: this.lastID, action: 'created' });
+        res.status(201).json({ success: true, id: transcriptId, action: 'created' });
       });
     }
   });

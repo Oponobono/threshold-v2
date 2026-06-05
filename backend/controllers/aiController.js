@@ -1,5 +1,6 @@
 const secrets = require('../config/secrets');
 const { db } = require('../db');
+const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
 const geminiService = require('../utils/geminiService');
@@ -178,15 +179,15 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
 
     // Crear el mazo en la BD
     db.run(
-      `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
-      [subject_id, user_id, title, description],
+      `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
+      [uuidv4(), subject_id, user_id, title, description],
       function(err) {
         if (err) {
           console.error('[aiController] ❌ Error insertando flashcard_deck:', err.message);
           return res.status(500).json({ error: err.message });
         }
         
-        const deckId = this.lastID;
+        const deckId = uuidv4();
         console.log('[aiController] ✅ Mazo creado en BD con ID:', deckId);
 
         // Insertar todos los ítems
@@ -521,11 +522,11 @@ ${deckIntent.shouldGenerate ? deckGenerationInstructions : ''}`;
 
                   persistedDeck = await new Promise((resolve, reject) => {
                     db.run(
-                      `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
-                      [session.subject_id, session.user_id, deckTitle, deckDesc],
+                      `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
+                      [uuidv4(), session.subject_id, session.user_id, deckTitle, deckDesc],
                       function(err) {
                         if (err) reject(err);
-                        else resolve({ id: this.lastID, title: deckTitle, description: deckDesc });
+                        else resolve({ id: uuidv4(), title: deckTitle, description: deckDesc });
                       }
                     );
                   });
@@ -651,27 +652,27 @@ exports.getChatHistory = async (req, res) => {
 
     if (!session) {
       db.run(
-        'INSERT INTO ai_chat_sessions (user_id, subject_id, title) VALUES (?, ?, ?)',
-        [userId, subjectId, 'Nueva Sesión'],
-        function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ session_id: this.lastID, messages: [] });
-        }
-      );
-      return;
-    }
-
-    db.all(
-      'SELECT role, content FROM ai_chat_messages WHERE session_id = ? ORDER BY created_at ASC',
-      [session.id],
-      (err, rows) => {
+      'INSERT INTO ai_chat_sessions (id, user_id, subject_id, title) VALUES (?, ?, ?, ?)',
+      [uuidv4(), userId, subjectId, 'Nueva Sesión'],
+      function(err) {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ session_id: session.id, messages: rows });
+        res.json({ session_id: uuidv4(), messages: [] });
       }
     );
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    return;
   }
+
+  db.all(
+    'SELECT role, content FROM ai_chat_messages WHERE session_id = ? ORDER BY created_at ASC',
+    [session.id],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ session_id: session.id, messages: rows });
+    }
+  );
+} catch (err) {
+  res.status(500).json({ error: err.message });
+}
 };
 
 /**
@@ -681,11 +682,11 @@ exports.clearChatHistory = async (req, res) => {
   const { userId, subjectId } = req.params;
   try {
     db.run(
-      'INSERT INTO ai_chat_sessions (user_id, subject_id, title) VALUES (?, ?, ?)',
-      [userId, subjectId, 'Nueva Sesión'],
+      'INSERT INTO ai_chat_sessions (id, user_id, subject_id, title) VALUES (?, ?, ?, ?)',
+      [uuidv4(), userId, subjectId, 'Nueva Sesión'],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ session_id: this.lastID, messages: [] });
+        res.json({ session_id: uuidv4(), messages: [] });
       }
     );
   } catch (err) {
@@ -1470,12 +1471,12 @@ Formato requerido EXACTO (JSON Object):
     const explanation = item.explanation || null;
 
     db.run(
-      `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, is_atomic) VALUES (?, ?, ?, 'flashcard', ?, ?, ?, 'new', 1)`,
-      [deckId, front, back, contentStr, hint, explanation],
+      `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status, is_atomic) VALUES (?, ?, ?, ?, 'flashcard', ?, ?, ?, 'new', 1)`,
+      [uuidv4(), deckId, front, back, contentStr, hint, explanation],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.status(201).json({
-          id: this.lastID,
+          id: uuidv4(),
           deck_id: Number(deckId),
           front: front,
           back: back,

@@ -1,8 +1,10 @@
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { UserProfile } from '../types';
 import { getUserId } from './session';
-import { cacheService } from '../../cacheService';
+import { storageService } from '../../storageService';
 import { downloadProfileImage, clearProfileImageCache } from '../../profileImageCache';
+
+const PROFILE_CACHE_KEY = 'app:cached_profile';
 
 /**
  * Obtiene el perfil del usuario actual con caché persistente.
@@ -12,25 +14,31 @@ import { downloadProfileImage, clearProfileImageCache } from '../../profileImage
 export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
   const freshProfile = await fetchProfileFromServer();
   if (freshProfile) {
-    await cacheService.saveProfile(freshProfile);
+    await storageService.saveLocal(PROFILE_CACHE_KEY, JSON.stringify(freshProfile));
     if (freshProfile.profile_image) {
       await downloadProfileImage(freshProfile.profile_image);
     }
     return freshProfile;
   }
 
-  const cached = cacheService.loadProfileSync() as UserProfile | null;
+  const cached = await getCurrentUserProfileSync();
   if (cached) return cached;
 
   return null;
 };
 
 /**
- * Obtiene el perfil desde caché síncrona (sin red).
+ * Obtiene el perfil desde caché (sin red).
  * Útil para hidratación instantánea de UI.
  */
-export const getCurrentUserProfileSync = (): UserProfile | null => {
-  return cacheService.loadProfileSync() as UserProfile | null;
+export const getCurrentUserProfileSync = async (): Promise<UserProfile | null> => {
+  try {
+    const raw = await storageService.getLocal(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as UserProfile;
+  } catch {
+    return null;
+  }
 };
 
 const fetchProfileFromServer = async (): Promise<UserProfile | null> => {
@@ -84,7 +92,7 @@ export const updateUserProfile = async (payload: {
 
   const freshProfile = await fetchProfileFromServer();
   if (freshProfile) {
-    await cacheService.saveProfile(freshProfile);
+    await storageService.saveLocal(PROFILE_CACHE_KEY, JSON.stringify(freshProfile));
   }
 
   return data;

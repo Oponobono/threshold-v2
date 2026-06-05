@@ -1,0 +1,15 @@
+export { SubjectRepository, subjectRepository, type Subject } from './SubjectRepository';
+export { AssessmentRepository, assessmentRepository, type Assessment } from './AssessmentRepository';
+export { AssessmentCategoryRepository, assessmentCategoryRepository, type AssessmentCategory } from './AssessmentCategoryRepository';
+export { FlashcardDeckRepository, flashcardDeckRepository, type FlashcardDeck } from './FlashcardDeckRepository';
+export { FlashcardRepository, flashcardRepository, type Flashcard } from './FlashcardRepository';
+export { ScheduleRepository, scheduleRepository, type Schedule } from './ScheduleRepository';
+export { PhotoRepository, photoRepository, type Photo } from './PhotoRepository';
+export { AudioRepository, audioRepository, type AudioRecording } from './AudioRepository';
+export { YouTubeRepository, youTubeRepository, type YouTubeVideo } from './YouTubeRepository';
+export { DocumentRepository, documentRepository, type ScannedDocument } from './DocumentRepository';
+export { CalendarEventRepository, calendarEventRepository, type CalendarEvent } from './CalendarEventRepository';
+export { StudySessionRepository, studySessionRepository, type StudySession } from './StudySessionRepository';
+export { CardLogRepository, cardLogRepository, type CardLog } from './CardLogRepository';
+export { SyncQueueRepository, syncQueueRepository, type SyncQueueItem } from './SyncQueueRepository';
+export { UserRepository, userRepository, type User } from './UserRepository';

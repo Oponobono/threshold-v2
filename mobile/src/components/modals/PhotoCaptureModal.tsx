@@ -9,15 +9,14 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { dashboardStyles } from '../../styles/Dashboard.styles';
 import { Subject, createPhoto } from '../../services/api';
-import { autoUploadIfEnabled } from '../../services/backup/backupService';
 import { styles } from '../../styles/PhotoCaptureModal.styles';
 
 interface PhotoCaptureModalProps {
   isVisible: boolean;
   onClose: () => void;
   subjects: Subject[];
-  onSave?: (uri: string, subjectId: number) => void;
-  initialSubjectId?: number;
+  onSave?: (uri: string, subjectId: string) => void;
+  initialSubjectId?: string | number;
 }
 
 /**
@@ -39,7 +38,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const cameraRef = useRef<any>(null);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId ? String(initialSubjectId) : null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [cameraKey, setCameraKey] = useState(0);
@@ -131,21 +130,11 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
 
       for (const permUri of permanentUris) {
         try {
-          const photoData = await createPhoto({
-            subject_id: selectedSubjectId,
+          await createPhoto({
+            subject_id: String(selectedSubjectId),
             local_uri: permUri,
             group_id: groupId,
           });
-          
-          if (photoData?.id) {
-            await autoUploadIfEnabled(
-              permUri,
-              'photo',
-              photoData.id,
-              `photo_${photoData.id}.jpg`,
-              'image/jpeg'
-            ).catch(err => console.warn('[PhotoCaptureModal] Auto-upload error:', err));
-          }
           successCount++;
         } catch (photoError) {
           console.warn('[PhotoCaptureModal] Error saving photo:', photoError);
@@ -173,7 +162,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const resetAndClose = () => {
     setCapturedImages([]);
     setSelectedImageIndex(null);
-    setSelectedSubjectId(initialSubjectId || null);
+    setSelectedSubjectId(initialSubjectId ? String(initialSubjectId) : null);
     setIsProcessing(false);
     setFlashEnabled(false);
     onClose();
@@ -301,13 +290,13 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
                     key={s.id} 
                     style={[
                       styles.subjectItem, 
-                      selectedSubjectId === s.id && { 
-                        backgroundColor: s.color ? s.color + '40' : undefined, 
+                      String(selectedSubjectId) === String(s.id) && { 
+                        backgroundColor: s.color ? s.color + '30' : theme.colors.primary + '20', 
                         borderColor: s.color || undefined,
                         borderWidth: 2
                       }
                     ]}
-                    onPress={() => setSelectedSubjectId(s.id)}
+                    onPress={() => setSelectedSubjectId(String(s.id))}
                   >
                     <View style={[dashboardStyles.subjectBadge, { backgroundColor: s.color || '#CCC', marginRight: 0, marginBottom: 4 }]}>
                       <MaterialCommunityIcons name={(s.icon as any) || 'book-outline'} size={18} color={theme.colors.text.primary} />

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo } from '../services/api';
 import { useAudioRecorder } from './useAudioRecorder';
 import { SubjectSection, GridMediaItem } from '../components/recordings/RecordingsGrid';
-import { cacheService } from '../services/cacheService';
+import { youTubeRepository } from '../services/database';
 
 /**
  * Hook para manejar la lógica de la pantalla de Grabaciones y Multimedia.
@@ -31,10 +31,10 @@ export const useRecordingsManager = () => {
   const loadYouTubeVideos = useCallback(async () => {
     setIsLoadingVideos(true);
 
-    // Fase 1: Cache-first — mostrar datos instantáneos desde MMKV
+    // Fase 1: Cache-first — mostrar datos instantáneos desde SQLite
     try {
-      const cached = cacheService.loadYouTubeVideos() as unknown as YouTubeVideo[] | null;
-      if (cached && cached.length > 0) {
+      const cached = await youTubeRepository.getAll();
+      if (cached.length > 0) {
         setYouTubeVideos(cached);
         setIsLoadingVideos(false);
       }
@@ -44,13 +44,12 @@ export const useRecordingsManager = () => {
     try {
       const videos = await getYouTubeVideos();
       setYouTubeVideos(videos);
-      await cacheService.saveYouTubeVideos(videos);
       console.log(`[useRecordingsManager] ✅ Cargados ${videos.length} videos de YouTube`);
     } catch (e) {
       console.warn('[useRecordingsManager] ⚠️ Error loading YouTube videos:', e);
       try {
-        const cachedVideos: YouTubeVideo[] | null = await cacheService.loadYouTubeVideos() as YouTubeVideo[] | null;
-        if (cachedVideos && cachedVideos.length > 0) {
+        const cachedVideos = await youTubeRepository.getAll();
+        if (cachedVideos.length > 0) {
           setYouTubeVideos(cachedVideos);
         }
       } catch (cacheError) {

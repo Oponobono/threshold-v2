@@ -12,7 +12,7 @@ const { db } = require('../db');
  * Devuelve cuántos ítems hay en total y cuántos están respaldados por tipo.
  */
 exports.getBackupStats = (req, res) => {
-  const userId = Number(req.user?.id);
+  const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
   const stats = {
@@ -105,7 +105,7 @@ exports.getBackupStats = (req, res) => {
  * Devuelve todos los ítems no respaldados agrupados por tipo.
  */
 exports.getPendingItems = (req, res) => {
-  const userId = Number(req.user?.id);
+  const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
   const result = { photos: [], audio: [], docs: [], transcripts: [] };
@@ -226,7 +226,7 @@ exports.markAsBackedUp = (req, res) => {
  * Body: { type: 'photo'|'audio'|'document', id, local_uri }
  */
 exports.restoreLocalUri = (req, res) => {
-  const userId = Number(req.user?.id);
+  const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
   const { type, id, local_uri } = req.body;
@@ -266,7 +266,7 @@ exports.restoreLocalUri = (req, res) => {
  * Usado por el móvil para descargar archivos en un dispositivo nuevo.
  */
 exports.getCloudItems = (req, res) => {
-  const userId = Number(req.user?.id);
+  const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
   const result = { photos: [], audio: [], docs: [], transcripts: [] };

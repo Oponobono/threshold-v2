@@ -23,7 +23,7 @@ import { useSubjectGrades } from './useSubjectGrades';
 import { useAudioRecorder } from './useAudioRecorder';
 import { useDataStore } from '../store/useDataStore';
 import { useConnectivityStore } from '../store/useConnectivityStore';
-import { cacheService } from '../services/cacheService';
+import { photoRepository, documentRepository, youTubeRepository } from '../services/database';
 import { useCustomAlert } from '../components/ui/CustomAlert';
 import { generatePdfFromImages } from '../utils/pdfGenerator';
 
@@ -42,8 +42,7 @@ export function useSubjectDetail() {
 
   const subjectId = useMemo(() => {
     const raw = Array.isArray(params.subjectId) ? params.subjectId[0] : params.subjectId;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed !== 0 ? parsed : null;
+    return raw || null;
   }, [params.subjectId]);
 
   // ── Hydratación instantánea desde el store Zustand (ya cargado por MMKV) ────
@@ -135,9 +134,6 @@ export function useSubjectDetail() {
 
         if (profileRes.status === 'fulfilled') {
           setProfile(profileRes.value);
-        } else if (!isOnline) {
-          const cached: UserProfile | null = await cacheService.loadProfile() as UserProfile | null;
-          if (cached) setProfile(cached);
         }
 
         if (subjectRes.status === 'fulfilled' && subjectRes.value) {
@@ -158,15 +154,15 @@ export function useSubjectDetail() {
         if (photosRes.status === 'fulfilled' && photosRes.value != null) {
           setPhotos(photosRes.value);
         } else if (photosRes.status === 'rejected' && !isOnline) {
-          const cached: any[] | null = await cacheService.loadPhotosBySubject(subjectId) as any[] | null;
-          if (cached) setPhotos(cached);
+          const cached = await photoRepository.getBySubject(subjectId);
+          if (cached.length > 0) setPhotos(cached);
         }
 
         if (docsRes.status === 'fulfilled' && docsRes.value != null) {
           setScannedDocuments(docsRes.value);
         } else if (docsRes.status === 'rejected' && !isOnline) {
-          const cached: ScannedDocument[] | null = await cacheService.loadScannedDocumentsBySubject(subjectId) as ScannedDocument[] | null;
-          if (cached) setScannedDocuments(cached);
+          const cached = await documentRepository.getBySubject(subjectId);
+          if (cached.length > 0) setScannedDocuments(cached);
         }
 
         if (schedulesRes.status === 'fulfilled') {
@@ -183,9 +179,9 @@ export function useSubjectDetail() {
           setAllSubjectVideos(filtered);
           setRecentVideos(filtered.slice(0, 3));
         } else if (videosRes.status === 'rejected' && !isOnline) {
-          const cached: any[] | null = await cacheService.loadYouTubeVideos() as any[] | null;
-          if (cached) {
-            const filtered: YouTubeVideo[] = cached.filter((v: any) => v.subject_id === subjectId);
+          const cached = await youTubeRepository.getBySubject(String(subjectId));
+          if (cached.length > 0) {
+            const filtered = cached.filter(v => v.subject_id === subjectId);
             if (filtered.length > 0) {
               setAllSubjectVideos(filtered);
               setRecentVideos(filtered.slice(0, 3));

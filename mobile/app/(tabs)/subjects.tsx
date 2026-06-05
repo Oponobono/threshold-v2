@@ -80,7 +80,12 @@ export default function SubjectsScreen() {
         {g.subjects.length > 0 && (
           <>
             <View style={styles.semesterHero}>
+              {/* Background decorations: concentric arcs emanating from the GPA circle */}
               <View style={styles.gpaAmbientGlow} />
+              <View style={styles.heroArc1} />
+              <View style={styles.heroArc2} />
+              <View style={styles.heroArc3} />
+
               <View style={styles.heroContentRow}>
                 <View style={styles.gpaContainer}>
                   <View style={styles.semesterGpaCircle}>

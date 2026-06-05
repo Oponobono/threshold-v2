@@ -7,7 +7,6 @@ import { theme } from '../../styles/theme';
 import { documentScannerStyles as localStyles } from '../../styles/DocumentScannerModal.styles';
 import { Subject, createPhoto, createScannedDocument } from '../../services/api';
 import { extractTextFromImageHybrid } from '../../services/hybridAIService';
-import { autoUploadIfEnabled } from '../../services/backup/backupService';
 import { AdvancedImageEnhancer, AdvancedImageEnhancerRef } from '../ai/AdvancedImageEnhancer';
 import * as Print from 'expo-print';
 import * as Clipboard from 'expo-clipboard';
@@ -33,7 +32,7 @@ interface DocumentScannerModalProps {
   isVisible: boolean;
   onClose: () => void;
   subjects: Subject[];
-  onSave?: (uri: string, subjectId: number, base64?: string) => void;
+  onSave?: (uri: string, subjectId: string, base64?: string) => void;
   onOCR?: (base64: string) => Promise<string>;
 }
 
@@ -67,7 +66,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
   const { showAlert } = useCustomAlert();
   const [step, setStep] = useState<ScannerStep>('guide');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLevel, setIsLevel] = useState(false);
   const [exportFormat, setExportFormat] = useState<'image' | 'pdf'>('image');
@@ -159,10 +158,11 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
         }
 
         // OCR en background — no bloquea el guardado si falla
-        let ocrText: string | null = null;
+        let ocrText: string | undefined = undefined;
         if (base64Img) {
           try {
-            ocrText = await extractTextFromImageHybrid(base64Img);
+            const extracted = await extractTextFromImageHybrid(base64Img);
+            ocrText = extracted ? extracted : undefined;
           } catch (ocrErr) {
             console.warn('[Scanner] OCR automático falló, documento se guarda sin texto:', ocrErr);
           }
@@ -170,18 +170,12 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
 
         // Guardar documento — maneja offline internamente (encola en offlineSyncService)
         const docData = await createScannedDocument({
-          subject_id: selectedSubjectId,
+          subject_id: String(selectedSubjectId),
           local_uri: pdfUri,
           name: `Documento Escaneado ${new Date().toLocaleDateString()}`,
           ocr_text: ocrText,
         });
         console.log('[Scanner] PDF guardado. ID:', docData?.id ?? 'pendiente offline');
-
-        // Auto-subida opcional en background
-        if (docData?.id && (docData.id as number) > 0) {
-          autoUploadIfEnabled(pdfUri, 'document', docData.id as number, `document_${docData.id}.pdf`, 'application/pdf')
-            .catch(err => console.warn('[Scanner] Auto-upload error:', err));
-        }
 
         finalImageUri = pdfUri;
 
@@ -189,13 +183,13 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
         // ── Ruta IMAGEN — guardar foto con URI local ──
         // createPhoto maneja offline internamente (encola en offlineSyncService y actualiza caché)
         const photoData = await createPhoto({
-          subject_id: selectedSubjectId,
+          subject_id: String(selectedSubjectId),
           local_uri: finalImageUri,
         });
         console.log('[Scanner] Foto guardada. ID:', photoData?.id ?? 'pendiente offline');
       }
 
-      if (onSave) onSave(finalImageUri, selectedSubjectId, base64Img || undefined);
+      if (onSave) onSave(finalImageUri, selectedSubjectId as string, base64Img || undefined);
       showAlert({
         title: t('common.success'),
         message: t('dashboard.documentScannerModal.success', { subject: subjects.find(s => s.id === selectedSubjectId)?.name }),
@@ -387,19 +381,19 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
                     key={s.id}
                     style={[
                       localStyles.subjectItem,
-                      selectedSubjectId === s.id && {
+                      String(selectedSubjectId) === String(s.id) && {
                         backgroundColor: s.color ? s.color + '30' : theme.colors.primary + '20',
                         borderColor: s.color || theme.colors.primary,
                         borderWidth: 2,
                       },
                     ]}
-                    onPress={() => setSelectedSubjectId(s.id)}
+                    onPress={() => setSelectedSubjectId(String(s.id))}
                   >
                     <View style={[localStyles.subjectBadgeOverride, { backgroundColor: s.color || '#CCC' }]}>
                       <MaterialCommunityIcons name={(s.icon as any) || 'book-outline'} size={16} color="white" />
                     </View>
                     <Text style={localStyles.subjectName} numberOfLines={1}>{s.name}</Text>
-                    {selectedSubjectId === s.id && (
+                    {String(selectedSubjectId) === String(s.id) && (
                       <Ionicons name="checkmark-circle" size={16} color={s.color || theme.colors.primary} style={{ marginLeft: 6 }} />
                     )}
                   </TouchableOpacity>

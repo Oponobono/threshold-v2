@@ -38,7 +38,6 @@ import {
   getYouTubeSubtitles,
 } from '../../services/api';
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
-import { autoUploadIfEnabled } from '../../services/backup/backupService';
 import { formatTranscription } from '../../utils/transcriptionFormatter';
 import { summarizeWithFallback } from '../../utils/groqHelpers';
 
@@ -151,7 +150,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
     : '';
 
   const screenWidth = Dimensions.get('window').width - 48;
-  const subjectForId = subjects.find(s => s.id === selectedSubjectId);
+  const subjectForId = selectedSubjectId != null ? subjects.find(s => String(s.id) === String(selectedSubjectId)) : undefined;
 
   useEffect(() => { loadInitialData(); }, [videoId]);
 
@@ -183,7 +182,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
           }
         }
         setVideoData(video);
-        setSelectedSubjectId(video.subject_id ?? null);
+        setSelectedSubjectId(video.subject_id ? Number(video.subject_id) : null);
       }
 
       await loadPersistedTexts(videoId, video);
@@ -244,22 +243,13 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       const di = await FileSystem.getInfoAsync(dir);
       if (!di.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify({ text, date: new Date().toISOString() }));
-
+      
       if (videoData?.id) {
         await upsertYouTubeTranscript({
           video_id: videoData.id,
           ...(type === 'transcript' ? { transcript_uri: fileUri, transcript_text: text } : {}),
           ...(type === 'summary' ? { summary_uri: fileUri, summary_text: text } : {}),
         }).catch(e => console.warn('upsert youtube transcript DB:', e));
-        
-        await autoUploadIfEnabled(
-          fileUri,
-          'transcript',
-          videoData.id,
-          `${type}_video_${videoData.id}.json`,
-          'application/json',
-          'youtube'
-        ).catch(err => console.warn('[VideoDetail] Auto-upload error:', err));
       }
     } catch (e) { console.error('saveTextToFile:', e); }
   };
@@ -540,9 +530,9 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
           try {
             const { getFlashcardsPrioritized, getFlashcardDecksWithMetrics } = await import('../../services/api');
             const decks = await getFlashcardDecksWithMetrics();
-            const deck = decks.find(d => d.id === deckId);
+            const deck = decks.find(d => String(d.id) === String(deckId));
             if (deck) {
-              const cards = await getFlashcardsPrioritized(deckId);
+              const cards = await getFlashcardsPrioritized(String(deckId));
               setStudyDeck({ id: deckId, title: deck.title, cards });
               setShowStudyScreen(true);
             }
@@ -555,7 +545,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         contentType="video"
         title={videoData?.title || 'Video'}
         subjectId={selectedSubjectId || 0}
-        userId={videoData?.user_id || 0}
+        userId={videoData?.user_id ? Number(videoData.user_id) : 0}
       />
 
       {showStudyScreen && studyDeck && (
@@ -565,9 +555,9 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
               const { FlashcardStudyScreenStandalone } = require('../flashcards/FlashcardStudyScreenStandalone');
               return (
                 <FlashcardStudyScreenStandalone
-                  activeDeck={{ ...studyDeck, card_count: studyDeck.cards.length, user_id: videoData?.user_id || 0 }}
+                  activeDeck={{ ...studyDeck, card_count: studyDeck.cards.length, user_id: videoData?.user_id ? Number(videoData.user_id) : 0 }}
                   initialCards={studyDeck.cards}
-                  currentUserId={videoData?.user_id || 0}
+                  currentUserId={videoData?.user_id ? Number(videoData.user_id) : 0}
                   onBack={() => {
                     setShowStudyScreen(false);
                     setStudyDeck(null);

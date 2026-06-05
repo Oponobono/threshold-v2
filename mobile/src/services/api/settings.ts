@@ -1,10 +1,9 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
-import { cacheService, saveToCacheSync, loadFromCacheSync } from '../cacheService';
-import { offlineSyncService } from '../offlineSyncService';
+import { syncService } from '../database';
 
 export interface GradingPeriod {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   name: string;
   period_type: string;
   start_date: string | null;
@@ -14,17 +13,17 @@ export interface GradingPeriod {
 }
 
 export interface ThresholdOverride {
-  id: number;
-  user_id: number;
-  subject_id: number;
+  id: string;
+  user_id: string;
+  subject_id: string;
   subject_name?: string;
   subject_color?: string;
   threshold: number;
 }
 
 export interface LmsAccount {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   platform: string;
   instance_url: string;
   username: string;
@@ -37,68 +36,47 @@ export interface TwoFactorStatus {
 }
 
 export const getGradingPeriods = async (): Promise<GradingPeriod[]> => {
-  try {
-    const response = await fetchWithFallback('/grading-periods');
-    if (!response.ok) throw new Error('Error al obtener períodos');
-    const data = await parseJsonSafely(response);
-    const periods = data?.periods || [];
-    if (periods.length > 0) {
-      await cacheService.saveGradingSystems(periods);
-    }
-    return periods;
-  } catch (error) {
-    console.warn('[Settings] Network error, loading grading periods from cache:', error);
-    const cached = await cacheService.loadGradingSystems();
-    if (cached) {
-      console.log('[Settings] ✅ Loaded grading periods from cache (offline mode)');
-      return cached as GradingPeriod[];
-    }
-    throw error;
-  }
+  const response = await fetchWithFallback('/grading-periods');
+  if (!response.ok) throw new Error('Error al obtener períodos');
+  const data = await parseJsonSafely(response);
+  return data?.periods || [];
 };
 
 export const createGradingPeriod = async (name: string, period_type: string = 'custom', start_date?: string, end_date?: string): Promise<any> => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = uuidv4();
+
   try {
     const response = await fetchWithFallback('/grading-periods', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, period_type, start_date: start_date || null, end_date: end_date || null }),
+      body: JSON.stringify({ id, name, period_type, start_date: start_date || null, end_date: end_date || null }),
     });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al crear período'); }
     return await parseJsonSafely(response);
-  } catch (error) {
-    console.warn('[Settings] Offline: encolando createGradingPeriod', error);
-    await offlineSyncService.addPendingOperation('POST', '/grading-periods', 'settings', { name, period_type, start_date, end_date });
-    return { id: -Date.now(), name, period_type, _isPending: true };
+  } catch {
+    await syncService.enqueueCreate('grading-period', id, { name, period_type, start_date, end_date });
+    return { id, name, period_type, _isPending: true };
   }
 };
 
-export const deleteGradingPeriod = async (id: number): Promise<void> => {
+export const deleteGradingPeriod = async (id: string): Promise<void> => {
   try {
     const response = await fetchWithFallback(`/grading-periods/${id}`, { method: 'DELETE' });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al eliminar período'); }
-  } catch (error) {
-    console.warn(`[Settings] Offline: encolando deleteGradingPeriod ${id}`, error);
-    await offlineSyncService.addPendingOperation('DELETE', `/grading-periods/${id}`, 'settings');
+  } catch {
+    await syncService.enqueueDelete('grading-period', id);
   }
 };
 
-const CACHE_KEY_THRESHOLD_OVERRIDES = 'cache:threshold_overrides';
-const TTL_THRESHOLD_OVERRIDES = 1000 * 60 * 5; // 5 min
-
 export const getThresholdOverrides = async (): Promise<ThresholdOverride[]> => {
-  const cached = loadFromCacheSync<ThresholdOverride[]>(CACHE_KEY_THRESHOLD_OVERRIDES, TTL_THRESHOLD_OVERRIDES);
-  if (cached) return cached;
-
   const response = await fetchWithFallback('/threshold-overrides');
   if (!response.ok) throw new Error('Error al obtener excepciones');
   const data = await parseJsonSafely(response);
-  const overrides = data?.overrides || [];
-  saveToCacheSync(CACHE_KEY_THRESHOLD_OVERRIDES, overrides);
-  return overrides;
+  return data?.overrides || [];
 };
 
-export const saveThresholdOverrides = async (overrides: { subjectId: number; threshold: string }[]): Promise<void> => {
+export const saveThresholdOverrides = async (overrides: { subjectId: string; threshold: string }[]): Promise<void> => {
   try {
     const response = await fetchWithFallback('/threshold-overrides', {
       method: 'PUT',
@@ -106,9 +84,8 @@ export const saveThresholdOverrides = async (overrides: { subjectId: number; thr
       body: JSON.stringify({ overrides }),
     });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al guardar excepciones'); }
-  } catch (error) {
-    console.warn('[Settings] Offline: encolando saveThresholdOverrides', error);
-    await offlineSyncService.addPendingOperation('PUT', '/threshold-overrides', 'settings', { overrides });
+  } catch {
+    await syncService.enqueueUpdate('threshold-overrides', 'all', { overrides });
   }
 };
 
@@ -116,18 +93,20 @@ export const createCustomGradingSystem = async (data: {
   name: string; min_value: number; max_value: number; passing_value: number;
   precision?: number; type?: string; mode?: string; direction?: string;
 }): Promise<any> => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = uuidv4();
+
   try {
     const response = await fetchWithFallback('/grading-systems/custom', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ id, ...data }),
     });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al crear escala'); }
     return await parseJsonSafely(response);
-  } catch (error) {
-    console.warn('[Settings] Offline: encolando createCustomGradingSystem', error);
-    await offlineSyncService.addPendingOperation('POST', '/grading-systems/custom', 'settings', data);
-    return { id: -Date.now(), ...data, _isPending: true };
+  } catch {
+    await syncService.enqueueCreate('grading-system', id, data);
+    return { id, ...data, _isPending: true };
   }
 };
 
@@ -157,28 +136,29 @@ export const getLmsAccounts = async (): Promise<LmsAccount[]> => {
 };
 
 export const addLmsAccount = async (platform: string, instance_url: string, username: string): Promise<LmsAccount> => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = uuidv4();
+
   try {
     const response = await fetchWithFallback('/lms-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ platform, instance_url, username }),
+      body: JSON.stringify({ id, platform, instance_url, username }),
     });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al vincular LMS'); }
     return await parseJsonSafely(response);
-  } catch (error) {
-    console.warn('[Settings] Offline: encolando addLmsAccount', error);
-    await offlineSyncService.addPendingOperation('POST', '/lms-accounts', 'settings', { platform, instance_url, username });
-    return { id: -Date.now(), platform, instance_url, username, _isPending: true } as any;
+  } catch {
+    await syncService.enqueueCreate('lms-account', id, { platform, instance_url, username });
+    return { id, platform, instance_url, username, _isPending: true } as any;
   }
 };
 
-export const removeLmsAccount = async (id: number): Promise<void> => {
+export const removeLmsAccount = async (id: string): Promise<void> => {
   try {
     const response = await fetchWithFallback(`/lms-accounts/${id}`, { method: 'DELETE' });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al desvincular LMS'); }
-  } catch (error) {
-    console.warn(`[Settings] Offline: encolando removeLmsAccount ${id}`, error);
-    await offlineSyncService.addPendingOperation('DELETE', `/lms-accounts/${id}`, 'settings');
+  } catch {
+    await syncService.enqueueDelete('lms-account', id);
   }
 };
 
@@ -195,15 +175,17 @@ export const exportDataPdf = async (): Promise<Blob> => {
 };
 
 export const sendFeedback = async (message: string): Promise<void> => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = uuidv4();
+
   try {
     const response = await fetchWithFallback('/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ id, message }),
     });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al enviar feedback'); }
-  } catch (error) {
-    console.warn('[Settings] Offline: encolando sendFeedback', error);
-    await offlineSyncService.addPendingOperation('POST', '/feedback', 'settings', { message });
+  } catch {
+    await syncService.enqueueCreate('feedback', id, { message });
   }
 };

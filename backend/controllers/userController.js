@@ -52,7 +52,7 @@ exports.updateUserProfile = (req, res) => {
   const fields = ['name', 'lastname', 'username', 'major', 'university', 'semester', 'study_goal', 'share_pin', 'display_name', 'profile_image', 'active_grading_version_id', 'approval_threshold'];
   
   // Validación de campos requeridos
-  if (!userId || isNaN(parseInt(userId))) {
+  if (!userId) {
     return res.status(400).json({ error: 'userId inválido.' });
   }
 

@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const secrets = require('../config/secrets');
 const { db } = require('../db');
 const pdfParse = require('pdf-parse');
@@ -39,30 +40,32 @@ exports.getScannedDocumentsBySubject = async (req, res) => {
  */
 exports.saveScannedDocument = (req, res) => {
   // Acepta ocr_text para persistirlo junto al documento y hacer el contexto IA disponible de inmediato
-  const { user_id, subject_id, name, local_uri, ocr_text } = req.body;
+  const { id: clientId, user_id, subject_id, name, local_uri, ocr_text } = req.body;
   
   if (!user_id || !local_uri) {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id, local_uri)' });
   }
 
   const authenticatedUserId = req.user.id;
-  if (parseInt(user_id) !== authenticatedUserId) {
+  if (String(user_id) !== String(authenticatedUserId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
+  const docId = clientId || uuidv4();
   const hasOcr = ocr_text && ocr_text.trim().length > 0;
   const query = hasOcr ? `
-    INSERT INTO scanned_documents (user_id, subject_id, name, local_uri, ocr_text, extracted_at)
-    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO scanned_documents (id, user_id, subject_id, name, local_uri, ocr_text, extracted_at)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
   ` : `
-    INSERT INTO scanned_documents (user_id, subject_id, name, local_uri, ocr_text)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO scanned_documents (id, user_id, subject_id, name, local_uri, ocr_text)
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [user_id, subject_id || null, name || null, local_uri, ocr_text || null], function(err) {
+  const values = [docId, user_id, subject_id || null, name || null, local_uri, ocr_text || null];
+  db.run(query, values, function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({
-      id: this.lastID,
+      id: docId,
       user_id,
       subject_id,
       name,

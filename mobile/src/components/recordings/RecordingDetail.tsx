@@ -37,7 +37,6 @@ import {
   upsertAudioTranscript,
   updateAudioRecording,
 } from '../../services/api';
-import { autoUploadIfEnabled } from '../../services/backup/backupService';
 
 import { SubjectPickerModal } from '../subjects/SubjectPickerModal';
 import { AnimatedSubjectSelector } from '../animated/AnimatedSubjectSelector';
@@ -124,7 +123,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       })();
 
   const screenWidth = Dimensions.get('window').width - 48;
-  const subjectForId = subjects.find(s => s.id === selectedSubjectId);
+  const subjectForId = selectedSubjectId != null ? subjects.find(s => String(s.id) === String(selectedSubjectId)) : undefined;
 
   // ---------------------------------------------------------------------------
   // Cleanup
@@ -160,8 +159,8 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         rec = all.find(r =>
           r.id?.toString() === recordingId ||
           r.id_string === recordingId ||
-          r.local_uri.endsWith(recordingId) ||
-          r.local_uri.endsWith(`${recordingId}.m4a`) ||
+          r.local_uri?.endsWith(recordingId) ||
+          r.local_uri?.endsWith(`${recordingId}.m4a`) ||
           r.uri?.endsWith(recordingId) ||
           r.uri?.endsWith(`${recordingId}.m4a`) ||
           (r.local_uri ? r.local_uri.split('/').pop()?.replace(/\.m4a$/, '') === recordingId : false) ||
@@ -171,7 +170,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
 
       if (rec) { 
         setRecordingData(rec); 
-        setSelectedSubjectId(rec.subject_id ?? null); 
+        setSelectedSubjectId(rec.subject_id ? Number(rec.subject_id) : null); 
       }
       
       // Determinar mejor URI de audio (Caché local -> Fallback a Nube -> Búsqueda)
@@ -297,16 +296,6 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
           ...(type === 'transcript' ? { transcript_uri: fileUri, transcript_text: text } : {}),
           ...(type === 'summary' ? { summary_uri: fileUri, summary_text: text } : {}),
         }).catch(e => console.warn('upsert transcript DB:', e));
-        
-        // Auto subida de transcripciones y resúmenes si está habilitada
-        await autoUploadIfEnabled(
-          fileUri,
-          'transcript',
-          recordingData.id,
-          `${type}_${recordingData.id}.json`,
-          'application/json',
-          'audio'
-        ).catch(err => console.warn('[RecordingDetail] Auto-upload error:', err));
       }
     } catch (e) { console.error('saveTextToFile:', e); }
   };
@@ -636,9 +625,9 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
           try {
             const { getFlashcardsPrioritized, getFlashcardDecksWithMetrics } = await import('../../services/api');
             const decks = await getFlashcardDecksWithMetrics();
-            const deck = decks.find(d => d.id === deckId);
+            const deck = decks.find(d => String(d.id) === String(deckId));
             if (deck) {
-              const cards = await getFlashcardsPrioritized(deckId);
+              const cards = await getFlashcardsPrioritized(String(deckId));
               setStudyDeck({ id: deckId, title: deck.title, cards });
               setShowStudyScreen(true);
             }
@@ -651,7 +640,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         contentType="recording"
         title={recordingData?.name || 'Recording'}
         subjectId={selectedSubjectId || 0}
-        userId={recordingData?.user_id || 0}
+        userId={recordingData?.user_id ? Number(recordingData.user_id) : 0}
       />
 
       {/* Study Screen Modal */}
@@ -662,9 +651,9 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
               const { FlashcardStudyScreenStandalone } = require('../flashcards/FlashcardStudyScreenStandalone');
               return (
                 <FlashcardStudyScreenStandalone
-                  activeDeck={{ ...studyDeck, card_count: studyDeck.cards.length, user_id: recordingData?.user_id || 0 }}
+                  activeDeck={{ ...studyDeck, card_count: studyDeck.cards.length, user_id: recordingData?.user_id ? Number(recordingData.user_id) : 0 }}
                   initialCards={studyDeck.cards}
-                  currentUserId={recordingData?.user_id || 0}
+                  currentUserId={recordingData?.user_id ? Number(recordingData.user_id) : 0}
                   onBack={() => {
                     setShowStudyScreen(false);
                     setStudyDeck(null);

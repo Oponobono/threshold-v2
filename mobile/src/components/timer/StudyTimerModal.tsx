@@ -120,8 +120,8 @@ export const StudyTimerModal: React.FC<StudyTimerModalProps> = ({
         {subjects.map((s) => (
           <TouchableOpacity 
             key={s.id} 
-            style={[localStyles.subjectCard, selectedSubjectId === s.id && { borderColor: theme.colors.primary, borderWidth: 2 }]}
-            onPress={() => setSelectedSubjectId(s.id)}
+            style={[localStyles.subjectCard, String(selectedSubjectId) === String(s.id) && { borderColor: theme.colors.primary, borderWidth: 2 }]}
+            onPress={() => setSelectedSubjectId(Number(s.id))}
           >
             <View style={[styles.subjectBadge, { backgroundColor: s.color || '#CCC', marginBottom: 0 }]}>
                <MaterialCommunityIcons name={(s.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />

@@ -61,7 +61,7 @@ export default function GradesScreen() {
           t={t}
         />
 
-        {g.userId && (
+        {g.userId != null && (
           <MasteryRadarCard
             userId={g.userId}
             selectedSubjectId={g.selectedSubjectId}
@@ -157,7 +157,7 @@ export default function GradesScreen() {
       </ScrollView>
 
       {/* Expanded chart modals */}
-      {expandedChart === 'mastery' && g.userId && (
+      {expandedChart === 'mastery' && g.userId != null && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setExpandedChart(null)}>
           <View style={{
             flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',

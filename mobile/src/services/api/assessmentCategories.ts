@@ -1,71 +1,73 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
-import { offlineSyncService } from '../offlineSyncService';
+import { assessmentCategoryRepository, syncService } from '../database';
+import type { AssessmentCategory } from './types';
 
-export interface AssessmentCategory {
-  id: number;
-  subject_id: number;
-  name: string;
-  weight?: number;
-  drop_lowest?: number;
-}
+export type { AssessmentCategory };
 
-export const getCategoriesBySubject = async (subjectId: string | number): Promise<AssessmentCategory[]> => {
-  const response = await fetchWithFallback(`/subjects/${subjectId}/categories`);
-  if (!response.ok) {
-    const errorData = await parseJsonSafely(response);
-    throw new Error(errorData?.error || 'Error fetching categories');
-  }
-  const data = await parseJsonSafely(response);
-  return Array.isArray(data) ? data : [];
+export const getCategoriesBySubject = async (subjectId: string): Promise<AssessmentCategory[]> => {
+  // 1. Leer localmente primero
+  const localData = await assessmentCategoryRepository.getBySubject(subjectId);
+
+  // 2. Sincronizar en background
+  (async () => {
+    try {
+      const response = await fetchWithFallback(`/subjects/${subjectId}/categories`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const c of data) await assessmentCategoryRepository.upsert(c);
+        }
+      }
+    } catch {}
+  })();
+
+  return localData || [];
 };
 
-export const createCategory = async (subjectId: string | number, data: Partial<AssessmentCategory>): Promise<AssessmentCategory> => {
+export const createCategory = async (subjectId: string, data: Partial<AssessmentCategory>): Promise<AssessmentCategory> => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = uuidv4();
+  const category: any = { id, subject_id: subjectId, ...data };
+  await assessmentCategoryRepository.create(category);
+
   try {
     const response = await fetchWithFallback(`/subjects/${subjectId}/categories`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, id }),
     });
-    if (!response.ok) {
-      const errorData = await parseJsonSafely(response);
-      throw new Error(errorData?.error || 'Error creating category');
-    }
-    return await parseJsonSafely(response);
-  } catch (error) {
-    console.warn('[Categories] Offline: encolando createCategory', error);
-    await offlineSyncService.addPendingOperation('POST', `/subjects/${subjectId}/categories`, 'category', data);
-    return { id: -Date.now(), subject_id: Number(subjectId), ...data, _isPending: true } as any;
+    if (!response.ok) throw new Error('Error creating category');
+    const result = await parseJsonSafely(response);
+    await assessmentCategoryRepository.upsert(result);
+    return result;
+  } catch {
+    await syncService.enqueueCreate('category', id, { ...data, id });
+    return category;
   }
 };
 
-export const updateCategory = async (id: string | number, data: Partial<AssessmentCategory>): Promise<void> => {
+export const updateCategory = async (id: string, data: Partial<AssessmentCategory>): Promise<void> => {
+  await assessmentCategoryRepository.update(id, data);
+
   try {
     const response = await fetchWithFallback(`/categories/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!response.ok) {
-      const errorData = await parseJsonSafely(response);
-      throw new Error(errorData?.error || 'Error updating category');
-    }
-  } catch (error) {
-    console.warn(`[Categories] Offline: encolando updateCategory ${id}`, error);
-    await offlineSyncService.addPendingOperation('PUT', `/categories/${id}`, 'category', data);
+    if (!response.ok) throw new Error('Error updating category');
+  } catch {
+    await syncService.enqueueUpdate('category', id, data);
   }
 };
 
-export const deleteCategory = async (id: string | number): Promise<void> => {
+export const deleteCategory = async (id: string): Promise<void> => {
+  await assessmentCategoryRepository.delete(id);
+
   try {
-    const response = await fetchWithFallback(`/categories/${id}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) {
-      const errorData = await parseJsonSafely(response);
-      throw new Error(errorData?.error || 'Error deleting category');
-    }
-  } catch (error) {
-    console.warn(`[Categories] Offline: encolando deleteCategory ${id}`, error);
-    await offlineSyncService.addPendingOperation('DELETE', `/categories/${id}`, 'category');
+    const response = await fetchWithFallback(`/categories/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Error deleting category');
+  } catch {
+    await syncService.enqueueDelete('category', id);
   }
 };

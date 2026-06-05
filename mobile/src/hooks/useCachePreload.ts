@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { cacheService } from '../services/cacheService';
+import { photoRepository, audioRepository, youTubeRepository, flashcardDeckRepository } from '../services/database';
 
 export interface CachePreloadedData {
   galleryItems: any[] | null;
@@ -10,9 +10,7 @@ export interface CachePreloadedData {
 }
 
 /**
- * Hook para cargar datos relacionados del caché en paralelo.
- * Carga galerías, audios, videos y mazos sin bloquear la UI.
- * Ideal para precargar datos en background mientras el dashboard se renderiza.
+ * Hook para cargar datos relacionados de SQLite en paralelo.
  */
 export const useCachePreload = () => {
   const [isPreloading, setIsPreloading] = useState(false);
@@ -21,31 +19,25 @@ export const useCachePreload = () => {
   const preloadRelatedData = useCallback(async (): Promise<CachePreloadedData | null> => {
     setIsPreloading(true);
     try {
-      console.log('[CachePreload] 📦 Pre-cargando datos relacionados del caché...');
+      console.log('[CachePreload] 📦 Pre-cargando datos relacionados de SQLite...');
 
-      const loaded = await Promise.all([
-        cacheService.loadGalleryItems(),
-        cacheService.loadAudioRecordings(),
-        cacheService.loadYouTubeVideos(),
-        cacheService.loadFlashcardDecks(),
-        cacheService.loadFlashcardDecksWithMetrics(),
+      const [galleryItems, audioRecordings, youTubeVideos, flashcardDecks] = await Promise.all([
+        photoRepository.getAll().catch(() => []),
+        audioRepository.getAll().catch(() => []),
+        youTubeRepository.getAll().catch(() => []),
+        flashcardDeckRepository.getAll().catch(() => []),
       ]);
-      const galleryItems = loaded[0] as any[] | null;
-      const audioRecordings = loaded[1] as any[] | null;
-      const youTubeVideos = loaded[2] as any[] | null;
-      const flashcardDecks = loaded[3] as any[] | null;
-      const flashcardDecksWithMetrics = loaded[4] as any[] | null;
 
       const result: CachePreloadedData = {
-        galleryItems,
-        audioRecordings,
-        youTubeVideos,
-        flashcardDecks,
-        flashcardDecksWithMetrics,
+        galleryItems: galleryItems.length > 0 ? galleryItems as any[] : null,
+        audioRecordings: audioRecordings.length > 0 ? audioRecordings as any[] : null,
+        youTubeVideos: youTubeVideos.length > 0 ? youTubeVideos as any[] : null,
+        flashcardDecks: flashcardDecks.length > 0 ? flashcardDecks as any[] : null,
+        flashcardDecksWithMetrics: flashcardDecks.length > 0 ? flashcardDecks as any[] : null,
       };
 
       setPreloadedData(result);
-      console.log('[CachePreload] ✅ Datos relacionados pre-cargados del caché');
+      console.log('[CachePreload] ✅ Datos relacionados pre-cargados de SQLite');
       return result;
     } catch (error) {
       console.warn('[CachePreload] Error pre-cargando datos:', error);

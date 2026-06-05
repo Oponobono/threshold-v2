@@ -1,4 +1,5 @@
 const secrets = require('../config/secrets');
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { analyzeCardDensity, fragmentCard } = require('../utils/atomicCardGenerator');
 const { calculateSM2, calculateFSRS } = require('../utils/sm2Algorithm');
@@ -55,7 +56,7 @@ function normalizeCard(row) {
 exports.getFlashcardDecks = (req, res) => {
   const requestUserId = req.query.user_id;
   const userId = req.user.id;
-  if (requestUserId && parseInt(requestUserId) !== userId) {
+  if (requestUserId && String(requestUserId) !== String(userId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   if (!userId) return res.status(400).json({ error: 'Se requiere user_id' });
@@ -106,7 +107,7 @@ exports.getFlashcardDecks = (req, res) => {
 exports.getFlashcardDecksWithMetrics = (req, res) => {
   const requestUserId = req.query.user_id;
   const userId = req.user.id;
-  if (requestUserId && parseInt(requestUserId) !== userId) {
+  if (requestUserId && String(requestUserId) !== String(userId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   if (!userId) return res.status(400).json({ error: 'Se requiere user_id' });
@@ -201,27 +202,29 @@ function sanitizeObject(obj) {
 }
 
 exports.createFlashcardDeck = (req, res) => {
-  const { subject_id, title, description } = req.body;
+  const { id: clientId, subject_id, title, description } = req.body;
   const userId = req.user.id;
   
   if (!title) return res.status(400).json({ error: 'Faltan campos requeridos (title).' });
   
   // SEGURIDAD: Ignorar cualquier user_id enviado desde el cliente
   // El user_id siempre será el del usuario autenticado
-  if (req.body.user_id && Number(req.body.user_id) !== Number(userId)) {
+  if (req.body.user_id && String(req.body.user_id) !== String(userId)) {
     console.warn(`[CreateDeck] Intento de asignar user_id diferente: ${req.body.user_id} vs ${userId}`);
   }
   
   const safeTitle = sanitizeText(title);
   const safeDescription = sanitizeText(description);
 
+  const deckId = clientId || uuidv4();
+
   db.run(
-    `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
-    [subject_id || null, userId, safeTitle, safeDescription || ''],
+    `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
+    [deckId, subject_id || null, userId, safeTitle, safeDescription || ''],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      console.log(`[CreateDeck] Mazo creado: ID=${this.lastID}, user_id=${userId}, title=${safeTitle}`);
-      res.status(201).json({ id: this.lastID, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 });
+      console.log(`[CreateDeck] Mazo creado: ID=${deckId}, user_id=${userId}, title=${safeTitle}`);
+      res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 });
     }
   );
 };
@@ -243,7 +246,7 @@ exports.exportDeck = (req, res) => {
       if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
 
       // Validar permiso: solo el propietario puede exportar
-      if (Number(deck.user_id) !== Number(userId)) {
+      if (String(deck.user_id) !== String(userId)) {
         return res.status(403).json({ error: 'No tienes permiso para exportar este mazo.' });
       }
 
@@ -324,17 +327,17 @@ exports.deleteDeck = (req, res) => {
   const user_id = req.user.id;
   const requestUserId = req.query.user_id;
 
-  if (requestUserId && parseInt(requestUserId) !== user_id) {
+  if (requestUserId && String(requestUserId) !== String(user_id)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  if (!user_id) return res.status(400).json({ error: 'Se requiere user_id para verificar permisos de eliminación.' });
+  if (!user_id) return res.status(400).json({ error: 'Se requiere user_id para verificar permisos de eliminaci\u00F3n.' });
 
   db.get(`SELECT user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
 
-    if (deck.user_id === Number(user_id)) {
-      // Eliminar el mazo directamente â€” flashcards, shared_decks, card_logs,
+    if (String(deck.user_id) === String(user_id)) {
+      // Eliminar el mazo directamente — flashcards, shared_decks, card_logs,
       // review_predictions y card_snoozes se eliminan en cascada por el schema.
       db.run(`DELETE FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], function(errDeck) {
         if (errDeck) {
@@ -387,7 +390,7 @@ exports.updateFlashcardDeck = (req, res) => {
   db.get(`SELECT user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
-    if (Number(deck.user_id) !== Number(userId)) {
+    if (String(deck.user_id) !== String(userId)) {
       return res.status(403).json({ error: 'No tienes permiso para editar este mazo.' });
     }
 
@@ -441,7 +444,7 @@ exports.removeDeckFromGroup = (req, res) => {
   const requestUserId = req.body.user_id;
   const group_pin_id = req.body.group_pin_id;
 
-  if (requestUserId && parseInt(requestUserId) !== user_id) {
+  if (requestUserId && String(requestUserId) !== String(user_id)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -454,7 +457,7 @@ exports.removeDeckFromGroup = (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
 
-    const isOwner = Number(deck.user_id) === Number(user_id);
+    const isOwner = String(deck.user_id) === String(user_id);
 
     if (!isOwner) {
       // Verificar si es admin del grupo
@@ -494,7 +497,7 @@ exports.shareDeck = (req, res) => {
   const requestUserId = req.body.user_id;
   const { recipient_pin, group_pin_id } = req.body;
 
-  if (requestUserId && parseInt(requestUserId) !== user_id) {
+  if (requestUserId && String(requestUserId) !== String(user_id)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -542,7 +545,7 @@ exports.shareDeck = (req, res) => {
   db.get(`SELECT id, username, name FROM users WHERE share_pin = ?`, [recipient_pin.trim().toUpperCase()], (err, recipient) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!recipient) return res.status(404).json({ error: 'No se encontrÃ³ ningÃºn usuario con ese PIN.' });
-    if (recipient.id === Number(user_id)) return res.status(400).json({ error: 'No puedes compartir un mazo contigo mismo.' });
+    if (String(recipient.id) === String(user_id)) return res.status(400).json({ error: 'No puedes compartir un mazo contigo mismo.' });
 
     db.get(`SELECT id, title FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], (err2, deck) => {
       if (err2) return res.status(500).json({ error: err2.message });
@@ -644,7 +647,7 @@ exports.getCardsByDeckPrioritized = (req, res) => {
  */
 exports.createCard = (req, res) => {
   const { deckId } = req.params;
-  const { front, back } = req.body;
+  const { id: clientId, front, back } = req.body;
   if (!front || !back) return res.status(400).json({ error: 'Faltan campos requeridos (front, back).' });
 
   const safeFront = sanitizeText(front);
@@ -652,18 +655,20 @@ exports.createCard = (req, res) => {
 
   const contentJson = JSON.stringify({ front: safeFront, back: safeBack });
   
-  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
+  // ── Calcular next_review_date: 7 dÃ­as desde hoy ─────────────────────────
   const nextReviewDate = new Date();
   nextReviewDate.setDate(nextReviewDate.getDate() + 7);
   const nextReviewDateStr = nextReviewDate.toISOString();
+
+  const cardId = clientId || uuidv4();
   
   db.run(
-    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
-    [deckId, safeFront, safeBack, contentJson, nextReviewDateStr],
+    `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
+    [cardId, deckId, safeFront, safeBack, contentJson, nextReviewDateStr],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json(normalizeCard({
-        id: this.lastID, deck_id: Number(deckId), front, back,
+        id: cardId, deck_id: deckId, front, back,
         item_type: 'flashcard', content_json: contentJson, status: 'new', hint: null, explanation: null,
       }));
     }
@@ -676,7 +681,7 @@ exports.createCard = (req, res) => {
  */
 exports.createEvaluationItem = (req, res) => {
   const { deckId } = req.params;
-  const { item_type, content_json, hint, explanation } = req.body;
+  const { id: clientId, item_type, content_json, hint, explanation } = req.body;
 
   const validTypes = ['flashcard', 'multiple_choice', 'boolean'];
   if (!item_type || !validTypes.includes(item_type)) {
@@ -687,10 +692,10 @@ exports.createEvaluationItem = (req, res) => {
   const contentStr = typeof content_json === 'string' ? content_json : JSON.stringify(content_json);
   let parsed;
   try { parsed = JSON.parse(contentStr); } catch (_) {
-    return res.status(400).json({ error: 'content_json no es JSON válido.' });
+    return res.status(400).json({ error: 'content_json no es JSON vÃ¡lido.' });
   }
 
-  // Sanitización contra inyecciones
+  // SanitizaciÃ³n contra inyecciones
   const safeParsed = sanitizeObject(parsed);
   const safeContentStr = JSON.stringify(safeParsed);
   const safeHint = hint ? sanitizeText(hint) : null;
@@ -700,18 +705,20 @@ exports.createEvaluationItem = (req, res) => {
   const front = item_type === 'flashcard' ? (safeParsed.front || '') : '';
   const back = item_type === 'flashcard' ? (safeParsed.back || '') : '';
 
-  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
+  // ── Calcular next_review_date: 7 dÃ­as desde hoy ─────────────────────────
   const nextReviewDate = new Date();
   nextReviewDate.setDate(nextReviewDate.getDate() + 7);
   const nextReviewDateStr = nextReviewDate.toISOString();
 
+  const itemId = clientId || uuidv4();
+
   db.run(
-    `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
-    [deckId, front, back, item_type, safeContentStr, safeHint, safeExplanation, nextReviewDateStr],
+    `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
+    [itemId, deckId, front, back, item_type, safeContentStr, safeHint, safeExplanation, nextReviewDateStr],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json(normalizeCard({
-        id: this.lastID, deck_id: Number(deckId), front, back,
+        id: itemId, deck_id: deckId, front, back,
         item_type, content_json: safeContentStr, hint: safeHint, explanation: safeExplanation, status: 'new',
       }));
     }
@@ -861,7 +868,7 @@ exports.deleteDeck = (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
 
-    if (deck.user_id === Number(user_id)) {
+    if (String(deck.user_id) === String(user_id)) {
       db.run(`DELETE FROM flashcards WHERE deck_id = ?`, [deckId], (errCards) => {
         if (errCards) return res.status(500).json({ error: errCards.message });
         db.run(`DELETE FROM shared_decks WHERE deck_id = ?`, [deckId], (errShared) => {
@@ -902,7 +909,7 @@ exports.shareDeck = (req, res) => {
   db.get(`SELECT id, username, name FROM users WHERE share_pin = ?`, [recipient_pin.trim().toUpperCase()], (err, recipient) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!recipient) return res.status(404).json({ error: 'No se encontró ningún usuario con ese PIN.' });
-    if (recipient.id === Number(user_id)) return res.status(400).json({ error: 'No puedes compartir un mazo contigo mismo.' });
+    if (String(recipient.id) === String(user_id)) return res.status(400).json({ error: 'No puedes compartir un mazo contigo mismo.' });
 
     db.get(`SELECT id, title FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], (err2, deck) => {
       if (err2) return res.status(500).json({ error: err2.message });
@@ -938,13 +945,14 @@ exports.shareDeck = (req, res) => {
  * Helper: Inserta un card en la BD de forma asÃ­ncrona
  */
 function insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count) {
+  const cardId = uuidv4();
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, is_atomic, parent_card_id, word_count) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)`,
-      [deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count],
+      `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status, is_atomic, parent_card_id, word_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)`,
+      [cardId, deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count],
       function(err) {
         if (err) reject(err);
-        else resolve(this.lastID);
+        else resolve(cardId);
       }
     );
   });
@@ -1207,15 +1215,16 @@ exports.generateDeckFromText = async (req, res) => {
     }
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con IA`;
+    const deckId = uuidv4();
     db.run(
-      `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
-      [subject_id, user_id, title, description],
+      `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
+      [deckId, subject_id, user_id, title, description],
       function(err) {
         if (err) {
           console.error('[Database] Error al insertar mazo:', err);
           return res.status(500).json({ error: err.message });
         }
-        insertItemsAndReturn(res, this.lastID, subject_id, user_id, title, description, items);
+        insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items);
       }
     );
   } catch (err) {
@@ -1299,15 +1308,16 @@ exports.generateDeckFromImage = async (req, res) => {
     }
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con OCR + IA`;
+    const deckId = uuidv4();
     db.run(
-      `INSERT INTO flashcard_decks (subject_id, user_id, title, description) VALUES (?, ?, ?, ?)`,
-      [subject_id, user_id, title, description],
+      `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
+      [deckId, subject_id, user_id, title, description],
       function(err) {
         if (err) {
           console.error('[Database] Error guardando mazo de imagen:', err);
           return res.status(500).json({ error: err.message });
         }
-        insertItemsAndReturn(res, this.lastID, subject_id, user_id, title, description, items);
+        insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items);
       }
     );
   } catch (err) {
@@ -1542,14 +1552,16 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
             const nextReviewDateStr = nextReviewDate.toISOString();
 
             const contentJson = JSON.stringify(diffCard);
+            const diffCardId = uuidv4();
 
             db.run(
               `INSERT INTO flashcards (
-                deck_id, front, back, item_type, content_json, hint, explanation,
+                id, deck_id, front, back, item_type, content_json, hint, explanation,
                 status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions,
                 fsrs_stability, fsrs_difficulty, fsrs_repetitions
-              ) VALUES (?, ?, ?, 'flashcard', ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
+              ) VALUES (?, ?, ?, ?, 'flashcard', ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
               [
+                diffCardId,
                 card.deck_id,
                 diffCard.front,
                 diffCard.back,
@@ -1565,7 +1577,7 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
 
                 res.status(201).json({
                   success: true,
-                  newCardId: this.lastID,
+                  newCardId: diffCardId,
                   front: diffCard.front,
                   back: diffCard.back,
                   message: 'Tarjeta de diferenciaciÃ³n creada exitosamente',

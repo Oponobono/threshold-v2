@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const {
   normalizeGrade,
@@ -116,7 +117,7 @@ const normalizeValue = async (req, res) => {
  */
 const createAssessmentResult = async (req, res) => {
   try {
-    const { assessment_id, raw_value, grading_system_id } = req.body;
+    const { id: clientId, assessment_id, raw_value, grading_system_id } = req.body;
     const userId = req.user.id;
 
     if (!assessment_id || raw_value == null || !grading_system_id) {
@@ -146,10 +147,11 @@ const createAssessmentResult = async (req, res) => {
         // Calcular y congelar el normalized_value
         const normalized = normalizeGrade(parseFloat(raw_value), version);
 
+        const resultId = clientId || uuidv4();
         db.run(
-          `INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-          [assessment_id, userId, raw_value, normalized, version.id],
+          `INSERT INTO assessment_results (id, assessment_id, user_id, raw_value, normalized_value, grading_version_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [resultId, assessment_id, userId, raw_value, normalized, version.id],
           function (insertErr) {
             if (insertErr) {
               console.error('[GradingController] Error creating assessment_result:', insertErr.message);
@@ -157,7 +159,7 @@ const createAssessmentResult = async (req, res) => {
             }
             // Registrar en audit trail (primer insert como creación)
             appendGradeHistory({
-              assessmentResultId: this.lastID,
+              assessmentResultId: resultId,
               oldRawValue: null,
               newRawValue: raw_value,
               changedBy: userId,
@@ -165,7 +167,7 @@ const createAssessmentResult = async (req, res) => {
             }).catch(console.error);
 
             res.status(201).json({
-              id: this.lastID,
+              id: resultId,
               assessment_id,
               user_id: userId,
               raw_value,
@@ -233,7 +235,7 @@ const updateAssessmentResult = async (req, res) => {
 
           // Audit trail — APPEND-ONLY
           await appendGradeHistory({
-            assessmentResultId: parseInt(id),
+            assessmentResultId: id,
             oldRawValue: current.raw_value,
             newRawValue: raw_value,
             changedBy: userId,
@@ -241,7 +243,7 @@ const updateAssessmentResult = async (req, res) => {
           });
 
           res.json({
-            id: parseInt(id),
+            id,
             raw_value,
             normalized_value: newNormalized,
             grading_version_id: current.grading_version_id,

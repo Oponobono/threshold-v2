@@ -569,55 +569,66 @@ export default function SettingsScreen() {
                 </View>
               )}
 
-              {/* ── Botones de acción: Upload + Download (50/50) ── */}
-              <View style={styles.actionRowGrid}>
-                {/* Columna Izquierda: Respaldar */}
-                <View style={[styles.actionGridColumn, styles.actionGridColumnLeft]}>
-                  <Text style={styles.actionLabel} numberOfLines={2}>
+              {/* ── Botones de acción (Bento Style) ── */}
+              <View style={{ marginTop: 16 }}>
+                {/* Texto de progreso general */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <Text style={[styles.actionLabel, { flex: 1, textAlign: 'left' }]} numberOfLines={2}>
                     {isUploading
                       ? t('backup.uploadingProgress', { done: uploadProgress?.done ?? 0, total: uploadProgress?.total ?? 0 })
                       : t('backup.lastUpload', { date: lastUploadLabel })}
                   </Text>
-                  <TouchableOpacity
-                    style={[styles.darkPill, (isBackupRunning) && { opacity: 0.45 }]}
-                    onPress={handleBackupNow}
-                    disabled={isBackupRunning}
-                  >
-                    {isUploading ? (
-                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
-                    ) : (
-                      <Ionicons name="cloud-upload-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
-                    )}
-                    <Text style={styles.darkPillText}>
-                      {isUploading
-                        ? t('backup.backingUp')
-                        : t('backup.backupNow')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Columna Derecha: Descargar */}
-                <View style={[styles.actionGridColumn, styles.actionGridColumnRight]}>
-                  <Text style={styles.actionLabel} numberOfLines={2}>
+                  <Text style={[styles.actionLabel, { flex: 1, textAlign: 'right' }]} numberOfLines={2}>
                     {isDownloading
                       ? t('backup.downloadingProgress', { done: downloadProgress?.done ?? 0, total: downloadProgress?.total ?? 0 })
                       : t('backup.lastDownload', { date: lastDownloadLabel })}
                   </Text>
+                </View>
+
+                {/* Grid 2x2 para Backup & Download */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   <TouchableOpacity
-                    style={[styles.darkPill, { backgroundColor: '#2C6EEB' }, (isBackupRunning) && { opacity: 0.45 }]}
+                    style={[styles.darkPill, { flex: 1, minWidth: '48%', backgroundColor: theme.colors.inputBackground, borderWidth: 1, borderColor: theme.colors.border }, isBackupRunning && { opacity: 0.45 }]}
+                    onPress={() => handleBackupNow('datos')}
+                    disabled={isBackupRunning}
+                  >
+                    <Ionicons name="document-text-outline" size={16} color={theme.colors.text.primary} style={{ marginRight: 6 }} />
+                    <Text style={[styles.darkPillText, { color: theme.colors.text.primary }]}>{t('backup.backupData', 'Solo Datos')}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.darkPill, { flex: 1, minWidth: '48%', backgroundColor: theme.colors.inputBackground, borderWidth: 1, borderColor: theme.colors.border }, isBackupRunning && { opacity: 0.45 }]}
+                    onPress={() => handleBackupNow('multimedia')}
+                    disabled={isBackupRunning}
+                  >
+                    <Ionicons name="images-outline" size={16} color={theme.colors.text.primary} style={{ marginRight: 6 }} />
+                    <Text style={[styles.darkPillText, { color: theme.colors.text.primary }]}>{t('backup.backupMedia', 'Multimedia')}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.darkPill, { flex: 1, minWidth: '48%', backgroundColor: theme.colors.primary }, isBackupRunning && { opacity: 0.45 }]}
+                    onPress={() => handleBackupNow('ambos')}
+                    disabled={isBackupRunning}
+                  >
+                    {isUploading ? (
+                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 6 }} />
+                    ) : (
+                      <Ionicons name="cloud-upload-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                    )}
+                    <Text style={[styles.darkPillText, { color: '#fff' }]}>{t('backup.backupAll', 'Respaldar Todo')}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.darkPill, { flex: 1, minWidth: '48%', backgroundColor: '#2C6EEB' }, isBackupRunning && { opacity: 0.45 }]}
                     onPress={handleDownloadNow}
                     disabled={isBackupRunning}
                   >
                     {isDownloading ? (
-                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
+                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 6 }} />
                     ) : (
-                      <Ionicons name="cloud-download-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                      <Ionicons name="cloud-download-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
                     )}
-                    <Text style={styles.darkPillText}>
-                      {isDownloading
-                        ? t('backup.downloading')
-                        : t('backup.downloadNow')}
-                    </Text>
+                    <Text style={[styles.darkPillText, { color: '#fff' }]}>{t('backup.downloadNow', 'Descargar Todo')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>

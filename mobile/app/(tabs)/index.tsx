@@ -14,8 +14,7 @@ import { getGlobalGPAAnalytics } from '../../src/services/api/analytics';
 import { useDataStore } from '../../src/store/useDataStore';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { useCachePreload } from '../../src/hooks/useCachePreload';
-import { cacheService } from '../../src/services/cacheService';
-import { downloadProfileImage } from '../../src/services/profileImageCache';
+import { downloadProfileImage, getLocalProfileImageUri } from '../../src/services/profileImageCache';
 import { StudyTimerCard } from '../../src/components/timer/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/modals/SnoozeModal';
 import { useDueCardSnooze, type SnoozeOption } from '../../src/hooks/useDueCardSnooze';
@@ -43,14 +42,21 @@ const SUBJECT_CARD_GAP = 12;
 export default function HybridDashboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile | null>(() => {
-    try { return cacheService.loadProfileSync() as UserProfile | null; } catch { return null; }
-  });
-  const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(() => {
-    try { return cacheService.getLocalProfileImage(); } catch { return null; }
-  });
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
   // ── Usar store global para subjects, assessments, schedules y predicciones ──
   const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions } = useDataStore();
+
+  // Cargar perfil desde caché al montar para hidratación instantánea
+  useEffect(() => {
+    (async () => {
+      const { getCurrentUserProfileSync } = await import('../../src/services/api/auth/profile');
+      const cached = await getCurrentUserProfileSync();
+      if (cached) setProfile(cached);
+      const localUri = await getLocalProfileImageUri();
+      if (localUri) setLocalProfileImageUri(localUri);
+    })();
+  }, []);
   const { preloadRelatedData } = useCachePreload();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] = useState(false);
@@ -117,10 +123,7 @@ export default function HybridDashboardScreen() {
 
       setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
       
-      // 💾 Guardar profile en caché para próxima apertura
-      if (userProfile) {
-        await cacheService.saveProfile(userProfile);
-      }
+      // 💾 Profile is cached by getCurrentUserProfile internally
       
       // ── Cargar datos globales del store (subjects, assessments, schedules) ──
       await loadAllData(true);
@@ -242,8 +245,11 @@ export default function HybridDashboardScreen() {
   }, [profile]);
 
   const nickname = useMemo(() => {
-    return profile?.username?.trim() || fullName || '';
-  }, [profile?.username, fullName]);
+    const finalNickname = profile?.username?.trim() || fullName || '';
+    console.log('[Dashboard] Perfil cargado:', JSON.stringify(profile));
+    console.log('[Dashboard] Nickname calculado:', finalNickname);
+    return finalNickname;
+  }, [profile?.username, fullName, profile]);
 
   const greetingData = useMemo(() => {
     const hour = new Date().getHours();

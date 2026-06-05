@@ -1,205 +1,174 @@
-/**
- * photos.ts
- *
- * Servicio CRUD para la galería de fotos del usuario.
- * Las fotos son capturadas con `PhotoCaptureModal` (cámara nativa) y quedan
- * vinculadas a una materia específica. También incluye la galería global del usuario
- * que agrega fotos y documentos escaneados de todas las materias.
- */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
-import { Photo } from './types';
-import { offlineSyncService } from '../offlineSyncService';
-import { cacheService, CACHE_KEYS } from '../cacheService';
+import type { Photo } from './types';
+import { photoRepository, syncService } from '../database';
+import { getBackupPreferences } from '../backup/backupService';
 
-/**
- * Obtiene ítems de la galería
- * Fallback offline: lee del caché MMKV de galería + items optimistas
- */
 export const getGalleryItems = async () => {
   const userId = await getUserId();
   if (!userId) return [];
-  try {
-    const response = await fetchWithFallback(`/gallery/${userId}`);
-    const isOfflineCache = response.headers.get('X-Offline-Cache') === 'true' || response.headers.get('x-offline-cache') === 'true';
-    if (isOfflineCache) {
-      throw new Error('Offline mode - use MMKV cache for optimistic UI');
-    }
-    const data = await parseJsonSafely(response);
-    if (Array.isArray(data)) {
-      await cacheService.saveGalleryItems(data);
-    }
-    return data || [];
-  } catch (error) {
-    console.warn('[getGalleryItems] Red no disponible, leyendo caché MMKV...');
+  
+  // 1. Leer localmente primero
+  const localData = await photoRepository.getAll();
+
+  if (!localData || localData.length === 0) {
     try {
-      const cached = await cacheService.loadGalleryItems();
-      if (Array.isArray(cached)) {
-        return cached;
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload) return [];
+      const response = await fetchWithFallback(`/gallery/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const p of data) await photoRepository.upsert(p);
+          return data;
+        }
       }
-    } catch (cacheError) {
-      console.error('[getGalleryItems] Error leyendo caché:', cacheError);
-    }
+    } catch {}
     return [];
   }
+  
+  // Sync attempt in background — solo si el usuario habilitó auto-upload
+  (async () => {
+    try {
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload) return;
+      const response = await fetchWithFallback(`/gallery/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const p of data) await photoRepository.upsert(p);
+        }
+      }
+    } catch {}
+  })();
+
+  return localData;
 };
 
-/**
- * Crea una nueva entrada de foto en la base de datos.
- * Acepta ocr_text opcional para que el asistente IA pueda leerlo directamente sin acceder al archivo.
- * Si falla la red, guarda en cola offline para sincronizar después
- */
 export const createPhoto = async (photoData: {
-  subject_id: number;
+  id?: string;
+  subject_id: string;
   local_uri: string;
   es_favorita?: number;
-  /** Texto extraído por OCR — alimenta el contexto del asistente IA */
   ocr_text?: string | null;
-  /** ID para agrupar múltiples fotos */
   group_id?: string | null;
 }) => {
-  try {
-    const response = await fetchWithFallback('/photos', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(photoData),
-    });
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = photoData.id || uuidv4();
+  const userId = await getUserId();
 
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'Error al guardar la foto en la base de datos');
-    }
+  // 1. Guardar SIEMPRE en SQLite local primero — la galería funciona sin red
+  const photo: any = { id, ...photoData };
+  await photoRepository.create(photo);
 
-    return data;
-  } catch (error) {
-    // Si falla, guardar en cola offline
-    console.warn('[Photos] Red no disponible, guardando foto en cola offline:', error);
-    await offlineSyncService.addPendingOperation(
-      'POST',
-      '/photos',
-      'photo',
-      photoData
-    );
-    
-    // Retornar objeto temporal para que la UI sea optimista
-    const optimisticPhoto = {
-      id: -Date.now(), // ID temporal único
-      ...photoData,
-      _isPending: true, // Bandera para UI
-    };
-    
-    // Persistir en cache local por materia
-    cacheService.addOptimisticItem(`${CACHE_KEYS.PHOTOS_BY_SUBJECT}${photoData.subject_id}`, optimisticPhoto);
-    
-    // Persistir en cache global de galería
-    cacheService.addOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, optimisticPhoto);
-    
-    return optimisticPhoto;
-  }
-};
-
-/**
- * Obtiene las fotos de una materia específica.
- * Fallback offline: lee del caché MMKV por materia.
- */
-export const getPhotosBySubject = async (subjectId: number): Promise<Photo[]> => {
-  try {
-    const response = await fetchWithFallback(`/photos/${subjectId}`);
-    const isOfflineCache = response.headers.get('X-Offline-Cache') === 'true' || response.headers.get('x-offline-cache') === 'true';
-    if (isOfflineCache) {
-      throw new Error('Offline mode - use MMKV cache for optimistic UI');
-    }
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const photos: Photo[] = data || [];
-    // Persistir datos frescos en caché MMKV para uso offline
-    if (photos.length > 0) {
-      await cacheService.savePhotosBySubject(subjectId, photos);
-    }
-    return photos;
-  } catch (error: any) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.warn(`[getPhotosBySubject] Red no disponible (${errorMsg}), leyendo caché MMKV...`);
+  // 2. Sincronizar con la nube SOLO si el usuario habilitó auto-upload (background, no bloqueante)
+  (async () => {
     try {
-      const cached = await cacheService.loadPhotosBySubject(subjectId);
-      if (Array.isArray(cached)) {
-        console.log(`[getPhotosBySubject] ✅ ${cached.length} fotos desde caché para materia ${subjectId}`);
-        return cached as Photo[];
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload || !prefs?.includePhotos) return;
+      const response = await fetchWithFallback('/photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...photoData, userId, id }),
+      });
+      const data = await parseJsonSafely(response);
+      if (response.ok && data) {
+        await photoRepository.upsert(data);
+      } else {
+        throw new Error(data?.error || 'Error del servidor');
       }
-    } catch (cacheError) {
-      console.error('[getPhotosBySubject] Error leyendo caché:', cacheError);
+    } catch {
+      // Auto-upload falló o está desactivado: encolar para cuando haya red/backup manual
+      await syncService.enqueueCreate('photo', id, { ...photoData, userId });
     }
-    return [];
-  }
+  })();
+
+  return photo;
 };
 
-/**
- * Elimina una foto por ID
- */
-export const deletePhoto = async (photoId: number) => {
-  try {
-    const response = await fetchWithFallback(`/photos/${photoId}`, {
-      method: 'DELETE',
-    });
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'Error al eliminar la foto');
-    }
-    return data;
-  } catch (error: any) {
-    console.warn('[Photos] Offline: encolando deletePhoto', error);
-    await offlineSyncService.addPendingOperation('DELETE', `/photos/${photoId}`, 'photo');
-    // Para remover optimísticamente no tenemos el subjectId, pero removeOptimisticItem de Gallery Items sirve
-    cacheService.removeOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, photoId);
-    return { success: true, _isPending: true };
-  }
+export const getPhotosBySubject = async (subjectId: string): Promise<Photo[]> => {
+  // Siempre retorna datos locales inmediatamente
+  const localData = await photoRepository.getBySubject(subjectId) as Promise<Photo[]>;
+  
+  // Actualizar desde la nube en background si auto-upload activo
+  (async () => {
+    try {
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload) return;
+      const response = await fetchWithFallback(`/photos/${subjectId}`);
+      const data = await parseJsonSafely(response);
+      if (response.ok && Array.isArray(data)) {
+        for (const p of data) await photoRepository.upsert(p);
+      }
+    } catch {}
+  })();
+
+  return localData;
 };
 
-/**
- * Actualiza una foto (ej: guardar OCR extraído posteriormente y tags generados)
- */
-export const updatePhoto = async (photoId: number, data: { ocr_text?: string; tags?: string; es_favorita?: boolean }) => {
-  try {
-    const response = await fetchWithFallback(`/photos/${photoId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+export const deletePhoto = async (photoId: string) => {
+  // 1. Borrar localmente de forma inmediata
+  await photoRepository.delete(photoId);
 
-    const result = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(result?.error || 'Error al actualizar la foto');
+  // 2. Sincronizar la eliminación en background
+  (async () => {
+    try {
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload) {
+        await syncService.enqueueDelete('photo', photoId);
+        return;
+      }
+      const userId = await getUserId();
+      const response = await fetchWithFallback(`/photos/${photoId}?userId=${userId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        await syncService.enqueueDelete('photo', photoId);
+      }
+    } catch {
+      await syncService.enqueueDelete('photo', photoId);
     }
+  })();
 
-    return result;
-  } catch (error: any) {
-    console.warn('[Photos] Offline: encolando updatePhoto', error);
-    await offlineSyncService.addPendingOperation('PUT', `/photos/${photoId}`, 'photo', data);
-    cacheService.updateOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, photoId, data);
-    return { ...data, _isPending: true };
-  }
+  return { success: true };
 };
 
-/**
- * Busca fotos por etiqueta/palabra clave en una materia
- */
-export const searchPhotosByTag = async (subjectId: number, tag: string): Promise<Photo[]> => {
+export const updatePhoto = async (photoId: string, data: { ocr_text?: string; tags?: string; es_favorita?: boolean }) => {
+  // 1. Actualizar localmente de forma inmediata (optimistic update garantizado)
+  await photoRepository.update(photoId, data as any);
+
+  // 2. Sincronizar con la nube en background si auto-upload activo
+  (async () => {
+    try {
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload) {
+        const uid = await getUserId();
+        await syncService.enqueueUpdate('photo', photoId, { ...data, userId: uid });
+        return;
+      }
+      const userId = await getUserId();
+      const response = await fetchWithFallback(`/photos/${photoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, userId }),
+      });
+      if (!response.ok) {
+        const uid = await getUserId();
+        await syncService.enqueueUpdate('photo', photoId, { ...data, userId: uid });
+      }
+    } catch {
+      const uid = await getUserId();
+      await syncService.enqueueUpdate('photo', photoId, { ...data, userId: uid });
+    }
+  })();
+
+  return { ...data };
+};
+
+export const searchPhotosByTag = async (subjectId: string, tag: string): Promise<Photo[]> => {
   try {
     const response = await fetchWithFallback(`/photos/${subjectId}/search?tag=${encodeURIComponent(tag)}`);
     const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      console.warn('[searchPhotosByTag] Error:', data?.error);
-      return [];
-    }
     return data || [];
-  } catch (error: any) {
-    console.warn('[searchPhotosByTag] Network error:', error.message);
+  } catch {
     return [];
   }
 };

@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { deleteMultipleFromUploadthing } = require('../utils/uploadthingServer');
 
@@ -33,18 +34,19 @@ exports.createAudioRecording = (req, res) => {
   }
 
   const authenticatedUserId = req.user.id;
-  if (parseInt(user_id) !== authenticatedUserId) {
+  if (String(user_id) !== String(authenticatedUserId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
+  const recordingId = req.body.id || uuidv4();
   const query = `
-    INSERT INTO audio_recordings (user_id, subject_id, name, local_uri, duration)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO audio_recordings (id, user_id, subject_id, name, local_uri, duration)
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
-  db.run(query, [user_id, subject_id || null, name || null, local_uri, duration || 0], function(err) {
+  db.run(query, [recordingId, user_id, subject_id || null, name || null, local_uri, duration || 0], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({ 
-      id: this.lastID, 
+      id: recordingId, 
       user_id, 
       subject_id: subject_id || null, 
       name: name || null,
@@ -115,7 +117,7 @@ exports.deleteAudioRecording = (req, res) => {
  */
 exports.upsertAudioTranscript = (req, res) => {
   // Acepta transcript_text (texto inline) además de las URIs de archivo
-  const { recording_id, transcript_uri, transcript_text, summary_uri, summary_text } = req.body;
+  const { id: clientId, recording_id, transcript_uri, transcript_text, summary_uri, summary_text } = req.body;
   
   if (!recording_id) {
     return res.status(400).json({ error: 'Falta recording_id' });
@@ -164,13 +166,14 @@ exports.upsertAudioTranscript = (req, res) => {
         res.json({ success: true, id: row.id, action: 'updated' });
       });
     } else {
+      const transcriptId = clientId || uuidv4();
       const insertQuery = `
-        INSERT INTO audio_transcripts (recording_id, transcript_uri, transcript_text, summary_uri, summary_text)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO audio_transcripts (id, recording_id, transcript_uri, transcript_text, summary_uri, summary_text)
+        VALUES (?, ?, ?, ?, ?, ?)
       `;
-      db.run(insertQuery, [recording_id, transcript_uri, transcript_text || null, summary_uri, summary_text || null], function(insertErr) {
+      db.run(insertQuery, [transcriptId, recording_id, transcript_uri, transcript_text || null, summary_uri, summary_text || null], function(insertErr) {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
-        res.status(201).json({ success: true, id: this.lastID, action: 'created' });
+        res.status(201).json({ success: true, id: transcriptId, action: 'created' });
       });
     }
   });

@@ -1,8 +1,10 @@
 const bcrypt = require('bcrypt');
+const { v4: uuidv4 } = require('uuid');
 const tableSchema = require('./schema');
 const { migrateColumnsPostgres } = require('./migrations');
 const { seedGradingSystemsPostgres } = require('./seeders');
 const { fixIsActiveBooleanToInteger } = require('./migrations/fix-is-active-type');
+const { fixUserIdTypes } = require('./migrations/fix-user-id-type');
 
 const initializePostgresDb = async (pool) => {
   try {
@@ -21,6 +23,9 @@ const initializePostgresDb = async (pool) => {
 
     // Fix any existing is_active BOOLEAN columns back to INTEGER for consistency
     await fixIsActiveBooleanToInteger(pool);
+
+    // Fix user_id columns from INTEGER to TEXT if they were created with an old schema
+    await fixUserIdTypes(pool);
 
     // Crear índices únicos (DESPUÉS de asegurarse que las columnas existen)
     await pool.query(`
@@ -76,12 +81,13 @@ const initializePostgresDb = async (pool) => {
 
     if (existingUser.length === 0) {
       const defaultPasswordHash = bcrypt.hashSync('1234', 10);
+      const defaultUserId = uuidv4();
       await pool.query(
-        `INSERT INTO users (email, password_hash, name, lastname, username, share_pin)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        ['user', defaultPasswordHash, 'Default', 'User', 'user', 'ABC123']
+        `INSERT INTO users (id, email, password_hash, name, lastname, username, share_pin)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [defaultUserId, 'user', defaultPasswordHash, 'Default', 'User', 'user', 'ABC123']
       );
-      console.log('✓ Usuario por defecto creado: user / 1234 (PIN: ABC123)');
+      console.log('✓ Usuario por defecto creado: user / 1234 (UUID: ' + defaultUserId + ')');
     } else {
       // Asegurarse de que el usuario existente tenga el PIN asignado
       await pool.query(

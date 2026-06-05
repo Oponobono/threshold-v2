@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getFlashcardDecksWithMetrics, type FlashcardDeck, type Subject } from '../services/api';
-import { cacheService } from '../services/cacheService';
+import { flashcardDeckRepository } from '../services/database';
 
 export interface FlashcardsManagerResult {
   decks: FlashcardDeck[];
@@ -43,10 +43,10 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
     const generation = ++loadGenRef.current;
     setIsLoading(true);
 
-    // Fase 1: Cache-first — mostrar datos instantáneos desde MMKV
-    const cached = cacheService.loadFlashcardDecksWithMetrics() as unknown as FlashcardDeck[] | null;
-    if (cached && cached.length > 0 && generation === loadGenRef.current) {
-      setDecks(cached);
+    // Fase 1: Cache-first — mostrar datos instantáneos desde SQLite
+    const cached = await flashcardDeckRepository.getAll();
+    if (cached.length > 0 && generation === loadGenRef.current) {
+      setDecks(cached as any);
       setIsLoading(false);
     }
 

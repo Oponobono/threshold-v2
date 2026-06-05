@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 
 /**
@@ -276,14 +277,14 @@ exports.getSubjectsByUser = (req, res) => {
  * Agregar una nueva materia
  */
 exports.createSubject = (req, res) => {
-  const { user_id, code, name, credits, professor, color, icon, target_grade } = req.body;
+  const { id: clientId, user_id, code, name, credits, professor, color, icon, target_grade } = req.body;
   const authenticatedUserId = req.user.id;
 
   if (!user_id || !name) {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id, name)' });
   }
 
-  if (parseInt(user_id) !== authenticatedUserId) {
+  if (String(user_id) !== String(authenticatedUserId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -310,14 +311,16 @@ exports.createSubject = (req, res) => {
       });
     }
 
+    const subjectId = clientId || uuidv4();
     const query = `
-      INSERT INTO subjects (user_id, code, name, credits, professor, color, icon, target_grade)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO subjects (id, user_id, code, name, credits, professor, color, icon, target_grade)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     db.run(
       query,
       [
+        subjectId,
         user_id,
         normalizedCode,
         name,
@@ -330,7 +333,7 @@ exports.createSubject = (req, res) => {
       function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({
-      id: this.lastID,
+      id: subjectId,
       user_id,
       code: normalizedCode,
       name,

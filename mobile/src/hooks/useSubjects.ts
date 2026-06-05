@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../store/useDataStore';
 import { getSemesterSummary, SemesterSummary } from '../services/api/analytics';
 import { SCALE_MAX } from '../utils/grades';
+import { calculateProjection } from '../utils/projectionEngine';
 
 export interface UnifiedActivityItem {
   id: string;
@@ -143,17 +144,24 @@ export function useSubjects(t: any) {
     return map;
   }, [assessments]);
 
-  const filteredSubjects = subjects
-    .filter(s =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
-      (s.professor && s.professor.toLowerCase().includes(search.toLowerCase()))
-    )
-    .map(s => ({
-      ...s,
-      pending_flashcards: pendingBySubject.get(s.id),
-      next_milestone: nextMilestoneBySubject.get(s.id),
-    }));
+  const filteredSubjects = useMemo(() => {
+    return subjects
+      .filter(s =>
+        s.name.toLowerCase().includes(search.toLowerCase()) ||
+        (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
+        (s.professor && s.professor.toLowerCase().includes(search.toLowerCase()))
+      )
+      .map(s => {
+        const subjectAssessments = assessments.filter(a => a.subject_id === s.id);
+        const projection = calculateProjection(subjectAssessments, s, null);
+        return {
+          ...s,
+          pending_flashcards: pendingBySubject.get(s.id),
+          next_milestone: nextMilestoneBySubject.get(s.id),
+          delta: projection.delta,
+        };
+      });
+  }, [subjects, search, pendingBySubject, nextMilestoneBySubject, assessments]);
 
   const localCriticalSubjects = useMemo(() => {
     return subjects

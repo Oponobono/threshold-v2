@@ -15,7 +15,6 @@ import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { createScannedDocument, extractTextFromPDF } from '../../services/api';
-import { autoUploadIfEnabled } from '../../services/backup/backupService';
 
 export interface PDFImportModalProps {
   isVisible: boolean;
@@ -125,16 +124,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
         ocr_text: ocrText || null,
       });
       
-      // Auto subida si está habilitada
-      if (savedDoc?.id) {
-        await autoUploadIfEnabled(
-          localPdfUri,
-          'document',
-          savedDoc.id,
-          `document_${savedDoc.id}.pdf`,
-          'application/pdf'
-        ).catch(err => console.warn('[PDFImportModal] Auto-upload error:', err));
-      }
+      // createScannedDocument ya gestiona el auto-upload según las preferencias de backup
 
       showAlert({
         title: t('common.success') || 'Éxito',

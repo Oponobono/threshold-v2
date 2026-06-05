@@ -28,7 +28,7 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId, o
         setLoading(false);
       }
     };
-    if (userId) {
+    if (userId != null) {
       fetchMastery();
     }
   }, [userId, subjectId]);

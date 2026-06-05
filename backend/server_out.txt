@@ -1,0 +1,2801 @@
+◇ injected env (5) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+[DB Init] 📋 Inicializando SQLite...
+✓ Conectado a SQLite.
+✓ WAL mode activado — lecturas concurrentes permitidas.
+✓ PRAGMA foreign_keys = ON habilitado.
+[DB Init] 📋 Paso 1: Creando tablas...
+[DB Init] Total de tablas: 41
+[DB Init] 🔄 Creando tabla: users...
+✓ busy_timeout = 5000ms — SQLite reintentará en lugar de fallar.
+✓ PRAGMA foreign_keys = ON habilitado.
+✓ Tabla creada/verificada: users { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: deleted_users...
+✓ Tabla creada/verificada: deleted_users { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: app_visitors...
+✓ Tabla creada/verificada: app_visitors { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: subjects...
+✓ Tabla creada/verificada: subjects { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: photos...
+✓ Tabla creada/verificada: photos { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: assessments...
+✓ Tabla creada/verificada: assessments { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: gallery_items...
+✓ Tabla creada/verificada: gallery_items { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: scanned_documents...
+✓ Tabla creada/verificada: scanned_documents { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: audio_recordings...
+✓ Tabla creada/verificada: audio_recordings { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: audio_transcripts...
+✓ Tabla creada/verificada: audio_transcripts { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: youtube_videos...
+✓ Tabla creada/verificada: youtube_videos { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: youtube_transcripts...
+✓ Tabla creada/verificada: youtube_transcripts { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: flashcard_decks...
+✓ Tabla creada/verificada: flashcard_decks { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: flashcards...
+✓ Tabla creada/verificada: flashcards { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: card_logs...
+✓ Tabla creada/verificada: card_logs { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: learning_analytics...
+✓ Tabla creada/verificada: learning_analytics { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: card_difficulty_analytics...
+✓ Tabla creada/verificada: card_difficulty_analytics { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: review_predictions...
+✓ Tabla creada/verificada: review_predictions { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: subject_threshold_overrides...
+✓ Tabla creada/verificada: subject_threshold_overrides { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: two_factor_auth...
+✓ Tabla creada/verificada: two_factor_auth { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: lms_accounts...
+✓ Tabla creada/verificada: lms_accounts { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: feedback_messages...
+✓ Tabla creada/verificada: feedback_messages { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: card_snoozes...
+✓ Tabla creada/verificada: card_snoozes { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: schedules...
+✓ Tabla creada/verificada: schedules { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: calendar_events...
+✓ Tabla creada/verificada: calendar_events { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: study_sessions...
+✓ Tabla creada/verificada: study_sessions { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: group_memberships...
+✓ Tabla creada/verificada: group_memberships { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: groups...
+✓ Tabla creada/verificada: groups { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: shared_decks...
+✓ Tabla creada/verificada: shared_decks { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: shared_group_decks...
+✓ Tabla creada/verificada: shared_group_decks { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: ai_chat_sessions...
+✓ Tabla creada/verificada: ai_chat_sessions { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: ai_chat_messages...
+✓ Tabla creada/verificada: ai_chat_messages { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: grading_systems...
+✓ Tabla creada/verificada: grading_systems { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: grading_versions...
+✓ Tabla creada/verificada: grading_versions { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: grading_scales...
+✓ Tabla creada/verificada: grading_scales { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: grading_periods...
+✓ Tabla creada/verificada: grading_periods { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: assessment_categories...
+✓ Tabla creada/verificada: assessment_categories { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: assessment_results...
+✓ Tabla creada/verificada: assessment_results { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: grade_history...
+✓ Tabla creada/verificada: grade_history { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: subject_grade_snapshots...
+✓ Tabla creada/verificada: subject_grade_snapshots { lastID: 0, changes: 0 }
+[DB Init] 🔄 Creando tabla: assessment_files...
+✓ Tabla creada/verificada: assessment_files { lastID: 0, changes: 0 }
+[DB Init] 📊 Paso 2: Creando índices...
+✓ Índice creado: idx_users_username_unique
+✓ Índice creado: idx_users_share_pin_unique
+✓ Índice creado: idx_decks_user_created
+✓ Índice creado: idx_yt_transcripts_video_id
+[DB Init] 🔄 Paso 3: Migrando columnas faltantes...
+✓ Columna agregada en users: active_grading_version_id
+✓ Columna agregada en users: approval_threshold
+✓ Columna agregada en photos: group_id
+✓ Columna agregada en assessments: period_id
+✓ Columna agregada en assessments: category_id
+✓ Columna agregada en flashcards: sm2_ease_factor
+✓ Columna agregada en flashcards: sm2_interval
+✓ Columna agregada en flashcards: sm2_repetitions
+✓ Columna agregada en flashcards: next_review_date
+✓ Columna agregada en flashcards: fsrs_stability
+✓ Columna agregada en flashcards: fsrs_difficulty
+✓ Columna agregada en flashcards: fsrs_repetitions
+✓ Columna agregada en flashcards: word_count
+✓ Columna agregada en flashcards: is_atomic
+✓ Columna agregada en flashcards: parent_card_id
+✓ Columna agregada en flashcards: atomic_index
+[DB Init] 🔄 Paso 4: Migrando tarjetas legacy...
+[DB Init] 👤 Paso 5: Verificando usuario por defecto...
+✓ Usuario por defecto creado: user / 1234 (UUID: a437fa30-ea46-4368-9bd4-62752fb4fe29)
+[DB Init] 🌱 Paso 6: Inicializando sistemas de calificación...
+✅ Base de datos SQLite Seeded con Grading Systems.
+✅ Base de datos SQLite inicializada correctamente.
+
+╔═══════════════════════════════════════════════════════════╗
+║             ✅ SERVIDOR INICIADO                        ║
+╠═══════════════════════════════════════════════════════════╣
+║ URL Local: http://localhost:3000
+║ URL Red: http://192.168.1.5:3000
+║ HOST Config: 0.0.0.0 (✓ Todas las interfaces)
+║ 
+║ 📱 Desde tu teléfono/emulador:
+║ - Asegúrate de estar en la MISMA WIFI que la PC
+║ - Usa: http://192.168.1.5:3000/api
+║ 
+║ 📚 Swagger Docs: http://localhost:3000/api-docs
+║ 🏥 Health Check: http://localhost:3000/health
+╚═══════════════════════════════════════════════════════════╝
+    
+127.0.0.1 - GET /health 200 15 - 5.110 ms
+127.0.0.1 - POST /api/auth/login 401 52 - 25.936 ms
+127.0.0.1 - POST /api/auth/login 401 52 - 1.383 ms
+127.0.0.1 - POST /api/login 200 313 - 91.425 ms
+127.0.0.1 - POST /api/login 200 313 - 87.395 ms
+127.0.0.1 - POST /api/login 200 313 - 87.757 ms
+127.0.0.1 - GET /api/subjects 404 151 - 8.003 ms
+127.0.0.1 - POST /api/login 200 313 - 87.994 ms
+127.0.0.1 - GET /api/subjects 404 151 - 3.965 ms
+127.0.0.1 - POST /api/login 200 313 - 88.415 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+127.0.0.1 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 11.961 ms
+127.0.0.1 - POST /api/login 200 313 - 87.512 ms
+127.0.0.1 - POST /api/subjects 201 286 - 3.933 ms
+127.0.0.1 - POST /api/login 200 313 - 90.314 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+127.0.0.1 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1005 - 7.850 ms
+127.0.0.1 - DELETE /api/subjects/08757a7c-ef02-45c3-927b-90e99afb65a3 200 83 - 8.297 ms
+192.168.1.4 - GET /health 200 15 - 40.770 ms
+192.168.1.4 - POST /api/login 200 313 - 104.845 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 10.517 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 13.674 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 12.902 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 3.455 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1801 - 6.406 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.664 ms
+192.168.1.4 - GET /api/youtube-videos/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 3.232 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 9.040 ms
+[FlashcardMetrics] userId=a437fa30-ea46-4368-9bd4-62752fb4fe29 â†’ 2 mazos devueltos
+192.168.1.4 - GET /api/flashcard-decks/with-metrics?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1172 - 3.690 ms
+192.168.1.4 - GET /api/calendar/events?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1156 - 6.066 ms
+[GradingController] GET /grading-systems
+  req.user: {
+  id: 'a437fa30-ea46-4368-9bd4-62752fb4fe29',
+  email: 'user',
+  iat: 1780625223,
+  exp: 1783217223
+}
+  userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GradingController] ✓ Devolviendo 5 sistemas
+192.168.1.4 - GET /api/grading-systems 200 1919 - 6.394 ms
+[Analytics] Mazos con tarjetas vencidas para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29: 1
+192.168.1.4 - GET /api/analytics/predictions/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 288 - 8.291 ms
+192.168.1.4 - GET /api/photos/76326756-a30a-4cb2-9eaf-1817e5d442ca 200 2 - 1.462 ms
+192.168.1.4 - GET /api/scanned_documents/subject/76326756-a30a-4cb2-9eaf-1817e5d442ca 200 490 - 5.839 ms
+192.168.1.4 - GET /api/subjects/76326756-a30a-4cb2-9eaf-1817e5d442ca/categories 200 2 - 1.464 ms
+192.168.1.4 - GET /api/photos/25baa870-73b9-4d5c-94e4-453220ee1e7b 200 2 - 1.237 ms
+192.168.1.4 - GET /api/scanned_documents/subject/25baa870-73b9-4d5c-94e4-453220ee1e7b 200 2 - 1.624 ms
+192.168.1.4 - GET /api/subjects/25baa870-73b9-4d5c-94e4-453220ee1e7b/categories 200 2 - 2.111 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 2.537 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 2.315 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards/prioritized?userId=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.641 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards/not-snoozed?userId=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.441 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 3.711 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards/prioritized?userId=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 8440 - 4.085 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards/not-snoozed?userId=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 8440 - 4.037 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 1.242 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 2.344 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (1ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 7.073 ms
+192.168.1.4 - GET /health 200 15 - 0.234 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 1.207 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 1.973 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (1ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 10.417 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 14.137 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 6.980 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 30.329 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 15.971 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 35.136 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 1.993 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 3.118 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 2.170 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 2.438 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 3.142 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.162 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 1.528 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 1.060 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 2.408 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 1.160 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 1.875 ms
+192.168.1.4 - GET /health 200 15 - 0.421 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 1.278 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 61.172 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 7.071 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 5.555 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 2.435 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 10.088 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 6.650 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (3ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 7.440 ms
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 19.258 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 7.786 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 11.188 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 3.412 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 2.476 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.907 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 1.469 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 4.939 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 2.894 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 2.464 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 2.042 ms
+192.168.1.4 - GET /health 200 15 - 2.950 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 0.871 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 1.798 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 6.415 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 7.092 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 2.030 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 13.668 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 8.455 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 3.083 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (1ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 6.651 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 4.122 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 4.099 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 5.506 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 6.852 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 3.429 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 3.148 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 3.050 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 3.345 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 2.296 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 4.435 ms
+192.168.1.4 - GET /health 200 15 - 0.551 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 1.002 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 1.236 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 2.991 ms
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 14.946 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 25.310 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (2ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 4.671 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 12.453 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 2.377 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 27.113 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 10.969 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 3.535 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 2.653 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 3.313 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.640 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 1.219 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 1.090 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 1.731 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 1.857 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 1.306 ms
+192.168.1.4 - GET /health 200 15 - 0.473 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 0.944 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 3.085 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (1ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 8.367 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 15.123 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 2.637 ms
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 8.826 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 12.994 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 3.599 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 13.227 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 1.859 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 4.160 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 5.023 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 4.282 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.316 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 2.053 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 2.303 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 1.449 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 2.190 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 1.883 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 1.452 ms
+192.168.1.4 - GET /api/photos/76326756-a30a-4cb2-9eaf-1817e5d442ca 200 2 - 3.134 ms
+192.168.1.4 - GET /api/subject/76326756-a30a-4cb2-9eaf-1817e5d442ca 200 312 - 17.742 ms
+192.168.1.4 - GET /api/scanned_documents/subject/76326756-a30a-4cb2-9eaf-1817e5d442ca 200 490 - 2.941 ms
+[GET] getAssessmentsBySubject para subjectId=76326756-a30a-4cb2-9eaf-1817e5d442ca
+[GET] getAssessmentsBySubject encontró 6 assessments sin denormalizar
+[GET] getAssessmentsBySubject denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/76326756-a30a-4cb2-9eaf-1817e5d442ca 200 2840 - 13.559 ms
+[Analytics] 🔍 getProjectionAnalytics START para subjectId=76326756-a30a-4cb2-9eaf-1817e5d442ca
+[Analytics] 📝 SQL Query: ...
+[Analytics] ✅ DB query retornó 5 rows
+[Analytics] 👤 userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Analytics] 📏 maxScale=100
+[Analytics] 📊 Denormalized 5 assessments: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 78,
+    weight: 20,
+    date: null
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 84,
+    weight: 15,
+    date: null
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 90,
+    weight: 15,
+    date: null
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 90,
+    weight: 10,
+    date: null
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 50,
+    weight: 20,
+    date: null
+  }
+]
+[Analytics] ✓ 5 assessments con notas válidas: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 78,
+    weight: 20,
+    date: null
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 84,
+    weight: 15,
+    date: null
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 90,
+    weight: 15,
+    date: null
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 90,
+    weight: 10,
+    date: null
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 50,
+    weight: 20,
+    date: null
+  }
+]
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 75.35624250000001,
+  currentAverage: 75.875,
+  delta: -0.5187574999999924,
+  'delta should be': '75.35624250000001 - 75.875 = -0.5187574999999924'
+}
+[Analytics] ✅ Proyección calculada: { currentAverage: 75.88, projectedGrade: 75.36, delta: -0.52 }
+192.168.1.4 - GET /api/assessments/analytics/subject/76326756-a30a-4cb2-9eaf-1817e5d442ca/projection 200 210 - 18.304 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 0.784 ms
+192.168.1.4 - GET /api/schedules/subject/76326756-a30a-4cb2-9eaf-1817e5d442ca 200 617 - 4.679 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 3.289 ms
+192.168.1.4 - GET /api/youtube-videos/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.953 ms
+192.168.1.4 - GET /api/backup/cloud-items 401 27 - 2.289 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 5.458 ms
+192.168.1.4 - GET /api/subjects/76326756-a30a-4cb2-9eaf-1817e5d442ca/categories 200 2 - 2.153 ms
+192.168.1.4 - GET /api/backup/stats 401 27 - 3.179 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 0.640 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 1.372 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 11.692 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 5.680 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 2.102 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 2.273 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (1ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 3.888 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 2.376 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 1.102 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 1.438 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 2.130 ms
+192.168.1.4 - GET /health 200 15 - 0.222 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 1.068 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 1.365 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (19ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 24.491 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 11.198 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 33.951 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 1.764 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 16.109 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 18.676 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 4.711 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 26.117 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 6.138 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 4.473 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 15.648 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 5.867 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.422 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 6.576 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 6.531 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 6.115 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 3.627 ms
+192.168.1.4 - GET /health 200 15 - 0.507 ms
+192.168.1.4 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 403 68 - 0.859 ms
+192.168.1.4 - GET /api/schedules/today/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 397 - 2.086 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [
+    3.9000000000000004,
+    4.2,
+    4.5,
+    4.5,
+    4.699999999999999,
+    4,
+    3.7,
+    3.2,
+    2.5
+  ],
+  weights: [
+    10, 7.5, 7.5,  5, 10,
+    10,   5,   5, 10
+  ],
+  totalWeight: 70,
+  currentAverage: 3.9035714285714285
+}
+[GradingEngine] 📊 EMA Calculation: {
+  firstGrade: 3.9000000000000004,
+  finalEMA: 3.326120034441406,
+  ALPHA: 0.35
+}
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 3.9035714285714285,
+  evaluatedWeight: 0.7,
+  currentEMA: 3.326120034441406,
+  remainingWeight: 0.30000000000000004,
+  projectedGrade: 3.730336010332422
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 3.730336010332422,
+  currentAverage: 3.9035714285714285,
+  delta: -0.17323541823900657,
+  'delta should be': '3.730336010332422 - 3.9035714285714285 = -0.17323541823900657'
+}
+[getGlobalGPAAnalytics] ✓ userId=a437fa30-ea46-4368-9bd4-62752fb4fe29, GPA=3.9 (3ms)
+192.168.1.4 - GET /api/analytics/global/gpa/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 137 - 9.225 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 19.041 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 9.013 ms
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 4.299 ms
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 78, 84, 90, 90, 50 ],
+  weights: [ 20, 15, 15, 10, 20 ],
+  totalWeight: 80,
+  currentAverage: 75.875
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 78, finalEMA: 73.28121250000001, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 75.875,
+  evaluatedWeight: 0.8,
+  currentEMA: 73.28121250000001,
+  remainingWeight: 0.19999999999999996,
+  projectedGrade: 75.35624250000001
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+[GradingEngine] 📊 PA Calculation: {
+  grades: [ 94, 80, 74, 64 ],
+  weights: [ 20, 20, 10, 10 ],
+  totalWeight: 60,
+  currentAverage: 81
+}
+[GradingEngine] 📊 EMA Calculation: { firstGrade: 94, finalEMA: 76.87975, ALPHA: 0.35 }
+[GradingEngine] 📊 NP Calculation: {
+  currentAverage: 81,
+  evaluatedWeight: 0.6,
+  currentEMA: 76.87975,
+  remainingWeight: 0.4,
+  projectedGrade: 79.3519
+}
+[GradingEngine] 📊 DELTA Calculation: {
+  projectedGrade: 5,
+  currentAverage: 5,
+  delta: 0,
+  'delta should be': '5 - 5 = 0'
+}
+192.168.1.4 - GET /api/subjects/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 671 - 23.803 ms
+[GET] getAssessmentsByUser para userId=a437fa30-ea46-4368-9bd4-62752fb4fe29
+[GET] getAssessmentsByUser encontró 12 assessments sin denormalizar
+192.168.1.4 - GET /api/schedules/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2489 - 7.382 ms
+[GET] getAssessmentsByUser denormalizados: [
+  {
+    id: '2f3414bf-fc5e-4d5f-96b1-fc25a44a7507',
+    grade_value: 3.9,
+    normalized_value: 0.78,
+    is_completed: 1
+  },
+  {
+    id: 'ecbd99b1-a450-4ec7-a91a-91a41f8e5050',
+    grade_value: 4.2,
+    normalized_value: 0.84,
+    is_completed: 1
+  },
+  {
+    id: 'cd8c26d8-6a57-4160-9e7e-cd31ebf53f76',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: '20ec3c2a-ce9d-416a-b1eb-cbd369397618',
+    grade_value: 4.5,
+    normalized_value: 0.9,
+    is_completed: 1
+  },
+  {
+    id: 'a2ef47ba-882d-4696-b17c-f705e5e5ba9c',
+    grade_value: 4.7,
+    normalized_value: 0.94,
+    is_completed: 1
+  },
+  {
+    id: '1ced01e2-16c4-41e2-b504-05d8078f8504',
+    grade_value: 4,
+    normalized_value: 0.8,
+    is_completed: 1
+  },
+  {
+    id: 'dc6284e6-5818-4c44-af0b-0deb89ff2a58',
+    grade_value: 3.7,
+    normalized_value: 0.74,
+    is_completed: 1
+  },
+  {
+    id: '93712c5e-4f06-4986-8b97-d30feba7cc9d',
+    grade_value: 3.2,
+    normalized_value: 0.64,
+    is_completed: 1
+  },
+  {
+    id: 'a29c4978-fb00-48ec-92c5-b57406ef6563',
+    grade_value: 2.5,
+    normalized_value: 0.5,
+    is_completed: 1
+  },
+  {
+    id: '348c6fac-2afa-4296-a9f3-8fd54cc53163',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: 'ff2d1dee-5f83-49d8-957b-c7111ab73285',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  },
+  {
+    id: '665ba7b8-1149-41b0-8c09-345454549bec',
+    grade_value: null,
+    normalized_value: null,
+    is_completed: 0
+  }
+]
+192.168.1.4 - GET /api/assessments/user/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 6636 - 16.879 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 5.849 ms
+192.168.1.4 - GET /api/flashcard-decks?user_id=a437fa30-ea46-4368-9bd4-62752fb4fe29 200 1110 - 5.567 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 3.305 ms
+[Gallery] Fetching items for userId: a437fa30-ea46-4368-9bd4-62752fb4fe29
+[Gallery] Retornando 1 elementos combinados
+192.168.1.4 - GET /api/gallery/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 570 - 6.781 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 2.008 ms
+192.168.1.4 - GET /api/audio-recordings/a437fa30-ea46-4368-9bd4-62752fb4fe29 200 2 - 7.634 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 2.060 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 3.482 ms
+192.168.1.4 - GET /api/flashcard-decks/be5f82c4-9a8f-44c7-a0cd-768e3003b451/cards 200 2 - 2.369 ms
+192.168.1.4 - GET /api/flashcard-decks/1acdd059-1937-4473-abf4-24bd57aadeb1/cards 200 8440 - 3.591 ms
+192.168.1.5 - GET /users/a437fa30-ea46-4368-9bd4-62752fb4fe29 404 181 - 8.045 ms
+127.0.0.1 - GET /users/a437fa30-ea46-4368-9bd4-62752fb4fe29 404 181 - 0.235 ms
+127.0.0.1 - GET /api/users/a437fa30-ea46-4368-9bd4-62752fb4fe29 401 52 - 0.506 ms

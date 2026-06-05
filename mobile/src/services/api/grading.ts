@@ -1,6 +1,6 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
-import { offlineSyncService } from '../offlineSyncService';
-import { cacheService } from '../../services/cacheService';
+import { syncService } from '../database';
+import { storageService } from '../storageService';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,16 +110,19 @@ export const fetchGradingSystems = async (): Promise<GradingSystem[]> => {
     
     const systems = data?.systems || [];
     if (systems.length > 0) {
-      await cacheService.saveGradingSystems(systems);
+      await storageService.saveLocal('app:cache:grading_systems', JSON.stringify(systems));
     }
     console.log('[API] Returning', systems.length, 'grading systems');
     return systems;
   } catch (error) {
-    console.warn('[Grading] fetchGradingSystems falló, usando caché MMKV:', error);
-    const cached = await cacheService.loadGradingSystems() as GradingSystem[] | null;
-    if (Array.isArray(cached) && cached.length > 0) {
-      console.log(`[Grading] ✅ ${cached.length} sistemas de calificación desde caché`);
-      return cached;
+    console.warn('[Grading] fetchGradingSystems falló, usando caché:', error);
+    const cached = await storageService.getLocal('app:cache:grading_systems');
+    if (cached) {
+      const parsed = JSON.parse(cached) as GradingSystem[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        console.log(`[Grading] ✅ ${parsed.length} sistemas de calificación desde caché`);
+        return parsed;
+      }
     }
     throw error;
   }
@@ -137,10 +140,10 @@ export const fetchSystemScales = async (
     return await parseJsonSafely(response);
   } catch (error) {
     console.warn(`[Grading] fetchSystemScales(${systemId}) falló, buscando sistemas cacheados...`);
-    const cachedSystems = await cacheService.loadGradingSystems() as GradingSystem[] | null;
-    if (Array.isArray(cachedSystems)) {
+    const cachedRaw = await storageService.getLocal('app:cache:grading_systems');
+    if (cachedRaw) {
+      const cachedSystems = JSON.parse(cachedRaw) as GradingSystem[];
       const system = cachedSystems.find(s => s.id === systemId);
-      // Solo un fallback básico, ya que scale data might not be in the basic GradingSystem object
       if (system) {
         console.warn(`[Grading] Fallback precario: devolviendo system simulado offline`);
       }
@@ -190,12 +193,12 @@ export const createAssessmentResult = async (
     return await parseJsonSafely(response);
   } catch (error) {
     console.warn('[Grading] Offline: encolando createAssessmentResult', error);
-    await offlineSyncService.addPendingOperation('POST', '/assessment-results', 'grading', {
+    await syncService.enqueueCreate('assessment-result', undefined, {
       assessment_id: assessmentId,
       raw_value: rawValue,
       grading_system_id: gradingSystemId,
     });
-    return { id: -Date.now(), assessment_id: assessmentId, raw_value: rawValue, grading_version_id: gradingSystemId, _isPending: true } as any;
+    return { id: `pending-${Date.now()}`, assessment_id: assessmentId, raw_value: rawValue, grading_version_id: gradingSystemId, _isPending: true } as any;
   }
 };
 
@@ -220,7 +223,7 @@ export const updateAssessmentResult = async (
     return await parseJsonSafely(response);
   } catch (error) {
     console.warn(`[Grading] Offline: encolando updateAssessmentResult ${resultId}`, error);
-    await offlineSyncService.addPendingOperation('PUT', `/assessment-results/${resultId}`, 'grading', { raw_value: rawValue, reason });
+    await syncService.enqueueUpdate('assessment-result', String(resultId), { raw_value: rawValue, reason });
     return { id: resultId, raw_value: rawValue, _isPending: true } as any;
   }
 };

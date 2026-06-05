@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
+import { View, Text } from 'react-native';
 
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
@@ -15,9 +16,9 @@ import { useColorScheme } from '@/src/hooks/use-color-scheme';
 import { CustomAlertProvider } from '../src/components/ui/CustomAlert';
 import { useAutoSync } from '../src/hooks/useAutoSync';
 import { useCacheCleanup } from '../src/hooks/useCacheCleanup';
+import { DatabaseProvider, useDatabaseReady } from '../src/context/DatabaseContext';
 
 import NetInfo from '@react-native-community/netinfo';
-import { flushOfflineQueue } from '../src/services/offlineQueue';
 import { hasValidSession } from '../src/services/api/auth/session';
 import { initializeApiClient } from '../src/services/api/client';
 import { requestPermissions } from '../src/services/notificationService';
@@ -45,9 +46,21 @@ export let unstable_settings = {
  * para no interferir con la navegación dentro de los tabs.
  */
 export default function RootLayout() {
+  return (
+    <DatabaseProvider>
+      <RootNavigator />
+    </DatabaseProvider>
+  );
+}
+
+/**
+ * Componente interno que usa DatabaseProvider para garantizar BD inicializada
+ */
+function RootNavigator() {
   const colorScheme = useColorScheme();
   const [appIsReady, setAppIsReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<string>('welcome');
+  const { isReady: isDatabaseReady, error: databaseError } = useDatabaseReady();
 
   // Activar sincronización automática cuando recupere internet
   useAutoSync();
@@ -58,6 +71,17 @@ export default function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
+        // 🔷 0. Esperar a que BD local esté lista
+        if (!isDatabaseReady) {
+          console.log('[RootLayout] Esperando a que BD local esté lista...');
+          return;
+        }
+
+        if (databaseError) {
+          console.error('[RootLayout] ❌ Error inicializando BD local:', databaseError);
+          // Intentar continuar de todas formas (puede usar API fallback)
+        }
+
         // 🔷 1. Inicializar cliente API con detección de backend (local vs Render)
         console.log('[RootLayout] 🔄 Inicializando cliente API...');
         await initializeApiClient();
@@ -85,24 +109,14 @@ export default function RootLayout() {
       }
     }
 
-    prepare();
-  }, []);
+    // Solo ejecutar preparación si BD está lista
+    if (isDatabaseReady) {
+      prepare();
+    }
+  }, [isDatabaseReady, databaseError]);
 
-  // ── Offline Queue: flush card_logs when connectivity is restored ─────────────
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      if (state.isConnected) {
-        flushOfflineQueue()
-          .then(({ sent, remaining }) => {
-            if (sent > 0) {
-              console.log(`[RootLayout] 🔁 Offline queue flushed: ${sent} log(s) synced, ${remaining} remaining.`);
-            }
-          })
-          .catch(e => console.warn('[RootLayout] Flush error:', e));
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+  // ── Offline Queue: Sincronización automática delegada a useAutoSync() ───
+
 
 
   const router = useRouter();
@@ -131,16 +145,43 @@ export default function RootLayout() {
   }, [router]);
 
   useEffect(() => {
-    if (appIsReady) {
-      console.log('[RootLayout] App is ready, hiding splash screen');
-      // Ocultamos el splash screen inmediatamente después de que el primer render sea posible
-      // Usamos un pequeño delay para asegurar que el motor JSI de la Nueva Arquitectura esté estable
-      const timer = setTimeout(() => {
-        SplashScreen.hideAsync().catch(() => {});
-      }, 100);
-      return () => clearTimeout(timer);
+    // Mostrar splash mientras BD se inicializa
+    if (!isDatabaseReady || !appIsReady) {
+      return;
     }
-  }, [appIsReady]);
+
+    console.log('[RootLayout] App está lista, ocultando splash screen');
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [isDatabaseReady, appIsReady]);
+
+  // Mostrar error si BD falla
+  if (isDatabaseReady === false || (isDatabaseReady && databaseError)) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+              Error inicializando aplicación
+            </Text>
+            <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', paddingHorizontal: 20 }}>
+              {databaseError?.message || 'No se pudo inicializar la base de datos local'}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#999', marginTop: 10 }}>
+              Por favor, reinicia la aplicación
+            </Text>
+          </View>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
+  }
+
+  // No renderizar nada hasta que BD esté lista
+  if (!isDatabaseReady || !appIsReady) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

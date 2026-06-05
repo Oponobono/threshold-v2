@@ -11,6 +11,7 @@ import { uploadFileToUploadthing } from '../uploadthing/storage';
 import { fetchWithFallback, parseJsonSafely } from '../api/client';
 import { getUserId } from '../api/auth/session';
 import * as FileSystem from 'expo-file-system/legacy';
+import { databaseService } from '../database/DatabaseService';
 
 // ─── Auto-subida individual ──────────────────────────────────────────────────
 
@@ -180,18 +181,107 @@ export const getBackupStats = async (): Promise<BackupStats> => {
  * @param onProgress - Callback con el progreso actual (llamado en cada ítem)
  */
 export const runBackup = async (
-  onProgress?: (progress: BackupProgress) => void
+  onProgress?: (progress: BackupProgress) => void,
+  overridePrefs?: Partial<BackupPreferences>
 ): Promise<{ success: boolean; uploaded: number; errors: number }> => {
   const userId = await getUserId();
   if (!userId) return { success: false, uploaded: 0, errors: 0 };
 
-  const prefs = await getBackupPreferences();
+  let prefs = await getBackupPreferences();
+  if (overridePrefs) {
+    prefs = { ...prefs, ...overridePrefs };
+  }
   if (!prefs.enabled) return { success: false, uploaded: 0, errors: 0 };
 
   let uploaded = 0;
   let errors = 0;
 
-  // Obtener ítems pendientes de backup desde el backend
+  // ──────────────────────────────────────────────────────────────────
+  // FASE 0: Sincronizar metadatos locales al backend
+  // Los ítems creados offline (sin auto-upload) solo existen en SQLite local.
+  // Necesitamos registrarlos en el backend ANTES de pedir los pendientes,
+  // porque el backend no sabe que existen.
+  // ──────────────────────────────────────────────────────────────────
+  const db = databaseService.getDb();
+
+  // ── Fase 0a: Fotos locales sin registro en backend ──
+  if (prefs.includePhotos) {
+    try {
+      const localOnlyPhotos: any[] = await db.getAllAsync(
+        `SELECT id, subject_id, local_uri, es_favorita, ocr_text, group_id
+         FROM photos
+         WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+      );
+      console.log(`[BackupService] Fase 0a: ${localOnlyPhotos.length} foto(s) sin registro en backend.`);
+      for (const photo of localOnlyPhotos) {
+        try {
+          await fetchWithFallback('/photos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: photo.id, subject_id: photo.subject_id, local_uri: photo.local_uri, es_favorita: photo.es_favorita, ocr_text: photo.ocr_text, group_id: photo.group_id, userId }),
+          });
+        } catch (e) {
+          console.warn(`[BackupService] Fase 0a ⚠️: foto ${photo.id}:`, e);
+        }
+      }
+    } catch (e) {
+      console.warn('[BackupService] Fase 0a: Error leyendo fotos locales:', e);
+    }
+  }
+
+  // ── Fase 0b: Grabaciones de audio locales sin registro en backend ──
+  if (prefs.includeAudio) {
+    try {
+      const localOnlyAudio: any[] = await db.getAllAsync(
+        `SELECT id, user_id, subject_id, name, local_uri, duration
+         FROM audio_recordings
+         WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+      );
+      console.log(`[BackupService] Fase 0b: ${localOnlyAudio.length} grabación(es) sin registro en backend.`);
+      for (const rec of localOnlyAudio) {
+        try {
+          await fetchWithFallback('/audio-recordings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: rec.id, user_id: Number(rec.user_id || userId), subject_id: rec.subject_id, name: rec.name, local_uri: rec.local_uri, duration: rec.duration }),
+          });
+        } catch (e) {
+          console.warn(`[BackupService] Fase 0b ⚠️: grabación ${rec.id}:`, e);
+        }
+      }
+    } catch (e) {
+      console.warn('[BackupService] Fase 0b: Error leyendo grabaciones locales:', e);
+    }
+  }
+
+  // ── Fase 0c: Documentos escaneados locales sin registro en backend ──
+  if (prefs.includeDocs) {
+    try {
+      const localOnlyDocs: any[] = await db.getAllAsync(
+        `SELECT id, user_id, subject_id, name, local_uri, ocr_text
+         FROM scanned_documents
+         WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+      );
+      console.log(`[BackupService] Fase 0c: ${localOnlyDocs.length} documento(s) sin registro en backend.`);
+      for (const doc of localOnlyDocs) {
+        try {
+          await fetchWithFallback('/scanned_documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, name: doc.name, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
+          });
+        } catch (e) {
+          console.warn(`[BackupService] Fase 0c ⚠️: documento ${doc.id}:`, e);
+        }
+      }
+    } catch (e) {
+      console.warn('[BackupService] Fase 0c: Error leyendo documentos locales:', e);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // FASE 1: Obtener ítems pendientes de backup desde el backend y subirlos
+  // ──────────────────────────────────────────────────────────────────
   const response = await fetchWithFallback(`/backup/pending`);
   if (!response.ok) return { success: false, uploaded: 0, errors: 0 };
 

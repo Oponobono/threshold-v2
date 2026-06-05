@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const tableSchema = require('./schema');
 const { seedGradingSystemsSqlite } = require('./seeders');
 
@@ -137,11 +138,12 @@ const initializeSqliteDb = async (db) => {
         console.log('✓ Usuario por defecto actualizado');
       } else {
         const defaultPasswordHash = bcrypt.hashSync('1234', 10);
+        const defaultUserId = uuidv4();
         await dbRun(db, 
-          `INSERT INTO users (email, password_hash, name, lastname, username, share_pin) VALUES (?, ?, ?, ?, ?, ?)`,
-          ['user', defaultPasswordHash, 'Default', 'User', 'user', 'ABC123']
+          `INSERT INTO users (id, email, password_hash, name, lastname, username, share_pin) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [defaultUserId, 'user', defaultPasswordHash, 'Default', 'User', 'user', 'ABC123']
         );
-        console.log('✓ Usuario por defecto creado: user / 1234');
+        console.log('✓ Usuario por defecto creado: user / 1234 (UUID: ' + defaultUserId + ')');
       }
     } catch (err) {
       console.error('Error en usuario por defecto:', err.message);

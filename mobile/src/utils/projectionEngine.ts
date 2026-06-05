@@ -11,34 +11,32 @@ export interface ProjectionResult {
   targetGrade: number;
 }
 
-const EMA_SMOOTHING_FACTOR = 2 / (3 + 1); // α = 0.5 (periodo N=3)
+/**
+ * EMA alpha=0.35 — idéntico al backend gradingEngine.js (ALPHA = 0.35)
+ * Fórmula: EMA_t = (grade_t * 0.35) + (EMA_t-1 * 0.65)
+ */
+const EMA_ALPHA = 0.35;
 
 /**
  * Calcula Exponential Moving Average sobre una serie de notas ordenadas por fecha.
- * Da más peso a las evaluaciones recientes para detectar tendencias.
+ * Usa alpha=0.35 para coincidir exactamente con el backend gradingEngine.js
  */
 function calculateEMA(grades: number[]): number {
   if (grades.length === 0) return 0;
   let ema = grades[0];
   for (let i = 1; i < grades.length; i++) {
-    ema = grades[i] * EMA_SMOOTHING_FACTOR + ema * (1 - EMA_SMOOTHING_FACTOR);
+    ema = grades[i] * EMA_ALPHA + ema * (1 - EMA_ALPHA);
   }
   return ema;
 }
 
 /**
  * Calcula la proyección académica del lado del cliente.
- * Útil cuando el usuario está offline y no puede consultar el servidor.
  *
- * Estrategia:
- * - currentAverage: promedio ponderado actual (igual que en useSubjectGrades)
- * - currentEMA: media móvil exponencial sobre la serie cronológica de notas
- * - projectedGrade: proyección usando EMA como tendencia:
- *     currentAverage + (currentEMA - currentAverage) * (remainingWeight / 100)
- *     Si no hay peso restante, projectedGrade = currentAverage
- * - delta: projectedGrade - targetGrade
- * - evaluatedWeight: % del curso ya evaluado
- * - remainingWeight: % restante
+ * Alineada con backend/services/gradingEngine.js `calculateProjectedGrade`:
+ *  - EMA alpha = 0.35
+ *  - NP = (PA × evaluatedWeight) + (EMA × remainingWeight)  [pesos 0-1]
+ *  - delta = projectedGrade − currentAverage  (igual al backend)
  */
 export function calculateProjection(
   assessments: Assessment[],
@@ -47,17 +45,19 @@ export function calculateProjection(
 ): ProjectionResult {
   const graded = assessments.filter((a) => normalizeGrade(a) !== null);
 
-  const evaluatedWeight = graded.reduce((sum, a) => sum + parseWeight(a), 0);
-  const remainingWeight = Math.max(0, 100 - evaluatedWeight);
+  // Peso total evaluado (en %, luego se convierte a fracción 0-1 para la proyección)
+  const evaluatedWeightPct = graded.reduce((sum, a) => sum + parseWeight(a), 0);
+  const remainingWeightPct = Math.max(0, 100 - evaluatedWeightPct);
 
+  // Promedio ponderado actual (PA) — igual que useSubjectGrades
   const accumulatedPoints = graded.reduce((sum, a) => {
     const grade = normalizeGrade(a) || 0;
     const weight = parseWeight(a) || 0;
     return sum + grade * (weight / 100);
   }, 0);
 
-  const currentAverage = evaluatedWeight > 0
-    ? accumulatedPoints / (evaluatedWeight / 100)
+  const currentAverage = evaluatedWeightPct > 0
+    ? accumulatedPoints / (evaluatedWeightPct / 100)
     : graded.length > 0
       ? graded.reduce((sum, a) => sum + (normalizeGrade(a) || 0), 0) / graded.length
       : 0;
@@ -72,32 +72,36 @@ export function calculateProjection(
     return 3.0;
   })();
 
-  // Calcular EMA: ordenar cronológicamente y extraer notas normalizadas
+  // EMA sobre serie cronológica de notas
   const sortedGrades: number[] = [...graded]
-    .sort((a, b) => {
-      const dateA = new Date(a.date || 0).getTime();
-      const dateB = new Date(b.date || 0).getTime();
-      return dateA - dateB;
-    })
+    .sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime())
     .map((a) => normalizeGrade(a))
     .filter((g): g is number => g !== null);
 
   const currentEMA = sortedGrades.length > 0 ? calculateEMA(sortedGrades) : currentAverage;
 
-  // Proyección: ajustar el promedio actual con la tendencia del EMA
-  const projectedGrade = evaluatedWeight > 0 && remainingWeight > 0
-    ? currentAverage + (currentEMA - currentAverage) * (remainingWeight / 100)
+  // Convertir pesos a fracción 0-1 (backend trabaja en fracción)
+  const evalFrac = Math.min(evaluatedWeightPct / 100, 1);
+  const remFrac  = Math.max(0, 1 - evalFrac);
+
+  // Nota Proyectada: NP = (PA × evalFrac) + (EMA × remFrac) — backend formula
+  let projectedGrade = evalFrac > 0
+    ? (currentAverage * evalFrac) + (currentEMA * remFrac)
     : currentAverage;
 
-  const delta = projectedGrade - targetGrade;
+  // Clamp a [0, SCALE_MAX]
+  projectedGrade = Math.max(0, Math.min(SCALE_MAX, projectedGrade));
+
+  // Delta = NP − PA (igual que backend: projectedGrade - currentAverage)
+  const delta = projectedGrade - currentAverage;
 
   return {
     currentAverage,
     currentEMA,
     projectedGrade,
     delta,
-    evaluatedWeight,
-    remainingWeight,
+    evaluatedWeight: evaluatedWeightPct,
+    remainingWeight: remainingWeightPct,
     targetGrade,
   };
 }

@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 
 exports.getGradingPeriods = (req, res) => {
@@ -14,17 +15,18 @@ exports.getGradingPeriods = (req, res) => {
 
 exports.createGradingPeriod = (req, res) => {
   const userId = req.user.id;
-  const { name, period_type, start_date, end_date } = req.body;
+  const { id: clientId, name, period_type, start_date, end_date } = req.body;
   if (!name || !period_type) {
     return res.status(400).json({ error: 'name y period_type son requeridos' });
   }
+  const periodId = clientId || uuidv4();
   db.run(
-    `INSERT INTO grading_periods (user_id, name, period_type, start_date, end_date)
-     VALUES (?, ?, ?, ?, ?)`,
-    [userId, name, period_type || 'custom', start_date || null, end_date || null],
+    `INSERT INTO grading_periods (id, user_id, name, period_type, start_date, end_date)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [periodId, userId, name, period_type || 'custom', start_date || null, end_date || null],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: this.lastID, name, period_type });
+      res.status(201).json({ id: periodId, name, period_type });
     }
   );
 };
@@ -89,25 +91,25 @@ exports.saveThresholdOverrides = (req, res) => {
 
 exports.createCustomGradingSystem = async (req, res) => {
   const userId = req.user.id;
-  const { name, code, min_value, max_value, passing_value, precision, type, mode, direction } = req.body;
+  const { id: clientId, name, code, min_value, max_value, passing_value, precision, type, mode, direction } = req.body;
   if (!name || min_value == null || max_value == null || passing_value == null) {
     return res.status(400).json({ error: 'name, min_value, max_value y passing_value son requeridos' });
   }
   const systemCode = code || `CUSTOM_${Date.now()}`;
+  const systemId = clientId || uuidv4();
   db.run(
-    `INSERT INTO grading_systems (code, name, type, mode, direction, country_code, is_system_seeded, is_custom, created_by_user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [systemCode, name, type || 'numeric', mode || 'continuous', direction || 'ascending', null, 0, 1, userId],
+    `INSERT INTO grading_systems (id, code, name, type, mode, direction, country_code, is_system_seeded, is_custom, created_by_user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [systemId, systemCode, name, type || 'numeric', mode || 'continuous', direction || 'ascending', null, 0, 1, userId],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      const systemId = this.lastID;
+      const versionId = uuidv4();
       db.run(
-        `INSERT INTO grading_versions (grading_system_id, owner_type, owner_id, min_value, max_value, passing_value, precision, is_active)
-         VALUES (?, 'user', ?, ?, ?, ?, ?, ?)`,
-        [systemId, String(userId), min_value, max_value, passing_value, precision || 2, 1],
+        `INSERT INTO grading_versions (id, grading_system_id, owner_type, owner_id, min_value, max_value, passing_value, precision, is_active)
+         VALUES (?, ?, 'user', ?, ?, ?, ?, ?, ?)`,
+        [versionId, systemId, String(userId), min_value, max_value, passing_value, precision || 2, 1],
         function (err) {
           if (err) return res.status(500).json({ error: err.message });
-          const versionId = this.lastID;
           const scales = [
             { label: 'Aprobado', min: passing_value, max: max_value, sort_order: 1, is_passing: 1, gpa_equivalent: 3.0, color: '#4CAF50' },
             { label: 'Reprobado', min: min_value, max: Math.max(min_value, passing_value - 0.01), sort_order: 2, is_passing: 0, gpa_equivalent: 0.0, color: '#F44336' },
@@ -197,16 +199,17 @@ exports.getLmsAccounts = (req, res) => {
 
 exports.addLmsAccount = (req, res) => {
   const userId = req.user.id;
-  const { platform, instance_url, username } = req.body;
+  const { id: clientId, platform, instance_url, username } = req.body;
   if (!platform || !instance_url || !username) {
     return res.status(400).json({ error: 'platform, instance_url y username son requeridos' });
   }
+  const accountId = clientId || uuidv4();
   db.run(
-    `INSERT INTO lms_accounts (user_id, platform, instance_url, username) VALUES (?, ?, ?, ?)`,
-    [userId, platform, instance_url, username],
+    `INSERT INTO lms_accounts (id, user_id, platform, instance_url, username) VALUES (?, ?, ?, ?, ?)`,
+    [accountId, userId, platform, instance_url, username],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: this.lastID, platform, instance_url, username });
+      res.status(201).json({ id: accountId, platform, instance_url, username });
     }
   );
 };

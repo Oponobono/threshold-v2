@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { deleteFromUploadthing } = require('../utils/uploadthingServer');
 
@@ -8,7 +9,7 @@ exports.getGalleryItems = (req, res) => {
   const { userId } = req.params;
   const authenticatedUserId = req.user.id;
   
-  if (parseInt(userId) !== authenticatedUserId) {
+  if (String(userId) !== String(authenticatedUserId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -69,17 +70,18 @@ exports.getGalleryItems = (req, res) => {
  * Agregar un nuevo ítem a la galería
  */
 exports.addGalleryItem = (req, res) => {
-  const { user_id, uri, subject, date, time, ocr_text } = req.body;
+  const { id: clientId, user_id, uri, subject, date, time, ocr_text } = req.body;
   const authenticatedUserId = req.user.id;
   
-  if (parseInt(user_id) !== authenticatedUserId) {
+  if (String(user_id) !== String(authenticatedUserId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const query = `INSERT INTO gallery_items (user_id, uri, subject, date, time, ocr_text) VALUES (?, ?, ?, ?, ?, ?)`;
-  db.run(query, [user_id, uri, subject, date, time, ocr_text], function(err) {
+  const itemId = clientId || uuidv4();
+  const query = `INSERT INTO gallery_items (id, user_id, uri, subject, date, time, ocr_text) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+  db.run(query, [itemId, user_id, uri, subject, date, time, ocr_text], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: this.lastID, message: 'Ítem agregado a galería' });
+    res.status(201).json({ id: itemId, message: 'Ítem agregado a galería' });
   });
 };
 
@@ -130,7 +132,7 @@ exports.searchPhotosByTag = (req, res) => {
  * Genera automáticamente tags/palabras clave a partir del OCR para búsqueda.
  */
 exports.savePhoto = (req, res) => {
-  const { subject_id, local_uri, es_favorita, ocr_text, group_id } = req.body;
+  const { id: clientId, subject_id, local_uri, es_favorita, ocr_text, group_id } = req.body;
   const userId = req.user.id;
   console.log('[Gallery] Saving photo:', { subject_id, local_uri, group_id });
   
@@ -141,9 +143,10 @@ exports.savePhoto = (req, res) => {
   db.get('SELECT id FROM subjects WHERE id = ? AND user_id = ?', [subject_id, userId], (err, row) => {
     if (err || !row) return res.status(400).json({ error: 'Materia no encontrada o acceso denegado' });
 
+    const photoId = clientId || uuidv4();
     const query = `
-      INSERT INTO photos (subject_id, local_uri, es_favorita, ocr_text, tags, group_id)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO photos (id, subject_id, local_uri, es_favorita, ocr_text, tags, group_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Generar tags a partir del OCR si existe
@@ -152,14 +155,14 @@ exports.savePhoto = (req, res) => {
       tags = generateTagsFromOCR(ocr_text);
     }
 
-    db.run(query, [subject_id, local_uri, es_favorita ? 1 : 0, ocr_text || null, tags, group_id || null], function(err) {
+    db.run(query, [photoId, subject_id, local_uri, es_favorita ? 1 : 0, ocr_text || null, tags, group_id || null], function(err) {
       if (err) {
         console.error('[Gallery] Save error:', err.message);
         return res.status(500).json({ error: err.message });
       }
-      console.log('[Gallery] Photo saved with ID:', this.lastID);
+      console.log('[Gallery] Photo saved with ID:', photoId);
       res.status(201).json({
-        id: this.lastID,
+        id: photoId,
         subject_id,
         local_uri,
         es_favorita: es_favorita || 0,
@@ -198,6 +201,7 @@ exports.toggleFavoritePhoto = (req, res) => {
 exports.updatePhoto = (req, res) => {
   const { photoId } = req.params;
   const { ocr_text, es_favorita } = req.body;
+  const userId = req.user.id;
 
   const updateFields = [];
   const updateValues = [];

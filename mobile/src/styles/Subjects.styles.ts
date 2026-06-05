@@ -33,21 +33,23 @@ export const subjectsStyles = StyleSheet.create({
   sectionTitle: { fontSize: theme.typography.sizes.md, fontWeight: '800', color: theme.colors.text.primary },
   sectionHint: { fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary },
   // ── Semester Hero ──
+  // DARK MODE: backgroundColor: '#0D0E12', borderColor: 'rgba(255,255,255,0.05)'
   semesterHero: {
-    backgroundColor: '#0D0E12',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: theme.colors.border,
     overflow: 'hidden',
     position: 'relative',
     shadowColor: '#000',
-    shadowRadius: 12,
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    shadowRadius: 8,
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
+  // DARK MODE: backgroundColor: 'rgba(99,102,241,0.12)', shadowOpacity: 1, elevation: 20
   gpaAmbientGlow: {
     position: 'absolute',
     top: '-20%',
@@ -55,11 +57,53 @@ export const subjectsStyles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    backgroundColor: 'rgba(99, 102, 241, 0.06)',
     shadowColor: '#6366f1',
-    shadowRadius: 40,
-    shadowOpacity: 1,
-    elevation: 20,
+    shadowRadius: 24,
+    shadowOpacity: 0.4,
+    elevation: 0,
+  },
+  // Concentric arcs — emanate from the GPA circle (left side of card)
+  // Clipped naturally by overflow: 'hidden' on semesterHero
+  // DARK MODE: borderColor: 'rgba(99,102,241,0.10/0.07/0.04)'
+  heroArc1: {
+    position: 'absolute',
+    top: '50%',
+    left: '18%',
+    width: 130,
+    height: 130,
+    marginTop: -65,
+    marginLeft: -65,
+    borderRadius: 65,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.10)',
+    backgroundColor: 'transparent',
+  },
+  heroArc2: {
+    position: 'absolute',
+    top: '50%',
+    left: '18%',
+    width: 190,
+    height: 190,
+    marginTop: -95,
+    marginLeft: -95,
+    borderRadius: 95,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.07)',
+    backgroundColor: 'transparent',
+  },
+  heroArc3: {
+    position: 'absolute',
+    top: '50%',
+    left: '18%',
+    width: 255,
+    height: 255,
+    marginTop: -127,
+    marginLeft: -127,
+    borderRadius: 127,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.04)',
+    backgroundColor: 'transparent',
   },
   heroContentRow: {
     flexDirection: 'row',
@@ -67,6 +111,7 @@ export const subjectsStyles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
   },
+  // DARK MODE: backgroundColor: 'rgba(255,255,255,0.02)', borderTopColor: 'rgba(255,255,255,0.05)'
   heroEngineRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -78,27 +123,29 @@ export const subjectsStyles = StyleSheet.create({
     marginTop: 18,
     paddingVertical: 12,
     paddingHorizontal: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: theme.colors.card,
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    borderTopColor: theme.colors.border,
   },
   heroEngineChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
+  // DARK MODE: color: '#FFFFFF'
   heroEngineSep: {
     fontSize: 11,
-    color: '#FFFFFF',
+    color: theme.colors.text.secondary,
     fontWeight: '300',
   },
   heroEngineIcon: {
     fontSize: 11,
   },
+  // DARK MODE: color: '#FFFFFF'
   heroEngineText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: theme.colors.text.primary,
     letterSpacing: 0.1,
   },
   gpaContainer: {
@@ -112,16 +159,17 @@ export const subjectsStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 7,
   },
+  // DARK MODE: backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)'
   miniCard: {
     width: '47%',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: theme.colors.card,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderColor: theme.colors.border,
   },
   miniCardInRisk: {
     width: '47%',
@@ -134,10 +182,11 @@ export const subjectsStyles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: 'rgba(255,45,85,0.15)',
   },
+  // DARK MODE: color: '#FFFFFF'
   miniCardTitle: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: theme.colors.text.secondary,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 4,
@@ -150,10 +199,11 @@ export const subjectsStyles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 4,
   },
+  // DARK MODE: color: '#F5F6FA'
   miniCardValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#F5F6FA',
+    color: theme.colors.text.primary,
     fontFamily: 'monospace',
     letterSpacing: -0.5,
   },
@@ -164,31 +214,35 @@ export const subjectsStyles = StyleSheet.create({
     fontFamily: 'monospace',
     letterSpacing: -0.5,
   },
+  // DARK MODE: color: '#FFFFFF'
   miniCardSub: {
     fontSize: 11,
     fontWeight: '300',
-    color: '#FFFFFF',
+    color: theme.colors.text.secondary,
   },
+  // DARK MODE: backgroundColor: 'rgba(0,0,0,0.2)', shadowOpacity: 0.3
   semesterGpaCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    borderWidth: 3,
-    borderColor: '#6366f1', 
+    borderWidth: 2.5,
+    borderColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: 'rgba(99, 102, 241, 0.07)',
     shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
     shadowRadius: 8,
   },
+  // DARK MODE: color: '#F5F6FA'
   semesterGpaValue: {
-    fontSize: 34, fontWeight: '200', color: '#F5F6FA',
+    fontSize: 34, fontWeight: '200', color: theme.colors.text.primary,
     letterSpacing: -1,
   },
+  // DARK MODE: color: '#FFFFFF'
   semesterGpaLabel: {
-    fontSize: 8, fontWeight: '600', color: '#FFFFFF',
+    fontSize: 8, fontWeight: '600', color: theme.colors.text.secondary,
     textTransform: 'uppercase', letterSpacing: 0.8, marginTop: -2,
   },
   // ── Critical Carousel ──

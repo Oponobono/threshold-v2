@@ -1,129 +1,133 @@
-/**
- * schedules.ts
- *
- * Servicio CRUD para los horarios académicos del usuario.
- * Cada horario define un bloque de clase semanal (`day_of_week`, `start_time`, `end_time`)
- * vinculado a una materia. Los horarios son utilizados por el dashboard para mostrar
- * la clase actual y por el sistema de predicción de materia activa.
- */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
-import { cacheService, CACHE_KEYS } from '../../services/cacheService';
-import { offlineSyncService } from '../offlineSyncService';
+import { scheduleRepository, syncService } from '../database';
 
-/**
- * Obtiene los horarios de hoy
- */
-export const getTodaySchedules = async (): Promise<any[]> => {
-  const userId = await getUserId();
-  if (!userId) return [];
-  const response = await fetchWithFallback(`/schedules/today/${userId}`);
-  return (await parseJsonSafely(response)) || [];
+const getUserIdNumber = async (): Promise<string> => {
+  const uid = await getUserId();
+  if (!uid) throw new Error('No hay sesión activa.');
+  return String(uid);
 };
 
-/**
- * Crea un nuevo horario (soporta repetición enviando múltiples peticiones si es necesario)
- * Si falla la red, guarda en cola offline para sincronizar después
- */
-export const createSchedule = async (payload: { subject_id: number, day_of_week: number, start_time: string, end_time: string }) => {
+export const getTodaySchedules = async (): Promise<any[]> => {
+  const userId = await getUserIdNumber();
+  
+  // 1. Leer localmente primero
+  const allLocal = await scheduleRepository.getByUser(userId);
+  const today = new Date().getDay();
+  const localToday = allLocal.filter(s => s.day_of_week === today);
+
+  // 2. Sincronizar en background
+  (async () => {
+    try {
+      const response = await fetchWithFallback(`/schedules/today/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          const mapped = data.map(s => ({ ...s, user_id: userId }));
+          for (const s of mapped) await scheduleRepository.upsert(s);
+        }
+      }
+    } catch {}
+  })();
+
+  return localToday;
+};
+
+export const createSchedule = async (payload: { subject_id: string; day_of_week: number; start_time: string; end_time: string }) => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const userId = await getUserIdNumber();
+  const id = (payload as any).id || uuidv4();
+
+  const schedule: any = { id, user_id: userId, ...payload };
+  await scheduleRepository.create(schedule);
+
   try {
     const response = await fetchWithFallback('/schedules', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
     const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo crear el horario.');
+    if (response.ok && data) {
+      await scheduleRepository.upsert(data);
+      return data;
     }
-
-    cacheService.clearKey(CACHE_KEYS.SCHEDULES);
-    return data;
-  } catch (error) {
-    // Si falla, guardar en cola offline
-    console.warn('[Schedules] Red no disponible, guardando en cola offline:', error);
-    await offlineSyncService.addPendingOperation(
-      'POST',
-      '/schedules',
-      'schedule',
-      payload
-    );
-    
-    // Retornar objeto temporal para que la UI sea optimista
-    const optimisticSchedule = {
-      id: -Date.now(), // ID temporal único
-      ...payload,
-      _isPending: true, // Bandera para UI
-    };
-    cacheService.addOptimisticItem(CACHE_KEYS.SCHEDULES, optimisticSchedule);
-    return optimisticSchedule;
+    throw new Error(data?.error || 'Error del servidor');
+  } catch {
+    await syncService.enqueueCreate('schedule', id, payload);
+    return schedule;
   }
 };
 
-/**
- * Elimina un horario
- */
-export const deleteSchedule = async (id: number) => {
+export const deleteSchedule = async (id: string) => {
+  await scheduleRepository.delete(id);
+
   try {
     const response = await fetchWithFallback(`/schedules/${id}`, { method: 'DELETE' });
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo eliminar el horario.');
-    }
-    cacheService.clearKey(CACHE_KEYS.SCHEDULES);
-    return data;
-  } catch (error) {
-    console.warn('[Schedules] Red no disponible, guardando eliminación en cola offline:', error);
-    await offlineSyncService.addPendingOperation('DELETE', `/schedules/${id}`, 'schedule');
-    cacheService.removeOptimisticItem(CACHE_KEYS.SCHEDULES, id);
+    return await parseJsonSafely(response);
+  } catch {
+    await syncService.enqueueDelete('schedule', id);
     return { success: true, _isPending: true };
   }
 };
 
-/**
- * Obtiene horarios por materia.
- * Fallback offline: busca en el caché MMKV de schedules globales.
- */
-export const getSchedulesBySubject = async (subjectId: number): Promise<any[]> => {
-  try {
-    const response = await fetchWithFallback(`/schedules/subject/${subjectId}`);
-    const data = await parseJsonSafely(response);
-    if (response.ok && Array.isArray(data)) {
-      return data;
-    }
-    throw new Error(`HTTP ${response.status}`);
-  } catch (error) {
-    console.warn(`[Schedules] getSchedulesBySubject(${subjectId}) falló, buscando en caché MMKV...`);
+export const getSchedulesBySubject = async (subjectId: string): Promise<any[]> => {
+  const userId = await getUserIdNumber();
+  
+  // 1. Leer localmente primero
+  const localData = await scheduleRepository.getBySubject(subjectId);
+
+  // 2. Sincronizar en background
+  (async () => {
     try {
-      const cached = cacheService.loadSchedulesSync() as any[] | null;
-      if (Array.isArray(cached)) {
-        return cached.filter(s => String(s.subject_id) === String(subjectId));
+      const response = await fetchWithFallback(`/schedules/subject/${subjectId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          const mapped = data.map(s => ({ ...s, user_id: userId }));
+          for (const s of mapped) await scheduleRepository.upsert(s);
+        }
       }
-    } catch (cacheError) {
-      console.error('[Schedules] Error al leer caché MMKV:', cacheError);
-    }
-    return [];
-  }
+    } catch {}
+  })();
+
+  return localData || [];
 };
 
-/**
- * Obtiene todos los horarios del usuario
- */
 export const getAllSchedules = async (): Promise<any[]> => {
-  const userId = await getUserId();
-  if (!userId) throw new Error('No hay sesión activa.');
-  const response = await fetchWithFallback(`/schedules/user/${userId}`);
-  if (!response.ok) {
-    const errorData = await parseJsonSafely(response);
-    throw new Error(errorData?.error || 'Error al obtener horarios.');
+  const userId = await getUserIdNumber();
+  
+  // 1. Leer localmente primero
+  const localData = await scheduleRepository.getByUser(userId);
+
+  if (!localData || localData.length === 0) {
+    try {
+      const response = await fetchWithFallback(`/schedules/user/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          const mapped = data.map(s => ({ ...s, user_id: userId }));
+          for (const s of mapped) await scheduleRepository.upsert(s);
+          return mapped;
+        }
+      }
+    } catch {}
+    return [];
   }
-  const data = await parseJsonSafely(response);
-  if (Array.isArray(data)) {
-    cacheService.saveSchedules(data);
-    return data;
-  }
-  return [];
+
+  // 2. Sincronizar en background
+  (async () => {
+    try {
+      const response = await fetchWithFallback(`/schedules/user/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          const mapped = data.map(s => ({ ...s, user_id: userId }));
+          for (const s of mapped) await scheduleRepository.upsert(s);
+        }
+      }
+    } catch {}
+  })();
+
+  return localData;
 };

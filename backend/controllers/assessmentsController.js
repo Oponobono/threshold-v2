@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const gradingEngine = require('../services/gradingEngine');
 
@@ -128,7 +129,7 @@ exports.getAssessmentsByUser = (req, res) => {
   const { userId } = req.params;
   const authenticatedUserId = req.user.id;
   
-  if (parseInt(userId) !== authenticatedUserId) {
+  if (String(userId) !== String(authenticatedUserId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -203,7 +204,7 @@ exports.getAssessmentsByUser = (req, res) => {
  * Agregar una nueva evaluación a una materia
  */
 exports.createAssessment = (req, res) => {
-  const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date } = req.body;
+  const { id: clientId, subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date } = req.body;
   console.log('[POST] 📝 createAssessment payload:', {
     subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date
   });
@@ -221,19 +222,19 @@ exports.createAssessment = (req, res) => {
     }
 
     const user_id = subject.user_id;
+    const newAssessmentId = clientId || uuidv4();
     const query = `
-      INSERT INTO assessments (user_id, subject_id, name, type, date, weight, out_of, is_completed, category_id, due_date, grading_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO assessments (id, user_id, subject_id, name, type, date, weight, out_of, is_completed, category_id, due_date, grading_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     db.run(
       query,
-      [user_id, subject_id, name, type, date, weight, finalOutOf, is_completed ? 1 : 0, category_id || null, due_date || null, grading_date || null],
+      [newAssessmentId, user_id, subject_id, name, type, date, weight, finalOutOf, is_completed ? 1 : 0, category_id || null, due_date || null, grading_date || null],
       function(err) {
         if (err) {
           console.error('[POST] ❌ Error insertando assessment:', err.message);
           return res.status(500).json({ error: err.message });
         }
-        const newAssessmentId = this.lastID;
         console.log('[POST] ✅ Assessment creado con ID:', newAssessmentId);
         console.log('[POST] ✅ Subject encontrado:', { subjectId: subject_id, userId: user_id });
         
@@ -492,7 +493,7 @@ exports.updateAssessment = (req, res) => {
             return res.status(200).json(fullAssessment);
           } catch (err) {
             console.warn('[AssessmentsController] Could not denormalize for response, using fallback:', err.message);
-            return res.status(200).json({ message: 'Evaluación actualizada', id: parseInt(id) });
+            return res.status(200).json({ message: 'Evaluación actualizada', id });
           }
         })();
       }
@@ -699,7 +700,7 @@ exports.getProjectionAnalytics = (req, res) => {
       if (!rows || rows.length === 0) {
         console.log(`[Analytics] ℹ️ No hay evaluaciones calificadas para subjectId=${subjectId}`);
         return res.json({
-          subjectId: parseInt(subjectId),
+          subjectId: subjectId,
           currentAverage: 0,
           currentEMA: 0,
           projectedGrade: 0,
@@ -778,7 +779,7 @@ exports.getProjectionAnalytics = (req, res) => {
       });
 
       return res.json({
-        subjectId: parseInt(subjectId),
+        subjectId: subjectId,
         ...projection,
         assessmentCount: denormalizedAssessments.length,
         maxScale,

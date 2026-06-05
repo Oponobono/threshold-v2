@@ -320,11 +320,17 @@ const cacheKey = `api_cache_${path}`;
       const fullUrl = `${base}${path}`;
       let requestInit = customInit;
       
-      // Aplicar timeout rápido (2s) a IPs locales para evitar bloquear la app
+      let timeoutMs = 2000;
+      const isSlowEndpoint = path.includes('/ocr') || path.includes('/ai') || path.includes('/transcribe') || path.includes('/generate') || path.includes('/upload');
+      if (isSlowEndpoint) {
+        timeoutMs = 30000;
+      }
+
+      // Aplicar timeout rápido a IPs locales para evitar bloquear la app
       // si el servidor local está apagado y queremos saltar rápido a Render.
       if (base.includes('192.168') || base.includes('10.0') || base.includes('localhost') || base.includes('127.0')) {
         const controller = new AbortController();
-        timeoutId = setTimeout(() => controller.abort(), 2000);
+        timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         requestInit = { ...customInit, signal: controller.signal as any };
       }
 

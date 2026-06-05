@@ -1,229 +1,156 @@
-/**
- * subjects.ts
- *
- * Servicio CRUD para las materias académicas del usuario.
- * Una materia es la entidad central del ecosistema Threshold: agrupa grabaciones,
- * fotos, documentos, flashcards, horarios y evaluaciones.
- * Incluye el endpoint de predicción que sugiere la materia activa según el horario actual.
- */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
-import { Subject } from './types';
-import { cacheService, CACHE_KEYS } from '../../services/cacheService';
-import { offlineSyncService } from '../offlineSyncService';
+import type { Subject } from './types';
+import { subjectRepository, syncService } from '../database';
 
-/**
- * Obtiene una materia específica.
- * Estrategia: Network First con fallback al caché MMKV de subjects cuando la red falla.
- * Esto garantiza que la pantalla de detalle de materia no quede vacía en modo offline.
- */
-export const getSubjectById = async (subjectId: number | string): Promise<Subject | null> => {
-  try {
-    const response = await fetchWithFallback(`/subject/${subjectId}`);
-    if (response.ok) {
-      const data = await parseJsonSafely(response);
-      return data;
-    }
-    // Si la respuesta no es ok, intentar caché MMKV
-    throw new Error(`HTTP ${response.status}`);
-  } catch (error) {
-    // Fallback: buscar en el caché MMKV de subjects
-    console.warn(`[Subjects] getSubjectById(${subjectId}) falló (${(error as Error)?.message}), buscando en caché MMKV...`);
+const getUserIdNumber = async (): Promise<string> => {
+  const uid = await getUserId();
+  if (!uid) throw new Error('No hay sesión activa.');
+  return String(uid);
+};
+
+export const getSubjectById = async (subjectId: string): Promise<Subject | null> => {
+  // 1. Leer localmente primero
+  const localData = await subjectRepository.getById(subjectId);
+
+  // 2. Sincronizar en background
+  (async () => {
     try {
-      const cached = cacheService.loadSubjectsSync() as Subject[] | null;
-      if (Array.isArray(cached)) {
-        const found = cached.find(s => String(s.id) === String(subjectId)) ?? null;
-        if (found) {
-          console.log(`[Subjects] ✅ Materia ${subjectId} encontrada en caché MMKV`);
-        } else {
-          console.warn(`[Subjects] ⚠️ Materia ${subjectId} NO encontrada en caché MMKV`);
-        }
-        return found;
+      const response = await fetchWithFallback(`/subject/${subjectId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (data) await subjectRepository.upsert(data);
       }
-    } catch (cacheError) {
-      console.error('[Subjects] Error al leer caché MMKV:', cacheError);
-    }
-    return null;
-  }
+    } catch {}
+  })();
+
+  return localData;
 };
 
-/**
- * Obtiene las materias del usuario
- */
-export const getSubjects = async () => {
-  const userId = await getUserId();
-  if (!userId) throw new Error('No hay sesión activa.');
-  try {
-    const response = await fetchWithFallback(`/subjects/${userId}`);
-    if (!response.ok) {
-      const errorData = await parseJsonSafely(response);
-      throw new Error(errorData?.error || `HTTP ${response.status}`);
-    }
-    const data = await parseJsonSafely(response);
-    if (Array.isArray(data)) {
-      cacheService.saveSubjects(data);
-      return data;
-    }
+export const getSubjects = async (): Promise<Subject[]> => {
+  const userId = await getUserIdNumber();
+  
+  // 1. Leer localmente primero
+  const localData = await subjectRepository.getByUser(userId);
+
+  // Si no hay datos locales (primer inicio o caché limpia), esperar la red obligatoriamente
+  if (!localData || localData.length === 0) {
+    try {
+      const response = await fetchWithFallback(`/subjects/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const s of data) await subjectRepository.upsert(s);
+          return data;
+        }
+      }
+    } catch {}
     return [];
-  } catch (error) {
-    console.warn('[Subjects] getSubjects falló, usando caché MMKV:', error);
-    const cached = cacheService.loadSubjectsSync() as any[] | null;
-    if (Array.isArray(cached) && cached.length > 0) {
-      console.log(`[Subjects] ✅ ${cached.length} materias desde caché MMKV`);
-      return cached;
-    }
-    throw error;
   }
+
+  // 2. Sincronizar en background
+  (async () => {
+    try {
+      const response = await fetchWithFallback(`/subjects/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const s of data) await subjectRepository.upsert(s);
+        }
+      }
+    } catch {}
+  })();
+
+  return localData;
 };
 
-/**
- * Crea una materia para el usuario actual
- * Si falla la red, guarda en cola offline para sincronizar después
- */
 export const createSubject = async (payload: {
+  id?: string;
   name: string;
   professor?: string;
   color?: string;
   icon?: string;
   credits?: number;
   target_grade?: number;
-}) => {
-  const userId = await getUserId();
-  if (!userId) {
-    throw new Error('No hay sesión activa.');
-  }
+}): Promise<Subject> => {
+  const userId = await getUserIdNumber();
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = payload.id || uuidv4();
 
-  const payloadWithUser = {
-    user_id: Number(userId),
-    ...payload,
+  const subject: Subject = {
+    id,
+    user_id: userId,
+    code: payload.name?.substring(0, 3).toUpperCase() || '',
+    name: payload.name,
+    professor: payload.professor,
+    color: payload.color || '#CCCCCC',
+    icon: payload.icon || 'book-outline',
+    credits: payload.credits || 0,
+    target_grade: payload.target_grade,
+    avg_score: 0,
+    normalized_avg_score: 0,
+    completion_percent: 0,
   };
+
+  await subjectRepository.create(subject);
 
   try {
     const response = await fetchWithFallback('/subjects', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payloadWithUser),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, id, user_id: userId }),
     });
-
     const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo crear la materia.');
+    if (response.ok && data) {
+      await subjectRepository.upsert(data);
+      return data;
     }
-
-    cacheService.clearKey(CACHE_KEYS.SUBJECTS);
-    return data as Subject;
-  } catch (error) {
-    // Si falla, guardar en cola offline
-    console.warn('[Subjects] Red no disponible, guardando en cola offline:', error);
-    await offlineSyncService.addPendingOperation(
-      'POST',
-      '/subjects',
-      'subject',
-      payloadWithUser
-    );
-    
-    // Retornar objeto temporal con datos del payload para que la UI sea optimista
-    const optimisticSubject = {
-      id: -Date.now(), // ID temporal único
-      user_id: Number(userId),
-      name: payload.name,
-      code: '',
-      professor: payload.professor,
-      color: payload.color || '#CCCCCC',
-      icon: payload.icon || 'book-outline',
-      target_grade: payload.target_grade,
-      avg_score: 0,
-      normalized_avg_score: 0,
-      completion_percent: 0,
-      credits: payload.credits || 0,
-      _isPending: true, // Bandera para UI
-    };
-    // Persistir en cache local para visibilidad offline inmediata
-    const existing = cacheService.loadSubjectsSync() as any[] | null;
-    if (existing) {
-      cacheService.saveSubjects([optimisticSubject, ...existing]);
-    } else {
-      cacheService.saveSubjects([optimisticSubject]);
-    }
-    return optimisticSubject as any;
+    throw new Error(data?.error || 'Error del servidor');
+  } catch {
+    await syncService.enqueueCreate('subject', id, { ...payload, user_id: userId });
+    return subject;
   }
 };
 
-/**
- * Consulta el servidor para obtener la materia más probable según los bloques
- * de horario que coincidan con la hora y día actuales del usuario.
- */
-export const getPredictedSubject = async (): Promise<Subject | null> => {
-  const userId = await getUserId();
-  if (!userId) return null;
-  const response = await fetchWithFallback(`/prediction/${userId}`);
-  return await parseJsonSafely(response);
-};
-
-/**
- * Elimina una materia
- */
-export const deleteSubject = async (subjectId: number | string) => {
-  // Importación dinámica para evitar dependencia circular
-  const { useDataStore } = await import('../../store/useDataStore');
-
-  const _purgeFromStore = () => {
-    const sid = String(subjectId);
-    useDataStore.setState(state => ({
-      subjects: state.subjects.filter(s => String(s.id) !== sid),
-    }));
-  };
+export const updateSubject = async (subjectId: string, payload: Partial<Subject>): Promise<any> => {
+  await subjectRepository.update(subjectId, payload);
 
   try {
     const response = await fetchWithFallback(`/subjects/${subjectId}`, {
-      method: 'DELETE',
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
-    if (!response.ok) {
-      const errorData = await parseJsonSafely(response);
-      throw new Error(errorData?.error || 'No se pudo eliminar la materia.');
+    const data = await parseJsonSafely(response);
+    if (response.ok && data) {
+      await subjectRepository.upsert(data);
+      return data;
     }
-    // Limpiar caché MMKV y store Zustand en memoria
-    cacheService.clearKey(CACHE_KEYS.SUBJECTS);
-    cacheService.clearSubjectRelatedCaches(subjectId);
-    _purgeFromStore();
+    throw new Error(data?.error || 'Error del servidor');
+  } catch {
+    await syncService.enqueueUpdate('subject', subjectId, payload);
+    return { ...payload, _isPending: true };
+  }
+};
+
+export const deleteSubject = async (subjectId: string) => {
+  await subjectRepository.delete(subjectId);
+
+  try {
+    const response = await fetchWithFallback(`/subjects/${subjectId}`, { method: 'DELETE' });
     return await parseJsonSafely(response);
-  } catch (error) {
-    console.warn('[Subjects] Red no disponible, guardando en cola offline:', error);
-    await offlineSyncService.addPendingOperation('DELETE', `/subjects/${subjectId}`, 'subject');
-    // Eliminar de MMKV, cachés secundarios y del store Zustand en memoria
-    cacheService.removeOptimisticItem(CACHE_KEYS.SUBJECTS, subjectId);
-    cacheService.clearSubjectRelatedCaches(subjectId);
-    _purgeFromStore();
+  } catch {
+    await syncService.enqueueDelete('subject', subjectId);
     return { success: true, _isPending: true };
   }
 };
 
-/**
- * Actualiza una materia existente
- */
-export const updateSubject = async (subjectId: number | string, payload: Partial<Subject>) => {
+export const getPredictedSubject = async (): Promise<Subject | null> => {
+  const userId = await getUserIdNumber();
   try {
-    const response = await fetchWithFallback(`/subjects/${subjectId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo actualizar la materia.');
-    }
-
-    cacheService.clearKey(CACHE_KEYS.SUBJECTS);
-    return data;
-  } catch (error) {
-    console.warn('[Subjects] Red no disponible, guardando update en cola offline:', error);
-    await offlineSyncService.addPendingOperation('PUT', `/subjects/${subjectId}`, 'subject', payload);
-    cacheService.updateOptimisticItem(CACHE_KEYS.SUBJECTS, subjectId, payload);
-    return { ...payload, _isPending: true };
+    const response = await fetchWithFallback(`/prediction/${userId}`);
+    return await parseJsonSafely(response);
+  } catch {
+    return null;
   }
 };

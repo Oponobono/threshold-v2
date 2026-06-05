@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
 import { InteractionManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { getGalleryItems, updatePhoto } from '../services/api';
+import { updatePhoto } from '../services/api';
+import { photoRepository } from '../services/database';
 import { useDataStore } from '../store/useDataStore';
 import { GalleryPhoto, FilterTab } from '../types/gallery';
 
@@ -33,10 +34,10 @@ export function useGallery(t: any) {
     if (refreshing) setIsRefreshing(true);
     else setIsLoading(true);
     try {
-      const raw = await getGalleryItems();
-      const list = Array.isArray(raw) ? raw : [];
+      // Leer siempre desde SQLite local — la galería funciona 100% offline
+      const list = await photoRepository.getAll();
       const subjectMap = new Map(subjects.map((s) => [s.id, s]));
-      const enriched: GalleryPhoto[] = list.map((item: any) => {
+      const enriched: GalleryPhoto[] = (list as any[]).map((item: any) => {
         const subj = subjectMap.get(item.subject_id);
         return {
           ...item,

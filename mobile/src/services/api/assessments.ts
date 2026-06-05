@@ -1,215 +1,141 @@
-/**
- * assessments.ts
- *
- * Servicio CRUD para evaluaciones académicas (notas, tareas, exámenes).
- * Cada evaluación pertenece a una materia y puede tener peso porcentual,
- * calificación obtenida, fecha y tipo ('task' o evaluación tradicional).
- * Los datos son usados por `useSubjectGrades` para calcular el Threshold de aprobación.
- */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Assessment } from './types';
-import { cacheService, CACHE_KEYS } from '../../services/cacheService';
-import { offlineSyncService } from '../offlineSyncService';
-import { useConnectivityStore } from '../../store/useConnectivityStore';
-import { useLocalAIStore } from '../../store/useLocalAIStore';
+import { assessmentRepository, syncService, subjectRepository } from '../database';
 
-
-
-/**
- * Obtiene evaluaciones por materia
- */
-export const getAssessments = async (subjectId: number) => {
-  const response = await fetchWithFallback(`/assessments/${subjectId}`);
-  return (await parseJsonSafely(response)) || [];
+const getUserIdNumber = async (): Promise<string> => {
+  const uid = await getUserId();
+  if (!uid) throw new Error('No hay sesión activa.');
+  return String(uid);
 };
 
-/**
- * Obtiene todas las evaluaciones del usuario
- */
-export const getAllAssessments = async (): Promise<any[]> => {
-  const userId = await getUserId();
-  if (!userId) throw new Error('No hay sesión activa.');
-  try {
-    const response = await fetchWithFallback(`/assessments/user/${userId}`);
-    if (!response.ok) {
-      const errorData = await parseJsonSafely(response);
-      throw new Error(errorData?.error || `HTTP ${response.status}`);
-    }
-    const data = await parseJsonSafely(response);
-    if (Array.isArray(data)) {
-      cacheService.saveAssessments(data);
-      return data;
-    }
-    return [];
-  } catch (error) {
-    console.warn('[Assessments] getAllAssessments falló, usando caché MMKV:', error);
-    const cached = cacheService.loadAssessmentsSync() as any[] | null;
-    if (Array.isArray(cached) && cached.length > 0) {
-      console.log(`[Assessments] ✅ ${cached.length} evaluaciones desde caché MMKV`);
-      return cached;
-    }
-    throw error;
-  }
+export const getAssessments = async (subjectId: string): Promise<Assessment[]> => {
+  // 1. Leer localmente primero
+  const localData = await assessmentRepository.getBySubject(subjectId) as Assessment[];
+
+  // 2. Sincronizar en background
+  (async () => {
+    try {
+      const response = await fetchWithFallback(`/assessments/${subjectId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const a of data) await assessmentRepository.upsert(a);
+        }
+      }
+    } catch {}
+  })();
+
+  return localData || [];
 };
 
-/**
- * Crea una nueva evaluación o tarea
- * Si falla la red, guarda en cola offline para sincronizar después
- */
-export const createAssessment = async (payload: Assessment) => {
-  console.log('[API/Assessments] createAssessment -> Sending payload:', JSON.stringify(payload, null, 2));
+export const getAllAssessments = async (): Promise<Assessment[]> => {
+  const userId = await getUserIdNumber();
   
+  // 1. Leer localmente primero
+  const localData = await assessmentRepository.getAll() as Assessment[];
+
+  if (!localData || localData.length === 0) {
+    try {
+      const response = await fetchWithFallback('/assessments/all');
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const a of data) await assessmentRepository.upsert(a);
+          return data;
+        }
+      }
+    } catch {}
+    return [];
+  }
+
+  // 2. Sincronizar en background
+  (async () => {
+    try {
+      const response = await fetchWithFallback(`/assessments/user/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const a of data) await assessmentRepository.upsert(a);
+        }
+      }
+    } catch {}
+  })();
+
+  return localData || [];
+};
+
+export const createAssessment = async (payload: Assessment): Promise<Assessment> => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = payload.id || uuidv4();
+
+  const assessment: Assessment = {
+    ...payload,
+    id,
+    _isPending: true,
+    is_completed: payload.is_completed ?? 0,
+  } as Assessment;
+
+  await assessmentRepository.create(assessment);
+
   try {
     const response = await fetchWithFallback('/assessments', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(assessment),
     });
-
     const data = await parseJsonSafely(response);
-
-    // Si el servidor devuelve 4xx/5xx con datos válidos, confiar en los datos
-    if (!response.ok && !data?.id) {
-      console.error('[API/Assessments] createAssessment failed:', data?.error || 'Unknown error', 'Status:', response.status);
-      throw new Error(data?.error || 'No se pudo crear la evaluación.');
+    if (data?.id) {
+      await assessmentRepository.upsert(data);
+      return data;
     }
-    cacheService.clearKey(CACHE_KEYS.ASSESSMENTS);
-    console.log('[API/Assessments] createAssessment success:', data);
-    return data;
-  } catch (error: any) {
-    const isOfflineMode = useConnectivityStore.getState().isOnline === false;
-    const isForceOffline = useLocalAIStore.getState().forceOfflineMode;
-    const isNetworkError = isOfflineMode || isForceOffline ||
-      error.message?.includes('fetch') ||
-      error.message?.includes('Network') ||
-      error.message?.includes('conexión') ||
-      error.message?.includes('servidor') ||
-      error.message?.includes('Modo offline');
-    if (isNetworkError) {
-      console.warn('[Assessments] Red no disponible, guardando en cola offline:', error);
-      await offlineSyncService.addPendingOperation('POST', '/assessments', 'assessment', payload);
-      const optimisticAssessment = { id: -Date.now(), ...payload, _isPending: true };
-      const existing: any[] | null = await cacheService.loadAssessments() as any[] | null;
-      if (existing) {
-        cacheService.saveAssessments([optimisticAssessment, ...existing]);
-      } else {
-        cacheService.saveAssessments([optimisticAssessment]);
-      }
-      return optimisticAssessment;
-    }
-    throw error;
+    throw new Error(data?.error || 'Error del servidor');
+  } catch {
+    await syncService.enqueueCreate('assessment', id, assessment);
+    return assessment;
   }
 };
 
-/**
- * Actualiza una evaluación o tarea existente
- * Si falla la red, guarda en cola offline para sincronizar después
- */
-export const updateAssessment = async (id: number, payload: Partial<Assessment>) => {
-  console.log(`[API/Assessments] updateAssessment (id:${id}) -> Sending payload:`, JSON.stringify(payload, null, 2));
-  
+export const updateAssessment = async (id: string, payload: Partial<Assessment>): Promise<any> => {
+  await assessmentRepository.update(id, payload);
+
   try {
     const response = await fetchWithFallback(`/assessments/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
     const data = await parseJsonSafely(response);
-    if (!response.ok && !data?.success) {
-      console.error(`[API/Assessments] updateAssessment (id:${id}) failed:`, data?.error || 'Unknown error', 'Status:', response.status);
-      throw new Error(data?.error || 'No se pudo actualizar la evaluación.');
+    if (response.ok) {
+      await assessmentRepository.upsert(data);
+      return data;
     }
-    cacheService.clearKey(CACHE_KEYS.ASSESSMENTS);
-    console.log(`[API/Assessments] updateAssessment (id:${id}) success:`, data);
-    return data;
-  } catch (error: any) {
-    const isOfflineMode = useConnectivityStore.getState().isOnline === false;
-    const isForceOffline = useLocalAIStore.getState().forceOfflineMode;
-    const isNetworkError = isOfflineMode || isForceOffline ||
-      error.message?.includes('fetch') ||
-      error.message?.includes('Network') ||
-      error.message?.includes('conexión') ||
-      error.message?.includes('servidor') ||
-      error.message?.includes('Modo offline');
-    if (isNetworkError) {
-      console.warn(`[Assessments] Red no disponible, guardando actualización en cola offline:`, error);
-      await offlineSyncService.addPendingOperation('PUT', `/assessments/${id}`, 'assessment', payload);
-      cacheService.updateOptimisticItem(CACHE_KEYS.ASSESSMENTS, id, payload);
-      return { success: true, message: 'Guardado localmente' };
-    }
-    throw error;
+    throw new Error(data?.error || 'Error del servidor');
+  } catch {
+    await syncService.enqueueUpdate('assessment', id, payload);
+    return { success: true, message: 'Guardado localmente' };
   }
 };
 
-/**
- * Elimina una evaluación o tarea
- */
-export const deleteAssessment = async (id: number) => {
+export const deleteAssessment = async (id: string) => {
+  await assessmentRepository.delete(id);
+
   try {
-    const response = await fetchWithFallback(`/assessments/${id}`, {
-      method: 'DELETE',
-    });
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo eliminar la evaluación.');
-    }
-    cacheService.clearKey(CACHE_KEYS.ASSESSMENTS);
-    return data;
-  } catch (error) {
-    console.warn('[Assessments] Red no disponible, guardando eliminación en cola offline:', error);
-    await offlineSyncService.addPendingOperation('DELETE', `/assessments/${id}`, 'assessment');
-    cacheService.removeOptimisticItem(CACHE_KEYS.ASSESSMENTS, id);
+    const response = await fetchWithFallback(`/assessments/${id}`, { method: 'DELETE' });
+    return await parseJsonSafely(response);
+  } catch {
+    await syncService.enqueueDelete('assessment', id);
     return { success: true, _isPending: true };
   }
 };
 
-/**
- * Obtiene métricas de proyección para una materia
- * Calcula: PA (promedio actual), EMA (tendencia), NP (proyección final)
- * 
- * @param subjectId - ID de la materia
- * @returns {currentAverage, currentEMA, projectedGrade, delta, evaluatedWeight, remainingWeight}
- */
-export const getProjectionAnalytics = async (subjectId: number) => {
+export const getProjectionAnalytics = async (subjectId: string) => {
   try {
-    const url = `/assessments/analytics/subject/${subjectId}/projection`;
-    console.log(`[API/Assessments] 🚀 Llamando getProjectionAnalytics con URL:`, url);
-    
-    const response = await fetchWithFallback(url);
-    console.log(`[API/Assessments] 📡 Response status: ${response.status}`, response.statusText);
-    
+    const response = await fetchWithFallback(`/assessments/analytics/subject/${subjectId}/projection`);
     const data = await parseJsonSafely(response);
-    console.log(`[API/Assessments] 📦 Response data:`, JSON.stringify(data).substring(0, 200));
-    
-    if (!response.ok) {
-      console.warn(
-        `[API/Assessments] ❌ Error HTTP ${response.status} para subject ${subjectId}:`,
-        data?.error || response.statusText || 'Sin detalles de error'
-      );
-      return null;
-    }
-    
-    if (!data) {
-      console.warn(`[API/Assessments] ⚠️ Response vacío para subject ${subjectId}`);
-      return null;
-    }
-    
-    console.log(`[API/Assessments] ✅ Proyección para subject ${subjectId}:`, {
-      currentAverage: data.currentAverage,
-      projectedGrade: data.projectedGrade,
-      delta: data.delta,
-    });
-    return data;
-  } catch (error) {
-    console.warn(`[API/Assessments] ❌ Exception en getProjectionAnalytics:`, error instanceof Error ? error.message : String(error));
+    if (response.ok && data) return data;
+    return null;
+  } catch {
     return null;
   }
 };
-
-

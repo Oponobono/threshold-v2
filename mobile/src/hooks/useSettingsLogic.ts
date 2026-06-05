@@ -7,8 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { alertRef } from '../components/ui/CustomAlert';
 import { uploadFileToUploadthing } from '../services/uploadthing/storage';
-import { downloadProfileImage } from '../services/profileImageCache';
-import { cacheService } from '../services/cacheService';
+import { downloadProfileImage, getLocalProfileImageUri } from '../services/profileImageCache';
 import { fetchGradingSystems, type GradingSystem } from '../services/api/grading';
 import { DEFAULT_GRADING_SYSTEMS } from '../services/api/gradingDefaults';
 import {
@@ -147,7 +146,7 @@ export const useSettingsLogic = () => {
 
   useEffect(() => {
     const loadProfile = async () => {
-      const cached = getCurrentUserProfileSync();
+      const cached = await getCurrentUserProfileSync();
       if (cached) {
         setProfile(cached);
         if (cached.approval_threshold !== null && cached.approval_threshold !== undefined) {
@@ -675,10 +674,9 @@ export const useSettingsLogic = () => {
   const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
 
   useEffect(() => {
-    const cachedLocal = cacheService.getLocalProfileImage();
-    if (cachedLocal) {
-      setLocalProfileImageUri(cachedLocal);
-    }
+    getLocalProfileImageUri().then(uri => {
+      if (uri) setLocalProfileImageUri(uri);
+    });
   }, [profile?.profile_image]);
 
   const fullName = useMemo(() => {

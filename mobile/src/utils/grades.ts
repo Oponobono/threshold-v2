@@ -31,11 +31,14 @@ export const parseDate = (value?: string | null) => {
 /** Parsea el peso porcentual de una evaluación, limpiando símbolos '%' y normalizando escalas (0-1 a 0-100) */
 export const parseWeight = (assessment: Assessment) => {
   if (typeof assessment.percentage === 'number') return assessment.percentage;
+  if (typeof assessment.weight === 'number') {
+    return assessment.weight <= 1 && assessment.weight > 0 ? assessment.weight * 100 : assessment.weight;
+  }
   if (!assessment.weight) return 0;
-  const cleaned = assessment.weight.replace('%', '').trim();
+  const cleaned = String(assessment.weight).replace('%', '').trim();
   const numeric = Number(cleaned);
   if (!Number.isFinite(numeric)) return 0;
-  if (numeric <= 1) return numeric * 100;
+  if (numeric <= 1 && numeric > 0) return numeric * 100;
   return numeric;
 };
 

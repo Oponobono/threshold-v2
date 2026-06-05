@@ -1,31 +1,29 @@
 import { Paths, File, Directory } from 'expo-file-system';
-import { cacheService } from './cacheService';
+import { storageService } from './storageService';
 
 const PROFILE_IMAGE_DIR_NAME = 'profile_images';
+const PROFILE_IMAGE_KEY = 'app:profile_image_local';
+const PROFILE_IMAGE_TIMESTAMP_KEY = 'app:profile_image_timestamp';
 
 const getDir = (): Directory => {
   return new Directory(Paths.cache, PROFILE_IMAGE_DIR_NAME);
 };
 
-const getLocalPath = (url: string): string => {
-  const hash = url.split('/').pop()?.split('?')[0] || 'profile.jpg';
-  return new File(getDir(), hash).uri;
-};
-
 export const downloadProfileImage = async (url: string | null | undefined): Promise<string | null> => {
   if (!url) {
-    cacheService.clearKey('cache:profile_image_local');
+    await storageService.removeLocal(PROFILE_IMAGE_KEY);
+    await storageService.removeLocal(PROFILE_IMAGE_TIMESTAMP_KEY);
     return null;
   }
 
-  const existingLocal = cacheService.getLocalProfileImage();
+  const existingLocal = await storageService.getLocal(PROFILE_IMAGE_KEY);
   if (existingLocal) {
     const info = Paths.info(existingLocal);
     if (info?.exists) {
-      const cachedTime = cacheService.getLocalProfileImageTimestamp();
+      const cachedTimeRaw = await storageService.getLocal(PROFILE_IMAGE_TIMESTAMP_KEY);
+      const cachedTime = cachedTimeRaw ? parseInt(cachedTimeRaw, 10) : null;
       const isStale = cachedTime && Date.now() - cachedTime > 7 * 24 * 60 * 60 * 1000;
       if (!isStale) return existingLocal;
-      // stale: re-download below
     }
   }
 
@@ -37,11 +35,12 @@ export const downloadProfileImage = async (url: string | null | undefined): Prom
     const destination = new File(dir, hash);
     const result = await File.downloadFileAsync(url, destination);
     if (result.uri) {
-      cacheService.saveLocalProfileImage(result.uri);
+      await storageService.saveLocal(PROFILE_IMAGE_KEY, result.uri);
+      await storageService.saveLocal(PROFILE_IMAGE_TIMESTAMP_KEY, Date.now().toString());
       return result.uri;
     }
   } catch (e) {
-    const fallbackLocal = cacheService.getLocalProfileImage();
+    const fallbackLocal = await storageService.getLocal(PROFILE_IMAGE_KEY);
     if (fallbackLocal) {
       const info = Paths.info(fallbackLocal);
       if (info?.exists) return fallbackLocal;
@@ -51,8 +50,13 @@ export const downloadProfileImage = async (url: string | null | undefined): Prom
   return null;
 };
 
+export const getLocalProfileImageUri = async (): Promise<string | null> => {
+  return storageService.getLocal(PROFILE_IMAGE_KEY);
+};
+
 export const clearProfileImageCache = async () => {
-  cacheService.clearKey('cache:profile_image_local');
+  await storageService.removeLocal(PROFILE_IMAGE_KEY);
+  await storageService.removeLocal(PROFILE_IMAGE_TIMESTAMP_KEY);
   try {
     const dir = getDir();
     await dir.delete();

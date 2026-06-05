@@ -71,7 +71,7 @@ export default function CalendarScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteCalendarEvent(Number(eventIdStr));
+              await deleteCalendarEvent(eventIdStr);
               await calendar.reloadEventsForMonth();
               alertRef.show({
                 title: t('common.success'),

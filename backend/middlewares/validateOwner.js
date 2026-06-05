@@ -3,7 +3,7 @@ const validateOwner = (req, res, next) => {
   
   if (!userId) return next();
 
-  if (parseInt(userId, 10) !== req.user.id) {
+  if (String(userId) !== String(req.user.id)) {
     return res.status(403).json({ error: 'Acceso denegado. No eres el propietario de este recurso.' });
   }
   

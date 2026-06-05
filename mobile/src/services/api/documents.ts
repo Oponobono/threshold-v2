@@ -1,186 +1,126 @@
-/**
- * documents.ts
- *
- * Servicio CRUD para documentos escaneados y extracción de texto por OCR.
- * Los documentos se generan con `DocumentScannerModal` y pueden exportarse como
- * imagen JPEG o PDF. El endpoint `/ocr` utiliza Groq Vision para extraer texto
- * del documento y retornarlo como string plano para compartir o procesar con IA.
- */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
-import { offlineSyncService } from '../offlineSyncService';
-import { cacheService, CACHE_KEYS } from '../cacheService';
+import { documentRepository, syncService } from '../database';
 import { extractTextFromPdfLocal } from '../localPDFService';
+import { getBackupPreferences } from '../backup/backupService';
 
-/** Representa un documento escaneado vinculado a una materia y guardado localmente */
 export interface ScannedDocument {
-  id?: number;
-  user_id?: number;
-  subject_id?: number | null;
-  name?: string | null;
+  id?: string;
+  user_id?: string;
+  subject_id?: string;
+  name?: string;
   local_uri: string;
-  /** Texto extraído por OCR — alimenta el contexto del asistente IA */
-  ocr_text?: string | null;
+  ocr_text?: string;
   created_at?: string;
 }
 
-/** Obtiene todos los documentos escaneados de una materia específica.
- * Fallback offline: lee del caché MMKV por materia.
- */
-export const getScannedDocumentsBySubject = async (subjectId: number | string): Promise<ScannedDocument[]> => {
-  try {
-    const response = await fetchWithFallback(`/scanned_documents/subject/${subjectId}`);
-    const isOfflineCache = response.headers.get('X-Offline-Cache') === 'true' || response.headers.get('x-offline-cache') === 'true';
-    if (isOfflineCache) {
-      throw new Error('Offline mode - use MMKV cache for optimistic UI');
-    }
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const docs: ScannedDocument[] = data || [];
-    // Persistir datos frescos en caché MMKV para uso offline
-    if (docs.length > 0) {
-      await cacheService.saveScannedDocumentsBySubject(Number(subjectId), docs);
-    }
-    return docs;
-  } catch (error: any) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.warn(`[getScannedDocumentsBySubject] Red no disponible (${errorMsg}), leyendo caché MMKV...`);
+export const getScannedDocumentsBySubject = async (subjectId: string): Promise<ScannedDocument[]> => {
+  // Retornar datos locales inmediatamente
+  const localData = await documentRepository.getBySubject(subjectId);
+
+  // Sincronizar desde la nube en background solo si auto-upload activo
+  (async () => {
     try {
-      const cached = await cacheService.loadScannedDocumentsBySubject(Number(subjectId));
-      if (Array.isArray(cached)) {
-        console.log(`[getScannedDocumentsBySubject] ✅ ${cached.length} docs desde caché para materia ${subjectId}`);
-        return cached as ScannedDocument[];
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload) return;
+      const response = await fetchWithFallback(`/scanned_documents/subject/${subjectId}`);
+      const data = await parseJsonSafely(response);
+      if (response.ok && Array.isArray(data)) {
+        for (const d of data) await documentRepository.upsert(d);
       }
-    } catch (cacheError) {
-      console.error('[getScannedDocumentsBySubject] Error leyendo caché:', cacheError);
-    }
-    return [];
-  }
+    } catch {}
+  })();
+
+  return localData;
 };
 
-/** Guarda un documento escaneado en el servidor. Inyecta automáticamente el `user_id` */
-export const createScannedDocument = async (
-  data: Omit<ScannedDocument, 'id' | 'created_at' | 'user_id'>
-): Promise<ScannedDocument> => {
-  try {
-    const userId = await getUserId();
-    if (!userId) throw new Error('Usuario no autenticado');
+export const createScannedDocument = async (data: { subject_id?: string; name?: string; local_uri: string; ocr_text?: string; id?: string }): Promise<ScannedDocument> => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = data.id || uuidv4();
+  const userId = await getUserId();
+  if (!userId) throw new Error('Usuario no autenticado');
 
-    // Enviar ocr_text junto a la URI para que la IA tenga contexto inmediato
-    const response = await fetchWithFallback('/scanned_documents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, user_id: userId }),
-    });
-    
-    const responseData = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(responseData?.error || 'Error al guardar el documento escaneado');
-    }
-    return responseData;
-  } catch (error: any) {
-    const isNetworkError = !error.message?.includes('Usuario no autenticado');
-    if (isNetworkError) {
-      console.warn('[Documents] Offline: encolando createScannedDocument', error);
-      const userId = await getUserId().catch(() => null);
-      await offlineSyncService.addPendingOperation('POST', '/scanned_documents', 'document', { ...data, user_id: userId });
-      const optimisticDoc = { id: -Date.now(), ...data, user_id: userId, _isPending: true };
-      
-      // Persistir en cache local por materia para visibilidad offline inmediata
-      if (data.subject_id) {
-        cacheService.addOptimisticItem(`${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${data.subject_id}`, optimisticDoc);
+  // 1. Guardar SIEMPRE en SQLite local primero — los documentos funcionan sin red
+  const doc: any = { id, user_id: String(userId), ...data };
+  await documentRepository.create(doc);
+
+  // 2. Sincronizar con la nube SOLO si el usuario habilitó auto-upload (background, no bloqueante)
+  (async () => {
+    try {
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload || !prefs?.includeDocs) return;
+
+      const response = await fetchWithFallback('/scanned_documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, id, user_id: userId }),
+      });
+      const responseData = await parseJsonSafely(response);
+      if (response.ok) {
+        await documentRepository.upsert(responseData);
+      } else {
+        throw new Error(responseData?.error || 'Error del servidor');
       }
-      
-      // Persistir en cache global de galería
-      cacheService.addOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, optimisticDoc);
-      
-      return optimisticDoc as any;
+    } catch {
+      await syncService.enqueueCreate('scanned-document', id, { ...data, user_id: userId });
     }
-    throw new Error(error.message || 'Error de red al crear el documento escaneado');
-  }
+  })();
+
+  return doc;
 };
 
-/**
- * Elimina un documento de todos los cachés relevantes:
- * - GALLERY_ITEMS (caché global)
- * - El caché por materia específica si se provee subjectId
- * Se llama tanto en eliminaciones online como offline para garantizar consistencia.
- */
-const _removeDocumentFromAllCaches = (documentId: number | string, subjectId?: number | string): void => {
-  // 1. Quitar del caché global de galería
-  cacheService.removeOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, documentId);
+export const deleteScannedDocument = async (documentId: string) => {
+  // 1. Borrar localmente de forma inmediata
+  await documentRepository.delete(documentId);
 
-  // 2. Quitar del caché por materia específica
-  if (subjectId != null) {
-    cacheService.removeOptimisticItem(
-      `${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${subjectId}`,
-      documentId
-    );
-  } else {
-    // Fallback: barrer todos los cachés por materia si no tenemos el subjectId
-    for (let sid = 1; sid <= 200; sid++) {
-      cacheService.removeOptimisticItem(
-        `${CACHE_KEYS.SCANNED_DOCUMENTS_BY_SUBJECT}${sid}`,
-        documentId
-      );
+  // 2. Sincronizar la eliminación en background
+  (async () => {
+    try {
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload) {
+        await syncService.enqueueDelete('scanned-document', documentId);
+        return;
+      }
+      const response = await fetchWithFallback(`/scanned_documents/${documentId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        await syncService.enqueueDelete('scanned-document', documentId);
+      }
+    } catch {
+      await syncService.enqueueDelete('scanned-document', documentId);
     }
-  }
+  })();
+
+  return { success: true };
 };
 
-/** Elimina un documento escaneado de la base de datos por su ID */
-export const deleteScannedDocument = async (documentId: number | string, subjectId?: number | string): Promise<any> => {
-  try {
-    const response = await fetchWithFallback(`/scanned_documents/${documentId}`, {
-      method: 'DELETE',
-    });
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'Error al eliminar el documento escaneado');
+export const updateScannedDocument = async (documentId: string, data: Partial<ScannedDocument>): Promise<any> => {
+  // 1. Actualizar localmente de forma inmediata
+  await documentRepository.update(documentId, data as any);
+
+  // 2. Sincronizar en background si auto-upload activo
+  (async () => {
+    try {
+      const prefs = await getBackupPreferences();
+      if (!prefs?.enabled || !prefs?.autoUpload) {
+        await syncService.enqueueUpdate('scanned-document', documentId, data);
+        return;
+      }
+      const response = await fetchWithFallback(`/scanned_documents/${documentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        await syncService.enqueueUpdate('scanned-document', documentId, data);
+      }
+    } catch {
+      await syncService.enqueueUpdate('scanned-document', documentId, data);
     }
-    // Limpiar también el caché local aunque la red funcione
-    _removeDocumentFromAllCaches(documentId, subjectId);
-    return data;
-  } catch (error: any) {
-    console.warn('[Documents] Offline: encolando deleteScannedDocument', error);
-    await offlineSyncService.addPendingOperation('DELETE', `/scanned_documents/${documentId}`, 'document');
-    _removeDocumentFromAllCaches(documentId, subjectId);
-    return { success: true, _isPending: true };
-  }
+  })();
+
+  return { ...data };
 };
 
-/** Actualiza un documento escaneado en la base de datos */
-export const updateScannedDocument = async (
-  documentId: number | string,
-  data: Partial<ScannedDocument>
-): Promise<ScannedDocument> => {
-  try {
-    const response = await fetchWithFallback(`/scanned_documents/${documentId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    
-    const responseData = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(responseData?.error || 'Error al actualizar el documento escaneado');
-    }
-    return responseData;
-  } catch (error: any) {
-    console.warn('[Documents] Offline: encolando updateScannedDocument', error);
-    await offlineSyncService.addPendingOperation('PUT', `/scanned_documents/${documentId}`, 'document', data);
-    cacheService.updateOptimisticItem(CACHE_KEYS.GALLERY_ITEMS, documentId, data);
-    return { ...data, _isPending: true } as any;
-  }
-};
-
-/**
- * Extrae texto de una imagen usando Groq Vision (OCR on-cloud).
- * La imagen debe enviarse como base64. El tamaño máximo recomendado es ~3.5 MB.
- * @param base64Image - Imagen codificada en base64 (sin prefijo `data:image/...`).
- * @returns Texto plano extraído de la imagen.
- */
 export const extractTextFromImage = async (base64Image: string): Promise<string> => {
   try {
     const response = await fetchWithFallback('/ocr', {
@@ -190,13 +130,8 @@ export const extractTextFromImage = async (base64Image: string): Promise<string>
     });
     const data = await parseJsonSafely(response);
     if (!response.ok) {
-      // El error puede ser string u objeto { message, type, code }
       const errField = data?.error;
-      const errMsg =
-        typeof errField === 'string'
-          ? errField
-          : errField?.message ?? JSON.stringify(errField) ?? 'Error al procesar el OCR';
-      console.error('[OCR] Backend error:', errMsg, '| Status:', response.status);
+      const errMsg = typeof errField === 'string' ? errField : errField?.message ?? JSON.stringify(errField) ?? 'Error al procesar el OCR';
       throw new Error(errMsg);
     }
     return data?.text || '';
@@ -205,11 +140,6 @@ export const extractTextFromImage = async (base64Image: string): Promise<string>
   }
 };
 
-/**
- * Extrae texto de un PDF a través del backend usando pdf-parse.
- * @param base64Pdf - Archivo PDF codificado en base64
- * @returns Texto plano extraído del PDF.
- */
 export const extractTextFromPDF = async (base64Pdf: string): Promise<string> => {
   try {
     const response = await fetchWithFallback('/pdf-extract', {
@@ -220,7 +150,6 @@ export const extractTextFromPDF = async (base64Pdf: string): Promise<string> => 
     const data = await parseJsonSafely(response);
     if (!response.ok) {
       const errMsg = typeof data?.error === 'string' ? data.error : 'Error al parsear el PDF';
-      console.error('[PDF Extract] Backend error:', errMsg);
       throw new Error(errMsg);
     }
     return data?.text || '';
@@ -228,12 +157,8 @@ export const extractTextFromPDF = async (base64Pdf: string): Promise<string> => 
     console.warn('[PDF Extract] Falló backend, intentando extracción local offline...', error);
     try {
       const localText = await extractTextFromPdfLocal(base64Pdf);
-      if (localText && localText.trim().length > 0) {
-        return localText;
-      }
-    } catch (localErr) {
-      console.error('[PDF Extract] Extracción local también falló:', localErr);
-    }
+      if (localText && localText.trim().length > 0) return localText;
+    } catch {}
     throw new Error(error.message || 'Error de red al invocar el servicio de extracción PDF');
   }
 };

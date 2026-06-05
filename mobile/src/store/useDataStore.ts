@@ -1,41 +1,29 @@
 import { create } from 'zustand';
-import { 
-  Subject, Assessment, Schedule, 
-  getSubjects, getAllAssessments, getAllSchedules, 
-  getPredictions, PredictionResponse,
-  getGalleryItems, getPhotosBySubject,
-  getAudioRecordings,
-  getFlashcardDecks, getFlashcardDecksWithMetrics, getFlashcards, getFlashcardsPrioritized, getCardsNotSnoozed,
-  getScannedDocumentsBySubject,
-  fetchWithFallback,
-} from '../services/api';
-import { loadPredictionsFromCache, savePredictionsToCache } from '../hooks/usePredictionPolling';
-import { cacheService } from '../services/cacheService';
-import { offlineSyncService } from '../services/offlineSyncService';
-import { useConnectivityStore } from './useConnectivityStore';
+import { Subject, Assessment, Schedule } from '../services/api';
+import {
+  subjectRepository,
+  assessmentRepository,
+  scheduleRepository,
+  syncService,
+  databaseService,
+} from '../services/database';
 
 interface DataState {
-  // Datos
   subjects: Subject[];
   assessments: Assessment[];
   schedules: Schedule[];
-  predictions: PredictionResponse | null;
+  predictions: any;
   calendarEvents: any[];
   flashcardDecks: any[];
   userStats: any | null;
 
-  // Estado de carga
   isInitialLoading: boolean;
   isRefreshing: boolean;
   hasLoadedOnce: boolean;
-  /** Indica si hay una sincronización de datos en curso */
   isSyncing: boolean;
-  /** Mensaje descriptivo del estado actual de sincronización */
   syncStatusMessage: string;
 
-  // Acciones (Mutadores globales)
   loadAllData: (forceRefresh?: boolean) => Promise<void>;
-  loadCachedDataOnly: () => Promise<void>;
   refreshSubjects: () => Promise<void>;
   refreshAssessments: () => Promise<void>;
   refreshSchedules: () => Promise<void>;
@@ -43,51 +31,28 @@ interface DataState {
   loadCachedPredictions: () => Promise<void>;
   preloadOfflineCache: () => Promise<void>;
   syncPendingOperations: () => Promise<{ success: number; failed: number; pending: number }>;
-  
-  // Selectores
-  getDuedeckIds: () => Set<number>;
+  getDuedeckIds: () => Set<string>;
 }
 
-// Intenta leer del caché síncrono de MMKV. Si el módulo nativo no está listo
-// todavía (primer arranque en frío), cae en el valor por defecto sin crashear.
-const trySync = <T>(fn: () => T | null, fallback: T): T => {
-  try { return fn() ?? fallback; } catch (_e) { return fallback; }
-};
-
 export const useDataStore = create<DataState>((set, get) => ({
-  // ═══════════════════════════════════════════════════════════════
-  // 📦 Datos: hidratados instantáneamente desde MMKV (stale ok)
-  // ═══════════════════════════════════════════════════════════════
-  subjects: trySync(() => cacheService.loadSubjectsSync(), []) as any[],
-  assessments: trySync(() => cacheService.loadAssessmentsSync(), []) as any[],
-  schedules: trySync(() => cacheService.loadSchedulesSync(), []) as any[],
-  predictions: trySync<PredictionResponse | null>(() => cacheService.loadPredictionsSync() as PredictionResponse | null, null),
-  calendarEvents: trySync(() => cacheService.loadCalendarEventsSync() || [], []) as any[],
-  flashcardDecks: trySync(() => cacheService.loadFlashcardDecksSync() || [], []) as any[],
-  userStats: trySync(() => cacheService.loadUserStatsSync() || null, null),
+  subjects: [],
+  assessments: [],
+  schedules: [],
+  predictions: null,
+  calendarEvents: [],
+  flashcardDecks: [],
+  userStats: null,
 
   isInitialLoading: false,
   isRefreshing: false,
-  // false para que loadAllData contacte al servidor en el primer uso.
-  // La UI ya tiene datos instantáneos gracias a MMKV (líneas 47-50).
   hasLoadedOnce: false,
   isSyncing: false,
   syncStatusMessage: '',
 
-  // ═══════════════════════════════════════════════════════════════
-  // 🔄 loadAllData: Estrategia "stale-while-revalidate"
-  //   1. Cache primero (ya hidratado por MMKV) — instantáneo
-  //   2. Si hay red, refrescar desde servidor en background
-  //   3. Si no hay red, mantener datos del caché (aunque estén stale)
-  // ═══════════════════════════════════════════════════════════════
   loadAllData: async (forceRefresh = false) => {
     const state = get();
     if (state.isInitialLoading || state.isRefreshing) return;
     if (state.hasLoadedOnce && !forceRefresh) return;
-
-    // Verificar conectividad actual
-    const connectivityState = useConnectivityStore.getState();
-    const isOnline = connectivityState.isOnline;
 
     if (!state.hasLoadedOnce) {
       set({ isInitialLoading: true });
@@ -95,318 +60,119 @@ export const useDataStore = create<DataState>((set, get) => ({
       set({ isRefreshing: true });
     }
 
-    // Si no hay conexión, saltar la fase de servidor
-    // Los datos del caché (via MMKV) ya están disponibles en el store
-    if (!isOnline) {
-      console.log('[DataStore] 📡 Modo offline: recargando datos del caché (stale-while-revalidate)');
-      
-      const cachedSubjects = cacheService.loadSubjectsSync() as any[];
-      const cachedAssessments = cacheService.loadAssessmentsSync() as any[];
-      const cachedSchedules = cacheService.loadSchedulesSync() as any[];
-      const cachedCalendar = (cacheService as any).loadCalendarEventsSync?.() || [];
-      const cachedDecks = (cacheService as any).loadFlashcardDecksSync?.() || [];
-      const cachedStats = (cacheService as any).loadUserStatsSync?.() || null;
-      
-      set({
-        subjects: cachedSubjects || [],
-        assessments: cachedAssessments || [],
-        schedules: cachedSchedules || [],
-        calendarEvents: cachedCalendar || [],
-        flashcardDecks: cachedDecks || [],
-        userStats: cachedStats || null,
-        hasLoadedOnce: true,
-        isInitialLoading: false,
-        isRefreshing: false,
-        isSyncing: false,
-        syncStatusMessage: '',
-      });
-      return;
-    }
-
-    // 🌐 Hay conexión: mostrar indicador de sincronización y refrescar
-    set({ isSyncing: true, syncStatusMessage: 'Sincronizando datos...' });
-
     try {
-      console.log('[DataStore] 🔄 Actualizando desde servidor...');
+      await databaseService.open();
+
+      const dbSubjects = await subjectRepository.getAll() as any;
+      if (dbSubjects.length > 0) set({ subjects: dbSubjects });
+      const dbAssessments = await assessmentRepository.getAll() as any;
+      if (dbAssessments.length > 0) set({ assessments: dbAssessments });
+      const dbSchedules = await scheduleRepository.getAll() as any;
+      if (dbSchedules.length > 0) set({ schedules: dbSchedules });
+
+      set({ hasLoadedOnce: true, isInitialLoading: false });
+
+      set({ isSyncing: true, syncStatusMessage: 'Sincronizando datos...' });
+
+      const { getSubjects, getAllAssessments, getAllSchedules } = await import('../services/api');
       const [subjectsData, assessmentsData, schedulesData] = await Promise.all([
-        getSubjects().catch((err) => {
-          console.warn('[DataStore] Error obteniendo subjects:', err);
-          return null;
-        }),
-        getAllAssessments().catch((err) => {
-          console.warn('[DataStore] Error obteniendo assessments:', err);
-          return null;
-        }),
-        getAllSchedules().catch((err) => {
-          console.warn('[DataStore] Error obteniendo schedules:', err);
-          return null;
-        })
+        getSubjects().catch(() => null),
+        getAllAssessments().catch(() => null),
+        getAllSchedules().catch(() => null),
       ]);
 
-      // Solo actualizar si hay datos válidos del servidor
-      // Si algo falla, mantener los datos existentes del caché
-      const updatedState: any = { hasLoadedOnce: true };
-      let anyDataUpdated = false;
-      
-      if (subjectsData !== null) {
-        updatedState.subjects = subjectsData;
-        anyDataUpdated = true;
-      }
-      if (assessmentsData !== null) {
-        updatedState.assessments = assessmentsData;
-        anyDataUpdated = true;
-      }
-      if (schedulesData !== null) {
-        updatedState.schedules = schedulesData;
-        anyDataUpdated = true;
-      }
+      if (subjectsData) set({ subjects: subjectsData });
+      if (assessmentsData) set({ assessments: assessmentsData });
+      if (schedulesData) set({ schedules: schedulesData });
 
-      set(updatedState);
-
-      // 💾 Guardar en caché solo lo que se obtuvo exitosamente
-      if (subjectsData !== null) {
-        await cacheService.saveSubjects(subjectsData);
-      }
-      if (assessmentsData !== null) {
-        await cacheService.saveAssessments(assessmentsData);
-      }
-      if (schedulesData !== null) {
-        await cacheService.saveSchedules(schedulesData);
-      }
-
-      if (anyDataUpdated) {
-        console.log('[DataStore] 💾 Datos guardados en caché');
-
-        // 🔁 Disparar pre-descarga en background (no bloquea)
+      if (subjectsData || assessmentsData || schedulesData) {
         get().preloadOfflineCache();
-
-        // ✅ Sincronización exitosa
-      } else {
-        // No se pudo obtener ningún dato del servidor a pesar de estar online
-        console.warn('[DataStore] ⚠️ No se obtuvieron datos del servidor');
       }
-      
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
     } finally {
-      set({
-        isInitialLoading: false,
-        isRefreshing: false,
-        isSyncing: false,
-        syncStatusMessage: '',
-      });
+      set({ isInitialLoading: false, isRefreshing: false, isSyncing: false, syncStatusMessage: '' });
     }
   },
 
   refreshSubjects: async () => {
     try {
+      const { getSubjects } = await import('../services/api');
       const data = await getSubjects();
-      if (data) {
-        set({ subjects: data });
-        await cacheService.saveSubjects(data);
-      }
+      if (data) set({ subjects: data as any });
     } catch (error) {
-      console.error('Error refreshing subjects, fallback to cache:', error);
-      const cached = await cacheService.loadSubjects();
-      if (cached) {
-        set({ subjects: cached as any[] });
-      }
+      console.error('[DataStore] refreshSubjects error:', error);
     }
   },
 
   refreshAssessments: async () => {
     try {
+      const { getAllAssessments } = await import('../services/api');
       const data = await getAllAssessments();
-      if (data) {
-        set({ assessments: data });
-        await cacheService.saveAssessments(data);
-      }
+      if (data) set({ assessments: data as any });
     } catch (error) {
-      console.error('Error refreshing assessments, fallback to cache:', error);
-      const cached = await cacheService.loadAssessments();
-      if (cached) {
-        set({ assessments: cached as Assessment[] });
-      }
+      console.error('[DataStore] refreshAssessments error:', error);
     }
   },
 
   refreshSchedules: async () => {
     try {
+      const { getAllSchedules } = await import('../services/api');
       const data = await getAllSchedules();
-      if (data) {
-        set({ schedules: data });
-        await cacheService.saveSchedules(data);
-      }
+      if (data) set({ schedules: data as any });
     } catch (error) {
-      console.error('Error refreshing schedules:', error);
+      console.error('[DataStore] refreshSchedules error:', error);
     }
   },
 
   refreshPredictions: async (userId: string | number) => {
     try {
-      console.log(`[DataStore] Refrescando predicciones para userId=${userId}`);
-      
-      // 🚀 Primero intentar cargar del caché (instantáneo)
-      const cachedPredictions = await cacheService.loadPredictions() as PredictionResponse | null;
-      if (cachedPredictions) {
-        console.log(`[DataStore] 📦 Predicciones del caché mostradas`);
-        set({ predictions: cachedPredictions });
-      } else {
-        // Valor por defecto mientras se carga
-        set({ predictions: { dueCount: 0, cards: [] } });
-      }
-      
-      // 🌐 Luego actualizar desde el servidor en segundo plano
+      const { getPredictions } = await import('../services/api');
       const data = await getPredictions(userId);
-      console.log(`[DataStore] ✅ Predicciones actualizadas:`, data);
-      set({ predictions: data });
-      
-      // 💾 Guardar en caché
-      await Promise.all([
-        cacheService.savePredictions(data),
-        savePredictionsToCache(data)
-      ]);
+      set({ predictions: data || { dueCount: 0, cards: [] } });
     } catch (error) {
-      console.error('[DataStore] Error refreshing predictions:', error);
-      // No sobrescribir con vacío si ya hay datos del caché mostrados
-      const currentPredictions = get().predictions;
-      if (!currentPredictions || currentPredictions.dueCount === 0 && currentPredictions.cards?.length === 0) {
-        set({ predictions: { dueCount: 0, cards: [] } });
-      }
+      console.error('[DataStore] refreshPredictions error:', error);
+      if (!get().predictions) set({ predictions: { dueCount: 0, cards: [] } });
     }
   },
 
   loadCachedPredictions: async () => {
-    try {
-      console.log(`[DataStore] Cargando predicciones del cache`);
-      const cachedData = await loadPredictionsFromCache() as PredictionResponse | null;
-      if (cachedData) {
-        console.log(`[DataStore] ✅ Predicciones cargadas del cache`, cachedData);
-        set({ predictions: cachedData });
-      } else {
-        console.log(`[DataStore] ℹ️ No hay predicciones en cache`);
-        set({ predictions: { dueCount: 0, cards: [] } });
-      }
-    } catch (error) {
-      console.error('[DataStore] Error cargando cache:', error);
-      set({ predictions: { dueCount: 0, cards: [] } });
-    }
+    set({ predictions: { dueCount: 0, cards: [] } });
   },
 
   preloadOfflineCache: async () => {
     try {
-      console.log('[Cache] 🔁 Pre-descarga de datos en segundo plano...');
-      const state = get();
-      
-      // Asegurarnos de que tenemos los subjects
-      let subjectsToProcess = state.subjects;
-      if (!subjectsToProcess || subjectsToProcess.length === 0) {
-        subjectsToProcess = await getSubjects().catch(() => []);
-      }
+      const { getFlashcardDecks, getGalleryItems, getAudioRecordings } = await import('../services/api');
+      const decks = await getFlashcardDecks().catch(() => []);
+      const gallery = await getGalleryItems().catch(() => []);
+      const audio = await getAudioRecordings().catch(() => []);
 
-      // Descargar y cachear galerías, audios, videos y mazos
-      const [decks, galleryItems, audioRecordings] = await Promise.all([
-        getFlashcardDecks().catch(() => []),
-        getGalleryItems().catch(() => []),
-        getAudioRecordings().catch(() => []),
-      ]);
+      if (decks.length > 0) set({ flashcardDecks: decks });
 
-      // Guardar en caché SOLO si hay datos reales (evita sobrescribir con vacío cuando offline)
-      if (galleryItems && galleryItems.length > 0) {
-        await cacheService.saveGalleryItems(galleryItems);
-      }
-      if (audioRecordings && audioRecordings.length > 0) {
-        await cacheService.saveAudioRecordings(audioRecordings);
-      }
-      if (decks && decks.length > 0) {
-        await cacheService.saveFlashcardDecks(decks);
-      }
-
-      // Descargar y cachear dependencias de subjects (Fotos por materia y Documentos)
-      if (subjectsToProcess && subjectsToProcess.length > 0) {
-        await Promise.all(subjectsToProcess.map(async (sub) => {
-          const [photos, docs] = await Promise.all([
-            getPhotosBySubject(sub.id).catch(() => []),
-            getScannedDocumentsBySubject(sub.id).catch(() => [])
-          ]);
-          const promises: Promise<void>[] = [];
-          if (photos && photos.length > 0) {
-            promises.push(cacheService.savePhotosBySubject(sub.id, photos));
-          }
-          if (docs && docs.length > 0) {
-            promises.push(cacheService.saveScannedDocumentsBySubject(sub.id, docs));
-          }
-          await Promise.all(promises);
+      if (decks.length > 0) {
+        const { getFlashcards } = await import('../services/api');
+        await Promise.all(decks.map(async (d: any) => {
+          await getFlashcards(d.id).catch(() => []);
         }));
       }
-
-      // Descargar y cachear dependencias de mazos (Flashcards)
-      if (decks && decks.length > 0) {
-        await Promise.all(decks.map(async (deck) => {
-          const [cards, prioritized, notSnoozed] = await Promise.all([
-            getFlashcards(deck.id).catch(() => []),
-            getFlashcardsPrioritized(deck.id).catch(() => []),
-            getCardsNotSnoozed(deck.id).catch(() => [])
-          ]);
-          const promises: Promise<void>[] = [];
-          if (cards && cards.length > 0) {
-            promises.push(cacheService.saveFlashcardsByDeck(deck.id, cards));
-          }
-          if (prioritized && prioritized.length > 0) {
-            promises.push(cacheService.saveFlashcardsPrioritizedByDeck(deck.id, prioritized));
-          }
-          if (notSnoozed && notSnoozed.length > 0) {
-            promises.push(cacheService.saveCardsNotSnoozedByDeck(deck.id, notSnoozed));
-          }
-          await Promise.all(promises);
-        }));
-      }
-
-      console.log('[Cache] ✅ Pre-descarga completada y datos cacheados.');
     } catch (error) {
-      console.error('[Cache] ❌ Error durante la pre-descarga:', error);
+      console.error('[DataStore] preloadOfflineCache error:', error);
     }
-  },
-
-  loadCachedDataOnly: async () => {
-    // Obsoleta por MMKV (ahora es síncrono al instanciar el store)
-    console.log('[DataStore] 📦 loadCachedDataOnly llamado pero ya está hidratado por MMKV.');
   },
 
   getDuedeckIds: () => {
     const state = get();
-    if (!state.predictions?.cards) return new Set<number>();
-    // Extraer IDs únicos de mazos que tienen tarjetas por repasar
+    if (!state.predictions?.cards) return new Set();
     return new Set(
       state.predictions.cards
-        .filter(card => card.deckId !== undefined)
-        .map(card => card.deckId as number)
+        .filter((card: any) => card.deckId !== undefined)
+        .map((card: any) => String(card.deckId))
     );
   },
 
   syncPendingOperations: async () => {
-    try {
-      console.log('[DataStore] 🔄 Sincronizando operaciones offline pendientes...');
-      
-      // Sincronizar todas las operaciones pendientes
-      const result = await offlineSyncService.syncPendingOperations(fetchWithFallback);
-      
-      console.log(`[DataStore] ✅ Sincronización completada: ${result.success} éxito, ${result.failed} fallos, ${result.pending} pendientes`);
-      
-      // Si hubo éxitos, purgar items optimistas y refrescar datos
-      if (result.success > 0) {
-        // 🧹 Purgar items con IDs temporales del caché MMKV
-        // ANTES de refrescar, para que loadAllData no mezcle datos viejos
-        cacheService.purgeOptimisticItems();
-        
-        console.log('[DataStore] 🔄 Refrescando datos después de sincronización...');
-        await get().loadAllData(true);
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('[DataStore] Error sincronizando operaciones offline:', error);
-      return { success: 0, failed: 0, pending: 0 };
-    }
-  }
+    const result = await syncService.sync();
+    if (result.success > 0) await get().loadAllData(true);
+    return result;
+  },
 }));

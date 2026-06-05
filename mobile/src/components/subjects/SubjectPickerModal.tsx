@@ -75,10 +75,10 @@ export const SubjectPickerModal: React.FC<SubjectPickerModalProps> = ({
                 style={{
                   flexDirection: 'row', alignItems: 'center',
                   paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 6,
-                  backgroundColor: selectedId === sub.id ? `${sub.color || theme.colors.primary}20` : theme.colors.background,
-                  borderWidth: 1, borderColor: selectedId === sub.id ? (sub.color || theme.colors.primary) : theme.colors.border,
+                  backgroundColor: String(selectedId) === String(sub.id) ? `${sub.color || theme.colors.primary}20` : theme.colors.background,
+                  borderWidth: 1, borderColor: String(selectedId) === String(sub.id) ? (sub.color || theme.colors.primary) : theme.colors.border,
                 }}
-                onPress={() => { onSelect(sub.id!); onClose(); }}
+                onPress={() => { onSelect(sub.id ? Number(sub.id) : null); onClose(); }}
               >
                 <View style={{
                   width: 28, height: 28, borderRadius: 8,
@@ -90,7 +90,7 @@ export const SubjectPickerModal: React.FC<SubjectPickerModalProps> = ({
                 <Text style={{ color: theme.colors.text.primary, fontSize: 15, fontWeight: '500', flex: 1 }}>
                   {sub.name}
                 </Text>
-                {selectedId === sub.id && (
+                {String(selectedId) === String(sub.id) && (
                   <Ionicons name="checkmark" size={18} color={sub.color || theme.colors.primary} />
                 )}
               </TouchableOpacity>

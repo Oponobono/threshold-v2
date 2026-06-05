@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 
 /**
@@ -60,15 +61,16 @@ exports.getTodaySchedules = (req, res) => {
  * Agregar un horario a una materia
  */
 exports.createSchedule = (req, res) => {
-  const { subject_id, day_of_week, start_time, end_time } = req.body;
+  const { id: clientId, subject_id, day_of_week, start_time, end_time } = req.body;
   if (!subject_id || !day_of_week || !start_time || !end_time) {
     return res.status(400).json({ error: 'Faltan campos requeridos.' });
   }
 
-  const query = `INSERT INTO schedules (subject_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?)`;
-  db.run(query, [subject_id, day_of_week, start_time, end_time], function(err) {
+  const scheduleId = clientId || uuidv4();
+  const query = `INSERT INTO schedules (id, subject_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?, ?)`;
+  db.run(query, [scheduleId, subject_id, day_of_week, start_time, end_time], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: this.lastID, message: 'Horario agregado' });
+    res.status(201).json({ id: scheduleId, message: 'Horario agregado' });
   });
 };
 

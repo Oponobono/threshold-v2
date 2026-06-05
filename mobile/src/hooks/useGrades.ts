@@ -51,7 +51,7 @@ export function useGrades(t: any) {
   }, [profile]);
 
   useEffect(() => {
-    getUserId().then(id => setUserId(id ? Number(id) : null));
+    getUserId().then(id => setUserId(id != null ? Number(id) : null));
   }, []);
 
   useEffect(() => {

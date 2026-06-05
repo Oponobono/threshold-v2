@@ -44,16 +44,18 @@ export const SubjectChips: React.FC<SubjectChipsProps> = ({
       {subjects.map((s) => (
         <TouchableOpacity
           key={s.id}
-          onPress={() => onSelectSubject(selectedSubjectId === s.id ? null : s.id)}
           style={[
             galleryStyles.subjectChip,
-            selectedSubjectId === s.id && galleryStyles.subjectChipActive,
+            String(selectedSubjectId) === String(s.id) && galleryStyles.subjectChipActive,
+            { borderColor: s.color || theme.colors.primary }
           ]}
+          onPress={() => onSelectSubject(String(selectedSubjectId) === String(s.id) ? null : Number(s.id))}
+          activeOpacity={0.7}
         >
-          <Text
+          <Text 
             style={[
               galleryStyles.subjectChipText,
-              selectedSubjectId === s.id && galleryStyles.subjectChipTextActive,
+              String(selectedSubjectId) === String(s.id) && galleryStyles.subjectChipTextActive
             ]}
           >
             {s.name}

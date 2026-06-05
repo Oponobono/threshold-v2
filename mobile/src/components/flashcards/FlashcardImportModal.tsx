@@ -64,7 +64,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   const { showAlert } = useCustomAlert();
   const [isProcessing, setIsProcessing] = useState(false);
   const [importedDeck, setImportedDeck] = useState<ImportedDeck | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | number | null>(null);
   const [deckTitle, setDeckTitle] = useState<string>('');
 
   const handleLaunchPicker = async () => {
@@ -412,7 +412,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       
       // Si se seleccionó materia, actualizarla
       if (selectedSubjectId) {
-        updateLocalDeckSubject(importedDeck.id, selectedSubjectId);
+        updateLocalDeckSubject(importedDeck.id, Number(selectedSubjectId));
       }
       
       showAlert({

@@ -16,9 +16,8 @@ import {
   StrategyFactory,
   adaptFlashcardsToEvaluationItems,
 } from '../../utils/evaluationStrategies';
-import { updateFlashcardStatus, deleteFlashcard, analyzeDeckConfusions, generateDifferentiationCard, snoozeCard } from '../../services/api';
+import { updateFlashcardStatus, deleteFlashcard, analyzeDeckConfusions, generateDifferentiationCard, snoozeCard, createCardLog } from '../../services/api';
 import { recordCardReview } from '../../services/api/analytics';
-import { createCardLogWithFallback } from '../../services/offlineQueue';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { QuestionRendererFactory } from '../evaluation/QuestionRendererFactory';
 import { ExplanationOverlay } from '../evaluation/ExplanationOverlay';
@@ -202,12 +201,12 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       const textToCount = item.front || (item as any).question || '';
       const wordCount = textToCount.trim() ? textToCount.trim().split(/\s+/).length : 20;
 
-      const logResponse = await createCardLogWithFallback({ 
+      const logResponse = await createCardLog({ 
         card_id: item.id, 
         result: result.passed ? 'correct' : 'incorrect', 
         response_time_ms: responseTime,
         question_word_count: wordCount 
-      });
+      }).catch(() => ({ queued: true, card_id: item.id }));
 
       if (logResponse?.feedback) {
         setLearningFeedback({

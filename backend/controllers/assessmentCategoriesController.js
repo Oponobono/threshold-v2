@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 
 // GET /api/subjects/:subjectId/categories
@@ -13,16 +14,17 @@ exports.getCategoriesBySubject = (req, res) => {
 // POST /api/subjects/:subjectId/categories
 exports.createCategory = (req, res) => {
   const { subjectId } = req.params;
-  const { name, weight, drop_lowest } = req.body;
+  const { id: clientId, name, weight, drop_lowest } = req.body;
   if (!name) return res.status(400).json({ error: 'Faltan campos requeridos (name)' });
 
+  const categoryId = clientId || uuidv4();
   const query = `
-    INSERT INTO assessment_categories (subject_id, name, weight, drop_lowest)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO assessment_categories (id, subject_id, name, weight, drop_lowest)
+    VALUES (?, ?, ?, ?, ?)
   `;
-  db.run(query, [subjectId, name, weight || null, drop_lowest ? 1 : 0], function(err) {
+  db.run(query, [categoryId, subjectId, name, weight || null, drop_lowest ? 1 : 0], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: this.lastID, subject_id: Number(subjectId), name, weight: weight || null, drop_lowest: drop_lowest || 0 });
+    res.status(201).json({ id: categoryId, subject_id: Number(subjectId), name, weight: weight || null, drop_lowest: drop_lowest || 0 });
   });
 };
 

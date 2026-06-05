@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { useDataStore } from '../store/useDataStore';
 import { useConnectivityStore } from '../store/useConnectivityStore';
-import { offlineSyncService } from '../services/offlineSyncService';
+import { syncQueueRepository } from '../services/database';
 import { useLocalAIStore } from '../store/useLocalAIStore';
 import { performCleanup } from '../services/cacheCleanupService';
 
@@ -80,7 +80,7 @@ export const useAutoSync = () => {
   }, [syncPendingOperations, loadAllData, setOnline]);
 
   return {
-    getPendingCount: () => offlineSyncService.getPendingCount(),
+    getPendingCount: async () => syncQueueRepository.countPending(),
     manualSync: () => syncPendingOperations(),
   };
 };

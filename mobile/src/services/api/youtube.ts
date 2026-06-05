@@ -1,159 +1,130 @@
-/**
- * youtube.ts
- *
- * Servicio CRUD para videos de YouTube vinculados al usuario.
- * Los videos se enlazan (no se descargan) guardando solo la URL y metadatos.
- * Los subtítulos se obtienen desde el backend Python que envuelve la API de YouTube
- * (`youtube-transcript-api`), lo que es más rápido que transcribir el audio con Whisper.
- * Las transcripciones y resúmenes generados se persisten como archivos locales.
- */
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
-import { YouTubeVideo } from './types';
-import { offlineSyncService } from '../offlineSyncService';
-import { storageService } from '../storageService';
+import type { YouTubeVideo } from './types';
+import { youTubeRepository, syncService } from '../database';
 
-/**
- * Obtiene todos los videos de YouTube del usuario
- */
 export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
   const userId = await getUserId();
   if (!userId) return [];
-  const response = await fetchWithFallback(`/youtube-videos/${userId}`);
-  return (await parseJsonSafely(response)) || [];
+
+  // 1. Leer localmente primero
+  const localData = await youTubeRepository.getByUser(String(userId));
+
+  if (!localData || localData.length === 0) {
+    try {
+      const response = await fetchWithFallback(`/youtube-videos/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const v of data) await youTubeRepository.upsert(v);
+          return data;
+        }
+      }
+    } catch {}
+    return [];
+  }
+
+  // 2. Sincronizar en background
+  (async () => {
+    try {
+      const response = await fetchWithFallback(`/youtube-videos/${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const v of data) await youTubeRepository.upsert(v);
+        }
+      }
+    } catch {}
+  })();
+
+  return localData;
 };
 
-/**
- * Crea un nuevo video de YouTube
- */
-export const createYouTubeVideo = async (payload: {
-  subject_id?: number | null;
-  youtube_url: string;
-  video_id?: string;
-  title?: string | null;
-  thumbnail_url?: string | null;
-  duration?: number;
-}) => {
+export const createYouTubeVideo = async (payload: { subject_id?: number | null; youtube_url: string; video_id?: string; title?: string; thumbnail_url?: string; duration?: number; id?: string }): Promise<any> => {
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = payload.id || uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');
 
-  const payloadWithUser = { ...payload, user_id: Number(userId) };
+  const video: any = { id, user_id: String(userId), ...payload };
+  await youTubeRepository.create(video);
 
   try {
     const response = await fetchWithFallback('/youtube-videos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payloadWithUser),
+      body: JSON.stringify({ ...payload, id, user_id: Number(userId) }),
     });
-
     const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo guardar el video en BD.');
+    if (response.ok && data) {
+      await youTubeRepository.upsert(data);
+      return data;
     }
-
-    return data;
-  } catch (error) {
-    console.warn('[YouTube] Offline: encolando createYouTubeVideo', error);
-    await offlineSyncService.addPendingOperation('POST', '/youtube-videos', 'youtube', payloadWithUser);
-    return { id: -Date.now(), ...payloadWithUser, _isPending: true };
+    throw new Error(data?.error || 'Error del servidor');
+  } catch {
+    await syncService.enqueueCreate('youtube-video', id, { ...payload, user_id: userId });
+    return video;
   }
 };
 
-/**
- * Actualiza un video de YouTube (ej: asociar materia, renombrar)
- */
-export const updateYouTubeVideo = async (id: number, payload: { subject_id?: number | null; title?: string | null }) => {
+export const updateYouTubeVideo = async (id: string, payload: { subject_id?: number | null; title?: string }): Promise<any> => {
+  await youTubeRepository.update(id, {
+    ...payload,
+    subject_id: payload.subject_id != null ? String(payload.subject_id) : undefined,
+  });
+
   try {
     const response = await fetchWithFallback(`/youtube-videos/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
     const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo actualizar el video.');
-    }
-
-    return data;
-  } catch (error) {
-    console.warn(`[YouTube] Offline: encolando updateYouTubeVideo ${id}`, error);
-    await offlineSyncService.addPendingOperation('PUT', `/youtube-videos/${id}`, 'youtube', payload);
+    if (response.ok) return data;
+    throw new Error(data?.error || 'Error del servidor');
+  } catch {
+    await syncService.enqueueUpdate('youtube-video', id, payload);
     return { ...payload, _isPending: true };
   }
 };
 
-/**
- * Elimina un video de YouTube de la base de datos
- */
-export const deleteYouTubeVideo = async (id: number) => {
+export const deleteYouTubeVideo = async (id: string) => {
+  await youTubeRepository.delete(id);
+
   try {
     const response = await fetchWithFallback(`/youtube-videos/${id}`, { method: 'DELETE' });
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo eliminar el video.');
-    }
-    return data;
-  } catch (error) {
-    console.warn(`[YouTube] Offline: encolando deleteYouTubeVideo ${id}`, error);
-    await offlineSyncService.addPendingOperation('DELETE', `/youtube-videos/${id}`, 'youtube');
-    const userId = await getUserId();
-    if (userId) {
-      const cacheKey = `api_cache_/youtube-videos/${userId}`;
-      try { await storageService.removeLocal(cacheKey); } catch {}
-    }
+    return await parseJsonSafely(response);
+  } catch {
+    await syncService.enqueueDelete('youtube-video', id);
     return { success: true, _isPending: true };
   }
 };
 
-/**
- * Crea o actualiza la transcripción de un video de YouTube.
- * Ahora soporta transcript_text inline (además de la URI de archivo local) para que
- * el asistente IA pueda leerlo directamente de la BD sin acceder al dispositivo.
- */
-export const upsertYouTubeTranscript = async (payload: {
-  video_id: number;
-  transcript_uri?: string | null;
-  /** Texto inline de la transcripción — leído directamente por buildContext */
-  transcript_text?: string | null;
-  summary_uri?: string | null;
-}) => {
+export const upsertYouTubeTranscript = async (payload: { video_id: string; transcript_uri?: string; transcript_text?: string; summary_uri?: string }) => {
   try {
     const response = await fetchWithFallback('/youtube-transcripts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
     const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'No se pudo guardar la transcripción del video.');
-    }
-
+    if (!response.ok) throw new Error(data?.error || 'Error del servidor');
     return data;
-  } catch (error) {
-    console.warn('[YouTube] Offline: encolando upsertYouTubeTranscript', error);
-    await offlineSyncService.addPendingOperation('POST', '/youtube-transcripts', 'youtube', payload);
-    return { ...payload, _isPending: true };
+  } catch {
+    const { uuidv4 } = await import('../../utils/uuid');
+    const id = uuidv4();
+    await syncService.enqueueCreate('youtube-transcript', id, payload);
+    return { id, ...payload, _isPending: true };
   }
 };
 
-/**
- * Obtiene los subtítulos de un video de YouTube desde el backend.
- * @param videoId - ID de YouTube del video (ej. `dQw4w9WgXcQ`).
- * @param language - Código de idioma preferido (por defecto 'es').
- */
-export const getYouTubeSubtitles = async (videoId: string, language: string = 'es'): Promise<{ captions: string; language: string }> => {
+export const getYouTubeSubtitles = async (videoId: string, language: string = 'es') => {
   const response = await fetchWithFallback('/youtube-captions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ video_id: videoId, language }),
   });
-
   const data = await parseJsonSafely(response);
-  if (!response.ok) {
-    throw new Error(data?.error || 'No se pudieron obtener los subtítulos del video.');
-  }
-
+  if (!response.ok) throw new Error(data?.error || 'No se pudieron obtener los subtítulos');
   return data;
 };

@@ -1,6 +1,6 @@
 import { storageService } from '../../storageService';
 import { fetchWithFallback, parseJsonSafely } from '../client';
-import { cacheService } from '../../cacheService';
+import { databaseService } from '../../database/DatabaseService';
 import { clearProfileImageCache } from '../../profileImageCache';
 
 /**
@@ -113,9 +113,14 @@ export const signOut = async (): Promise<void> => {
     await storageService.removeSecure('app_user_email');
     await storageService.removeSecure('app_user_id');
     
-    // Limpiar TODO: MMKV, cola offline, AsyncStorage, imágenes locales
-    await cacheService.clear();
+    // Limpiar todos los datos locales
+    await databaseService.clearAll();
     await clearProfileImageCache();
+    await storageService.removeLocal('app:cached_profile');
+    await storageService.removeLocal('app:cache:predictions');
+    await storageService.removeLocal('app:cache:semester_summary');
+    await storageService.removeLocal('app:cache:global_gpa');
+    await storageService.removeLocal('app:cache:grading_systems');
     
     console.log('[Auth] Sesión cerrada. Datos de autenticación y caché eliminados.');
   } catch (error) {

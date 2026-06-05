@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 
 /**
@@ -21,14 +22,15 @@ exports.uploadAssessmentFile = (req, res) => {
         return res.status(403).json({ error: 'Assessment no encontrado o acceso denegado' });
       }
 
+      const fileId = req.body.id || uuidv4();
       const query = `
-        INSERT INTO assessment_files (assessment_id, file_name, file_type, local_uri, file_size)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO assessment_files (id, assessment_id, file_name, file_type, local_uri, file_size)
+        VALUES (?, ?, ?, ?, ?, ?)
       `;
 
       db.run(
         query,
-        [assessmentId, file_name, file_type || null, local_uri || null, file_size || null],
+        [fileId, assessmentId, file_name, file_type || null, local_uri || null, file_size || null],
         function(err) {
           if (err) {
             console.error('[POST] Error subiendo archivo:', err.message);
@@ -36,7 +38,7 @@ exports.uploadAssessmentFile = (req, res) => {
           }
 
           res.status(201).json({
-            id: this.lastID,
+            id: fileId,
             assessment_id: assessmentId,
             file_name,
             file_type,

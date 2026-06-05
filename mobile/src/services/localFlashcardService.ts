@@ -1,5 +1,6 @@
-import { cacheService, saveToCacheSync, loadFromCacheSync, CACHE_KEYS } from './cacheService';
 import { getUserId } from './api';
+import { syncService } from './database';
+import { storageService } from './storageService';
 
 let _localIdCounter = -Date.now();
 
@@ -31,12 +32,25 @@ export interface LocalDeck {
 
 const LOCAL_DECKS_KEY = 'local:flashcard_decks';
 
-export function getLocalDecks(): LocalDeck[] {
-  return loadFromCacheSync<LocalDeck[]>(LOCAL_DECKS_KEY, Infinity) || [];
+function getLocalDecksSync(): LocalDeck[] {
+  try {
+    const raw = require('react-native-mmkv').createMMKV().getString(LOCAL_DECKS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 }
 
-function saveLocalDecks(decks: LocalDeck[]): void {
-  saveToCacheSync(LOCAL_DECKS_KEY, decks);
+function saveLocalDecksSync(decks: LocalDeck[]): void {
+  try {
+    require('react-native-mmkv').createMMKV().set(LOCAL_DECKS_KEY, JSON.stringify(decks));
+  } catch (e) {
+    console.warn('[LocalFlashcard] Error saving local decks:', e);
+  }
+}
+
+export function getLocalDecks(): LocalDeck[] {
+  return getLocalDecksSync();
 }
 
 export async function saveImportedDeck(
@@ -60,26 +74,7 @@ export async function saveImportedDeck(
   };
 
   const existing = getLocalDecks();
-  saveLocalDecks([...existing, deck]);
-
-  const items = cards.map((card, i) => ({
-    id: nextLocalId(),
-    deck_id: deck.id,
-    item_type: card.type || 'flashcard',
-    content: card.data,
-    hint: card.hint || null,
-    explanation: card.explanation || null,
-    status: 'new' as const,
-    created_at: new Date().toISOString(),
-    front: card.data?.front || '',
-    back: card.data?.back || '',
-  }));
-
-  saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_BY_DECK}${deck.id}`, items);
-  saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deck.id}`, items);
-  saveToCacheSync(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deck.id}`, items);
-
-  mergeIntoDecksCache(deck);
+  saveLocalDecksSync([...existing, deck]);
 
   return deck;
 }
@@ -89,153 +84,96 @@ export function updateLocalDeckSubject(deckId: number, subjectId: number): void 
   const idx = decks.findIndex(d => d.id === deckId);
   if (idx === -1) return;
   decks[idx] = { ...decks[idx], subject_id: subjectId };
-  saveLocalDecks(decks);
-  mergeIntoDecksCache(decks[idx]);
+  saveLocalDecksSync(decks);
 }
 
 export function deleteLocalDeck(deckId: number): void {
   const decks = getLocalDecks().filter(d => d.id !== deckId);
-  saveLocalDecks(decks);
-  saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`, null);
-  saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deckId}`, null);
-  saveToCacheSync(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deckId}`, null);
-  refreshDecksCacheFromLocal();
-}
-
-function mergeIntoDecksCache(deck: LocalDeck): void {
-  const metricsDecks = loadFromCacheSync<any[]>(`${CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS}`, Infinity) || [];
-  const idx = metricsDecks.findIndex((d: any) => d.id === deck.id);
-  if (idx >= 0) {
-    metricsDecks[idx] = { ...metricsDecks[idx], ...deck };
-  } else {
-    metricsDecks.push(deck);
-  }
-  saveToCacheSync(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, metricsDecks);
-
-  const simpleDecks = loadFromCacheSync<any[]>(CACHE_KEYS.FLASHCARD_DECKS, Infinity) || [];
-  const idx2 = simpleDecks.findIndex((d: any) => d.id === deck.id);
-  if (idx2 >= 0) {
-    simpleDecks[idx2] = { ...simpleDecks[idx2], ...deck };
-  } else {
-    simpleDecks.push(deck);
-  }
-  saveToCacheSync(CACHE_KEYS.FLASHCARD_DECKS, simpleDecks);
-}
-
-function refreshDecksCacheFromLocal(): void {
-  const localDecks = getLocalDecks();
-  if (localDecks.length === 0) return;
-
-  const metricsDecks = loadFromCacheSync<any[]>(`${CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS}`, Infinity) || [];
-  const filtered = metricsDecks.filter((d: any) => !d._local || localDecks.some(ld => ld.id === d.id));
-  for (const ld of localDecks) {
-    if (!filtered.some((d: any) => d.id === ld.id)) {
-      filtered.push(ld);
-    }
-  }
-  saveToCacheSync(CACHE_KEYS.FLASHCARD_DECKS_WITH_METRICS, filtered);
-
-  const simpleDecks = loadFromCacheSync<any[]>(CACHE_KEYS.FLASHCARD_DECKS, Infinity) || [];
-  const filtered2 = simpleDecks.filter((d: any) => !d._local || localDecks.some(ld => ld.id === d.id));
-  for (const ld of localDecks) {
-    if (!filtered2.some((d: any) => d.id === ld.id)) {
-      filtered2.push(ld);
-    }
-  }
-  saveToCacheSync(CACHE_KEYS.FLASHCARD_DECKS, filtered2);
+  saveLocalDecksSync(decks);
 }
 
 /**
  * OFFLINE-FIRST: Exporta un mazo local a JSON sin exponer user_id (seguridad)
- * Funciona completamente offline leyendo del cache local
- * @param deckId - ID del mazo a exportar
- * @returns JSON seguro del mazo para compartir/respaldar
  */
 export async function exportDeckToJSON(deckId: number): Promise<any> {
   try {
-    // Obtener el mazo
     const allDecks = getLocalDecks();
     const deck = allDecks.find(d => d.id === deckId);
-    
+
     if (!deck) {
       throw new Error(`Mazo ${deckId} no encontrado`);
     }
 
-    // Obtener las tarjetas del mazo
-    const cardsKey = `${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`;
-    const cards = loadFromCacheSync<any[]>(cardsKey, Infinity) || [];
+    const cardsKey = `cache:flashcards_by_deck:${deckId}`;
+    let cards: any[] = [];
+    try {
+      const raw = require('react-native-mmkv').createMMKV().getString(cardsKey);
+      if (raw) {
+        const entry = JSON.parse(raw);
+        cards = entry.data || entry || [];
+      }
+    } catch {}
 
-    // Construir JSON de exportación SIN user_id (SEGURIDAD)
     const exportData = {
       title: deck.title,
       description: deck.description || '',
-      // NO incluir subject_id - será seleccionado durante importación
-      // NO incluir user_id - será asignado por el backend/app que importa
       cards: cards.map(card => {
         const cardExport: any = {
           type: card.item_type || 'flashcard',
         };
 
-        // Incluir datos del contenido
         if (card.content) {
           cardExport.data = card.content;
         } else if (card.item_type === 'flashcard') {
-          // Fallback para tarjetas antiguas
           cardExport.data = {
             front: card.front || '',
             back: card.back || '',
           };
         }
 
-        // Incluir opcional metadata
-        if (card.hint) {
-          cardExport.hint = card.hint;
-        }
-        if (card.explanation) {
-          cardExport.explanation = card.explanation;
-        }
+        if (card.hint) cardExport.hint = card.hint;
+        if (card.explanation) cardExport.explanation = card.explanation;
 
         return cardExport;
       }),
     };
 
-    console.log(`[LocalFlashcard] Mazo ${deckId} exportado: ${exportData.cards.length} tarjetas`);
     return exportData;
   } catch (error) {
-    console.error('[LocalFlashcard] Error exportando mazo:', error);
+    console.error('[LocalFlashcard] Error exporting deck:', error);
     throw error;
   }
 }
 
 /**
- * OFFLINE-FIRST: Prepara sincronización de mazos importados cuando vuelve online
- * Marca mazos locales para sincronizar con el backend
- * @param deckId - ID local del mazo importado
- * @param userId - ID del usuario autenticado
+ * OFFLINE-FIRST: Prepara sincronización de mazos importados
  */
 export async function prepareDeckForSync(deckId: number, userId: number): Promise<void> {
   try {
     const decks = getLocalDecks();
     const idx = decks.findIndex(d => d.id === deckId);
-    
+
     if (idx === -1) {
       throw new Error(`Mazo ${deckId} no encontrado`);
     }
 
     const deck = decks[idx];
 
-    // Asegurar que el user_id sea el correcto (seguridad)
     if (deck.user_id !== userId) {
-      console.warn(`[LocalFlashcard] Corrigiendo user_id de mazo: ${deck.user_id} → ${userId}`);
       decks[idx] = { ...deck, user_id: userId };
-      saveLocalDecks(decks);
+      saveLocalDecksSync(decks);
     }
 
-    // OFFLINE-FIRST: Obtener tarjetas del mazo para incluirlas en la sincronización
-    const cardsKey = `${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`;
-    const cards = loadFromCacheSync<any[]>(cardsKey, Infinity) || [];
+    const cardsKey = `cache:flashcards_by_deck:${deckId}`;
+    let cards: any[] = [];
+    try {
+      const raw = require('react-native-mmkv').createMMKV().getString(cardsKey);
+      if (raw) {
+        const entry = JSON.parse(raw);
+        cards = entry.data || entry || [];
+      }
+    } catch {}
 
-    // Preparar payload de sincronización con todas las tarjetas
     const deckPayload = {
       id: deckId,
       title: deck.title,
@@ -249,82 +187,54 @@ export async function prepareDeckForSync(deckId: number, userId: number): Promis
       })),
     };
 
-    // Encolar en offlineSyncService para sincronizar cuando vuelva online
-    const { offlineSyncService } = await import('./offlineSyncService');
-    await offlineSyncService.addPendingOperation(
-      'POST',
-      '/flashcard-decks',
-      'flashcard_deck',
-      deckPayload
-    );
-
-    // Marcar como preparado para tracking
-    const syncKey = `sync:deck_pending:${deckId}`;
-    const storage = require('react-native-mmkv').createMMKV();
-    storage.set(syncKey, JSON.stringify({ deckId, userId, status: 'pending', timestamp: Date.now() }));
-
-    console.log(`[LocalFlashcard] Mazo ${deckId} preparado para sincronizar con ${cards.length} tarjetas`);
+    await syncService.enqueueCreate('flashcard-deck', String(deckId), deckPayload);
   } catch (error) {
-    console.error('[LocalFlashcard] Error preparando mazo para sync:', error);
+    console.error('[LocalFlashcard] Error preparing deck for sync:', error);
     throw error;
   }
 }
 
-/**
- * OFFLINE-FIRST: Obtiene mazos locales pendientes de sincronización
- * @returns Mazos que necesitan sincronizar con el backend
- */
 export function getPendingDecksForSync(): LocalDeck[] {
   try {
     const localDecks = getLocalDecks();
-    // Retornar mazos marcados como _local que aún no han sido sincronizados
     return localDecks.filter(d => d._local === true && d.id < 0);
   } catch (error) {
-    console.error('[LocalFlashcard] Error obteniendo mazos pendientes:', error);
+    console.error('[LocalFlashcard] Error getting pending decks:', error);
     return [];
   }
 }
 
-/**
- * OFFLINE-FIRST: Edita información de un mazo local (título, materia)
- * Funciona offline actualizando cache local
- * @param deckId - ID del mazo (puede ser local, negativo)
- * @param updates - Cambios a aplicar
- */
 export function updateLocalDeck(deckId: number, updates: Partial<LocalDeck>): void {
   try {
     const decks = getLocalDecks();
     const idx = decks.findIndex(d => d.id === deckId);
-    
+
     if (idx === -1) {
       throw new Error(`Mazo ${deckId} no encontrado`);
     }
 
-    const updated = { ...decks[idx], ...updates };
-    decks[idx] = updated;
-    saveLocalDecks(decks);
-    mergeIntoDecksCache(updated);
-
-    console.log(`[LocalFlashcard] Mazo ${deckId} actualizado: ${JSON.stringify(updates)}`);
+    decks[idx] = { ...decks[idx], ...updates };
+    saveLocalDecksSync(decks);
   } catch (error) {
-    console.error('[LocalFlashcard] Error actualizando mazo:', error);
+    console.error('[LocalFlashcard] Error updating deck:', error);
     throw error;
   }
 }
 
-/**
- * OFFLINE-FIRST: Agrega una tarjeta a un mazo local
- * Crea tarjeta localmente con ID temporal
- * @param deckId - ID del mazo (puede ser local, negativo)
- * @param card - Datos de la tarjeta a agregar
- */
 export function addLocalCard(deckId: number, card: Omit<LocalCard, 'id'>): void {
   try {
-    // Obtener tarjetas existentes
-    const cardsKey = `${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`;
-    const cards = loadFromCacheSync<any[]>(cardsKey, Infinity) || [];
+    const mmkv = require('react-native-mmkv').createMMKV();
+    const cardsKey = `cache:flashcards_by_deck:${deckId}`;
 
-    // Crear tarjeta con ID temporal
+    let cards: any[] = [];
+    try {
+      const raw = mmkv.getString(cardsKey);
+      if (raw) {
+        const entry = JSON.parse(raw);
+        cards = entry.data || entry || [];
+      }
+    } catch {}
+
     const newCard = {
       id: nextLocalId(),
       deck_id: deckId,
@@ -340,108 +250,65 @@ export function addLocalCard(deckId: number, card: Omit<LocalCard, 'id'>): void 
       _isPending: true,
     };
 
-    // Agregar a array de tarjetas
     cards.push(newCard);
-    saveToCacheSync(cardsKey, cards);
-    saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deckId}`, cards);
-    saveToCacheSync(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deckId}`, cards);
-
-    // Actualizar conteo en el mazo
-    const decks = getLocalDecks();
-    const idx = decks.findIndex(d => d.id === deckId);
-    if (idx >= 0) {
-      decks[idx] = {
-        ...decks[idx],
-        card_count: cards.length,
-        new_count: (decks[idx].new_count || 0) + 1,
-      };
-      saveLocalDecks(decks);
-      mergeIntoDecksCache(decks[idx]);
-    }
-
-    console.log(`[LocalFlashcard] Tarjeta agregada a mazo ${deckId}: ${newCard.id}`);
+    mmkv.set(cardsKey, JSON.stringify({ data: cards, timestamp: Date.now() }));
   } catch (error) {
-    console.error('[LocalFlashcard] Error agregando tarjeta:', error);
+    console.error('[LocalFlashcard] Error adding card:', error);
     throw error;
   }
 }
 
-/**
- * OFFLINE-FIRST: Elimina una tarjeta de un mazo local
- * @param deckId - ID del mazo (puede ser local, negativo)
- * @param cardId - ID de la tarjeta a eliminar
- */
 export function deleteLocalCard(deckId: number, cardId: number): void {
   try {
-    // Obtener tarjetas
-    const cardsKey = `${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`;
-    let cards = loadFromCacheSync<any[]>(cardsKey, Infinity) || [];
+    const mmkv = require('react-native-mmkv').createMMKV();
+    const cardsKey = `cache:flashcards_by_deck:${deckId}`;
 
-    // Encontrar tarjeta a eliminar
-    const deletedCard = cards.find(c => c.id === cardId);
-    if (!deletedCard) {
-      throw new Error(`Tarjeta ${cardId} no encontrada`);
-    }
+    let cards: any[] = [];
+    try {
+      const raw = mmkv.getString(cardsKey);
+      if (raw) {
+        const entry = JSON.parse(raw);
+        cards = entry.data || entry || [];
+      }
+    } catch {}
 
-    // Eliminar tarjeta
     cards = cards.filter(c => c.id !== cardId);
-    saveToCacheSync(cardsKey, cards);
-    saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deckId}`, cards);
-    saveToCacheSync(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deckId}`, cards);
-
-    // Actualizar conteo en el mazo
-    const decks = getLocalDecks();
-    const idx = decks.findIndex(d => d.id === deckId);
-    if (idx >= 0) {
-      const newCount = Math.max(0, (decks[idx].new_count || 0) - (deletedCard.status === 'new' ? 1 : 0));
-      decks[idx] = {
-        ...decks[idx],
-        card_count: cards.length,
-        new_count: newCount,
-      };
-      saveLocalDecks(decks);
-      mergeIntoDecksCache(decks[idx]);
-    }
-
-    console.log(`[LocalFlashcard] Tarjeta ${cardId} eliminada del mazo ${deckId}`);
+    mmkv.set(cardsKey, JSON.stringify({ data: cards, timestamp: Date.now() }));
   } catch (error) {
-    console.error('[LocalFlashcard] Error eliminando tarjeta:', error);
+    console.error('[LocalFlashcard] Error deleting card:', error);
     throw error;
   }
 }
 
-/**
- * OFFLINE-FIRST: Edita una tarjeta local
- * @param deckId - ID del mazo (puede ser local, negativo)
- * @param cardId - ID de la tarjeta a editar
- * @param updates - Cambios a aplicar
- */
 export function updateLocalCard(deckId: number, cardId: number, updates: Partial<LocalCard>): void {
   try {
-    const cardsKey = `${CACHE_KEYS.FLASHCARDS_BY_DECK}${deckId}`;
-    const cards = loadFromCacheSync<any[]>(cardsKey, Infinity) || [];
+    const mmkv = require('react-native-mmkv').createMMKV();
+    const cardsKey = `cache:flashcards_by_deck:${deckId}`;
+
+    let cards: any[] = [];
+    try {
+      const raw = mmkv.getString(cardsKey);
+      if (raw) {
+        const entry = JSON.parse(raw);
+        cards = entry.data || entry || [];
+      }
+    } catch {}
 
     const idx = cards.findIndex(c => c.id === cardId);
     if (idx === -1) {
       throw new Error(`Tarjeta ${cardId} no encontrada`);
     }
 
-    // Aplicar actualizaciones
-    const updated = {
+    cards[idx] = {
       ...cards[idx],
       ...(updates.data && { content: updates.data, ...(updates.data?.front && { front: updates.data.front }), ...(updates.data?.back && { back: updates.data.back }) }),
       ...(updates.hint !== undefined && { hint: updates.hint }),
       ...(updates.explanation !== undefined && { explanation: updates.explanation }),
     };
 
-    cards[idx] = updated;
-    saveToCacheSync(cardsKey, cards);
-    saveToCacheSync(`${CACHE_KEYS.FLASHCARDS_PRIORITIZED_BY_DECK}${deckId}`, cards);
-    saveToCacheSync(`${CACHE_KEYS.CARDS_NOT_SNOOZED_BY_DECK}${deckId}`, cards);
-
-    console.log(`[LocalFlashcard] Tarjeta ${cardId} actualizada`);
+    mmkv.set(cardsKey, JSON.stringify({ data: cards, timestamp: Date.now() }));
   } catch (error) {
-    console.error('[LocalFlashcard] Error actualizando tarjeta:', error);
+    console.error('[LocalFlashcard] Error updating card:', error);
     throw error;
   }
 }

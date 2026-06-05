@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 
 /**
@@ -24,6 +25,7 @@ exports.createCalendarEvent = (req, res) => {
   }
 
   const {
+    id: clientId,
     title,
     eventType,
     subjectId,
@@ -61,6 +63,7 @@ exports.createCalendarEvent = (req, res) => {
 
   const insertEventQuery = `
     INSERT INTO calendar_events (
+      id,
       user_id,
       subject_id,
       title,
@@ -74,7 +77,7 @@ exports.createCalendarEvent = (req, res) => {
       create_study_plan,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `;
 
   // Si hay subjectId, primero verificar que pertenezca al usuario
@@ -97,9 +100,11 @@ exports.createCalendarEvent = (req, res) => {
   }
 
   function insertEvent() {
+    const eventId = clientId || uuidv4();
     db.run(
       insertEventQuery,
       [
+        eventId,
         userId,
         subjectId || null,
         title.trim(),
@@ -121,8 +126,6 @@ exports.createCalendarEvent = (req, res) => {
         // Si es un evento de examen y se solicita crear plan de estudio,
         // aquí se podría llamar a la lógica de generación de plan de estudio
         // Por ahora, solo retornamos el evento creado
-
-        const eventId = this.lastID;
 
         // Retornar el evento creado
         db.get(
