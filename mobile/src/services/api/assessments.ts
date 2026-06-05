@@ -37,7 +37,7 @@ export const getAllAssessments = async (): Promise<Assessment[]> => {
 
   if (!localData || localData.length === 0) {
     try {
-      const response = await fetchWithFallback('/assessments/all');
+      const response = await fetchWithFallback(`/assessments/user/${userId}`);
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
