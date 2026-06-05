@@ -9,8 +9,8 @@ import { type AssessmentCategory } from '../../services/api/assessmentCategories
 interface CategorySelectorModalProps {
   visible: boolean;
   categories: AssessmentCategory[];
-  selectedCategoryId: number | null;
-  onSelectCategory: (id: number | null) => void;
+  selectedCategoryId: string | null;
+  onSelectCategory: (id: string | null) => void;
   onClose: () => void;
 }
 

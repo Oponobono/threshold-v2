@@ -9,8 +9,8 @@ import { type Subject } from '../../services/api';
 interface SubjectSelectorModalProps {
   visible: boolean;
   subjects: Subject[];
-  selectedSubjectId: number | null;
-  onSelectSubject: (id: number) => void;
+  selectedSubjectId: string | null;
+  onSelectSubject: (id: string) => void;
   onClose: () => void;
 }
 

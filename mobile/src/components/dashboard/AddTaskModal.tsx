@@ -12,7 +12,7 @@ interface Props {
   onClose: () => void;
   onSave: () => void;
   subjects: Subject[];
-  selectedSubjectId: number | null;
+  selectedSubjectId: string | null;
   onOpenSubjectSelector: () => void;
   taskName: string;
   setTaskName: (v: string) => void;

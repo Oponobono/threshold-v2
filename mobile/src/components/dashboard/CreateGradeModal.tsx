@@ -18,17 +18,17 @@ interface CreateGradeModalProps {
   visible: boolean;
   onClose: () => void;
   subjects: Subject[];
-  initialSubjectId?: number | null;
+  initialSubjectId?: string | null;
 }
 
 export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId }: CreateGradeModalProps) => {
   const { t } = useTranslation();
   const { refreshSubjects, refreshAssessments } = useDataStore();
 
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId ? String(initialSubjectId) : null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isCategorySelectorVisible, setIsCategorySelectorVisible] = useState(false);
   const [gradeName, setGradeName] = useState('');
   const [gradeValue, setGradeValue] = useState('');
@@ -58,7 +58,7 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
     setGradingDate(null);
     setShowDueDatePicker(false);
     setShowGradingDatePicker(false);
-    setSelectedSubjectId(initialSubjectId || null);
+    setSelectedSubjectId(initialSubjectId ? String(initialSubjectId) : null);
     setSelectedCategoryId(null);
     setIsSavingGrade(false);
   };
@@ -105,11 +105,11 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
     try {
       setIsSavingGrade(true);
       const result = await createAssessment({
-        subject_id: selectedSubjectId,
+        subject_id: selectedSubjectId as string,
         name: gradeName.trim(),
         grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
         weight: gradePercentage ? gradePercentage.replace(',', '.') : '0',
-        is_completed: true,
+        is_completed: 1 as unknown as number,
         type: 'grade',
         category_id: selectedCategoryId || undefined,
         due_date: formatDateForAPI(dueDate) || undefined,
@@ -208,7 +208,7 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
                 style={styles.sheetInput} 
                 onPress={() => setShowDueDatePicker(true)}
               >
-                <Text style={dueDate ? styles.sheetInputText : [styles.sheetInputText, { color: theme.colors.text.placeholder }]}>
+                <Text style={[styles.sheetInput, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }, !dueDate && { color: theme.colors.text.placeholder }]}>
                   {formatDateForDisplay(dueDate)}
                 </Text>
               </TouchableOpacity>
@@ -227,7 +227,7 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
                 style={styles.sheetInput} 
                 onPress={() => setShowGradingDatePicker(true)}
               >
-                <Text style={gradingDate ? styles.sheetInputText : [styles.sheetInputText, { color: theme.colors.text.placeholder }]}>
+                <Text style={[styles.sheetInput, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }, !gradingDate && { color: theme.colors.text.placeholder }]}>
                   {formatDateForDisplay(gradingDate)}
                 </Text>
               </TouchableOpacity>

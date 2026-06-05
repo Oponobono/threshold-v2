@@ -11,7 +11,7 @@ interface Props {
   onClose: () => void;
   onSave: () => void;
   subjects: Subject[];
-  selectedSubjectId: number | null;
+  selectedSubjectId: string | null;
   onOpenSubjectSelector: () => void;
   gradeName: string;
   setGradeName: (v: string) => void;

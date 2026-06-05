@@ -17,7 +17,7 @@ interface CreateTaskModalProps {
   visible: boolean;
   onClose: () => void;
   subjects: Subject[];
-  initialSubjectId?: number | null;
+  initialSubjectId?: string | null;
   onTaskCreated: () => Promise<void> | void;
 }
 
@@ -25,10 +25,10 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
   const { t } = useTranslation();
 
 
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(initialSubjectId || null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId || null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isCategorySelectorVisible, setIsCategorySelectorVisible] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -59,7 +59,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
     const m = (now.getMonth() + 1).toString().padStart(2, '0');
     const y = now.getFullYear();
     setTaskDate(`${d}-${m}-${y}`);
-    setSelectedSubjectId(initialSubjectId || null);
+    setSelectedSubjectId(initialSubjectId ? String(initialSubjectId) : null);
     setSelectedCategoryId(null);
     setIsSavingTask(false);
   };
@@ -88,10 +88,10 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
     try {
       setIsSavingTask(true);
       const result = await createAssessment({
-        subject_id: selectedSubjectId,
+        subject_id: selectedSubjectId as string,
         name: taskName.trim(),
         date: taskDate,
-        is_completed: false,
+        is_completed: 0,
         type: 'task',
         category_id: selectedCategoryId || undefined,
       });

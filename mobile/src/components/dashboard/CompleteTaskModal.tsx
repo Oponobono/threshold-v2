@@ -47,7 +47,7 @@ export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalP
     try {
       setIsSaving(true);
       await updateAssessment(task.id, {
-        is_completed: true,
+        is_completed: 1 as unknown as number,
         grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
         weight: gradePercentage ? String(Number(gradePercentage.replace(',', '.'))) : '0',
       });

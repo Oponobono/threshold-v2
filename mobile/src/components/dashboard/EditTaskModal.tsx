@@ -23,10 +23,10 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
   const { t } = useTranslation();
   const { refreshSubjects, refreshAssessments } = useDataStore();
 
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isCategorySelectorVisible, setIsCategorySelectorVisible] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -34,9 +34,9 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
   // Initialize form when task changes
   useEffect(() => {
     if (task && visible) {
-      setSelectedSubjectId(task.subject_id);
+      setSelectedSubjectId(task.subject_id ? String(task.subject_id) : null);
       setTaskName(task.name);
-      setSelectedCategoryId(task.category_id || null);
+      setSelectedCategoryId(task.category_id ? String(task.category_id) : null);
     }
   }, [task, visible]);
 
@@ -63,7 +63,7 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
     try {
       setIsSaving(true);
       await updateAssessment(task.id, {
-        subject_id: selectedSubjectId,
+        subject_id: selectedSubjectId as string,
         name: taskName.trim(),
         category_id: selectedCategoryId || undefined,
       });

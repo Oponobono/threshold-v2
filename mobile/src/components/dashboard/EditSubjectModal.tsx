@@ -67,9 +67,9 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
       setIsSaving(true);
       await updateSubject(subject.id, {
         name: subjectName.trim(),
-        professor: subjectProfessor.trim() || null,
-        credits: subjectCredits ? Number(subjectCredits) : null,
-        target_grade: subjectTarget ? Number(subjectTarget) : null,
+        professor: subjectProfessor.trim() || undefined,
+        credits: subjectCredits ? Number(subjectCredits) : undefined,
+        target_grade: subjectTarget ? Number(subjectTarget) : undefined,
         color: selectedColor,
         icon: selectedIcon,
       });
