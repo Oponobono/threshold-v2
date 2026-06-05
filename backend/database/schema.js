@@ -237,8 +237,8 @@ const tableSchema = {
       { name: 'percentage', type: 'REAL' },
       { name: 'due_date', type: 'TEXT' },
       { name: 'grading_date', type: 'TEXT' },
-      { name: 'created_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
-      { name: 'updated_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' }
+      { name: 'created_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }
     ]
   },
   gallery_items: {
@@ -865,8 +865,8 @@ const tableSchema = {
       { name: 'end_time', type: 'TEXT' },
       { name: 'all_day', type: 'INTEGER DEFAULT 0' },
       { name: 'create_study_plan', type: 'INTEGER DEFAULT 0' },
-      { name: 'created_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
-      { name: 'updated_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' }
+      { name: 'created_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }
     ]
   },
   study_sessions: {

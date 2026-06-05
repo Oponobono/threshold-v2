@@ -66,10 +66,16 @@ const fixUserIdTypes = async (pool) => {
         kcu.column_name
       FROM information_schema.table_constraints tc
       JOIN information_schema.key_column_usage kcu
-        ON tc.constraint_name = kcu.constraint_name
+        ON tc.constraint_catalog = kcu.constraint_catalog
+        AND tc.constraint_schema = kcu.constraint_schema
+        AND tc.constraint_name = kcu.constraint_name
+      JOIN information_schema.constraint_column_usage ccu
+        ON tc.constraint_catalog = ccu.constraint_catalog
+        AND tc.constraint_schema = ccu.constraint_schema
+        AND tc.constraint_name = ccu.constraint_name
       WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND kcu.referenced_table_name = 'users'
-        AND kcu.referenced_column_name = 'id'
+        AND ccu.table_name = 'users'
+        AND ccu.column_name = 'id'
     `);
 
     const fkConstraints = fkResult.rows;
