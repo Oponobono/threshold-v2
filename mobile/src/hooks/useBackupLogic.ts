@@ -14,12 +14,20 @@ import {
   BackupStats,
   BackupProgress,
   BACKUP_PREFS,
+  getScheduledBackupConfig,
+  saveScheduledBackupConfig,
+  ScheduledBackupType,
+  ScheduledBackupConfig,
 } from '../services/backup/backupService';
 import {
   downloadCloudItems,
   getCloudItemsCount,
   DownloadProgress,
 } from '../services/backup/downloadService';
+import {
+  registerScheduledBackup,
+  unregisterScheduledBackup,
+} from '../services/backup/scheduledBackupService';
 import { storageService } from '../services/storageService';
 import { alertRef } from '../components/ui/CustomAlert';
 import { syncService } from '../services/database';
@@ -71,17 +79,27 @@ export const useBackupLogic = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
 
+  // Estado del backup programado
+  const [scheduledConfig, setScheduledConfig] = useState<ScheduledBackupConfig>({
+    enabled: false,
+    hour: 2,
+    minute: 0,
+    type: 'ambos',
+  });
+
   // ─── Carga inicial ────────────────────────────────────────────────────────
 
   const loadAll = useCallback(async () => {
-    const [loadedPrefs, loadedStats, cloudCount] = await Promise.all([
+    const [loadedPrefs, loadedStats, cloudCount, scheduledCfg] = await Promise.all([
       getBackupPreferences(),
       getBackupStats(),
       getCloudItemsCount(),
+      getScheduledBackupConfig(),
     ]);
     setPrefs(loadedPrefs);
     setStats(loadedStats);
     setCloudItemsCount(cloudCount);
+    setScheduledConfig(scheduledCfg);
   }, []);
 
   useEffect(() => {
@@ -225,6 +243,45 @@ export const useBackupLogic = () => {
     }
   }, [isDownloading, isUploading, prefs.enabled, loadAll]);
 
+  // ─── Backup programado ────────────────────────────────────────────────────
+
+  const handleToggleScheduled = useCallback(async (enabled: boolean) => {
+    const updated = { ...scheduledConfig, enabled };
+    setScheduledConfig(updated);
+    await saveScheduledBackupConfig({ enabled });
+    if (enabled) {
+      await registerScheduledBackup();
+      alertRef.show({
+        title: 'Backup programado activado',
+        message: `Se respaldará automáticamente a las ${String(updated.hour).padStart(2, '0')}:${String(updated.minute).padStart(2, '0')} cada día.`,
+        type: 'success',
+      });
+    } else {
+      await unregisterScheduledBackup();
+      alertRef.show({
+        title: 'Backup programado desactivado',
+        message: 'No se ejecutarán backups automáticos.',
+        type: 'info',
+      });
+    }
+  }, [scheduledConfig]);
+
+  const handleSaveScheduledTime = useCallback(async (hour: number, minute: number) => {
+    const updated = { ...scheduledConfig, hour, minute };
+    setScheduledConfig(updated);
+    await saveScheduledBackupConfig({ hour, minute });
+    // Re-registrar para que el sistema tome la nueva hora
+    if (updated.enabled) {
+      await unregisterScheduledBackup();
+      await registerScheduledBackup();
+    }
+  }, [scheduledConfig]);
+
+  const handleSetScheduledType = useCallback(async (type: ScheduledBackupType) => {
+    setScheduledConfig(prev => ({ ...prev, type }));
+    await saveScheduledBackupConfig({ type });
+  }, []);
+
   // ─── Labels formateados ───────────────────────────────────────────────────
 
   const lastUploadLabel = formatRelativeTime(prefs.lastRun, t);
@@ -239,7 +296,7 @@ export const useBackupLogic = () => {
   const totalCount = Number(stats.photos.total) + Number(stats.audio.total) + Number(stats.docs.total) + Number(stats.transcripts.total);
   const backedCount = Number(stats.photos.backed) + Number(stats.audio.backed) + Number(stats.docs.backed) + Number(stats.transcripts.backed);
 
-  const isRunning = isUploading || isDownloading;
+  const isBackupRunning = isUploading || isDownloading;
 
   return {
     prefs,
@@ -257,9 +314,14 @@ export const useBackupLogic = () => {
     handleDownloadNow,
     lastDownloadLabel,
     // Shared
-    isRunning,
+    isBackupRunning,
     pendingCount,
     totalCount,
     backedCount,
+    // Backup programado
+    scheduledConfig,
+    handleToggleScheduled,
+    handleSaveScheduledTime,
+    handleSetScheduledType,
   };
 };

@@ -81,9 +81,23 @@ export const BACKUP_PREFS = {
   INCLUDE_TRANSCRIPTS: 'backup_include_transcripts',
   LAST_RUN: 'backup_last_run',
   LAST_DOWNLOAD: 'backup_last_download',
+  // Backup programado
+  SCHEDULED_ENABLED: 'backup_scheduled_enabled',
+  SCHEDULED_HOUR: 'backup_scheduled_hour',
+  SCHEDULED_MINUTE: 'backup_scheduled_minute',
+  SCHEDULED_TYPE: 'backup_scheduled_type',
 } as const;
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
+
+export type ScheduledBackupType = 'datos' | 'multimedia' | 'ambos';
+
+export interface ScheduledBackupConfig {
+  enabled: boolean;
+  hour: number;   // 0-23
+  minute: number; // 0-59
+  type: ScheduledBackupType;
+}
 
 export interface BackupPreferences {
   enabled: boolean;
@@ -155,6 +169,36 @@ export const saveBackupPreferences = async (prefs: Partial<BackupPreferences>): 
     promises.push(storageService.saveSecure(BACKUP_PREFS.INCLUDE_DOCS, String(prefs.includeDocs)));
   if (prefs.includeTranscripts !== undefined)
     promises.push(storageService.saveSecure(BACKUP_PREFS.INCLUDE_TRANSCRIPTS, String(prefs.includeTranscripts)));
+  await Promise.all(promises);
+};
+
+// ─── Configuración de backup programado ─────────────────────────────────────
+
+export const getScheduledBackupConfig = async (): Promise<ScheduledBackupConfig> => {
+  const [enabled, hour, minute, type] = await Promise.all([
+    storageService.getSecure(BACKUP_PREFS.SCHEDULED_ENABLED),
+    storageService.getSecure(BACKUP_PREFS.SCHEDULED_HOUR),
+    storageService.getSecure(BACKUP_PREFS.SCHEDULED_MINUTE),
+    storageService.getSecure(BACKUP_PREFS.SCHEDULED_TYPE),
+  ]);
+  return {
+    enabled: enabled === 'true',
+    hour: hour !== null ? parseInt(hour, 10) : 2,
+    minute: minute !== null ? parseInt(minute, 10) : 0,
+    type: (type as ScheduledBackupType) || 'ambos',
+  };
+};
+
+export const saveScheduledBackupConfig = async (config: Partial<ScheduledBackupConfig>): Promise<void> => {
+  const promises: Promise<void>[] = [];
+  if (config.enabled !== undefined)
+    promises.push(storageService.saveSecure(BACKUP_PREFS.SCHEDULED_ENABLED, String(config.enabled)));
+  if (config.hour !== undefined)
+    promises.push(storageService.saveSecure(BACKUP_PREFS.SCHEDULED_HOUR, String(config.hour)));
+  if (config.minute !== undefined)
+    promises.push(storageService.saveSecure(BACKUP_PREFS.SCHEDULED_MINUTE, String(config.minute)));
+  if (config.type !== undefined)
+    promises.push(storageService.saveSecure(BACKUP_PREFS.SCHEDULED_TYPE, config.type));
   await Promise.all(promises);
 };
 

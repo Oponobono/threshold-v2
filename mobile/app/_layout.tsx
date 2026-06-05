@@ -22,6 +22,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { hasValidSession } from '../src/services/api/auth/session';
 import { initializeApiClient } from '../src/services/api/client';
 import { requestPermissions } from '../src/services/notificationService';
+import { registerScheduledBackup } from '../src/services/backup/scheduledBackupService';
+import { getScheduledBackupConfig } from '../src/services/backup/backupService';
 
 // Mantener el Splash Screen visible hasta que decidamos ocultarlo
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -101,6 +103,15 @@ function RootNavigator() {
         requestPermissions().then(granted => {
           console.log(`[RootLayout] 📱 Permiso de notificaciones: ${granted ? 'concedido' : 'denegado'}`);
         });
+
+        // 🔷 4. Registrar backup automático si está habilitado
+        getScheduledBackupConfig().then(cfg => {
+          if (cfg.enabled) {
+            registerScheduledBackup().catch(err =>
+              console.warn('[RootLayout] No se pudo registrar backup programado:', err)
+            );
+          }
+        }).catch(() => {});
       } catch (e) {
         console.warn('[RootLayout] Error durante preparación:', e);
         setInitialRoute('welcome');

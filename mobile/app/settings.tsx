@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput, ActivityIndicator, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { globalStyles } from '../src/styles/globalStyles';
@@ -214,11 +215,20 @@ export default function SettingsScreen() {
     downloadProgress,
     handleDownloadNow,
     lastDownloadLabel,
-    isRunning: isBackupRunning,
+    isBackupRunning,
     pendingCount,
     totalCount,
     backedCount,
+    scheduledConfig,
+    handleToggleScheduled,
+    handleSaveScheduledTime,
+    handleSetScheduledType,
   } = useBackupLogic();
+
+  const [showScheduledTimePicker, setShowScheduledTimePicker] = useState(false);
+  const scheduledTimeDate = new Date();
+  scheduledTimeDate.setHours(scheduledConfig.hour, scheduledConfig.minute, 0, 0);
+  const scheduledTimeLabel = `${String(scheduledConfig.hour).padStart(2, '0')}:${String(scheduledConfig.minute).padStart(2, '0')}`;
 
   return (
     <SafeAreaView style={globalStyles.safeArea}>
@@ -631,6 +641,90 @@ export default function SettingsScreen() {
                     <Text style={[styles.darkPillText, { color: '#fff' }]}>{t('backup.downloadNow', 'Descargar Todo')}</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+
+              {/* ── Backup Automático Programado ── */}
+              <View style={{
+                marginTop: 20,
+                borderRadius: 16,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: scheduledConfig.enabled ? theme.colors.primary + '50' : theme.colors.border,
+                backgroundColor: scheduledConfig.enabled ? theme.colors.primary + '08' : theme.colors.inputBackground,
+              }}>
+                {/* Header con toggle */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: scheduledConfig.enabled ? theme.colors.primary + '20' : theme.colors.border + '40', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                      <Ionicons name="time-outline" size={17} color={scheduledConfig.enabled ? theme.colors.primary : theme.colors.text.secondary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.settingTitle, { fontSize: 13 }]}>Backup Automático</Text>
+                      <Text style={[styles.settingDesc, { fontSize: 11, marginTop: 1 }]}>
+                        {scheduledConfig.enabled
+                          ? `Programado a las ${scheduledTimeLabel} · ${scheduledConfig.type === 'datos' ? 'Solo Datos' : scheduledConfig.type === 'multimedia' ? 'Multimedia' : 'Ambos'}`
+                          : 'Activa para respaldar automáticamente cada día'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={scheduledConfig.enabled}
+                    onValueChange={handleToggleScheduled}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary + '60' }}
+                    thumbColor={scheduledConfig.enabled ? theme.colors.primary : '#ccc'}
+                  />
+                </View>
+
+                {scheduledConfig.enabled && (
+                  <View style={{ padding: 14, gap: 14 }}>
+                    {/* Selector de hora */}
+                    <View>
+                      <Text style={[styles.settingDesc, { fontSize: 11, marginBottom: 8, fontWeight: '600', color: theme.colors.text.primary }]}>HORA DEL BACKUP</Text>
+                      <TouchableOpacity
+                        onPress={() => setShowScheduledTimePicker(true)}
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface || theme.colors.card, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: theme.colors.border }}
+                      >
+                        <Ionicons name="alarm-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                        <Text style={[styles.settingTitle, { fontSize: 20, flex: 1, letterSpacing: 2, color: theme.colors.primary }]}>{scheduledTimeLabel}</Text>
+                        <Ionicons name="chevron-forward" size={14} color={theme.colors.text.secondary} />
+                      </TouchableOpacity>
+                      {showScheduledTimePicker && (
+                        <DateTimePicker
+                          value={scheduledTimeDate}
+                          mode="time"
+                          is24Hour
+                          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                          onChange={(_event: any, date?: Date) => {
+                            setShowScheduledTimePicker(Platform.OS === 'ios');
+                            if (date) handleSaveScheduledTime(date.getHours(), date.getMinutes());
+                          }}
+                        />
+                      )}
+                    </View>
+
+                    {/* Selector de tipo */}
+                    <View>
+                      <Text style={[styles.settingDesc, { fontSize: 11, marginBottom: 8, fontWeight: '600', color: theme.colors.text.primary }]}>QUÉ RESPALDAR</Text>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {(['datos', 'multimedia', 'ambos'] as const).map((opt) => {
+                          const active = scheduledConfig.type === opt;
+                          const labels = { datos: 'Solo Datos', multimedia: 'Multimedia', ambos: 'Ambos' };
+                          const icons = { datos: 'document-text-outline', multimedia: 'images-outline', ambos: 'cloud-upload-outline' };
+                          return (
+                            <TouchableOpacity
+                              key={opt}
+                              onPress={() => handleSetScheduledType(opt)}
+                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, paddingHorizontal: 6, borderRadius: 10, borderWidth: 1.5, borderColor: active ? theme.colors.primary : theme.colors.border, backgroundColor: active ? theme.colors.primary + '15' : 'transparent', gap: 4 }}
+                            >
+                              <Ionicons name={icons[opt] as any} size={13} color={active ? theme.colors.primary : theme.colors.text.secondary} />
+                              <Text style={{ fontSize: 11, fontWeight: active ? '700' : '400', color: active ? theme.colors.primary : theme.colors.text.secondary }}>{labels[opt]}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </View>
+                )}
               </View>
             </>
           )}

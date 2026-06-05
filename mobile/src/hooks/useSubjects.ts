@@ -156,6 +156,8 @@ export function useSubjects(t: any) {
         const projection = calculateProjection(subjectAssessments, s, null);
         return {
           ...s,
+          avg_score: projection.currentAverage > 0 ? projection.currentAverage : s.avg_score,
+          completion_percent: projection.evaluatedWeight > 0 ? projection.evaluatedWeight : s.completion_percent,
           pending_flashcards: pendingBySubject.get(s.id),
           next_milestone: nextMilestoneBySubject.get(s.id),
           delta: projection.delta,
@@ -166,9 +168,11 @@ export function useSubjects(t: any) {
   const localCriticalSubjects = useMemo(() => {
     return subjects
       .map(s => {
-        const raw = s.avg_score ?? 0;
+        const subjectAssessments = assessments.filter(a => a.subject_id === s.id);
+        const projection = calculateProjection(subjectAssessments, s, null);
+        const raw = projection.currentAverage > 0 ? projection.currentAverage : (s.avg_score ?? 0);
         const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
-        return { ...s, computedAvg: avg };
+        return { ...s, computedAvg: avg, avg_score: raw };
       })
       .filter(s => s.computedAvg < 3.0)
       .sort((a, b) => a.computedAvg - b.computedAvg)
@@ -202,7 +206,7 @@ export function useSubjects(t: any) {
 
     // 1. Assessments (pasado reciente)
     assessments.forEach(as => {
-      const ts = parseDateOrFail(as.date || '');
+      const ts = parseDateOrFail(as.date || as.grading_date || as.due_date || '');
       if (ts > 0 && ts <= now && ts > now - SEVEN_DAYS_MS) {
         items.push({
           id: `asm-${as.id}`,
