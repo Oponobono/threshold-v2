@@ -97,12 +97,12 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // Recording metadata
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [recordingData, setRecordingData] = useState<AudioRecording | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
 
   // Flashcard generation
   const [showFlashcardModal, setShowFlashcardModal] = useState(false);
-  const [studyDeck, setStudyDeck] = useState<{ id: number; title: string; cards: any[] } | null>(null);
+  const [studyDeck, setStudyDeck] = useState<{ id: string; title: string; cards: any[] } | null>(null);
   const [showStudyScreen, setShowStudyScreen] = useState(false);
 
   const [audioUri, setAudioUri] = useState<string>('');
@@ -170,7 +170,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
 
       if (rec) { 
         setRecordingData(rec); 
-        setSelectedSubjectId(rec.subject_id ? Number(rec.subject_id) : null); 
+        setSelectedSubjectId(rec.subject_id ? String(rec.subject_id) : null); 
       }
       
       // Determinar mejor URI de audio (Caché local -> Fallback a Nube -> Búsqueda)
@@ -304,7 +304,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // ---------------------------------------------------------------------------
   // Subject association
   // ---------------------------------------------------------------------------
-  const handleSubjectChange = async (newId: number | null) => {
+  const handleSubjectChange = async (newId: string | null) => {
     setSelectedSubjectId(newId);
     if (recordingData?.id) {
       await updateAudioRecording(recordingData.id, { subject_id: newId }).catch(e => console.warn('updateSubject:', e));
@@ -639,8 +639,8 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         content={summary || transcription || ''}
         contentType="recording"
         title={recordingData?.name || 'Recording'}
-        subjectId={selectedSubjectId || 0}
-        userId={recordingData?.user_id ? Number(recordingData.user_id) : 0}
+        subjectId={selectedSubjectId || ''}
+        userId={recordingData?.user_id ? String(recordingData.user_id) : ''}
       />
 
       {/* Study Screen Modal */}

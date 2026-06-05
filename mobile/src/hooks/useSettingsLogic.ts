@@ -15,6 +15,7 @@ import {
   getCurrentUserProfileSync,
   signOut,
   type UserProfile,
+  type Subject,
   updateUserProfile,
   updateUserPassword,
   removeBiometricToken,
@@ -129,7 +130,7 @@ export const useSettingsLogic = () => {
   // Dynamic loaded data
   const [gradingPeriods, setGradingPeriods] = useState<any[]>([]);
   const [thresholdOverrides, setThresholdOverrides] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<{ id: number; name: string; color?: string }[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [lmsAccounts, setLmsAccounts] = useState<any[]>([]);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
@@ -202,7 +203,7 @@ export const useSettingsLogic = () => {
 
       let currentSystemId: number | null = null;
       if (userProfile?.active_grading_version_id) {
-        const sys = allSystems.find(s => s.active_version_id === userProfile.active_grading_version_id);
+        const sys = allSystems.find(s => String(s.active_version_id) === userProfile.active_grading_version_id);
         if (sys) currentSystemId = sys.id;
       }
 
@@ -805,7 +806,7 @@ export const useSettingsLogic = () => {
         alertRef.show({ title: t('common.error'), message: error.message, type: 'error' });
       }
     },
-    handleDeleteTerm: async (id: number, name: string) => {
+    handleDeleteTerm: async (id: string, name: string) => {
       try {
         await deleteGradingPeriod(id);
         const periods = await getGradingPeriods();

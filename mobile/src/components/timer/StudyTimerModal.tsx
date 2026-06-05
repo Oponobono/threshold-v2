@@ -11,7 +11,7 @@ interface StudyTimerModalProps {
   isVisible: boolean;
   onClose: () => void;
   subjects: Subject[];
-  onStart: (config: { mode: 'pomodoro' | 'threshold', subjectId: number | null, duration: number }) => void;
+  onStart: (config: { mode: 'pomodoro' | 'threshold', subjectId: string | null, duration: number }) => void;
   viewState: 'config' | 'feedback';
   onSaveFeedback: (feedback: string) => void;
 }
@@ -43,7 +43,7 @@ export const StudyTimerModal: React.FC<StudyTimerModalProps> = ({
   const { t } = useTranslation();
   
   const [selectedMode, setSelectedMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [duration, setDuration] = useState(25);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -121,7 +121,7 @@ export const StudyTimerModal: React.FC<StudyTimerModalProps> = ({
           <TouchableOpacity 
             key={s.id} 
             style={[localStyles.subjectCard, String(selectedSubjectId) === String(s.id) && { borderColor: theme.colors.primary, borderWidth: 2 }]}
-            onPress={() => setSelectedSubjectId(Number(s.id))}
+            onPress={() => setSelectedSubjectId(String(s.id))}
           >
             <View style={[styles.subjectBadge, { backgroundColor: s.color || '#CCC', marginBottom: 0 }]}>
                <MaterialCommunityIcons name={(s.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />

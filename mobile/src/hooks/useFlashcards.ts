@@ -32,7 +32,7 @@ export function useFlashcards() {
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [editingDeck, setEditingDeck] = useState<FlashcardDeck | null>(null);
   const [studyDeckCards, setStudyDeckCards] = useState<any[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Share deck state
@@ -185,12 +185,13 @@ export function useFlashcards() {
       }
 
       // OFFLINE-FIRST: Exportar desde cache local si está offline
-      if (deck.id < 0 || deck._local) {
-        const localDecks = getLocalDecks();
-        const localDeck = localDecks.find(d => d.id === deck.id);
+      const localDecks = getLocalDecks();
+      const isLocal = localDecks.some(d => String(d.id) === deck.id);
+      if (isLocal) {
+        const localDeck = localDecks.find(d => String(d.id) === deck.id);
         
         if (localDeck) {
-          const deckJSON = await exportDeckToJSON(deck.id);
+          const deckJSON = await exportDeckToJSON(localDeck.id);
           console.log('[useFlashcards] Mazo exportado localmente (offline)');
           return deckJSON;
         }
@@ -209,7 +210,7 @@ export function useFlashcards() {
   }, [t, showAlert]);
 
   const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
-    const isOwner = deck.user_id === currentUserId;
+    const isOwner = deck.user_id === currentUserId || deck.user_id === String(currentUserId);
     const pillWidth = isOwner ? 152 : 101;
     return {
       pillWidth,
@@ -246,7 +247,7 @@ export function useFlashcards() {
   };
 
   // ── Due deck notifications ──────────────────────────────────────────
-  const dueNotifScheduled = useRef<Set<number>>(new Set());
+  const dueNotifScheduled = useRef<Set<string>>(new Set());
   const filteredDecksRef = useRef(filteredDecks);
   filteredDecksRef.current = filteredDecks;
 
@@ -274,7 +275,7 @@ export function useFlashcards() {
       const task = InteractionManager.runAfterInteractions(async () => {
         try {
           const userId = await getUserId();
-          setCurrentUserId(userId ? Number(userId) : null);
+          setCurrentUserId(userId ? String(userId) : null);
           const subs = await getSubjects();
           setSubjects(subs || []);
           // Load groups

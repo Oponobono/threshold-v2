@@ -10,7 +10,7 @@ interface PerformanceCardProps {
   displayGPA: string;
   displayProjectedGPA: string;
   displayDelta: number | null;
-  selectedSubjectId: number | null;
+  selectedSubjectId: string | null;
   globalGPA: any;
   gradedAssessments: any[];
   onPressInfo?: () => void;

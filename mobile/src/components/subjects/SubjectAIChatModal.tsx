@@ -130,9 +130,9 @@ export interface SubjectAIChatModalProps {
   /** Callback para volver al selector de contexto */
   onGoBack?: () => void;
   /** ID de la materia */
-  subjectId?: number;
+  subjectId?: string;
   /** ID del usuario */
-  userId?: number;
+  userId?: string;
   /** Nombre de la materia para el encabezado */
   subjectName: string;
   /** Contexto académico ensamblado por el backend */

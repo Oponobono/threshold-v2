@@ -72,7 +72,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
 
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [cards, setCards] = useState<Flashcard[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const activeCloseRef = useRef<(() => void) | null>(null);
 
@@ -164,7 +164,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
       setActiveTab('mazos');
       setScreen('hub');
       loadDecks();
-      getUserId().then(id => setCurrentUserId(id ? Number(id) : null));
+      getUserId().then(id => setCurrentUserId(id || null));
       // Load groups
       getUserGroups().then(g => {
         const valid = (g || []).filter((gr: any) => gr.group_pin_id);

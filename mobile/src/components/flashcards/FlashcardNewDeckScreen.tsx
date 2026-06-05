@@ -32,7 +32,7 @@ export const FlashcardNewDeckScreen: React.FC<Props> = ({ subjects, onBack, onDe
 
   const [deckTitle, setDeckTitle] = useState('');
   const [deckDesc, setDeckDesc] = useState('');
-  const [deckSubjectId, setDeckSubjectId] = useState<number | null>(null);
+  const [deckSubjectId, setDeckSubjectId] = useState<string | null>(null);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
 
   const handleSaveDeck = async () => {

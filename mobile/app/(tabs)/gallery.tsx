@@ -40,7 +40,7 @@ export default function GalleryScreen() {
   };
 
   const handleGridDelete = async (group: GalleryPhoto[]) => {
-    const ids = group.map((p) => p.id).filter(Boolean) as number[];
+    const ids = group.map((p) => p.id).filter(Boolean) as string[];
     const count = ids.length;
     if (count === 0) return;
     alertRef.show({
@@ -115,8 +115,8 @@ export default function GalleryScreen() {
 
       <SubjectChips
         subjects={g.subjects}
-        selectedSubjectId={g.selectedSubjectId}
-        onSelectSubject={g.setSelectedSubjectId}
+        selectedSubjectId={g.selectedSubjectId as string | null}
+        onSelectSubject={g.setSelectedSubjectId as (id: string | null) => void}
         t={t}
       />
 
@@ -181,7 +181,7 @@ export default function GalleryScreen() {
             photos={g.viewerPhotos as any}
             initialIndex={g.viewerIndex}
             onClose={() => g.setViewerVisible(false)}
-            onPhotoDeleted={g.handlePhotoDeleted}
+            onPhotoDeleted={g.handlePhotoDeleted as unknown as (id: string) => void}
             onOCRSaved={g.handleSave}
           />
         )}

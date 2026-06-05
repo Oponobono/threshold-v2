@@ -11,7 +11,7 @@ export interface UnifiedActivityItem {
   title: string;
   subtitle: string;
   date: number;
-  subjectId: number;
+  subjectId: string;
   subjectName?: string;
   subjectColor?: string;
   type: 'assessment' | 'flashcard' | 'study' | 'calendar';
@@ -107,11 +107,11 @@ export function useSubjects(t: any) {
 
   // ── Pending FSRS cards per subject (real data from predictions engine) ──
   const pendingBySubject = useMemo(() => {
-    const map = new Map<number, number>();
+    const map = new Map<string, number>();
     if (!predictions?.cards) return map;
     for (const card of predictions.cards) {
       if (card.subjectId !== undefined) {
-        map.set(card.subjectId, (map.get(card.subjectId) ?? 0) + 1);
+        map.set(String(card.subjectId), (map.get(String(card.subjectId)) ?? 0) + 1);
       }
     }
     return map;
@@ -119,7 +119,7 @@ export function useSubjects(t: any) {
 
   // ── Next upcoming assessment per subject (real data from assessments) ──
   const nextMilestoneBySubject = useMemo(() => {
-    const map = new Map<number, string>();
+    const map = new Map<string, string>();
     const now = Date.now();
     const upcoming = assessments
       .filter(a => {
@@ -229,7 +229,7 @@ export function useSubjects(t: any) {
           title: `Repaso: ${deck.title}`,
           subtitle: `${deck.review_count || 0} tarjetas memorizadas`,
           date: lastReviewed,
-          subjectId: deck.subject_id || 0,
+          subjectId: deck.subject_id || '',
           type: 'flashcard'
         });
       }
@@ -246,7 +246,7 @@ export function useSubjects(t: any) {
             title: 'Sesión de Repaso',
             subtitle: `${session.total_attempts} tarjetas revisadas • ${acc}% de acierto`,
             date: ts,
-            subjectId: 0,
+            subjectId: '',
             type: 'study'
           });
         }
@@ -262,7 +262,7 @@ export function useSubjects(t: any) {
           title: ev.title,
           subtitle: ev.eventType === 'class' ? 'Clase' : ev.eventType === 'exam' ? 'Examen' : 'Tarea',
           date: ts,
-          subjectId: ev.subjectId || 0,
+          subjectId: ev.subjectId || '',
           type: 'calendar'
         });
       }

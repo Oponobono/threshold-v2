@@ -6,8 +6,8 @@ import { getMasteryAnalytics } from '../../services/api/analytics';
 import { useTranslation } from 'react-i18next';
 
 interface MasteryRadarProps {
-  userId: number;
-  subjectId: number | 'all';
+  userId: string;
+  subjectId: string | 'all';
   onPress?: () => void;
 }
 

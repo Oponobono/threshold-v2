@@ -8,8 +8,8 @@ import { Subject } from '../../services/api';
 export interface SubjectPickerModalProps {
   visible: boolean;
   subjects: Subject[];
-  selectedId: number | null;
-  onSelect: (id: number | null) => void;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
   onClose: () => void;
 }
 
@@ -78,7 +78,7 @@ export const SubjectPickerModal: React.FC<SubjectPickerModalProps> = ({
                   backgroundColor: String(selectedId) === String(sub.id) ? `${sub.color || theme.colors.primary}20` : theme.colors.background,
                   borderWidth: 1, borderColor: String(selectedId) === String(sub.id) ? (sub.color || theme.colors.primary) : theme.colors.border,
                 }}
-                onPress={() => { onSelect(sub.id ? Number(sub.id) : null); onClose(); }}
+                onPress={() => { onSelect(sub.id ? String(sub.id) : null); onClose(); }}
               >
                 <View style={{
                   width: 28, height: 28, borderRadius: 8,

@@ -21,13 +21,13 @@ import { StudyMode } from '../../services/api/types';
 interface FlashcardCreatorModalProps {
   visible: boolean;
   onClose: () => void;
-  onSuccess: (deckId: number) => void;
+  onSuccess: (deckId: string) => void;
   content?: string;
   imageBase64?: string;
   contentType: 'recording' | 'video' | 'image' | 'document';
   title: string;
-  subjectId: number;
-  userId: number;
+  subjectId: string;
+  userId: string;
 }
 
 interface EditableCard {
@@ -165,7 +165,7 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
     setTimeout(() => {
       const deckId = generatedDeck?.id || 0;
       if (deckId > 0) {
-        onSuccess(deckId);
+        onSuccess(String(deckId));
       } else {
         Alert.alert(t('common.error'), t('flashcards.noDeckId'));
         handleClose();

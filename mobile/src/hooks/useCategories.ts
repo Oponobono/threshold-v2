@@ -20,7 +20,7 @@ export function useCategories() {
   const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ subjectId?: string; subjectName?: string }>();
-  const subjectId = params.subjectId ? Number(params.subjectId) : null;
+  const subjectId = params.subjectId ?? null;
   const subjectName = params.subjectName ?? t('categories.screenTitle');
   const { showAlert } = useCustomAlert();
 

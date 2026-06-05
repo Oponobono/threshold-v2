@@ -109,7 +109,7 @@ export default function CalendarScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await Promise.all(assessmentIds.map((id: number) => deleteAssessment(id)));
+              await Promise.all(assessmentIds.map((id: any) => deleteAssessment(String(id))));
               await calendar.loadAllData(true);
               await calendar.reloadEventsForMonth();
               alertRef.show({

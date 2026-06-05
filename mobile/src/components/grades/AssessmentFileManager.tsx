@@ -14,7 +14,7 @@ import {
 } from '../../services/api/assessmentFiles';
 
 interface AssessmentFileManagerProps {
-  assessmentId: number;
+  assessmentId: string;
   onFilesUpdated?: (files: AssessmentFile[]) => void;
 }
 
@@ -102,7 +102,7 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
     }
   };
 
-  const handleDeleteFile = (fileId: number) => {
+  const handleDeleteFile = (fileId: string) => {
     Alert.alert(
       t('assessments.deleteFileConfirm'),
       t('assessments.deleteFileConfirmMessage'),
@@ -153,7 +153,7 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
   return (
     <View style={{ marginVertical: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <Text style={[globalStyles.subheading, { fontSize: 14, fontWeight: '600' }]}>
+        <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>
           {t('assessments.attachedFiles')} ({files.length})
         </Text>
       </View>
@@ -176,7 +176,7 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
                 alignItems: 'center',
                 paddingVertical: 10,
                 paddingHorizontal: 12,
-                backgroundColor: theme.colors.background.secondary,
+                backgroundColor: theme.colors.card,
                 borderRadius: 8,
                 marginBottom: 8,
               }}
@@ -188,11 +188,11 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
                 style={{ marginRight: 10 }}
               />
               <View style={{ flex: 1 }}>
-                <Text style={[globalStyles.bodySmall, { fontWeight: '500' }]} numberOfLines={1}>
+                <Text style={{ fontSize: 13, fontWeight: '500' }} numberOfLines={1}>
                   {item.file_name}
                 </Text>
                 {item.file_size && (
-                  <Text style={[globalStyles.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
+                  <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 2 }}>
                     {getFileSizeLabel(item.file_size)}
                   </Text>
                 )}
@@ -201,7 +201,7 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
                 onPress={() => handleDeleteFile(item.id)}
                 style={{ padding: 8, marginLeft: 8 }}
               >
-                <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
+                <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
               </TouchableOpacity>
             </View>
           )}
@@ -219,7 +219,7 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
           borderWidth: 1,
           borderStyle: 'dashed',
           borderColor: theme.colors.primary,
-          backgroundColor: theme.colors.background.tertiary,
+          backgroundColor: theme.colors.card,
           opacity: isUploading ? 0.6 : 1,
         }}
         onPress={handlePickFile}
@@ -228,14 +228,14 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
         {isUploading ? (
           <>
             <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: 8 }} />
-            <Text style={[globalStyles.bodySmall, { color: theme.colors.primary, fontWeight: '500' }]}>
+            <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '500' }}>
               {t('assessments.uploading')}
             </Text>
           </>
         ) : (
           <>
             <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} style={{ marginRight: 8 }} />
-            <Text style={[globalStyles.bodySmall, { color: theme.colors.primary, fontWeight: '500' }]}>
+            <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '500' }}>
               {t('assessments.attachFile')}
             </Text>
           </>

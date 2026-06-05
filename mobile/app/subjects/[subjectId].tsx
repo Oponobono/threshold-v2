@@ -305,7 +305,7 @@ export default function SubjectDetailScreen() {
         <DocumentScannerModal
           isVisible={isScannerVisible}
           onClose={() => setIsScannerVisible(false)}
-          subjects={selectedSubject ? [selectedSubject as Subject] : []}
+          subjects={selectedSubject ? [selectedSubject as unknown as Subject] : [] as Subject[]}
           onSave={handleScannerSave}
         />
       )}

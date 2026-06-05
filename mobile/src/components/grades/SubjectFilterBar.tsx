@@ -5,8 +5,8 @@ import { gradesStyles } from '../../styles/Grades.styles';
 
 interface SubjectFilterBarProps {
   subjects: any[];
-  selectedSubjectId: number | null;
-  onSelectSubject: (id: number | null) => void;
+  selectedSubjectId: string | null;
+  onSelectSubject: (id: string | null) => void;
   t: any;
 }
 

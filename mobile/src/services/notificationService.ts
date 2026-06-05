@@ -122,7 +122,7 @@ function deadlineId(eventId: string): string {
   return `${DEADLINE_PREFIX}${eventId}`;
 }
 
-function dueDeckId(deckId: number): string {
+function dueDeckId(deckId: string | number): string {
   return `${DUEDECK_PREFIX}${deckId}`;
 }
 
@@ -284,7 +284,7 @@ export async function cancelWeeklyDigest(): Promise<void> {
 // ── Due deck notifications ──────────────────────────────────────────────────────
 
 export async function scheduleDueDeckNotification(
-  deckId: number,
+  deckId: string | number,
   deckTitle: string,
   dueCount: number,
 ): Promise<string | undefined> {
@@ -304,7 +304,7 @@ export async function scheduleDueDeckNotification(
   return id;
 }
 
-export async function cancelDueDeckNotification(deckId: number): Promise<void> {
+export async function cancelDueDeckNotification(deckId: string | number): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(dueDeckId(deckId));
 }
 

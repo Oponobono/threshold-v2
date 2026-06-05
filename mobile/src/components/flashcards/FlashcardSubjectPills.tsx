@@ -8,8 +8,8 @@ import type { Subject } from '../../services/api';
 
 interface Props {
   subjects: Subject[];
-  activeSubjectId: number | null;
-  onSelect: (id: number | null) => void;
+  activeSubjectId: string | null;
+  onSelect: (id: string | null) => void;
 }
 
 export const FlashcardSubjectPills: React.FC<Props> = ({ subjects, activeSubjectId, onSelect }) => {

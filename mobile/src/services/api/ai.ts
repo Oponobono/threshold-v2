@@ -248,8 +248,8 @@ export const generateStudyMaterialFromChat = async (params: {
   mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed';
   count: number;
   title: string;
-  subjectId: number;
-  userId: number;
+  subjectId: string;
+  userId: string;
 }) => {
   try {
     const response = await fetchWithFallback('/ai/generate-study-material', {

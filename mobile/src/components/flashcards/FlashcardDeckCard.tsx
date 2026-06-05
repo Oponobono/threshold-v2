@@ -23,7 +23,7 @@ const AnimatedArrow = React.memo(function AnimatedArrow() {
 interface DeckCardProps {
   deck: FlashcardDeck;
   isShared: boolean;
-  currentUserId: number | null;
+  currentUserId: string | null;
   isDue: boolean;
   onPress: () => void;
   onLongPress: () => void;

@@ -8,8 +8,8 @@ interface GenerateCardsParams {
   imageBase64?: string;
   count: number;
   title: string;
-  subjectId: number;
-  userId: number;
+  subjectId: string;
+  userId: string;
   mode?: StudyMode;
 }
 

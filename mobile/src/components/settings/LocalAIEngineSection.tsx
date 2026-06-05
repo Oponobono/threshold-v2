@@ -541,7 +541,7 @@ export const LocalAIEngineSection = () => {
             try {
               const caps = await refreshDeviceCapabilities();
               if (caps) {
-                alertRef?.current?.show({
+                alertRef.show({
                   title: t('settings.localAI.ramDetected', 'Información de RAM'),
                   message: `${t('common.total', 'Total')}: ${caps.totalRamGB}GB\n${t('common.available', 'Disponible')}: ${caps.availableRamGB}GB\n${t('common.usable', 'Utilizable')}: ${caps.usableRamGB}GB\n\n${t('common.tier', 'Nivel')}: ${caps.tier}\n${t('common.compatible', 'Modelos compatibles')}: ${caps.compatibleModels.join(', ')}`,
                   buttons: [{ text: 'OK' }],
@@ -777,7 +777,7 @@ export const LocalAIEngineSection = () => {
                 : MODELS[modelId as LocalModelId]?.downloadSizeBytes || 0;
               const name = isWhisper 
                 ? 'Whisper Tiny' 
-                : MODELS[modelId as LocalModelId]?.name || modelId;
+                : MODELS[modelId as LocalModelId]?.label || modelId;
               const isLast = idx === Object.keys(downloadedModels).length - 1;
               
               return (

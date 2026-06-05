@@ -26,7 +26,7 @@ const ProgressBar = ({ value, color }: { value: number; color: string }) => (
 
 interface SubjectInsightsProps {
   recentAssessments: Assessment[];
-  onDeleteAssessment?: (id: number) => void;
+  onDeleteAssessment?: (id: string) => void;
   onOpenCategories?: () => void;
   onAddAssessment?: () => void;
   onAssessmentUpdated?: (assessment?: Assessment) => void;
@@ -104,7 +104,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     showAlert({
       title: t('common.deleteItem'),
       message: t('assessments.deleteConfirm'),
@@ -203,7 +203,7 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                       <Text style={[styles.insightScore, scoreColor ? { color: scoreColor } : null]}>{scoreText}</Text>
-                      {assessment.id && assessment.id > 0 && (
+                      {assessment.id && (
                         <TouchableOpacity 
                           onPress={() => handleShowMenu(assessment)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

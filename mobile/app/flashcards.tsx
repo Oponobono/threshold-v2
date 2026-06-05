@@ -79,8 +79,8 @@ export default function FlashcardsScreen() {
 
             <FlashcardSubjectPills
               subjects={subjects}
-              activeSubjectId={activeSubjectId}
-              onSelect={setActiveSubjectId}
+              activeSubjectId={activeSubjectId as string | null}
+              onSelect={setActiveSubjectId as (id: string | null) => void}
             />
           </>
         )}

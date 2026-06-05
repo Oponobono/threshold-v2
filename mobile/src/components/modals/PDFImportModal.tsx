@@ -19,8 +19,8 @@ import { createScannedDocument, extractTextFromPDF } from '../../services/api';
 export interface PDFImportModalProps {
   isVisible: boolean;
   onClose: () => void;
-  selectedSubjectId?: number;
-  onImportSuccess?: (documentUri: string, documentId?: number) => void;
+  selectedSubjectId?: string;
+  onImportSuccess?: (documentUri: string, documentId?: string) => void;
 }
 
 const PDF_DIR = () => `${FileSystem.documentDirectory}Threshold/pdf/`;
@@ -121,7 +121,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
         subject_id: selectedSubjectId,
         local_uri: localPdfUri,
         name: file.name,
-        ocr_text: ocrText || null,
+        ocr_text: ocrText || undefined,
       });
       
       // createScannedDocument ya gestiona el auto-upload según las preferencias de backup

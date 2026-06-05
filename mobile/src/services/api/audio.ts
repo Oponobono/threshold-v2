@@ -45,7 +45,7 @@ export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
   return localData;
 };
 
-export const createAudioRecording = async (payload: { subject_id?: number | null; name?: string; local_uri: string; duration?: number; id?: string }): Promise<any> => {
+export const createAudioRecording = async (payload: { subject_id?: string | null; name?: string; local_uri: string; duration?: number; id?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
   const userId = await getUserId();
@@ -81,7 +81,7 @@ export const createAudioRecording = async (payload: { subject_id?: number | null
   return recording;
 };
 
-export const updateAudioRecording = async (id: string, payload: { subject_id?: number | null; name?: string }): Promise<any> => {
+export const updateAudioRecording = async (id: string, payload: { subject_id?: string | null; name?: string }): Promise<any> => {
   // 1. Actualizar localmente de forma inmediata
   await audioRepository.update(id, {
     ...payload,

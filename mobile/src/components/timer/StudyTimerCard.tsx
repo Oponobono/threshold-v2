@@ -15,7 +15,7 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface StudyTimerCardProps {
   onOpenConfig: () => void;
-  onFinish: (duration: number, subjectId: number | null, mode: 'pomodoro' | 'threshold') => void;
+  onFinish: (duration: number, subjectId: string | null, mode: 'pomodoro' | 'threshold') => void;
   refreshTrigger?: number;
 }
 
@@ -43,7 +43,7 @@ export const StudyTimerCard: React.FC<StudyTimerCardProps> = ({ onOpenConfig, on
   const [mode, setMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
   const [totalSeconds, setTotalSeconds] = useState(25 * 60);
   const [remainingSeconds, setRemainingSeconds] = useState(25 * 60);
-  const [subjectId, setSubjectId] = useState<number | null>(null);
+  const [subjectId, setSubjectId] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
 

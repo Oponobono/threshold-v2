@@ -8,8 +8,8 @@ export interface FlashcardsManagerResult {
   isLoading: boolean;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  activeSubjectId: number | null;
-  setActiveSubjectId: (id: number | null) => void;
+  activeSubjectId: string | null;
+  setActiveSubjectId: (id: string | null) => void;
   subjects: Subject[];
   filteredDecks: FlashcardDeck[];
   loadDecks: () => Promise<void>;
@@ -30,7 +30,7 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSubjectId, setActiveSubjectId] = useState<number | null>(null);
+  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
 
   /**
    * Contador de generación: cada vez que se inicia una carga, se incrementa.

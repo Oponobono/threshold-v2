@@ -23,7 +23,7 @@ export interface PredictionResponse {
 
 export interface CardReviewResponse {
   success: boolean;
-  cardId: number;
+  cardId: string;
   quality: number;
   nextReviewDate: string;
   newStability: number;
@@ -68,8 +68,8 @@ export const getPredictions = async (userId: string | number): Promise<Predictio
  * @param responseTimeMs Tiempo de respuesta en milisegundos
  */
 export const recordCardReview = async (
-  cardId: number,
-  userId: number,
+  cardId: string,
+  userId: string,
   result: 'correct' | 'incorrect',
   responseTimeMs: number
 ): Promise<CardReviewResponse> => {
@@ -352,7 +352,7 @@ export interface MasteryRadarData {
  * Obtiene el análisis de dominio (mastery) para un usuario/materia
  * GET /api/analytics/mastery/:userId/:subjectId
  */
-export const getMasteryAnalytics = async (userId: number, subjectId: number | 'all'): Promise<MasteryRadarData> => {
+export const getMasteryAnalytics = async (userId: string, subjectId: string | 'all'): Promise<MasteryRadarData> => {
   const response = await fetchWithFallback(`/analytics/mastery/${userId}/${subjectId}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },

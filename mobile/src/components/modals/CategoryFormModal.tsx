@@ -26,7 +26,7 @@ import { useCustomAlert } from '../ui/CustomAlert';
 
 interface CategoryFormModalProps {
   visible: boolean;
-  subjectId: number;
+  subjectId: string;
   editing: AssessmentCategory | null;
   onClose: () => void;
   onSaved: () => void;

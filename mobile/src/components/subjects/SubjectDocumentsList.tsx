@@ -153,10 +153,10 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
                
                if (doc?.is_legacy_photo) {
                  console.log('[SubjectDocumentsList] Borrando como foto legacy...');
-                 await deletePhoto(docId as number);
+                  await deletePhoto(String(docId));
                } else {
                  console.log('[SubjectDocumentsList] Borrando como documento escaneado...');
-                 await deleteScannedDocument(docId, doc?.subject_id);
+                  await deleteScannedDocument(String(docId));
                }
                
                // Eliminar archivo físico para liberar espacio

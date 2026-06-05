@@ -24,7 +24,7 @@ export const SchedulePlannerModal = ({ visible, onClose, subjects, allSchedules,
   const insets = useSafeAreaInsets();
   const { refreshSchedules } = useDataStore();
 
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [isSubjectSelectorVisible, setIsSubjectSelectorVisible] = useState(false);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [scheduleDraftKeys, setScheduleDraftKeys] = useState<Set<string>>(new Set());

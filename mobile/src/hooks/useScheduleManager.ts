@@ -6,7 +6,7 @@ import { type Schedule } from '../services/api';
 import { useDataStore } from '../store/useDataStore';
 import { useTranslation } from 'react-i18next';
 
-export function useScheduleManager(selectedSubjectId: number | null, setTodaySchedules: (s: any[]) => void) {
+export function useScheduleManager(selectedSubjectId: string | null, setTodaySchedules: (s: any[]) => void) {
   const { t } = useTranslation();
   const { schedules: allSchedules, refreshSchedules } = useDataStore();
 
@@ -82,6 +82,7 @@ export function useScheduleManager(selectedSubjectId: number | null, setTodaySch
       return;
     }
 
+    const subjectId = selectedSubjectId;
     const toDelete = existingScheduleRowsForSelectedSubject.filter(
       (s: any) => !scheduleDraftKeys.has(buildScheduleKey(s.day_of_week, s.start_time))
     );
@@ -91,7 +92,7 @@ export function useScheduleManager(selectedSubjectId: number | null, setTodaySch
         const [day, start] = key.split('-');
         const hour = Number(start.split(':')[0]);
         return {
-          subject_id: selectedSubjectId,
+          subject_id: subjectId,
           day_of_week: Number(day),
           start_time: start,
           end_time: `${(hour + 1).toString().padStart(2, '0')}:00`,

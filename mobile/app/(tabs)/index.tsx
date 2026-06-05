@@ -67,7 +67,7 @@ export default function HybridDashboardScreen() {
   const [isQuickAddMenuVisible, setIsQuickAddMenuVisible] = useState(false);
   const [isGradeModalVisible, setIsGradeModalVisible] = useState(false);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
-  const [predictedSubjectId, setPredictedSubjectId] = useState<number | null>(null);
+  const [predictedSubjectId, setPredictedSubjectId] = useState<string | null>(null);
 
   const [selectedMetric, setSelectedMetric] = useState<any>(null);
 
@@ -91,7 +91,7 @@ export default function HybridDashboardScreen() {
   
   // Timer Session State
   const [lastSessionDuration, setLastSessionDuration] = useState<number>(0);
-  const [lastSessionSubjectId, setLastSessionSubjectId] = useState<number | null>(null);
+  const [lastSessionSubjectId, setLastSessionSubjectId] = useState<string | null>(null);
   const [lastSessionMode, setLastSessionMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -766,14 +766,14 @@ export default function HybridDashboardScreen() {
         visible={isGradeModalVisible}
         onClose={() => setIsGradeModalVisible(false)}
         subjects={subjects}
-        initialSubjectId={predictedSubjectId}
+        initialSubjectId={predictedSubjectId as string | null | undefined}
       />
 
       <CreateTaskModal
         visible={isTaskModalVisible}
         onClose={() => setIsTaskModalVisible(false)}
         subjects={subjects}
-        initialSubjectId={predictedSubjectId}
+        initialSubjectId={predictedSubjectId as string | null | undefined}
         onTaskCreated={() => loadData()}
       />
 
@@ -865,7 +865,7 @@ export default function HybridDashboardScreen() {
               const rating = ratingMap[feedback] || 3;
 
               await createStudySession({
-                subject_id: lastSessionSubjectId,
+                subject_id: lastSessionSubjectId as string | undefined,
                 session_type: lastSessionMode === 'pomodoro' ? 'Pomodoro' : 'Threshold',
                 duration_seconds: lastSessionDuration,
                 performance_rating: rating,

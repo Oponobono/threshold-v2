@@ -9,7 +9,7 @@ export interface ScannedDocument {
   user_id?: string;
   subject_id?: string;
   name?: string;
-  local_uri: string;
+  local_uri?: string;
   ocr_text?: string;
   created_at?: string;
 }

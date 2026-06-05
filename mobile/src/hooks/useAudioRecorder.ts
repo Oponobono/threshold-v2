@@ -42,9 +42,11 @@ async function readLocalFiles(t: (key: string, opts?: any) => string): Promise<R
       const fullUri = audioDir + file;
       const timestamp = parseInt(file.split('_')[1] || '0', 10) || Date.now();
       const dateObj = new Date(timestamp);
+      const id = file;
       return {
+        id,
         local_uri: fullUri,
-        user_id: 0,
+        user_id: '0',
         id_string: file,            // fallback id before DB sync
         uri: fullUri,
         date: dateObj.toLocaleString(),
@@ -66,7 +68,9 @@ function mergeLocalAndDb(
   dbRecordings: AudioRecording[],
   t: (key: string, opts?: any) => string
 ): RecordingItem[] {
-  const dbByUri = new Map<string, AudioRecording>(dbRecordings.map((r) => [r.local_uri, r]));
+  const dbByUri = new Map<string, AudioRecording>(
+    dbRecordings.filter((r): r is AudioRecording & { local_uri: string } => !!r.local_uri).map((r) => [r.local_uri, r])
+  );
 
   const merged: RecordingItem[] = localFiles.map((local) => {
     const db = dbByUri.get(local.uri);
@@ -90,7 +94,7 @@ function mergeLocalAndDb(
   // so the UI can show a "file missing" state and let the user delete the record.
   const mergedUris = new Set(merged.map((r) => r.uri));
   for (const db of dbRecordings) {
-    if (!mergedUris.has(db.local_uri)) {
+    if (!db.local_uri || !mergedUris.has(db.local_uri)) {
       const hasCloudBackup = db.cloud_url && db.cloud_url !== 'ghost_file';
       
       merged.push({
@@ -352,8 +356,9 @@ export function useAudioRecorder() {
           date: now.toLocaleDateString(),
         });
         const optimisticItem: RecordingItem = {
+          id: fileName,
           local_uri: permanentUri,
-          user_id: 0,
+          user_id: '0',
           id_string: fileName,
           uri: permanentUri,
           date: now.toLocaleString(),
@@ -503,14 +508,11 @@ export function useAudioRecorder() {
     );
 
     try {
-      // Convert string id to number if needed
-      const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
-      
-      // 2. Delete from DB if it's a numeric ID (already synced)
+      // 2. Delete from DB if it's already synced
       let wasQueuedOffline = false;
-      if (!isNaN(numericId) && numericId > 0) {
+      if (id) {
         try {
-          const result = await deleteAudioRecording(numericId);
+          const result = await deleteAudioRecording(String(id));
           wasQueuedOffline = !!(result as any)?._isPending;
         } catch (dbErr) {
           console.error('Error deleting from DB:', dbErr);

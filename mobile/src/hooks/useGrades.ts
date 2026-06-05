@@ -15,8 +15,8 @@ export function useGrades(t: any) {
   const { subjects, assessments, refreshAssessments } = useDataStore();
 
   const [profile, setProfile] = useState<any>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
-  const [userId, setUserId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [globalGPA, setGlobalGPA] = useState<any>(null);
   const [isLoadingGlobalGPA, setIsLoadingGlobalGPA] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -51,7 +51,7 @@ export function useGrades(t: any) {
   }, [profile]);
 
   useEffect(() => {
-    getUserId().then(id => setUserId(id != null ? Number(id) : null));
+    getUserId().then(id => setUserId(id != null ? String(id) : null));
   }, []);
 
   useEffect(() => {

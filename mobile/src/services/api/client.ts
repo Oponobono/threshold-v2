@@ -315,7 +315,7 @@ const cacheKey = `api_cache_${path}`;
   const customInit = { ...init, headers };
 
   for (const base of candidates) {
-    let timeoutId: NodeJS.Timeout | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       const fullUrl = `${base}${path}`;
       let requestInit = customInit;

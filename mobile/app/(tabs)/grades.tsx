@@ -37,8 +37,8 @@ export default function GradesScreen() {
 
       <SubjectFilterBar
         subjects={g.subjects}
-        selectedSubjectId={g.selectedSubjectId}
-        onSelectSubject={g.setSelectedSubjectId}
+        selectedSubjectId={g.selectedSubjectId as string | null}
+        onSelectSubject={g.setSelectedSubjectId as (id: string | null) => void}
         t={t}
       />
 
@@ -47,7 +47,7 @@ export default function GradesScreen() {
           displayGPA={g.displayGPA}
           displayProjectedGPA={g.displayProjectedGPA}
           displayDelta={g.displayDelta}
-          selectedSubjectId={g.selectedSubjectId}
+          selectedSubjectId={g.selectedSubjectId as string | null}
           selectedSubject={g.selectedSubject}
           globalGpaLetter={g.globalGpaLetter}
           globalProjectedLetter={g.globalProjectedLetter}
@@ -63,8 +63,8 @@ export default function GradesScreen() {
 
         {g.userId != null && (
           <MasteryRadarCard
-            userId={g.userId}
-            selectedSubjectId={g.selectedSubjectId}
+            userId={g.userId as string}
+            selectedSubjectId={g.selectedSubjectId as string | null}
             onPressInfo={() => {
               g.setOverlayText(t('grades.masteryOverlay'));
               g.setOverlayVisible(true);
@@ -169,7 +169,7 @@ export default function GradesScreen() {
             >
               <Ionicons name="close-circle" size={32} color="#fff" />
             </TouchableOpacity>
-            <MasteryRadar userId={g.userId} subjectId={g.selectedSubjectId || 'all'} />
+            <MasteryRadar userId={g.userId} subjectId={(g.selectedSubjectId as string | null) || 'all'} />
           </View>
         </Modal>
       )}

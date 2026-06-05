@@ -24,7 +24,7 @@ import { useAudioRecorder } from './useAudioRecorder';
 import { useDataStore } from '../store/useDataStore';
 import { useConnectivityStore } from '../store/useConnectivityStore';
 import { photoRepository, documentRepository, youTubeRepository } from '../services/database';
-import { useCustomAlert } from '../components/ui/CustomAlert';
+import { useCustomAlert, alertRef } from '../components/ui/CustomAlert';
 import { generatePdfFromImages } from '../utils/pdfGenerator';
 
 type DetailSubject = Subject & {
@@ -286,7 +286,7 @@ export function useSubjectDetail() {
           style: 'destructive' as const,
           onPress: async () => {
             try {
-              await deleteYouTubeVideo(Number(videoId));
+              await deleteYouTubeVideo(String(videoId));
               setRecentVideos(prev => prev.filter(v => v.id !== videoId));
             } catch {
               showAlert({ title: t('subjects.error'), message: t('subjects.deleteVideoError'), type: 'error' });
@@ -300,7 +300,7 @@ export function useSubjectDetail() {
   const handleTakePhoto = () => setIsPhotoModalVisible(true);
   const handleOpenScanner = () => setIsScannerVisible(true);
 
-  const handleScannerSave = useCallback(async (_uri: string, _id: number, base64?: string | null) => {
+  const handleScannerSave = useCallback(async (_uri: string, _id: string, base64?: string | null) => {
     if (!subjectId) return;
     const updatedPhotos = await getPhotosBySubject(subjectId);
     const updatedDocs = await getScannedDocumentsBySubject(subjectId);
@@ -320,8 +320,8 @@ export function useSubjectDetail() {
     setScannedDocuments(updatedDocs || []);
   }, [subjectId]);
 
-  const handleViewerPhotoDeleted = useCallback((id: number) => {
-    setPhotos(prev => prev.filter(p => p.id !== id));
+  const handleViewerPhotoDeleted = useCallback((id: string) => {
+    setPhotos(prev => prev.filter(p => String(p.id) !== id));
   }, []);
 
   const handleViewerOCRSaved = useCallback(async () => {
@@ -370,7 +370,7 @@ export function useSubjectDetail() {
     setFlashcardBase64('');
   }, []);
 
-  const handleFlashcardSuccess = useCallback((deckId: number) => {
+  const handleFlashcardSuccess = useCallback((deckId: string) => {
     setIsFlashcardModalVisible(false);
     setFlashcardContextText('');
     setFlashcardBase64('');

@@ -14,7 +14,7 @@ import { ZoomableImage } from '../ui/ZoomableImage';
 const { width } = Dimensions.get('window');
 
 interface PhotoItem {
-  id?: number;
+  id?: string;
   local_uri: string;
   cloud_url?: string | null;
 }
@@ -24,7 +24,7 @@ interface ImageViewerModalProps {
   photos: PhotoItem[];
   initialIndex?: number;
   onClose: () => void;
-  onPhotoDeleted: (id: number) => void;
+  onPhotoDeleted: (id: string) => void;
   onOCRSaved?: () => void;
 }
 
@@ -135,7 +135,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     }
   };
 
-  const handleDelete = async (photoId: number) => {
+  const handleDelete = async (photoId: string) => {
     showAlert({
       title: t('gallery.deletePhotoTitle'),
       message: t('gallery.deletePhotoConfirm'),

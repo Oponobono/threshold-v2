@@ -5,10 +5,10 @@ export interface ScheduleItem {
   color: string;
   start_time: string;
   end_time: string;
-  subject_id?: number;
+  subject_id?: string;
   time?: string;
   eventType?: string;
-  assessmentId?: number;
+  assessmentId?: string;
   assessmentData?: any;
   count?: number;
   allAssessments?: any[];
@@ -24,9 +24,9 @@ export interface CalendarEventItem {
   start_time: string;
   end_time: string;
   time?: string;
-  subject_id?: number;
+  subject_id?: string;
   eventType?: string;
-  assessmentId?: number;
+  assessmentId?: string;
   assessmentData?: any;
   count?: number;
   allAssessments?: any[];

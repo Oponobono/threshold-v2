@@ -33,8 +33,8 @@ const zyrenOrbAnimation = require('../../lottieFiles/ai_orb.json');
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface SubjectAIFabProps {
-  subjectId?: number;
-  userId?: number;
+  subjectId?: string;
+  userId?: string;
   subjectName: string;
   recordings?: RecordingItem[];
   photos?: any[];

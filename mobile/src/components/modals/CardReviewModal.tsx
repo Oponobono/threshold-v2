@@ -24,7 +24,7 @@ import { theme } from '../../styles/theme';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface CardReviewCard {
-  cardId: number;
+  cardId: string;
   front: string;
   back: string;
 }
@@ -32,7 +32,7 @@ export interface CardReviewCard {
 interface CardReviewModalProps {
   isVisible: boolean;
   card: CardReviewCard | null;
-  userId: number;
+  userId: string;
   onClose: () => void;
   onReviewComplete?: (result: CardReviewResponse) => void;
 }

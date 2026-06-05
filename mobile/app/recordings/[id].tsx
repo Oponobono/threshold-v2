@@ -53,8 +53,8 @@ export default function RecordingDetailScreen() {
         const recordings = await getAudioRecordings();
         const recordingFound = recordings.find(r =>
           r.id?.toString() === id ||
-          r.local_uri.endsWith(id) ||
-          r.local_uri.endsWith(`${id}.m4a`)
+          (r.local_uri?.endsWith(id) ?? false) ||
+          (r.local_uri?.endsWith(`${id}.m4a`) ?? false)
         );
         if (recordingFound) {
           setContentType('recording');

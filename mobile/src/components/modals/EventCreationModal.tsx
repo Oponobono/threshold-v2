@@ -30,7 +30,7 @@ import { alertRef } from '../ui/CustomAlert';
 interface EventCreationModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (event: CalendarEventInput, eventId?: number) => void;
+  onSave: (event: CalendarEventInput, eventId?: string) => void;
   selectedDate?: Date;
   subjects: any[];
   editingEvent?: any | null;
@@ -39,7 +39,7 @@ interface EventCreationModalProps {
 export interface CalendarEventInput {
   title: string;
   eventType: 'exam' | 'task' | 'class' | 'other';
-  subjectId?: number;
+  subjectId?: string;
   startDate: string; // DD-MM-YYYY
   endDate: string; // DD-MM-YYYY
   startTime?: string; // HH:MM
@@ -77,7 +77,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
   // Form state
   const [title, setTitle] = useState('');
   const [eventType, setEventType] = useState<EventType>('task');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | undefined>();
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>();
   const [allDay, setAllDay] = useState(true);
   const [description, setDescription] = useState('');
   const [createStudyPlan, setCreateStudyPlan] = useState(false);
@@ -548,8 +548,8 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
 interface SubjectPickerSheetProps {
   visible: boolean;
   subjects: any[];
-  selectedId?: number;
-  onSelect: (id: number) => void;
+  selectedId?: string;
+  onSelect: (id: string) => void;
   onClose: () => void;
 }
 

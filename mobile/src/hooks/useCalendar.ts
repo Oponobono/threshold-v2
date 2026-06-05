@@ -93,16 +93,16 @@ export function useCalendar(t: any, language: string = 'es-ES') {
       subject_id: s.subject_id,
     }));
 
-    const classMap = new Map<number, any>();
+    const classMap = new Map<string, any>();
     rawClasses.forEach(cls => {
-      if (classMap.has(cls.subject_id)) {
+      if (cls.subject_id && classMap.has(cls.subject_id)) {
         const existing = classMap.get(cls.subject_id)!;
         const newStartTime = existing.start_time < cls.start_time ? existing.start_time : cls.start_time;
         const newEndTime = existing.end_time > cls.end_time ? existing.end_time : cls.end_time;
         existing.start_time = newStartTime;
         existing.end_time = newEndTime;
         existing.time = `${newStartTime} - ${newEndTime}`;
-      } else {
+      } else if (cls.subject_id) {
         classMap.set(cls.subject_id, {
           ...cls,
           time: `${cls.start_time} - ${cls.end_time}`,
@@ -131,16 +131,16 @@ export function useCalendar(t: any, language: string = 'es-ES') {
         subject_id: a.subject_id,
       }));
 
-    const taskMap = new Map<number, any>();
+    const taskMap = new Map<string, any>();
     rawTasks.forEach(task => {
-      if (taskMap.has(task.subject_id)) {
+      if (task.subject_id && taskMap.has(task.subject_id)) {
         const existing = taskMap.get(task.subject_id)!;
         existing.count = (existing.count || 1) + 1;
         if (!existing.allAssessments) {
           existing.allAssessments = [existing.assessmentData];
         }
         existing.allAssessments.push(task.assessmentData);
-      } else {
+      } else if (task.subject_id) {
         taskMap.set(task.subject_id, {
           ...task,
           count: 1,

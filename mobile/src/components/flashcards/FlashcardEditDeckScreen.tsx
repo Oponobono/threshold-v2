@@ -31,7 +31,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
   const { showAlert } = useCustomAlert();
 
   const [deckTitle, setDeckTitle] = useState(deck.title);
-  const [deckSubjectId, setDeckSubjectId] = useState<number | null>(deck.subject_id || null);
+  const [deckSubjectId, setDeckSubjectId] = useState<string | null>(deck.subject_id || null);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
 
   const handleSaveDeck = async () => {

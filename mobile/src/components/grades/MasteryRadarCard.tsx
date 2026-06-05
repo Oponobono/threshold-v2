@@ -7,8 +7,8 @@ import { gradesStyles } from '../../styles/Grades.styles';
 import { MasteryRadar } from '../ui/MasteryRadar';
 
 interface MasteryRadarCardProps {
-  userId: number;
-  selectedSubjectId: number | null;
+  userId: string;
+  selectedSubjectId: string | null;
   onPressInfo: () => void;
   onExpand?: () => void;
   t: any;

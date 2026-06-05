@@ -137,11 +137,11 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [videoData, setVideoData] = useState<YouTubeVideo | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
 
   const [showFlashcardModal, setShowFlashcardModal] = useState(false);
-  const [studyDeck, setStudyDeck] = useState<{ id: number; title: string; cards: any[] } | null>(null);
+  const [studyDeck, setStudyDeck] = useState<{ id: string; title: string; cards: any[] } | null>(null);
   const [showStudyScreen, setShowStudyScreen] = useState(false);
 
   const videoTitle = videoData?.title || 'Video de YouTube';
@@ -182,7 +182,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
           }
         }
         setVideoData(video);
-        setSelectedSubjectId(video.subject_id ? Number(video.subject_id) : null);
+        setSelectedSubjectId(video.subject_id ? String(video.subject_id) : null);
       }
 
       await loadPersistedTexts(videoId, video);
@@ -254,7 +254,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
     } catch (e) { console.error('saveTextToFile:', e); }
   };
 
-  const handleSubjectChange = async (newId: number | null) => {
+  const handleSubjectChange = async (newId: string | null) => {
     setSelectedSubjectId(newId);
     if (videoData?.id) {
       await updateYouTubeVideo(videoData.id, { subject_id: newId }).catch(e => console.warn('updateSubject:', e));
@@ -544,8 +544,8 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         content={summary || transcription || ''}
         contentType="video"
         title={videoData?.title || 'Video'}
-        subjectId={selectedSubjectId || 0}
-        userId={videoData?.user_id ? Number(videoData.user_id) : 0}
+        subjectId={selectedSubjectId || ''}
+        userId={videoData?.user_id ? String(videoData.user_id) : ''}
       />
 
       {showStudyScreen && studyDeck && (

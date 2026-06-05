@@ -18,7 +18,7 @@ export function useGallery(t: any) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -74,7 +74,7 @@ export function useGallery(t: any) {
     }
   }, []);
 
-  const handlePhotoDeleted = useCallback((id: number) => {
+  const handlePhotoDeleted = useCallback((id: string) => {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
     setViewerPhotos((prev) => prev.filter((p) => p.id !== id));
   }, []);

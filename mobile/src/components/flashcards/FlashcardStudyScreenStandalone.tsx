@@ -27,7 +27,7 @@ import { useDueCardSnooze, SnoozeOption } from '../../hooks/useDueCardSnooze';
 interface Props {
   activeDeck: FlashcardDeck | null;
   initialCards: any[];
-  currentUserId: number | null;
+  currentUserId: string | null;
   onBack: () => void;
 }
 
@@ -176,8 +176,8 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           responseTimeMs: responseTime,
         });
         const reviewResult = await recordCardReview(
-          item.id,
-          currentUserId,
+          String(item.id),
+          String(currentUserId),
           result.passed ? 'correct' : 'incorrect',
           responseTime
         );
@@ -224,7 +224,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
 
   }, [isAnswered, isProcessing, isRevealed, items, itemIndex, cardStartTime, currentUserId]);
 
-  const handleDeleteCard = (cardId: number) => {
+  const handleDeleteCard = (cardId: string) => {
     showAlert({
       title: t('flashcards.deleteItem'),
       message: t('flashcards.deleteItemConfirm'),
@@ -235,7 +235,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           text: t('common.delete'), style: 'destructive',
           onPress: async () => {
             try {
-              await deleteFlashcard(cardId, activeDeck?.id);
+              await deleteFlashcard(cardId);
               const updated = items.filter(c => c.id !== cardId);
               setItems(updated);
               if (updated.length === 0) { setSessionDone(true); return; }

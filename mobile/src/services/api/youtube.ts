@@ -40,7 +40,7 @@ export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
   return localData;
 };
 
-export const createYouTubeVideo = async (payload: { subject_id?: number | null; youtube_url: string; video_id?: string; title?: string; thumbnail_url?: string; duration?: number; id?: string }): Promise<any> => {
+export const createYouTubeVideo = async (payload: { subject_id?: string | null; youtube_url: string; video_id?: string; title?: string; thumbnail_url?: string; duration?: number; id?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
   const userId = await getUserId();
@@ -67,7 +67,7 @@ export const createYouTubeVideo = async (payload: { subject_id?: number | null; 
   }
 };
 
-export const updateYouTubeVideo = async (id: string, payload: { subject_id?: number | null; title?: string }): Promise<any> => {
+export const updateYouTubeVideo = async (id: string, payload: { subject_id?: string | null; title?: string }): Promise<any> => {
   await youTubeRepository.update(id, {
     ...payload,
     subject_id: payload.subject_id != null ? String(payload.subject_id) : undefined,

@@ -682,7 +682,7 @@ export default function SettingsScreen() {
                       <Text style={[styles.settingDesc, { fontSize: 11, marginBottom: 8, fontWeight: '600', color: theme.colors.text.primary }]}>HORA DEL BACKUP</Text>
                       <TouchableOpacity
                         onPress={() => setShowScheduledTimePicker(true)}
-                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface || theme.colors.card, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: theme.colors.border }}
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: theme.colors.border }}
                       >
                         <Ionicons name="alarm-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
                         <Text style={[styles.settingTitle, { fontSize: 20, flex: 1, letterSpacing: 2, color: theme.colors.primary }]}>{scheduledTimeLabel}</Text>
@@ -1012,7 +1012,7 @@ export default function SettingsScreen() {
       <ManageOverridesModal
         visible={isManageOverridesVisible}
         onClose={() => setIsManageOverridesVisible(false)}
-        subjects={subjects}
+        subjects={subjects as any}
         defaultThreshold={threshold}
         onSave={handleSaveOverrides}
       />

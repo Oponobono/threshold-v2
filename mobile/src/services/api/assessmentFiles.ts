@@ -1,8 +1,8 @@
 import { fetchWithFallback } from './client';
 
 export interface AssessmentFile {
-  id: number;
-  assessment_id: number;
+  id: string;
+  assessment_id: string;
   file_name: string;
   file_type?: string;
   local_uri?: string;
@@ -16,7 +16,7 @@ export interface AssessmentFile {
  * Upload a file to an assessment
  */
 export const uploadAssessmentFile = async (
-  assessmentId: number,
+  assessmentId: string,
   file: {
     file_name: string;
     file_type?: string;
@@ -30,8 +30,7 @@ export const uploadAssessmentFile = async (
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(file),
-    },
-    'uploadAssessmentFile'
+    }
   );
 
   if (!response.ok) {
@@ -44,11 +43,10 @@ export const uploadAssessmentFile = async (
 /**
  * Get all files for an assessment
  */
-export const getAssessmentFiles = async (assessmentId: number): Promise<AssessmentFile[]> => {
+export const getAssessmentFiles = async (assessmentId: string): Promise<AssessmentFile[]> => {
   const response = await fetchWithFallback(
     `/assessments/${assessmentId}/files`,
-    { method: 'GET' },
-    'getAssessmentFiles'
+    { method: 'GET' }
   );
 
   if (!response.ok) {
@@ -61,11 +59,10 @@ export const getAssessmentFiles = async (assessmentId: number): Promise<Assessme
 /**
  * Delete a file from an assessment
  */
-export const deleteAssessmentFile = async (assessmentId: number, fileId: number): Promise<void> => {
+export const deleteAssessmentFile = async (assessmentId: string, fileId: string): Promise<void> => {
   const response = await fetchWithFallback(
     `/assessments/${assessmentId}/files/${fileId}`,
-    { method: 'DELETE' },
-    'deleteAssessmentFile'
+    { method: 'DELETE' }
   );
 
   if (!response.ok) {

@@ -5,8 +5,8 @@ import { galleryStyles } from '../../styles/Gallery.styles';
 
 interface SubjectChipsProps {
   subjects: any[];
-  selectedSubjectId: number | null;
-  onSelectSubject: (id: number | null) => void;
+  selectedSubjectId: string | null;
+  onSelectSubject: (id: string | null) => void;
   t: any;
 }
 
@@ -49,7 +49,7 @@ export const SubjectChips: React.FC<SubjectChipsProps> = ({
             String(selectedSubjectId) === String(s.id) && galleryStyles.subjectChipActive,
             { borderColor: s.color || theme.colors.primary }
           ]}
-          onPress={() => onSelectSubject(String(selectedSubjectId) === String(s.id) ? null : Number(s.id))}
+          onPress={() => onSelectSubject(String(selectedSubjectId) === String(s.id) ? null : String(s.id))}
           activeOpacity={0.7}
         >
           <Text 
