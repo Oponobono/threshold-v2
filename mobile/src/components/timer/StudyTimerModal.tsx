@@ -124,7 +124,7 @@ export const StudyTimerModal: React.FC<StudyTimerModalProps> = ({
             onPress={() => setSelectedSubjectId(String(s.id))}
           >
             <View style={[styles.subjectBadge, { backgroundColor: s.color || '#CCC', marginBottom: 0 }]}>
-               <MaterialCommunityIcons name={(s.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />
+               <MaterialCommunityIcons name={(s.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={20} color={theme.colors.text.primary} />
             </View>
             <Text style={localStyles.subjectName} numberOfLines={1}>{s.name}</Text>
           </TouchableOpacity>

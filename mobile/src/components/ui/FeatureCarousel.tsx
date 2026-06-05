@@ -148,7 +148,7 @@ export const FeatureCarousel = () => {
             {pageFeatures.map((feature) => (
               <View key={feature.id} style={styles.featureCard}>
                 <View style={styles.iconContainer}>
-                  <Feather name={feature.icon as any} size={24} color={theme.colors.primary} />
+                  <Feather name={feature.icon as React.ComponentProps<typeof Feather>['name']} size={24} color={theme.colors.primary} />
                 </View>
                 <View style={styles.textContainer}>
                   <Text style={styles.featureTitle} numberOfLines={1}>{feature.title}</Text>

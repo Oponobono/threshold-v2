@@ -41,7 +41,7 @@ export const AudioPlayerItem: React.FC<AudioPlayerItemProps> = ({
 }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
-  const isMissing = (item as any).missingFile === true;
+  const isMissing = item.missingFile === true;
 
   const handleDelete = () => {
     showAlert({
@@ -74,14 +74,14 @@ export const AudioPlayerItem: React.FC<AudioPlayerItemProps> = ({
             ⚠ Archivo no encontrado — solo registro en BD
           </Text>
         )}
-        {(item as any).isStreaming && (
+        {item.isStreaming && (
           <Text style={{ fontSize: 11, color: theme.colors.primary, marginTop: 2 }}>
             ☁️ Reproduciendo desde la nube
           </Text>
         )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
           <Text style={styles.recordingDate}>{item.date}</Text>
-          {(item.cloud_url || (item as any).is_backed_up === 1) && (
+          {(item.cloud_url || item.is_backed_up === 1) && (
             <Ionicons name="cloud-done" size={14} color={theme.colors.success || '#34C759'} />
           )}
         </View>

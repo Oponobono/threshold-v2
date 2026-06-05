@@ -220,7 +220,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   };
 
   const handleDeleteDeck = (deck: FlashcardDeck) => {
-    const isLocal = (deck as any)._local === true;
+    const isLocal = (deck as FlashcardDeck & { _local?: boolean })._local === true;
     const isOwner = deck.user_id === currentUserId;
     showAlert({
       title: isOwner ? t('modals.deleteDeck') : t('flashcards.removeShared'),
@@ -302,7 +302,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           <TouchableOpacity 
             onPress={() => {
               onClose();
-              router.push('/flashcards' as any);
+              router.push('/flashcards');
             }}
             style={s.closeBtn} 
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -369,7 +369,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 />
               }
               renderItem={({ item }) => {
-                const isShared = item.user_id != null && item.user_id !== currentUserId && !(item as any)._local;
+                const isShared = item.user_id != null && item.user_id !== currentUserId && !(item as FlashcardDeck & { _local?: boolean })._local;
                 const duedeckIds = getDuedeckIds();
                 const isDue = duedeckIds.has(item.id);
                 return (
@@ -387,9 +387,9 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                         activeOpacity={0.85}
                         onPress={() => openStudySession(item)}
                       >
-                      <View style={[s.deckBadge, { backgroundColor: (item as any).subject_color || '#DDE7FF' }]}>
+                      <View style={[s.deckBadge, { backgroundColor: item.subject_color || '#DDE7FF' }]}>
                         <MaterialCommunityIcons
-                          name={isShared ? 'account-group-outline' : (((item as any).subject_icon as any) || 'cards-outline')}
+                          name={isShared ? 'account-group-outline' : ((item.subject_icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'cards-outline')}
                           size={20}
                           color={theme.colors.text.primary}
                         />
@@ -468,19 +468,19 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                   style={{ flex: 1 }}
                   contentContainerStyle={{ paddingBottom: 8 }}
                     renderItem={({ item }) => {
-                    const isOwn = (item as any).is_own;
+                    const isOwn = (item as FlashcardDeck & { is_own?: boolean; _groupPinId?: string }).is_own;
                     const duedeckIds = getDuedeckIds();
                     const isDue = duedeckIds.has(item.id);
-                    const canRemove = (isOwn || isGroupAdmin) && (!!activeGroupPin || !!(item as any)._groupPinId);
+                    const canRemove = (isOwn || isGroupAdmin) && (!!activeGroupPin || !!(item as FlashcardDeck & { _groupPinId?: string })._groupPinId);
                     const card = (
                         <TouchableOpacity
                           style={[s.deckCard, { marginBottom: 8, borderWidth: 1, borderColor: isDue ? theme.colors.danger : '#E0E0E0' }]}
                           activeOpacity={0.85}
                           onPress={() => openStudySession(item)}
                         >
-                          <View style={[s.deckBadge, { backgroundColor: (item as any).subject_color || '#DDE7FF' }]}>
+                          <View style={[s.deckBadge, { backgroundColor: item.subject_color || '#DDE7FF' }]}>
                             <MaterialCommunityIcons
-                              name={(item as any).subject_icon || 'cards-outline'}
+                              name={(item.subject_icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'cards-outline'}
                               size={20}
                               color={theme.colors.text.primary}
                             />
@@ -515,7 +515,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                           <View style={[s.swipeActionsPill, { width: 70 }]}>
                             <TouchableOpacity
                               style={s.swipeActionBtn}
-                              onPress={() => { close(); handleRemoveFromGroup(item, (item as any)._groupPinId || activeGroupPin!); }}
+                              onPress={() => { close(); handleRemoveFromGroup(item, (item as FlashcardDeck & { _groupPinId?: string })._groupPinId || activeGroupPin || ''); }}
                               activeOpacity={0.6}
                             >
                               <Ionicons name="trash-outline" size={17} color={theme.colors.danger} />

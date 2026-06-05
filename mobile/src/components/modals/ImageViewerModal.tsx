@@ -224,7 +224,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             <TouchableOpacity onPress={() => handleShare(photos[currentIndex]?.local_uri)} style={styles.iconButton}>
               <Ionicons name="share-outline" size={24} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => photos[currentIndex]?.id && handleDelete(photos[currentIndex].id!)} style={styles.iconButton}>
+            <TouchableOpacity onPress={() => photos[currentIndex]?.id && handleDelete(photos[currentIndex].id)} style={styles.iconButton}>
               <Ionicons name="trash-outline" size={24} color="#fff" />
             </TouchableOpacity>
           </View>

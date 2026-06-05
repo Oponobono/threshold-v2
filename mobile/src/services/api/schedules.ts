@@ -36,7 +36,7 @@ export const getTodaySchedules = async (): Promise<any[]> => {
 export const createSchedule = async (payload: { subject_id: string; day_of_week: number; start_time: string; end_time: string }) => {
   const { uuidv4 } = await import('../../utils/uuid');
   const userId = await getUserIdNumber();
-  const id = (payload as any).id || uuidv4();
+  const id = (payload as { id?: string }).id || uuidv4();
 
   const schedule: any = { id, user_id: userId, ...payload };
   await scheduleRepository.create(schedule);

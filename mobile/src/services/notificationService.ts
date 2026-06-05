@@ -321,16 +321,19 @@ export async function cancelAllDueDeckNotifications(): Promise<void> {
 
 export async function getScheduledNotifications(): Promise<ScheduledInfo[]> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  return scheduled.map(n => ({
-    identifier: n.identifier,
-    title: n.content.title || '',
-    body: n.content.body || '',
-    triggerDate: (n.trigger as any)?.dateComponents
-      ? undefined
-      : (n.trigger as any)?.date
-        ? new Date((n.trigger as any).date)
-        : undefined,
-  }));
+  return scheduled.map(n => {
+    const trigger = n.trigger as { dateComponents?: unknown; date?: number };
+    return {
+      identifier: n.identifier,
+      title: n.content.title || '',
+      body: n.content.body || '',
+      triggerDate: trigger.dateComponents
+        ? undefined
+        : trigger.date
+          ? new Date(trigger.date)
+          : undefined,
+    };
+  });
 }
 
 // ── Cancel all ──────────────────────────────────────────────────────────────────

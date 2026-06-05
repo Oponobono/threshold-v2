@@ -299,7 +299,7 @@ const FieldSection: React.FC<FieldSectionProps> = ({ icon, label, hint, right, c
     <View style={styles.fieldHeader}>
       <View style={styles.fieldLabelRow}>
         <View style={styles.fieldIconWrap}>
-          <Ionicons name={icon as any} size={14} color={theme.colors.text.secondary} />
+          <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={14} color={theme.colors.text.secondary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.fieldLabel}>{label}</Text>

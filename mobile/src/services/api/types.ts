@@ -57,6 +57,7 @@ export type Assessment = {
   category_id?: string;
   due_date?: string;
   grading_date?: string;
+  _isPending?: boolean;
 };
 
 export type Photo = {
@@ -168,6 +169,7 @@ export interface AudioRecording {
   subject_icon?: string;
   transcript_uri?: string;
   transcript_text?: string;
+  summary_text?: string;
   summary_uri?: string;
   cloud_url?: string;
   is_backed_up?: number;
@@ -191,6 +193,7 @@ export interface YouTubeVideo {
   subject_icon?: string;
   transcript_uri?: string;
   transcript_text?: string;
+  summary_text?: string;
   summary_uri?: string;
 }
 

@@ -14,7 +14,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ icon, message, sub }) =>
   return (
     <View style={galleryStyles.emptyStateContainer}>
       <View style={galleryStyles.emptyStateIconWrap}>
-        <Ionicons name={icon as any} size={32} color={theme.colors.primary} />
+        <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={32} color={theme.colors.primary} />
       </View>
       <Text style={galleryStyles.emptyStateMessage}>{message}</Text>
       {sub ? <Text style={galleryStyles.emptyStateSub}>{sub}</Text> : null}

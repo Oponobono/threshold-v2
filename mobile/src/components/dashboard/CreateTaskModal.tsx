@@ -88,7 +88,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
     try {
       setIsSavingTask(true);
       const result = await createAssessment({
-        subject_id: selectedSubjectId as string,
+        subject_id: selectedSubjectId,
         name: taskName.trim(),
         date: taskDate,
         is_completed: 0,
@@ -96,9 +96,9 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
         category_id: selectedCategoryId || undefined,
       });
 
-      if ((result as any)._isPending) {
+      if (result._isPending) {
         useDataStore.setState(state => ({
-          assessments: [result, ...state.assessments.filter(a => a.id !== (result as any).id)]
+          assessments: [result, ...state.assessments.filter(a => a.id !== result.id)]
         }));
       } else {
         await onTaskCreated();
@@ -106,7 +106,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
 
       alertRef.show({
         title: t('common.success'),
-        message: (result as any)._isPending
+        message: result._isPending
           ? t('dashboard.quickAddMenu.task.offlineSuccess')
           : t('dashboard.quickAddMenu.task.success'),
         type: 'success',

@@ -63,11 +63,11 @@ export const useDataStore = create<DataState>((set, get) => ({
     try {
       await databaseService.open();
 
-      const dbSubjects = await subjectRepository.getAll() as any;
+      const dbSubjects = await subjectRepository.getAll() as Subject[];
       if (dbSubjects.length > 0) set({ subjects: dbSubjects });
-      const dbAssessments = await assessmentRepository.getAll() as any;
+      const dbAssessments = await assessmentRepository.getAll() as Assessment[];
       if (dbAssessments.length > 0) set({ assessments: dbAssessments });
-      const dbSchedules = await scheduleRepository.getAll() as any;
+      const dbSchedules = await scheduleRepository.getAll() as Schedule[];
       if (dbSchedules.length > 0) set({ schedules: dbSchedules });
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
@@ -99,7 +99,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     try {
       const { getSubjects } = await import('../services/api');
       const data = await getSubjects();
-      if (data) set({ subjects: data as any });
+      if (data) set({ subjects: data as Subject[] });
     } catch (error) {
       console.error('[DataStore] refreshSubjects error:', error);
     }
@@ -109,7 +109,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     try {
       const { getAllAssessments } = await import('../services/api');
       const data = await getAllAssessments();
-      if (data) set({ assessments: data as any });
+      if (data) set({ assessments: data as Assessment[] });
     } catch (error) {
       console.error('[DataStore] refreshAssessments error:', error);
     }
@@ -119,7 +119,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     try {
       const { getAllSchedules } = await import('../services/api');
       const data = await getAllSchedules();
-      if (data) set({ schedules: data as any });
+      if (data) set({ schedules: data as Schedule[] });
     } catch (error) {
       console.error('[DataStore] refreshSchedules error:', error);
     }

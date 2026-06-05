@@ -60,8 +60,8 @@ export const AIContextCarousel: React.FC<AIContextCarouselProps> = ({
             alignItems: 'center', justifyContent: 'center',
           }}>
             {meta.iconSet === 'mci'
-              ? <MaterialCommunityIcons name={meta.icon as any} size={16} color={meta.color} />
-              : <Ionicons name={meta.icon as any} size={16} color={meta.color} />}
+              ? <MaterialCommunityIcons name={meta.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']} size={16} color={meta.color} />
+              : <Ionicons name={meta.icon as React.ComponentProps<typeof Ionicons>['name']} size={16} color={meta.color} />}
           </View>
           <View>
             <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text.primary }}>

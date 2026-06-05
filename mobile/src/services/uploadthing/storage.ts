@@ -43,7 +43,7 @@ export const uploadFileToUploadthing = async (
     uri: localUri,
     name: resolvedName,
     type: resolvedMime,
-  } as any);
+  });
 
   console.log(`[Uploadthing] Subiendo archivo al servidor: ${getApiUrl()}/upload`);
   console.log(`[Uploadthing] Datos: uri=${localUri}, name=${resolvedName}, type=${resolvedMime}`);

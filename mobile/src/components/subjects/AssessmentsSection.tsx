@@ -80,7 +80,7 @@ export const AssessmentsSection: React.FC<AssessmentsSectionProps> = ({ subject,
               return (
                 <TouchableOpacity style={subjectsStyles.assessRow} activeOpacity={0.6}>
                   <View style={subjectsStyles.assessIcon}>
-                    <MaterialCommunityIcons name={icon as any} size={18} color={color} />
+                    <MaterialCommunityIcons name={icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']} size={18} color={color} />
                   </View>
                   <View style={subjectsStyles.assessBody}>
                     <Text style={subjectsStyles.assessName} numberOfLines={1}>{a.name}</Text>

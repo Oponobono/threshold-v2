@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo } from '../services/api';
-import { useAudioRecorder } from './useAudioRecorder';
+import { useAudioRecorder, RecordingItem } from './useAudioRecorder';
 import { SubjectSection, GridMediaItem } from '../components/recordings/RecordingsGrid';
 import { youTubeRepository } from '../services/database';
 
@@ -112,10 +112,10 @@ export const useRecordingsManager = () => {
     (id: string) => {
       const video = youTubeVideos.find((v) => v.id?.toString() === id);
       if (video) {
-        const numericId = video.id!;
+        const numericId = video.id;
         deleteYouTubeVideo(numericId)
           .then((result) => {
-            if ((result as any)?._isPending) {
+            if ((result as { _isPending?: boolean })._isPending) {
               setYouTubeVideos((prev) => prev.filter((v) => v.id !== numericId));
             } else {
               loadYouTubeVideos();
@@ -195,7 +195,7 @@ export const useRecordingsManager = () => {
           subject_color: rec.subject_color || undefined,
           uri: rec.uri,
           duration: rec.duration ?? undefined,
-          missingFile: (rec as any).missingFile,
+          missingFile: (rec as RecordingItem & { missingFile?: boolean }).missingFile,
         });
       });
     }

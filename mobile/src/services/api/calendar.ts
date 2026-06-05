@@ -88,7 +88,7 @@ export const getCalendarEvents = async (startDate?: string, endDate?: string): P
     } catch {}
   })();
 
-  return localData as any;
+  return localData as unknown as CalendarEvent[];
 };
 
 

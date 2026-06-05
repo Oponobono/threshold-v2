@@ -31,8 +31,8 @@ const TypeBadge: React.FC<{ type: keyof typeof META }> = ({ type }) => {
   return (
     <View style={[s.badge, { backgroundColor: `${m.color}1E` }]}>
       {m.lib === 'mci'
-        ? <MaterialCommunityIcons name={m.icon as any} size={10} color={m.color} />
-        : <Ionicons name={m.icon as any} size={10} color={m.color} />}
+        ? <MaterialCommunityIcons name={m.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']} size={10} color={m.color} />
+        : <Ionicons name={m.icon as React.ComponentProps<typeof Ionicons>['name']} size={10} color={m.color} />}
       <Text style={[s.badgeText, { color: m.color }]}>{m.label}</Text>
     </View>
   );

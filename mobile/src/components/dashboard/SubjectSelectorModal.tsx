@@ -49,7 +49,7 @@ export const SubjectSelectorModal = ({
                 }}
               >
                 <View style={[styles.subjectBadge, { backgroundColor: item.color || '#CCCCCC', marginBottom: 0, marginRight: 16, width: 44, height: 44, borderRadius: 12 }]}>
-                  <MaterialCommunityIcons name={(item.icon as any) || 'book-outline'} size={22} color={theme.colors.text.primary} />
+                  <MaterialCommunityIcons name={(item.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={22} color={theme.colors.text.primary} />
                 </View>
                 <View style={styles.quickAddMenuInfo}>
                   <Text style={styles.quickAddMenuText}>{item.name}</Text>

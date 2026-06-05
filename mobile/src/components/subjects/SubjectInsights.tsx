@@ -86,14 +86,14 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
             } else if (buttonIndex === 2) {
               setIsEditTaskModalVisible(true);
             } else if (buttonIndex === 3) {
-              handleDelete(assessment.id!);
+              if (assessment.id) handleDelete(assessment.id);
             }
           } else {
             // For completed tasks/grades: Cancel(0), Edit(1), Delete(2)
             if (buttonIndex === 1) {
               setIsEditGradeModalVisible(true);
-            } else if (buttonIndex === 2) {
-              handleDelete(assessment.id!);
+            } else             if (buttonIndex === 2) {
+              if (assessment.id) handleDelete(assessment.id);
             }
           }
         }
@@ -165,14 +165,14 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
                 : t('subjects.note');
               const weightValue = parseWeight(assessment);
               const weightText = weightValue > 0 ? ` (${weightValue}%)` : '';
-              const isPending = (assessment as any)._isPending === true;
+              const isPending = assessment._isPending === true;
 
               let scoreText = t('subjects.pending');
               let scoreColor: string | undefined;
               if (grade !== null) {
-                if ((assessment as any).display_label) {
-                  scoreText = `≈ ${(assessment as any).display_label}`;
-                  scoreColor = (assessment as any).display_color;
+                if (assessment.display_label) {
+                  scoreText = `≈ ${assessment.display_label}`;
+                  scoreColor = assessment.display_color;
                 } else {
                   scoreText = `${formatGrade(grade)} / ${SCALE_MAX}`;
                 }

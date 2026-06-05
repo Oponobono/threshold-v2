@@ -289,13 +289,13 @@ const MessageBubble: React.FC<{ msg: Message; onOpenImage: (src: string) => void
                         <MarkdownWithCode key={`text-${idx}`} style={markdownStyles} rules={localMarkdownRules}>
                           {part.content}
                         </MarkdownWithCode>
-                      ) : (
+                      ) : part.data ? (
                         <ScrollableTable
                           key={`table-${idx}`}
-                          headers={part.data!.headers}
-                          rows={part.data!.rows}
+                          headers={part.data.headers}
+                          rows={part.data.rows}
                         />
-                      )
+                      ) : null
                     )}
                   </View>
                 );
@@ -511,13 +511,14 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         title: deckTitle,
       });
 
+      if (!subjectId || !userId) return;
       const deck = await generateStudyMaterialFromChat({
         contextText: ctx,
         mode: activeMode,
         count: activeCount,
         title: deckTitle,
-        subjectId: subjectId!,
-        userId: userId!,
+        subjectId,
+        userId,
       });
 
       console.log('[AIChatModal] ✅ Respuesta exitosa de generateStudyMaterialFromChat:', deck);

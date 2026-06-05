@@ -272,9 +272,9 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
     }
 
     const localSummaryFound = await tryLoadSummary();
-    if (!localSummaryFound && (rec as any)?.summary_text) {
+    if (!localSummaryFound && rec?.summary_text) {
       console.log(`[RecordingDetail] Fallback a summary_text del servidor para audio: ${rec?.id}`);
-      setSummary((rec as any).summary_text);
+      setSummary(rec.summary_text);
     }
   };
 

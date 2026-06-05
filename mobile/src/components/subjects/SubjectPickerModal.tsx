@@ -85,7 +85,7 @@ export const SubjectPickerModal: React.FC<SubjectPickerModalProps> = ({
                   backgroundColor: sub.color || theme.colors.primary,
                   justifyContent: 'center', alignItems: 'center', marginRight: 12,
                 }}>
-                  <MaterialCommunityIcons name={(sub.icon as any) || 'book-outline'} size={16} color="#fff" />
+                  <MaterialCommunityIcons name={(sub.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={16} color="#fff" />
                 </View>
                 <Text style={{ color: theme.colors.text.primary, fontSize: 15, fontWeight: '500', flex: 1 }}>
                   {sub.name}

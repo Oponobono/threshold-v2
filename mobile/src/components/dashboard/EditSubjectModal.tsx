@@ -47,7 +47,7 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
       setSubjectCredits(subject.credits != null ? String(subject.credits) : '');
       setSubjectTarget(subject.target_grade != null ? String(subject.target_grade) : '');
       setSelectedColor(subject.color || SUBJECT_COLORS[0]);
-      setSelectedIcon((subject.icon as any) || 'book-outline');
+      setSelectedIcon((subject.icon as (typeof SUBJECT_ICONS)[number]) || 'book-outline');
     }
   }, [subject]);
 

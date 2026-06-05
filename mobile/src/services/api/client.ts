@@ -53,7 +53,7 @@ export const getExpoHostIp = (): string | null => {
 
   const hostUri =
     Constants.expoConfig?.hostUri ||
-    (Constants as any).manifest2?.extra?.expoClient?.hostUri ||
+    (Constants as Record<string, any>).manifest2?.extra?.expoClient?.hostUri ||
     null;
 
   if (!hostUri) return null;
@@ -331,6 +331,7 @@ const cacheKey = `api_cache_${path}`;
       if (base.includes('192.168') || base.includes('10.0') || base.includes('localhost') || base.includes('127.0')) {
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        // AbortSignal is intentionally widened because Expo's fetch types may not perfectly align with the DOM AbortSignal type at runtime
         requestInit = { ...customInit, signal: controller.signal as any };
       }
 

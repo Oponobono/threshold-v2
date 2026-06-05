@@ -12,9 +12,9 @@ interface Props {
 export const MarkdownWithCode: React.FC<Props> = ({ children, style, rules: customRules }) => {
   const baseRules = {
     fence: (node: ASTNode) => {
-      const sourceInfo = (node as any).sourceInfo?.trim();
+      const sourceInfo = (node as ASTNode & { sourceInfo?: string }).sourceInfo?.trim();
       const language = sourceInfo || undefined;
-      const code = (node as any).content ?? '';
+      const code = node.content ?? '';
 
       return (
         <View key={node.key}>
@@ -23,7 +23,7 @@ export const MarkdownWithCode: React.FC<Props> = ({ children, style, rules: cust
       );
     },
     code_inline: (node: ASTNode) => {
-      const content = (node as any).content ?? '';
+      const content = node.content ?? '';
       return (
         <Text key={node.key} style={s.codeInline}>
           {content}

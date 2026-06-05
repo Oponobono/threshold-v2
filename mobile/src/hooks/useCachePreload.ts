@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react';
+import type { Photo, AudioRecording, YouTubeVideo, FlashcardDeck } from '../services/api/types';
 import { photoRepository, audioRepository, youTubeRepository, flashcardDeckRepository } from '../services/database';
 
 export interface CachePreloadedData {
-  galleryItems: any[] | null;
-  audioRecordings: any[] | null;
-  youTubeVideos: any[] | null;
-  flashcardDecks: any[] | null;
-  flashcardDecksWithMetrics: any[] | null;
+  galleryItems: Photo[] | null;
+  audioRecordings: AudioRecording[] | null;
+  youTubeVideos: YouTubeVideo[] | null;
+  flashcardDecks: FlashcardDeck[] | null;
+  flashcardDecksWithMetrics: FlashcardDeck[] | null;
 }
 
 /**
@@ -29,11 +30,11 @@ export const useCachePreload = () => {
       ]);
 
       const result: CachePreloadedData = {
-        galleryItems: galleryItems.length > 0 ? galleryItems as any[] : null,
-        audioRecordings: audioRecordings.length > 0 ? audioRecordings as any[] : null,
-        youTubeVideos: youTubeVideos.length > 0 ? youTubeVideos as any[] : null,
-        flashcardDecks: flashcardDecks.length > 0 ? flashcardDecks as any[] : null,
-        flashcardDecksWithMetrics: flashcardDecks.length > 0 ? flashcardDecks as any[] : null,
+        galleryItems: galleryItems.length > 0 ? galleryItems as Photo[] : null,
+        audioRecordings: audioRecordings.length > 0 ? audioRecordings as AudioRecording[] : null,
+        youTubeVideos: youTubeVideos.length > 0 ? youTubeVideos as YouTubeVideo[] : null,
+        flashcardDecks: flashcardDecks.length > 0 ? flashcardDecks as FlashcardDeck[] : null,
+        flashcardDecksWithMetrics: flashcardDecks.length > 0 ? flashcardDecks as FlashcardDeck[] : null,
       };
 
       setPreloadedData(result);

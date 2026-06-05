@@ -87,7 +87,7 @@ export const ZyrenInfoModal: React.FC<Props> = ({ visible, onClose }) => {
               <View style={{ marginTop: 4 }}>
                 {capabilities.map((cap, k) => (
                   <View key={k} style={iconRow}>
-                    <Ionicons name={cap.icon as any} size={16} color={theme.colors.primary} style={{ marginTop: 2, flexShrink: 0 }} />
+                    <Ionicons name={cap.icon as React.ComponentProps<typeof Ionicons>['name']} size={16} color={theme.colors.primary} style={{ marginTop: 2, flexShrink: 0 }} />
                     <Text style={[bodyText, { flex: 1 }]}>{t(`settings.zyren.${cap.key}`)}</Text>
                   </View>
                 ))}

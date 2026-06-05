@@ -52,10 +52,10 @@ const SectionHeader = ({ title, desc, icon, onIconPress, iconColor, iconSize }: 
     </View>
     {onIconPress ? (
       <TouchableOpacity onPress={onIconPress} style={{ padding: 4 }}>
-        <Ionicons name={icon as any} size={iconSize || 18} color={iconColor || theme.colors.text.secondary} />
+        <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={iconSize || 18} color={iconColor || theme.colors.text.secondary} />
       </TouchableOpacity>
     ) : (
-      <Ionicons name={icon as any} size={iconSize || 18} color={iconColor || theme.colors.text.secondary} />
+      <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={iconSize || 18} color={iconColor || theme.colors.text.secondary} />
     )}
   </View>
 );

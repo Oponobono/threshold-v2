@@ -189,7 +189,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
         console.log('[Scanner] Foto guardada. ID:', photoData?.id ?? 'pendiente offline');
       }
 
-      if (onSave) onSave(finalImageUri, selectedSubjectId as string, base64Img || undefined);
+      if (onSave) onSave(finalImageUri, selectedSubjectId, base64Img || undefined);
       showAlert({
         title: t('common.success'),
         message: t('dashboard.documentScannerModal.success', { subject: subjects.find(s => s.id === selectedSubjectId)?.name }),
@@ -390,7 +390,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
                     onPress={() => setSelectedSubjectId(String(s.id))}
                   >
                     <View style={[localStyles.subjectBadgeOverride, { backgroundColor: s.color || '#CCC' }]}>
-                      <MaterialCommunityIcons name={(s.icon as any) || 'book-outline'} size={16} color="white" />
+                      <MaterialCommunityIcons name={(s.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={16} color="white" />
                     </View>
                     <Text style={localStyles.subjectName} numberOfLines={1}>{s.name}</Text>
                     {String(selectedSubjectId) === String(s.id) && (

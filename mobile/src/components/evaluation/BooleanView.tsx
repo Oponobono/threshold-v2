@@ -156,7 +156,7 @@ const s = StyleSheet.create({
   boolBtnError: { borderWidth: 2.5, borderColor: '#EF5350' },
   boolIcon: { fontSize: 32 },
   boolLabel: { fontSize: 15, fontWeight: '800', color: theme.colors.text.primary },
-  resultIcon: { position: 'absolute' as any, top: 10, right: 10 },
+  resultIcon: { position: 'absolute' as const, top: 10, right: 10 },
   explanationBox: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: 'rgba(0,122,255,0.07)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(0,122,255,0.18)' },
   explanationTitle: { fontSize: 11, fontWeight: '700', color: theme.colors.info, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   explanationText: { fontSize: 13, color: theme.colors.text.primary, lineHeight: 19 },

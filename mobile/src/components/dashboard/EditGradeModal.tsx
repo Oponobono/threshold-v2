@@ -117,12 +117,12 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
     try {
       setIsSaving(true);
       const updatePayload = {
-        subject_id: selectedSubjectId as string,
+        subject_id: selectedSubjectId,
         name: gradeName.trim(),
         grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
         weight: gradePercentage ? Number(gradePercentage.replace(',', '.')) : 0,
         category_id: selectedCategoryId || undefined,
-        is_completed: 1 as unknown as number,
+        is_completed: 1,
         due_date: formatDateForAPI(dueDate) || undefined,
         grading_date: formatDateForAPI(gradingDate) || undefined,
       };

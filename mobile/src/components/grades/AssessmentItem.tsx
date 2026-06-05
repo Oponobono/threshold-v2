@@ -64,7 +64,7 @@ export const AssessmentItem: React.FC<AssessmentItemProps> = ({
         {pct !== null ? (
           <>
             <Text style={[gradesStyles.assessScore, { color: GRADE_COLORS(pct) }]}>
-              {gradeVal!.toFixed(1)}/{SCALE_MAX}
+              {(gradeVal ?? 0).toFixed(1)}/{SCALE_MAX}
             </Text>
           </>
         ) : (

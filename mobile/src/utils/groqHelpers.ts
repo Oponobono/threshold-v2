@@ -12,7 +12,7 @@ export async function transcribeWithWhisper(audioUri: string, apiKey: string): P
     uri: audioUri,
     name: 'audio.m4a',
     type: 'audio/mp4',
-  } as any);
+  });
   formData.append('model', 'whisper-large-v3');
   formData.append('language', 'es');
   formData.append('response_format', 'text');

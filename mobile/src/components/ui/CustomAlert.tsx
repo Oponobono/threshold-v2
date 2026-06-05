@@ -117,7 +117,7 @@ export const CustomAlertProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
             {/* Icon */}
             <View style={[styles.iconCircle, { backgroundColor: `${meta.color}14` }]}>
-              <Ionicons name={meta.icon as any} size={34} color={meta.color} />
+              <Ionicons name={meta.icon as React.ComponentProps<typeof Ionicons>['name']} size={34} color={meta.color} />
             </View>
 
             {/* Title */}

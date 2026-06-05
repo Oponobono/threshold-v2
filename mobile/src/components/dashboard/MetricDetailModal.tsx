@@ -20,7 +20,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({ metric, on
           <View style={styles.sheetHandle} />
           <View style={{ alignItems: 'center', paddingVertical: 10 }}>
             <View style={[styles.iconBox, { backgroundColor: metric.color + '20', width: 60, height: 60, borderRadius: 20, marginBottom: 16 }]}>
-              <Ionicons name={metric.icon as any} size={30} color={metric.color} />
+              <Ionicons name={metric.icon as React.ComponentProps<typeof Ionicons>['name']} size={30} color={metric.color} />
             </View>
             <Text style={[styles.sectionTitle, { marginBottom: 4 }]}>{metric.title}</Text>
             <Text style={[styles.cardValue, { fontSize: 22, textAlign: 'center', paddingHorizontal: 10 }]}>{metric.value}</Text>

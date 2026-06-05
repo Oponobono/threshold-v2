@@ -299,7 +299,7 @@ export function useSubjectGrades(
     delta: projectionData?.delta !== undefined
       ? (() => {
           const maxScale = projectionData.maxScale ?? SCALE_MAX;
-          return maxScale !== SCALE_MAX ? (projectionData.delta! / maxScale) * SCALE_MAX : projectionData.delta!;
+          return maxScale !== SCALE_MAX ? (projectionData.delta ?? 0 / maxScale) * SCALE_MAX : projectionData.delta ?? 0;
         })()
       : 0,
     currentEMA: projectionData?.currentEMA ?? null,

@@ -20,7 +20,7 @@ export class BaseRepository<T extends { id: string }> {
 
   async getAll(): Promise<T[]> {
     const rows = await this.getDb().getAllAsync(`SELECT * FROM ${this.tableName} ORDER BY created_at DESC`);
-    return (rows as any[]).map(row => this.mapRow(row));
+    return (rows as T[]).map(row => this.mapRow(row));
   }
 
   async getById(id: string): Promise<T | null> {
@@ -32,7 +32,7 @@ export class BaseRepository<T extends { id: string }> {
     const rows = await this.getDb().getAllAsync(
       `SELECT * FROM ${this.tableName} WHERE ${field} = ? ORDER BY created_at DESC`, value
     );
-    return (rows as any[]).map(row => this.mapRow(row));
+    return (rows as T[]).map(row => this.mapRow(row));
   }
 
   private validColumns: string[] | null = null;
@@ -41,7 +41,7 @@ export class BaseRepository<T extends { id: string }> {
     if (this.validColumns) return this.validColumns;
     try {
       const rows = await this.getDb().getAllAsync(`PRAGMA table_info(${this.tableName})`);
-      this.validColumns = (rows as any[]).map(r => r.name);
+      this.validColumns = (rows as { name: string }[]).map(r => r.name);
     } catch (e) {
       console.warn(`[BaseRepository] Error obteniendo schema para ${this.tableName}:`, e);
       this.validColumns = [];
@@ -52,7 +52,7 @@ export class BaseRepository<T extends { id: string }> {
   async create(data: Partial<T>): Promise<T> {
     const validCols = await this.getValidColumns();
     const keys = Object.keys(data).filter(k => (k === 'id' && data.id) || (validCols.length > 0 ? validCols.includes(k) : true));
-    const values = keys.map(k => (data as any)[k]);
+    const values = keys.map(k => data[k as keyof T]);
     const filteredKeys: string[] = [];
     const filteredValues: any[] = [];
     for (let i = 0; i < keys.length; i++) {
@@ -77,7 +77,7 @@ export class BaseRepository<T extends { id: string }> {
     const filteredKeys: string[] = [];
     const filteredValues: any[] = [];
     for (const k of keys) {
-      const val = (data as any)[k];
+      const val = data[k as keyof T];
       if (val !== undefined) {
         filteredKeys.push(k);
         filteredValues.push(val);
@@ -105,7 +105,7 @@ export class BaseRepository<T extends { id: string }> {
   async upsert(data: T): Promise<void> {
     const existing = await this.getById(data.id);
     if (existing) {
-      await this.update(data.id, data as any);
+      await this.update(data.id, data as Partial<T>);
     } else {
       await this.create(data);
     }

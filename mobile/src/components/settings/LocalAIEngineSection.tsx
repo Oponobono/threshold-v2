@@ -33,7 +33,7 @@ const SectionHeader = ({ title, desc, icon }: { title: string; desc: string; ico
       <Text style={styles.sectionTitle}>{title}</Text>
       <Text style={styles.sectionDesc}>{desc}</Text>
     </View>
-    <Ionicons name={icon as any} size={18} color={theme.colors.text.secondary} />
+    <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={18} color={theme.colors.text.secondary} />
   </View>
 );
 

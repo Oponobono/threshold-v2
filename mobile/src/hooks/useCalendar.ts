@@ -86,8 +86,8 @@ export function useCalendar(t: any, language: string = 'es-ES') {
     const rawClasses = allSchedules.filter(s => s.day_of_week === dayOfWeek).map(s => ({
       id: s.id,
       type: 'class' as const,
-      title: (s as any).name || t('calendar.defaultClassTitle'),
-      color: (s as any).color || '#2F80ED',
+      title: s.name || t('calendar.defaultClassTitle'),
+      color: s.color || '#2F80ED',
       start_time: s.start_time,
       end_time: s.end_time,
       subject_id: s.subject_id,

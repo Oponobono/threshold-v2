@@ -105,11 +105,11 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
     try {
       setIsSavingGrade(true);
       const result = await createAssessment({
-        subject_id: selectedSubjectId as string,
+        subject_id: selectedSubjectId,
         name: gradeName.trim(),
         grade_value: gradeValue ? Number(gradeValue.replace(',', '.')) : 0,
         weight: gradePercentage ? Number(gradePercentage.replace(',', '.')) : 0,
-        is_completed: 1 as unknown as number,
+        is_completed: 1,
         type: 'grade',
         category_id: selectedCategoryId || undefined,
         due_date: formatDateForAPI(dueDate) || undefined,
@@ -118,9 +118,9 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
 
       const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
 
-      if ((result as any)._isPending) {
+      if (result._isPending) {
         useDataStore.setState(state => ({
-          assessments: [result, ...state.assessments.filter(a => a.id !== (result as any).id)]
+          assessments: [result, ...state.assessments.filter(a => a.id !== result.id)]
         }));
         alertRef.show({
           title: t('common.success'),

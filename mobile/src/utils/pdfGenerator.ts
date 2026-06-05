@@ -26,7 +26,7 @@ export const generatePdfFromImages = async (uris: string[]): Promise<string> => 
     try {
       // Comprimir imagen antes de incrustar (reduce de 5MB a ~300KB)
       // Esto acelera embedJpg y saveAsBase64 drásticamente
-      const saveFormat = (ImageManipulator as any).SaveFormat?.JPEG || 'jpeg';
+      const saveFormat = ImageManipulator.SaveFormat?.JPEG || 'jpeg';
       const compressed = await ImageManipulator.manipulateAsync(
         uri,
         [], // sin transformaciones de escala

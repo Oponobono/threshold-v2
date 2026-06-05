@@ -228,9 +228,9 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       }
     } catch (e) { console.warn('summary file:', e); }
 
-    if (!localSummaryFound && (video as any)?.summary_text) {
+    if (!localSummaryFound && video?.summary_text) {
       console.log(`[VideoDetail] Fallback a summary_text del servidor para video: ${video?.id}`);
-      setSummary((video as any).summary_text);
+      setSummary(video.summary_text);
       setShowTutorial(false);
       setActiveTab('summary');
     }

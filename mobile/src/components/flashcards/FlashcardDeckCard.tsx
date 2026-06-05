@@ -57,11 +57,11 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
           borderRadius: 21,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: (deck as any).subject_color || '#DDE7FF',
+          backgroundColor: deck.subject_color || '#DDE7FF',
         }}
       >
         <MaterialCommunityIcons
-          name={isShared ? 'account-group-outline' : (((deck as any).subject_icon as any) || 'cards-outline')}
+          name={isShared ? 'account-group-outline' : ((deck.subject_icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'cards-outline')}
           size={20}
           color={theme.colors.text.primary}
         />
@@ -82,7 +82,7 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
         {isShared && (
           <Text style={{ fontSize: 11, color: '#388E3C', fontStyle: 'italic', marginBottom: 2, marginTop: 2 }}>
             <Ionicons name="people" size={10} color="#388E3C" />
-            {' '}{t('modals.shared')} {t('flashcards.sharedBy')} @{(deck as any).owner_username || (deck as any).owner_name || t('flashcards.peer')}
+            {' '}{t('modals.shared')} {t('flashcards.sharedBy')} @{deck.owner_username || deck.owner_name || t('flashcards.peer')}
           </Text>
         )}
         <Text
@@ -93,7 +93,7 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
           }}
           numberOfLines={1}
         >
-          {(deck as any).subject_name || t('flashcards.noSubject')}
+          {deck.subject_name || t('flashcards.noSubject')}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
           <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
@@ -102,10 +102,10 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
           {Number(deck.card_count ?? 0) > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={{ fontSize: 11, color: '#388E3C', fontWeight: '600' }}>
-                ✓ {Number((deck as any).review_count ?? 0)}
+                ✓ {Number(deck.review_count ?? 0)}
               </Text>
               <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>
-                💪 {Number((deck as any).learning_count ?? 0) + Number((deck as any).new_count ?? 0)}
+                💪 {Number(deck.learning_count ?? 0) + Number(deck.new_count ?? 0)}
               </Text>
             </View>
           )}

@@ -77,7 +77,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
 
 export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
-  const id = (payload as any).id || uuidv4();
+  const id = (payload as { id?: string }).id || uuidv4();
 
   const deck: any = { id, ...payload, card_count: 0, created_at: new Date().toISOString() };
   await flashcardDeckRepository.create(deck);
@@ -220,7 +220,7 @@ export const createEvaluationItem = async (payload: { deck_id: string; item_type
 };
 
 export const updateFlashcardStatus = async (cardId: string, status: string) => {
-  await flashcardRepository.update(cardId, { status } as any);
+  await flashcardRepository.update(cardId, { status } as Partial<Flashcard>);
 
   try {
     const response = await fetchWithFallback(`/flashcards/${cardId}`, {

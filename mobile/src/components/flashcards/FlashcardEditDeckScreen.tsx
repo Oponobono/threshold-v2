@@ -110,7 +110,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
                 onPress={() => setDeckSubjectId(sub.id)}
               >
                 <View style={[styles.subjectBadge, { backgroundColor: sub.color || '#CCC' }]}>
-                  <MaterialCommunityIcons name={(sub.icon as any) || 'book-outline'} size={14} color="white" />
+                  <MaterialCommunityIcons name={(sub.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={14} color="white" />
                 </View>
                 <Text style={[styles.subjectName, deckSubjectId === sub.id && { color: sub.color || theme.colors.primary, fontWeight: '700' }]}>
                   {sub.name}

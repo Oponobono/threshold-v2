@@ -40,11 +40,11 @@ export const SubjectTile = ({ subject, onEdit, onDelete }: SubjectTileProps) => 
         </TouchableOpacity>
 
         <View style={[styles.subjectBadge, { backgroundColor: subject.color || '#CCCCCC' }]}>
-          <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />
+          <MaterialCommunityIcons name={(subject.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={20} color={theme.colors.text.primary} />
         </View>
         <View style={globalStyles.flex1}>
           <Text style={styles.subjectTileName} numberOfLines={1}>
-            {subject.name || ((subject as any)._isPending ? t('common.pending') || 'Pendiente' : t('dashboard.newSubject.title') || 'Materia')}
+            {subject.name || ((subject as Subject & { _isPending?: boolean })._isPending ? t('common.pending') || 'Pendiente' : t('dashboard.newSubject.title') || 'Materia')}
           </Text>
           <Text style={styles.subjectTileMeta} numberOfLines={1}>
             {subject.professor || t('dashboard.newSubject.noProfessor')}
@@ -160,7 +160,7 @@ export const MetricCard = ({ title, value, subtext, icon, color, showMood, onPre
           { backgroundColor: color + '20' },
           showMood && { transform: [{ scale: pulseAnim }], opacity: pulseOpacity }
         ]}>
-          <Ionicons name={icon as any} size={20} color={color} />
+          <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={20} color={color} />
         </Animated.View>
       </View>
       <Text 
@@ -179,7 +179,7 @@ export const MetricCard = ({ title, value, subtext, icon, color, showMood, onPre
 export const ActionCircle = ({ title, icon, color, onPress }: any) => (
   <TouchableOpacity style={styles.actionItem} activeOpacity={0.65} onPress={onPress}>
     <View style={[styles.actionCircle, { backgroundColor: color + '08', borderColor: color + '20' }]}>
-      <MaterialCommunityIcons name={icon as any} size={28} color={color} />
+      <MaterialCommunityIcons name={icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']} size={28} color={color} />
     </View>
     <Text style={styles.actionText}>{title}</Text>
   </TouchableOpacity>
@@ -191,7 +191,7 @@ export const PerformanceRow = ({ rank, name, gpa, icon, iconColor, isYou }: any)
     <View style={[styles.perfRow, isYou && styles.perfRowYou]}>
       <Text style={styles.perfRank}>#{rank}</Text>
       <View style={styles.perfUser}>
-        <Ionicons name={icon as any} size={20} color={iconColor} style={globalStyles.mr8} />
+        <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={20} color={iconColor} style={globalStyles.mr8} />
         <Text style={[styles.perfName, isYou && { fontWeight: '600' }]}>{name}</Text>
       </View>
       <Text style={styles.perfGpa}>{t('dashboard.gpa')} {gpa}</Text>

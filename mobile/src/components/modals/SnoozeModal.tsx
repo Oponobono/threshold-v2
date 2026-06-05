@@ -124,7 +124,7 @@ export const SnoozeModal: React.FC<SnoozeModalProps> = ({
                     <View style={styles.optionLeft}>
                       <View style={styles.iconContainer}>
                         <MaterialCommunityIcons
-                          name={option.icon as any}
+                          name={option.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
                           size={22}
                           color={theme.colors.primary}
                         />

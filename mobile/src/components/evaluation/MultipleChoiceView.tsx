@@ -213,7 +213,7 @@ const s = StyleSheet.create({
     flex: 1, fontSize: 13, fontWeight: '500',
     color: theme.colors.text.primary, lineHeight: 18,
   },
-  resultIcon: { position: 'absolute' as any, top: 10, right: 10 },
+  resultIcon: { position: 'absolute' as const, top: 10, right: 10 },
   explanationBox: {
     flexDirection: 'row', gap: 10, alignItems: 'flex-start',
     backgroundColor: 'rgba(0,122,255,0.07)', borderRadius: 14,

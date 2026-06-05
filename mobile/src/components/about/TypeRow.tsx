@@ -11,7 +11,7 @@ interface TypeRowProps {
 
 export const TypeRow: React.FC<TypeRowProps> = ({ icon, color, label }) => (
   <View style={styles.typeRow}>
-    <Ionicons name={icon as any} size={16} color={color} style={styles.typeIcon} />
+    <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={16} color={color} style={styles.typeIcon} />
     <Text style={styles.typeLabel}>{label}</Text>
   </View>
 );

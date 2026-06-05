@@ -259,7 +259,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       // El user_id siempre será el del usuario autenticado, nunca del JSON
       if ('user_id' in deckData) {
         console.warn('[FlashcardImportModal] JSON contiene user_id, será ignorado por seguridad');
-        delete (deckData as any).user_id;
+        delete (deckData as DeckJSON & { user_id?: string }).user_id;
       }
 
       // Validar estructura básica

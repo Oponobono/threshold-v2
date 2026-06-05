@@ -162,7 +162,7 @@ export const generateFlashcardsFromContext = async (
  * @returns Resultado del procesamiento de Gemini
  */
 export const processDocumentUpload = async (
-  file: { uri: string; name: string; type: string } | any,
+  file: { uri: string; name: string; type: string },
   prompt: string,
 ): Promise<{ result: string; fileName: string; fileSize: string }> => {
   try {
@@ -202,7 +202,7 @@ export const processDocumentUpload = async (
  * @returns Array de flashcards { front, back }
  */
 export const generateFlashcardsUpload = async (
-  file: { uri: string; name: string; type: string } | any,
+  file: { uri: string; name: string; type: string },
   count: number = 10,
 ): Promise<{ front: string; back: string }[]> => {
   try {

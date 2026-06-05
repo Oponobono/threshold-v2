@@ -7,7 +7,7 @@ import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { globalStyles } from '../../styles/globalStyles';
 import { theme } from '../../styles/theme';
 import { alertRef } from '../ui/CustomAlert';
-import { createSchedule, deleteSchedule, type Subject } from '../../services/api';
+import { createSchedule, deleteSchedule, type Subject, type Schedule } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 import { SubjectSelectorModal } from './SubjectSelectorModal';
 
@@ -38,7 +38,7 @@ export const SchedulePlannerModal = ({ visible, onClose, subjects, allSchedules,
   );
 
   const existingScheduleRowsForSelectedSubject = useMemo(() => {
-    if (!selectedSubjectId) return [] as any[];
+    if (!selectedSubjectId) return [] as Schedule[];
     return Array.isArray(allSchedules) ? allSchedules.filter((s) => s.subject_id === selectedSubjectId) : [];
   }, [allSchedules, selectedSubjectId]);
 

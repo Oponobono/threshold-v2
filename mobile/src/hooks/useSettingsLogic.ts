@@ -243,7 +243,7 @@ export const useSettingsLogic = () => {
         setGradingPeriods(periods);
         setThresholdOverrides(overrides);
         setLmsAccounts(lms);
-        setTwoFactorEnabled((twoFactor as any)?.enabled || false);
+        setTwoFactorEnabled(twoFactor?.enabled || false);
         setSubjects(userSubjects || []);
       } catch (e) {
         console.warn('Failed to load some settings data', e);

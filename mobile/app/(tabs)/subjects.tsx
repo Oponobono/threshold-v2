@@ -202,7 +202,7 @@ export default function SubjectsScreen() {
                       return (
                         <View key={item.id || idx} style={[styles.timelineItem, idx < arr.length - 1 && { position: 'relative' }]}>
                           <View style={[styles.timelineDot, { backgroundColor: item.subjectColor, justifyContent: 'center', alignItems: 'center' }]}>
-                            <Ionicons name={config.icon as any} size={10} color="#FFFFFF" />
+                            <Ionicons name={config.icon as React.ComponentProps<typeof Ionicons>['name']} size={10} color="#FFFFFF" />
                           </View>
                           {idx < arr.length - 1 && <View style={styles.timelineLine} />}
                           <View style={styles.timelineContent}>

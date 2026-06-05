@@ -56,7 +56,7 @@ async function readLocalFiles(t: (key: string, opts?: any) => string): Promise<R
         created_at: dateObj.toISOString(),
       } as RecordingItem;
     })
-    .sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
+    .sort((a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime());
 }
 
 /**
@@ -112,7 +112,7 @@ function mergeLocalAndDb(
   }
 
   return merged.sort(
-    (a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime()
+    (a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime()
   );
 }
 
@@ -513,7 +513,7 @@ export function useAudioRecorder() {
       if (id) {
         try {
           const result = await deleteAudioRecording(String(id));
-          wasQueuedOffline = !!(result as any)?._isPending;
+          wasQueuedOffline = !!(result as { _isPending?: boolean })._isPending;
         } catch (dbErr) {
           console.error('Error deleting from DB:', dbErr);
           throw dbErr; // Let the outer catch handle and revert

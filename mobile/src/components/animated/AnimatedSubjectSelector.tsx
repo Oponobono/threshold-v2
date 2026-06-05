@@ -87,7 +87,7 @@ export const AnimatedSubjectSelector: React.FC<AnimatedSubjectSelectorProps> = (
             backgroundColor: subjectForId.color || theme.colors.primary,
             justifyContent: 'center', alignItems: 'center', position: 'absolute', left: 16,
           }}>
-            <MaterialCommunityIcons name={(subjectForId.icon as any) || 'book-outline'} size={14} color="#fff" />
+            <MaterialCommunityIcons name={(subjectForId.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={14} color="#fff" />
           </View>
         ) : (
           <Ionicons name="albums-outline" size={20} color={theme.colors.text.placeholder} style={{ position: 'absolute', left: 16 }} />

@@ -74,7 +74,7 @@ export const AIContextItem: React.FC<AIContextItemProps> = ({ item, isSelected, 
             resizeMode="cover"
           />
         ) : (
-          <MaterialCommunityIcons name={meta.icon as any} size={32} color={meta.color} />
+          <MaterialCommunityIcons name={meta.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']} size={32} color={meta.color} />
         )}
       </View>
 

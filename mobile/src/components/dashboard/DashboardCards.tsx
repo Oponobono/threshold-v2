@@ -23,7 +23,7 @@ export const SubjectTile = React.memo(({ subject }: { subject: Subject }) => {
       onPress={() => router.push(`/subjects/${subject.id}`)}
     >
       <View style={[styles.subjectBadge, { backgroundColor: subject.color || '#CCCCCC' }]}>
-        <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />
+        <MaterialCommunityIcons name={(subject.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={20} color={theme.colors.text.primary} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.subjectTileName} numberOfLines={1}>{subject.name}</Text>

@@ -11,6 +11,7 @@ export interface GridMediaItem {
   video_id?: string;
   duration?: number;
   missingFile?: boolean;
+  isStreaming?: boolean;
   isPlaying?: boolean;
 }
 

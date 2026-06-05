@@ -63,7 +63,7 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
     try {
       setIsSaving(true);
       await updateAssessment(task.id, {
-        subject_id: selectedSubjectId as string,
+        subject_id: selectedSubjectId,
         name: taskName.trim(),
         category_id: selectedCategoryId || undefined,
       });

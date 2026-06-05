@@ -299,7 +299,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
                     onPress={() => setSelectedSubjectId(String(s.id))}
                   >
                     <View style={[dashboardStyles.subjectBadge, { backgroundColor: s.color || '#CCC', marginRight: 0, marginBottom: 4 }]}>
-                      <MaterialCommunityIcons name={(s.icon as any) || 'book-outline'} size={18} color={theme.colors.text.primary} />
+                      <MaterialCommunityIcons name={(s.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) || 'book-outline'} size={18} color={theme.colors.text.primary} />
                     </View>
                     <Text style={styles.subjectName} numberOfLines={1}>{s.name}</Text>
                   </TouchableOpacity>

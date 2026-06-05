@@ -192,7 +192,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <View style={{ position: 'relative' }}>
                     {editProfileImage || profile?.profile_image ? (
                       <Image
-                        source={{ uri: editProfileImage || profile?.profile_image! }}
+                        source={{ uri: editProfileImage ?? profile?.profile_image ?? '' }}
                         style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1.5, borderColor: theme.colors.border }}
                       />
                     ) : (

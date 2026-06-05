@@ -47,7 +47,7 @@ export class MediaSyncService {
               uri: row.local_uri,
               name: row.local_uri.split('/').pop() || `file_${row.id}`,
               type: table.type,
-            } as any);
+            });
 
             const response = await fetchWithFallback('/upload', {
               method: 'POST',

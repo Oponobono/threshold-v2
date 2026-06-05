@@ -133,7 +133,7 @@ export const deletePhoto = async (photoId: string) => {
 
 export const updatePhoto = async (photoId: string, data: { ocr_text?: string; tags?: string; es_favorita?: boolean }) => {
   // 1. Actualizar localmente de forma inmediata (optimistic update garantizado)
-  await photoRepository.update(photoId, data as any);
+  await photoRepository.update(photoId, data as Partial<Photo>);
 
   // 2. Sincronizar con la nube en background si auto-upload activo
   (async () => {

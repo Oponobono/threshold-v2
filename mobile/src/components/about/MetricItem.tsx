@@ -13,7 +13,7 @@ interface MetricItemProps {
 
 export const MetricItem: React.FC<MetricItemProps> = ({ icon, color, label, formula }) => (
   <View style={styles.metricItem}>
-    <Ionicons name={icon as any} size={16} color={color} style={styles.metricIcon} />
+    <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={16} color={color} style={styles.metricIcon} />
     <View style={styles.metricContent}>
       <Text style={styles.metricLabel}>{label}</Text>
       <F>{formula}</F>

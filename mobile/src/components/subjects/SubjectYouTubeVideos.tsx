@@ -55,7 +55,7 @@ export const SubjectYouTubeVideos: React.FC<SubjectYouTubeVideosProps> = ({ vide
               </Text>
             </View>
             <TouchableOpacity
-              onPress={(e) => { e.stopPropagation(); onDeleteVideo(video.id!); }}
+              onPress={(e) => { e.stopPropagation(); onDeleteVideo(video.id); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{ padding: 4 }}
             >

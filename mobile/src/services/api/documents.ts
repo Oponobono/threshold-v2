@@ -95,7 +95,7 @@ export const deleteScannedDocument = async (documentId: string) => {
 
 export const updateScannedDocument = async (documentId: string, data: Partial<ScannedDocument>): Promise<any> => {
   // 1. Actualizar localmente de forma inmediata
-  await documentRepository.update(documentId, data as any);
+  await documentRepository.update(documentId, data as ScannedDocument);
 
   // 2. Sincronizar en background si auto-upload activo
   (async () => {
