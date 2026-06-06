@@ -161,22 +161,18 @@ exports.getPendingItems = (req, res) => {
 /**
  * POST /api/backup/mark
  * Marca un ítem como respaldado y guarda su cloud_url.
- * Body: { type: 'photo'|'audio'|'document'|'transcript', id, cloud_url, transcript_type? }
+ * Si el ítem no existe en el backend (fue creado offline), lo inserta automáticamente.
+ * Body: { type: 'photo'|'audio'|'document'|'transcript', id, cloud_url, transcript_type?,
+ *         subject_id?, user_id? (para inserción de items offline) }
  */
 exports.markAsBackedUp = (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
-  const { type, id, cloud_url, transcript_type } = req.body;
+  const { type, id, cloud_url, transcript_type, subject_id, user_id: bodyUserId } = req.body;
   if (!type || !id || !cloud_url) {
     return res.status(400).json({ error: 'Se requieren type, id y cloud_url.' });
   }
-
-  const tableMap = {
-    photo: 'photos',
-    audio: 'audio_recordings',
-    document: 'scanned_documents',
-  };
 
   if (type === 'transcript') {
     const table = transcript_type === 'youtube' ? 'youtube_transcripts' : 'audio_transcripts';
@@ -185,40 +181,80 @@ exports.markAsBackedUp = (req, res) => {
       [cloud_url, id],
       function (err) {
         if (err) { console.error('[Backup] Error al marcar transcripción:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar transcripción.' }); }
+        // Para transcripciones, 0 changes no es error crítico — se ignora
         res.json({ ok: true });
       }
     );
     return;
   }
 
-  const table = tableMap[type];
-  if (!table) return res.status(400).json({ error: `Tipo desconocido: ${type}` });
-
   if (type === 'photo') {
+    // Primero intentar UPDATE normal (item ya existe en backend)
     db.run(
-      `UPDATE photos SET cloud_url = ?, is_backed_up = 1 
+      `UPDATE photos SET cloud_url = ?, is_backed_up = 1
        WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`,
       [cloud_url, id, userId],
       function (err) {
         if (err) { console.error('[Backup] Error al marcar foto:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar foto.' }); }
-        if (this.changes === 0) return res.status(404).json({ error: 'Foto no encontrada o sin permiso.' });
-        res.json({ ok: true });
+        if (this.changes > 0) return res.json({ ok: true });
+
+        // 0 changes → foto no existe en backend (fue creada offline).
+        // Insertar con los datos mínimos disponibles.
+        const resolvedSubjectId = subject_id || null;
+        db.run(
+          `INSERT INTO photos (id, subject_id, local_uri, cloud_url, is_backed_up)
+           VALUES (?, ?, '', ?, 1)
+           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+          [id, resolvedSubjectId, cloud_url],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[Backup] Error al insertar foto offline:', insertErr.message);
+              return res.status(500).json({ error: 'Error al registrar foto offline.' });
+            }
+            res.json({ ok: true, inserted: true });
+          }
+        );
       }
     );
     return;
   }
 
-  // Verificar que el ítem pertenece al usuario antes de actualizar
+  const tableMap = {
+    audio: 'audio_recordings',
+    document: 'scanned_documents',
+  };
+  const table = tableMap[type];
+  if (!table) return res.status(400).json({ error: `Tipo desconocido: ${type}` });
+
+  // Primero intentar UPDATE normal
   db.run(
     `UPDATE ${table} SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND user_id = ?`,
     [cloud_url, id, userId],
-      function (err) {
-        if (err) { console.error('[Backup] Error al marcar ítem:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar ítem.' }); }
-        if (this.changes === 0) return res.status(404).json({ error: 'Ítem no encontrado.' });
-        res.json({ ok: true });
-      }
+    function (err) {
+      if (err) { console.error('[Backup] Error al marcar ítem:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar ítem.' }); }
+      if (this.changes > 0) return res.json({ ok: true });
+
+      // 0 changes → ítem no existe en backend (fue creado offline).
+      // Insertar con datos mínimos.
+      const insertQuery = table === 'audio_recordings'
+        ? `INSERT INTO audio_recordings (id, user_id, local_uri, cloud_url, is_backed_up)
+           VALUES (?, ?, '', ?, 1)
+           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`
+        : `INSERT INTO scanned_documents (id, user_id, local_uri, cloud_url, is_backed_up)
+           VALUES (?, ?, '', ?, 1)
+           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`;
+
+      db.run(insertQuery, [id, userId, cloud_url], function (insertErr) {
+        if (insertErr) {
+          console.error('[Backup] Error al insertar ítem offline:', insertErr.message);
+          return res.status(500).json({ error: 'Error al registrar ítem offline.' });
+        }
+        res.json({ ok: true, inserted: true });
+      });
+    }
   );
 };
+
 
 /**
  * POST /api/backup/restore-local-uri

@@ -279,14 +279,14 @@ async function getLocalBackupStats(): Promise<BackupStats> {
  * Fuente de verdad para el proceso de backup (is_backed_up = 0).
  */
 async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
-  photos: { id: string; uri: string }[];
+  photos: { id: string; uri: string; subject_id?: string }[];
   audio: { id: string; local_uri: string; name: string }[];
   docs: { id: string; local_uri: string }[];
   transcripts: { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[];
 }> {
   const db = databaseService.getDb();
   const result = {
-    photos: [] as { id: string; uri: string }[],
+    photos: [] as { id: string; uri: string; subject_id?: string }[],
     audio: [] as { id: string; local_uri: string; name: string }[],
     docs: [] as { id: string; local_uri: string }[],
     transcripts: [] as { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[],
@@ -296,9 +296,9 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Fotos no respaldadas
     if (prefs.includePhotos) {
       const photos = await db.getAllAsync(
-        `SELECT id, local_uri FROM photos WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri, subject_id FROM photos WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
-      result.photos = photos.map((p: any) => ({ id: String(p.id), uri: p.local_uri }));
+      result.photos = photos.map((p: any) => ({ id: String(p.id), uri: p.local_uri, subject_id: p.subject_id ? String(p.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.photos.length} foto(s) pendientes`);
     }
 
@@ -460,7 +460,7 @@ export const runBackup = async (
         const localOnlyPhotos: any[] = await db.getAllAsync(
           `SELECT id, subject_id, local_uri, es_favorita, ocr_text, group_id
            FROM photos
-           WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0a: ${localOnlyPhotos.length} foto(s) sin registro en backend.`);
         for (const photo of localOnlyPhotos) {
@@ -471,7 +471,7 @@ export const runBackup = async (
               body: JSON.stringify({ id: photo.id, subject_id: photo.subject_id, local_uri: photo.local_uri, es_favorita: photo.es_favorita, ocr_text: photo.ocr_text, group_id: photo.group_id, userId }),
             });
           } catch (e) {
-            console.warn(`[BackupService] Fase 0a ⚠️: foto ${photo.id}:`, e);
+            // Ignorar — el UPSERT en /backup/mark lo registrará al marcar
           }
         }
       } catch (e) {
@@ -485,7 +485,7 @@ export const runBackup = async (
         const localOnlyAudio: any[] = await db.getAllAsync(
           `SELECT id, user_id, subject_id, name, local_uri, duration
            FROM audio_recordings
-           WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0b: ${localOnlyAudio.length} grabación(es) sin registro en backend.`);
         for (const rec of localOnlyAudio) {
@@ -496,7 +496,7 @@ export const runBackup = async (
               body: JSON.stringify({ id: rec.id, user_id: Number(rec.user_id || userId), subject_id: rec.subject_id, name: rec.name, local_uri: rec.local_uri, duration: rec.duration }),
             });
           } catch (e) {
-            console.warn(`[BackupService] Fase 0b ⚠️: grabación ${rec.id}:`, e);
+            // Ignorar
           }
         }
       } catch (e) {
@@ -510,7 +510,7 @@ export const runBackup = async (
         const localOnlyDocs: any[] = await db.getAllAsync(
           `SELECT id, user_id, subject_id, local_uri, ocr_text
            FROM scanned_documents
-           WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0c: ${localOnlyDocs.length} documento(s) sin registro en backend.`);
         for (const doc of localOnlyDocs) {
@@ -521,7 +521,7 @@ export const runBackup = async (
               body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
             });
           } catch (e) {
-            console.warn(`[BackupService] Fase 0c ⚠️: documento ${doc.id}:`, e);
+            // Ignorar
           }
         }
       } catch (e) {
@@ -551,7 +551,7 @@ export const runBackup = async (
             const res = await fetchWithFallback(`/backup/mark`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: 'ghost_file' }),
+              body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: 'ghost_file', subject_id: photo.subject_id }),
             });
             if (!res.ok) {
               const errBody = await res.text().catch(() => '');
@@ -560,7 +560,7 @@ export const runBackup = async (
             try {
               await db.runAsync(
                 `UPDATE photos SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
-                [Number(photo.id)]
+                [photo.id]
               );
             } catch (e) {
               console.warn(`[BackupService] No se pudo marcar fantasma local foto ${photo.id}:`, e);
@@ -574,7 +574,7 @@ export const runBackup = async (
           const res2 = await fetchWithFallback(`/backup/mark`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: result.url }),
+            body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: result.url, subject_id: (photo as any).subject_id }),
           });
           if (!res2.ok) {
             const errBody = await res2.text().catch(() => '');
@@ -583,7 +583,7 @@ export const runBackup = async (
           try {
             await db.runAsync(
               `UPDATE photos SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-              [result.url, Number(photo.id)]
+              [result.url, photo.id]
             );
           } catch (e) {
             console.warn(`[BackupService] No se pudo actualizar estado local de foto ${photo.id}:`, e);
@@ -619,7 +619,7 @@ export const runBackup = async (
             try {
               await db.runAsync(
                 `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
-                [Number(rec.id)]
+                [rec.id]
               );
             } catch (e) {
               console.warn(`[BackupService] No se pudo marcar fantasma local audio ${rec.id}:`, e);
@@ -642,7 +642,7 @@ export const runBackup = async (
           try {
             await db.runAsync(
               `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-              [result.url, Number(rec.id)]
+              [result.url, rec.id]
             );
           } catch (e) {
             console.warn(`[BackupService] No se pudo actualizar estado local de audio ${rec.id}:`, e);
@@ -678,7 +678,7 @@ export const runBackup = async (
             try {
               await db.runAsync(
                 `UPDATE scanned_documents SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
-                [Number(doc.id)]
+                [doc.id]
               );
             } catch (e) {
               console.warn(`[BackupService] No se pudo marcar fantasma local documento ${doc.id}:`, e);
@@ -702,7 +702,7 @@ export const runBackup = async (
           try {
             await db.runAsync(
               `UPDATE scanned_documents SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-              [result.url, Number(doc.id)]
+              [result.url, doc.id]
             );
           } catch (e) {
             console.warn(`[BackupService] No se pudo actualizar estado local de documento ${doc.id}:`, e);
@@ -745,12 +745,12 @@ export const runBackup = async (
             if (t.type === 'audio') {
               await db.runAsync(
                 `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-                [result.url, Number(t.id)]
+                [result.url, t.id]
               );
             } else {
               await db.runAsync(
                 `UPDATE youtube_videos SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-                [result.url, Number(t.id)]
+                [result.url, t.id]
               );
             }
           } catch (e) {
