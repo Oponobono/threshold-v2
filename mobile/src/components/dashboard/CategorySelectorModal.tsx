@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Modal, Pressable, FlatList, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
@@ -22,6 +23,7 @@ export const CategorySelectorModal = ({
   onClose
 }: CategorySelectorModalProps) => {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal
@@ -31,7 +33,7 @@ export const CategorySelectorModal = ({
       onRequestClose={onClose}
     >
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <View style={[styles.sheetContent, { maxHeight: '60%' }]}>
+        <View style={[styles.sheetContent, { maxHeight: '60%', paddingBottom: Math.max(insets.bottom, 20) }]}>
           <Text style={[styles.sheetTitle, { marginBottom: 16 }]}>{t('categories.selectCategory')}</Text>
           <FlatList
             data={[{ id: null, name: t('categories.none') } as any, ...categories]}

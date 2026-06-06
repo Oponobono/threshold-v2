@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
@@ -23,6 +24,7 @@ interface CreateTaskModalProps {
 
 export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, onTaskCreated }: CreateTaskModalProps) => {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId || null);
@@ -129,7 +131,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
         onRequestClose={handleClose}
       >
         <Pressable style={styles.sheetBackdrop} onPress={handleClose}>
-          <Pressable style={styles.sheetContent} onPress={() => null}>
+          <Pressable style={[styles.sheetContent, { paddingBottom: Math.max(insets.bottom, 20) }]} onPress={() => null}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>{t('dashboard.quickAddMenu.task.title')}</Text>
 

@@ -19,6 +19,7 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - **Scanner OCR for images**: `DocumentScannerModal.tsx` — moved OCR block before PDF/image bifurcation; now both export formats run `extractTextFromImageHybrid` and pass `ocr_text` to `createPhoto()` / `createScannedDocument()`.
 - **Calendar modal bottom safe-area**: `EventCreationModal.tsx` — added `paddingBottom: insets.bottom` to content view and `paddingBottom: Math.max(insets.bottom, 20)` to `SubjectPickerSheet`'s pickerContent, preventing buttons and subject selector from clipping behind the native navbar.
 - **Backup progress notifications**: `notificationService.ts` — added 8 functions (`showBackupUploadNotification`, `updateBackupUploadNotification`, `completeBackupUploadNotification`, `cancelBackupUploadNotification` and download equivalents) that show ongoing progress (X/Y items) and result (success/partial/error) in system notifications. `useBackupLogic.ts` — integrated them into `handleBackupNow` and `handleDownloadNow`. `scheduledBackupService.ts` — integrated into the background task for automatic backups. `locales/*/backup.json` — added missing `backup.partial` key.
+- **Dashboard sheet modals bottom safe-area**: `CreateTaskModal.tsx`, `SubjectSelectorModal.tsx`, `CategorySelectorModal.tsx` — each now imports `useSafeAreaInsets` and applies `paddingBottom: Math.max(insets.bottom, 20)` to `sheetContent`, preventing action buttons from clipping behind the native navbar.
 
 ### In Progress
 - *(none)*
@@ -32,7 +33,6 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - **Inline safe-area padding for modals**: Use `useSafeAreaInsets()` with inline `paddingBottom` rather than modifying StyleSheet definitions, to keep styles static and avoid per-device StyleSheet recreation.
 
 ## Next Steps
-- If CreateTaskModal, SubjectSelectorModal, or CategorySelectorModal also show bottom-clipping, apply similar `useSafeAreaInsets()` + inline `paddingBottom` pattern.
 - Consider whether `Dashboard.styles.ts` `sheetContent` hardcoded `paddingBottom: 44/52` should be replaced with dynamic inset values passed via props or context.
 
 ## Relevant Files
@@ -43,9 +43,9 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - `mobile/src/components/modals/PDFImportModal.tsx`: switched to `extractTextFromPDFHybrid`
 - `mobile/src/components/modals/DocumentScannerModal.tsx`: OCR runs for both image and PDF export
 - `mobile/src/components/modals/EventCreationModal.tsx`: added bottom safe-area padding to content and SubjectPickerSheet
-- `mobile/src/components/dashboard/CreateTaskModal.tsx`: task creation; uses Dashboard.styles sheetContent (hardcoded 44/52 padding)
-- `mobile/src/components/dashboard/SubjectSelectorModal.tsx`: subject selector; uses Dashboard.styles sheetContent
-- `mobile/src/components/dashboard/CategorySelectorModal.tsx`: category selector; uses Dashboard.styles sheetContent
+- `mobile/src/components/dashboard/CreateTaskModal.tsx`: task creation; now uses `useSafeAreaInsets` + inline `paddingBottom`
+- `mobile/src/components/dashboard/SubjectSelectorModal.tsx`: subject selector; now uses `useSafeAreaInsets` + inline `paddingBottom`
+- `mobile/src/components/dashboard/CategorySelectorModal.tsx`: category selector; now uses `useSafeAreaInsets` + inline `paddingBottom`
 - `mobile/src/services/hybridAIService.ts`: `extractTextFromImageHybrid` and `extractTextFromPDFHybrid`
 - `mobile/src/services/localOCRService.ts`: ML Kit text recognition (offline)
 - `mobile/src/services/localPDFService.ts`: native PDF text extraction (offline)
