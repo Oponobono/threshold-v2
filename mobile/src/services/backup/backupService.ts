@@ -219,7 +219,9 @@ export const getBackupStats = async (): Promise<BackupStats> => {
         transcripts: { total: Math.max(localStats.transcripts.total, serverStats.transcripts.total), backed: Math.max(localStats.transcripts.backed, serverStats.transcripts.backed) },
       };
     }
-  } catch {}
+  } catch (err) {
+    console.warn('[BackupService] Server stats unavailable, usando locales:', err);
+  }
 
   return localStats;
 };
@@ -233,7 +235,7 @@ async function getLocalBackupStats(): Promise<BackupStats> {
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings`),
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents`),
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE transcript_text IS NOT NULL AND transcript_text != ''`),
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN cloud_url IS NOT NULL AND cloud_url != '' THEN 1 ELSE 0 END) as backed FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`),
+      db.getFirstAsync(`SELECT COUNT(*) as total, 0 as backed FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`),
     ]);
 
     const transcriptTotal = (audioTransRow?.total ?? 0) + (ytTransRow?.total ?? 0);
@@ -245,7 +247,8 @@ async function getLocalBackupStats(): Promise<BackupStats> {
       docs: { total: docRow?.total ?? 0, backed: docRow?.backed ?? 0 },
       transcripts: { total: transcriptTotal, backed: transcriptBacked },
     };
-  } catch {
+  } catch (err) {
+    console.error('[BackupService] Error obteniendo estadísticas locales:', err);
     return { photos: { total: 0, backed: 0 }, audio: { total: 0, backed: 0 }, docs: { total: 0, backed: 0 }, transcripts: { total: 0, backed: 0 } };
   }
 }
