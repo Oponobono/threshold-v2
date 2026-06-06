@@ -353,13 +353,27 @@ export interface MasteryRadarData {
  * GET /api/analytics/mastery/:userId/:subjectId
  */
 export const getMasteryAnalytics = async (userId: string, subjectId: string | 'all'): Promise<MasteryRadarData> => {
-  const response = await fetchWithFallback(`/analytics/mastery/${userId}/${subjectId}`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) throw new Error('Error al obtener analytics de dominio');
-  const data = await parseJsonSafely(response);
-  return data;
+  const CACHE_KEY = `app:cache:mastery_${userId}_${subjectId}`;
+  try {
+    const response = await fetchWithFallback(`/analytics/mastery/${userId}/${subjectId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) throw new Error('Error al obtener analytics de dominio');
+    const data = await parseJsonSafely(response);
+    if (data) {
+      await storageService.saveLocal(CACHE_KEY, JSON.stringify(data));
+    }
+    return data;
+  } catch (error) {
+    console.warn('[Analytics] Network error, falling back to cached mastery:', error);
+    const cached = await storageService.getLocal(CACHE_KEY);
+    if (cached) {
+      console.log('[Analytics] Loaded mastery from cache (offline mode)');
+      return JSON.parse(cached) as MasteryRadarData;
+    }
+    throw error;
+  }
 };
 
 /**

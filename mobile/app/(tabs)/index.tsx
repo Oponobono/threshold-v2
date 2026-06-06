@@ -11,6 +11,7 @@ import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
 import { getCurrentUserProfile, getPredictedSubject, getTodaySchedules, createStudySession, deleteSubject, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
 import { getGlobalGPAAnalytics } from '../../src/services/api/analytics';
+import { calculateProjection } from '../../src/utils/projectionEngine';
 import { useDataStore } from '../../src/store/useDataStore';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { useCachePreload } from '../../src/hooks/useCachePreload';
@@ -281,11 +282,23 @@ export default function HybridDashboardScreen() {
 
   const shouldUseInfiniteCarousel = subjects.length > SUBJECT_LOOP_THRESHOLD;
 
+  const enrichedSubjects = useMemo(() => {
+    return subjects.map((s) => {
+      const subjectAssessments = assessments.filter((a: Assessment) => a.subject_id === s.id);
+      const projection = calculateProjection(subjectAssessments, s, null);
+      return {
+        ...s,
+        avg_score: projection.currentAverage > 0 ? projection.currentAverage : s.avg_score,
+        completion_percent: projection.evaluatedWeight > 0 ? projection.evaluatedWeight : s.completion_percent,
+      };
+    });
+  }, [subjects, assessments]);
+
   const carouselSubjects = useMemo(() => {
-    if (!subjects.length) return [] as (Subject & { __key: string })[];
+    if (!enrichedSubjects.length) return [] as (Subject & { __key: string })[];
 
     if (!shouldUseInfiniteCarousel) {
-      return subjects.map((subject) => ({
+      return enrichedSubjects.map((subject) => ({
         ...subject,
         __key: `${subject.id}`,
       }));
@@ -293,7 +306,7 @@ export default function HybridDashboardScreen() {
 
     const result: (Subject & { __key: string })[] = [];
     for (let loop = 0; loop < SUBJECT_LOOP_MULTIPLIER; loop += 1) {
-      for (const subject of subjects) {
+      for (const subject of enrichedSubjects) {
         result.push({
           ...subject,
           __key: `${subject.id}-${loop}`,
@@ -301,7 +314,7 @@ export default function HybridDashboardScreen() {
       }
     }
     return result;
-  }, [subjects, shouldUseInfiniteCarousel]);
+  }, [enrichedSubjects, shouldUseInfiniteCarousel]);
 
   const initialScrollIndex = useMemo(() => {
     if (!shouldUseInfiniteCarousel || !subjects.length) return 0;

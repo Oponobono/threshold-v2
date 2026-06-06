@@ -75,10 +75,17 @@ export function useSubjectGrades(
     }
 
     if (!selectedSubject?.id) {
-      console.log('[useSubjectGrades] ⚠️ selectedSubject.id no disponible:', selectedSubject?.id);
-      if (!offlineFallbackRef.current) {
-        setProjectionData(null);
-      }
+      console.log('[useSubjectGrades] ⚠️ selectedSubject.id no disponible: calculando proyección local');
+      const local = calculateProjection(assessments, selectedSubject, profile);
+      setProjectionData({
+        currentAverage: local.currentAverage,
+        currentEMA: local.currentEMA,
+        projectedGrade: local.projectedGrade,
+        delta: local.delta,
+        evaluatedWeight: local.evaluatedWeight,
+        remainingWeight: local.remainingWeight,
+        maxScale: SCALE_MAX,
+      });
       return;
     }
 

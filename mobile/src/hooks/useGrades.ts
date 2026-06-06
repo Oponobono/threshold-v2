@@ -4,7 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../store/useDataStore';
 import { useSubjectGrades } from './useSubjectGrades';
 import { getUserId, getCurrentUserProfile } from '../services/api/auth';
-import { downloadReport, getGlobalGPAAnalytics } from '../services/api/analytics';
+import { downloadReport } from '../services/api/analytics';
 import { normalizeGrade, parseWeight, SCALE_MAX } from '../utils/grades';
 import { DEFAULT_GRADING_SYSTEMS, US_LETTER_SCALES } from '../services/api/gradingDefaults';
 import { fetchSystemScales } from '../services/api/grading';
@@ -17,8 +17,6 @@ export function useGrades(t: any) {
   const [profile, setProfile] = useState<any>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [globalGPA, setGlobalGPA] = useState<any>(null);
-  const [isLoadingGlobalGPA, setIsLoadingGlobalGPA] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const [simScore, setSimScore] = useState('');
@@ -53,21 +51,6 @@ export function useGrades(t: any) {
   useEffect(() => {
     getUserId().then(id => setUserId(id != null ? String(id) : null));
   }, []);
-
-  useEffect(() => {
-    if (selectedSubjectId === null && userId) {
-      setIsLoadingGlobalGPA(true);
-      getGlobalGPAAnalytics()
-        .then(data => setGlobalGPA(data))
-        .catch(err => {
-          console.warn(`[grades.tsx] Failed to fetch global GPA: ${err}`);
-          setGlobalGPA(null);
-        })
-        .finally(() => setIsLoadingGlobalGPA(false));
-    } else {
-      setGlobalGPA(null);
-    }
-  }, [selectedSubjectId, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -106,17 +89,11 @@ export function useGrades(t: any) {
 
   const termGpa = averageGrade.toFixed(2);
 
-  const displayGPA = selectedSubjectId === null && globalGPA
-    ? globalGPA.currentAverage?.toFixed(2)
-    : termGpa;
+  const displayGPA = termGpa;
 
-  const displayProjectedGPA = selectedSubjectId === null && globalGPA
-    ? globalGPA.projectedGrade?.toFixed(2)
-    : engineProjectedGrade.toFixed(2);
+  const displayProjectedGPA = engineProjectedGrade.toFixed(2);
 
-  const displayDelta = selectedSubjectId === null && globalGPA
-    ? globalGPA.delta
-    : engineDelta;
+  const displayDelta = engineDelta;
 
   const globalGpaLetter = useMemo<DisplayGrade | null>(() => {
     if (!activeSystem || !activeScales.length) return null;
@@ -148,9 +125,7 @@ export function useGrades(t: any) {
       return;
     }
     const currentGpaVal = parseFloat(displayGPA) || 0;
-    const currentEvaluated = selectedSubjectId === null && globalGPA
-      ? globalGPA.evaluatedWeight
-      : evaluatedPercentage;
+    const currentEvaluated = evaluatedPercentage;
     const simNormalized = s;
     if (currentEvaluated === 0) {
       setProjectedGpa(simNormalized.toFixed(2));

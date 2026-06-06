@@ -292,11 +292,9 @@ export default function SubjectsScreen() {
 
                       <View style={styles.gridBody}>
                         <Text style={styles.gridName} numberOfLines={1}>{subject.name}</Text>
-                        {subject.professor && (
-                          <Text style={styles.gridProf} numberOfLines={1}>
-                            Prof. {subject.professor}{(subject as any).room ? ` • Aula ${(subject as any).room}` : ''}
-                          </Text>
-                        )}
+                        <Text style={styles.gridProf} numberOfLines={1}>
+                          {subject.professor ? `Prof. ${subject.professor}${(subject as any).room ? ` • Aula ${(subject as any).room}` : ''}` : ''}
+                        </Text>
                       </View>
 
                       <View style={styles.gridMetaRow}>
