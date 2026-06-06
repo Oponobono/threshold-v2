@@ -205,17 +205,43 @@ export const saveScheduledBackupConfig = async (config: Partial<ScheduledBackupC
 // ─── Obtener estadísticas de backup ─────────────────────────────────────────
 
 export const getBackupStats = async (): Promise<BackupStats> => {
-  const userId = await getUserId();
-  if (!userId) return { photos: { total: 0, backed: 0 }, audio: { total: 0, backed: 0 }, docs: { total: 0, backed: 0 }, transcripts: { total: 0, backed: 0 } };
-
   try {
     const response = await fetchWithFallback(`/backup/stats`);
     if (!response.ok) throw new Error('stats fetch failed');
-    return await parseJsonSafely(response);
+    const serverStats = await parseJsonSafely(response) as BackupStats;
+    if (serverStats && (serverStats.photos.total > 0 || serverStats.audio.total > 0 || serverStats.docs.total > 0 || serverStats.transcripts.total > 0)) {
+      return serverStats;
+    }
+  } catch {}
+
+  return getLocalBackupStats();
+};
+
+async function getLocalBackupStats(): Promise<BackupStats> {
+  try {
+    const db = databaseService.getDb();
+
+    const [photoRow, audioRow, docRow, audioTransRow, ytTransRow] = await Promise.all([
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos`),
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings`),
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents`),
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE transcript_text IS NOT NULL AND transcript_text != ''`),
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN cloud_url IS NOT NULL AND cloud_url != '' THEN 1 ELSE 0 END) as backed FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`),
+    ]);
+
+    const transcriptTotal = (audioTransRow?.total ?? 0) + (ytTransRow?.total ?? 0);
+    const transcriptBacked = (audioTransRow?.backed ?? 0) + (ytTransRow?.backed ?? 0);
+
+    return {
+      photos: { total: photoRow?.total ?? 0, backed: photoRow?.backed ?? 0 },
+      audio: { total: audioRow?.total ?? 0, backed: audioRow?.backed ?? 0 },
+      docs: { total: docRow?.total ?? 0, backed: docRow?.backed ?? 0 },
+      transcripts: { total: transcriptTotal, backed: transcriptBacked },
+    };
   } catch {
     return { photos: { total: 0, backed: 0 }, audio: { total: 0, backed: 0 }, docs: { total: 0, backed: 0 }, transcripts: { total: 0, backed: 0 } };
   }
-};
+}
 
 // ─── Ejecución del backup ────────────────────────────────────────────────────
 
