@@ -263,20 +263,27 @@ async function getLocalBackupStats(): Promise<BackupStats> {
     const db = databaseService.getDb();
 
     const [photoRow, audioRow, docRow, audioTransRow, ytTransRow] = await Promise.all([
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos`),
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings`),
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents`),
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE transcript_text IS NOT NULL AND transcript_text != ''`),
-      db.getFirstAsync(`SELECT COUNT(*) as total, 0 as backed FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`),
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE transcript_text IS NOT NULL AND transcript_text != ''`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, 0 as backed FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`) as Promise<{ total: number; backed: number } | undefined>,
     ]);
 
-    const transcriptTotal = (audioTransRow?.total ?? 0) + (ytTransRow?.total ?? 0);
-    const transcriptBacked = (audioTransRow?.backed ?? 0) + (ytTransRow?.backed ?? 0);
+    const photoTotal = (photoRow as { total: number; backed: number | null } | undefined)?.total ?? 0;
+    const photoBacked = (photoRow as { total: number; backed: number | null } | undefined)?.backed ?? 0;
+    const audioTotal = (audioRow as { total: number; backed: number | null } | undefined)?.total ?? 0;
+    const audioBacked = (audioRow as { total: number; backed: number | null } | undefined)?.backed ?? 0;
+    const docTotal = (docRow as { total: number; backed: number | null } | undefined)?.total ?? 0;
+    const docBacked = (docRow as { total: number; backed: number | null } | undefined)?.backed ?? 0;
+    
+    const transcriptTotal = ((audioTransRow as { total: number; backed: number | null } | undefined)?.total ?? 0) + ((ytTransRow as { total: number; backed: number } | undefined)?.total ?? 0);
+    const transcriptBacked = ((audioTransRow as { total: number; backed: number | null } | undefined)?.backed ?? 0) + ((ytTransRow as { total: number; backed: number } | undefined)?.backed ?? 0);
 
     return {
-      photos: { total: photoRow?.total ?? 0, backed: photoRow?.backed ?? 0 },
-      audio: { total: audioRow?.total ?? 0, backed: audioRow?.backed ?? 0 },
-      docs: { total: docRow?.total ?? 0, backed: docRow?.backed ?? 0 },
+      photos: { total: photoTotal, backed: photoBacked },
+      audio: { total: audioTotal, backed: audioBacked },
+      docs: { total: docTotal, backed: docBacked },
       transcripts: { total: transcriptTotal, backed: transcriptBacked },
     };
   } catch (err) {

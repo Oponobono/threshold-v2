@@ -26,7 +26,7 @@ const META = {
   video:     { color: '#F87171', label: 'VIDEO', icon: 'logo-youtube',          lib: 'ion' },
 } as const;
 
-const TypeBadge: React.FC<{ type: keyof typeof META }> = ({ type }) => {
+const TypeBadge: React.FC<{ type: keyof typeof META; hasText?: boolean }> = ({ type, hasText }) => {
   const m = META[type];
   return (
     <View style={[s.badge, { backgroundColor: `${m.color}1E` }]}>
@@ -34,6 +34,7 @@ const TypeBadge: React.FC<{ type: keyof typeof META }> = ({ type }) => {
         ? <MaterialCommunityIcons name={m.icon as any} size={10} color={m.color} />
         : <Ionicons name={m.icon as any} size={10} color={m.color} />}
       <Text style={[s.badgeText, { color: m.color }]}>{m.label}</Text>
+      {!hasText && <Text style={[s.badgeText, { color: m.color }]}>•</Text>}
     </View>
   );
 };
@@ -62,7 +63,7 @@ export const BentoContextCard: React.FC<BentoContextCardProps> = ({
       >
         <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
         <View style={s.mediaGradient}>
-          <TypeBadge type="photo" />
+          <TypeBadge type="photo" hasText={item.hasText} />
           <Text numberOfLines={1} style={s.mediaTitle}>{item.label}</Text>
         </View>
         <Checkmark selected={isSelected} />
@@ -104,7 +105,7 @@ export const BentoContextCard: React.FC<BentoContextCardProps> = ({
         style={[s.card, s.contentCard, { width: cardW, height: cardH, borderColor: isSelected ? PRIMARY : 'rgba(255,255,255,0.08)' },
           isSelected && s.cardSelected]}
       >
-        <TypeBadge type="recording" />
+        <TypeBadge type="recording" hasText={item.hasText} />
         <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 4 }}>
           <AnimatedWaveform color={m.color} height={waveHeight} />
         </View>
@@ -121,7 +122,7 @@ export const BentoContextCard: React.FC<BentoContextCardProps> = ({
       style={[s.card, s.contentCard, { width: cardW, height: cardH, borderColor: isSelected ? PRIMARY : 'rgba(255,255,255,0.08)' },
         isSelected && s.cardSelected]}
     >
-      <TypeBadge type={item.type} />
+      <TypeBadge type={item.type} hasText={item.hasText} />
       <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 2 }}>
         {item.type === 'document'
           ? <MaterialCommunityIcons name="file-document-outline" size={28} color={`${m.color}30`} />

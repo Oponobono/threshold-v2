@@ -13,6 +13,8 @@ export interface AIContextItemData {
   type: AIContextItemType;
   /** true si el item tiene texto procesado (transcript/OCR) en la BD — listo para el contexto IA */
   hasText?: boolean;
+  /** Texto OCR / transcripción para búsqueda */
+  searchText?: string;
   rawItem?: any;
 }
 

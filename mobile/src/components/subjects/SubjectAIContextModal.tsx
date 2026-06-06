@@ -1,13 +1,12 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
-  Animated, Dimensions, StyleSheet,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
+  Animated, StyleSheet,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { AIContextItemData, AIContextItemType } from '../ai/AIContextItem';
-import { BentoContextCard, CELL_W, FULL_W } from '../ui/BentoContextCard';
 import { RecordingItem } from '../../hooks/useAudioRecorder';
 import { YouTubeVideo } from '../../services/api/types';
 import { mapRecordings, mapPhotos, mapDocuments, mapVideos } from '../../utils/aiContextMappers';
@@ -23,17 +22,9 @@ const BG_CARD   = '#1C1C2A';
 const BORDER    = 'rgba(255,255,255,0.08)';
 const TXT_PRI   = '#F0F0F8';
 const TXT_SEC   = 'rgba(240,240,248,0.45)';
-const GAP       = 10;
 const PAD       = 20;
 
 type FilterKey = 'all' | 'audio' | 'videos' | 'docs' | 'photos';
-const getFilters = (t: any): { key: FilterKey; label: string }[] => [
-  { key: 'all',    label: t('ai.filterAll', 'Todo')   },
-  { key: 'audio',  label: t('ai.filterAudio', 'Audio')  },
-  { key: 'videos', label: t('ai.filterVideos', 'Videos') },
-  { key: 'docs',   label: t('ai.filterDocs', 'Docs')   },
-  { key: 'photos', label: t('ai.filterPhotos', 'Fotos')  },
-];
 
 const FILTER_TYPE_MAP: Partial<Record<FilterKey, AIContextItemType>> = {
   audio:  'recording',
@@ -42,37 +33,7 @@ const FILTER_TYPE_MAP: Partial<Record<FilterKey, AIContextItemType>> = {
   photos: 'photo',
 };
 
-// ─── Bento span assignment ────────────────────────────────────────────────────
-// Only the first card in the filtered list is a hero (full-width).
-// Everything else is 'half' so items pair up in 2-column rows.
-function assignSpan(_item: AIContextItemData, index: number, list: AIContextItemData[]): 'full' | 'half' {
-  if (list.length <= 2) return 'full';   // ≤2 items → each gets full width
-  if (index === 0) return 'full';        // single hero anchor card
-  return 'half';
-}
-
-// Build rows: 'full' items get their own row; 'half' items fill rows of 3 (3-column grid).
-function buildRows(items: AIContextItemData[]) {
-  type Cell = { item: AIContextItemData; span: 'full' | 'half' };
-  const cells: Cell[] = items.map((item, i) => ({ item, span: assignSpan(item, i, items) }));
-  const rows: Cell[][] = [];
-  let i = 0;
-  while (i < cells.length) {
-    if (cells[i].span === 'full') {
-      rows.push([cells[i]]);
-      i++;
-    } else {
-      // Collect up to 3 consecutive half-cells per row
-      const group: Cell[] = [];
-      while (i < cells.length && cells[i].span === 'half' && group.length < 3) {
-        group.push(cells[i]);
-        i++;
-      }
-      rows.push(group);
-    }
-  }
-  return rows;
-}
+const ITEMS_PER_PAGE = 10;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 export interface SubjectAIContextModalProps {
@@ -88,10 +49,11 @@ export interface SubjectAIContextModalProps {
 }
 
 /**
- * SubjectAIContextModal — Bento Grid redesign (iOS 18 / Apple Intelligence dark aesthetic).
+ * SubjectAIContextModal — Selector de contexto Zyren con búsqueda.
  *
- * Bottom Sheet with Smart Filter chips, modular Bento Grid cards, glassmorphism
- * action bar, and an animated selection counter badge.
+ * Bottom Sheet con barra de búsqueda (OCR/transcripción), chips de categoría
+ * horizontal, lista compacta de archivos (10 por página), "Ver más" y
+ * barra de acción inferior.
  */
 export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   isVisible, onClose, subjectName,
@@ -102,13 +64,16 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showContent, setShowContent] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const badgeScale = useRef(new Animated.Value(1)).current;
+  const searchRef = useRef<TextInput>(null);
 
   // ── Toast de advertencia ────────────────────────────────────────────────────
   const [toastMsg, setToastMsg] = useState('');
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
-  /** Muestra un toast que se desvanece automáticamente en ~3 segundos */
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
     Animated.sequence([
@@ -126,28 +91,47 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     ...mapVideos(videos),
   ], [documents, photos, recordings, videos]);
 
-  // Sincronizar selectedIds con los items actuales — limpiar IDs que ya no existen
+  // Sincronizar selectedIds con los items actuales
   useEffect(() => {
     setSelectedIds(prev => {
       const validIds = new Set(allItems.map(item => item.id));
       const cleaned = new Set(Array.from(prev).filter(id => validIds.has(id)));
-      // Solo actualizar el estado si hay cambios
       return cleaned.size === prev.size ? prev : cleaned;
     });
   }, [allItems]);
 
-  // Filter items
-  const filteredItems = useMemo(() => {
-    if (activeFilter === 'all') return allItems;
-    const type = FILTER_TYPE_MAP[activeFilter];
-    return allItems.filter(i => i.type === type);
-  }, [allItems, activeFilter]);
+  // Category counts
+  const categoryCounts = useMemo(() => ({
+    all: allItems.length,
+    docs: allItems.filter(i => i.type === 'document').length,
+    photos: allItems.filter(i => i.type === 'photo').length,
+    audio: allItems.filter(i => i.type === 'recording').length,
+    videos: allItems.filter(i => i.type === 'video').length,
+  }), [allItems]);
 
-  const rows = useMemo(() => buildRows(filteredItems), [filteredItems]);
+  // Search matching
+  const searchFiltered = useMemo(() => {
+    if (!searchQuery.trim()) return allItems;
+    const q = searchQuery.toLowerCase().trim();
+    return allItems.filter(i =>
+      i.label.toLowerCase().includes(q) ||
+      (i.searchText && i.searchText.toLowerCase().includes(q))
+    );
+  }, [allItems, searchQuery]);
+
+  // Category filter applied on top of search
+  const displayedItems = useMemo(() => {
+    const source = searchQuery.trim() ? searchFiltered : allItems;
+    if (activeFilter === 'all') return source;
+    const type = FILTER_TYPE_MAP[activeFilter];
+    return source.filter(i => i.type === type);
+  }, [searchFiltered, allItems, activeFilter, searchQuery]);
+
+  const visibleItems = useMemo(() => displayedItems.slice(0, visibleCount), [displayedItems, visibleCount]);
+  const totalMatching = displayedItems.length;
   const totalSelected = selectedIds.size;
   const hasContent = allItems.length > 0;
 
-  // Pulse badge on count change
   const pulseBadge = useCallback(() => {
     Animated.sequence([
       Animated.spring(badgeScale, { toValue: 1.25, useNativeDriver: true, tension: 400, friction: 12 }),
@@ -155,22 +139,65 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     ]).start();
   }, []);
 
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   const handleToggle = useCallback((id: string) => {
+    const item = allItems.find(i => i.id === id);
+    if (!item) return;
+
+    if (!item.hasText) {
+      if (item.type === 'photo') {
+        showToast(t('ai.missingOCRPhoto', 'Esta fotografía aún no ha sido procesada. Por favor, extrae el texto mediante OCR para proporcionarle contexto adicional a Zyren.'));
+      } else if (item.type === 'document') {
+        showToast(t('ai.missingOCRDocument', 'Este documento aún no ha sido analizado. Por favor, realiza un escaneo de texto (OCR) para proporcionar contexto inteligente a tu asistente.'));
+      } else if (item.type === 'recording') {
+        showToast(t('ai.missingTranscriptRecording', 'Esta grabación requiere una transcripción. Por favor, transcribe el audio para que Zyren pueda utilizarlo como base de conocimiento.'));
+      } else if (item.type === 'video') {
+        showToast(t('ai.missingTranscriptVideo', 'Este video necesita ser transcrito. Por favor, genera una transcripción o resumen para enriquecer tu sesión de estudio.'));
+      }
+      return;
+    }
+
     setSelectedIds(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
     pulseBadge();
-  }, [pulseBadge]);
+  }, [allItems, showToast, t, pulseBadge]);
 
-  const handleClose = () => { setSelectedIds(new Set()); setActiveFilter('all'); onClose(); };
+  const handleFilterPress = useCallback((key: FilterKey) => {
+    setActiveFilter(key);
+    setShowContent(true);
+    setVisibleCount(ITEMS_PER_PAGE);
+  }, []);
 
-  /**
-   * Valida que los ítems seleccionados tengan texto procesado.
-   * Retorna 'all_empty' si ninguno tiene texto, 'some_empty' si algunos no,
-   * o 'ok' si todos tienen texto.
-   */
+  const handleSearch = useCallback((text: string) => {
+    setSearchQuery(text);
+    setShowContent(true);
+    setVisibleCount(ITEMS_PER_PAGE);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setShowContent(false);
+    setVisibleCount(ITEMS_PER_PAGE);
+    searchRef.current?.blur();
+  }, []);
+
+  const showMore = useCallback(() => {
+    setVisibleCount(prev => prev + ITEMS_PER_PAGE);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setSelectedIds(new Set());
+    setActiveFilter('all');
+    setSearchQuery('');
+    setShowContent(false);
+    setVisibleCount(ITEMS_PER_PAGE);
+    onClose();
+  }, [onClose]);
+
   const checkTextReadiness = useCallback((selected: AIContextItemData[]) => {
     const withoutText = selected.filter(i => i.hasText === false);
     if (withoutText.length === 0) return { status: 'ok' as const, items: [] };
@@ -178,7 +205,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     return { status: 'some_empty' as const, items: withoutText };
   }, []);
 
-  /** Genera el mensaje de toast según los tipos de ítems sin texto */
   const getToastMessage = useCallback((items: AIContextItemData[]) => {
     const hasAudioVideo = items.some(i => i.type === 'recording' || i.type === 'video');
     const hasDocPhoto   = items.some(i => i.type === 'document'  || i.type === 'photo');
@@ -191,33 +217,57 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
 
   const handleAsk = useCallback(() => {
     const selected = allItems.filter(i => selectedIds.has(i.id));
-    
-    // Si no hay nada seleccionado, abrir chat sin contexto (Zyren responderá abiertamente)
     if (selected.length === 0) {
       showToast(t('ai.chatOpenFree', '💬 Abriendo chat libre. Puedes hacer preguntas sin contexto.'));
       onAskQuestions?.(selected);
       return;
     }
-    
     const { status, items } = checkTextReadiness(selected);
     if (status === 'all_empty') {
       showToast(getToastMessage(items));
-      return; // bloquear — no hay texto con que responder
+      return;
     }
-    if (status === 'some_empty') showToast(getToastMessage(items)); // advertir pero continuar
+    if (status === 'some_empty') showToast(getToastMessage(items));
     onAskQuestions?.(selected);
-  }, [allItems, selectedIds, onAskQuestions, checkTextReadiness, getToastMessage, showToast]);
+  }, [allItems, selectedIds, onAskQuestions, checkTextReadiness, getToastMessage, showToast, t]);
 
   const handleFlashcards = useCallback(() => {
     const selected = allItems.filter(i => selectedIds.has(i.id));
     const { status, items } = checkTextReadiness(selected);
     if (status === 'all_empty') {
       showToast(getToastMessage(items));
-      return; // bloquear — sin texto no se pueden generar flashcards
+      return;
     }
-    if (status === 'some_empty') showToast(getToastMessage(items)); // advertir pero continuar
+    if (status === 'some_empty') showToast(getToastMessage(items));
     onGenerateFlashcards?.(selected);
   }, [allItems, selectedIds, onGenerateFlashcards, checkTextReadiness, getToastMessage, showToast]);
+
+  // ── UI builders ─────────────────────────────────────────────────────────────
+
+  const filterChips = useMemo(() => {
+    const labels: Record<FilterKey, string> = {
+      all:    t('ai.filterAll', 'Todos'),
+      audio:  t('ai.filterAudio', 'Grabaciones'),
+      videos: t('ai.filterVideos', 'Videos'),
+      docs:   t('ai.filterDocs', 'Docs'),
+      photos: t('ai.filterPhotos', 'Fotos'),
+    };
+    return (['all', 'docs', 'photos', 'audio', 'videos'] as FilterKey[])
+      .filter(k => k === 'all' || categoryCounts[k] > 0)
+      .map(k => ({
+        key: k,
+        label: labels[k],
+        count: categoryCounts[k],
+        active: activeFilter === k,
+      }));
+  }, [t, categoryCounts, activeFilter]);
+
+  const typeMeta: Record<AIContextItemType, { icon: string; color: string; label: string }> = {
+    document:   { icon: 'file-document-outline', color: '#8B7FFF', label: 'PDF' },
+    photo:      { icon: 'image-outline',         color: '#38BDF8', label: 'FOTO' },
+    recording:  { icon: 'microphone',            color: '#34D399', label: 'AUDIO' },
+    video:      { icon: 'logo-youtube',          color: '#F87171', label: 'VIDEO' },
+  };
 
   if (!isVisible) return null;
 
@@ -226,143 +276,177 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
       <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={handleClose} />
       <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
 
-          {/* Handle */}
-          <View style={s.handle} />
+        {/* Handle */}
+        <View style={s.handle} />
 
-          {/* Header */}
-          <View style={s.header}>
-            <View style={s.aiIconWrap}>
-              <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.title}>Zyren</Text>
-              <Text style={s.subtitle} numberOfLines={1}>
-                {t('ai.addContext', 'Añade contexto a tu sesión')}
+        {/* Header */}
+        <View style={s.header}>
+          <View style={s.aiIconWrap}>
+            <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.title}>Zyren</Text>
+            <Text style={s.subtitle} numberOfLines={1}>
+              {t('ai.addContext', 'Añade contexto a tu sesión')}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={handleClose} style={s.closeBtn}>
+            <Ionicons name="close" size={18} color={TXT_PRI} />
+          </TouchableOpacity>
+        </View>
+
+        {/* 🔍 Search bar */}
+        <View style={s.searchContainer}>
+          <Ionicons name="search" size={16} color={TXT_SEC} style={{ marginRight: 8 }} />
+          <TextInput
+            ref={searchRef}
+            value={searchQuery}
+            onChangeText={handleSearch}
+            placeholder={t('ai.searchPlaceholder', 'Buscar archivo...')}
+            placeholderTextColor={TXT_SEC}
+            style={s.searchInput}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close-circle" size={16} color={TXT_SEC} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Category pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.filterRow}
+          style={{ flexGrow: 0 }}
+        >
+          {filterChips.map(f => (
+            <TouchableOpacity
+              key={f.key}
+              onPress={() => handleFilterPress(f.key)}
+              style={[s.chip, f.active && s.chipActive]}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.chipText, f.active && s.chipTextActive]}>{f.label}</Text>
+              {f.count > 0 && (
+                <View style={[s.chipBadge, f.active && s.chipBadgeActive]}>
+                  <Text style={[s.chipBadgeText, f.active && { color: PRIMARY }]}>{f.count}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Content area */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={s.listContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {!hasContent ? (
+            <View style={s.emptyState}>
+              <MaterialCommunityIcons name="folder-open-outline" size={52} color="rgba(255,255,255,0.1)" />
+              <Text style={s.emptyTitle}>{t('ai.emptyNoResources', 'Sin recursos')}</Text>
+              <Text style={s.emptyText}>
+                {t('ai.emptyNoResourcesText', 'Agrega grabaciones, fotos, documentos o videos a esta materia para usar la IA.')}
               </Text>
             </View>
-            <TouchableOpacity onPress={handleClose} style={s.closeBtn}>
-              <Ionicons name="close" size={18} color={TXT_PRI} />
+          ) : !showContent ? (
+            <View style={s.emptyState}>
+              <MaterialCommunityIcons name="file-find-outline" size={42} color="rgba(255,255,255,0.1)" />
+              <Text style={s.emptyTitle}>{t('ai.searchPrompt', 'Busca o selecciona una categoría para comenzar')}</Text>
+            </View>
+          ) : visibleItems.length === 0 ? (
+            <View style={s.emptyState}>
+              <MaterialCommunityIcons name="filter-outline" size={42} color="rgba(255,255,255,0.1)" />
+              <Text style={s.emptyTitle}>{t('ai.emptyNoResults', 'Sin resultados')}</Text>
+              <Text style={s.emptyText}>{t('ai.emptyNoResultsText', 'No hay archivos de este tipo.')}</Text>
+            </View>
+          ) : (
+            <>
+              {visibleItems.map(item => {
+                const m = typeMeta[item.type];
+                const isSelected = selectedIds.has(item.id);
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    activeOpacity={0.75}
+                    onPress={() => handleToggle(item.id)}
+                    style={[s.listItem, isSelected && s.listItemSelected]}
+                  >
+                    <View style={[s.listIconBg, { backgroundColor: `${m.color}20` }]}>
+                      <MaterialCommunityIcons name={m.icon as any} size={20} color={m.color} />
+                    </View>
+                    <View style={s.listInfo}>
+                      <Text numberOfLines={1} style={s.listLabel}>{item.label}</Text>
+                      <Text style={s.listMeta}>
+                        {m.label}
+                        {item.hasText ? ` • ${t('ai.ready', 'Listo')}` : ` • ${t('ai.noText', 'Sin texto')}`}
+                      </Text>
+                    </View>
+                    <View style={[s.listCheck, isSelected && s.listCheckActive]}>
+                      {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              {totalMatching > visibleCount && (
+                <TouchableOpacity onPress={showMore} style={s.seeMoreBtn} activeOpacity={0.7}>
+                  <Text style={s.seeMoreText}>
+                    {t('ai.seeMore', { count: totalMatching - visibleCount, defaultValue: `Ver más (${totalMatching - visibleCount} más)` })}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </ScrollView>
+
+        {/* Bottom action bar */}
+        <View style={s.actionBar}>
+          {totalSelected > 0 && (
+            <Animated.View style={[s.counterBadge, { transform: [{ scale: badgeScale }] }]}>
+              <Ionicons name="checkmark-circle" size={13} color={PRIMARY} />
+              <Text style={s.counterText}>
+                {t('ai.filesSelected', { count: totalSelected, plural: totalSelected !== 1 ? 's' : '', defaultValue: `${totalSelected} archivo${totalSelected !== 1 ? 's' : ''} seleccionado${totalSelected !== 1 ? 's' : ''}` })}
+              </Text>
+            </Animated.View>
+          )}
+
+          <View style={s.btnRow}>
+            <TouchableOpacity
+              onPress={handleAsk}
+              activeOpacity={0.82}
+              style={[s.btn, s.btnPrimary]}
+            >
+              <MaterialCommunityIcons name="chat-processing-outline" size={18} color="#fff" />
+              <Text style={s.btnPrimaryText}>{t('ai.talkWithZyren', 'Habla con Zyren')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleFlashcards}
+              disabled={totalSelected === 0}
+              activeOpacity={0.82}
+              style={[
+                s.btn, s.btnSecondary,
+                totalSelected === 0 && s.btnDisabled,
+              ]}
+            >
+              <MaterialCommunityIcons name="cards-outline" size={18} color={totalSelected > 0 ? TXT_PRI : TXT_SEC} />
+              <Text style={[s.btnSecondaryText, totalSelected === 0 && { color: TXT_SEC }]}>
+                {t('ai.flashcardsBtn', 'Flashcards')}
+              </Text>
             </TouchableOpacity>
           </View>
-
-          {/* Smart Filter chips */}
-            <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.filterRow}
-            style={{ flexGrow: 0 }}
-          >
-            {getFilters(t).map(f => {
-              const active = activeFilter === f.key;
-              const count = f.key === 'all'
-                ? allItems.length
-                : allItems.filter(i => i.type === FILTER_TYPE_MAP[f.key]).length;
-              if (f.key !== 'all' && count === 0) return null;
-              return (
-                <TouchableOpacity
-                  key={f.key}
-                  onPress={() => setActiveFilter(f.key)}
-                  style={[s.chip, active && s.chipActive]}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.chipText, active && s.chipTextActive]}>{f.label}</Text>
-                  {count > 0 && (
-                    <View style={[s.chipBadge, active && s.chipBadgeActive]}>
-                      <Text style={[s.chipBadgeText, active && { color: PRIMARY }]}>{count}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Bento Grid */}
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={s.gridContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {!hasContent ? (
-              <View style={s.emptyState}>
-                <MaterialCommunityIcons name="folder-open-outline" size={52} color="rgba(255,255,255,0.1)" />
-                <Text style={s.emptyTitle}>{t('ai.emptyNoResources', 'Sin recursos')}</Text>
-                <Text style={s.emptyText}>
-                  {t('ai.emptyNoResourcesText', 'Agrega grabaciones, fotos, documentos o videos a esta materia para usar la IA.')}
-                </Text>
-              </View>
-            ) : filteredItems.length === 0 ? (
-              <View style={s.emptyState}>
-                <MaterialCommunityIcons name="filter-outline" size={42} color="rgba(255,255,255,0.1)" />
-                <Text style={s.emptyTitle}>{t('ai.emptyNoResults', 'Sin resultados')}</Text>
-                <Text style={s.emptyText}>{t('ai.emptyNoResultsText', 'No hay archivos de este tipo.')}</Text>
-              </View>
-            ) : (
-              rows.map((row, ri) => (
-                <View key={ri} style={s.row}>
-                  {row.map(({ item, span }) => (
-                    <BentoContextCard
-                      key={item.id}
-                      item={item}
-                      span={span}
-                      isSelected={selectedIds.has(item.id)}
-                      onToggle={handleToggle}
-                    />
-                  ))}
-                </View>
-              ))
-            )}
-          </ScrollView>
-
-          {/* Glassmorphism bottom action bar */}
-          <View style={s.actionBar}>
-            {/* Floating counter badge */}
-            {totalSelected > 0 && (
-              <Animated.View style={[s.counterBadge, { transform: [{ scale: badgeScale }] }]}>
-                <Ionicons name="checkmark-circle" size={13} color={PRIMARY} />
-                <Text style={s.counterText}>
-                  {t('ai.filesSelected', { count: totalSelected, plural: totalSelected !== 1 ? 's' : '', defaultValue: `${totalSelected} archivo${totalSelected !== 1 ? 's' : ''} seleccionado${totalSelected !== 1 ? 's' : ''}` })}
-                </Text>
-              </Animated.View>
-            )}
-
-            <View style={s.btnRow}>
-              {/* Primary: Ask Assistant — HABILITADO incluso sin archivos para chat libre */}
-              <TouchableOpacity
-                onPress={handleAsk}
-                activeOpacity={0.82}
-                style={[
-                  s.btn, s.btnPrimary,
-                ]}
-              >
-                <MaterialCommunityIcons name="chat-processing-outline" size={18} color="#fff" />
-                <Text style={s.btnPrimaryText}>{t('ai.talkWithZyren', 'Habla con Zyren')}</Text>
-              </TouchableOpacity>
-
-              {/* Secondary: Flashcards — REQUIERE archivos con contenido */}
-              <TouchableOpacity
-                onPress={handleFlashcards}
-                disabled={totalSelected === 0}
-                activeOpacity={0.82}
-                style={[
-                  s.btn, s.btnSecondary,
-                  totalSelected === 0 && s.btnDisabled,
-                ]}
-              >
-                <MaterialCommunityIcons name="cards-outline" size={18} color={totalSelected > 0 ? TXT_PRI : TXT_SEC} />
-                <Text style={[s.btnSecondaryText, totalSelected === 0 && { color: TXT_SEC }]}>
-                  {t('ai.flashcardsBtn', 'Flashcards')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Toast de advertencia — se desvanece automáticamente */}
-          <Animated.View style={[s.toast, { opacity: toastOpacity }]} pointerEvents="none">
-            <Text style={s.toastText}>{toastMsg}</Text>
-          </Animated.View>
-
         </View>
+
+        {/* Toast */}
+        <Animated.View style={[s.toast, { opacity: toastOpacity }]} pointerEvents="none">
+          <Text style={s.toastText}>{toastMsg}</Text>
+        </Animated.View>
+
       </View>
+    </View>
   );
 };
 
@@ -390,7 +474,7 @@ const s = StyleSheet.create({
   },
   header: {
     flexDirection: 'row', alignItems: 'center',
-    gap: 12, marginBottom: 16,
+    gap: 12, marginBottom: 12,
     paddingHorizontal: PAD,
   },
   aiIconWrap: {
@@ -409,6 +493,21 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: BORDER,
+  },
+
+  // 🔍 Search bar
+  searchContainer: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: PAD, marginBottom: 12,
+    paddingHorizontal: 12, height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: BORDER,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14, color: TXT_PRI,
+    paddingVertical: 0,
   },
 
   // Filter chips
@@ -438,10 +537,56 @@ const s = StyleSheet.create({
   chipBadgeActive: { backgroundColor: `${PRIMARY}22` },
   chipBadgeText: { fontSize: 10, fontWeight: '700', color: TXT_SEC },
 
-  // Grid
-  gridContent: { paddingHorizontal: PAD, paddingBottom: 24, paddingTop: 4 },
-  row: {
-    flexDirection: 'row', gap: GAP, marginBottom: GAP,
+  // List content
+  listContent: {
+    paddingHorizontal: PAD, paddingBottom: 24, paddingTop: 4,
+  },
+
+  // List item compact
+  listItem: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 12,
+    marginBottom: 6,
+    borderRadius: 14,
+    backgroundColor: BG_CARD,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  listItemSelected: {
+    backgroundColor: `${PRIMARY}12`,
+    borderColor: `${PRIMARY}40`,
+  },
+  listIconBg: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: 10,
+  },
+  listInfo: {
+    flex: 1, marginRight: 8,
+  },
+  listLabel: {
+    fontSize: 13, fontWeight: '600', color: TXT_PRI,
+  },
+  listMeta: {
+    fontSize: 10, color: TXT_SEC, marginTop: 2,
+  },
+  listCheck: {
+    width: 20, height: 20, borderRadius: 10,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  listCheckActive: {
+    backgroundColor: PRIMARY,
+    borderWidth: 0,
+  },
+
+  // See more
+  seeMoreBtn: {
+    alignItems: 'center', paddingVertical: 14, marginTop: 2,
+  },
+  seeMoreText: {
+    fontSize: 13, fontWeight: '700', color: PRIMARY,
   },
 
   // Empty state
@@ -510,7 +655,7 @@ const s = StyleSheet.create({
     elevation: 0,
   },
 
-  // Toast de advertencia
+  // Toast
   toast: {
     position: 'absolute',
     bottom: 120,

@@ -185,6 +185,61 @@ export const testScheduledBackupNow = async (
 ): Promise<{ success: boolean; uploaded: number; errors: number }> => {
   try {
     const now = new Date();
-    console.log(`[ScheduledBackup] 🧪 TEST: Ejecutando backup programado manualmente a las ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);\n\n    const config = await getScheduledBackupConfig();
+    console.log(`[ScheduledBackup] 🧪 TEST: Ejecutando backup programado manualmente a las ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
+
+    const config = await getScheduledBackupConfig();
     if (!config.enabled) {
-      console.log('[ScheduledBackup] 🧪 TEST: Backup programado desactivado, continuando de todas formas...');\n    }\n\n    console.log(`[ScheduledBackup] 🧪 TEST: Ejecutando backup tipo: ${config.type}`);\n\n    // Mostrar notificación de progreso\n    await showBackupUploadNotification(0).catch(() => {});\n\n    let hasNewData = false;\n    let totalUploaded = 0;\n    let totalErrors = 0;\n\n    // 1. Sincronizar datos de BD\n    if (config.type === 'datos' || config.type === 'ambos') {\n      const syncResult = await syncService.sync();\n      if (syncResult.success > 0) hasNewData = true;\n      console.log(`[ScheduledBackup] 🧪 TEST - Datos: ${syncResult.success} éxitos, ${syncResult.failed} fallos`);\n    }\n\n    // 2. Respaldar archivos multimedia\n    if (config.type === 'multimedia' || config.type === 'ambos') {\n      const result = await runBackup((p) => {\n        updateBackupUploadNotification(p.done, p.total, p.current).catch(() => {});\n        onProgress?.(p);\n      }, {\n        includePhotos: true,\n        includeAudio: true,\n        includeDocs: true,\n        includeTranscripts: true,\n      });\n      if (result.uploaded > 0) hasNewData = true;\n      totalUploaded = result.uploaded;\n      totalErrors = result.errors;\n      console.log(`[ScheduledBackup] 🧪 TEST - Multimedia: ${result.uploaded} subidos, ${result.errors} errores`);\n    }\n\n    // Guardar marca de tiempo de última ejecución\n    await storageService.saveSecure(BACKUP_PREFS.SCHEDULED_LAST_RUN, new Date().toISOString()).catch(() => {});\n    console.log(`[ScheduledBackup] 🧪 TEST: Última ejecución registrada`);\n\n    // Notificación desaparece al finalizar\n    await cancelBackupUploadNotification().catch(() => {});\n\n    console.log(`[ScheduledBackup] 🧪 TEST: Completado - ${totalUploaded} subidos, ${totalErrors} errores`);\n    return { success: totalErrors === 0, uploaded: totalUploaded, errors: totalErrors };\n  } catch (error) {\n    console.error('[ScheduledBackup] 🧪 TEST: Error en ejecución manual:', error);\n    if (error instanceof Error) {\n      console.error('[ScheduledBackup] 🧪 TEST: Stack:', error.stack);\n    }\n    await cancelBackupUploadNotification().catch(() => {});\n    return { success: false, uploaded: 0, errors: 1 };\n  }\n};
+      console.log('[ScheduledBackup] 🧪 TEST: Backup programado desactivado, continuando de todas formas...');
+    }
+
+    console.log(`[ScheduledBackup] 🧪 TEST: Ejecutando backup tipo: ${config.type}`);
+
+    // Mostrar notificación de progreso
+    await showBackupUploadNotification(0).catch(() => {});
+
+    let hasNewData = false;
+    let totalUploaded = 0;
+    let totalErrors = 0;
+
+    // 1. Sincronizar datos de BD
+    if (config.type === 'datos' || config.type === 'ambos') {
+      const syncResult = await syncService.sync();
+      if (syncResult.success > 0) hasNewData = true;
+      console.log(`[ScheduledBackup] 🧪 TEST - Datos: ${syncResult.success} éxitos, ${syncResult.failed} fallos`);
+    }
+
+    // 2. Respaldar archivos multimedia
+    if (config.type === 'multimedia' || config.type === 'ambos') {
+      const result = await runBackup((p) => {
+        updateBackupUploadNotification(p.done, p.total, p.current).catch(() => {});
+        onProgress?.(p);
+      }, {
+        includePhotos: true,
+        includeAudio: true,
+        includeDocs: true,
+        includeTranscripts: true,
+      });
+      if (result.uploaded > 0) hasNewData = true;
+      totalUploaded = result.uploaded;
+      totalErrors = result.errors;
+      console.log(`[ScheduledBackup] 🧪 TEST - Multimedia: ${result.uploaded} subidos, ${result.errors} errores`);
+    }
+
+    // Guardar marca de tiempo de última ejecución
+    await storageService.saveSecure(BACKUP_PREFS.SCHEDULED_LAST_RUN, new Date().toISOString()).catch(() => {});
+    console.log(`[ScheduledBackup] 🧪 TEST: Última ejecución registrada`);
+
+    // Notificación desaparece al finalizar
+    await cancelBackupUploadNotification().catch(() => {});
+
+    console.log(`[ScheduledBackup] 🧪 TEST: Completado - ${totalUploaded} subidos, ${totalErrors} errores`);
+    return { success: totalErrors === 0, uploaded: totalUploaded, errors: totalErrors };
+  } catch (error) {
+    console.error('[ScheduledBackup] 🧪 TEST: Error en ejecución manual:', error);
+    if (error instanceof Error) {
+      console.error('[ScheduledBackup] 🧪 TEST: Stack:', error.stack);
+    }
+    await cancelBackupUploadNotification().catch(() => {});
+    return { success: false, uploaded: 0, errors: 1 };
+  }
+};

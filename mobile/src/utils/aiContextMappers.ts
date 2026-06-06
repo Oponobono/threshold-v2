@@ -22,6 +22,7 @@ export function mapRecordings(recordings: RecordingItem[]): AIContextItemData[] 
       (r.transcript_uri && r.transcript_uri.length > 0) ||
       (r.transcript_text && r.transcript_text.length > 0)
     ),
+    searchText: r.transcript_text || '',
     rawItem: r,
   }));
 }
@@ -34,6 +35,7 @@ export function mapPhotos(photos: any[]): AIContextItemData[] {
     uri: p.local_uri,
     type: 'photo' as AIContextItemType,
     hasText: !!(p.ocr_text && p.ocr_text.length > 0),
+    searchText: p.ocr_text || '',
     rawItem: p,
   }));
 }
@@ -46,6 +48,7 @@ export function mapDocuments(documents: any[]): AIContextItemData[] {
     uri: d.local_uri,
     type: 'document' as AIContextItemType,
     hasText: !!(d.ocr_text && d.ocr_text.length > 0),
+    searchText: d.ocr_text || '',
     rawItem: d,
   }));
 }
@@ -61,6 +64,7 @@ export function mapVideos(videos: YouTubeVideo[]): AIContextItemData[] {
       (v.transcript_uri && v.transcript_uri.length > 0) ||
       (v.transcript_text && v.transcript_text.length > 0)
     ),
+    searchText: v.transcript_text || '',
     rawItem: v,
   }));
 }
