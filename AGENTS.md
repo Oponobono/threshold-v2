@@ -25,6 +25,8 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - **YouTube transcripts query fixed**: `backupService.ts` — removed `WHERE (is_backed_up IS NULL OR is_backed_up = 0)` from the `youtube_videos` query (that table lacks the column). Migration `v2` adds `is_backed_up` and `cloud_url` columns to `youtube_videos`.
 - **Migration runner fixed**: `DatabaseService.ts` — removed `PRAGMA user_version = 0` hack so versions are properly tracked; incremental migrations now run exactly once.
 - **Backend mark logging**: `backupController.js` — added `console.error` logging of `err.message`, `err.code`, and `err.stack` on every `db.run` failure in the mark endpoint, so the actual PostgreSQL error is visible in server logs.
+- **PostgreSQL id type fix**: `migrations/fix-id-type.js` — new migration converts `photos.id`, `audio_recordings.id`, `scanned_documents.id` from `INTEGER`/`SERIAL` to `TEXT` in production. Registered in `postgres.js`.
+- **Scheduled backup UI clean up**: `settings.tsx` — replaced nested card-in-card layout for scheduled backup with flat `SettingRow` + `actionRow` pattern consistent with the rest of settings. Removed obsolete `scheduledBackup*` styles; now uses standard `actionRow`, `outlinePill`, `settingTitle`/`settingDesc`. Added `backup.includedItems` key to locales.
 
 ### In Progress
 - *(none)*
@@ -62,7 +64,11 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - `mobile/src/services/database/DatabaseService.ts`: removed user_version=0 hack; proper incremental migrations
 - `mobile/src/services/database/migrations.ts`: v2 adds `is_backed_up` + `cloud_url` to `youtube_videos`
 - `backend/controllers/backupController.js`: added error detail logging to mark endpoint
+- `backend/database/migrations/fix-id-type.js`: converts primary key id columns from INTEGER to TEXT
+- `mobile/src/styles/Settings.styles.ts`: removed obsolete scheduledBackup* styles
 - `mobile/src/styles/Dashboard.styles.ts`: `sheetContent` with hardcoded bottom padding
+- `mobile/src/locales/es/backup.json`: Spanish backup translations (added `partial` key)
+- `mobile/src/locales/en/backup.json`: English backup translations (added `partial` key)
 - `mobile/src/locales/es/backup.json`: Spanish backup translations (added `partial` key)
 - `mobile/src/locales/en/backup.json`: English backup translations (added `partial` key)
 - `mobile/src/components/subjects/SubjectAIContextModal.tsx`: redesigned context selector with search, horizontal pills, pagination

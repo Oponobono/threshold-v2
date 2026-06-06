@@ -208,75 +208,29 @@ export const settingsStyles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // ── Backup Scheduled Section ──
-  scheduledBackupContainer: {
-    marginTop: 20,
+  // ── Scheduled Backup Section ──
+  scheduledSection: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    ...globalStyles.shadow,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.inputBackground,
   },
-  scheduledBackupHeader: {
+  scheduledTypeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
-  scheduledBackupIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  scheduledBackupContent: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 14,
-  },
-  scheduledBackupLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-  },
-  scheduledTimePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
     gap: 8,
   },
-  scheduledTimeValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 2,
-    flex: 1,
-  },
-  scheduledTypeSelector: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  scheduledTypeButton: {
+  scheduledTypeBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1.5,
     gap: 5,
-  },
-  scheduledTypeButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
   },
 
   modalOverlay: {

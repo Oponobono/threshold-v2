@@ -57,6 +57,7 @@
   "scheduledDesc": "Activa para respaldar automáticamente",
   "scheduleTime": "Hora del Backup",
   "backupType": "Qué Respaldar",
+  "includedItems": "Ítems a respaldar",
   "backupData": "Datos",
   "backupMedia": "Multimedia",
   "backupAll": "Respaldar",

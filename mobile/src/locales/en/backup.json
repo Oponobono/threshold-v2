@@ -57,6 +57,7 @@
   "scheduledDesc": "Enable to automatically back up every day",
   "scheduleTime": "Backup Time",
   "backupType": "What to Back Up",
+  "includedItems": "Items to back up",
   "backupData": "Data",
   "backupMedia": "Media",
   "backupAll": "Backup",

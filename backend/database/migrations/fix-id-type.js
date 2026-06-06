@@ -43,9 +43,29 @@ const fixIdTypes = async (pool) => {
         // No default to drop is fine
       }
 
+      // Drop dependent foreign keys if needed
+      if (table === 'audio_recordings') {
+        try {
+          await pool.query(`ALTER TABLE audio_transcripts DROP CONSTRAINT IF EXISTS audio_transcripts_recording_id_fkey`);
+        } catch (e) {
+          // Ignore
+        }
+      }
+
       // Alter column type
       await pool.query(`ALTER TABLE ${table} ALTER COLUMN id TYPE TEXT USING id::text`);
       console.log(`  ✓ Converted ${table}.id to TEXT`);
+
+      // Alter dependent columns and restore foreign keys
+      if (table === 'audio_recordings') {
+        try {
+          await pool.query(`ALTER TABLE audio_transcripts ALTER COLUMN recording_id TYPE TEXT USING recording_id::text`);
+          await pool.query(`ALTER TABLE audio_transcripts ADD CONSTRAINT audio_transcripts_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES audio_recordings(id) ON DELETE CASCADE`);
+          console.log(`  ✓ Converted audio_transcripts.recording_id to TEXT and restored foreign key`);
+        } catch (e) {
+          console.log(`  ! Note: Could not update audio_transcripts foreign key: ${e.message}`);
+        }
+      }
     }
 
     console.log('[Migration:fix-id] ✅ Primary key id type migration complete');
