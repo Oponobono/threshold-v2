@@ -12,6 +12,7 @@ import { fetchWithFallback, parseJsonSafely } from '../api/client';
 import { getUserId } from '../api/auth/session';
 import * as FileSystem from 'expo-file-system/legacy';
 import { databaseService } from '../database/DatabaseService';
+import { useConnectivityStore } from '../../store/useConnectivityStore';
 
 // ─── Auto-subida individual ──────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ export const BACKUP_PREFS = {
   SCHEDULED_HOUR: 'backup_scheduled_hour',
   SCHEDULED_MINUTE: 'backup_scheduled_minute',
   SCHEDULED_TYPE: 'backup_scheduled_type',
+  SCHEDULED_LAST_RUN: 'backup_scheduled_last_run', // Última vez que se ejecutó automáticamente
 } as const;
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -175,18 +177,33 @@ export const saveBackupPreferences = async (prefs: Partial<BackupPreferences>): 
 // ─── Configuración de backup programado ─────────────────────────────────────
 
 export const getScheduledBackupConfig = async (): Promise<ScheduledBackupConfig> => {
-  const [enabled, hour, minute, type] = await Promise.all([
-    storageService.getSecure(BACKUP_PREFS.SCHEDULED_ENABLED),
-    storageService.getSecure(BACKUP_PREFS.SCHEDULED_HOUR),
-    storageService.getSecure(BACKUP_PREFS.SCHEDULED_MINUTE),
-    storageService.getSecure(BACKUP_PREFS.SCHEDULED_TYPE),
-  ]);
-  return {
-    enabled: enabled === 'true',
-    hour: hour !== null ? parseInt(hour, 10) : 2,
-    minute: minute !== null ? parseInt(minute, 10) : 0,
-    type: (type as ScheduledBackupType) || 'ambos',
-  };
+  try {
+    const [enabled, hour, minute, type] = await Promise.all([
+      storageService.getSecure(BACKUP_PREFS.SCHEDULED_ENABLED),
+      storageService.getSecure(BACKUP_PREFS.SCHEDULED_HOUR),
+      storageService.getSecure(BACKUP_PREFS.SCHEDULED_MINUTE),
+      storageService.getSecure(BACKUP_PREFS.SCHEDULED_TYPE),
+    ]);
+    
+    const config: ScheduledBackupConfig = {
+      enabled: enabled === 'true',
+      hour: hour !== null ? parseInt(hour, 10) : 2,
+      minute: minute !== null ? parseInt(minute, 10) : 0,
+      type: (type as ScheduledBackupType) || 'ambos',
+    };
+    
+    console.log(`[BackupService] getScheduledBackupConfig: enabled=${config.enabled}, hora=${config.hour}:${String(config.minute).padStart(2, '0')}`);
+    return config;
+  } catch (err) {
+    console.error('[BackupService] Error leyendo config de backup programado:', err);
+    // Retornar default pero con enabled=false para ser seguro
+    return {
+      enabled: false,
+      hour: 2,
+      minute: 0,
+      type: 'ambos',
+    };
+  }
 };
 
 export const saveScheduledBackupConfig = async (config: Partial<ScheduledBackupConfig>): Promise<void> => {
@@ -200,6 +217,21 @@ export const saveScheduledBackupConfig = async (config: Partial<ScheduledBackupC
   if (config.type !== undefined)
     promises.push(storageService.saveSecure(BACKUP_PREFS.SCHEDULED_TYPE, config.type));
   await Promise.all(promises);
+};
+
+/**
+ * Obtiene la fecha/hora de la última ejecución automática del backup programado.
+ * Retorna null si nunca se ha ejecutado automáticamente.
+ */
+export const getScheduledBackupLastRun = async (): Promise<Date | null> => {
+  try {
+    const lastRunStr = await storageService.getSecure(BACKUP_PREFS.SCHEDULED_LAST_RUN);
+    if (!lastRunStr) return null;
+    return new Date(lastRunStr);
+  } catch (err) {
+    console.warn('[BackupService] Error obteniendo última ejecución automática:', err);
+    return null;
+  }
 };
 
 // ─── Obtener estadísticas de backup ─────────────────────────────────────────
@@ -253,11 +285,83 @@ async function getLocalBackupStats(): Promise<BackupStats> {
   }
 }
 
+/**
+ * Obtiene items NO respaldados directamente desde SQLite local (fallback cuando el backend no responde).
+ * Se usa en modo offline para permitir que los backups continúen.
+ */
+async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
+  photos: { id: string; uri: string }[];
+  audio: { id: string; local_uri: string; name: string }[];
+  docs: { id: string; local_uri: string; name: string }[];
+  transcripts: { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[];
+}> {
+  const db = databaseService.getDb();
+  const result = {
+    photos: [] as { id: string; uri: string }[],
+    audio: [] as { id: string; local_uri: string; name: string }[],
+    docs: [] as { id: string; local_uri: string; name: string }[],
+    transcripts: [] as { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[],
+  };
+
+  try {
+    // Fotos no respaldadas
+    if (prefs.includePhotos) {
+      const photos = await db.getAllAsync(
+        `SELECT id, local_uri FROM photos WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+      );
+      result.photos = photos.map((p: any) => ({ id: String(p.id), uri: p.local_uri }));
+      console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.photos.length} foto(s) pendientes`);
+    }
+
+    // Grabaciones de audio no respaldadas
+    if (prefs.includeAudio) {
+      const audio = await db.getAllAsync(
+        `SELECT id, local_uri, name FROM audio_recordings WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+      );
+      result.audio = audio.map((a: any) => ({ id: String(a.id), local_uri: a.local_uri, name: a.name }));
+      console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.audio.length} grabación(es) pendiente(s)`);
+    }
+
+    // Documentos no respaldados
+    if (prefs.includeDocs) {
+      const docs = await db.getAllAsync(
+        `SELECT id, local_uri, name FROM scanned_documents WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+      );
+      result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri, name: d.name }));
+      console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.docs.length} documento(s) pendiente(s)`);
+    }
+
+    // Transcripciones no respaldadas
+    if (prefs.includeTranscripts) {
+      // Audio transcripts
+      const audioTranscripts = await db.getAllAsync(
+        `SELECT id, transcript_text, recording_id FROM audio_recordings WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
+      );
+      result.transcripts.push(...audioTranscripts.map((t: any) => ({ id: String(t.id), type: 'audio' as const, text: t.transcript_text, recording_id: String(t.recording_id) })));
+      console.log(`[BackupService] getPendingItemsFromLocalDB: ${audioTranscripts.length} transcripción(es) de audio pendiente(s)`);
+
+      // YouTube transcripts
+      const ytTranscripts = await db.getAllAsync(
+        `SELECT id, transcript_text, id as video_id FROM youtube_videos WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
+      );
+      result.transcripts.push(...ytTranscripts.map((t: any) => ({ id: String(t.id), type: 'youtube' as const, text: t.transcript_text, video_id: String(t.video_id) })));
+      console.log(`[BackupService] getPendingItemsFromLocalDB: ${ytTranscripts.length} transcripción(es) de YouTube pendiente(s)`);
+    }
+  } catch (err) {
+    console.error('[BackupService] Error obteniendo items pendientes desde DB local:', err);
+  }
+
+  return result;
+}
+
 // ─── Ejecución del backup ────────────────────────────────────────────────────
 
 /**
  * Ejecuta el proceso de backup.
  * Sube a Uploadthing todos los ítems no respaldados según las preferencias.
+ * 
+ * EN MODO OFFLINE: Obtiene items desde SQLite local sin intentar conectarse al backend.
+ * 
  * @param onProgress - Callback con el progreso actual (llamado en cada ítem)
  */
 export const runBackup = async (
@@ -276,101 +380,116 @@ export const runBackup = async (
   let uploaded = 0;
   let errors = 0;
 
-  // ──────────────────────────────────────────────────────────────────
-  // FASE 0: Sincronizar metadatos locales al backend
-  // Los ítems creados offline (sin auto-upload) solo existen en SQLite local.
-  // Necesitamos registrarlos en el backend ANTES de pedir los pendientes,
-  // porque el backend no sabe que existen.
-  // ──────────────────────────────────────────────────────────────────
+  // Detectar si estamos en modo offline
+  const isOffline = !useConnectivityStore.getState().isOnline;
+  console.log(`[BackupService] Iniciando backup. Modo offline: ${isOffline}`);
+
   const db = databaseService.getDb();
 
-  // ── Fase 0a: Fotos locales sin registro en backend ──
-  if (prefs.includePhotos) {
-    try {
-      const localOnlyPhotos: any[] = await db.getAllAsync(
-        `SELECT id, subject_id, local_uri, es_favorita, ocr_text, group_id
-         FROM photos
-         WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
-      );
-      console.log(`[BackupService] Fase 0a: ${localOnlyPhotos.length} foto(s) sin registro en backend.`);
-      for (const photo of localOnlyPhotos) {
-        try {
-          await fetchWithFallback('/photos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: photo.id, subject_id: photo.subject_id, local_uri: photo.local_uri, es_favorita: photo.es_favorita, ocr_text: photo.ocr_text, group_id: photo.group_id, userId }),
-          });
-        } catch (e) {
-          console.warn(`[BackupService] Fase 0a ⚠️: foto ${photo.id}:`, e);
+  // ──────────────────────────────────────────────────────────────────
+  // FASE 0: Sincronizar metadatos locales al backend (SOLO EN MODO ONLINE)
+  // Los ítems creados offline (sin auto-upload) solo existen en SQLite local.
+  // En modo online, registrarlos en el backend ANTES de pedir los pendientes.
+  // ──────────────────────────────────────────────────────────────────
+  if (!isOffline) {
+    // ── Fase 0a: Fotos locales sin registro en backend ──
+    if (prefs.includePhotos) {
+      try {
+        const localOnlyPhotos: any[] = await db.getAllAsync(
+          `SELECT id, subject_id, local_uri, es_favorita, ocr_text, group_id
+           FROM photos
+           WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+        );
+        console.log(`[BackupService] Fase 0a: ${localOnlyPhotos.length} foto(s) sin registro en backend.`);
+        for (const photo of localOnlyPhotos) {
+          try {
+            await fetchWithFallback('/photos', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: photo.id, subject_id: photo.subject_id, local_uri: photo.local_uri, es_favorita: photo.es_favorita, ocr_text: photo.ocr_text, group_id: photo.group_id, userId }),
+            });
+          } catch (e) {
+            console.warn(`[BackupService] Fase 0a ⚠️: foto ${photo.id}:`, e);
+          }
         }
+      } catch (e) {
+        console.warn('[BackupService] Fase 0a: Error leyendo fotos locales:', e);
       }
-    } catch (e) {
-      console.warn('[BackupService] Fase 0a: Error leyendo fotos locales:', e);
     }
-  }
 
-  // ── Fase 0b: Grabaciones de audio locales sin registro en backend ──
-  if (prefs.includeAudio) {
-    try {
-      const localOnlyAudio: any[] = await db.getAllAsync(
-        `SELECT id, user_id, subject_id, name, local_uri, duration
-         FROM audio_recordings
-         WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
-      );
-      console.log(`[BackupService] Fase 0b: ${localOnlyAudio.length} grabación(es) sin registro en backend.`);
-      for (const rec of localOnlyAudio) {
-        try {
-          await fetchWithFallback('/audio-recordings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: rec.id, user_id: Number(rec.user_id || userId), subject_id: rec.subject_id, name: rec.name, local_uri: rec.local_uri, duration: rec.duration }),
-          });
-        } catch (e) {
-          console.warn(`[BackupService] Fase 0b ⚠️: grabación ${rec.id}:`, e);
+    // ── Fase 0b: Grabaciones de audio locales sin registro en backend ──
+    if (prefs.includeAudio) {
+      try {
+        const localOnlyAudio: any[] = await db.getAllAsync(
+          `SELECT id, user_id, subject_id, name, local_uri, duration
+           FROM audio_recordings
+           WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+        );
+        console.log(`[BackupService] Fase 0b: ${localOnlyAudio.length} grabación(es) sin registro en backend.`);
+        for (const rec of localOnlyAudio) {
+          try {
+            await fetchWithFallback('/audio-recordings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: rec.id, user_id: Number(rec.user_id || userId), subject_id: rec.subject_id, name: rec.name, local_uri: rec.local_uri, duration: rec.duration }),
+            });
+          } catch (e) {
+            console.warn(`[BackupService] Fase 0b ⚠️: grabación ${rec.id}:`, e);
+          }
         }
+      } catch (e) {
+        console.warn('[BackupService] Fase 0b: Error leyendo grabaciones locales:', e);
       }
-    } catch (e) {
-      console.warn('[BackupService] Fase 0b: Error leyendo grabaciones locales:', e);
     }
-  }
 
-  // ── Fase 0c: Documentos escaneados locales sin registro en backend ──
-  if (prefs.includeDocs) {
-    try {
-      const localOnlyDocs: any[] = await db.getAllAsync(
-        `SELECT id, user_id, subject_id, name, local_uri, ocr_text
-         FROM scanned_documents
-         WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
-      );
-      console.log(`[BackupService] Fase 0c: ${localOnlyDocs.length} documento(s) sin registro en backend.`);
-      for (const doc of localOnlyDocs) {
-        try {
-          await fetchWithFallback('/scanned_documents', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, name: doc.name, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
-          });
-        } catch (e) {
-          console.warn(`[BackupService] Fase 0c ⚠️: documento ${doc.id}:`, e);
+    // ── Fase 0c: Documentos escaneados locales sin registro en backend ──
+    if (prefs.includeDocs) {
+      try {
+        const localOnlyDocs: any[] = await db.getAllAsync(
+          `SELECT id, user_id, subject_id, name, local_uri, ocr_text
+           FROM scanned_documents
+           WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
+        );
+        console.log(`[BackupService] Fase 0c: ${localOnlyDocs.length} documento(s) sin registro en backend.`);
+        for (const doc of localOnlyDocs) {
+          try {
+            await fetchWithFallback('/scanned_documents', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, name: doc.name, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
+            });
+          } catch (e) {
+            console.warn(`[BackupService] Fase 0c ⚠️: documento ${doc.id}:`, e);
+          }
         }
+      } catch (e) {
+        console.warn('[BackupService] Fase 0c: Error leyendo documentos locales:', e);
       }
-    } catch (e) {
-      console.warn('[BackupService] Fase 0c: Error leyendo documentos locales:', e);
     }
-  }
+  } // Cierre de if (!isOffline)
 
   // ──────────────────────────────────────────────────────────────────
   // FASE 1: Obtener ítems pendientes de backup desde el backend y subirlos
+  // EN MODO OFFLINE: colectar directamente de SQLite local
   // ──────────────────────────────────────────────────────────────────
-  const response = await fetchWithFallback(`/backup/pending`);
-  if (!response.ok) return { success: false, uploaded: 0, errors: 0 };
-
-  const pending = await parseJsonSafely(response) as {
-    photos: { id: number; uri: string }[];
-    audio: { id: number; local_uri: string; name: string }[];
-    docs: { id: number; local_uri: string; name: string }[];
-    transcripts: { id: number; type: 'audio' | 'youtube'; text: string; recording_id?: number; video_id?: number }[];
+  let pending: {
+    photos: { id: string | number; uri: string }[];
+    audio: { id: string | number; local_uri: string; name: string }[];
+    docs: { id: string | number; local_uri: string; name: string }[];
+    transcripts: { id: string | number; type: 'audio' | 'youtube'; text: string; recording_id?: string | number; video_id?: string | number }[];
   };
+
+  try {
+    // Intentar obtener desde el backend
+    const response = await fetchWithFallback(`/backup/pending`);
+    if (!response.ok) throw new Error(`Backend pending failed: ${response.status}`);
+    pending = await parseJsonSafely(response);
+    console.log('[BackupService] Fase 1: Items pendientes obtenidos del backend');
+  } catch (err) {
+    // Fallback: obtener directamente de SQLite local (modo offline)
+    console.warn('[BackupService] Fase 1: Backend no disponible, usando BD local como fallback:', err);
+    pending = await getPendingItemsFromLocalDB(prefs);
+  }
 
   const tasks: (() => Promise<void>)[] = [];
 

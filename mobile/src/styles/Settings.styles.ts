@@ -164,6 +164,121 @@ export const settingsStyles = StyleSheet.create({
     backgroundColor: theme.colors.inputBackground,
   },
   outlinePillText: { fontSize: 11, fontWeight: '600', color: theme.colors.text.secondary },
+
+  // ── Backup Action Buttons ──
+  backupButtonContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 16,
+  },
+  backupButton: {
+    flex: 1,
+    minWidth: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    gap: 6,
+    ...globalStyles.shadow,
+  },
+  backupButtonOutline: {
+    backgroundColor: theme.colors.background,
+    borderColor: theme.colors.border,
+  },
+  backupButtonPrimary: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  backupButtonSecondary: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  backupButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+  },
+  backupButtonTextLight: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // ── Backup Scheduled Section ──
+  scheduledBackupContainer: {
+    marginTop: 20,
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    ...globalStyles.shadow,
+  },
+  scheduledBackupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  scheduledBackupIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  scheduledBackupContent: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 14,
+  },
+  scheduledBackupLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  scheduledTimePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    gap: 8,
+  },
+  scheduledTimeValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 2,
+    flex: 1,
+  },
+  scheduledTypeSelector: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  scheduledTypeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1.5,
+    gap: 5,
+  },
+  scheduledTypeButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center', alignItems: 'center',

@@ -157,11 +157,21 @@ export const SubjectAIFab: React.FC<SubjectAIFabProps> = ({
           console.warn(`[buildAIContext] Item ${item.type} "${item.label}" no tiene ID. rawItem:`, item.rawItem);
         }
 
-        return {
+        const payloadItem: any = {
           id: id,
           type: item.type,
           label: item.label,
         };
+
+        // En modo offline, incluir el ocr_text del cliente para que el servidor
+        // pueda usarlo si no encuentra el documento en la BD
+        if (item.type === 'document' || item.type === 'photo') {
+          if (item.rawItem?.ocr_text) {
+            payloadItem.ocr_text = item.rawItem.ocr_text;
+          }
+        }
+
+        return payloadItem;
       });
 
       console.log('[buildAIContext] Payload:', payload);

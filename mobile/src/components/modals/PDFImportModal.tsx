@@ -112,7 +112,14 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
           const base64Data = await FileSystem.readAsStringAsync(localPdfUri, {
             encoding: FileSystem.EncodingType.Base64,
           });
-          ocrText = await extractTextFromPDFHybrid(base64Data);
+          const extracted = await extractTextFromPDFHybrid(base64Data);
+          // Guardar incluso si está vacío — vacío significa "OCR se ejecutó pero no encontró texto"
+          // null significa "OCR no se intentó"
+          ocrText = extracted !== undefined ? extracted : null;
+          
+          if (!ocrText) {
+            console.warn('[PDFImportModal] OCR executó pero no extrajo texto. Base64 size:', base64Data.length);
+          }
         } catch (ocrErr) {
           console.warn('[PDFImportModal] Extracción de texto falló:', ocrErr);
           showAlert({
@@ -120,6 +127,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
             message: t('documents.textExtractionFailed', 'No se pudo extraer texto del PDF. El documento se guardará sin contenido textual.'),
             type: 'warning',
           });
+          ocrText = null; // null indica que el OCR falló, no que no se intentó
         }
       }
 
@@ -127,7 +135,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
         subject_id: selectedSubjectId,
         local_uri: localPdfUri,
         name: file.name,
-        ocr_text: ocrText || undefined,
+        ocr_text: ocrText ? ocrText : undefined, // Enviar undefined si es null (no se intentó) o "" (no encontró texto)
       });
       
       // createScannedDocument ya gestiona el auto-upload según las preferencias de backup

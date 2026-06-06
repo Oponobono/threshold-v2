@@ -51,5 +51,16 @@
   "momentAgo": "A moment ago",
   "minAgo": "{{mins}} min ago",
   "hoursAgo": "{{hours}}h ago",
-  "daysAgo": "{{days}} day(s) ago"
+  "daysAgo": "{{days}} day(s) ago",
+  "scheduled": "Automatic Backup",
+  "scheduledAt": "Scheduled for",
+  "scheduledDesc": "Enable to automatically back up every day",
+  "scheduleTime": "Backup Time",
+  "backupType": "What to Back Up",
+  "backupData": "Data",
+  "backupMedia": "Media",
+  "backupAll": "Backup",
+  "dataOnly": "Data",
+  "mediaOnly": "Media",
+  "both": "Both"
 }

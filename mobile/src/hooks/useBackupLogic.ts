@@ -18,6 +18,7 @@ import {
   saveScheduledBackupConfig,
   ScheduledBackupType,
   ScheduledBackupConfig,
+  getScheduledBackupLastRun,
 } from '../services/backup/backupService';
 import {
   downloadCloudItems,
@@ -39,6 +40,7 @@ import {
   updateBackupDownloadNotification,
   cancelBackupDownloadNotification,
 } from '../services/notificationService';
+import { useConnectivityStore } from '../store/useConnectivityStore';
 
 // ─── Helpers de formato ──────────────────────────────────────────────────────
 
@@ -95,19 +97,24 @@ export const useBackupLogic = () => {
     type: 'ambos',
   });
 
+  // Última ejecución automática del backup programado
+  const [scheduledLastRun, setScheduledLastRun] = useState<Date | null>(null);
+
   // ─── Carga inicial ────────────────────────────────────────────────────────
 
   const loadAll = useCallback(async () => {
-    const [loadedPrefs, loadedStats, cloudCount, scheduledCfg] = await Promise.all([
+    const [loadedPrefs, loadedStats, cloudCount, scheduledCfg, scheduledLR] = await Promise.all([
       getBackupPreferences(),
       getBackupStats(),
       getCloudItemsCount(),
       getScheduledBackupConfig(),
+      getScheduledBackupLastRun(),
     ]);
     setPrefs(loadedPrefs);
     setStats(loadedStats);
     setCloudItemsCount(cloudCount);
     setScheduledConfig(scheduledCfg);
+    setScheduledLastRun(scheduledLR);
   }, []);
 
   useEffect(() => {
@@ -136,6 +143,12 @@ export const useBackupLogic = () => {
         type: 'warning',
       });
       return;
+    }
+
+    // Advertencia si está offline, pero permitir continuar (usará BD local como fallback)
+    const isOffline = !useConnectivityStore.getState().isOnline;
+    if (isOffline && type === 'multimedia') {
+      console.warn('[useBackupLogic] Backup en modo offline: detectando items locales sin conexión al backend');
     }
 
     setIsUploading(true);
@@ -349,5 +362,7 @@ export const useBackupLogic = () => {
     handleToggleScheduled,
     handleSaveScheduledTime,
     handleSetScheduledType,
+    scheduledLastRun,
+    scheduledLastRunFormatted: scheduledLastRun ? formatRelativeTime(scheduledLastRun.toISOString(), t) : t('backup.never'),
   };
 };

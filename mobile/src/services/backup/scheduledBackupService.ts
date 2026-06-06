@@ -12,8 +12,9 @@
  */
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
-import { getScheduledBackupConfig, runBackup } from './backupService';
+import { getScheduledBackupConfig, runBackup, BACKUP_PREFS } from './backupService';
 import { syncService } from '../database';
+import { storageService } from '../storageService';
 import {
   showBackupUploadNotification,
   updateBackupUploadNotification,
@@ -25,7 +26,9 @@ export const BACKUP_TASK_NAME = 'threshold-scheduled-backup';
 // ── Registrar el task handler (debe ejecutarse en el root del módulo) ────────
 TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
   try {
-    console.log('[ScheduledBackup] 🕐 Task ejecutado por el sistema');
+    const now = new Date();
+    const nowIso = now.toISOString();
+    console.log(`[ScheduledBackup] 🕐 Task ejecutado por el sistema a las ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
 
     const config = await getScheduledBackupConfig();
     if (!config.enabled) {
@@ -33,18 +36,41 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
       return BackgroundFetch.BackgroundFetchResult.NoData;
     }
 
-    // Verificar si la hora actual coincide con la hora programada (±15 min)
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const scheduledMinutes = config.hour * 60 + config.minute;
-    const diff = Math.abs(currentMinutes - scheduledMinutes);
-
-    // Tolerancia: 15 minutos antes o después
-    const TOLERANCE_MINUTES = 15;
-    if (diff > TOLERANCE_MINUTES && diff < (24 * 60 - TOLERANCE_MINUTES)) {
-      console.log(`[ScheduledBackup] ⏰ Hora actual (${now.getHours()}:${now.getMinutes()}) no coincide con la programada (${config.hour}:${config.minute}). Saltando.`);
+    // Estrategia: Ejecutar 1 vez por día en una ventana flexible
+    // El SO de Android/iOS controla cuándo ejecutar, así que permitimos ejecución
+    // entre las horas configuradas ± 2 horas de flexibilidad
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTotalMinutes = currentHour * 60 + currentMinutes;
+    const scheduledTotalMinutes = config.hour * 60 + config.minute;
+    
+    // Ventana: 2 horas antes y después de la hora programada
+    const WINDOW_MINUTES = 120;
+    const minAllowed = scheduledTotalMinutes - WINDOW_MINUTES;
+    const maxAllowed = scheduledTotalMinutes + WINDOW_MINUTES;
+    
+    // Comprobar si estamos dentro de la ventana
+    const inWindow = (currentTotalMinutes >= minAllowed && currentTotalMinutes <= maxAllowed);
+    
+    if (!inWindow) {
+      console.log(`[ScheduledBackup] ⏰ Hora actual (${String(currentHour).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}) fuera de ventana [${String(config.hour).padStart(2, '0')}:${String(config.minute).padStart(2, '0')} ±2h]. Saltando.`);
       return BackgroundFetch.BackgroundFetchResult.NoData;
     }
+    
+    // Verificar que no se haya ejecutado ya hoy
+    const lastRunStr = await storageService.getSecure('backup_scheduled_last_run');
+    if (lastRunStr) {
+      const lastRun = new Date(lastRunStr);
+      const lastRunDate = `${lastRun.getFullYear()}-${String(lastRun.getMonth() + 1).padStart(2, '0')}-${String(lastRun.getDate()).padStart(2, '0')}`;
+      const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      
+      if (lastRunDate === todayDate) {
+        console.log(`[ScheduledBackup] ✅ Backup ya ejecutado hoy a las ${lastRun.getHours()}:${String(lastRun.getMinutes()).padStart(2, '0')}. Saltando para evitar duplicados.`);
+        return BackgroundFetch.BackgroundFetchResult.NoData;
+      }
+    }
+    
+    console.log(`[ScheduledBackup] ✅ Ventana de ejecución válida. Ejecutando backup tipo: ${config.type}`);
 
     console.log(`[ScheduledBackup] ✅ Ejecutando backup tipo: ${config.type}`);
 
@@ -74,6 +100,10 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
       console.log(`[ScheduledBackup] 🗂️ Multimedia: ${result.uploaded} subidos, ${result.errors} errores`);
     }
 
+    // Guardar marca de tiempo de última ejecución
+    await storageService.saveSecure(BACKUP_PREFS.SCHEDULED_LAST_RUN, new Date().toISOString()).catch(() => {});
+    console.log(`[ScheduledBackup] 💾 Última ejecución registrada`);
+
     // Notificación desaparece al finalizar
     await cancelBackupUploadNotification().catch(() => {});
 
@@ -82,6 +112,7 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
       : BackgroundFetch.BackgroundFetchResult.NoData;
   } catch (error) {
     console.error('[ScheduledBackup] ❌ Error en el task:', error);
+    console.error('[ScheduledBackup] Stack:', error instanceof Error ? error.stack : 'No stack available');
     await cancelBackupUploadNotification().catch(() => {});
     return BackgroundFetch.BackgroundFetchResult.Failed;
   }
@@ -98,18 +129,23 @@ export const registerScheduledBackup = async (): Promise<void> => {
   try {
     const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKUP_TASK_NAME);
     if (isRegistered) {
-      console.log('[ScheduledBackup] Task ya registrado.');
+      console.log('[ScheduledBackup] ✅ Task ya estaba registrado, actualizando intervalo...');
+      // No volvemos a registrar si ya existe - el SO mantiene la configuración
       return;
     }
 
+    console.log('[ScheduledBackup] 📝 Registrando nuevo task de backup programado...');
     await BackgroundFetch.registerTaskAsync(BACKUP_TASK_NAME, {
-      minimumInterval: 60 * 60, // cada hora (el SO decide cuándo ejecutar)
+      minimumInterval: 15 * 60, // 15 minutos mínimo (el SO puede ejecutar más frecuentemente)
       stopOnTerminate: false,   // continúa aunque el usuario cierre la app
       startOnBoot: true,        // se reactiva al reiniciar el dispositivo
     });
-    console.log('[ScheduledBackup] ✅ Task registrado correctamente.');
+    console.log('[ScheduledBackup] ✅ Task registrado correctamente con intervalo mínimo de 15 minutos.');
   } catch (error) {
     console.error('[ScheduledBackup] ❌ Error al registrar task:', error);
+    if (error instanceof Error) {
+      console.error('[ScheduledBackup] Detalles:', error.message);
+    }
   }
 };
 
@@ -138,3 +174,17 @@ export const isScheduledBackupRegistered = async (): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Función de TESTING/DEBUG: Ejecuta el backup programado inmediatamente.
+ * Ignora la verificación de hora para permitir testing rápido.
+ * Usa la misma lógica del task pero forzado a ejecutar.
+ */
+export const testScheduledBackupNow = async (
+  onProgress?: (progress: { done: number; total: number; current: string; errors: number }) => void
+): Promise<{ success: boolean; uploaded: number; errors: number }> => {
+  try {
+    const now = new Date();
+    console.log(`[ScheduledBackup] 🧪 TEST: Ejecutando backup programado manualmente a las ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);\n\n    const config = await getScheduledBackupConfig();
+    if (!config.enabled) {
+      console.log('[ScheduledBackup] 🧪 TEST: Backup programado desactivado, continuando de todas formas...');\n    }\n\n    console.log(`[ScheduledBackup] 🧪 TEST: Ejecutando backup tipo: ${config.type}`);\n\n    // Mostrar notificación de progreso\n    await showBackupUploadNotification(0).catch(() => {});\n\n    let hasNewData = false;\n    let totalUploaded = 0;\n    let totalErrors = 0;\n\n    // 1. Sincronizar datos de BD\n    if (config.type === 'datos' || config.type === 'ambos') {\n      const syncResult = await syncService.sync();\n      if (syncResult.success > 0) hasNewData = true;\n      console.log(`[ScheduledBackup] 🧪 TEST - Datos: ${syncResult.success} éxitos, ${syncResult.failed} fallos`);\n    }\n\n    // 2. Respaldar archivos multimedia\n    if (config.type === 'multimedia' || config.type === 'ambos') {\n      const result = await runBackup((p) => {\n        updateBackupUploadNotification(p.done, p.total, p.current).catch(() => {});\n        onProgress?.(p);\n      }, {\n        includePhotos: true,\n        includeAudio: true,\n        includeDocs: true,\n        includeTranscripts: true,\n      });\n      if (result.uploaded > 0) hasNewData = true;\n      totalUploaded = result.uploaded;\n      totalErrors = result.errors;\n      console.log(`[ScheduledBackup] 🧪 TEST - Multimedia: ${result.uploaded} subidos, ${result.errors} errores`);\n    }\n\n    // Guardar marca de tiempo de última ejecución\n    await storageService.saveSecure(BACKUP_PREFS.SCHEDULED_LAST_RUN, new Date().toISOString()).catch(() => {});\n    console.log(`[ScheduledBackup] 🧪 TEST: Última ejecución registrada`);\n\n    // Notificación desaparece al finalizar\n    await cancelBackupUploadNotification().catch(() => {});\n\n    console.log(`[ScheduledBackup] 🧪 TEST: Completado - ${totalUploaded} subidos, ${totalErrors} errores`);\n    return { success: totalErrors === 0, uploaded: totalUploaded, errors: totalErrors };\n  } catch (error) {\n    console.error('[ScheduledBackup] 🧪 TEST: Error en ejecución manual:', error);\n    if (error instanceof Error) {\n      console.error('[ScheduledBackup] 🧪 TEST: Stack:', error.stack);\n    }\n    await cancelBackupUploadNotification().catch(() => {});\n    return { success: false, uploaded: 0, errors: 1 };\n  }\n};

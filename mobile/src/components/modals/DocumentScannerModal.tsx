@@ -148,7 +148,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
       if (base64Img) {
         try {
           const extracted = await extractTextFromImageHybrid(base64Img);
-          ocrText = extracted ? extracted : undefined;
+          ocrText = extracted || undefined;
         } catch (ocrErr) {
           console.warn('[Scanner] OCR automático falló, documento se guarda sin texto:', ocrErr);
         }

@@ -579,91 +579,89 @@ export default function SettingsScreen() {
                 </View>
               )}
 
-              {/* ── Botones de acción (Bento Style) ── */}
-              <View style={{ marginTop: 16 }}>
-                {/* Texto de progreso general */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <Text style={[styles.actionLabel, { flex: 1, textAlign: 'left' }]} numberOfLines={2}>
-                    {isUploading
-                      ? t('backup.uploadingProgress', { done: uploadProgress?.done ?? 0, total: uploadProgress?.total ?? 0 })
-                      : t('backup.lastUpload', { date: lastUploadLabel })}
-                  </Text>
-                  <Text style={[styles.actionLabel, { flex: 1, textAlign: 'right' }]} numberOfLines={2}>
-                    {isDownloading
-                      ? t('backup.downloadingProgress', { done: downloadProgress?.done ?? 0, total: downloadProgress?.total ?? 0 })
-                      : t('backup.lastDownload', { date: lastDownloadLabel })}
-                  </Text>
-                </View>
+              {/* ── Botones de acción (Elegancia minimalista) ── */}
+              <View style={styles.backupButtonContainer}>
+                {/* Fila 1: Datos y Multimedia */}
+                <TouchableOpacity
+                  style={[styles.backupButton, styles.backupButtonOutline, isBackupRunning && { opacity: 0.6 }]}
+                  onPress={() => handleBackupNow('datos')}
+                  disabled={isBackupRunning}
+                >
+                  <Ionicons name="document-text-outline" size={16} color={theme.colors.text.primary} />
+                  <Text style={styles.backupButtonText}>{t('backup.backupData', 'Datos')}</Text>
+                </TouchableOpacity>
 
-                {/* Grid 2x2 para Backup & Download */}
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  <TouchableOpacity
-                    style={[styles.darkPill, { flex: 1, minWidth: '48%', backgroundColor: theme.colors.inputBackground, borderWidth: 1, borderColor: theme.colors.border }, isBackupRunning && { opacity: 0.45 }]}
-                    onPress={() => handleBackupNow('datos')}
-                    disabled={isBackupRunning}
-                  >
-                    <Ionicons name="document-text-outline" size={16} color={theme.colors.text.primary} style={{ marginRight: 6 }} />
-                    <Text style={[styles.darkPillText, { color: theme.colors.text.primary }]}>{t('backup.backupData', 'Solo Datos')}</Text>
-                  </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.backupButton, styles.backupButtonOutline, isBackupRunning && { opacity: 0.6 }]}
+                  onPress={() => handleBackupNow('multimedia')}
+                  disabled={isBackupRunning}
+                >
+                  <Ionicons name="image-outline" size={16} color={theme.colors.text.primary} />
+                  <Text style={styles.backupButtonText}>{t('backup.backupMedia', 'Multimedia')}</Text>
+                </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.darkPill, { flex: 1, minWidth: '48%', backgroundColor: theme.colors.inputBackground, borderWidth: 1, borderColor: theme.colors.border }, isBackupRunning && { opacity: 0.45 }]}
-                    onPress={() => handleBackupNow('multimedia')}
-                    disabled={isBackupRunning}
-                  >
-                    <Ionicons name="images-outline" size={16} color={theme.colors.text.primary} style={{ marginRight: 6 }} />
-                    <Text style={[styles.darkPillText, { color: theme.colors.text.primary }]}>{t('backup.backupMedia', 'Multimedia')}</Text>
-                  </TouchableOpacity>
+                {/* Fila 2: Respaldar Todo y Descargar */}
+                <TouchableOpacity
+                  style={[styles.backupButton, styles.backupButtonPrimary, isBackupRunning && { opacity: 0.6 }]}
+                  onPress={() => handleBackupNow('ambos')}
+                  disabled={isBackupRunning}
+                >
+                  {isUploading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="cloud-upload" size={16} color="#fff" />
+                  )}
+                  <Text style={styles.backupButtonTextLight}>{t('backup.backupAll', 'Respaldar')}</Text>
+                </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.darkPill, { flex: 1, minWidth: '48%', backgroundColor: theme.colors.primary }, isBackupRunning && { opacity: 0.45 }]}
-                    onPress={() => handleBackupNow('ambos')}
-                    disabled={isBackupRunning}
-                  >
-                    {isUploading ? (
-                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 6 }} />
-                    ) : (
-                      <Ionicons name="cloud-upload-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                    )}
-                    <Text style={[styles.darkPillText, { color: '#fff' }]}>{t('backup.backupAll', 'Respaldar Todo')}</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.darkPill, { flex: 1, minWidth: '48%', backgroundColor: '#2C6EEB' }, isBackupRunning && { opacity: 0.45 }]}
-                    onPress={handleDownloadNow}
-                    disabled={isBackupRunning}
-                  >
-                    {isDownloading ? (
-                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 6 }} />
-                    ) : (
-                      <Ionicons name="cloud-download-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                    )}
-                    <Text style={[styles.darkPillText, { color: '#fff' }]}>{t('backup.downloadNow', 'Descargar Todo')}</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={[styles.backupButton, styles.backupButtonSecondary, isBackupRunning && { opacity: 0.6 }]}
+                  onPress={handleDownloadNow}
+                  disabled={isBackupRunning}
+                >
+                  {isDownloading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="cloud-download" size={16} color="#fff" />
+                  )}
+                  <Text style={styles.backupButtonTextLight}>{t('backup.downloadNow', 'Descargar')}</Text>
+                </TouchableOpacity>
               </View>
 
               {/* ── Backup Automático Programado ── */}
-              <View style={{
-                marginTop: 20,
-                borderRadius: 16,
-                overflow: 'hidden',
-                borderWidth: 1,
-                borderColor: scheduledConfig.enabled ? theme.colors.primary + '50' : theme.colors.border,
-                backgroundColor: scheduledConfig.enabled ? theme.colors.primary + '08' : theme.colors.inputBackground,
-              }}>
+              <View style={[
+                styles.scheduledBackupContainer,
+                {
+                  borderColor: scheduledConfig.enabled ? theme.colors.primary + '40' : theme.colors.border,
+                  backgroundColor: scheduledConfig.enabled ? theme.colors.primary + '08' : theme.colors.inputBackground,
+                }
+              ]}>
                 {/* Header con toggle */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+                <View style={[
+                  styles.scheduledBackupHeader,
+                  { borderBottomColor: theme.colors.border }
+                ]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: scheduledConfig.enabled ? theme.colors.primary + '20' : theme.colors.border + '40', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                      <Ionicons name="time-outline" size={17} color={scheduledConfig.enabled ? theme.colors.primary : theme.colors.text.secondary} />
+                    <View style={[
+                      styles.scheduledBackupIcon,
+                      {
+                        backgroundColor: scheduledConfig.enabled ? theme.colors.primary + '20' : theme.colors.border + '40'
+                      }
+                    ]}>
+                      <Ionicons
+                        name="time-outline"
+                        size={18}
+                        color={scheduledConfig.enabled ? theme.colors.primary : theme.colors.text.secondary}
+                      />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.settingTitle, { fontSize: 13 }]}>Backup Automático</Text>
-                      <Text style={[styles.settingDesc, { fontSize: 11, marginTop: 1 }]}>
+                      <Text style={[styles.settingTitle, { fontSize: 13, fontWeight: '800' }]}>
+                        {t('backup.scheduled', 'Backup Automático')}
+                      </Text>
+                      <Text style={[styles.settingDesc, { fontSize: 11, marginTop: 2 }]}>
                         {scheduledConfig.enabled
-                          ? `Programado a las ${scheduledTimeLabel} · ${scheduledConfig.type === 'datos' ? 'Solo Datos' : scheduledConfig.type === 'multimedia' ? 'Multimedia' : 'Ambos'}`
-                          : 'Activa para respaldar automáticamente cada día'}
+                          ? `${t('backup.scheduledAt', 'Programado a las')} ${scheduledTimeLabel} · ${scheduledConfig.type === 'datos' ? 'Datos' : scheduledConfig.type === 'multimedia' ? 'Multimedia' : 'Ambos'}`
+                          : t('backup.scheduledDesc', 'Activa para respaldar automáticamente')}
                       </Text>
                     </View>
                   </View>
@@ -672,20 +670,34 @@ export default function SettingsScreen() {
                     onValueChange={handleToggleScheduled}
                     trackColor={{ false: theme.colors.border, true: theme.colors.primary + '60' }}
                     thumbColor={scheduledConfig.enabled ? theme.colors.primary : '#ccc'}
+                    style={{ marginLeft: 12 }}
                   />
                 </View>
 
                 {scheduledConfig.enabled && (
-                  <View style={{ padding: 14, gap: 14 }}>
+                  <View style={styles.scheduledBackupContent}>
                     {/* Selector de hora */}
                     <View>
-                      <Text style={[styles.settingDesc, { fontSize: 11, marginBottom: 8, fontWeight: '600', color: theme.colors.text.primary }]}>HORA DEL BACKUP</Text>
+                      <Text style={[styles.scheduledBackupLabel, { color: theme.colors.text.secondary }]}>
+                        {t('backup.scheduleTime', 'Hora del Backup')}
+                      </Text>
                       <TouchableOpacity
                         onPress={() => setShowScheduledTimePicker(true)}
-                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: theme.colors.border }}
+                        style={[
+                          styles.scheduledTimePicker,
+                          {
+                            backgroundColor: theme.colors.card,
+                            borderColor: theme.colors.border
+                          }
+                        ]}
                       >
-                        <Ionicons name="alarm-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
-                        <Text style={[styles.settingTitle, { fontSize: 20, flex: 1, letterSpacing: 2, color: theme.colors.primary }]}>{scheduledTimeLabel}</Text>
+                        <Ionicons name="alarm-outline" size={16} color={theme.colors.primary} />
+                        <Text style={[
+                          styles.scheduledTimeValue,
+                          { color: theme.colors.primary }
+                        ]}>
+                          {scheduledTimeLabel}
+                        </Text>
                         <Ionicons name="chevron-forward" size={14} color={theme.colors.text.secondary} />
                       </TouchableOpacity>
                       {showScheduledTimePicker && (
@@ -704,20 +716,48 @@ export default function SettingsScreen() {
 
                     {/* Selector de tipo */}
                     <View>
-                      <Text style={[styles.settingDesc, { fontSize: 11, marginBottom: 8, fontWeight: '600', color: theme.colors.text.primary }]}>QUÉ RESPALDAR</Text>
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <Text style={[styles.scheduledBackupLabel, { color: theme.colors.text.secondary }]}>
+                        {t('backup.backupType', 'Qué Respaldar')}
+                      </Text>
+                      <View style={styles.scheduledTypeSelector}>
                         {(['datos', 'multimedia', 'ambos'] as const).map((opt) => {
                           const active = scheduledConfig.type === opt;
-                          const labels = { datos: 'Solo Datos', multimedia: 'Multimedia', ambos: 'Ambos' };
-                          const icons = { datos: 'document-text-outline', multimedia: 'images-outline', ambos: 'cloud-upload-outline' };
+                          const labels = {
+                            datos: t('backup.dataOnly', 'Datos'),
+                            multimedia: t('backup.mediaOnly', 'Multimedia'),
+                            ambos: t('backup.both', 'Ambos')
+                          };
+                          const icons = {
+                            datos: 'document-text-outline',
+                            multimedia: 'image-outline',
+                            ambos: 'cloud-upload'
+                          };
                           return (
                             <TouchableOpacity
                               key={opt}
                               onPress={() => handleSetScheduledType(opt)}
-                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, paddingHorizontal: 6, borderRadius: 10, borderWidth: 1.5, borderColor: active ? theme.colors.primary : theme.colors.border, backgroundColor: active ? theme.colors.primary + '15' : 'transparent', gap: 4 }}
+                              style={[
+                                styles.scheduledTypeButton,
+                                {
+                                  borderColor: active ? theme.colors.primary : theme.colors.border,
+                                  backgroundColor: active ? theme.colors.primary + '15' : 'transparent'
+                                }
+                              ]}
                             >
-                              <Ionicons name={icons[opt] as any} size={13} color={active ? theme.colors.primary : theme.colors.text.secondary} />
-                              <Text style={{ fontSize: 11, fontWeight: active ? '700' : '400', color: active ? theme.colors.primary : theme.colors.text.secondary }}>{labels[opt]}</Text>
+                              <Ionicons
+                                name={icons[opt] as any}
+                                size={13}
+                                color={active ? theme.colors.primary : theme.colors.text.secondary}
+                              />
+                              <Text style={[
+                                styles.scheduledTypeButtonText,
+                                {
+                                  fontWeight: active ? '700' : '500',
+                                  color: active ? theme.colors.primary : theme.colors.text.secondary
+                                }
+                              ]}>
+                                {labels[opt]}
+                              </Text>
                             </TouchableOpacity>
                           );
                         })}

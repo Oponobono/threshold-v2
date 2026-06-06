@@ -714,23 +714,30 @@ exports.buildContext = async (req, res) => {
           // Leer ocr_text de la tabla photos (donde PhotoCaptureModal y DocumentScannerModal guardan las fotos)
           console.log(`[buildContext] Processing photo: id=${item.id}, label="${item.label}"`);
           
-          const photo = await new Promise((resolve, reject) => {
-            db.get('SELECT ocr_text, local_uri FROM photos WHERE id = ?', [item.id], (err, row) => {
-              if (err) {
-                console.error(`[buildContext] DB error for photo_id=${item.id}:`, err.message);
-                reject(err);
-              } else {
-                console.log(`[buildContext] Query result for photo_id=${item.id}:`, row);
-                resolve(row);
-              }
-            });
-          });
-          
-          if (photo?.ocr_text) {
-            console.log(`[buildContext] Using ocr_text for photo_id=${item.id}`);
-            text = `[FOTO: ${item.label}]\n${photo.ocr_text}`;
+          // OFFLINE: si item.ocr_text está presente, usarlo directamente (foto local)
+          if (item.ocr_text) {
+            console.log(`[buildContext] Using client-provided ocr_text for photo ${item.id}`);
+            text = `[FOTO: ${item.label}]\n${item.ocr_text}`;
           } else {
-            console.log(`[buildContext] No ocr_text for photo_id=${item.id}, label="${item.label}"`);
+            // ONLINE: buscar en la BD
+            const photo = await new Promise((resolve, reject) => {
+              db.get('SELECT ocr_text, local_uri FROM photos WHERE id = ?', [item.id], (err, row) => {
+                if (err) {
+                  console.error(`[buildContext] DB error for photo_id=${item.id}:`, err.message);
+                  reject(err);
+                } else {
+                  console.log(`[buildContext] Query result for photo_id=${item.id}:`, row);
+                  resolve(row);
+                }
+              });
+            });
+            
+            if (photo?.ocr_text) {
+              console.log(`[buildContext] Using ocr_text for photo_id=${item.id}`);
+              text = `[FOTO: ${item.label}]\n${photo.ocr_text}`;
+            } else {
+              console.log(`[buildContext] No ocr_text for photo_id=${item.id}, label="${item.label}"`);
+            }
           }
         } 
         else if (item.type === 'recording') {
@@ -845,12 +852,19 @@ exports.buildContext = async (req, res) => {
         }
         else if (item.type === 'document') {
           // Obtener OCR de documentos escaneados (columna nueva ocr_text)
-          const doc = await new Promise((resolve, reject) => {
-            db.get('SELECT ocr_text, name FROM scanned_documents WHERE id = ?', [item.id], (err, row) => {
-              if (err) reject(err); else resolve(row);
+          // OFFLINE: si item.ocr_text está presente, usarlo directamente (documento local)
+          if (item.ocr_text) {
+            console.log(`[buildContext] Using client-provided ocr_text for document ${item.id}`);
+            text = `[DOCUMENTO: ${item.label}]\n${item.ocr_text}`;
+          } else {
+            // ONLINE: buscar en la BD
+            const doc = await new Promise((resolve, reject) => {
+              db.get('SELECT ocr_text, name FROM scanned_documents WHERE id = ?', [item.id], (err, row) => {
+                if (err) reject(err); else resolve(row);
+              });
             });
-          });
-          text = doc?.ocr_text ? `[DOCUMENTO: ${doc.name || item.label}]\n${doc.ocr_text}` : `[DOCUMENTO: ${doc?.name || item.label}] (Sin contenido de texto extraído aún)`;
+            text = doc?.ocr_text ? `[DOCUMENTO: ${doc.name || item.label}]\n${doc.ocr_text}` : `[DOCUMENTO: ${doc?.name || item.label}] (Sin contenido de texto extraído aún)`;
+          }
         }
       } catch (itemErr) {
         console.error(`Error procesando item ${item.id} (${item.type}):`, itemErr);

@@ -511,6 +511,8 @@ Devuelve SOLO un JSON válido con: title, keyPoints (array), conclusion.`;
  *   @react-native-ml-kit/text-recognition, 100% offline.
  *
  * Respeta el interruptor forceOfflineMode y la conectividad.
+ * 
+ * EN MODO OFFLINE FORZADO: Solo ejecuta OCR local, sin fallbacks a cloud.
  */
 export async function extractTextFromImageHybrid(base64Image: string): Promise<string> {
   const resolved = await resolveProvider();
@@ -525,19 +527,23 @@ export async function extractTextFromImageHybrid(base64Image: string): Promise<s
     return extractTextFromImage(base64Image);
   };
 
-  if (!resolved) {
+  // En modo offline forzado: SOLO OCR local, sin fallback
+  if (resolved === 'local') {
+    console.log('[extractTextFromImageHybrid] Modo offline forzado - usando OCR local exclusivamente');
     return tryLocal();
   }
 
-  if (resolved === 'local') {
+  // Si no hay proveedor resuelto: intentar local primero
+  if (!resolved) {
     try {
       return await tryLocal();
     } catch (localError) {
-      console.warn('[extractTextFromImageHybrid] Local OCR failed, trying cloud:', localError);
+      console.warn('[extractTextFromImageHybrid] Local OCR no disponible, intentando cloud:', localError);
       return tryCloud();
     }
   }
 
+  // Modo online: preferir cloud pero con fallback a local
   try {
     return await tryCloud();
   } catch (cloudError) {
@@ -553,6 +559,8 @@ export async function extractTextFromImageHybrid(base64Image: string): Promise<s
  * - Local: módulo nativo con PDFKit (iOS) / PDFBox-Android.
  *
  * Respeta forceOfflineMode.
+ * 
+ * EN MODO OFFLINE FORZADO: Solo extrae local, sin fallbacks a cloud.
  */
 export async function extractTextFromPDFHybrid(base64Pdf: string): Promise<string> {
   const resolved = await resolveProvider();
@@ -567,19 +575,23 @@ export async function extractTextFromPDFHybrid(base64Pdf: string): Promise<strin
     return extractTextFromPDF(base64Pdf);
   };
 
-  if (!resolved) {
+  // En modo offline forzado: SOLO extracción local, sin fallback
+  if (resolved === 'local') {
+    console.log('[extractTextFromPDFHybrid] Modo offline forzado - usando extracción PDF local exclusivamente');
     return tryLocal();
   }
 
-  if (resolved === 'local') {
+  // Si no hay proveedor resuelto: intentar local primero
+  if (!resolved) {
     try {
       return await tryLocal();
     } catch (localError) {
-      console.warn('[extractTextFromPDFHybrid] Local extraction failed, trying cloud:', localError);
+      console.warn('[extractTextFromPDFHybrid] Local extraction no disponible, intentando cloud:', localError);
       return tryCloud();
     }
   }
 
+  // Modo online: preferir cloud pero con fallback a local
   try {
     return await tryCloud();
   } catch (cloudError) {

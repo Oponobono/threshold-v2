@@ -105,13 +105,21 @@ function RootNavigator() {
         });
 
         // 🔷 4. Registrar backup automático si está habilitado
-        getScheduledBackupConfig().then(cfg => {
+        // IMPORTANTE: Esto debe ocurrir DESPUÉS de que BD esté inicializada
+        // ya que getScheduledBackupConfig() necesita acceso al almacenamiento seguro
+        try {
+          const cfg = await getScheduledBackupConfig();
+          console.log(`[RootLayout] 🔄 Config de backup programado leída: enabled=${cfg.enabled}, hora=${cfg.hour}:${cfg.minute}, tipo=${cfg.type}`);
           if (cfg.enabled) {
-            registerScheduledBackup().catch(err =>
-              console.warn('[RootLayout] No se pudo registrar backup programado:', err)
-            );
+            console.log('[RootLayout] ✅ Registrando backup programado...');
+            await registerScheduledBackup();
+            console.log('[RootLayout] ✅ Backup programado registrado correctamente');
+          } else {
+            console.log('[RootLayout] ⏭️ Backup programado desactivado, no registrando task');
           }
-        }).catch(() => {});
+        } catch (err) {
+          console.warn('[RootLayout] ⚠️ Error al registrar backup programado:', err);
+        }
       } catch (e) {
         console.warn('[RootLayout] Error durante preparación:', e);
         setInitialRoute('welcome');

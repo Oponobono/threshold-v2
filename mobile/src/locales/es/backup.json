@@ -51,5 +51,16 @@
   "momentAgo": "Hace un momento",
   "minAgo": "Hace {{mins}} min",
   "hoursAgo": "Hace {{hours}}h",
-  "daysAgo": "Hace {{days}} día(s)"
+  "daysAgo": "Hace {{days}} día(s)",
+  "scheduled": "Backup Automático",
+  "scheduledAt": "Programado a las",
+  "scheduledDesc": "Activa para respaldar automáticamente",
+  "scheduleTime": "Hora del Backup",
+  "backupType": "Qué Respaldar",
+  "backupData": "Datos",
+  "backupMedia": "Multimedia",
+  "backupAll": "Respaldar",
+  "dataOnly": "Datos",
+  "mediaOnly": "Multimedia",
+  "both": "Ambos"
 }
