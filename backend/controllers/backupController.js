@@ -209,7 +209,7 @@ exports.markAsBackedUp = (req, res) => {
           function (insertErr) {
             if (insertErr) {
               console.error('[Backup] Error al insertar foto offline:', insertErr.message);
-              return res.status(500).json({ error: 'Error al registrar foto offline.' });
+              return res.status(500).json({ error: 'Error al registrar foto offline.', details: insertErr.message });
             }
             res.json({ ok: true, inserted: true });
           }
@@ -236,21 +236,38 @@ exports.markAsBackedUp = (req, res) => {
 
       // 0 changes → ítem no existe en backend (fue creado offline).
       // Insertar con datos mínimos.
-      const insertQuery = table === 'audio_recordings'
-        ? `INSERT INTO audio_recordings (id, user_id, local_uri, cloud_url, is_backed_up)
-           VALUES (?, ?, '', ?, 1)
-           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`
-        : `INSERT INTO scanned_documents (id, user_id, local_uri, cloud_url, is_backed_up)
-           VALUES (?, ?, '', ?, 1)
-           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`;
+      const resolvedSubjectId = req.body.subject_id || null;
+      const resolvedName = req.body.name || 'Respaldo Offline';
 
-      db.run(insertQuery, [id, userId, cloud_url], function (insertErr) {
-        if (insertErr) {
-          console.error('[Backup] Error al insertar ítem offline:', insertErr.message);
-          return res.status(500).json({ error: 'Error al registrar ítem offline.' });
-        }
-        res.json({ ok: true, inserted: true });
-      });
+      if (table === 'audio_recordings') {
+        db.run(
+          `INSERT INTO audio_recordings (id, user_id, subject_id, name, local_uri, cloud_url, is_backed_up)
+           VALUES (?, ?, ?, ?, '', ?, 1)
+           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+          [id, userId, resolvedSubjectId, resolvedName, cloud_url],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[Backup] Error al insertar audio offline:', insertErr.message);
+              return res.status(500).json({ error: 'Error al registrar audio offline.', details: insertErr.message });
+            }
+            res.json({ ok: true, inserted: true });
+          }
+        );
+      } else {
+        db.run(
+          `INSERT INTO scanned_documents (id, user_id, subject_id, name, local_uri, cloud_url, is_backed_up)
+           VALUES (?, ?, ?, ?, '', ?, 1)
+           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+          [id, userId, resolvedSubjectId, resolvedName, cloud_url],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[Backup] Error al insertar documento offline:', insertErr.message);
+              return res.status(500).json({ error: 'Error al registrar documento offline.', details: insertErr.message });
+            }
+            res.json({ ok: true, inserted: true });
+          }
+        );
+      }
     }
   );
 };

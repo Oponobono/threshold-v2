@@ -280,15 +280,15 @@ async function getLocalBackupStats(): Promise<BackupStats> {
  */
 async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   photos: { id: string; uri: string; subject_id?: string }[];
-  audio: { id: string; local_uri: string; name: string }[];
-  docs: { id: string; local_uri: string }[];
+  audio: { id: string; local_uri: string; name: string; subject_id?: string }[];
+  docs: { id: string; local_uri: string; name?: string; subject_id?: string }[];
   transcripts: { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[];
 }> {
   const db = databaseService.getDb();
   const result = {
     photos: [] as { id: string; uri: string; subject_id?: string }[],
-    audio: [] as { id: string; local_uri: string; name: string }[],
-    docs: [] as { id: string; local_uri: string }[],
+    audio: [] as { id: string; local_uri: string; name: string; subject_id?: string }[],
+    docs: [] as { id: string; local_uri: string; name?: string; subject_id?: string }[],
     transcripts: [] as { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[],
   };
 
@@ -305,18 +305,18 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Grabaciones de audio no respaldadas
     if (prefs.includeAudio) {
       const audio = await db.getAllAsync(
-        `SELECT id, local_uri, name FROM audio_recordings WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri, name, subject_id FROM audio_recordings WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
-      result.audio = audio.map((a: any) => ({ id: String(a.id), local_uri: a.local_uri, name: a.name }));
+      result.audio = audio.map((a: any) => ({ id: String(a.id), local_uri: a.local_uri, name: String(a.name), subject_id: a.subject_id ? String(a.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.audio.length} grabación(es) pendiente(s)`);
     }
 
     // Documentos no respaldados
     if (prefs.includeDocs) {
       const docs = await db.getAllAsync(
-        `SELECT id, local_uri FROM scanned_documents WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri, name, subject_id FROM scanned_documents WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
-      result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri }));
+      result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri, name: d.name ? String(d.name) : undefined, subject_id: d.subject_id ? String(d.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.docs.length} documento(s) pendiente(s)`);
     }
 
@@ -610,7 +610,7 @@ export const runBackup = async (
             const res = await fetchWithFallback(`/backup/mark`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: 'ghost_file' }),
+              body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: 'ghost_file', name: rec.name, subject_id: rec.subject_id }),
             });
             if (!res.ok) {
               const errBody = await res.text().catch(() => '');
@@ -633,7 +633,7 @@ export const runBackup = async (
           const res2 = await fetchWithFallback(`/backup/mark`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: result.url }),
+            body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: result.url, name: rec.name, subject_id: rec.subject_id }),
           });
           if (!res2.ok) {
             const errBody = await res2.text().catch(() => '');
@@ -669,7 +669,7 @@ export const runBackup = async (
             const res = await fetchWithFallback(`/backup/mark`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: 'ghost_file' }),
+              body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: 'ghost_file', name: doc.name, subject_id: doc.subject_id }),
             });
             if (!res.ok) {
               const errBody = await res.text().catch(() => '');
@@ -693,7 +693,7 @@ export const runBackup = async (
           const res2 = await fetchWithFallback(`/backup/mark`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: result.url }),
+            body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: result.url, name: doc.name, subject_id: doc.subject_id }),
           });
           if (!res2.ok) {
             const errBody = await res2.text().catch(() => '');
