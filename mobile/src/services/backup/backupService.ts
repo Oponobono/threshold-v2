@@ -205,16 +205,23 @@ export const saveScheduledBackupConfig = async (config: Partial<ScheduledBackupC
 // ─── Obtener estadísticas de backup ─────────────────────────────────────────
 
 export const getBackupStats = async (): Promise<BackupStats> => {
+  const localStats = await getLocalBackupStats();
+
   try {
     const response = await fetchWithFallback(`/backup/stats`);
     if (!response.ok) throw new Error('stats fetch failed');
     const serverStats = await parseJsonSafely(response) as BackupStats;
-    if (serverStats && (serverStats.photos.total > 0 || serverStats.audio.total > 0 || serverStats.docs.total > 0 || serverStats.transcripts.total > 0)) {
-      return serverStats;
+    if (serverStats) {
+      return {
+        photos: { total: Math.max(localStats.photos.total, serverStats.photos.total), backed: Math.max(localStats.photos.backed, serverStats.photos.backed) },
+        audio: { total: Math.max(localStats.audio.total, serverStats.audio.total), backed: Math.max(localStats.audio.backed, serverStats.audio.backed) },
+        docs: { total: Math.max(localStats.docs.total, serverStats.docs.total), backed: Math.max(localStats.docs.backed, serverStats.docs.backed) },
+        transcripts: { total: Math.max(localStats.transcripts.total, serverStats.transcripts.total), backed: Math.max(localStats.transcripts.backed, serverStats.transcripts.backed) },
+      };
     }
   } catch {}
 
-  return getLocalBackupStats();
+  return localStats;
 };
 
 async function getLocalBackupStats(): Promise<BackupStats> {
