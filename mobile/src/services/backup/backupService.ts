@@ -508,7 +508,7 @@ export const runBackup = async (
     if (prefs.includeDocs) {
       try {
         const localOnlyDocs: any[] = await db.getAllAsync(
-          `SELECT id, user_id, subject_id, name, local_uri, ocr_text
+          `SELECT id, user_id, subject_id, local_uri, ocr_text
            FROM scanned_documents
            WHERE (cloud_url IS NULL OR cloud_url = '') AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
@@ -518,7 +518,7 @@ export const runBackup = async (
             await fetchWithFallback('/scanned_documents', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, name: doc.name, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
+              body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
             });
           } catch (e) {
             console.warn(`[BackupService] Fase 0c ⚠️: documento ${doc.id}:`, e);

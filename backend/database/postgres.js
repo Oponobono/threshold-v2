@@ -5,6 +5,7 @@ const { migrateColumnsPostgres } = require('./migrations');
 const { seedGradingSystemsPostgres } = require('./seeders');
 const { fixIsActiveBooleanToInteger } = require('./migrations/fix-is-active-type');
 const { fixUserIdTypes } = require('./migrations/fix-user-id-type');
+const { fixIdTypes } = require('./migrations/fix-id-type');
 
 const initializePostgresDb = async (pool) => {
   try {
@@ -26,6 +27,9 @@ const initializePostgresDb = async (pool) => {
 
     // Fix user_id columns from INTEGER to TEXT if they were created with an old schema
     await fixUserIdTypes(pool);
+
+    // Fix primary key id columns from INTEGER to TEXT for backup tables
+    await fixIdTypes(pool);
 
     // Crear índices únicos (DESPUÉS de asegurarse que las columnas existen)
     await pool.query(`
