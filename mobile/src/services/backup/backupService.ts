@@ -8,7 +8,7 @@
  */
 import { storageService } from '../storageService';
 import { uploadFileToUploadthing } from '../uploadthing/storage';
-import { fetchWithFallback, parseJsonSafely } from '../api/client';
+import { fetchWithFallback } from '../api/client';
 import { getUserId } from '../api/auth/session';
 import * as FileSystem from 'expo-file-system/legacy';
 import { databaseService } from '../database/DatabaseService';
@@ -237,25 +237,7 @@ export const getScheduledBackupLastRun = async (): Promise<Date | null> => {
 // ─── Obtener estadísticas de backup ─────────────────────────────────────────
 
 export const getBackupStats = async (): Promise<BackupStats> => {
-  const localStats = await getLocalBackupStats();
-
-  try {
-    const response = await fetchWithFallback(`/backup/stats`);
-    if (!response.ok) throw new Error('stats fetch failed');
-    const serverStats = await parseJsonSafely(response) as BackupStats;
-    if (serverStats) {
-      return {
-        photos: { total: Math.max(localStats.photos.total, serverStats.photos.total), backed: Math.max(localStats.photos.backed, serverStats.photos.backed) },
-        audio: { total: Math.max(localStats.audio.total, serverStats.audio.total), backed: Math.max(localStats.audio.backed, serverStats.audio.backed) },
-        docs: { total: Math.max(localStats.docs.total, serverStats.docs.total), backed: Math.max(localStats.docs.backed, serverStats.docs.backed) },
-        transcripts: { total: Math.max(localStats.transcripts.total, serverStats.transcripts.total), backed: Math.max(localStats.transcripts.backed, serverStats.transcripts.backed) },
-      };
-    }
-  } catch (err) {
-    console.warn('[BackupService] Server stats unavailable, usando locales:', err);
-  }
-
-  return localStats;
+  return getLocalBackupStats();
 };
 
 async function getLocalBackupStats(): Promise<BackupStats> {
@@ -293,8 +275,8 @@ async function getLocalBackupStats(): Promise<BackupStats> {
 }
 
 /**
- * Obtiene items NO respaldados directamente desde SQLite local (fallback cuando el backend no responde).
- * Se usa en modo offline para permitir que los backups continúen.
+ * Obtiene items NO respaldados directamente desde SQLite local.
+ * Fuente de verdad para el proceso de backup (is_backed_up = 0).
  */
 async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   photos: { id: string; uri: string }[];
@@ -361,13 +343,86 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   return result;
 }
 
+// ─── Rescatar estado atascado ───────────────────────────────────────────────
+
+/**
+ * Resetea a 0 la bandera `is_backed_up` de todos los items marcados como respaldados
+ * pero que NO tienen una URL real de Uploadthing (cloud_url NULL, vacío o 'ghost_file').
+ * Útil si un backup previo dejó el flag en 1 sin haber subido realmente el archivo.
+ * 
+ * @returns Objeto con la cantidad de items reseteados por categoría
+ */
+export const resetStuckBackupFlags = async (): Promise<{
+  photos: number;
+  audio: number;
+  docs: number;
+  audioTranscripts: number;
+  ytTranscripts: number;
+}> => {
+  const db = databaseService.getDb();
+  const result = { photos: 0, audio: 0, docs: 0, audioTranscripts: 0, ytTranscripts: 0 };
+
+  try {
+    const { changes: photoChanges } = await db.runAsync(
+      `UPDATE photos SET is_backed_up = 0, cloud_url = NULL
+       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+    );
+    result.photos = photoChanges ?? 0;
+  } catch (e) {
+    console.warn('[BackupService] resetStuckBackupFlags: error en photos:', e);
+  }
+
+  try {
+    const { changes: audioChanges } = await db.runAsync(
+      `UPDATE audio_recordings SET is_backed_up = 0, cloud_url = NULL
+       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+    );
+    result.audio = audioChanges ?? 0;
+  } catch (e) {
+    console.warn('[BackupService] resetStuckBackupFlags: error en audio:', e);
+  }
+
+  try {
+    const { changes: docChanges } = await db.runAsync(
+      `UPDATE scanned_documents SET is_backed_up = 0, cloud_url = NULL
+       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+    );
+    result.docs = docChanges ?? 0;
+  } catch (e) {
+    console.warn('[BackupService] resetStuckBackupFlags: error en documentos:', e);
+  }
+
+  try {
+    const { changes: audioTransChanges } = await db.runAsync(
+      `UPDATE audio_recordings SET is_backed_up = 0, cloud_url = NULL
+       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+    );
+    result.audioTranscripts = audioTransChanges ?? 0;
+  } catch (e) {
+    console.warn('[BackupService] resetStuckBackupFlags: error en transcripciones de audio:', e);
+  }
+
+  try {
+    const { changes: ytTransChanges } = await db.runAsync(
+      `UPDATE youtube_videos SET is_backed_up = 0, cloud_url = NULL
+       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+    );
+    result.ytTranscripts = ytTransChanges ?? 0;
+  } catch (e) {
+    console.warn('[BackupService] resetStuckBackupFlags: error en transcripciones de YouTube:', e);
+  }
+
+  console.log('[BackupService] resetStuckBackupFlags completado:', result);
+  return result;
+};
+
 // ─── Ejecución del backup ────────────────────────────────────────────────────
 
 /**
  * Ejecuta el proceso de backup.
- * Sube a Uploadthing todos los ítems no respaldados según las preferencias.
- * 
- * EN MODO OFFLINE: Obtiene items desde SQLite local sin intentar conectarse al backend.
+ * Sube a Uploadthing todos los ítems no respaldados (is_backed_up = 0) según las preferencias.
+ * Siempre usa SQLite local como fuente de verdad para determinar items pendientes.
+ * Marca tanto backend como BD local después de cada subida exitosa.
  * 
  * @param onProgress - Callback con el progreso actual (llamado en cada ítem)
  */
@@ -476,27 +531,11 @@ export const runBackup = async (
   } // Cierre de if (!isOffline)
 
   // ──────────────────────────────────────────────────────────────────
-  // FASE 1: Obtener ítems pendientes de backup desde el backend y subirlos
-  // EN MODO OFFLINE: colectar directamente de SQLite local
+  // FASE 1: Obtener ítems pendientes desde SQLite local y subirlos
+  // Siempre usa la BD local como fuente de verdad (is_backed_up = 0).
   // ──────────────────────────────────────────────────────────────────
-  let pending: {
-    photos: { id: string | number; uri: string }[];
-    audio: { id: string | number; local_uri: string; name: string }[];
-    docs: { id: string | number; local_uri: string; name: string }[];
-    transcripts: { id: string | number; type: 'audio' | 'youtube'; text: string; recording_id?: string | number; video_id?: string | number }[];
-  };
-
-  try {
-    // Intentar obtener desde el backend
-    const response = await fetchWithFallback(`/backup/pending`);
-    if (!response.ok) throw new Error(`Backend pending failed: ${response.status}`);
-    pending = await parseJsonSafely(response);
-    console.log('[BackupService] Fase 1: Items pendientes obtenidos del backend');
-  } catch (err) {
-    // Fallback: obtener directamente de SQLite local (modo offline)
-    console.warn('[BackupService] Fase 1: Backend no disponible, usando BD local como fallback:', err);
-    pending = await getPendingItemsFromLocalDB(prefs);
-  }
+  const pending = await getPendingItemsFromLocalDB(prefs);
+  console.log(`[BackupService] Fase 1: ${pending.photos.length + pending.audio.length + pending.docs.length + pending.transcripts.length} item(s) pendientes desde BD local`);
 
   const tasks: (() => Promise<void>)[] = [];
 
@@ -515,6 +554,14 @@ export const runBackup = async (
               body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: 'ghost_file' }),
             });
             if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            try {
+              await db.runAsync(
+                `UPDATE photos SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
+                [Number(photo.id)]
+              );
+            } catch (e) {
+              console.warn(`[BackupService] No se pudo marcar fantasma local foto ${photo.id}:`, e);
+            }
             uploaded++;
             return;
           }
@@ -527,7 +574,15 @@ export const runBackup = async (
             body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: result.url }),
           });
           if (!res2.ok) throw new Error(`Marcar foto falló: ${res2.status}`);
-          console.log(`[BackupService] ÉXITO: Foto ${photo.id} marcada como respaldada.`);
+          try {
+            await db.runAsync(
+              `UPDATE photos SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+              [result.url, Number(photo.id)]
+            );
+          } catch (e) {
+            console.warn(`[BackupService] No se pudo actualizar estado local de foto ${photo.id}:`, e);
+          }
+          console.log(`[BackupService] ÉXITO: Foto ${photo.id} respaldada.`);
           uploaded++;
         } catch (err) {
           console.error(`[BackupService] ERROR: Falló el backup de foto ${photo.id}:`, err);
@@ -552,6 +607,14 @@ export const runBackup = async (
               body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: 'ghost_file' }),
             });
             if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            try {
+              await db.runAsync(
+                `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
+                [Number(rec.id)]
+              );
+            } catch (e) {
+              console.warn(`[BackupService] No se pudo marcar fantasma local audio ${rec.id}:`, e);
+            }
             uploaded++;
             return;
           }
@@ -564,6 +627,14 @@ export const runBackup = async (
             body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: result.url }),
           });
           if (!res2.ok) throw new Error(`Marcar audio falló: ${res2.status}`);
+          try {
+            await db.runAsync(
+              `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+              [result.url, Number(rec.id)]
+            );
+          } catch (e) {
+            console.warn(`[BackupService] No se pudo actualizar estado local de audio ${rec.id}:`, e);
+          }
           console.log(`[BackupService] ÉXITO: Audio ${rec.id} respaldado.`);
           uploaded++;
         } catch (err) { 
@@ -589,6 +660,14 @@ export const runBackup = async (
               body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: 'ghost_file' }),
             });
             if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            try {
+              await db.runAsync(
+                `UPDATE scanned_documents SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
+                [Number(doc.id)]
+              );
+            } catch (e) {
+              console.warn(`[BackupService] No se pudo marcar fantasma local documento ${doc.id}:`, e);
+            }
             uploaded++;
             return;
           }
@@ -602,6 +681,14 @@ export const runBackup = async (
             body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: result.url }),
           });
           if (!res2.ok) throw new Error(`Marcar documento falló: ${res2.status}`);
+          try {
+            await db.runAsync(
+              `UPDATE scanned_documents SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+              [result.url, Number(doc.id)]
+            );
+          } catch (e) {
+            console.warn(`[BackupService] No se pudo actualizar estado local de documento ${doc.id}:`, e);
+          }
           console.log(`[BackupService] ÉXITO: Documento ${doc.id} respaldado.`);
           uploaded++;
         } catch (err) { 
@@ -633,6 +720,21 @@ export const runBackup = async (
             body: JSON.stringify({ type: 'transcript', id: t.id, transcript_type: t.type, cloud_url: result.url }),
           });
           if (!res.ok) throw new Error(`Marcar transcripción falló: ${res.status}`);
+          try {
+            if (t.type === 'audio') {
+              await db.runAsync(
+                `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+                [result.url, Number(t.id)]
+              );
+            } else {
+              await db.runAsync(
+                `UPDATE youtube_videos SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+                [result.url, Number(t.id)]
+              );
+            }
+          } catch (e) {
+            console.warn(`[BackupService] No se pudo actualizar estado local de transcripción ${t.id}:`, e);
+          }
           console.log(`[BackupService] ÉXITO: Transcripción ${t.id} respaldada.`);
           uploaded++;
         } catch (err) { 

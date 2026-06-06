@@ -145,10 +145,9 @@ export const useBackupLogic = () => {
       return;
     }
 
-    // Advertencia si está offline, pero permitir continuar (usará BD local como fallback)
     const isOffline = !useConnectivityStore.getState().isOnline;
     if (isOffline && type === 'multimedia') {
-      console.warn('[useBackupLogic] Backup en modo offline: detectando items locales sin conexión al backend');
+      console.warn('[useBackupLogic] Backup en modo offline: BD local como fuente de verdad, subida a Uploadthing fallará sin conexión');
     }
 
     setIsUploading(true);
