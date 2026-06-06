@@ -229,6 +229,13 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status)`,
     ],
   },
+  {
+    version: 2,
+    up: [
+      `ALTER TABLE youtube_videos ADD COLUMN is_backed_up INTEGER DEFAULT 0`,
+      `ALTER TABLE youtube_videos ADD COLUMN cloud_url TEXT`,
+    ],
+  },
 ];
 
 export default migrations;

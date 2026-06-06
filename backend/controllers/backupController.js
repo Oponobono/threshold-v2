@@ -184,7 +184,7 @@ exports.markAsBackedUp = (req, res) => {
       `UPDATE ${table} SET cloud_url = ?, is_backed_up = 1 WHERE id = ?`,
       [cloud_url, id],
       function (err) {
-        if (err) return res.status(500).json({ error: 'Error al marcar transcripción.' });
+        if (err) { console.error('[Backup] Error al marcar transcripción:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar transcripción.' }); }
         res.json({ ok: true });
       }
     );
@@ -200,7 +200,7 @@ exports.markAsBackedUp = (req, res) => {
        WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`,
       [cloud_url, id, userId],
       function (err) {
-        if (err) return res.status(500).json({ error: 'Error al marcar foto.' });
+        if (err) { console.error('[Backup] Error al marcar foto:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar foto.' }); }
         if (this.changes === 0) return res.status(404).json({ error: 'Foto no encontrada o sin permiso.' });
         res.json({ ok: true });
       }
@@ -212,11 +212,11 @@ exports.markAsBackedUp = (req, res) => {
   db.run(
     `UPDATE ${table} SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND user_id = ?`,
     [cloud_url, id, userId],
-    function (err) {
-      if (err) return res.status(500).json({ error: 'Error al marcar ítem.' });
-      if (this.changes === 0) return res.status(404).json({ error: 'Ítem no encontrado.' });
-      res.json({ ok: true });
-    }
+      function (err) {
+        if (err) { console.error('[Backup] Error al marcar ítem:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar ítem.' }); }
+        if (this.changes === 0) return res.status(404).json({ error: 'Ítem no encontrado.' });
+        res.json({ ok: true });
+      }
   );
 };
 

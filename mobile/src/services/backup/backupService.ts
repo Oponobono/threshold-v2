@@ -281,14 +281,14 @@ async function getLocalBackupStats(): Promise<BackupStats> {
 async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   photos: { id: string; uri: string }[];
   audio: { id: string; local_uri: string; name: string }[];
-  docs: { id: string; local_uri: string; name: string }[];
+  docs: { id: string; local_uri: string }[];
   transcripts: { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[];
 }> {
   const db = databaseService.getDb();
   const result = {
     photos: [] as { id: string; uri: string }[],
     audio: [] as { id: string; local_uri: string; name: string }[],
-    docs: [] as { id: string; local_uri: string; name: string }[],
+    docs: [] as { id: string; local_uri: string }[],
     transcripts: [] as { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[],
   };
 
@@ -314,24 +314,24 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Documentos no respaldados
     if (prefs.includeDocs) {
       const docs = await db.getAllAsync(
-        `SELECT id, local_uri, name FROM scanned_documents WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri FROM scanned_documents WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
-      result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri, name: d.name }));
+      result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.docs.length} documento(s) pendiente(s)`);
     }
 
     // Transcripciones no respaldadas
     if (prefs.includeTranscripts) {
-      // Audio transcripts
+      // Audio transcripts (transcript_text está en la misma fila de audio_recordings)
       const audioTranscripts = await db.getAllAsync(
-        `SELECT id, transcript_text, recording_id FROM audio_recordings WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
+        `SELECT id, transcript_text, id as recording_id FROM audio_recordings WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
       );
       result.transcripts.push(...audioTranscripts.map((t: any) => ({ id: String(t.id), type: 'audio' as const, text: t.transcript_text, recording_id: String(t.recording_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${audioTranscripts.length} transcripción(es) de audio pendiente(s)`);
 
-      // YouTube transcripts
+      // YouTube transcripts (la tabla no tiene columna is_backed_up, se filtra por NULL)
       const ytTranscripts = await db.getAllAsync(
-        `SELECT id, transcript_text, id as video_id FROM youtube_videos WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
+        `SELECT id, transcript_text, id as video_id FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`
       );
       result.transcripts.push(...ytTranscripts.map((t: any) => ({ id: String(t.id), type: 'youtube' as const, text: t.transcript_text, video_id: String(t.video_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${ytTranscripts.length} transcripción(es) de YouTube pendiente(s)`);
@@ -553,7 +553,10 @@ export const runBackup = async (
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: 'ghost_file' }),
             });
-            if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            if (!res.ok) {
+              const errBody = await res.text().catch(() => '');
+              console.warn(`[BackupService] ⚠️ Backend no pudo marcar fantasma foto ${photo.id}: ${res.status} — ${errBody}. Marcando localmente.`);
+            }
             try {
               await db.runAsync(
                 `UPDATE photos SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
@@ -573,7 +576,10 @@ export const runBackup = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'photo', id: photo.id, cloud_url: result.url }),
           });
-          if (!res2.ok) throw new Error(`Marcar foto falló: ${res2.status}`);
+          if (!res2.ok) {
+            const errBody = await res2.text().catch(() => '');
+            console.warn(`[BackupService] ⚠️ Backend no pudo marcar foto ${photo.id}: ${res2.status} — ${errBody}. Marcando localmente.`);
+          }
           try {
             await db.runAsync(
               `UPDATE photos SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
@@ -606,7 +612,10 @@ export const runBackup = async (
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: 'ghost_file' }),
             });
-            if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            if (!res.ok) {
+              const errBody = await res.text().catch(() => '');
+              console.warn(`[BackupService] ⚠️ Backend no pudo marcar fantasma audio ${rec.id}: ${res.status} — ${errBody}. Marcando localmente.`);
+            }
             try {
               await db.runAsync(
                 `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
@@ -626,7 +635,10 @@ export const runBackup = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'audio', id: rec.id, cloud_url: result.url }),
           });
-          if (!res2.ok) throw new Error(`Marcar audio falló: ${res2.status}`);
+          if (!res2.ok) {
+            const errBody = await res2.text().catch(() => '');
+            console.warn(`[BackupService] ⚠️ Backend no pudo marcar audio ${rec.id}: ${res2.status} — ${errBody}. Marcando localmente.`);
+          }
           try {
             await db.runAsync(
               `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
@@ -659,7 +671,10 @@ export const runBackup = async (
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: 'ghost_file' }),
             });
-            if (!res.ok) throw new Error(`Marcar fantasma falló: ${res.status}`);
+            if (!res.ok) {
+              const errBody = await res.text().catch(() => '');
+              console.warn(`[BackupService] ⚠️ Backend no pudo marcar fantasma documento ${doc.id}: ${res.status} — ${errBody}. Marcando localmente.`);
+            }
             try {
               await db.runAsync(
                 `UPDATE scanned_documents SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
@@ -680,7 +695,10 @@ export const runBackup = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'document', id: doc.id, cloud_url: result.url }),
           });
-          if (!res2.ok) throw new Error(`Marcar documento falló: ${res2.status}`);
+          if (!res2.ok) {
+            const errBody = await res2.text().catch(() => '');
+            console.warn(`[BackupService] ⚠️ Backend no pudo marcar documento ${doc.id}: ${res2.status} — ${errBody}. Marcando localmente.`);
+          }
           try {
             await db.runAsync(
               `UPDATE scanned_documents SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
@@ -719,7 +737,10 @@ export const runBackup = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'transcript', id: t.id, transcript_type: t.type, cloud_url: result.url }),
           });
-          if (!res.ok) throw new Error(`Marcar transcripción falló: ${res.status}`);
+          if (!res.ok) {
+            const errBody = await res.text().catch(() => '');
+            console.warn(`[BackupService] ⚠️ Backend no pudo marcar transcripción ${t.id}: ${res.status} — ${errBody}. Marcando localmente.`);
+          }
           try {
             if (t.type === 'audio') {
               await db.runAsync(

@@ -10,9 +10,6 @@ class DatabaseService {
     await this.db.execAsync('PRAGMA journal_mode = WAL');
     await this.db.execAsync('PRAGMA foreign_keys = ON');
     
-    // 🔥 FORZAR VERSIÓN 0 PARA QUE SE EJECUTEN LAS MIGRACIONES (IF NOT EXISTS) SIEMPRE
-    await this.db.execAsync('PRAGMA user_version = 0');
-    
     await this.runMigrations();
     return this.db;
   }

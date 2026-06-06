@@ -21,6 +21,10 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - **Backup progress notifications**: `notificationService.ts` — added 8 functions (`showBackupUploadNotification`, `updateBackupUploadNotification`, `completeBackupUploadNotification`, `cancelBackupUploadNotification` and download equivalents) that show ongoing progress (X/Y items) and result (success/partial/error) in system notifications. `useBackupLogic.ts` — integrated them into `handleBackupNow` and `handleDownloadNow`. `scheduledBackupService.ts` — integrated into the background task for automatic backups. `locales/*/backup.json` — added missing `backup.partial` key.
 - **Dashboard sheet modals bottom safe-area**: `CreateTaskModal.tsx`, `SubjectSelectorModal.tsx`, `CategorySelectorModal.tsx` — each now imports `useSafeAreaInsets` and applies `paddingBottom: Math.max(insets.bottom, 20)` to `sheetContent`, preventing action buttons from clipping behind the native navbar.
 - **Zyren context selector redesigned**: `SubjectAIContextModal.tsx` — replaced bento grid with search bar (filters by OCR/transcript text), horizontally scrollable category pills with counts (Todos, Docs, Fotos, Grabaciones, Videos), content hidden until user searches or picks a category, max 10 items per page with "Ver más" pagination, compact list items with type icon + status. `AIContextItem.tsx` — added `searchText` field. `aiContextMappers.ts` — populate `searchText` from OCR/transcript. `locales/*/ai.json` — added `searchPlaceholder`, `searchPrompt`, `seeMore`, `ready`, `noText` keys; updated filter labels (filterAll→"Todos", filterAudio→"Grabaciones"/"Recordings").
+- **Backup flow resilience**: `backupService.ts` — `POST /backup/mark` failures no longer throw; files that uploaded successfully to Uploadthing are always marked `is_backed_up = 1` locally even if the backend mark fails. This prevents infinite re-upload loops on retry.
+- **YouTube transcripts query fixed**: `backupService.ts` — removed `WHERE (is_backed_up IS NULL OR is_backed_up = 0)` from the `youtube_videos` query (that table lacks the column). Migration `v2` adds `is_backed_up` and `cloud_url` columns to `youtube_videos`.
+- **Migration runner fixed**: `DatabaseService.ts` — removed `PRAGMA user_version = 0` hack so versions are properly tracked; incremental migrations now run exactly once.
+- **Backend mark logging**: `backupController.js` — added `console.error` logging of `err.message`, `err.code`, and `err.stack` on every `db.run` failure in the mark endpoint, so the actual PostgreSQL error is visible in server logs.
 
 ### In Progress
 - *(none)*
@@ -54,6 +58,10 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - `mobile/src/services/localPDFService.ts`: native PDF text extraction (offline)
 - `mobile/src/services/notificationService.ts`: backup upload/download progress notification functions
 - `mobile/src/hooks/useBackupLogic.ts`: backup/download hook with integrated notification calls
+- `mobile/src/services/backup/backupService.ts`: resilient mark flow (no throw on backend fail), youtube_videos query fixed
+- `mobile/src/services/database/DatabaseService.ts`: removed user_version=0 hack; proper incremental migrations
+- `mobile/src/services/database/migrations.ts`: v2 adds `is_backed_up` + `cloud_url` to `youtube_videos`
+- `backend/controllers/backupController.js`: added error detail logging to mark endpoint
 - `mobile/src/styles/Dashboard.styles.ts`: `sheetContent` with hardcoded bottom padding
 - `mobile/src/locales/es/backup.json`: Spanish backup translations (added `partial` key)
 - `mobile/src/locales/en/backup.json`: English backup translations (added `partial` key)
