@@ -314,9 +314,9 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Documentos no respaldados
     if (prefs.includeDocs) {
       const docs = await db.getAllAsync(
-        `SELECT id, local_uri, name, subject_id FROM scanned_documents WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri, subject_id FROM scanned_documents WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
-      result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri, name: d.name ? String(d.name) : undefined, subject_id: d.subject_id ? String(d.subject_id) : undefined }));
+      result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri, name: undefined, subject_id: d.subject_id ? String(d.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.docs.length} documento(s) pendiente(s)`);
     }
 
