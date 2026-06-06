@@ -9,9 +9,39 @@
  */
 
 const TABLES_TO_FIX = [
+  'users',
+  'subjects',
+  'assessments',
+  'assessment_categories',
+  'schedules',
+  'flashcard_decks',
+  'flashcards',
+  'card_logs',
+  'study_sessions',
   'photos',
   'audio_recordings',
+  'audio_transcripts',
+  'youtube_videos',
+  'youtube_transcripts',
   'scanned_documents',
+  'calendar_events',
+  'learning_analytics',
+  'card_difficulty_analytics',
+  'review_predictions',
+  'subject_threshold_overrides',
+  'card_snoozes',
+  'group_memberships',
+  'groups',
+  'shared_decks',
+  'shared_group_decks',
+  'ai_chat_sessions',
+  'ai_chat_messages',
+  'grading_systems',
+  'grading_versions',
+  'grading_scales',
+  'grading_periods',
+  'grade_history',
+  'subject_grade_snapshots'
 ];
 
 const fixIdTypes = async (pool) => {

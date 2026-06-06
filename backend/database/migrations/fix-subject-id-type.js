@@ -20,6 +20,8 @@ const SUBJECT_ID_TABLES = [
   { table: 'subject_grade_snapshots',          column: 'subject_id', fk: true },
   { table: 'calendar_events',                  column: 'subject_id', fk: true },
   { table: 'study_sessions',                   column: 'subject_id', fk: true },
+  { table: 'schedules',                        column: 'subject_id', fk: true },
+  { table: 'assessment_categories',            column: 'subject_id', fk: true },
 ];
 
 const fixSubjectIdTypes = async (pool) => {
@@ -107,8 +109,12 @@ const fixSubjectIdTypes = async (pool) => {
         if (existingFk.rows.length > 0) continue;
 
         let onDelete = 'CASCADE';
-        if (table === 'scanned_documents' || table === 'youtube_videos') {
+        if (table === 'scanned_documents' || table === 'youtube_videos' || table === 'assessment_categories') {
            onDelete = 'SET NULL';
+        }
+
+        if (table === 'schedules') {
+           onDelete = 'NO ACTION'; // or let it default, in schema it's just REFERENCES subjects(id)
         }
 
         await pool.query(
