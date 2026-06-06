@@ -36,13 +36,17 @@ export const FlashcardNewDeckScreen: React.FC<Props> = ({ subjects, onBack, onDe
   const [isSavingDeck, setIsSavingDeck] = useState(false);
 
   const handleSaveDeck = async () => {
-    if (!deckTitle.trim() || !deckSubjectId) {
+    if (!deckTitle.trim()) {
       showAlert({ title: t('common.error'), message: t('flashcards.deckFormError'), type: 'warning' });
       return;
     }
     try {
       setIsSavingDeck(true);
-      await createFlashcardDeck({ subject_id: deckSubjectId, title: deckTitle.trim(), description: deckDesc.trim() });
+      await createFlashcardDeck({
+        ...(deckSubjectId ? { subject_id: deckSubjectId } : {}),
+        title: deckTitle.trim(),
+        description: deckDesc.trim(),
+      });
       setDeckTitle('');
       setDeckDesc('');
       setDeckSubjectId(null);

@@ -14,7 +14,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
-import { createScannedDocument, extractTextFromPDF } from '../../services/api';
+import { createScannedDocument } from '../../services/api';
+import { extractTextFromPDFHybrid } from '../../services/hybridAIService';
 
 export interface PDFImportModalProps {
   isVisible: boolean;
@@ -111,9 +112,14 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
           const base64Data = await FileSystem.readAsStringAsync(localPdfUri, {
             encoding: FileSystem.EncodingType.Base64,
           });
-          ocrText = await extractTextFromPDF(base64Data);
+          ocrText = await extractTextFromPDFHybrid(base64Data);
         } catch (ocrErr) {
           console.warn('[PDFImportModal] Extracción de texto falló:', ocrErr);
+          showAlert({
+            title: t('common.warning') || 'Aviso',
+            message: t('documents.textExtractionFailed', 'No se pudo extraer texto del PDF. El documento se guardará sin contenido textual.'),
+            type: 'warning',
+          });
         }
       }
 

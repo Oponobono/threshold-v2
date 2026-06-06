@@ -35,6 +35,7 @@
   "allUpToDate": "✅ All up to date",
   "noNewFiles": "No new files to back up.",
   "complete": "✅ Backup complete",
+  "partial": "Partial backup",
   "uploadResult": "{{uploaded}} file(s) backed up successfully.",
   "uploadPartial": "{{uploaded}} backed up, {{errors}} error(s).",
   "backupFailed": "Could not complete the backup.",

@@ -17,7 +17,7 @@ import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { type Subject } from '../../services/api';
-import { saveImportedDeck, updateLocalDeckSubject, prepareDeckForSync, exportDeckToJSON } from '../../services/localFlashcardService';
+import { saveImportedDeck, updateLocalDeckSubject, prepareDeckForSync, exportDeckToJSON, addLocalCard } from '../../services/localFlashcardService';
 
 export interface FlashcardImportModalProps {
   isVisible: boolean;
@@ -353,6 +353,11 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         cards,
         null,
       );
+
+      // OFFLINE-FIRST: Persistir cada tarjeta individualmente en MMKV
+      for (const card of cards) {
+        addLocalCard(deck.id, card);
+      }
 
       // OFFLINE-FIRST: Preparar mazo para sincronizar cuando vuelva online
       try {

@@ -253,7 +253,7 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 0 }}
         >
-          <View style={styles.content}>
+          <View style={[styles.content, { paddingBottom: insets.bottom }]}>
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>{editingEvent ? t('calendar.editEvent') : t('calendar.newEvent')}</Text>
@@ -561,6 +561,7 @@ const SubjectPickerSheet: React.FC<SubjectPickerSheetProps> = ({
   onClose,
 }) => {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   
   if (!visible) return null;
 
@@ -568,7 +569,7 @@ const SubjectPickerSheet: React.FC<SubjectPickerSheetProps> = ({
     <Modal transparent visible={visible} animationType="fade">
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} />
       <View style={styles.pickerContainer}>
-        <View style={styles.pickerContent}>
+        <View style={[styles.pickerContent, { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <Text style={styles.pickerTitle}>{t('calendar.selectSubject')}</Text>
           <ScrollView style={styles.pickerList}>
             {subjects.map((subject) => (

@@ -31,6 +31,14 @@ import {
 import { storageService } from '../services/storageService';
 import { alertRef } from '../components/ui/CustomAlert';
 import { syncService } from '../services/database';
+import {
+  showBackupUploadNotification,
+  updateBackupUploadNotification,
+  cancelBackupUploadNotification,
+  showBackupDownloadNotification,
+  updateBackupDownloadNotification,
+  cancelBackupDownloadNotification,
+} from '../services/notificationService';
 
 // ─── Helpers de formato ──────────────────────────────────────────────────────
 
@@ -146,6 +154,7 @@ export const useBackupLogic = () => {
         }
         
         if (type === 'datos') {
+          cancelBackupUploadNotification().catch(() => {});
           alertRef.show({ title: t('backup.complete'), message: dataMessage, type: 'success' });
           return;
         }
@@ -159,21 +168,29 @@ export const useBackupLogic = () => {
           includePhotos: true,
           includeAudio: true,
         };
-        const result = await runBackup((p) => setUploadProgress(p), overridePrefs);
+
+        await showBackupUploadNotification(0);
+        const result = await runBackup((p) => {
+          setUploadProgress(p);
+          updateBackupUploadNotification(p.done, p.total, p.current).catch(() => {});
+        }, overridePrefs);
 
         if (result.uploaded === 0 && result.errors === 0) {
+          cancelBackupUploadNotification().catch(() => {});
           alertRef.show({ 
             title: t('backup.allUpToDate'), 
             message: type === 'ambos' ? `${dataMessage} No hay multimedia nueva.` : 'No hay multimedia nueva por respaldar.', 
             type: 'success' 
           });
         } else if (result.errors === 0) {
+          cancelBackupUploadNotification().catch(() => {});
           alertRef.show({ 
             title: t('backup.complete'), 
             message: type === 'ambos' ? `${dataMessage} ${result.uploaded} archivos subidos.` : t('backup.uploadResult', { uploaded: result.uploaded }), 
             type: 'success' 
           });
         } else {
+          cancelBackupUploadNotification().catch(() => {});
           alertRef.show({ 
             title: t('backup.partial'), 
             message: t('backup.uploadPartial', { uploaded: result.uploaded, errors: result.errors }), 
@@ -184,6 +201,7 @@ export const useBackupLogic = () => {
 
       await loadAll();
     } catch (error: any) {
+      cancelBackupUploadNotification().catch(() => {});
       alertRef.show({ title: t('common.error'), message: error?.message || t('backup.backupFailed'), type: 'error' });
     } finally {
       setIsUploading(false);
@@ -208,13 +226,18 @@ export const useBackupLogic = () => {
     setDownloadProgress({ total: 0, done: 0, current: t('backup.startingDownload'), errors: 0, skipped: 0 });
 
     try {
-      const result = await downloadCloudItems((p) => setDownloadProgress(p));
+      await showBackupDownloadNotification(0);
+      const result = await downloadCloudItems((p) => {
+        setDownloadProgress(p);
+        updateBackupDownloadNotification(p.done, p.total, p.current).catch(() => {});
+      });
 
       // Guardar fecha de última descarga
       await storageService.saveSecure(BACKUP_PREFS.LAST_DOWNLOAD, new Date().toISOString());
       await loadAll();
 
       if (result.downloaded === 0 && result.errors === 0) {
+        cancelBackupDownloadNotification().catch(() => {});
         alertRef.show({
           title: t('backup.synced'),
           message: result.skipped > 0
@@ -223,12 +246,14 @@ export const useBackupLogic = () => {
           type: 'success',
         });
       } else if (result.errors === 0) {
+        cancelBackupDownloadNotification().catch(() => {});
         alertRef.show({
           title: t('backup.downloadComplete'),
           message: t('backup.downloadResult', { downloaded: result.downloaded, skipped: result.skipped }),
           type: 'success',
         });
       } else {
+        cancelBackupDownloadNotification().catch(() => {});
         alertRef.show({
           title: t('backup.downloadPartial'),
           message: t('backup.downloadPartialResult', { downloaded: result.downloaded, errors: result.errors }),
@@ -236,6 +261,7 @@ export const useBackupLogic = () => {
         });
       }
     } catch (error: any) {
+      cancelBackupDownloadNotification().catch(() => {});
       alertRef.show({ title: t('common.error'), message: error?.message || t('backup.downloadFailed'), type: 'error' });
     } finally {
       setIsDownloading(false);

@@ -14,6 +14,11 @@ import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import { getScheduledBackupConfig, runBackup } from './backupService';
 import { syncService } from '../database';
+import {
+  showBackupUploadNotification,
+  updateBackupUploadNotification,
+  cancelBackupUploadNotification,
+} from '../notificationService';
 
 export const BACKUP_TASK_NAME = 'threshold-scheduled-backup';
 
@@ -43,6 +48,9 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
 
     console.log(`[ScheduledBackup] ✅ Ejecutando backup tipo: ${config.type}`);
 
+    // Mostrar notificación de progreso
+    await showBackupUploadNotification(0).catch(() => {});
+
     let hasNewData = false;
 
     // 1. Sincronizar datos de BD
@@ -54,7 +62,9 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
 
     // 2. Respaldar archivos multimedia
     if (config.type === 'multimedia' || config.type === 'ambos') {
-      const result = await runBackup(undefined, {
+      const result = await runBackup((p) => {
+        updateBackupUploadNotification(p.done, p.total, p.current).catch(() => {});
+      }, {
         includePhotos: true,
         includeAudio: true,
         includeDocs: true,
@@ -64,11 +74,15 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
       console.log(`[ScheduledBackup] 🗂️ Multimedia: ${result.uploaded} subidos, ${result.errors} errores`);
     }
 
+    // Notificación desaparece al finalizar
+    await cancelBackupUploadNotification().catch(() => {});
+
     return hasNewData
       ? BackgroundFetch.BackgroundFetchResult.NewData
       : BackgroundFetch.BackgroundFetchResult.NoData;
   } catch (error) {
     console.error('[ScheduledBackup] ❌ Error en el task:', error);
+    await cancelBackupUploadNotification().catch(() => {});
     return BackgroundFetch.BackgroundFetchResult.Failed;
   }
 });

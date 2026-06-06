@@ -35,6 +35,7 @@
   "allUpToDate": "✅ Todo al día",
   "noNewFiles": "No hay archivos nuevos que respaldar.",
   "complete": "✅ Backup completo",
+  "partial": "Backup parcial",
   "uploadResult": "{{uploaded}} archivo(s) respaldados correctamente.",
   "uploadPartial": "{{uploaded}} respaldados, {{errors}} error(es).",
   "backupFailed": "No se pudo completar el backup.",

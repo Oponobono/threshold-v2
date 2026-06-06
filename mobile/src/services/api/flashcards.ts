@@ -121,9 +121,28 @@ export const updateFlashcardDeck = async (deckId: string, payload: any): Promise
   }
 };
 
+function getLocalCardsFromMMKV(deckId: string): any[] {
+  try {
+    const mmkv = require('react-native-mmkv').createMMKV();
+    const raw = mmkv.getString(`cache:flashcards_by_deck:${deckId}`);
+    if (raw) {
+      const entry = JSON.parse(raw);
+      return entry.data || entry || [];
+    }
+  } catch {}
+  return [];
+}
+
+function mergeCards(database: any[], mmkv: any[]): any[] {
+  const seen = new Set(database.map(c => String(c.id)));
+  return [...database, ...mmkv.filter(c => !seen.has(String(c.id)))];
+}
+
 export const getFlashcards = async (deckId: string): Promise<Flashcard[]> => {
-  // 1. Leer localmente primero
-  const localData = await flashcardRepository.getByDeck(deckId);
+  // 1. Leer localmente primero (SQLite + MMKV)
+  const sqliteCards = await flashcardRepository.getByDeck(deckId);
+  const mmkvCards = getLocalCardsFromMMKV(deckId);
+  const localData = mergeCards(sqliteCards || [], mmkvCards);
 
   // 2. Sincronizar en background
   (async () => {
@@ -138,12 +157,14 @@ export const getFlashcards = async (deckId: string): Promise<Flashcard[]> => {
     } catch {}
   })();
 
-  return localData || [];
+  return localData;
 };
 
 export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcard[]> => {
-  // 1. Leer localmente primero
-  const localData = await flashcardRepository.getByDeck(deckId);
+  // 1. Leer localmente primero (SQLite + MMKV)
+  const sqliteCards = await flashcardRepository.getByDeck(deckId);
+  const mmkvCards = getLocalCardsFromMMKV(deckId);
+  const localData = mergeCards(sqliteCards || [], mmkvCards);
 
   // 2. Sincronizar en background
   (async () => {
@@ -159,7 +180,7 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
     } catch {}
   })();
 
-  return localData || [];
+  return localData;
 };
 
 export const getCardById = async (cardId: string): Promise<Flashcard> => {
@@ -347,8 +368,10 @@ export const getSnoozeStatus = async (cardId: string): Promise<SnoozeStatus> => 
 };
 
 export const getCardsNotSnoozed = async (deckId: string): Promise<Flashcard[]> => {
-  // 1. Leer localmente primero
-  const localData = await flashcardRepository.getByDeck(deckId);
+  // 1. Leer localmente primero (SQLite + MMKV)
+  const sqliteCards = await flashcardRepository.getByDeck(deckId);
+  const mmkvCards = getLocalCardsFromMMKV(deckId);
+  const localData = mergeCards(sqliteCards || [], mmkvCards);
 
   // 2. Sincronizar en background
   (async () => {
@@ -364,7 +387,7 @@ export const getCardsNotSnoozed = async (deckId: string): Promise<Flashcard[]> =
     } catch {}
   })();
 
-  return localData || [];
+  return localData;
 };
 
 export const autoUnsnoozeExpired = async (): Promise<any> => {

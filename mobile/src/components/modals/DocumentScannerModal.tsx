@@ -143,6 +143,17 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
 
       console.log('[Scanner] handleSave — formato:', exportFormat, '| base64 disponible:', base64Img.length > 0, '| uri:', finalImageUri?.substring(0, 60));
 
+      // OCR en background para ambos formatos (no bloquea el guardado si falla)
+      let ocrText: string | undefined = undefined;
+      if (base64Img) {
+        try {
+          const extracted = await extractTextFromImageHybrid(base64Img);
+          ocrText = extracted ? extracted : undefined;
+        } catch (ocrErr) {
+          console.warn('[Scanner] OCR automático falló, documento se guarda sin texto:', ocrErr);
+        }
+      }
+
       if (exportFormat === 'pdf') {
         // ── Ruta PDF (genera archivo local con expo-print) ──
         const imgSrc = base64Img ? `data:image/jpeg;base64,${base64Img}` : finalImageUri;
@@ -157,17 +168,6 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
           throw new Error('No se pudo generar el PDF.');
         }
 
-        // OCR en background — no bloquea el guardado si falla
-        let ocrText: string | undefined = undefined;
-        if (base64Img) {
-          try {
-            const extracted = await extractTextFromImageHybrid(base64Img);
-            ocrText = extracted ? extracted : undefined;
-          } catch (ocrErr) {
-            console.warn('[Scanner] OCR automático falló, documento se guarda sin texto:', ocrErr);
-          }
-        }
-
         // Guardar documento — maneja offline internamente (encola en offlineSyncService)
         const docData = await createScannedDocument({
           subject_id: String(selectedSubjectId),
@@ -180,11 +180,11 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
         finalImageUri = pdfUri;
 
       } else {
-        // ── Ruta IMAGEN — guardar foto con URI local ──
-        // createPhoto maneja offline internamente (encola en offlineSyncService y actualiza caché)
+        // ── Ruta IMAGEN — guardar foto con URI local y texto OCR ──
         const photoData = await createPhoto({
           subject_id: String(selectedSubjectId),
           local_uri: finalImageUri,
+          ocr_text: ocrText,
         });
         console.log('[Scanner] Foto guardada. ID:', photoData?.id ?? 'pendiente offline');
       }
