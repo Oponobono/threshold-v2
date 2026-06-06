@@ -67,8 +67,11 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showContent, setShowContent] = useState(false);
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [isInitialLoading, setInitialLoading] = useState(true);
   const badgeScale = useRef(new Animated.Value(1)).current;
   const searchRef = useRef<TextInput>(null);
+  const loadingOpacity = useRef(new Animated.Value(1)).current;
+  const loadingSpin = useRef(new Animated.Value(0)).current;
 
   // ── Toast de advertencia ────────────────────────────────────────────────────
   const [toastMsg, setToastMsg] = useState('');
@@ -99,6 +102,42 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
       return cleaned.size === prev.size ? prev : cleaned;
     });
   }, [allItems]);
+
+  // ── Loading state ───────────────────────────────────────────────────────────
+  // Cuando el modal se abre, algunas props pueden llegar vacías el primer render
+  // mientras el padre termina de cargar. Mostramos un indicador breve.
+  useEffect(() => {
+    if (isVisible) {
+      setInitialLoading(true);
+      const timer = setTimeout(() => setInitialLoading(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (allItems.length > 0) setInitialLoading(false);
+  }, [allItems]);
+
+  // Pulsing animation for loading indicator
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(loadingOpacity, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+        Animated.timing(loadingOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ]),
+    );
+    const spin = Animated.loop(
+      Animated.timing(loadingSpin, { toValue: 1, duration: 1200, useNativeDriver: true }),
+    );
+    pulse.start();
+    spin.start();
+    return () => { pulse.stop(); spin.stop(); };
+  }, [loadingOpacity, loadingSpin]);
+
+  const spinInterpolation = loadingSpin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   // Category counts
   const categoryCounts = useMemo(() => ({
@@ -137,7 +176,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
       Animated.spring(badgeScale, { toValue: 1.25, useNativeDriver: true, tension: 400, friction: 12 }),
       Animated.spring(badgeScale, { toValue: 1,    useNativeDriver: true, tension: 400, friction: 12 }),
     ]).start();
-  }, []);
+  }, [badgeScale]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -344,7 +383,16 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}
         >
-          {!hasContent ? (
+          {isInitialLoading ? (
+            <View style={s.emptyState}>
+              <Animated.View style={{ transform: [{ rotate: spinInterpolation }] }}>
+                <MaterialCommunityIcons name="sync" size={36} color={PRIMARY} />
+              </Animated.View>
+              <Animated.Text style={[s.loadingText, { opacity: loadingOpacity }]}>
+                {t('ai.searching', 'Buscando archivos...')}
+              </Animated.Text>
+            </View>
+          ) : !hasContent ? (
             <View style={s.emptyState}>
               <MaterialCommunityIcons name="folder-open-outline" size={52} color="rgba(255,255,255,0.1)" />
               <Text style={s.emptyTitle}>{t('ai.emptyNoResources', 'Sin recursos')}</Text>
@@ -587,6 +635,11 @@ const s = StyleSheet.create({
   },
   seeMoreText: {
     fontSize: 13, fontWeight: '700', color: PRIMARY,
+  },
+
+  // Loading state
+  loadingText: {
+    fontSize: 14, fontWeight: '600', color: PRIMARY, marginTop: 12,
   },
 
   // Empty state

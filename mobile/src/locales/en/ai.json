@@ -22,6 +22,7 @@
   "filterPhotos": "Photos",
   "searchPlaceholder": "Search files...",
   "searchPrompt": "Search or select a category to start",
+  "searching": "Searching files...",
   "seeMore": "See more ({{count}} more)",
   "seeMore_one": "See more (1 more)",
   "ready": "Ready",
