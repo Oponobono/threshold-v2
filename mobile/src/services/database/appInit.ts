@@ -58,7 +58,17 @@ export async function initializeDatabase(): Promise<void> {
     });
 
     console.log('[DB] Sync handler registered');
-    await syncService.sync();
+
+    // Only sync pending operations on startup if there are any queued items.
+    // This avoids the cloud call storm on every app restart.
+    // Regular sync happens via useAutoSync when connectivity changes.
+    const pendingCount = await syncService.getPendingCount();
+    if (pendingCount > 0) {
+      console.log(`[DB] ${pendingCount} operaciones pendientes, sincronizando...`);
+      syncService.sync().catch((err) =>
+        console.warn('[DB] Sync on init failed (will retry later):', err)
+      );
+    }
   } catch (error) {
     console.warn('[DB] Initialization failed:', error);
   }

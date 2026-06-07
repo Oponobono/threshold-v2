@@ -72,8 +72,6 @@ export const useDataStore = create<DataState>((set, get) => ({
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
 
-      set({ isSyncing: true, syncStatusMessage: 'Sincronizando datos...' });
-
       const { getSubjects, getAllAssessments, getAllSchedules } = await import('../services/api');
       const [subjectsData, assessmentsData, schedulesData] = await Promise.all([
         getSubjects().catch(() => null),
@@ -81,12 +79,18 @@ export const useDataStore = create<DataState>((set, get) => ({
         getAllSchedules().catch(() => null),
       ]);
 
-      if (subjectsData) set({ subjects: subjectsData });
-      if (assessmentsData) set({ assessments: assessmentsData });
-      if (schedulesData) set({ schedules: schedulesData });
+      // Only overwrite with cloud data if we got real results back.
+      // Empty arrays from failed cloud calls must NOT erase local SQLite data.
+      if (subjectsData && Array.isArray(subjectsData) && subjectsData.length > 0) set({ subjects: subjectsData });
+      if (assessmentsData && Array.isArray(assessmentsData) && assessmentsData.length > 0) set({ assessments: assessmentsData });
+      if (schedulesData && Array.isArray(schedulesData) && schedulesData.length > 0) set({ schedules: schedulesData });
 
-      if (subjectsData || assessmentsData || schedulesData) {
-        get().preloadOfflineCache();
+      const hasCloudData = (subjectsData && subjectsData.length > 0) ||
+        (assessmentsData && assessmentsData.length > 0) ||
+        (schedulesData && schedulesData.length > 0);
+      if (hasCloudData) {
+        set({ isSyncing: true, syncStatusMessage: 'Sincronizando datos...' });
+        await get().preloadOfflineCache();
       }
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
@@ -147,9 +151,9 @@ export const useDataStore = create<DataState>((set, get) => ({
       const gallery = await getGalleryItems().catch(() => []);
       const audio = await getAudioRecordings().catch(() => []);
 
-      if (decks.length > 0) set({ flashcardDecks: decks });
+      if (Array.isArray(decks) && decks.length > 0) set({ flashcardDecks: decks });
 
-      if (decks.length > 0) {
+      if (Array.isArray(decks) && decks.length > 0) {
         const { getFlashcards } = await import('../services/api');
         await Promise.all(decks.map(async (d: any) => {
           await getFlashcards(d.id).catch(() => []);

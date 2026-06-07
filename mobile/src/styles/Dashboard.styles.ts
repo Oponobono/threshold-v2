@@ -3,6 +3,29 @@ import { theme } from './theme';
 import { globalStyles } from './globalStyles';
 
 export const dashboardStyles = StyleSheet.create({
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary + '12',
+    borderRadius: theme.borderRadius.full,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+    alignSelf: 'center',
+  },
+  syncIndicatorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.primary,
+    marginRight: 8,
+  },
+  syncIndicatorText: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.primary,
+    fontWeight: '500',
+  },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,

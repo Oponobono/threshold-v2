@@ -247,5 +247,6 @@
   "doneForToday": "You're done for today!",
   "nothingPending": "Nothing pending",
   "progressSaved": "Progress saved",
-  "errorSavingSession": "Error saving study session"
+  "errorSavingSession": "Error saving study session",
+  "syncing": "Syncing..."
 }

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { memo, useRef, useState, useEffect } from 'react';
 import { View, Modal, TouchableOpacity, Image, FlatList, Dimensions, Share, Platform, ActivityIndicator, Text, TextInput } from 'react-native';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +18,17 @@ interface PhotoItem {
   local_uri: string;
   cloud_url?: string | null;
 }
+
+// Defined OUTSIDE the component so its reference is stable across re-renders.
+// Prevents React from unmounting/remounting all images on every state change.
+const ImageWithFallback = memo(({ item }: { item: PhotoItem }) => {
+  const uri = item.local_uri || item.cloud_url || '';
+  return (
+    <View style={styles.imageContainer}>
+      <ZoomableImage uri={uri} resizeMode="contain" />
+    </View>
+  );
+});
 
 interface ImageViewerModalProps {
   isVisible: boolean;
@@ -184,22 +195,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   };
 
 
-  const ImageWithFallback = ({ item }: { item: PhotoItem }) => {
-    const [sourceUri, setSourceUri] = useState(item.local_uri || item.cloud_url || '');
-    
-    return (
-      <View style={styles.imageContainer}>
-        <ZoomableImage 
-          uri={sourceUri}
-          resizeMode="contain"
-        />
-      </View>
-    );
-  };
-
-  const renderItem = ({ item }: { item: PhotoItem }) => (
+  const renderItem = useRef(({ item }: { item: PhotoItem }) => (
     <ImageWithFallback item={item} />
-  );
+  )).current;
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {

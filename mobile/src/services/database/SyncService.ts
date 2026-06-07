@@ -51,6 +51,10 @@ export class SyncService {
     this.triggerSync();
   }
 
+  async getPendingCount(): Promise<number> {
+    return syncQueueRepository.countPending();
+  }
+
   private triggerSync() {
     // Optional automatic trigger, can be debounced
     this.sync().catch(console.error);

@@ -247,5 +247,6 @@
   "doneForToday": "¡Terminaste por hoy!",
   "nothingPending": "Nada pendiente",
   "progressSaved": "Progreso guardado",
-  "errorSavingSession": "Error al guardar sesión de estudio"
+  "errorSavingSession": "Error al guardar sesión de estudio",
+  "syncing": "Sincronizando..."
 }

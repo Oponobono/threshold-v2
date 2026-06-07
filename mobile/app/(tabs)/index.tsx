@@ -46,7 +46,7 @@ export default function HybridDashboardScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
   // ── Usar store global para subjects, assessments, schedules y predicciones ──
-  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions } = useDataStore();
+  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions, isSyncing, syncStatusMessage } = useDataStore();
 
   // Cargar perfil desde caché al montar para hidratación instantánea
   useEffect(() => {
@@ -95,6 +95,8 @@ export default function HybridDashboardScreen() {
   const [lastSessionSubjectId, setLastSessionSubjectId] = useState<string | null>(null);
   const [lastSessionMode, setLastSessionMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const lastFocusRefreshRef = useRef<number>(0);
+  const FOCUS_REFRESH_THROTTLE_MS = 5 * 60 * 1000; // 5 min
 
   // Profile ya fue inicializado síncronamente en el useState vía MMKV
 
@@ -108,7 +110,7 @@ export default function HybridDashboardScreen() {
     setSnoozeRefreshTrigger(prev => prev + 1);
   }, [snoozeManager.snoozedCards]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (skipFullReload = false) => {
     try {
       const [userProfile, schedulesToday] = await Promise.all([
         getCurrentUserProfile(),
@@ -127,7 +129,13 @@ export default function HybridDashboardScreen() {
       // 💾 Profile is cached by getCurrentUserProfile internally
       
       // ── Cargar datos globales del store (subjects, assessments, schedules) ──
-      await loadAllData(true);
+      // Solo refresca del cloud si ha pasado suficiente tiempo desde la última vez.
+      // En focus normal se salta la recarga completa para evitar cloud call storm.
+      const now = Date.now();
+      if (!skipFullReload && (now - lastFocusRefreshRef.current > FOCUS_REFRESH_THROTTLE_MS)) {
+        lastFocusRefreshRef.current = now;
+        await loadAllData(true);
+      }
 
       // ── Obtener GPA general ──
       try {
@@ -147,6 +155,7 @@ export default function HybridDashboardScreen() {
   // Handle pull-to-refresh: actualizar datos y predicciones
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
+    lastFocusRefreshRef.current = 0; // Reset throttle to force full reload
     try {
       await Promise.all([
         loadData(),
@@ -223,7 +232,10 @@ export default function HybridDashboardScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadData();
+      // On first focus, triggers full reload (throttled to 5 min).
+      // Subsequent focuses skip the full subject/assessment/schedule cloud refresh
+      // to avoid the cloud call storm on every tab switch.
+      loadData(false);
     }, [loadData])
   );
 
@@ -450,6 +462,14 @@ export default function HybridDashboardScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* SYNC INDICATOR */}
+        {isSyncing ? (
+          <View style={styles.syncIndicator}>
+            <View style={styles.syncIndicatorDot} />
+            <Text style={styles.syncIndicatorText}>{t('dashboard.syncing', { defaultValue: syncStatusMessage || 'Sincronizando...' })}</Text>
+          </View>
+        ) : null}
 
         {/* 2. YOUR SUBJECTS */}
         <View style={styles.section}>

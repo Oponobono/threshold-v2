@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { memo, useRef, useState, useMemo } from 'react';
 import { View, Dimensions, PanResponder } from 'react-native';
 import { Image, type ImageContentFit } from 'expo-image';
 
@@ -16,7 +16,7 @@ const CONTENT_FIT_MAP: Record<string, ImageContentFit> = {
   stretch: 'fill',
 };
 
-export const ZoomableImage: React.FC<ZoomableImageProps> = ({
+export const ZoomableImage: React.FC<ZoomableImageProps> = memo(({
   uri,
   resizeMode = 'contain',
 }) => {
@@ -127,8 +127,9 @@ export const ZoomableImage: React.FC<ZoomableImageProps> = ({
           source={{ uri }}
           style={{ width: '100%', height: '100%' }}
           contentFit={CONTENT_FIT_MAP[resizeMode] ?? 'contain'}
+          transition={0}
         />
       </View>
     </View>
   );
-};
+});
