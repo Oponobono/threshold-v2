@@ -44,6 +44,33 @@ const TABLES_TO_FIX = [
   'subject_grade_snapshots'
 ];
 
+const getReferencingFks = async (pool, table) => {
+  const result = await pool.query(`
+    SELECT
+      tc.table_name AS child_table,
+      kcu.column_name AS child_column,
+      tc.constraint_name,
+      rc.delete_rule
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_catalog = kcu.constraint_catalog
+      AND tc.constraint_schema = kcu.constraint_schema
+      AND tc.constraint_name = kcu.constraint_name
+    JOIN information_schema.constraint_column_usage ccu
+      ON tc.constraint_catalog = ccu.constraint_catalog
+      AND tc.constraint_schema = ccu.constraint_schema
+      AND tc.constraint_name = ccu.constraint_name
+    JOIN information_schema.referential_constraints rc
+      ON tc.constraint_catalog = rc.constraint_catalog
+      AND tc.constraint_schema = rc.constraint_schema
+      AND tc.constraint_name = rc.constraint_name
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND ccu.table_name = $1
+      AND ccu.column_name = 'id'
+  `, [table]);
+  return result.rows;
+};
+
 const fixIdTypes = async (pool) => {
   try {
     for (const table of TABLES_TO_FIX) {
@@ -73,22 +100,14 @@ const fixIdTypes = async (pool) => {
         // No default to drop is fine
       }
 
-      // Drop dependent foreign keys if needed
-      if (table === 'audio_recordings') {
+      // Dynamically discover and drop all FKs referencing this table's id
+      const fks = await getReferencingFks(pool, table);
+      for (const fk of fks) {
         try {
-          await pool.query(`ALTER TABLE audio_transcripts DROP CONSTRAINT IF EXISTS audio_transcripts_recording_id_fkey`);
+          await pool.query(`ALTER TABLE ${fk.child_table} DROP CONSTRAINT IF EXISTS ${fk.constraint_name}`);
+          console.log(`  ✓ Dropped FK ${fk.constraint_name} on ${fk.child_table}`);
         } catch (e) {
-          // Ignore
-        }
-      }
-      if (table === 'assessments') {
-        const deps = ['assessment_files', 'assessment_results'];
-        for (const dep of deps) {
-          try {
-            await pool.query(`ALTER TABLE ${dep} DROP CONSTRAINT IF EXISTS ${dep}_assessment_id_fkey`);
-          } catch (e) {
-            // Ignore
-          }
+          // Ignore if already gone
         }
       }
 
@@ -96,26 +115,27 @@ const fixIdTypes = async (pool) => {
       await pool.query(`ALTER TABLE ${table} ALTER COLUMN id TYPE TEXT USING id::text`);
       console.log(`  ✓ Converted ${table}.id to TEXT`);
 
-      // Alter dependent columns and restore foreign keys
-      if (table === 'audio_recordings') {
+      // Alter child columns and restore FKs
+      for (const fk of fks) {
         try {
-          await pool.query(`ALTER TABLE audio_transcripts ALTER COLUMN recording_id TYPE TEXT USING recording_id::text`);
-          await pool.query(`ALTER TABLE audio_transcripts ADD CONSTRAINT audio_transcripts_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES audio_recordings(id) ON DELETE CASCADE`);
-          console.log(`  ✓ Converted audio_transcripts.recording_id to TEXT and restored foreign key`);
-        } catch (e) {
-          console.log(`  ! Note: Could not update audio_transcripts foreign key: ${e.message}`);
-        }
-      }
-      if (table === 'assessments') {
-        for (const dep of ['assessment_files', 'assessment_results']) {
-          const col = 'assessment_id';
-          try {
-            await pool.query(`ALTER TABLE ${dep} ALTER COLUMN ${col} TYPE TEXT USING ${col}::text`);
-            await pool.query(`ALTER TABLE ${dep} ADD FOREIGN KEY (${col}) REFERENCES assessments(id) ON DELETE CASCADE`);
-            console.log(`  ✓ Converted ${dep}.${col} to TEXT and restored foreign key`);
-          } catch (e) {
-            console.log(`  ! Note: Could not update ${dep} foreign key: ${e.message}`);
+          const childColResult = await pool.query(`
+            SELECT data_type FROM information_schema.columns
+            WHERE table_name = $1 AND column_name = $2
+          `, [fk.child_table, fk.child_column]);
+
+          const childType = childColResult.rows[0]?.data_type;
+          if (childType && childType !== 'text') {
+            await pool.query(
+              `ALTER TABLE ${fk.child_table} ALTER COLUMN ${fk.child_column} TYPE TEXT USING ${fk.child_column}::text`
+            );
           }
+          const deleteRule = fk.delete_rule === 'NO ACTION' ? '' : ` ON DELETE ${fk.delete_rule}`;
+          await pool.query(
+            `ALTER TABLE ${fk.child_table} ADD FOREIGN KEY (${fk.child_column}) REFERENCES ${table}(id)${deleteRule}`
+          );
+          console.log(`  ✓ Converted ${fk.child_table}.${fk.child_column} and restored FK ${fk.constraint_name}`);
+        } catch (e) {
+          console.log(`  ! Note: Could not update FK on ${fk.child_table}.${fk.child_column}: ${e.message}`);
         }
       }
     }
