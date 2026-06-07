@@ -99,6 +99,16 @@ const fixSubjectIdTypes = async (pool) => {
     for (const { table, column, fk } of SUBJECT_ID_TABLES) {
       if (!fk) continue;
       try {
+        // Check that the column actually exists before re-adding FK
+        const colExists = await pool.query(`
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = $1 AND column_name = $2
+        `, [table, column]);
+        if (colExists.rows.length === 0) {
+          console.log(`  - Skipping FK re-add on ${table}(${column}): column does not exist`);
+          continue;
+        }
+
         // Check if constraint already exists
         const existingFk = await pool.query(`
           SELECT 1 FROM information_schema.table_constraints

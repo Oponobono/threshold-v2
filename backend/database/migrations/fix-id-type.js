@@ -81,6 +81,16 @@ const fixIdTypes = async (pool) => {
           // Ignore
         }
       }
+      if (table === 'assessments') {
+        const deps = ['assessment_files', 'assessment_results'];
+        for (const dep of deps) {
+          try {
+            await pool.query(`ALTER TABLE ${dep} DROP CONSTRAINT IF EXISTS ${dep}_assessment_id_fkey`);
+          } catch (e) {
+            // Ignore
+          }
+        }
+      }
 
       // Alter column type
       await pool.query(`ALTER TABLE ${table} ALTER COLUMN id TYPE TEXT USING id::text`);
@@ -94,6 +104,18 @@ const fixIdTypes = async (pool) => {
           console.log(`  ✓ Converted audio_transcripts.recording_id to TEXT and restored foreign key`);
         } catch (e) {
           console.log(`  ! Note: Could not update audio_transcripts foreign key: ${e.message}`);
+        }
+      }
+      if (table === 'assessments') {
+        for (const dep of ['assessment_files', 'assessment_results']) {
+          const col = 'assessment_id';
+          try {
+            await pool.query(`ALTER TABLE ${dep} ALTER COLUMN ${col} TYPE TEXT USING ${col}::text`);
+            await pool.query(`ALTER TABLE ${dep} ADD FOREIGN KEY (${col}) REFERENCES assessments(id) ON DELETE CASCADE`);
+            console.log(`  ✓ Converted ${dep}.${col} to TEXT and restored foreign key`);
+          } catch (e) {
+            console.log(`  ! Note: Could not update ${dep} foreign key: ${e.message}`);
+          }
         }
       }
     }
