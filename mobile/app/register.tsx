@@ -25,6 +25,7 @@ import { CustomInput } from '../src/components/ui/CustomInput';
 import { CustomButton } from '../src/components/ui/CustomButton';
 import { MapuviaFooter } from '../src/components/ui/MapuviaFooter';
 import { registerUser } from '../src/services/api';
+import { fetchWithFallback } from '../src/services/api/client';
 import { uploadFileToUploadthing } from '../src/services/uploadthing/storage';
 import { alertRef } from '../src/components/ui/CustomAlert';
 import { fetchGradingSystems, type GradingSystem } from '../src/services/api/grading';
@@ -43,6 +44,7 @@ export default function RegisterScreen() {
 
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // Animations
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -181,18 +183,8 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     setIsLoading(true);
     try {
-      // Subir foto de perfil a Uploadthing si el usuario eligió una
-      let profileImageUrl: string | undefined;
-      if (profilePhoto) {
-        const uploadResult = await uploadFileToUploadthing(
-          profilePhoto,
-          `profile_${Date.now()}.jpg`,
-          'image/jpeg'
-        );
-        profileImageUrl = uploadResult.url;
-      }
-
-      await registerUser({
+      // 1. Crear la cuenta PRIMERO (sin foto) para obtener sesión activa
+      const userData = await registerUser({
         email,
         password,
         name,
@@ -204,10 +196,47 @@ export default function RegisterScreen() {
         semester,
         study_goal: studyGoal,
         reference_language: referenceLanguage,
-        profile_image: profileImageUrl,
+        profile_image: undefined, // Se guardará después si hay foto
       });
 
-      // Persist chosen language so login screen picks it up
+      // 2. Subir foto de perfil DESPUÉS de crear el usuario (para que la autenticación sea válida)
+      if (profilePhoto) {
+        setIsUploadingPhoto(true);
+        try {
+          const uploadResult = await uploadFileToUploadthing(
+            profilePhoto,
+            `profile_${Date.now()}.jpg`,
+            'image/jpeg'
+          );
+
+          // Actualizar el perfil del usuario con la URL de la imagen
+          // Usar fetchWithFallback que automáticamente incluye el JWT del storage
+          const response = await fetchWithFallback(`/users/${userData.userId}/profile-image`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ profile_image: uploadResult.url }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Error al actualizar foto: ${response.status} ${response.statusText}`);
+          }
+        } catch (uploadError: any) {
+          // La cuenta se creó exitosamente, pero la foto tuvo un error
+          // Continuamos de todos modos porque la cuenta es lo importante
+          console.warn('[Register] Cuenta creada, pero error al subir foto:', uploadError);
+          alertRef.show({
+            title: t('common.warning'),
+            message: t('register.photoUploadWarning') || 'Cuenta creada, pero no se pudo guardar la foto.',
+            type: 'warning',
+          });
+        } finally {
+          setIsUploadingPhoto(false);
+        }
+      }
+
+      // 3. Persist chosen language so login screen picks it up
       const langToSave = referenceLanguage === 'en' ? 'en' : 'es';
       await setItemAsync('app_language', langToSave);
       i18n.changeLanguage(langToSave);
@@ -217,7 +246,8 @@ export default function RegisterScreen() {
         message: t('register.success.accountCreated'),
         type: 'success',
       });
-      // Pequeño delay para asegurar que el usuario está completamente creado en la BD
+
+      // 4. Pequeño delay para asegurar que el usuario está completamente creado en la BD
       setTimeout(() => {
         router.replace('/(tabs)');
       }, 500);
@@ -229,6 +259,7 @@ export default function RegisterScreen() {
       });
     } finally {
       setIsLoading(false);
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -338,7 +369,11 @@ export default function RegisterScreen() {
                     <Text style={localStyles.bentoCardLabel}>{t('register.step1.profilePhoto')}</Text>
                   </View>
                   <View style={localStyles.avatarCenter}>
-                    <TouchableOpacity style={localStyles.avatarTouchable} onPress={handlePickPhoto}>
+                    <TouchableOpacity 
+                      style={localStyles.avatarTouchable} 
+                      onPress={handlePickPhoto}
+                      disabled={isUploadingPhoto}
+                    >
                       {profilePhoto ? (
                         <Image source={{ uri: profilePhoto }} style={localStyles.avatarImage} />
                       ) : (
@@ -347,7 +382,11 @@ export default function RegisterScreen() {
                         </View>
                       )}
                       <View style={localStyles.avatarEditBadge}>
-                        <Feather name="camera" size={12} color="#fff" />
+                        {isUploadingPhoto ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Feather name="camera" size={12} color="#fff" />
+                        )}
                       </View>
                     </TouchableOpacity>
                     <Text
@@ -356,7 +395,10 @@ export default function RegisterScreen() {
                     >
                       {username.trim() || t('register.step1.usernamePlaceholder')}
                     </Text>
-                    {profilePhoto && (
+                    {isUploadingPhoto && (
+                      <Text style={localStyles.uploadingText}>{t('register.photoUploading')}</Text>
+                    )}
+                    {profilePhoto && !isUploadingPhoto && (
                       <TouchableOpacity onPress={() => setProfilePhoto(null)}>
                         <Text style={localStyles.removePhotoText}>{t('register.step1.removePhoto')}</Text>
                       </TouchableOpacity>

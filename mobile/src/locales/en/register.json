@@ -21,6 +21,7 @@
     "registerTitle": "Registration Error",
     "generic": "We could not create your account right now. Please try again."
   },
+  "photoUploadWarning": "Your account was created successfully, but we couldn't save your profile photo. You can add it later in Settings.",
   "success": {
     "accountCreated": "Your account is ready. Welcome to Threshold!"
   },
@@ -49,6 +50,7 @@
     "profilePhoto": "Profile photo",
     "photoHint": "Optional. If you skip this, we'll show your initials instead.",
     "removePhoto": "Remove photo",
+    "photoUploading": "Saving photo...",
     "identityCard": "Identity",
     "firstNameLabel": "First name",
     "firstNamePlaceholder": "Ex: Maria",
@@ -78,5 +80,6 @@
     "credentialsCard": "Access credentials",
     "finishBtn": "Create Account"
   },
-  "approvalWithValues": "Approval: {{passing}} / {{max}}"
+  "approvalWithValues": "Approval: {{passing}} / {{max}}",
+  "photoUploadWarning": "Your account was created successfully, but we couldn't save your profile photo. You can add it later in Settings."
 }

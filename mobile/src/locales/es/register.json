@@ -21,6 +21,7 @@
     "registerTitle": "Error de registro",
     "generic": "No pudimos crear tu cuenta ahora. Inténtalo de nuevo."
   },
+  "photoUploadWarning": "Tu cuenta se creó exitosamente, pero no pudimos guardar la foto de perfil. Puedes agregarla después en Configuración.",
   "success": {
     "accountCreated": "Tu cuenta está lista. ¡Bienvenido a Threshold!"
   },
@@ -49,6 +50,7 @@
     "profilePhoto": "Foto de perfil",
     "photoHint": "Opcional. Si no subes foto, mostraremos tus iniciales.",
     "removePhoto": "Quitar foto",
+    "photoUploading": "Guardando foto...",
     "identityCard": "Identidad",
     "firstNameLabel": "Nombre(s)",
     "firstNamePlaceholder": "Ej: María",
@@ -78,5 +80,6 @@
     "credentialsCard": "Credenciales de acceso",
     "finishBtn": "Crear cuenta"
   },
-  "approvalWithValues": "Aprobación: {{passing}} / {{max}}"
+  "approvalWithValues": "Aprobación: {{passing}} / {{max}}",
+  "photoUploadWarning": "Tu cuenta se creó exitosamente, pero no pudimos guardar la foto de perfil. Puedes agregarla después en Configuración."
 }

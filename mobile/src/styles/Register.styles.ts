@@ -132,6 +132,13 @@ export const registerStyles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  uploadingText: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.primary,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: theme.spacing.xs,
+  },
 
   // ── Goal Grid (2×2) ───────────────────────────────────────
   goalGrid: {
