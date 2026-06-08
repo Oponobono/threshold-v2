@@ -140,7 +140,9 @@ export default function RegisterScreen() {
   const isStep1Valid =
     name.trim().length > 0 &&
     lastname.trim().length > 0 &&
-    username.trim().length > 0;
+    username.trim().length > 0 &&
+    studyGoal.trim().length > 0 &&
+    referenceLanguage.trim().length > 0;
 
   const isEmailValid = (mail: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail);
   const reqs = {
@@ -150,12 +152,15 @@ export default function RegisterScreen() {
     special: /[@$!%*?&]/.test(password),
   };
   const isPasswordValid = Object.values(reqs).every(Boolean);
+  const isPasswordConfirmed = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
   const isStep2Valid =
     selectedSystemId !== null &&
     !isNaN(parseFloat(approvalThreshold)) &&
+    university.trim().length > 0 &&
+    major.trim().length > 0 &&
     isEmailValid(email) &&
     isPasswordValid &&
-    password === confirmPassword;
+    isPasswordConfirmed;
 
   const handleNext = () => {
     if (step < TOTAL_STEPS) {
@@ -212,7 +217,10 @@ export default function RegisterScreen() {
         message: t('register.success.accountCreated'),
         type: 'success',
       });
-      router.replace('/(tabs)');
+      // Pequeño delay para asegurar que el usuario está completamente creado en la BD
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 500);
     } catch (error: any) {
       alertRef.show({
         title: t('common.error'),
@@ -393,16 +401,6 @@ export default function RegisterScreen() {
                     value={semester}
                     onChangeText={setSemester}
                   />
-                  <CustomInput
-                    label={t('register.step1.majorLabel')}
-                    value={major}
-                    onChangeText={setMajor}
-                  />
-                  <CustomInput
-                    label={t('register.step1.universityLabel')}
-                    value={university}
-                    onChangeText={setUniversity}
-                  />
                 </View>
 
                 {/* ── Objetivos IA Card ── */}
@@ -517,6 +515,24 @@ export default function RegisterScreen() {
                       textAlign="center"
                     />
                   </View>
+                </View>
+
+                {/* ── Contexto Académico Card ── */}
+                <View style={localStyles.bentoCard}>
+                  <View style={localStyles.bentoCardHeader}>
+                    <Feather name="book-open" size={15} color={theme.colors.text.secondary} />
+                    <Text style={localStyles.bentoCardLabel}>{t('register.step2.academicContextCard')}</Text>
+                  </View>
+                  <CustomInput
+                    label={t('register.step1.majorLabel')}
+                    value={major}
+                    onChangeText={setMajor}
+                  />
+                  <CustomInput
+                    label={t('register.step1.universityLabel')}
+                    value={university}
+                    onChangeText={setUniversity}
+                  />
                 </View>
 
                 {/* ── Credenciales Card ── */}

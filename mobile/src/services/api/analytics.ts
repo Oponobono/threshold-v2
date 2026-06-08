@@ -142,18 +142,18 @@ export interface UserStats {
   learning_cards: number;
   new_cards: number;
   due_cards: number;
-  subjects: Array<{
+  subjects: {
     subject_id: number;
     subject_name: string;
     mastery_percentage: number;
     total_reviews: number;
     correct_reviews: number;
-  }>;
-  recent_activity: Array<{
+  }[];
+  recent_activity: {
     review_date: string;
     total_attempts: number;
     correct_attempts: number;
-  }>;
+  }[];
 }
 
 export interface DeckStats {
@@ -168,7 +168,7 @@ export interface DeckStats {
   new_cards: number;
   due_cards: number;
   total_reviews: number;
-  difficult_cards: Array<{
+  difficult_cards: {
     id: number;
     front: string;
     total_attempts: number;
@@ -176,34 +176,34 @@ export interface DeckStats {
     failure_rate: number;
     fsrs_stability: number;
     fsrs_difficulty: number;
-  }>;
-  mastery_trend: Array<{
+  }[];
+  mastery_trend: {
     review_date: string;
     total_attempts: number;
     correct_attempts: number;
-  }>;
+  }[];
 }
 
 export interface ProgressTrends {
   user_id: number;
   period_days: number;
-  daily_mastery: Array<{
+  daily_mastery: {
     date: string;
     total_attempts: number;
     correct_attempts: number;
     daily_accuracy: number;
-  }>;
-  cards_timeline: Array<{
+  }[];
+  cards_timeline: {
     date: string;
     cards_reviewed: number;
     cards_mastered: number;
-  }>;
-  subject_progress: Array<{
+  }[];
+  subject_progress: {
     subject_name: string;
     mastery_percentage: number;
     total_reviews: number;
     correct_reviews: number;
-  }>;
+  }[];
 }
 
 export interface GlobalGPAAnalytics {

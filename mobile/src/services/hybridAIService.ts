@@ -219,6 +219,7 @@ export async function sequentialAudioProcess(
   await unloadModel();
 
   // ── Paso 2: Cargar Whisper, transcribir, liberar ──
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { transcribeWithWhisperLocal } = require('../utils/groqHelpers');
   const transcription = await transcribeWithWhisperLocal(audioUri);
 
@@ -349,6 +350,7 @@ ${contextText}`;
   }
 
   // Cloud: importar función original
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { generateFlashcardsFromContext } = require('./api/ai');
   return generateFlashcardsFromContext(contextText, count);
 }
@@ -395,6 +397,7 @@ ${params.contextText || ''}`;
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { generateStudyMaterialFromChat } = require('./api/ai');
   return generateStudyMaterialFromChat(params);
 }
@@ -428,6 +431,7 @@ Devuelve SOLO un JSON válido.`;
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { analyzeDeckConfusions } = require('./api/ai');
   return analyzeDeckConfusions(deckId);
 }
@@ -466,6 +470,7 @@ Devuelve SOLO un JSON válido con: conceptA, conceptB, difference, example.`;
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { generateDifferentiationCard } = require('./api/ai');
   return generateDifferentiationCard(deckId, conceptA, conceptB, reason);
 }
@@ -498,6 +503,7 @@ Devuelve SOLO un JSON válido con: title, keyPoints (array), conclusion.`;
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { summarizeWithGroq } = require('../utils/groqHelpers');
   const result = await summarizeWithGroq(text, '');
   return { success: true, data: result };
@@ -518,11 +524,13 @@ export async function extractTextFromImageHybrid(base64Image: string): Promise<s
   const resolved = await resolveProvider();
 
   const tryLocal = async (): Promise<string> => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { extractTextFromImageLocal } = require('./localOCRService');
     return extractTextFromImageLocal(base64Image);
   };
 
   const tryCloud = async (): Promise<string> => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { extractTextFromImage } = require('./api/documents');
     return extractTextFromImage(base64Image);
   };
@@ -566,11 +574,13 @@ export async function extractTextFromPDFHybrid(base64Pdf: string): Promise<strin
   const resolved = await resolveProvider();
 
   const tryLocal = async (): Promise<string> => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { extractTextFromPdfLocal } = require('./localPDFService');
     return extractTextFromPdfLocal(base64Pdf);
   };
 
   const tryCloud = async (): Promise<string> => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { extractTextFromPDF } = require('./api/documents');
     return extractTextFromPDF(base64Pdf);
   };
@@ -625,6 +635,7 @@ export async function generateFlashcardsFromImageHybrid(payload: {
 
   if (resolved === 'local') {
     // 1. Extraer texto de la imagen con ML Kit
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { extractTextFromImageLocal } = require('./localOCRService');
     const ocrText = await extractTextFromImageLocal(payload.image_base64);
 
@@ -636,6 +647,7 @@ export async function generateFlashcardsFromImageHybrid(payload: {
     return generateHybridFlashcards(ocrText, payload.count);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { generateFlashcardsFromImage } = require('./api/flashcards');
   return generateFlashcardsFromImage(payload);
 }
@@ -656,6 +668,7 @@ export async function processDocumentUploadHybrid(
   const resolved = await resolveProvider();
 
   // 1. Siempre extraer texto localmente (offline) para no enviar el archivo
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const FileSystem = require('expo-file-system/legacy');
   const fileContent = await FileSystem.readAsStringAsync(file.uri, {
     encoding: FileSystem.EncodingType.Base64,
@@ -663,9 +676,11 @@ export async function processDocumentUploadHybrid(
 
   let text = '';
   if (file.type?.includes('pdf')) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { extractTextFromPdfLocal } = require('./localPDFService');
     text = await extractTextFromPdfLocal(fileContent);
   } else {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { extractTextFromImageLocal } = require('./localOCRService');
     text = await extractTextFromImageLocal(fileContent);
   }
@@ -700,6 +715,7 @@ export async function processDocumentUploadHybrid(
  */
 export function isHybridAIAvailable(): boolean {
   const store = useLocalAIStore.getState();
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useConnectivityStore } = require('../store/useConnectivityStore');
   const isOnline = useConnectivityStore.getState().isOnline;
   return isOnline || (store.activeModelId !== null && store.inferenceStatus !== 'error');

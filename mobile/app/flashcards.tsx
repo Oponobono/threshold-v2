@@ -3,8 +3,8 @@ import { View, FlatList, RefreshControl, StatusBar, Text, TouchableOpacity, Moda
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons , MaterialCommunityIcons } from '@expo/vector-icons';
+
 import { theme } from '../src/styles/theme';
 import { recordingsStyles } from '../src/styles/RecordingsScreen.styles';
 import { flashcardsStyles as flashcardStyles } from '../src/styles/FlashcardsModal.styles';

@@ -145,7 +145,7 @@ export const MetricCard = ({ title, value, subtext, icon, color, showMood, onPre
       pulseAnim.setValue(1);
       pulseOpacity.setValue(1);
     }
-  }, [showMood, pulseAnim]);
+  }, [showMood, pulseAnim, pulseOpacity]);
 
   return (
     <TouchableOpacity 

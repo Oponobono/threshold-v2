@@ -53,11 +53,6 @@ import {
 } from '../services/api/settings';
 
 /**
- * Claves para los tipos de escalas de calificación disponibles.
- */
-type ScaleKey = 'af' | 'pct' | 'scale4' | 'custom';
-
-/**
  * Hook centralizado que maneja toda la lógica de estado y negocio
  * de la pantalla de configuración de Threshold.
  * Incluye gestión de perfil, biometría, eliminación de cuenta, y grupos.
@@ -830,7 +825,6 @@ export const useSettingsLogic = () => {
       try {
         const result = await createCustomGradingSystem({ name, min_value: minValue, max_value: maxValue, passing_value: passingValue });
         setGradingSystems(prev => {
-          const defaultIds = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.id));
           const existingIds = new Set(prev.map(s => s.id));
           if (existingIds.has(result.id)) {
             const maxId = Math.max(...prev.map(s => s.id)) + 1;

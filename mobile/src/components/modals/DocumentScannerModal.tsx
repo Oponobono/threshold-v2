@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Modal, TouchableOpacity, ActivityIndicator, Platform, Share, ScrollView, TextInput } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ActivityIndicator, Platform, ScrollView, TextInput } from 'react-native';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -16,11 +16,13 @@ let DocumentScanner: any = null;
 let ResponseType: any = null;
 let Accelerometer: any = null;
 
-if (Platform.OS !== 'web') {
-  try {
-    const scanner = require('react-native-document-scanner-plugin');
+  if (Platform.OS !== 'web') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const scanner = require('react-native-document-scanner-plugin');
     DocumentScanner = scanner.default || scanner;
     ResponseType = scanner.ResponseType;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sensors = require('expo-sensors');
     Accelerometer = sensors.Accelerometer;
   } catch (e) {
@@ -70,7 +72,7 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLevel, setIsLevel] = useState(false);
   const [exportFormat, setExportFormat] = useState<'image' | 'pdf'>('image');
-  const [activeFilter, setActiveFilter] = useState('original');
+  const [, setActiveFilter] = useState('original');
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const enhancerRef = useRef<AdvancedImageEnhancerRef>(null);
 

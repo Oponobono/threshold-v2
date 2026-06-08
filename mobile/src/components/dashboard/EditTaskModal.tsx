@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { theme } from '../../styles/theme';
-import { globalStyles } from '../../styles/globalStyles';
 import { alertRef } from '../ui/CustomAlert';
 import { updateAssessment, type Subject, Assessment } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
@@ -68,7 +67,6 @@ export const EditTaskModal = ({ visible, onClose, task, subjects }: EditTaskModa
         category_id: selectedCategoryId || undefined,
       });
 
-      const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       alertRef.show({ title: t('common.success'), message: t('tasks.updateSuccess'), type: 'success' });
       
       await Promise.all([refreshSubjects(), refreshAssessments()]);

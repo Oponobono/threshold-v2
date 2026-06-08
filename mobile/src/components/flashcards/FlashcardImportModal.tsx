@@ -17,7 +17,7 @@ import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { type Subject } from '../../services/api';
-import { saveImportedDeck, updateLocalDeckSubject, prepareDeckForSync, exportDeckToJSON, addLocalCard } from '../../services/localFlashcardService';
+import { saveImportedDeck, updateLocalDeckSubject, prepareDeckForSync, addLocalCard } from '../../services/localFlashcardService';
 
 export interface FlashcardImportModalProps {
   isVisible: boolean;
@@ -65,8 +65,6 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [importedDeck, setImportedDeck] = useState<ImportedDeck | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | number | null>(null);
-  const [deckTitle, setDeckTitle] = useState<string>('');
-
   const handleLaunchPicker = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({

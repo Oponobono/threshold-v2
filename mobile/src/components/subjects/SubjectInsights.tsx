@@ -9,7 +9,7 @@ import { subjectDetailStyles as styles } from '../../styles/SubjectDetail.styles
 import { EditGradeModal } from '../dashboard/EditGradeModal';
 import { EditTaskModal } from '../dashboard/EditTaskModal';
 import { CompleteTaskModal } from '../dashboard/CompleteTaskModal';
-import { dashboardStyles as dashStyles } from '../../styles/Dashboard.styles';
+
 import {
   getAssessmentProgress,
   normalizeGrade,
@@ -371,29 +371,3 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
   );
 };
 
-const insightStyles = StyleSheet.create({
-  categoriesChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: theme.colors.card,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  categoriesChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.text.secondary,
-  },
-  addBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: theme.colors.inputBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

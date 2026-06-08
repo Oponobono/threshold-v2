@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, Modal, TouchableOpacity, ScrollView, Pressable } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
@@ -45,7 +45,7 @@ export const StudyTimerModal: React.FC<StudyTimerModalProps> = ({
   const [selectedMode, setSelectedMode] = useState<'pomodoro' | 'threshold'>('pomodoro');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [duration, setDuration] = useState(25);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [, setFeedback] = useState<string | null>(null);
 
   const handleStart = () => {
     onStart({

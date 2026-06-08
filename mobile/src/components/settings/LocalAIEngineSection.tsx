@@ -7,7 +7,7 @@
  *   2. Catálogo de Modelos (Essential / Advanced)
  *   3. Almacenamiento y Mantenimiento
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, Switch, TouchableOpacity,
 } from 'react-native';
@@ -58,7 +58,7 @@ export const LocalAIEngineSection = () => {
   const downloadStatus = useLocalAIStore((s) => s.downloadStatus);
   const downloadedModels = useLocalAIStore((s) => s.downloadedModels);
   const storageUsedBytes = useLocalAIStore((s) => s.storageUsedBytes);
-  const inferenceStatus = useLocalAIStore((s) => s.inferenceStatus);
+
   const deviceTier = useLocalAIStore((s) => s.deviceTier);
   const deviceCompatibleModels = useLocalAIStore((s) => s.deviceCompatibleModels);
   const deviceRamGB = useLocalAIStore((s) => s.deviceRamGB);
@@ -72,7 +72,7 @@ export const LocalAIEngineSection = () => {
   const setDownloadProgress = useLocalAIStore((s) => s.setDownloadProgress);
   const refreshDeviceCapabilities = useLocalAIStore((s) => s.refreshDeviceCapabilities);
 
-  const [downloadingId, setDownloadingId] = useState<LocalModelId | null>(null);
+  const [, setDownloadingId] = useState<LocalModelId | null>(null);
   const downloadResumables = React.useRef<Record<string, FileSystem.DownloadResumable>>({});
 
   // Calcular almacenamiento usado
@@ -163,7 +163,7 @@ export const LocalAIEngineSection = () => {
         });
         return;
       }
-    } catch (_) {}
+    } catch {}
 
     setDownloadingId(modelId);
     setDownloadProgress(modelId, 0, 'downloading');
@@ -301,7 +301,7 @@ export const LocalAIEngineSection = () => {
     if (resumable) {
       try {
         await resumable.pauseAsync();
-      } catch (e) {}
+      } catch (_e) {}
       delete downloadResumables.current[modelId];
     }
     setDownloadProgress(modelId, 0, 'none');
@@ -343,7 +343,7 @@ export const LocalAIEngineSection = () => {
         });
         return;
       }
-    } catch (_) {}
+    } catch {}
 
     setWhisperDownloading(true);
     setDownloadProgress('whisper', 0, 'downloading');

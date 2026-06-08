@@ -1,5 +1,5 @@
 import React, { memo, useRef, useState, useEffect } from 'react';
-import { View, Modal, TouchableOpacity, Image, FlatList, Dimensions, Share, Platform, ActivityIndicator, Text, TextInput } from 'react-native';
+import { View, Modal, TouchableOpacity, FlatList, Dimensions, Share, Platform, ActivityIndicator, Text, TextInput } from 'react-native';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +21,7 @@ interface PhotoItem {
 
 // Defined OUTSIDE the component so its reference is stable across re-renders.
 // Prevents React from unmounting/remounting all images on every state change.
-const ImageWithFallback = memo(({ item }: { item: PhotoItem }) => {
+const ImageWithFallback = memo(function ImageWithFallback({ item }: { item: PhotoItem }) {
   const uri = item.local_uri || item.cloud_url || '';
   return (
     <View style={styles.imageContainer}>

@@ -189,6 +189,7 @@ async function persistHydrate(store: { setState: (s: Partial<LocalAIState>) => v
   if (_initialized) { _hydrationResolve(); return; }
   _initialized = true;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const FileSystem = require('expo-file-system/legacy');
     const [modelsRaw, activeRaw, forcedRaw, providerRaw, whisperRaw] = await Promise.all([
       AsyncStorage.getItem(STORAGE_KEY_MODELS),
@@ -351,6 +352,7 @@ export const useLocalAIStore = create<LocalAIState>((set, get) => {
   // Función para refrescar la detección de RAM (útil para debugging)
   refreshDeviceCapabilities: async () => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { clearCapabilitiesCache } = require('../utils/deviceCapabilities');
       clearCapabilitiesCache();
       const caps = await getDeviceCapabilities();

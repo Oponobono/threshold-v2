@@ -114,7 +114,7 @@ export class SyncService {
                if (freshRecord?.cloud_url && payload) {
                  payload.cloud_url = freshRecord.cloud_url;
                }
-             } catch (e) { /* ignore */ }
+              } catch (_e) { /* ignore */ }
           }
           
           console.log(`[SyncService] Sincronizando ${item.operation} ${item.entity_type}/${item.entity_id}`);

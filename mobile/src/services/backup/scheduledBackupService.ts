@@ -27,7 +27,6 @@ export const BACKUP_TASK_NAME = 'threshold-scheduled-backup';
 TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
   try {
     const now = new Date();
-    const nowIso = now.toISOString();
     console.log(`[ScheduledBackup] 🕐 Task ejecutado por el sistema a las ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
 
     const config = await getScheduledBackupConfig();
@@ -77,12 +76,9 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
     // Mostrar notificación de progreso
     await showBackupUploadNotification(0).catch(() => {});
 
-    let hasNewData = false;
-
     // 1. Sincronizar datos de BD
     if (config.type === 'datos' || config.type === 'ambos') {
       const syncResult = await syncService.sync();
-      if (syncResult.success > 0) hasNewData = true;
       console.log(`[ScheduledBackup] 📊 Datos sincronizados: ${syncResult.success} éxitos, ${syncResult.failed} fallos`);
     }
 
@@ -96,7 +92,6 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
         includeDocs: true,
         includeTranscripts: true,
       });
-      if (result.uploaded > 0) hasNewData = true;
       console.log(`[ScheduledBackup] 🗂️ Multimedia: ${result.uploaded} subidos, ${result.errors} errores`);
     }
 
@@ -107,9 +102,7 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
     // Notificación desaparece al finalizar
     await cancelBackupUploadNotification().catch(() => {});
 
-    return hasNewData
-      ? BackgroundFetch.BackgroundFetchResult.NewData
-      : BackgroundFetch.BackgroundFetchResult.NoData;
+    return BackgroundFetch.BackgroundFetchResult.NoData;
   } catch (error) {
     console.error('[ScheduledBackup] ❌ Error en el task:', error);
     console.error('[ScheduledBackup] Stack:', error instanceof Error ? error.stack : 'No stack available');

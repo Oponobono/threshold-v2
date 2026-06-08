@@ -16,10 +16,10 @@ const CONTENT_FIT_MAP: Record<string, ImageContentFit> = {
   stretch: 'fill',
 };
 
-export const ZoomableImage: React.FC<ZoomableImageProps> = memo(({
+export const ZoomableImage: React.FC<ZoomableImageProps> = memo(function ZoomableImage({
   uri,
   resizeMode = 'contain',
-}) => {
+}) {
   const scale = useRef(1);
   const translateX = useRef(0);
   const translateY = useRef(0);

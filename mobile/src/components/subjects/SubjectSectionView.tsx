@@ -37,7 +37,6 @@ export function SubjectSectionView({
   onPress: (item: GridMediaItem) => void;
 }) {
   const { t } = useTranslation();
-  const now = Date.now();
   const sorted = [...section.items].sort(
     (a, b) =>
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()

@@ -5,9 +5,7 @@
  * Proporciona funciones compatibles con la interfaz de groqHelpers
  * pero usa Gemini para mayor capacidad de procesamiento.
  */
-import * as FileSystem from 'expo-file-system/legacy';
 
-const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
  * Transcribe un archivo de audio usando Google Gemini (mediante el backend).

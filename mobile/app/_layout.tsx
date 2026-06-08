@@ -18,7 +18,6 @@ import { useAutoSync } from '../src/hooks/useAutoSync';
 import { useCacheCleanup } from '../src/hooks/useCacheCleanup';
 import { DatabaseProvider, useDatabaseReady } from '../src/context/DatabaseContext';
 
-import NetInfo from '@react-native-community/netinfo';
 import { hasValidSession } from '../src/services/api/auth/session';
 import { initializeApiClient } from '../src/services/api/client';
 import { requestPermissions } from '../src/services/notificationService';

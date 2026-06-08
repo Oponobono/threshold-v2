@@ -39,7 +39,7 @@ export function AnimatedWaveform({ color = '#fff', height = 36 }: { color?: stri
     );
     Animated.parallel(animations).start();
     return () => animations.forEach((a) => a.stop());
-  }, []);
+  }, [anims]);
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, height }}>

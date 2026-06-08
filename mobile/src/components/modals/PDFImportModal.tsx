@@ -113,8 +113,6 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
             encoding: FileSystem.EncodingType.Base64,
           });
           const extracted = await extractTextFromPDFHybrid(base64Data);
-          // Guardar incluso si está vacío — vacío significa "OCR se ejecutó pero no encontró texto"
-          // null significa "OCR no se intentó"
           ocrText = extracted !== undefined ? extracted : null;
           
           if (!ocrText) {

@@ -42,8 +42,6 @@ function localDeckToFlashcardDeck(local: LocalDeck): FlashcardDeck {
  * - No reinicia decks a [] en errores (preserva el estado existente)
  */
 export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResult => {
-  const { t } = useTranslation();
-
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');

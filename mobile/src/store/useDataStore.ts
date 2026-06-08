@@ -148,8 +148,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     try {
       const { getFlashcardDecks, getGalleryItems, getAudioRecordings } = await import('../services/api');
       const decks = await getFlashcardDecks().catch(() => []);
-      const gallery = await getGalleryItems().catch(() => []);
-      const audio = await getAudioRecordings().catch(() => []);
 
       if (Array.isArray(decks) && decks.length > 0) set({ flashcardDecks: decks });
 

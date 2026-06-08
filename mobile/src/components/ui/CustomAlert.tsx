@@ -18,7 +18,6 @@ import {
   Modal,
   StyleSheet,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,7 +70,7 @@ const TYPE_META: Record<AlertType, { icon: string; color: string }> = {
 
 interface InternalState extends AlertOptions { visible: boolean }
 const INITIAL: InternalState = { visible: false, title: '' };
-const { width } = Dimensions.get('window');
+
 
 export const CustomAlertProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<InternalState>(INITIAL);
@@ -87,7 +86,7 @@ export const CustomAlertProvider: React.FC<{ children: React.ReactNode }> = ({ c
       Animated.spring(scaleAnim,   { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 280 }),
       Animated.timing(opacityAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [opacityAnim, scaleAnim]);
 
   // Wire up the global ref so non-component code can use it
   alertRef.show = showAlert;

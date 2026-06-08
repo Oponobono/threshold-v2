@@ -46,7 +46,7 @@ async function getExpoDeviceRam(): Promise<RamInfo | null> {
               }
             }
           }
-        } catch (_) {}
+        } catch (_e) {}
         console.log(`[RAM Detection] expo-device - Total: ${totalMB}MB, Available: ${availableMB}MB`);
         return { totalMB, availableMB };
       }
@@ -133,6 +133,7 @@ function getCpuCoreCount(): number {
     }
   } catch {}
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const os = require('os');
     const cpus = os?.cpus?.()?.length;
     if (cpus && cpus > 0) return cpus;

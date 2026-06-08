@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -46,7 +46,6 @@ import { summarizeWithFallback } from '../../utils/groqHelpers';
 // ---------------------------------------------------------------------------
 const GROQ_API_KEY: string = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
-const YOUTUBE_API_KEY: string = process.env.EXPO_PUBLIC_YOUTUBE_API_KEY ?? '';
 const TRANSCRIPTS_DIR = () => `${FileSystem.documentDirectory}Threshold/transcripts/`;
 
 // Groq helpers
@@ -130,7 +129,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [activeTab, setActiveTab] = useState<AITabType>('transcription');
-  const [showTutorial, setShowTutorial] = useState(true);
+
   const [isLoading, setIsLoading] = useState(true);
   
   const isOnline = useConnectivityStore(state => state.isOnline);
@@ -152,89 +151,91 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
   const screenWidth = Dimensions.get('window').width - 48;
   const subjectForId = selectedSubjectId != null ? subjects.find(s => String(s.id) === String(selectedSubjectId)) : undefined;
 
-  useEffect(() => { loadInitialData(); }, [videoId]);
-
-  const loadInitialData = async () => {
-    try {
-      try { setSubjects(await getSubjects()); } catch (e) { console.warn('subjects:', e); }
-
-      let video: YouTubeVideo | null = null;
+  useEffect(() => {
+    const loadPersistedTexts = async (key: string, video: YouTubeVideo | null) => {
+      const dir = TRANSCRIPTS_DIR();
+      let localTranscriptFound = false;
       try {
-        const all = await getYouTubeVideos();
-        video = all.find(v => v.id?.toString() === videoId) ?? null;
-      } catch (e) { console.warn('videos:', e); }
-
-      if (video) {
-        if (!video.title && video.video_id) {
-          try {
-            const metadataRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${video.video_id}`);
-            if (metadataRes.ok) {
-              const metadata = await metadataRes.json();
-              if (metadata.title) {
-                video.title = metadata.title;
-                if (video.id) {
-                  await updateYouTubeVideo(video.id, { title: metadata.title }).catch(e => console.warn('updateTitle:', e));
-                }
-              }
-            }
-          } catch (err) {
-            console.warn('Error fetching video title from noembed:', err);
+        const ti = await FileSystem.getInfoAsync(`${dir}transcript_video_${key}.json`);
+        if (ti.exists) {
+          const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}transcript_video_${key}.json`));
+          if (parsed.text) { 
+            setTranscription(parsed.text); 
+            
+            localTranscriptFound = true;
           }
         }
-        setVideoData(video);
-        setSelectedSubjectId(video.subject_id ? String(video.subject_id) : null);
+      } catch (e) { console.warn('transcript file:', e); }
+
+      if (!localTranscriptFound && video?.transcript_text) {
+        console.log(`[VideoDetail] Fallback a transcript_text del servidor para video: ${video.id}`);
+        setTranscription(video.transcript_text);
+        
       }
 
-      await loadPersistedTexts(videoId, video);
-    } catch (e) {
-      console.error('loadInitialData:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadPersistedTexts = async (key: string, video: YouTubeVideo | null) => {
-    const dir = TRANSCRIPTS_DIR();
-    let localTranscriptFound = false;
-    try {
-      const ti = await FileSystem.getInfoAsync(`${dir}transcript_video_${key}.json`);
-      if (ti.exists) {
-        const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}transcript_video_${key}.json`));
-        if (parsed.text) { 
-          setTranscription(parsed.text); 
-          setShowTutorial(false); 
-          localTranscriptFound = true;
+      let localSummaryFound = false;
+      try {
+        const si = await FileSystem.getInfoAsync(`${dir}summary_video_${key}.json`);
+        if (si.exists) {
+          const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}summary_video_${key}.json`));
+          if (parsed.text) { 
+            setSummary(parsed.text); 
+            
+            setActiveTab('summary'); 
+            localSummaryFound = true;
+          }
         }
+      } catch (e) { console.warn('summary file:', e); }
+
+      if (!localSummaryFound && (video as any)?.summary_text) {
+        console.log(`[VideoDetail] Fallback a summary_text del servidor para video: ${video?.id}`);
+        setSummary((video as any).summary_text);
+        
+        setActiveTab('summary');
       }
-    } catch (e) { console.warn('transcript file:', e); }
+    };
 
-    if (!localTranscriptFound && video?.transcript_text) {
-      console.log(`[VideoDetail] Fallback a transcript_text del servidor para video: ${video.id}`);
-      setTranscription(video.transcript_text);
-      setShowTutorial(false);
-    }
+    const loadInitialData = async () => {
+      try {
+        try { setSubjects(await getSubjects()); } catch (e) { console.warn('subjects:', e); }
 
-    let localSummaryFound = false;
-    try {
-      const si = await FileSystem.getInfoAsync(`${dir}summary_video_${key}.json`);
-      if (si.exists) {
-        const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}summary_video_${key}.json`));
-        if (parsed.text) { 
-          setSummary(parsed.text); 
-          setShowTutorial(false); 
-          setActiveTab('summary'); 
-          localSummaryFound = true;
+        let video: YouTubeVideo | null = null;
+        try {
+          const all = await getYouTubeVideos();
+          video = all.find(v => v.id?.toString() === videoId) ?? null;
+        } catch (e) { console.warn('videos:', e); }
+
+        if (video) {
+          if (!video.title && video.video_id) {
+            try {
+              const metadataRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${video.video_id}`);
+              if (metadataRes.ok) {
+                const metadata = await metadataRes.json();
+                if (metadata.title) {
+                  video.title = metadata.title;
+                  if (video.id) {
+                    await updateYouTubeVideo(video.id, { title: metadata.title }).catch(e => console.warn('updateTitle:', e));
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('Error fetching video title from noembed:', err);
+            }
+          }
+          setVideoData(video);
+          setSelectedSubjectId(video.subject_id ? String(video.subject_id) : null);
         }
-      }
-    } catch (e) { console.warn('summary file:', e); }
 
-    if (!localSummaryFound && (video as any)?.summary_text) {
-      console.log(`[VideoDetail] Fallback a summary_text del servidor para video: ${video?.id}`);
-      setSummary((video as any).summary_text);
-      setShowTutorial(false);
-      setActiveTab('summary');
-    }
-  };
+        await loadPersistedTexts(videoId, video);
+      } catch (e) {
+        console.error('loadInitialData:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, [videoId]);
 
   const saveTextToFile = async (text: string, type: 'transcript' | 'summary') => {
     const dir = TRANSCRIPTS_DIR();
@@ -282,7 +283,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       const formattedText = formatTranscription(text);
       
       setTranscription(formattedText);
-      setShowTutorial(false);
+      
       await saveTextToFile(formattedText, 'transcript');
     } catch (e) {
       console.error('ERROR EN TRANSCRIPCIÓN:', e);
@@ -312,7 +313,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
     try {
       const result = await summarizeWithFallback(transcription, GROQ_API_KEY);
       setSummary(result);
-      setShowTutorial(false);
+      
       setActiveTab('summary');
       await saveTextToFile(result, 'summary');
     } catch (e) {
@@ -552,6 +553,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         <Modal visible={showStudyScreen} animationType="slide">
           <View style={{ flex: 1 }}>
             {(() => {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
               const { FlashcardStudyScreenStandalone } = require('../flashcards/FlashcardStudyScreenStandalone');
               return (
                 <FlashcardStudyScreenStandalone

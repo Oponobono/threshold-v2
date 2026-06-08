@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput, ActivityIndicator, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -197,7 +197,6 @@ export default function SettingsScreen() {
     handleExportPdf,
     handleSendFeedback,
     subjects,
-    gradingPeriods,
     lmsAccounts,
     twoFactorEnabled,
   } = useSettingsLogic();
@@ -208,13 +207,9 @@ export default function SettingsScreen() {
     stats: backupStats,
     cloudItemsCount,
     isUploading,
-    uploadProgress,
     handleBackupNow,
-    lastUploadLabel,
     isDownloading,
-    downloadProgress,
     handleDownloadNow,
-    lastDownloadLabel,
     isBackupRunning,
     pendingCount,
     totalCount,

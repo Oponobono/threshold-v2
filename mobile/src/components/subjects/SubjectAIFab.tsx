@@ -18,8 +18,8 @@ import {
   Text, StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { theme } from '../../styles/theme';
+
+
 import { subjectDetailStyles as styles } from '../../styles/SubjectDetail.styles';
 import { SubjectAIContextModal } from './SubjectAIContextModal';
 import { SubjectAIChatModal } from './SubjectAIChatModal';

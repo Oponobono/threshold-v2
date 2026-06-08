@@ -1,6 +1,5 @@
 import { getUserId } from './api';
 import { syncService } from './database';
-import { storageService } from './storageService';
 
 let _localIdCounter = -Date.now();
 
@@ -34,6 +33,7 @@ const LOCAL_DECKS_KEY = 'local:flashcard_decks';
 
 function getLocalDecksSync(): LocalDeck[] {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const raw = require('react-native-mmkv').createMMKV().getString(LOCAL_DECKS_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
@@ -43,6 +43,7 @@ function getLocalDecksSync(): LocalDeck[] {
 
 function saveLocalDecksSync(decks: LocalDeck[]): void {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('react-native-mmkv').createMMKV().set(LOCAL_DECKS_KEY, JSON.stringify(decks));
   } catch (e) {
     console.warn('[LocalFlashcard] Error saving local decks:', e);
@@ -107,6 +108,7 @@ export async function exportDeckToJSON(deckId: number): Promise<any> {
     const cardsKey = `cache:flashcards_by_deck:${deckId}`;
     let cards: any[] = [];
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const raw = require('react-native-mmkv').createMMKV().getString(cardsKey);
       if (raw) {
         const entry = JSON.parse(raw);
@@ -167,6 +169,7 @@ export async function prepareDeckForSync(deckId: number, userId: number): Promis
     const cardsKey = `cache:flashcards_by_deck:${deckId}`;
     let cards: any[] = [];
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const raw = require('react-native-mmkv').createMMKV().getString(cardsKey);
       if (raw) {
         const entry = JSON.parse(raw);
@@ -260,6 +263,7 @@ export function addLocalCard(deckId: number, card: Omit<LocalCard, 'id'>): void 
 
 export function deleteLocalCard(deckId: number, cardId: number): void {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mmkv = require('react-native-mmkv').createMMKV();
     const cardsKey = `cache:flashcards_by_deck:${deckId}`;
 
@@ -282,6 +286,7 @@ export function deleteLocalCard(deckId: number, cardId: number): void {
 
 export function updateLocalCard(deckId: number, cardId: number, updates: Partial<LocalCard>): void {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mmkv = require('react-native-mmkv').createMMKV();
     const cardsKey = `cache:flashcards_by_deck:${deckId}`;
 

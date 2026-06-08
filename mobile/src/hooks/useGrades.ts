@@ -73,9 +73,6 @@ export function useGrades(t: any) {
   const {
     averageGrade,
     projectedGrade: engineProjectedGrade,
-    securedPercent,
-    deliveredText,
-    thresholdStatus,
     delta: engineDelta,
   } = useSubjectGrades(filteredAssessments, selectedSubject, profile);
 

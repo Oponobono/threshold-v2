@@ -470,7 +470,7 @@ export const runBackup = async (
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: photo.id, subject_id: photo.subject_id, local_uri: photo.local_uri, es_favorita: photo.es_favorita, ocr_text: photo.ocr_text, group_id: photo.group_id, userId }),
             });
-          } catch (e) {
+          } catch (_e) {
             // Ignorar — el UPSERT en /backup/mark lo registrará al marcar
           }
         }
@@ -495,7 +495,7 @@ export const runBackup = async (
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: rec.id, user_id: Number(rec.user_id || userId), subject_id: rec.subject_id, name: rec.name, local_uri: rec.local_uri, duration: rec.duration }),
             });
-          } catch (e) {
+          } catch (_e) {
             // Ignorar
           }
         }
@@ -520,7 +520,7 @@ export const runBackup = async (
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
             });
-          } catch (e) {
+          } catch (_e) {
             // Ignorar
           }
         }

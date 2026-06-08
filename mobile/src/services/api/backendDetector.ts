@@ -13,8 +13,6 @@
  */
 
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
-import { storageService } from '../storageService';
 
 export interface BackendConfig {
   url: string;

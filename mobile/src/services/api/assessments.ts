@@ -1,7 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Assessment } from './types';
-import { assessmentRepository, syncService, subjectRepository } from '../database';
+import { assessmentRepository, syncService } from '../database';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();

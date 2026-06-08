@@ -41,12 +41,6 @@ export default function SubjectsScreen() {
     return g.subjects.length - approvedCount;
   }, [g.subjects, approvedCount]);
 
-  const semesterMessage = useMemo(() => {
-    if (g.criticalSubjects.length === 0) return t('subjects.semesterMessageGood');
-    if (g.criticalSubjects.length === 1) return t('subjects.semesterMessageRisk', { subject: g.criticalSubjects[0].name });
-    return t('subjects.semesterMessageMultipleRisk', { count: g.criticalSubjects.length });
-  }, [g.criticalSubjects, t]);
-
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <View style={styles.header}>

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
-import { globalStyles } from '../../styles/globalStyles';
+
 import { subjectsStyles } from '../../styles/Subjects.styles';
 import { normalizeGrade, SCALE_MAX } from '../../utils/grades';
 

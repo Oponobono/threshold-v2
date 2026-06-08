@@ -36,6 +36,7 @@ export const getDeviceId = async (): Promise<string> => {
  */
 export const trackGuestVisit = async () => {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { DEFAULT_LAN_IP } = require('../client');
     // En dispositivo físico, 127.0.0.1 apunta al propio celular y no al backend de la PC.
     if (Platform.OS !== 'web' && DEFAULT_LAN_IP === '127.0.0.1') {
@@ -54,7 +55,7 @@ export const trackGuestVisit = async () => {
 
     const data = await parseJsonSafely(response);
     return data;
-  } catch (error) {
+  } catch (_error) {
     return { skipped: true };
   }
 };

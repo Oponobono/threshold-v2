@@ -150,7 +150,7 @@ export default function HybridDashboardScreen() {
     } catch (err) {
       console.warn('Error loading dashboard data:', err);
     }
-  }, [loadAllData, preloadRelatedData]);
+  }, [loadAllData, preloadRelatedData, FOCUS_REFRESH_THROTTLE_MS]);
 
   // Handle pull-to-refresh: actualizar datos y predicciones
   const handleRefresh = useCallback(async () => {
@@ -262,7 +262,7 @@ export default function HybridDashboardScreen() {
     console.log('[Dashboard] Perfil cargado:', JSON.stringify(profile));
     console.log('[Dashboard] Nickname calculado:', finalNickname);
     return finalNickname;
-  }, [profile?.username, fullName, profile]);
+  }, [fullName, profile]);
 
   const greetingData = useMemo(() => {
     const hour = new Date().getHours();

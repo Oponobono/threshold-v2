@@ -86,7 +86,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         useNativeDriver: true,
       }).start();
     }
-  }, [visible, editing]);
+  }, [visible, editing, slideAnim]);
 
   // ── Save ────────────────────────────────────────────────────────────────────
   const handleSave = async () => {

@@ -134,7 +134,7 @@ export function useSubjectGrades(
     };
 
     loadProjection();
-  }, [selectedSubject?.id, assessments.length, isOnline]);
+  }, [selectedSubject?.id, assessments.length, isOnline, selectedSubject, profile, assessments]);
 
   const gradedAssessments = useMemo(() => {
     // Only include assessments with actual grades/scores

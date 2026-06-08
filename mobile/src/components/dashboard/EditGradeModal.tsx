@@ -146,7 +146,6 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
         normalized_valueType: typeof updatedAssessment?.normalized_value,
       });
 
-      const subjectName = Array.isArray(subjects) ? subjects.find(s => s.id === selectedSubjectId)?.name || '' : '';
       alertRef.show({ title: t('common.success'), message: t('assessments.updateSuccess'), type: 'success' });
       
       // Call callback with updated assessment ONLY if the backend returned a valid full object

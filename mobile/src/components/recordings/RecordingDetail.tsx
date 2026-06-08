@@ -7,13 +7,9 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  Alert,
   Modal,
   Dimensions,
   StatusBar,
-  Animated,
-  Pressable,
-  ActivityIndicator,
 } from 'react-native';
 import { alertRef } from '../ui/CustomAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -25,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../../styles/theme';
 import { detailStyles as styles } from '../../styles/RecordingDetailScreen.styles';
-import { RecordingAITabs, AITabType } from './RecordingAITabs';
+import { AITabType } from './RecordingAITabs';
 import { RecordingAIContent } from './RecordingAIContent';
 import { PremiumLoading } from '../ui/PremiumLoading';
 import { FlashcardCreatorModal } from '../flashcards/FlashcardCreatorModal';
@@ -43,7 +39,7 @@ import { AnimatedSubjectSelector } from '../animated/AnimatedSubjectSelector';
 import { WaveformBars } from '../audio/WaveformBars';
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 import { transcribeWithFallback, summarizeWithFallback } from '../../utils/groqHelpers';
-import { useLocalAIStore } from '../../store/useLocalAIStore';
+
 import { formatTranscription } from '../../utils/transcriptionFormatter';
 
 // ---------------------------------------------------------------------------
@@ -91,7 +87,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [activeTab, setActiveTab] = useState<AITabType>('transcription');
-  const [showTutorial, setShowTutorial] = useState(true);
+  const [, setShowTutorial] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   // Recording metadata
@@ -147,8 +143,6 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // ---------------------------------------------------------------------------
   // Load data
   // ---------------------------------------------------------------------------
-  useEffect(() => { loadInitialData(); }, [recordingId]);
-
   const loadInitialData = async () => {
     try {
       try { setSubjects(await getSubjects()); } catch (e) { console.warn('subjects:', e); }
@@ -226,6 +220,8 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       setIsLoading(false);
     }
   };
+
+  useEffect(() => { loadInitialData(); }, [recordingId, loadInitialData]);
 
   const loadPersistedTexts = async (fileKey: string, serverKey: string | null, rec: AudioRecording | null) => {
     const dir = TRANSCRIPTS_DIR();
@@ -328,7 +324,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       if (status.isLoaded) {
         await soundRef.current.setPositionAsync(Math.floor(value * (status.durationMillis ?? 0)));
       }
-    } catch (e) { /* ignore */ }
+      } catch (_e) { /* ignore */ }
   }, []);
 
   const togglePlayback = useCallback(async () => {
@@ -398,7 +394,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
           }
         }
       });
-    } catch (e) {
+    } catch (_e) {
       isToggling.current = false;
       setIsPlaying(false);
       alertRef.show({ title: t('common.error') || 'Error', message: t('recordings.errors.playbackFailed'), type: 'error' });
@@ -648,6 +644,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         <Modal visible={showStudyScreen} animationType="slide">
           <View style={{ flex: 1 }}>
             {(() => {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
               const { FlashcardStudyScreenStandalone } = require('../flashcards/FlashcardStudyScreenStandalone');
               return (
                 <FlashcardStudyScreenStandalone

@@ -1,7 +1,5 @@
-import { StyleSheet, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { theme } from './theme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const flashcardsScreenStyles = StyleSheet.create({
   container: {

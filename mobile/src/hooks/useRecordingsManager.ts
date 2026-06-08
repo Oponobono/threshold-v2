@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo } from '../services/api';
 import { useAudioRecorder } from './useAudioRecorder';
-import { SubjectSection, GridMediaItem } from '../components/recordings/RecordingsGrid';
+import { SubjectSection } from '../components/recordings/RecordingsGrid';
 import { youTubeRepository } from '../services/database';
 
 /**
@@ -38,7 +38,7 @@ export const useRecordingsManager = () => {
         setYouTubeVideos(cached);
         setIsLoadingVideos(false);
       }
-    } catch (_) {}
+    } catch (_e) {}
 
     // Fase 2: Refresh desde la red
     try {
@@ -132,7 +132,7 @@ export const useRecordingsManager = () => {
         deleteRecordingConfirmed(rec.id_string || rec.id || 0, rec.uri);
       }
     },
-    [youTubeVideos, recordings, deleteRecordingConfirmed, loadYouTubeVideos]
+    [youTubeVideos, recordings, deleteRecordingConfirmed, loadYouTubeVideos, t]
   );
 
   const sections: SubjectSection[] = useMemo(() => {

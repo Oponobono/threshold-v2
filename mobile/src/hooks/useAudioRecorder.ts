@@ -146,7 +146,6 @@ export function useAudioRecorder() {
   const [recordings, setRecordings] = useState<RecordingItem[]>([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [meteringDb, setMeteringDb] = useState<number>(-160);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const isPlayingRef = useRef(false);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -159,7 +158,6 @@ export function useAudioRecorder() {
       if (soundRef.current) {
         soundRef.current.unloadAsync().catch(() => {});
         soundRef.current = null;
-        setSound(null);
         setPlayingId(null);
       }
     };
@@ -406,7 +404,6 @@ export function useAudioRecorder() {
           console.warn('[useAudioRecorder] Error deteniendo audio anterior:', stopErr);
         }
         soundRef.current = null;
-        setSound(null);
         setPlayingId(null);
       }
 
@@ -454,7 +451,6 @@ export function useAudioRecorder() {
         }
       }
 
-      setSound(newSound);
       soundRef.current = newSound;
       playingUriRef.current = targetUri;
       setPlayingId(id);
@@ -462,7 +458,6 @@ export function useAudioRecorder() {
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
           setPlayingId(null);
-          setSound(null);
           soundRef.current = null;
           playingUriRef.current = null;
           isPlayingRef.current = false;
@@ -487,7 +482,6 @@ export function useAudioRecorder() {
       }
       soundRef.current = null;
       playingUriRef.current = null;
-      setSound(null);
       setPlayingId(null);
     }
     isPlayingRef.current = false;
@@ -578,7 +572,6 @@ export function useAudioRecorder() {
       }
       soundRef.current = null;
       playingUriRef.current = null;
-      setSound(null);
       setPlayingId(null);
     }
   }, []);

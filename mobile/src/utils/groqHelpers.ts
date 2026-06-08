@@ -136,11 +136,13 @@ const WHISPER_TINY_FILENAME = 'whisper-tiny.bin';
 async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
   let initWhisper: Function;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     initWhisper = require('whisper.rn').initWhisper;
   } catch {
     throw new Error('whisper.rn no está disponible. Instálalo o usa la transcripción en la nube.');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useLocalAIStore } = require('../store/useLocalAIStore');
   const store = useLocalAIStore.getState();
   const storedPath = store.downloadedModels['whisper'];
@@ -218,7 +220,7 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
     if (wavUri !== audioUri) {
       try {
         await FileSystem.deleteAsync(wavUri, { idempotent: true });
-      } catch (_) {}
+      } catch (_e) {}
     }
   }
 }

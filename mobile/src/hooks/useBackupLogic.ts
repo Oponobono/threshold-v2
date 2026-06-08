@@ -219,7 +219,7 @@ export const useBackupLogic = () => {
       setIsUploading(false);
       setUploadProgress(null);
     }
-  }, [isUploading, isDownloading, prefs.enabled, loadAll]);
+  }, [isUploading, isDownloading, prefs.enabled, loadAll, t]);
 
   // ─── Download manual ──────────────────────────────────────────────────────
 
@@ -279,7 +279,7 @@ export const useBackupLogic = () => {
       setIsDownloading(false);
       setDownloadProgress(null);
     }
-  }, [isDownloading, isUploading, prefs.enabled, loadAll]);
+  }, [isDownloading, isUploading, prefs.enabled, loadAll, t]);
 
   // ─── Backup programado ────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
-// eslint-disable-next-line import/no-unresolved
+ 
 import { initWhisper, WhisperContext } from 'whisper.rn';
 import { useTranslation } from 'react-i18next';
 
@@ -33,7 +33,6 @@ const MODEL_URLS = {
  * @returns `initContextIfNeeded` - Inicializa el contexto si el modelo ya existe pero no está cargado.
  */
 export function useWhisper() {
-  const { t } = useTranslation();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isTranscribing, setIsTranscribing] = useState(false);

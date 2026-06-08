@@ -123,6 +123,7 @@ export const updateFlashcardDeck = async (deckId: string, payload: any): Promise
 
 function getLocalCardsFromMMKV(deckId: string): any[] {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mmkv = require('react-native-mmkv').createMMKV();
     const raw = mmkv.getString(`cache:flashcards_by_deck:${deckId}`);
     if (raw) {

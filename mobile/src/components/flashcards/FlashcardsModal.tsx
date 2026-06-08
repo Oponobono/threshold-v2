@@ -24,13 +24,11 @@ import {
   type FlashcardDeck,
   type Flashcard,
   getFlashcardDecksWithMetrics,
-  getFlashcards,
   getFlashcardsPrioritized,
   getUserId,
   shareDeck,
   removeDeckFromGroup,
   deleteFlashcardDeck,
-  downloadReport,
 } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 import { getUserGroups, getGroupDecks } from '../../services/api/learning/groups';
@@ -66,7 +64,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const router = useRouter();
-  const { refreshPredictions, getDuedeckIds } = useDataStore();
+  const { getDuedeckIds } = useDataStore();
   const [screen, setScreen] = useState<Screen>('hub');
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
 

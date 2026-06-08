@@ -37,7 +37,7 @@ export async function initializeDatabase(): Promise<void> {
               return; 
             }
           }
-        } catch (e) {
+        } catch (_e) {
           console.log(`[SyncService] No se pudo resolver conflicto remoto (offline o error).`);
         }
       }

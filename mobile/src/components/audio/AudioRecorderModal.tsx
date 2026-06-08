@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, Modal, TouchableOpacity, Animated, FlatList, Easing, Pressable } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
@@ -71,14 +71,14 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ isVisibl
       duration: 80,
       useNativeDriver: false,
     }).start();
-  }, [meteringDb]);
+  }, [meteringDb, meterAnim]);
 
   // Reload recordings when modal becomes visible to sync with full screen
   useEffect(() => {
     if (isVisible) {
       loadRecordings();
     }
-  }, [isVisible]);
+  }, [isVisible, loadRecordings]);
 
   // Reload recordings right after a recording stops (transition: recording → stopped)
   const prevIsRecordingRef = React.useRef(isRecording);
@@ -88,40 +88,40 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ isVisibl
       setTimeout(() => loadRecordings(), 800);
     }
     prevIsRecordingRef.current = isRecording;
-  }, [isRecording]);
+  }, [isRecording, loadRecordings]);
 
   useEffect(() => {
+    const startPulse = () => {
+      pulseAnim.setValue(1);
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    const stopPulse = () => {
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
+    };
+
     if (isRecording && !isPaused) {
       startPulse();
     } else {
       stopPulse();
     }
-  }, [isRecording, isPaused]);
-
-  const startPulse = () => {
-    pulseAnim.setValue(1);
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 600,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 600,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  };
-
-  const stopPulse = () => {
-    pulseAnim.stopAnimation();
-    pulseAnim.setValue(1);
-  };
+  }, [isRecording, isPaused, pulseAnim]);
 
   const handleOpenFullList = () => {
     onClose();

@@ -18,7 +18,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   TextInput, Keyboard, Platform, StyleSheet,
   Animated, ActivityIndicator,
-} from 'react-native';
+ Image as RNImage } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getChatHistory, clearChatHistory, generateStudyMaterialFromChat } from '../../services/api/ai';
@@ -29,7 +29,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
 import { MarkdownWithCode } from '../ui/MarkdownWithCode';
-import { Image as RNImage } from 'react-native';
+
 import LottieView from 'lottie-react-native';
 import { useTranslation } from 'react-i18next';
 import { OfflineIndicator } from '../ui/OfflineIndicator';
@@ -543,7 +543,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [subjectId, userId, buildGenerationContext, showToast, closeGenPanel, genMode, genCount, subjectName]);
+  }, [subjectId, userId, buildGenerationContext, showToast, closeGenPanel, genMode, genCount, subjectName, t]);
 
   useEffect(() => {
     setLocalContextText(contextText);
@@ -786,7 +786,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       setStreamingContent(null);
       streamAccumulated.current = '';
     }
-  }, [inputText, isLoading, messages, localContextText, uploadedDocContext, sessionId, currentProvider, handleGenerateMaterial, showToast]);
+  }, [inputText, isLoading, messages, localContextText, uploadedDocContext, sessionId, currentProvider, handleGenerateMaterial, showToast, t]);
 
   /** Limpiar la conversación actual y crear una nueva */
   const handleClearHistory = useCallback(async () => {
@@ -891,7 +891,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     } finally {
       setIsUploadingDocument(false);
     }
-  }, [subjectId, showToast]);
+  }, [subjectId, showToast, t]);
 
   if (!isVisible) return null;
 
@@ -1195,7 +1195,6 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 };
 
 // ─── Render rules personalizados para Markdown (imágenes) ────────────────────
-const CHAT_BUBBLE_MAX_WIDTH = '78%';
 
 const ChatImage: React.FC<{ src: string; alt: string; onOpen: () => void }> = ({ src, alt, onOpen }) => {
   const [failed, setFailed] = useState(false);

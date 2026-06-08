@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { Text, Modal, Pressable, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';

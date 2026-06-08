@@ -48,14 +48,14 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     if (isVisible && permission && !permission.granted && permission.canAskAgain) {
       requestPermission();
     }
-  }, [isVisible, permission]);
+  }, [isVisible, permission, requestPermission]);
 
   // Si se otorga el permiso mientras el modal está abierto, forzamos un refresco para evitar pantalla negra
   useEffect(() => {
     if (permission?.granted && isVisible) {
       setCameraKey(prev => prev + 1);
     }
-  }, [permission?.granted]);
+  }, [permission?.granted, isVisible]);
 
   const takePicture = async () => {
     if (cameraRef.current) {
@@ -65,7 +65,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
         });
         setCapturedImages([...capturedImages, photo.uri]);
         setSelectedImageIndex(capturedImages.length);
-      } catch (err) {
+      } catch (_err) {
         showAlert({ title: t('common.error'), message: t('subjects.errorTakingPhoto') || 'Error', type: 'error' });
       }
     }
@@ -88,7 +88,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
         setCapturedImages(updatedImages);
         setSelectedImageIndex(updatedImages.length - 1);
       }
-    } catch (err) {
+    } catch (_err) {
       showAlert({ title: t('common.error'), message: t('common.error') || 'Error', type: 'error' });
     }
   };
@@ -152,7 +152,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
       } else {
         showAlert({ title: t('common.error'), message: t('dashboard.quickAddMenu.takePhoto.error') || 'Error', type: 'error' });
       }
-    } catch (error) {
+    } catch (_error) {
       showAlert({ title: t('common.error'), message: t('dashboard.quickAddMenu.takePhoto.error') || 'Error', type: 'error' });
     } finally {
       setIsProcessing(false);

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Animated } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, StatusBar, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
