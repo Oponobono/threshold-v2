@@ -26,7 +26,7 @@ const AUDIO_DIR = () => `${FileSystem.documentDirectory}Threshold/audio/`;
  * Reads all local .m4a files from the audio directory and returns them as
  * lightweight RecordingItems. This works even when the backend is offline.
  */
-async function readLocalFiles(t: (key: string, opts?: any) => string): Promise<RecordingItem[]> {
+const readLocalFiles = async (t: (key: string, opts?: any) => string): Promise<RecordingItem[]> => {
   const audioDir = AUDIO_DIR();
   const dirInfo = await FileSystem.getInfoAsync(audioDir);
   if (!dirInfo.exists) {
@@ -150,6 +150,7 @@ export function useAudioRecorder() {
   const isPlayingRef = useRef(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const playingUriRef = useRef<string | null>(null);
+  const isLoadingRecordingsRef = useRef(false);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -182,6 +183,8 @@ export function useAudioRecorder() {
    * 3. Orphan local files get synced to the DB silently.
    */
   const loadRecordings = useCallback(async () => {
+    if (isLoadingRecordingsRef.current) return;
+    isLoadingRecordingsRef.current = true;
     try {
       // Step 1: Show local files right away
       const localFiles = await readLocalFiles(t);
@@ -223,6 +226,8 @@ export function useAudioRecorder() {
       setRecordings(merged);
     } catch (err) {
       console.error('[useAudioRecorder] loadRecordings error:', err);
+    } finally {
+      isLoadingRecordingsRef.current = false;
     }
   }, [t]);
 

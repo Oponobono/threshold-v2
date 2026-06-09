@@ -20,6 +20,10 @@ export async function initializeDatabase(): Promise<void> {
         if (uid && !payload.userId) payload.userId = uid;
       }
 
+      // Special route overrides that embed entity_id in path
+      if (entity_type === 'card-review') path = `/flashcards/${entity_id}/review`;
+      if (entity_type === 'card-log') path = '/learning/card_logs';
+
       if (entity_id && operation !== 'CREATE') path += `/${entity_id}`;
 
       // Conflict Resolution: LWW (Last Write Wins) for UPDATE

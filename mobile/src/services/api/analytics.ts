@@ -74,6 +74,31 @@ export const recordCardReview = async (
   responseTimeMs: number
 ): Promise<CardReviewResponse> => {
   try {
+    // Local cards (negative IDs) - save pending review to MMKV instead of API
+    const numericId = Number(cardId);
+    if (!isNaN(numericId) && numericId < 0) {
+      const { queuePendingReview } = await import('../localFlashcardService');
+      await queuePendingReview({
+        cardId: numericId,
+        grade: result === 'correct' ? 4 : 1,
+        status: result === 'correct' ? 'review' : 'learning',
+        stability: 0,
+        difficulty: 0,
+      });
+      return {
+        success: true,
+        cardId,
+        quality: result === 'correct' ? 4 : 1,
+        nextReviewDate: new Date(Date.now() + 86400000).toISOString(),
+        newStability: 0,
+        newDifficulty: 0,
+        newRepetitions: 1,
+        retention: 0.9,
+        message: 'Revisión guardada localmente como pendiente',
+        _isPending: true,
+      } as CardReviewResponse & { _isPending?: boolean };
+    }
+
     const response = await fetchWithFallback(`/flashcards/${cardId}/review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -350,10 +375,24 @@ export interface MasteryRadarData {
 
 /**
  * Obtiene el análisis de dominio (mastery) para un usuario/materia
- * GET /api/analytics/mastery/:userId/:subjectId
+ * Offline-first: calcula localmente desde SQLite + MMKV, API como fallback
  */
 export const getMasteryAnalytics = async (userId: string, subjectId: string | 'all'): Promise<MasteryRadarData> => {
   const CACHE_KEY = `app:cache:mastery_${userId}_${subjectId}`;
+
+  // 1. Calcular localmente (SQLite card_logs + MMKV pending reviews)
+  try {
+    const { getLocalMasteryData } = await import('../localMasteryService');
+    const localData = await getLocalMasteryData(userId, subjectId);
+    if (localData.radar.length > 0) {
+      await storageService.saveLocal(CACHE_KEY, JSON.stringify(localData));
+      return localData;
+    }
+  } catch (err) {
+    console.warn('[Analytics] Local mastery calculation failed:', err);
+  }
+
+  // 2. Fallback a API (para cuando el backend tenga métricas)
   try {
     const response = await fetchWithFallback(`/analytics/mastery/${userId}/${subjectId}`, {
       method: 'GET',
@@ -361,19 +400,28 @@ export const getMasteryAnalytics = async (userId: string, subjectId: string | 'a
     });
     if (!response.ok) throw new Error('Error al obtener analytics de dominio');
     const data = await parseJsonSafely(response);
-    if (data) {
+    if (data && data.radar && data.radar.length > 0) {
       await storageService.saveLocal(CACHE_KEY, JSON.stringify(data));
+      return data;
     }
-    return data;
   } catch (error) {
     console.warn('[Analytics] Network error, falling back to cached mastery:', error);
-    const cached = await storageService.getLocal(CACHE_KEY);
-    if (cached) {
-      console.log('[Analytics] Loaded mastery from cache (offline mode)');
-      return JSON.parse(cached) as MasteryRadarData;
-    }
-    throw error;
   }
+
+  // 3. Último recurso: cache
+  const cached = await storageService.getLocal(CACHE_KEY);
+  if (cached) {
+    console.log('[Analytics] Loaded mastery from cache');
+    return JSON.parse(cached) as MasteryRadarData;
+  }
+
+  return {
+    radar: [],
+    averageMastery: 0,
+    strongestArea: null,
+    weakestArea: null,
+    recommendation: 'Aún no hay suficientes datos de dominio. Crea y practica flashcards para generar analytics.',
+  };
 };
 
 /**

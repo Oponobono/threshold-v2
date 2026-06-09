@@ -30,5 +30,13 @@
   "classAlertTitle": "📚 Class soon",
   "classAlertBody": "\"{{name}}\" starts in {{minutes}} minutes",
   "urgentReviewTitle": "🔬 Cards pending",
-  "urgentReviewBody": "You have {{count}} deck(s) with cards to review"
+  "urgentReviewBody": "You have {{count}} deck(s) with cards to review",
+  "backupProgressTitle": "⬆️ Backup in progress",
+  "backupProgressBody": "{{current}} / {{total}} items backed up",
+  "backupComplete": "✅ Backup complete",
+  "backupFailed": "❌ Backup failed",
+  "downloadProgressTitle": "⬇️ Download in progress",
+  "downloadProgressBody": "{{current}} / {{total}} items downloaded",
+  "downloadComplete": "✅ Download complete",
+  "downloadFailed": "❌ Download failed"
 }

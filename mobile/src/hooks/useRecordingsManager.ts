@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo } from '../services/api';
 import { useAudioRecorder } from './useAudioRecorder';
@@ -21,6 +21,8 @@ export const useRecordingsManager = () => {
   const [youTubeVideos, setYouTubeVideos] = useState<YouTubeVideo[]>([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [isAddingYouTubeVideo, setIsAddingYouTubeVideo] = useState(false);
+  const isLoadingVideosRef = useRef(false);
+  const isAddingYouTubeRef = useRef(false);
 
   // ── Search & filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +31,8 @@ export const useRecordingsManager = () => {
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
   const loadYouTubeVideos = useCallback(async () => {
+    if (isLoadingVideosRef.current) return;
+    isLoadingVideosRef.current = true;
     setIsLoadingVideos(true);
 
     // Fase 1: Cache-first — mostrar datos instantáneos desde SQLite
@@ -42,7 +46,14 @@ export const useRecordingsManager = () => {
 
     // Fase 2: Refresh desde la red
     try {
-      const videos = await getYouTubeVideos();
+      let videos = await getYouTubeVideos();
+      // Dedup by video_id (keep first occurrence)
+      const seen = new Set();
+      videos = videos.filter((r: any) => {
+        if (seen.has(r.video_id)) return false;
+        seen.add(r.video_id);
+        return true;
+      });
       setYouTubeVideos(videos);
       console.log(`[useRecordingsManager] ✅ Cargados ${videos.length} videos de YouTube`);
     } catch (e) {
@@ -57,10 +68,13 @@ export const useRecordingsManager = () => {
       }
     } finally {
       setIsLoadingVideos(false);
+      isLoadingVideosRef.current = false;
     }
   }, []);
 
   const handleAddYoutube = async (youtubeUrl: string) => {
+    if (isAddingYouTubeRef.current) return;
+    isAddingYouTubeRef.current = true;
     const trimmedUrl = youtubeUrl.trim();
     if (!trimmedUrl) throw new Error(t('recordings.youtubeUrlRequired'));
     if (!trimmedUrl.includes('youtube.com') && !trimmedUrl.includes('youtu.be')) {
@@ -78,6 +92,17 @@ export const useRecordingsManager = () => {
 
       if (!videoId || videoId.length < 10) {
         throw new Error(t('recordings.invalidVideoId'));
+      }
+
+      // Check if video_id already exists to prevent duplicates
+      const existing = await new Promise((resolve) => {
+        db.get('SELECT id FROM youtube_videos WHERE video_id = ?', [videoId], (err, row) => {
+          resolve(row);
+        });
+      });
+      if (existing) {
+        console.log('[useRecordingsManager] YouTube video already exists, skipping:', videoId);
+        return;
       }
 
       let videoTitle = t('recordings.defaultVideoTitle');
@@ -105,6 +130,7 @@ export const useRecordingsManager = () => {
       await loadYouTubeVideos();
     } finally {
       setIsAddingYouTubeVideo(false);
+      isAddingYouTubeRef.current = false;
     }
   };
 

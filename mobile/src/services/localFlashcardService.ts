@@ -284,7 +284,16 @@ export function deleteLocalCard(deckId: number, cardId: number): void {
   }
 }
 
-export function updateLocalCard(deckId: number, cardId: number, updates: Partial<LocalCard>): void {
+export function updateLocalCard(
+  deckId: number,
+  cardId: number,
+  updates: Partial<LocalCard>,
+  status?: string,
+  fsrs_stability?: number,
+  fsrs_difficulty?: number,
+  fsrs_repetitions?: number,
+  next_review_date?: string,
+): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mmkv = require('react-native-mmkv').createMMKV();
@@ -304,11 +313,19 @@ export function updateLocalCard(deckId: number, cardId: number, updates: Partial
       throw new Error(`Tarjeta ${cardId} no encontrada`);
     }
 
+    const fsrsUpdates: Record<string, any> = {};
+    if (status !== undefined) fsrsUpdates.status = status;
+    if (fsrs_stability !== undefined) fsrsUpdates.fsrs_stability = fsrs_stability;
+    if (fsrs_difficulty !== undefined) fsrsUpdates.fsrs_difficulty = fsrs_difficulty;
+    if (fsrs_repetitions !== undefined) fsrsUpdates.fsrs_repetitions = fsrs_repetitions;
+    if (next_review_date !== undefined) fsrsUpdates.next_review_date = next_review_date;
+
     cards[idx] = {
       ...cards[idx],
       ...(updates.data && { content: updates.data, ...(updates.data?.front && { front: updates.data.front }), ...(updates.data?.back && { back: updates.data.back }) }),
       ...(updates.hint !== undefined && { hint: updates.hint }),
       ...(updates.explanation !== undefined && { explanation: updates.explanation }),
+      ...fsrsUpdates,
     };
 
     mmkv.set(cardsKey, JSON.stringify({ data: cards, timestamp: Date.now() }));
@@ -316,4 +333,26 @@ export function updateLocalCard(deckId: number, cardId: number, updates: Partial
     console.error('[LocalFlashcard] Error updating card:', error);
     throw error;
   }
+}
+
+export function queuePendingReview(review: { cardId: number; grade: number; status: string; stability: number; difficulty: number }): void {
+  const key = 'local_pending_reviews';
+  const mmkv = require('react-native-mmkv').createMMKV();
+  const existing = mmkv.getString(key);
+  const reviews = existing ? JSON.parse(existing) : [];
+  reviews.push(review);
+  mmkv.set(key, JSON.stringify(reviews));
+}
+
+export function getPendingReviews(): Array<{ cardId: number; grade: number; status: string; stability: number; difficulty: number }> {
+  const key = 'local_pending_reviews';
+  const mmkv = require('react-native-mmkv').createMMKV();
+  const existing = mmkv.getString(key);
+  return existing ? JSON.parse(existing) : [];
+}
+
+export function clearPendingReviews(): void {
+  const key = 'local_pending_reviews';
+  const mmkv = require('react-native-mmkv').createMMKV();
+  mmkv.delete(key);
 }

@@ -685,7 +685,11 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       if (data?.context_truncated) setIsTruncated(true);
 
       let replyContent: string = data?.reply?.content || t('subjects.couldNotProcess');
-      const cleanReply = replyContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim() || replyContent;
+      let cleanReply = replyContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim() || replyContent;
+      // Strip markdown images from AI response
+      cleanReply = cleanReply.replace(/!\[.*?\]\(.*?\)/g, '');
+      // Strip stray DECK_ACTION markers without valid JSON
+      cleanReply = cleanReply.replace(/%%DECK_ACTION%%(?!\{)/g, '');
 
       console.log('[AIChatModal] 📥 Respuesta recibida del backend:', {
         hasData: !!data,

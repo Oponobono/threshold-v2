@@ -45,29 +45,46 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId, o
     );
   }
 
-  // Prepara datos para Victory
-  // Agregamos un punto dummy si solo hay uno para poder graficar algo
-  let chartData = masteryData.radar.map((item: any) => ({
-    x: item.name,
-    y: item.value,
-  }));
+  // Prepara datos para Victory sanitizando valores inválidos
+  const avg = typeof masteryData.averageMastery === 'number' && !isNaN(masteryData.averageMastery) ? masteryData.averageMastery : 0;
 
-  if (chartData.length === 1) {
-    chartData.push({ x: 'Dummy', y: 0 });
-    chartData.push({ x: 'Dummy2', y: 0 });
-  } else if (chartData.length === 2) {
-    chartData.push({ x: 'Dummy', y: 0 });
+  let chartData = masteryData.radar
+    .filter((item: any) => typeof item.value === 'number' && !isNaN(item.value))
+    .map((item: any) => ({
+      x: item.name,
+      y: item.value,
+    }));
+
+  if (chartData.length === 0) {
+    return (
+      <View style={{ padding: 20, alignItems: 'center' }}>
+        <Text style={{ color: theme.colors.text.secondary }}>{t('analytics.noMasteryData', 'No hay datos suficientes para mostrar el dominio.')}</Text>
+      </View>
+    );
+  }
+
+  // Si todos los valores son 0, Victory calcula dominio [0,0] → 0/0 = NaN → crash SVG
+  if (chartData.every((d: any) => d.y === 0)) {
+    return (
+      <View style={{ padding: 20, alignItems: 'center' }}>
+        <Text style={{ color: theme.colors.text.secondary }}>{t('analytics.noMasteryData', 'No hay datos suficientes para mostrar el dominio.')}</Text>
+      </View>
+    );
+  }
+
+  while (chartData.length < 3) {
+    chartData.push({ x: '', y: 0 });
   }
 
   return (
     <View style={{ alignItems: 'center' }}>
       <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={{ width: '100%', alignItems: 'center' }}>
-      <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.text.primary, marginBottom: 8 }}>
-        {t('analytics.totalMastery', 'Dominio Total:')} {Math.round(masteryData.averageMastery)}%
+      <Text style={{ fontSize: theme.typography.sizes.md, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 8 }}>
+        {t('analytics.totalMastery', 'Dominio Total:')} {Math.round(avg)}%
       </Text>
 
       <View pointerEvents="none">
-        <VictoryChart polar theme={VictoryTheme.material} height={250} padding={30}>
+        <VictoryChart polar domain={{ y: [0, 100] }} theme={VictoryTheme.material} height={250} padding={30}>
           <VictoryPolarAxis 
             style={{ 
               axis: { stroke: "none" }, 
@@ -93,19 +110,19 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId, o
       </View>
 
       {masteryData.strongestArea && (
-        <Text style={{ fontSize: 13, color: theme.colors.text.primary, marginTop: 4 }}>
+        <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.primary, marginTop: 4 }}>
           💪 <Text style={{ fontWeight: 'bold' }}>{t('analytics.strength', 'Fortaleza:')}</Text> {masteryData.strongestArea.name} ({Math.round(masteryData.strongestArea.value)}%)
         </Text>
       )}
       
       {masteryData.weakestArea && (
-        <Text style={{ fontSize: 13, color: theme.colors.text.primary, marginTop: 4 }}>
+        <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.primary, marginTop: 4 }}>
           📚 <Text style={{ fontWeight: 'bold' }}>{t('analytics.needsAttention', 'Necesita atención:')}</Text> {masteryData.weakestArea.name} ({Math.round(masteryData.weakestArea.value)}%)
         </Text>
       )}
 
       {masteryData.recommendation && (
-        <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 12, textAlign: 'center', paddingHorizontal: 20, fontStyle: 'italic' }}>
+        <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, marginTop: 12, textAlign: 'center', paddingHorizontal: 20, fontStyle: 'italic' }}>
           {'"'}{masteryData.recommendation}{'"'}
         </Text>
       )}

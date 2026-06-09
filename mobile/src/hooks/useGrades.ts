@@ -172,9 +172,12 @@ export function useGrades(t: any) {
     return points.slice(-10);
   }, [gradedAssessments]);
 
-  const trendSeries = projectedGpa
+  const sanitize = (v: number) => isFinite(v) ? v : 0;
+
+  const trendSeries = (projectedGpa
     ? [...historicalGpas, Number(projectedGpa)]
-    : [...historicalGpas, parseFloat(displayProjectedGPA) || 0];
+    : [...historicalGpas, parseFloat(displayProjectedGPA) || 0]
+  ).map(sanitize);
 
   const handleDownloadReport = async () => {
     const uid = await getUserId();

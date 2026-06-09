@@ -29,6 +29,12 @@ export const getCardLogs = async (): Promise<CardLog[]> => {
 };
 
 export const createCardLog = async (logData: Omit<CardLog, 'id' | 'timestamp' | 'user_id'>): Promise<any> => {
+  // Local cards (negative IDs) - skip server log
+  const cardIdNum = Number(logData.card_id);
+  if (!isNaN(cardIdNum) && cardIdNum < 0) {
+    return;
+  }
+
   const { uuidv4 } = await import('../../../utils/uuid');
   const id = uuidv4();
   const userId = await getUserId();

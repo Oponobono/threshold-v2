@@ -176,13 +176,27 @@ exports.markAsBackedUp = (req, res) => {
 
   if (type === 'transcript') {
     const table = transcript_type === 'youtube' ? 'youtube_transcripts' : 'audio_transcripts';
+    const idColumn = transcript_type === 'youtube' ? 'video_id' : 'recording_id';
     db.run(
-      `UPDATE ${table} SET cloud_url = ?, is_backed_up = 1 WHERE id = ?`,
+      `UPDATE ${table} SET cloud_url = ?, is_backed_up = 1 WHERE ${idColumn} = ?`,
       [cloud_url, id],
       function (err) {
         if (err) { console.error('[Backup] Error al marcar transcripción:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar transcripción.' }); }
-        // Para transcripciones, 0 changes no es error crítico — se ignora
-        res.json({ ok: true });
+        if (this.changes > 0) return res.json({ ok: true });
+
+        // 0 changes → insert fallback para transcripciones creadas offline
+        db.run(
+          `INSERT INTO ${table} (${idColumn}, cloud_url, is_backed_up) VALUES (?, ?, 1)
+           ON CONFLICT(${idColumn}) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+          [id, cloud_url],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[Backup] Error al insertar transcripción offline:', insertErr.message, insertErr.code, insertErr.stack);
+              return res.status(500).json({ error: 'Error al registrar transcripción offline.', details: insertErr.message });
+            }
+            res.json({ ok: true, inserted: true });
+          }
+        );
       }
     );
     return;
@@ -208,7 +222,7 @@ exports.markAsBackedUp = (req, res) => {
           [id, resolvedSubjectId, cloud_url],
           function (insertErr) {
             if (insertErr) {
-              console.error('[Backup] Error al insertar foto offline:', insertErr.message);
+              console.error('[Backup] Error al insertar foto offline:', insertErr.message, insertErr.code, insertErr.stack);
               return res.status(500).json({ error: 'Error al registrar foto offline.', details: insertErr.message });
             }
             res.json({ ok: true, inserted: true });
@@ -247,7 +261,7 @@ exports.markAsBackedUp = (req, res) => {
           [id, userId, resolvedSubjectId, resolvedName, cloud_url],
           function (insertErr) {
             if (insertErr) {
-              console.error('[Backup] Error al insertar audio offline:', insertErr.message);
+              console.error('[Backup] Error al insertar audio offline:', insertErr.message, insertErr.code, insertErr.stack);
               return res.status(500).json({ error: 'Error al registrar audio offline.', details: insertErr.message });
             }
             res.json({ ok: true, inserted: true });
@@ -261,7 +275,7 @@ exports.markAsBackedUp = (req, res) => {
           [id, userId, resolvedSubjectId, resolvedName, cloud_url],
           function (insertErr) {
             if (insertErr) {
-              console.error('[Backup] Error al insertar documento offline:', insertErr.message);
+              console.error('[Backup] Error al insertar documento offline:', insertErr.message, insertErr.code, insertErr.stack);
               return res.status(500).json({ error: 'Error al registrar documento offline.', details: insertErr.message });
             }
             res.json({ ok: true, inserted: true });

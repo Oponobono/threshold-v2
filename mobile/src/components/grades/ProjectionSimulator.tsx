@@ -90,7 +90,7 @@ export const ProjectionSimulator: React.FC<ProjectionSimulatorProps> = ({
                 return `${startIndex + i + 1}`;
               }),
               datasets: [{
-                data: trendSeries,
+                data: trendSeries.map((v: number) => isFinite(v) ? v : 0),
                 color: () => theme.colors.text.primary,
                 strokeWidth: 2.8,
               }],

@@ -47,23 +47,43 @@ export const autoUploadIfEnabled = async (
     const result = await uploadFileToUploadthing(localUri, filename, mimeType);
     console.log(`[BackupService] ÉXITO: Archivo subido a la nube. URL: ${result.url}`);
 
-    // Marcar como respaldado en el backend
-    await fetchWithFallback('/backup/mark', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type,
-        id: itemId,
-        cloud_url: result.url,
-        ...(transcriptType ? { transcript_type: transcriptType } : {}),
-      }),
-    });
+    // Marcar como respaldado en el backend (no propagamos error)
+    try {
+      await fetchWithFallback('/backup/mark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          id: itemId,
+          cloud_url: result.url,
+          ...(transcriptType ? { transcript_type: transcriptType } : {}),
+        }),
+      });
+    } catch (markErr) {
+      console.warn(`[BackupService] ⚠️ Backend no pudo marcar ${type} ${itemId}:`, markErr);
+    }
 
-    console.log(`[BackupService] ÉXITO: Registro marcado en BD como respaldado.`);
+    // Siempre marcar localmente para evitar re-subidas infinitas aunque falle el backend
+    const db = databaseService.getDb();
+    const tableName =
+      type === 'photo' ? 'photos'
+      : type === 'audio' ? 'audio_recordings'
+      : type === 'document' ? 'scanned_documents'
+      : transcriptType === 'youtube' ? 'youtube_videos'
+      : 'audio_recordings';
+    try {
+      await db.runAsync(
+        `UPDATE ${tableName} SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+        [result.url, itemId]
+      );
+    } catch (dbErr) {
+      console.warn(`[BackupService] No se pudo marcar localmente ${type} ${itemId}:`, dbErr);
+    }
+
+    console.log(`[BackupService] ÉXITO: ${type} ${itemId} respaldado.`);
     return result.url;
   } catch (err) {
-    // No propagamos el error — el archivo local ya fue guardado exitosamente
-    console.error(`[BackupService] ERROR: Fallo al subir o marcar archivo en la nube:`, err);
+    console.error(`[BackupService] ERROR: Fallo al subir archivo a la nube:`, err);
     console.warn('[BackupService] Auto-subida fallida, se respaldará en el próximo backup manual.');
     return null;
   }
@@ -780,4 +800,69 @@ export const runBackup = async (
   await storageService.saveSecure(BACKUP_PREFS.LAST_RUN, new Date().toISOString());
 
   return { success: errors === 0, uploaded, errors };
+};
+
+// ─── Sync local flashcards to backend ─────────────────────────────────────────
+
+export const syncLocalFlashcardsToBackend = async (): Promise<void> => {
+  try {
+    const { default: mmkv } = await import('react-native-mmkv');
+    const storage = mmkv.createMMKV();
+    const { getLocalDecks, deleteLocalDeck } = await import('../localFlashcardService');
+    const { createFlashcardDeck } = await import('../api/flashcards');
+
+    const localDecks = getLocalDecks().filter((d: any) => d._local);
+    if (localDecks.length === 0) {
+      console.log('[BackupService] No hay mazos locales para sincronizar.');
+      return;
+    }
+
+    console.log(`[BackupService] Sincronizando ${localDecks.length} mazo(s) local(es) al backend...`);
+
+    for (const deck of localDecks) {
+      try {
+        const createdDeck = await createFlashcardDeck({
+          id: String(deck.id),
+          title: deck.title,
+          description: deck.description,
+          subject_id: deck.subject_id ? String(deck.subject_id) : undefined,
+        });
+        console.log(`[BackupService] Mazo ${deck.id} sincronizado. Nuevo ID remoto: ${createdDeck?.id}`);
+
+        // Leer cards locales desde MMKV
+        const cardsKey = `cache:flashcards_by_deck:${deck.id}`;
+        const raw = storage.getString(cardsKey);
+        let cards: any[] = [];
+        if (raw) {
+          const entry = JSON.parse(raw);
+          cards = entry.data || entry || [];
+        }
+
+        const { createFlashcard } = await import('../api/flashcards');
+        for (const card of cards) {
+          try {
+            await createFlashcard({
+              deck_id: String(createdDeck?.id || deck.id),
+              front: card.front || card.content?.front || '',
+              back: card.back || card.content?.back || '',
+              id: String(card.id),
+            });
+          } catch (cardErr) {
+            console.warn(`[BackupService] Error sincronizando card ${card.id}:`, cardErr);
+          }
+        }
+
+        // Eliminar copia local tras sincronización exitosa
+        deleteLocalDeck(String(deck.id));
+        storage.delete(cardsKey);
+        console.log(`[BackupService] Mazo local ${deck.id} eliminado.`);
+      } catch (deckErr) {
+        console.warn(`[BackupService] Error sincronizando mazo ${deck.id}:`, deckErr);
+      }
+    }
+
+    console.log('[BackupService] Sincronización de mazos locales completada.');
+  } catch (err) {
+    console.error('[BackupService] Error en syncLocalFlashcardsToBackend:', err);
+  }
 };

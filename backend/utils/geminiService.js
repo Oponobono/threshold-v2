@@ -543,6 +543,7 @@ async function generateFlashcardsFromText(contextText, count = 10) {
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
       safetySettings: SAFETY_SETTINGS,
+      generationConfig: { temperature: 0.15 },
     });
 
     // Auto-detectar disciplina y usar prompt especializado
@@ -645,7 +646,7 @@ async function generateFlashcardsWithGroq(contextText, count = 10) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Contexto académico:\n${trimmedContext}` },
         ],
-        temperature: 0.5,
+        temperature: 0.2,
         max_tokens: 4096,
       }),
     });

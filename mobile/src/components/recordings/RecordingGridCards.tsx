@@ -9,7 +9,7 @@ import { AnimatedWaveform } from '../animated/AnimatedWaveform';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = 200;
-const MEDIUM_SIZE = (SCREEN_WIDTH - 20 * 2 - 8) / 2; // two columns with gap
+const MEDIUM_SIZE = (SCREEN_WIDTH - theme.spacing.lg * 2 - 8) / 2; // two columns with gap
 const RADIUS = 24;
 
 /**

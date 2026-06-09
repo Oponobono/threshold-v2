@@ -220,6 +220,12 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
       }
     } catch {}
 
+    // Persist local card review to MMKV
+    if (typeof item.id === 'number' && item.id < 0 && activeDeck?.id) {
+      const { updateLocalCard } = await import('../../services/localFlashcardService');
+      updateLocalCard(Number(activeDeck.id), item.id, {}, newStatus);
+    }
+
     setIsProcessing(false); // Marcar fin de procesamiento
 
   }, [isAnswered, isProcessing, isRevealed, items, itemIndex, cardStartTime, currentUserId]);

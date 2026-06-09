@@ -146,6 +146,23 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
     try {
       const data = await getFlashcardDecksWithMetrics();
       setDecks(data || []);
+
+      // Merge local MMKV decks
+      const { getLocalDecks } = await import('../../services/localFlashcardService');
+      const localDecks = getLocalDecks();
+      if (localDecks.length > 0) {
+        setDecks(prev => {
+          const seen = new Set(prev.map(d => d.id));
+          const merged = [...prev];
+          for (const ld of localDecks) {
+            if (!seen.has(ld.id)) {
+              seen.add(ld.id);
+              merged.push(ld as any);
+            }
+          }
+          return merged;
+        });
+      }
     } catch (e) {
       console.warn('Error loading decks:', e);
     }
