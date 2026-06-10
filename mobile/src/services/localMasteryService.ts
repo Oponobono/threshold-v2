@@ -58,12 +58,11 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
   }
 
   // 2. Obtener decks de SQLite + MMKV, mapear deck_id → subject_id
-  const sqliteDecks = await db.getAllAsync(
-    subjectId === 'all'
-      ? 'SELECT id, subject_id FROM flashcard_decks WHERE user_id = ?'
-      : 'SELECT id, subject_id FROM flashcard_decks WHERE user_id = ? AND subject_id = ?',
-    subjectId === 'all' ? [userId] : [userId, subjectId]
-  ) as any[];
+  const deckQuery = subjectId === 'all'
+    ? 'SELECT id, subject_id FROM flashcard_decks WHERE user_id = ?'
+    : 'SELECT id, subject_id FROM flashcard_decks WHERE user_id = ? AND subject_id = ?';
+  const deckParams: any[] = subjectId === 'all' ? [userId] : [userId, subjectId];
+  const sqliteDecks = await db.getAllAsync(deckQuery, ...deckParams) as any[];
 
   const localDecks = getLocalDecks();
   const deckToSubject: Record<string, string | null> = {};
