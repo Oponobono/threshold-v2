@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const bcrypt = require('bcrypt');
+const { computeUserGPA } = require('./analyticsController');
 
 /**
  * Obtener sesiones de estudio de un usuario
@@ -324,4 +325,61 @@ exports.leaveGroup = (req, res) => {
     if (this.changes === 0) return res.status(404).json({ error: 'No se encontró la membresía del grupo.' });
     res.json({ message: 'Has salido del grupo exitosamente.' });
   });
+};
+
+/**
+ * GET /learning/groups/:groupPinId/leaderboard
+ * 
+ * Obtiene el ranking de GPA de los miembros de un grupo.
+ */
+exports.getGroupLeaderboard = async (req, res) => {
+  const { groupPinId } = req.params;
+
+  if (!groupPinId) {
+    return res.status(400).json({ error: 'Se requiere groupPinId' });
+  }
+
+  try {
+    // Obtener todos los miembros del grupo
+    db.all(
+      `SELECT gm.user_id, u.username, u.display_name, u.profile_image
+       FROM group_memberships gm
+       JOIN users u ON gm.user_id = u.id
+       WHERE gm.group_pin_id = ?`,
+      [groupPinId],
+      async (err, members) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        if (!members || members.length === 0) {
+          return res.json({ leaderboard: [] });
+        }
+
+        try {
+          const results = await Promise.all(
+            members.map(async (member) => {
+              const gpa = await computeUserGPA(member.user_id);
+              return {
+                userId: member.user_id,
+                username: member.username,
+                displayName: member.display_name,
+                profileImage: member.profile_image,
+                gpa: gpa.currentAverage,
+                assessmentCount: gpa.assessmentCount,
+                subjectCount: gpa.subjectCount,
+              };
+            })
+          );
+
+          results.sort((a, b) => b.gpa - a.gpa);
+          res.json({ leaderboard: results });
+        } catch (calcErr) {
+          console.error(`[getGroupLeaderboard] Error al calcular GPA: ${calcErr.message}`);
+          res.status(500).json({ error: `Error al calcular GPAs: ${calcErr.message}` });
+        }
+      }
+    );
+  } catch (err) {
+    console.error(`[getGroupLeaderboard] Unexpected error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
 };

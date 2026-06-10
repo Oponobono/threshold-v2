@@ -83,6 +83,26 @@ export const getGroupDecks = async (groupPinId: string): Promise<any[]> => {
   }
 };
 
+export interface LeaderboardEntry {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  profileImage: string | null;
+  gpa: number;
+  assessmentCount: number;
+  subjectCount: number;
+}
+
+export const getGroupLeaderboard = async (groupPinId: string): Promise<LeaderboardEntry[]> => {
+  try {
+    const response = await fetchWithFallback(`/learning/groups/${groupPinId}/leaderboard`);
+    const data = await parseJsonSafely(response);
+    return data?.leaderboard || [];
+  } catch {
+    return [];
+  }
+};
+
 export const createGroup = async (params: CreateGroupParams): Promise<any> => {
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');

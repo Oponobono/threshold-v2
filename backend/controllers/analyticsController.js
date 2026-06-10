@@ -4,6 +4,94 @@ const AcademicWorkflowEngine = require('../services/academicWorkflowEngine');
 const gradingEngine = require('../services/gradingEngine');
 
 /**
+ * Calcula el GPA de un usuario a partir de sus assessments
+ * Retorna: { currentAverage, projectedGrade, delta, evaluatedWeight, remainingWeight, assessmentCount, subjectCount }
+ */
+function computeUserGPA(userId) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT 
+         a.id, a.subject_id, a.grade_value, a.score, a.out_of,
+         a.percentage, a.weight, a.date,
+         ar.normalized_value, ar.raw_value as original_raw_value
+       FROM assessments a
+       LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+       LEFT JOIN subjects s ON a.subject_id = s.id
+       WHERE s.user_id = ?
+       AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR ar.raw_value IS NOT NULL OR ar.normalized_value IS NOT NULL)
+       ORDER BY a.date ASC`,
+      [userId],
+      (err, assessments) => {
+        if (err) return reject(err);
+
+        if (!assessments || assessments.length === 0) {
+          return resolve({ currentAverage: 0, projectedGrade: 0, delta: 0, evaluatedWeight: 0, remainingWeight: 100, assessmentCount: 0, subjectCount: 0 });
+        }
+
+        try {
+          let totalWeightedGrade = 0;
+          let totalWeight = 0;
+          const subjects = new Set();
+          const validAssessments = [];
+
+          assessments.forEach(a => {
+            if (a.subject_id) subjects.add(a.subject_id);
+
+            let normalized = 0;
+            if (typeof a.normalized_value === 'number') {
+              normalized = a.normalized_value;
+            } else if (typeof a.original_raw_value === 'number') {
+              normalized = a.original_raw_value / 5;
+            } else if (typeof a.grade_value === 'number' && a.grade_value <= 5) {
+              normalized = a.grade_value / 5;
+            } else if (typeof a.score === 'number' && typeof a.out_of === 'number' && a.out_of > 0) {
+              normalized = a.score / a.out_of;
+            }
+
+            let weight = 1;
+            if (typeof a.percentage === 'number') {
+              weight = a.percentage;
+            } else if (typeof a.weight === 'string') {
+              const parsed = parseFloat(a.weight);
+              weight = !isNaN(parsed) ? Math.min(parsed, 100) : 1;
+            } else if (typeof a.weight === 'number') {
+              weight = a.weight;
+            }
+
+            const gradeOutOf5 = normalized * 5;
+            totalWeightedGrade += gradeOutOf5 * weight;
+            totalWeight += weight;
+            validAssessments.push({ grade_value: gradeOutOf5, weight });
+          });
+
+          const currentAverage = totalWeight > 0 ? totalWeightedGrade / totalWeight : 0;
+          const subjectCount = Math.max(subjects.size, 1);
+          const normalizedAssessments = validAssessments.map(a => ({
+            ...a,
+            weight: a.weight / subjectCount,
+          }));
+
+          const { calculateProjectedGrade } = require('../services/gradingEngine');
+          const projection = calculateProjectedGrade(normalizedAssessments, 5.0);
+
+          resolve({
+            currentAverage: parseFloat(currentAverage.toFixed(2)),
+            projectedGrade: projection.projectedGrade,
+            delta: projection.delta,
+            evaluatedWeight: Math.round((totalWeight / Math.max(totalWeight, 100)) * 100),
+            remainingWeight: Math.max(0, 100 - Math.round((totalWeight / Math.max(totalWeight, 100)) * 100)),
+            assessmentCount: assessments.length,
+            subjectCount: subjects.size,
+          });
+        } catch (calcErr) {
+          reject(calcErr);
+        }
+      }
+    );
+  });
+}
+
+/**
  * Registra o actualiza la visita de un dispositivo invitado
  */
 exports.trackGuest = (req, res) => {
@@ -641,144 +729,19 @@ exports.getDeckStats = (req, res) => {
  *  - assessmentCount: Total de evaluaciones
  *  - subjectCount: Total de materias con evaluaciones
  */
-exports.getGlobalGPAAnalytics = (req, res) => {
+exports.computeUserGPA = computeUserGPA;
+
+exports.getGlobalGPAAnalytics = async (req, res) => {
   const { userId } = req.params;
-  const startTime = Date.now();
-  const TIMEOUT = 30000; // 30 segundos timeout
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Se requiere userId' });
-  }
-
-  // Configurar timeout
-  const timeoutId = setTimeout(() => {
-    console.error(`[getGlobalGPAAnalytics] Request timeout para userId=${userId}`);
-    if (!res.headersSent) {
-      res.status(503).json({ error: 'Request timeout al calcular GPA global' });
-    }
-  }, TIMEOUT);
+  if (!userId) return res.status(400).json({ error: 'Se requiere userId' });
 
   try {
-    // Calcular promedio global ponderado considerando todas las materias
-    // Usa JOIN con subjects para obtener user_id (assessments puede no tener la columna en producción)
-    db.all(
-      `SELECT 
-         a.id,
-         a.subject_id,
-         a.grade_value,
-         a.score,
-         a.out_of,
-         a.percentage,
-         a.weight,
-         a.date,
-         ar.normalized_value,
-         ar.raw_value as original_raw_value,
-         s.name as subject_name,
-         s.user_id
-       FROM assessments a
-       LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
-       LEFT JOIN subjects s ON a.subject_id = s.id
-       WHERE s.user_id = ?
-       AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR ar.raw_value IS NOT NULL OR ar.normalized_value IS NOT NULL)
-       ORDER BY a.date ASC`,
-      [userId],
-      (err, assessments) => {
-        clearTimeout(timeoutId);
-        const duration = Date.now() - startTime;
-
-        if (err) {
-          console.error(`[getGlobalGPAAnalytics] Error DB para userId=${userId}: ${err.message} (${duration}ms)`);
-          return res.status(500).json({ error: `Database error: ${err.message}` });
-        }
-
-        if (!assessments || assessments.length === 0) {
-          console.log(`[getGlobalGPAAnalytics] Sin evaluaciones para userId=${userId}`);
-          return res.json({
-            currentAverage: 0,
-            projectedGrade: 0,
-            delta: 0,
-            evaluatedWeight: 0,
-            remainingWeight: 100,
-            assessmentCount: 0,
-            subjectCount: 0,
-          });
-        }
-
-        try {
-          // Normalizar y calcular promedio ponderado
-          let totalWeightedGrade = 0;
-          let totalWeight = 0;
-          const subjects = new Set();
-
-          const validAssessments = [];
-
-          assessments.forEach(a => {
-            if (a.subject_id) subjects.add(a.subject_id);
-
-            // Obtener la nota normalizada (0-1)
-            let normalized = 0;
-            if (typeof a.normalized_value === 'number') {
-              normalized = a.normalized_value; // Del assessment_results (ya está de 0 a 1 normalizado)
-            } else if (typeof a.original_raw_value === 'number') {
-              normalized = a.original_raw_value / 5; // Asumir 0-5 si es del DB nuevo
-            } else if (typeof a.grade_value === 'number' && a.grade_value <= 5) {
-              normalized = a.grade_value / 5; // Asumir escala 0-5 de tabla antigua
-            } else if (typeof a.score === 'number' && typeof a.out_of === 'number' && a.out_of > 0) {
-              normalized = a.score / a.out_of;
-            }
-
-            // Parsear peso (default 1 si no hay)
-            let weight = 1;
-            if (typeof a.percentage === 'number') {
-              weight = a.percentage;
-            } else if (typeof a.weight === 'string') {
-              const parsed = parseFloat(a.weight);
-              weight = !isNaN(parsed) ? Math.min(parsed, 100) : 1;
-            } else if (typeof a.weight === 'number') {
-              weight = a.weight;
-            }
-
-            // Convertir a escala 0-5 para visualización
-            const gradeOutOf5 = normalized * 5;
-            totalWeightedGrade += gradeOutOf5 * weight;
-            totalWeight += weight;
-            
-            validAssessments.push({ grade_value: gradeOutOf5, weight });
-          });
-
-          const currentAverage = totalWeight > 0 ? totalWeightedGrade / totalWeight : 0;
-          
-          const subjectCount = Math.max(subjects.size, 1);
-          const normalizedAssessments = validAssessments.map(a => ({
-            ...a,
-            weight: a.weight / subjectCount
-          }));
-
-          const { calculateProjectedGrade } = require('../services/gradingEngine');
-          const projection = calculateProjectedGrade(normalizedAssessments, 5.0);
-
-          const result = {
-            currentAverage: parseFloat(currentAverage.toFixed(2)),
-            projectedGrade: projection.projectedGrade,
-            delta: projection.delta,
-            evaluatedWeight: Math.round((totalWeight / Math.max(totalWeight, 100)) * 100),
-            remainingWeight: Math.max(0, 100 - Math.round((totalWeight / Math.max(totalWeight, 100)) * 100)),
-            assessmentCount: assessments.length,
-            subjectCount: subjects.size,
-          };
-
-          console.log(`[getGlobalGPAAnalytics] ✓ userId=${userId}, GPA=${result.currentAverage} (${duration}ms)`);
-          res.json(result);
-        } catch (calcErr) {
-          console.error(`[getGlobalGPAAnalytics] Error al calcular GPA: ${calcErr.message}`);
-          res.status(500).json({ error: `Error calculating GPA: ${calcErr.message}` });
-        }
-      }
-    );
+    const result = await computeUserGPA(userId);
+    console.log(`[getGlobalGPAAnalytics] ✓ userId=${userId}, GPA=${result.currentAverage}`);
+    res.json(result);
   } catch (err) {
-    clearTimeout(timeoutId);
-    console.error(`[getGlobalGPAAnalytics] Unexpected error: ${err.message}`);
-    res.status(500).json({ error: err.message });
+    console.error(`[getGlobalGPAAnalytics] Error: ${err.message}`);
+    res.status(500).json({ error: `Error calculating GPA: ${err.message}` });
   }
 };
 

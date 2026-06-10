@@ -10,6 +10,7 @@ import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
 import { getCurrentUserProfile, getPredictedSubject, getTodaySchedules, createStudySession, deleteSubject, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
+import { getUserGroups } from '../../src/services/api/learning/groups';
 import { getGlobalGPAAnalytics } from '../../src/services/api/analytics';
 import { calculateProjection } from '../../src/utils/projectionEngine';
 import { useDataStore } from '../../src/store/useDataStore';
@@ -25,7 +26,8 @@ import { StudyTimerModal } from '../../src/components/timer/StudyTimerModal';
 import { DocumentScannerModal } from '../../src/components/modals/DocumentScannerModal';
 import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal';
 import { FlashcardsModal } from '../../src/components/flashcards/FlashcardsModal';
-import { SubjectTile, MetricCard, ActionCircle, PerformanceRow } from '../../src/components/dashboard/DashboardWidgets';
+import { SubjectTile, MetricCard, ActionCircle } from '../../src/components/dashboard/DashboardWidgets';
+import { GroupPerformanceLeaderboard } from '../../src/components/dashboard/GroupPerformanceLeaderboard';
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
 import { EditSubjectModal } from '../../src/components/dashboard/EditSubjectModal';
 import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
@@ -77,6 +79,7 @@ export default function HybridDashboardScreen() {
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [overallGpa, setOverallGpa] = useState<number | null>(null);
+  const [userGroups, setUserGroups] = useState<any[]>([]);
 
   // ── allSchedules viene del store ahora ─────────────────────────────────
   const allSchedules = storeSchedules;
@@ -112,9 +115,10 @@ export default function HybridDashboardScreen() {
 
   const loadData = useCallback(async (skipFullReload = false) => {
     try {
-      const [userProfile, schedulesToday] = await Promise.all([
+      const [userProfile, schedulesToday, groups] = await Promise.all([
         getCurrentUserProfile(),
         getTodaySchedules(),
+        getUserGroups(),
       ]);
 
       setProfile(userProfile);
@@ -125,6 +129,10 @@ export default function HybridDashboardScreen() {
       }
 
       setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
+
+      if (Array.isArray(groups) && groups.length > 0) {
+        setUserGroups(groups);
+      }
       
       // 💾 Profile is cached by getCurrentUserProfile internally
       
@@ -689,19 +697,9 @@ export default function HybridDashboardScreen() {
         </View>
 
         {/* 6. PERFORMANCE LEADERBOARD */}
-        <View style={styles.section}>
-          <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
-            <Text style={styles.sectionTitle}>{t('dashboard.performance')}</Text>
-            <View style={styles.allChip}><Text style={styles.allChipText}>{t('dashboard.filterAll')}</Text></View>
-          </View>
-          
-          <View style={styles.perfContainer}>
-            <PerformanceRow rank="1" name={t('dashboard.top')} gpa="3.92" icon="trophy" iconColor="#FFD700" />
-            <PerformanceRow rank="2" name={t('dashboard.peerB')} gpa="3.70" icon="medal" iconColor="#C0C0C0" />
-            <PerformanceRow rank="3" name={t('dashboard.peerC')} gpa="3.45" icon="medal" iconColor="#CD7F32" />
-            <PerformanceRow rank="7" name={t('dashboard.you')} gpa="2.90" icon="person-circle" iconColor={theme.colors.primary} isYou />
-          </View>
-        </View>
+        {userGroups.length > 0 && profile?.id ? (
+          <GroupPerformanceLeaderboard groupPinId={userGroups[0].group_pin_id} currentUserId={profile.id} />
+        ) : null}
 
         <CreateSubjectModal 
           visible={isSubjectModalVisible}

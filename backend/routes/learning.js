@@ -238,4 +238,22 @@ router.post('/learning/groups/join', learningController.joinGroup);
  */
 router.delete('/learning/groups/leave', learningController.leaveGroup);
 
+/**
+ * @swagger
+ * /api/learning/groups/{groupPinId}/leaderboard:
+ *   get:
+ *     summary: Obtiene el ranking de GPA de los miembros de un grupo
+ *     tags: [Learning]
+ *     parameters:
+ *       - in: path
+ *         name: groupPinId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Leaderboard ordenado por GPA descendente
+ */
+router.get('/learning/groups/:groupPinId/leaderboard', learningController.getGroupLeaderboard);
+
 module.exports = router;
