@@ -1,6 +1,6 @@
 import { databaseService } from './database/DatabaseService';
 import { getLocalDecks, getPendingReviews } from './localFlashcardService';
-import type { MasteryRadarData, MasteryRadarItem } from './api/analytics';
+import type { MasteryRadarData, MasteryRadarItem, GlobalGPAAnalytics } from './api/analytics';
 
 interface SubjectAgg {
   subjectName: string;
@@ -197,4 +197,71 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
     weakestArea: { name: weakestArea.name, value: weakestArea.value },
     recommendation,
   };
+}
+
+export async function getLocalGlobalGPA(userId: string): Promise<GlobalGPAAnalytics> {
+  const db = databaseService.getDb();
+
+  try {
+    const assessments = await db.getAllAsync(
+      `SELECT a.subject_id, a.grade_value, a.score, a.out_of, a.percentage, a.weight, a.normalized_value
+       FROM assessments a
+       JOIN subjects s ON a.subject_id = s.id
+       WHERE s.user_id = ?
+       AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR a.normalized_value IS NOT NULL)
+       ORDER BY a.date ASC`,
+      userId
+    ) as any[];
+
+    if (!assessments || assessments.length === 0) {
+      return { currentAverage: 0, projectedGrade: 0, delta: 0, evaluatedWeight: 0, remainingWeight: 100, assessmentCount: 0, subjectCount: 0 };
+    }
+
+    let totalWeightedGrade = 0;
+    let totalWeight = 0;
+    const subjects = new Set<string>();
+
+    for (const a of assessments) {
+      if (a.subject_id) subjects.add(String(a.subject_id));
+
+      let normalized = 0;
+      if (typeof a.normalized_value === 'number') {
+        normalized = a.normalized_value;
+      } else if (typeof a.grade_value === 'number' && a.grade_value <= 5) {
+        normalized = a.grade_value / 5;
+      } else if (typeof a.score === 'number' && typeof a.out_of === 'number' && a.out_of > 0) {
+        normalized = a.score / a.out_of;
+      }
+
+      let weight = 1;
+      if (typeof a.percentage === 'number') {
+        weight = a.percentage;
+      } else if (typeof a.weight === 'number') {
+        weight = a.weight;
+      } else if (typeof a.weight === 'string') {
+        weight = parseFloat(a.weight) || 1;
+      }
+
+      const gradeOutOf5 = normalized * 5;
+      totalWeightedGrade += gradeOutOf5 * weight;
+      totalWeight += weight;
+    }
+
+    const currentAverage = totalWeight > 0
+      ? parseFloat((totalWeightedGrade / totalWeight).toFixed(2))
+      : 0;
+
+    return {
+      currentAverage,
+      projectedGrade: currentAverage,
+      delta: 0,
+      evaluatedWeight: Math.round((totalWeight / Math.max(totalWeight, 100)) * 100),
+      remainingWeight: Math.max(0, 100 - Math.round((totalWeight / Math.max(totalWeight, 100)) * 100)),
+      assessmentCount: assessments.length,
+      subjectCount: subjects.size,
+    };
+  } catch (err) {
+    console.warn('[LocalGPA] Error calculating GPA locally:', err);
+    return { currentAverage: 0, projectedGrade: 0, delta: 0, evaluatedWeight: 0, remainingWeight: 100, assessmentCount: 0, subjectCount: 0 };
+  }
 }

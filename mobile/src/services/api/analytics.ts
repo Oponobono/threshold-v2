@@ -426,13 +426,26 @@ export const getMasteryAnalytics = async (userId: string, subjectId: string | 'a
 
 /**
  * Obtiene el GPA global agregado para todos los sujetos del usuario
- * Calcula el promedio ponderado de todas las evaluaciones realizadas
+ * Offline-first: calcula localmente desde SQLite assessments, API como fallback
  */
 export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
   const { getUserId } = await import('./auth');
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');
-  
+
+  // 1. Calcular localmente (SQLite assessments)
+  try {
+    const { getLocalGlobalGPA } = await import('../localMasteryService');
+    const localData = await getLocalGlobalGPA(userId);
+    if (localData.assessmentCount > 0) {
+      await storageService.saveLocal('app:cache:global_gpa', JSON.stringify(localData));
+      return localData;
+    }
+  } catch (err) {
+    console.warn('[Analytics] Local GPA calculation failed:', err);
+  }
+
+  // 2. Fallback a API
   try {
     const url = `/analytics/global/gpa/${userId}`;
     const response = await fetchWithFallback(url, {
@@ -448,27 +461,28 @@ export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
       throw new Error(`Error al obtener GPA global: ${errorMsg}`);
     }
     
-    if (data) {
+    if (data && data.assessmentCount > 0) {
       await storageService.saveLocal('app:cache:global_gpa', JSON.stringify(data));
+      return data;
     }
-    return data || {
-      currentAverage: 0,
-      projectedGrade: 0,
-      delta: 0,
-      evaluatedWeight: 0,
-      remainingWeight: 100,
-      assessmentCount: 0,
-      subjectCount: 0,
-    };
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error(`[getGlobalGPAAnalytics] Network error:`, errorMsg);
-    console.warn('[Analytics] Falling back to cached global GPA');
-    const cached = await storageService.getLocal('app:cache:global_gpa');
-    if (cached) {
-      console.log('[Analytics] ✅ Loaded global GPA from cache (offline mode)');
-      return JSON.parse(cached) as GlobalGPAAnalytics;
-    }
-    throw error;
+    console.warn(`[getGlobalGPAAnalytics] Network error:`, error instanceof Error ? error.message : String(error));
   }
+
+  // 3. Último recurso: cache
+  const cached = await storageService.getLocal('app:cache:global_gpa');
+  if (cached) {
+    console.log('[Analytics] ✅ Loaded global GPA from cache');
+    return JSON.parse(cached) as GlobalGPAAnalytics;
+  }
+
+  return {
+    currentAverage: 0,
+    projectedGrade: 0,
+    delta: 0,
+    evaluatedWeight: 0,
+    remainingWeight: 100,
+    assessmentCount: 0,
+    subjectCount: 0,
+  };
 };
