@@ -93,6 +93,42 @@ export function deleteLocalDeck(deckId: string): void {
   saveLocalDecksSync(decks);
 }
 
+export function recalculateLocalDeckCounters(deckId: number): void {
+  try {
+    const mmkv = require('react-native-mmkv').createMMKV();
+    const cardsKey = `cache:flashcards_by_deck:${deckId}`;
+    const raw = mmkv.getString(cardsKey);
+    if (!raw) return;
+
+    const entry = JSON.parse(raw);
+    const cards: any[] = entry.data || entry || [];
+    let reviewCount = 0;
+    let learningCount = 0;
+    let newCount = 0;
+
+    for (const card of cards) {
+      const status = card.status || 'new';
+      if (status === 'review') reviewCount++;
+      else if (status === 'learning') learningCount++;
+      else newCount++;
+    }
+
+    const decks = getLocalDecks();
+    const idx = decks.findIndex(d => d.id === deckId);
+    if (idx === -1) return;
+
+    decks[idx] = {
+      ...decks[idx],
+      review_count: reviewCount,
+      learning_count: learningCount,
+      new_count: newCount,
+    };
+    saveLocalDecksSync(decks);
+  } catch (e) {
+    console.error('[LocalFlashcard] Error recalculating deck counters:', e);
+  }
+}
+
 /**
  * OFFLINE-FIRST: Exporta un mazo local a JSON sin exponer user_id (seguridad)
  */

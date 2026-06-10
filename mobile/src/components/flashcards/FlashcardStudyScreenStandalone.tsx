@@ -220,11 +220,43 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       }
     } catch {}
 
-    // Persist local card review to MMKV
-    if (typeof item.id === 'number' && item.id < 0 && activeDeck?.id) {
-      const { updateLocalCard } = await import('../../services/localFlashcardService');
-      updateLocalCard(Number(activeDeck.id), item.id, {}, newStatus);
+    // Actualizar contadores del mazo según el nuevo status de la tarjeta
+    if (activeDeck?.id) {
+      if (typeof item.id === 'number' && item.id < 0) {
+        // Mazo local (MMKV)
+        const { updateLocalCard, recalculateLocalDeckCounters } = await import('../../services/localFlashcardService');
+        updateLocalCard(Number(activeDeck.id), item.id, {}, newStatus);
+        recalculateLocalDeckCounters(Number(activeDeck.id));
+      } else {
+        // Mazo cloud (SQLite) — refrescar contadores dinámicamente
+        try {
+          const { databaseService } = await import('../../services/database/DatabaseService');
+          const db = databaseService.getDb();
+          const row: any = await db.getFirstAsync(
+            `SELECT
+              COUNT(CASE WHEN status = 'review' THEN 1 END) as review_count,
+              COUNT(CASE WHEN status = 'learning' THEN 1 END) as learning_count,
+              COUNT(CASE WHEN status = 'new' THEN 1 END) as new_count
+            FROM flashcards WHERE deck_id = ?`,
+            String(activeDeck.id)
+          );
+          if (row) {
+            await db.runAsync(
+              `UPDATE flashcard_decks SET review_count = ?, learning_count = ?, new_count = ?, updated_at = datetime('now') WHERE id = ?`,
+              row.review_count, row.learning_count, row.new_count, String(activeDeck.id)
+            );
+          }
+        } catch {}
+      }
     }
+
+    // Refresh predictions after reviewing
+    try {
+      const { useDataStore } = await import('../../store/useDataStore');
+      if (currentUserId) {
+        useDataStore.getState().refreshPredictions(currentUserId);
+      }
+    } catch {}
 
     setIsProcessing(false); // Marcar fin de procesamiento
 
