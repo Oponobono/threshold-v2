@@ -28,6 +28,15 @@ interface Props {
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
+/** Fisher-Yates shuffle (mutates array, returns it) */
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export const MultipleChoiceView: React.FC<Props> = ({
   item, onAnswer, onShowExplanation, isAnswered, selectedIndex, onNext
 }) => {
@@ -36,9 +45,16 @@ export const MultipleChoiceView: React.FC<Props> = ({
   const hintAnim = useRef(new Animated.Value(0)).current;
   const isNavigating = useRef(false);
 
+  // Shuffle order: shuffledPos → originalIndex (resets per question)
+  const shuffledIndices = useRef<number[]>([]);
+  if (shuffledIndices.current.length === 0) {
+    shuffledIndices.current = shuffle([...Array(content.options.length).keys()]);
+  }
+
   useEffect(() => {
     setHintVisible(false);
     hintAnim.setValue(0);
+    shuffledIndices.current = shuffle([...Array(content.options.length).keys()]);
   }, [item.id, hintAnim]);
 
   const toggleHint = () => {
@@ -47,28 +63,26 @@ export const MultipleChoiceView: React.FC<Props> = ({
     Animated.timing(hintAnim, { toValue: next ? 1 : 0, duration: 220, useNativeDriver: true }).start();
   };
 
-
-
   const correctIdx = Number(content.correctIndex);
 
-  const getOptionStyle = (index: number) => {
+  const getOptionStyle = (shuffledPos: number, originalIdx: number) => {
     if (!isAnswered) return [s.option];
-    if (index === correctIdx) return [s.option, s.optionCorrect];
-    if (index === selectedIndex) return [s.option, s.optionWrong];
+    if (originalIdx === correctIdx) return [s.option, s.optionCorrect];
+    if (originalIdx === selectedIndex) return [s.option, s.optionWrong];
     return [s.option, s.optionDimmed];
   };
 
-  const getOptionTextStyle = (index: number) => {
+  const getOptionTextStyle = (originalIdx: number) => {
     if (!isAnswered) return s.optionText;
-    if (index === correctIdx) return [s.optionText, { color: '#2E7D32' }];
-    if (index === selectedIndex) return [s.optionText, { color: '#C62828' }];
+    if (originalIdx === correctIdx) return [s.optionText, { color: '#2E7D32' }];
+    if (originalIdx === selectedIndex) return [s.optionText, { color: '#C62828' }];
     return [s.optionText, { color: theme.colors.text.placeholder }];
   };
 
-  const getLabelStyle = (index: number) => {
+  const getLabelStyle = (originalIdx: number) => {
     if (!isAnswered) return [s.optionLabel];
-    if (index === correctIdx) return [s.optionLabel, s.optionLabelCorrect];
-    if (index === selectedIndex) return [s.optionLabel, s.optionLabelWrong];
+    if (originalIdx === correctIdx) return [s.optionLabel, s.optionLabelCorrect];
+    if (originalIdx === selectedIndex) return [s.optionLabel, s.optionLabelWrong];
     return [s.optionLabel, s.optionLabelDimmed];
   };
 
@@ -116,29 +130,27 @@ export const MultipleChoiceView: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* Options grid 2x2 */}
+      {/* Options grid 2x2 — rendered in shuffled order */}
       <View style={s.optionsGrid}>
-        {content.options.map((option, index) => (
+        {shuffledIndices.current.map((originalIdx, shuffledPos) => (
           <TouchableOpacity
-            key={index}
-            style={getOptionStyle(index)}
-            onPress={() => !isAnswered && onAnswer(index)}
+            key={originalIdx}
+            style={getOptionStyle(shuffledPos, originalIdx)}
+            onPress={() => !isAnswered && onAnswer(originalIdx)}
             disabled={isAnswered}
             activeOpacity={0.75}
           >
-            <View style={getLabelStyle(index)}>
-              <Text style={s.optionLabelText}>{OPTION_LABELS[index]}</Text>
+            <View style={getLabelStyle(originalIdx)}>
+              <Text style={s.optionLabelText}>{OPTION_LABELS[shuffledPos]}</Text>
             </View>
-            <Text style={getOptionTextStyle(index)}>{option}</Text>
+            <Text style={getOptionTextStyle(originalIdx)}>{content.options[originalIdx]}</Text>
             
-            {/* Íconos en la esquina superior derecha */}
-            {isAnswered && index === correctIdx && (
+            {isAnswered && originalIdx === correctIdx && (
               <Ionicons name="checkmark-circle" size={20} color="#2E7D32" style={s.resultIcon} />
             )}
-            {isAnswered && index === selectedIndex && index !== correctIdx && (
+            {isAnswered && originalIdx === selectedIndex && originalIdx !== correctIdx && (
               <Ionicons name="close-circle" size={20} color="#C62828" style={s.resultIcon} />
             )}
-            {/* Opcional: mostrar un icono gris si no fue seleccionada ni es correcta (comentado para mantenerlo limpio como pide el usuario) */}
           </TouchableOpacity>
         ))}
       </View>

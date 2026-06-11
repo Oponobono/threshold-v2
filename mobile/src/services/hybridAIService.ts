@@ -413,8 +413,96 @@ ${params.contextText || ''}`;
   return generateStudyMaterialFromChat(params);
 }
 
+// ───────────────────────────────────────────
+//  Helpers de almacenamiento local
+// ───────────────────────────────────────────
+
+/** Lee tarjetas desde la BD SQLite local + MMKV para el análisis offline */
+async function getLocalCardsForAnalysis(deckId: string): Promise<{ front: string; back: string }[]> {
+  const seen = new Set<string>();
+  const cards: { front: string; back: string }[] = [];
+
+  // SQLite local
+  try {
+    const { flashcardRepository } = await import('./database');
+    const sqliteCards = await flashcardRepository.getByDeck(deckId);
+    if (sqliteCards) {
+      for (const c of sqliteCards) {
+        if (c.front && !seen.has(c.front)) {
+          seen.add(c.front);
+          cards.push({ front: c.front, back: c.back || '' });
+        }
+      }
+    }
+  } catch {}
+
+  // MMKV (mazos importados / locales)
+  try {
+    const mmkv = require('react-native-mmkv').createMMKV();
+    const raw = mmkv.getString(`cache:flashcards_by_deck:${deckId}`);
+    if (raw) {
+      const entry = JSON.parse(raw);
+      const mmkvCards = entry.data || entry || [];
+      for (const c of mmkvCards) {
+        const front = c.front || c.content?.front || '';
+        const back = c.back || c.content?.back || '';
+        if (front && !seen.has(front)) {
+          seen.add(front);
+          cards.push({ front, back });
+        }
+      }
+    }
+  } catch {}
+
+  return cards;
+}
+
+/** Ejecuta el análisis de confusiones con el LLM local */
+async function analyzeDeckConfusionsLocal(cards: { front: string; back: string }[]): Promise<{ suggestions: any[] }> {
+  if (cards.length < 2) return { suggestions: [] };
+
+  try {
+    await ensureLocalModel();
+    const cardsJson = JSON.stringify(cards);
+    const prompt = `${getSystemPrompt()}
+Analiza estas flashcards y encuentra pares de conceptos que los estudiantes podrían confundir (similitud semántica o estructural).
+
+Reglas:
+1. Encuentra máximo 3 pares de conceptos altamente confundibles.
+2. Si no hay ninguno, devuelve un array vacío [].
+3. Responde ÚNICAMENTE con un JSON array válido.
+
+Formato esperado:
+[
+  {
+    "conceptA": "Nombre del Concepto 1",
+    "conceptB": "Nombre del Concepto 2",
+    "reason": "Explicación breve de por qué el estudiante podría confundirlos"
+  }
+]
+
+Flashcards a analizar:
+${cardsJson}`;
+
+    const result = await runInference({
+      prompt,
+      grammarType: 'confusions',
+      temperature: 0.3,
+      maxTokens: 1024,
+    });
+
+    const parsed = JSON.parse(result.text);
+    const suggestions = Array.isArray(parsed) ? parsed : (parsed.confusions || []);
+    return { suggestions };
+  } catch {
+    return { suggestions: [] };
+  }
+}
+
 /**
  * Analiza confusiones de un deck.
+ * - Cloud: llama al backend existente.
+ * - Local / fallback: lee las tarjetas del almacenamiento local y usa el LLM local.
  */
 export async function analyzeDeckConfusionsHybrid(deckId: number | string) {
   const resolved = await resolveProvider();
@@ -424,31 +512,79 @@ export async function analyzeDeckConfusionsHybrid(deckId: number | string) {
   }
 
   if (resolved === 'local') {
-    await ensureLocalModel();
-    const prompt = `${getSystemPrompt()}
-Analiza el deck de flashcards con ID ${deckId} y devuelve un JSON con las confusiones más comunes entre conceptos.
-Devuelve SOLO un JSON válido.`;
-    const result = await runInference({
-      prompt,
-      grammarType: 'confusions',
-      temperature: 0.3,
-      maxTokens: 1024,
-    });
-    try {
-      const parsed = JSON.parse(result.text);
-      return { suggestions: parsed.confusions || [] };
-    } catch {
-      return { suggestions: [] };
-    }
+    const localCards = await getLocalCardsForAnalysis(String(deckId));
+    return analyzeDeckConfusionsLocal(localCards);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { analyzeDeckConfusions } = require('./api/ai');
-  return analyzeDeckConfusions(deckId);
+  // Cloud: intentar API, si devuelve vacío hacer fallback a local
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { analyzeDeckConfusions } = require('./api/ai');
+    const cloudResult = await analyzeDeckConfusions(deckId);
+    if (cloudResult?.suggestions?.length > 0) {
+      return cloudResult;
+    }
+  } catch {}
+
+  const localCards = await getLocalCardsForAnalysis(String(deckId));
+  if (localCards.length >= 2) {
+    return analyzeDeckConfusionsLocal(localCards);
+  }
+
+  return { suggestions: [] };
+}
+
+/**
+ * Persiste una tarjeta de diferenciación en el almacenamiento local.
+ * - Mazos locales (MMKV): usa addLocalCard.
+ * - Mazos cloud (SQLite): usa flashcardRepository.create.
+ */
+async function persistDifferentiationCardLocally(
+  deckId: number | string,
+  front: string,
+  back: string,
+  hint?: string,
+  explanation?: string,
+  existingId?: string,
+): Promise<void> {
+  const deckIdNum = Number(deckId);
+  if (!Number.isNaN(deckIdNum) && deckIdNum < 0) {
+    // Mazo local MMKV
+    try {
+      const { addLocalCard } = await import('./localFlashcardService');
+      addLocalCard(deckIdNum, {
+        type: 'flashcard',
+        data: { front, back },
+        hint,
+        explanation,
+      });
+    } catch (e) {
+      console.warn('[persistDifferentiationCardLocally] Error guardando en MMKV:', e);
+    }
+  } else {
+    // Mazo cloud — guardar en SQLite local con el mismo ID que asignó el backend
+    try {
+      const { uuidv4 } = await import('../utils/uuid');
+      const { flashcardRepository } = await import('./database');
+      await flashcardRepository.create({
+        id: existingId || uuidv4(),
+        deck_id: String(deckId),
+        front,
+        back,
+        status: 'new',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn('[persistDifferentiationCardLocally] Error guardando en SQLite:', e);
+    }
+  }
 }
 
 /**
  * Genera tarjeta de diferenciación.
+ * - Cloud: llama al backend y luego persiste localmente.
+ * - Local: genera con el LLM local y persiste en MMKV.
  */
 export async function generateDifferentiationCardHybrid(
   deckId: number | string,
@@ -457,33 +593,68 @@ export async function generateDifferentiationCardHybrid(
   reason: string,
 ) {
   const resolved = await resolveProvider();
+  // Los mazos locales (id negativo) no existen en el backend, siempre deben usar generación local
+  const isLocalDeck = (typeof deckId === 'number' && deckId < 0) ||
+    (typeof deckId === 'string' && /^-\d+$/.test(deckId) && Number(deckId) < 0);
 
-  if (!resolved) {
+  if (!resolved && !isLocalDeck) {
     throw new Error('No hay conexión a internet ni modelo local disponible.');
   }
 
-  if (resolved === 'local') {
+  if (resolved === 'local' || isLocalDeck) {
     await ensureLocalModel();
     const prompt = `${getSystemPrompt()}
-Genera una tarjeta de diferenciación entre "${conceptA}" y "${conceptB}".
+Genera UNA tarjeta de diferenciación entre "${conceptA}" y "${conceptB}".
 Razón: ${reason}
-Devuelve SOLO un JSON válido con: conceptA, conceptB, difference, example.`;
+
+La tarjeta debe tener:
+- Front: Una pregunta o escenario que obligue a diferenciar ambos conceptos.
+- Back: Respuesta que contraste ambos conceptos de forma clara y memorable.
+- Hint: Una regla mnemotécnica o pista rápida.
+- Explanation: Profundización técnica de por qué son distintos.
+
+Devuelve SOLO un JSON válido con: front, back, hint, explanation.`;
+
     const result = await runInference({
       prompt,
       grammarType: 'differentiation',
       temperature: 0.3,
       maxTokens: 1024,
     });
+
+    let card: { front: string; back: string; hint?: string; explanation?: string };
     try {
-      return JSON.parse(result.text);
+      card = JSON.parse(result.text);
     } catch {
-      return { conceptA, conceptB, difference: result.text, example: '' };
+      card = { front: conceptA, back: conceptB, hint: '', explanation: result.text };
     }
+
+    if (!card.front || !card.back) {
+      throw new Error('La IA local no generó el formato esperado (front/back).');
+    }
+
+    await persistDifferentiationCardLocally(deckId, card.front, card.back, card.hint, card.explanation);
+    return card;
   }
 
+  // Cloud: llamar al backend y luego persistir localmente para visibilidad inmediata
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { generateDifferentiationCard } = require('./api/ai');
-  return generateDifferentiationCard(deckId, conceptA, conceptB, reason);
+  const cloudResponse = await generateDifferentiationCard(deckId, conceptA, conceptB, reason);
+
+  // Persistir localmente la respuesta del backend (con su mismo ID para evitar duplicados)
+  if (cloudResponse?.front && cloudResponse?.back) {
+    await persistDifferentiationCardLocally(
+      deckId,
+      cloudResponse.front,
+      cloudResponse.back,
+      cloudResponse.hint,
+      cloudResponse.explanation,
+      cloudResponse.id,
+    );
+  }
+
+  return cloudResponse;
 }
 
 /**

@@ -16,7 +16,8 @@ import {
   StrategyFactory,
   adaptFlashcardsToEvaluationItems,
 } from '../../utils/evaluationStrategies';
-import { updateFlashcardStatus, deleteFlashcard, analyzeDeckConfusions, generateDifferentiationCard, snoozeCard, createCardLog } from '../../services/api';
+import { updateFlashcardStatus, deleteFlashcard, snoozeCard, createCardLog } from '../../services/api';
+import { analyzeDeckConfusionsHybrid as analyzeDeckConfusions, generateDifferentiationCardHybrid as generateDifferentiationCard } from '../../services/hybridAIService';
 import { recordCardReview } from '../../services/api/analytics';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { QuestionRendererFactory } from '../evaluation/QuestionRendererFactory';
@@ -195,9 +196,9 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
     }
 
     // Persistir
+    const isLocalCard = typeof item.id === 'number' && item.id < 0;
+
     try {
-      await updateFlashcardStatus(item.id, newStatus);
-      
       const textToCount = item.front || (item as any).question || '';
       const wordCount = textToCount.trim() ? textToCount.trim().split(/\s+/).length : 20;
 
@@ -215,20 +216,22 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           color: logResponse.microInteraction?.color || theme.colors.primary,
         });
 
-        // Ocultar el feedback después de 2 segundos
         setTimeout(() => setLearningFeedback(null), 2000);
       }
     } catch {}
 
-    // Actualizar contadores del mazo según el nuevo status de la tarjeta
+    // Actualizar estado y contadores según tipo de tarjeta
     if (activeDeck?.id) {
-      if (typeof item.id === 'number' && item.id < 0) {
-        // Mazo local (MMKV)
+      if (isLocalCard) {
         const { updateLocalCard, recalculateLocalDeckCounters } = await import('../../services/localFlashcardService');
-        updateLocalCard(Number(activeDeck.id), item.id, {}, newStatus);
-        recalculateLocalDeckCounters(Number(activeDeck.id));
+        await updateLocalCard(Number(activeDeck.id), item.id, {}, newStatus);
+        await recalculateLocalDeckCounters(Number(activeDeck.id));
       } else {
-        // Mazo cloud (SQLite) — refrescar contadores dinámicamente
+        // Cloud: persistir status en SQLite + backend
+        try {
+          await updateFlashcardStatus(item.id, newStatus);
+        } catch {}
+
         try {
           const { databaseService } = await import('../../services/database/DatabaseService');
           const db = databaseService.getDb();
@@ -258,7 +261,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       }
     } catch {}
 
-    setIsProcessing(false); // Marcar fin de procesamiento
+    setIsProcessing(false);
 
   }, [isAnswered, isProcessing, isRevealed, items, itemIndex, cardStartTime, currentUserId]);
 
