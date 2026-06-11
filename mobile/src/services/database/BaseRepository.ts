@@ -78,6 +78,8 @@ export class BaseRepository<T extends { id: string }> {
     const filteredValues: any[] = [];
     for (const k of keys) {
       const val = (data as any)[k];
+      // No sobrescribir valores existentes con null a menos que sea explícitamente intencional
+      // (grade_value, score, normalized_value son campos críticos que no deben perderse)
       if (val !== undefined) {
         filteredKeys.push(k);
         filteredValues.push(val);

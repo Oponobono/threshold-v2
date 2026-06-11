@@ -93,8 +93,12 @@ export function useSubjectGrades(
       try {
         console.log(`[useSubjectGrades] 📊 Cargando proyección para subject ${selectedSubject.id}`);
         const data = await getProjectionAnalytics(selectedSubject.id);
-        if (data) {
-          console.log(`[useSubjectGrades] 📊 Proyección cargada exitosamente:`, {
+        // Usar API solo si devolvió datos con al menos 1 assessment calificado.
+        // Si assessmentCount es 0, el backend no tiene datos (posible type mismatch en JOINs)
+        // y debemos usar el cálculo local.
+        const hasValidData = data && data.assessmentCount > 0;
+        if (hasValidData) {
+          console.log(`[useSubjectGrades] 📊 Proyección API cargada exitosamente:`, {
             currentAverage: data.currentAverage,
             currentEMA: data.currentEMA,
             projectedGrade: data.projectedGrade,
@@ -106,7 +110,7 @@ export function useSubjectGrades(
           offlineFallbackRef.current = false;
           setProjectionData(data);
         } else {
-          console.warn('[useSubjectGrades] ⚠️ getProjectionAnalytics retornó null, usando local');
+          console.warn(`[useSubjectGrades] ⚠️ API retornó ${data ? 'assessmentCount=0' : 'null'}, usando cálculo local`);
           const local = calculateProjection(assessments, selectedSubject, profile);
           setProjectionData({
             currentAverage: local.currentAverage,
@@ -134,7 +138,9 @@ export function useSubjectGrades(
     };
 
     loadProjection();
-  }, [selectedSubject?.id, assessments.length, isOnline, selectedSubject, profile, assessments]);
+    // Dependencias mínimas esenciales: valores primitivos para evitar
+    // re-ejecuciones por cambios de referencia de objetos/arrays.
+  }, [selectedSubject?.id, selectedSubject?.target_grade, assessments.length, isOnline, profile?.approval_threshold]);
 
   const gradedAssessments = useMemo(() => {
     // Only include assessments with actual grades/scores

@@ -15,8 +15,8 @@ function computeUserGPA(userId) {
          a.percentage, a.weight, a.date,
          ar.normalized_value, ar.raw_value as original_raw_value
        FROM assessments a
-       LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
-       LEFT JOIN subjects s ON a.subject_id = s.id
+        LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
+        LEFT JOIN subjects s ON a.subject_id = s.id
        WHERE s.user_id = ?
        AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR ar.raw_value IS NOT NULL OR ar.normalized_value IS NOT NULL)
        ORDER BY a.date ASC`,
@@ -794,7 +794,7 @@ exports.getSemesterSummary = (req, res) => {
           db.all(
             `SELECT a.id, a.subject_id, a.category_id, a.weight, a.is_completed, ar.normalized_value
              FROM assessments a
-             LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+             LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
              WHERE a.subject_id IN (${ph})`,
             subjectIds,
             (e, rows) => resolve(rows || [])

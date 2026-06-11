@@ -27,7 +27,7 @@ exports.getSubjectById = (req, res) => {
         const sql = `
           SELECT a.id, a.subject_id, a.category_id, a.weight, a.is_completed, ar.normalized_value 
           FROM assessments a
-          LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+          LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
           WHERE a.subject_id = ?
         `;
         db.all(sql, [subjectId], (err, asts) => {
@@ -132,7 +132,7 @@ exports.getSubjectsByUser = (req, res) => {
         const sql = `
           SELECT a.id, a.subject_id, a.category_id, a.weight, a.is_completed, ar.normalized_value 
           FROM assessments a
-          LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+          LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
           WHERE a.subject_id IN (${placeholders})
         `;
         db.all(sql, subjectIds, (err, asts) => {

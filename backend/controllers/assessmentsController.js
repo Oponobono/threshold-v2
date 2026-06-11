@@ -6,6 +6,14 @@ const gradingEngine = require('../services/gradingEngine');
  * Helper: Denormalize a single assessment row
  */
 const denormalizeAssessment = (row, versionRow, scales) => {
+  // Preferir original_raw_value (assessment_results), fallback a row.grade_value (assessments table)
+  let gradeVal = null;
+  if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
+    gradeVal = parseFloat(row.original_raw_value);
+  } else if (row.grade_value !== null && row.grade_value !== undefined) {
+    gradeVal = parseFloat(row.grade_value);
+  }
+
   const result = {
     id: row.id,
     subject_id: row.subject_id,
@@ -21,7 +29,7 @@ const denormalizeAssessment = (row, versionRow, scales) => {
     category_id: row.category_id,
     normalized_value: row.normalized_value !== null && row.normalized_value !== undefined ? parseFloat(row.normalized_value) : null,
     original_raw_value: row.original_raw_value,
-    grade_value: row.original_raw_value !== null && row.original_raw_value !== undefined ? parseFloat(row.original_raw_value) : null,
+    grade_value: gradeVal,
     subject_name: row.subject_name,
     subject_color: row.subject_color,
     subject_icon: row.subject_icon,
@@ -60,7 +68,7 @@ exports.getAssessmentsBySubject = (req, res) => {
   const query = `
     SELECT a.*, ar.normalized_value, ar.raw_value as original_raw_value, s.user_id
     FROM assessments a
-    LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+    LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
     JOIN subjects s ON a.subject_id = s.id
     WHERE a.subject_id = ? AND s.user_id = ?
     ORDER BY a.date ASC
@@ -140,7 +148,7 @@ exports.getAssessmentsByUser = (req, res) => {
            s.name as subject_name, s.color as subject_color, s.icon as subject_icon, s.user_id
     FROM assessments a
     JOIN subjects s ON a.subject_id = s.id
-    LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+    LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
     WHERE s.user_id = ?
     ORDER BY a.date ASC
   `;
@@ -224,12 +232,12 @@ exports.createAssessment = (req, res) => {
     const user_id = subject.user_id;
     const newAssessmentId = clientId || uuidv4();
     const query = `
-      INSERT INTO assessments (id, user_id, subject_id, name, type, date, weight, out_of, is_completed, category_id, due_date, grading_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO assessments (id, user_id, subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     db.run(
       query,
-      [newAssessmentId, user_id, subject_id, name, type, date, weight, finalOutOf, is_completed ? 1 : 0, category_id || null, due_date || null, grading_date || null],
+      [newAssessmentId, user_id, subject_id, name, type, date, weight, finalOutOf, score || null, percentage || null, grade_value ?? null, is_completed ? 1 : 0, category_id || null, due_date || null, grading_date || null],
       function(err) {
         if (err) {
           console.error('[POST] ❌ Error insertando assessment:', err.message);
@@ -315,7 +323,7 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
     const query = `
       SELECT a.*, ar.normalized_value, ar.raw_value as original_raw_value, s.user_id
       FROM assessments a
-      LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+      LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
       JOIN subjects s ON a.subject_id = s.id
       WHERE a.id = ? AND s.user_id = ?
     `;
@@ -334,8 +342,11 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
         if (row.normalized_value !== null && row.normalized_value !== undefined) {
           row.normalized_value = parseFloat(row.normalized_value);
         }
+        // Preferir original_raw_value (assessment_results), fallback a row.grade_value (assessments table)
         if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
           row.grade_value = parseFloat(row.original_raw_value);
+        } else if (row.grade_value !== null && row.grade_value !== undefined) {
+          row.grade_value = parseFloat(row.grade_value);
         }
         // Convert SQLite integer to boolean
         if (row.is_completed !== undefined) {
@@ -387,8 +398,11 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
         if (row.normalized_value !== null && row.normalized_value !== undefined) {
           row.normalized_value = parseFloat(row.normalized_value);
         }
+        // Preferir original_raw_value (assessment_results), fallback a row.grade_value (assessments table)
         if (row.original_raw_value !== null && row.original_raw_value !== undefined) {
           row.grade_value = parseFloat(row.original_raw_value);
+        } else if (row.grade_value !== null && row.grade_value !== undefined) {
+          row.grade_value = parseFloat(row.grade_value);
         }
         if (row.is_completed !== undefined) {
           row.is_completed = row.is_completed === 1 ? 1 : 0;
@@ -680,7 +694,7 @@ exports.getProjectionAnalytics = (req, res) => {
       s.name as subject_name, s.user_id
     FROM assessments a
     JOIN subjects s ON a.subject_id = s.id
-    LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+    LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
     WHERE a.subject_id = ? AND s.user_id = ? AND (a.grade_value IS NOT NULL OR ar.raw_value IS NOT NULL OR ar.normalized_value IS NOT NULL)
     ORDER BY a.date ASC
   `;

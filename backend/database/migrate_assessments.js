@@ -56,7 +56,7 @@ async function migrateAssessments() {
         SELECT a.id, a.grade_value, a.score, a.out_of, a.percentage
         FROM assessments a
         JOIN subjects s ON a.subject_id = s.id
-        LEFT JOIN assessment_results ar ON a.id = ar.assessment_id
+        LEFT JOIN assessment_results ar ON CAST(a.id AS TEXT) = CAST(ar.assessment_id AS TEXT)
         WHERE s.user_id = ? AND ar.id IS NULL AND (a.grade_value IS NOT NULL OR (a.score IS NOT NULL AND a.out_of IS NOT NULL))
       `, [user.id]);
 
