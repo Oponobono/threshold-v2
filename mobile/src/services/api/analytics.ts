@@ -38,6 +38,18 @@ export interface CardReviewResponse {
  * Obtiene las tarjetas de mayor urgencia para revisión predictiva (FSRS)
  */
 export const getPredictions = async (userId: string | number): Promise<PredictionResponse> => {
+  // 1. Calcular localmente (SQLite + MMKV)
+  try {
+    const { getLocalPredictions } = await import('../localMasteryService');
+    const localData = await getLocalPredictions(String(userId));
+    if (localData.cards.length > 0) {
+      return localData;
+    }
+  } catch (err) {
+    console.warn('[Analytics] Local predictions failed:', err);
+  }
+
+  // 2. Fallback a API
   try {
     const response = await fetchWithFallback(`/analytics/predictions/${userId}`, {
       method: 'GET',
@@ -51,13 +63,16 @@ export const getPredictions = async (userId: string | number): Promise<Predictio
     return data;
   } catch (error) {
     console.warn('[Analytics] Network error, falling back to cached predictions:', error);
-    const cached = await storageService.getLocal('app:cache:predictions');
-    if (cached) {
-      console.log('[Analytics] ✅ Loaded predictions from cache (offline mode)');
-      return JSON.parse(cached) as PredictionResponse;
-    }
-    throw error;
   }
+
+  // 3. Último recurso: cache
+  const cached = await storageService.getLocal('app:cache:predictions');
+  if (cached) {
+    console.log('[Analytics] ✅ Loaded predictions from cache (offline mode)');
+    return JSON.parse(cached) as PredictionResponse;
+  }
+
+  return { dueCount: 0, deckCount: 0, cards: [] };
 };
 
 /**

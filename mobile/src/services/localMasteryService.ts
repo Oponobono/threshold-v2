@@ -1,6 +1,6 @@
 import { databaseService } from './database/DatabaseService';
 import { getLocalDecks, getPendingReviews } from './localFlashcardService';
-import type { MasteryRadarData, MasteryRadarItem, GlobalGPAAnalytics } from './api/analytics';
+import type { MasteryRadarData, MasteryRadarItem, GlobalGPAAnalytics, PredictionResponse, PredictionItem } from './api/analytics';
 
 interface SubjectAgg {
   subjectName: string;
@@ -264,4 +264,120 @@ export async function getLocalGlobalGPA(userId: string): Promise<GlobalGPAAnalyt
     console.warn('[LocalGPA] Error calculating GPA locally:', err);
     return { currentAverage: 0, projectedGrade: 0, delta: 0, evaluatedWeight: 0, remainingWeight: 100, assessmentCount: 0, subjectCount: 0 };
   }
+}
+
+/** Lee tarjetas vencidas desde SQLite + MMKV y calcula predicciones FSRS localmente */
+export async function getLocalPredictions(userId: string): Promise<PredictionResponse> {
+  const db = databaseService.getDb();
+  const now = new Date().toISOString();
+
+  // 1. Cloud cards (SQLite) — mismas condiciones que el backend
+  const sqliteDue: any[] = [];
+  try {
+    const rows = await db.getAllAsync(
+      `SELECT
+         fc.id, fc.front, fc.deck_id, fc.status, fc.next_review_date,
+         COALESCE((SELECT name FROM subjects WHERE id = fd.subject_id), '') as subject_name,
+         fd.title as deck_title,
+         fd.subject_id
+       FROM flashcards fc
+       JOIN flashcard_decks fd ON fc.deck_id = fd.id
+       WHERE fd.user_id = ?
+       AND fc.status IN ('new', 'learning')
+       AND fc.next_review_date IS NOT NULL
+       AND fc.next_review_date <= ?`,
+      userId, now
+    ) as any[];
+    sqliteDue.push(...(rows || []));
+  } catch { /* ignore */ }
+
+  // 2. Local cards (MMKV)
+  const localDecks = getLocalDecks().filter(d => d.user_id === Number(userId) || d.id < 0);
+  const localDue: any[] = [];
+  const mmkv = require('react-native-mmkv').createMMKV();
+  for (const deck of localDecks) {
+    try {
+      const raw = mmkv.getString(`cache:flashcards_by_deck:${deck.id}`);
+      if (!raw) continue;
+      const entry = JSON.parse(raw);
+      const cards: any[] = entry.data || entry || [];
+      for (const card of cards) {
+        if (card.status === 'review' || card.status === 'mastered') continue;
+        const nrd = card.next_review_date;
+        if (!nrd) continue;
+        if (nrd <= now) {
+          localDue.push({
+            id: card.id,
+            front: card.front || card.content?.front || '',
+            deck_id: deck.id,
+            status: card.status || 'new',
+            next_review_date: nrd,
+            deck_title: deck.title,
+            subject_id: deck.subject_id ?? 0,
+            subject_name: '',
+          });
+        }
+      }
+    } catch {}
+  }
+
+  const allDue = [...sqliteDue, ...localDue];
+  if (allDue.length === 0) return { dueCount: 0, deckCount: 0, cards: [] };
+
+  // 3. Contar mazos únicos con vencidas
+  const uniqueDeckIds = new Set(allDue.map(c => String(c.deck_id)));
+  const dueDeckCount = uniqueDeckIds.size;
+
+  // 4. Calcular failure rate desde card_logs + pending reviews
+  const pendingReviews = getPendingReviews();
+  const pendingMap: Record<number, number> = {};
+  for (const r of pendingReviews) {
+    if (!pendingMap[r.cardId]) pendingMap[r.cardId] = 0;
+    pendingMap[r.cardId]++;
+    if (r.grade < 3) pendingMap[r.cardId] = -999; // mark as incorrect
+  }
+
+  // 5. Obtener failure_rate desde SQLite en batch
+  const cardIds = allDue.map(c => c.id).filter(Boolean);
+  const failureRateMap: Record<string, number> = {};
+  if (cardIds.length > 0) {
+    try {
+      const placeholders = cardIds.map(() => '?').join(',');
+      const logs = await db.getAllAsync(
+        `SELECT card_id,
+                CAST(COALESCE(SUM(CASE WHEN result = 'incorrect' THEN 1 ELSE 0 END), 0) AS REAL) /
+                CAST(COALESCE(COUNT(*), 1) AS REAL) as failure_rate
+         FROM card_logs WHERE card_id IN (${placeholders}) GROUP BY card_id`,
+        ...cardIds
+      ) as any[];
+      for (const row of logs) {
+        failureRateMap[row.card_id] = row.failure_rate || 0;
+      }
+    } catch {}
+  }
+
+  // 6. Construir predicciones
+  const cards: PredictionItem[] = allDue.map(c => {
+    const fr = failureRateMap[c.id] ?? (pendingMap[c.id] === -999 ? 1 : 0);
+    const mastery = Math.max(0, Math.round((1 - fr) * 100));
+    return {
+      cardId: Number(c.id),
+      question: c.front || '',
+      deckId: c.deck_id,
+      deckTitle: c.deck_title || '',
+      subjectId: c.subject_id || 0,
+      mastery,
+      urgency: mastery < 50 ? 'HIGH' as const : 'MEDIUM' as const,
+      failureRate: Math.round(fr * 100),
+    };
+  });
+
+  // 7. Ordenar igual que el backend: mastery ASC, next_review_date ASC
+  cards.sort((a, b) => a.mastery - b.mastery);
+
+  return {
+    dueCount: dueDeckCount,
+    deckCount: dueDeckCount,
+    cards: cards.slice(0, 20),
+  };
 }
