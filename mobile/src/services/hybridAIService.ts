@@ -637,13 +637,14 @@ async function persistDifferentiationCardLocally(
   if (!Number.isNaN(deckIdNum) && deckIdNum < 0) {
     // Mazo local MMKV
     try {
-      const { addLocalCard } = await import('./localFlashcardService');
+      const { addLocalCard, recalculateLocalDeckCounters } = await import('./localFlashcardService');
       addLocalCard(deckIdNum, {
         type: 'flashcard',
         data: { front, back },
         hint,
         explanation,
       });
+      recalculateLocalDeckCounters(deckIdNum);
     } catch (e) {
       console.warn('[persistDifferentiationCardLocally] Error guardando en MMKV:', e);
     }

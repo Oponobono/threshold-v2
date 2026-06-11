@@ -401,7 +401,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       <View style={{ flex: 1, width: '100%' }}>
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[s.sessionDone, { flexGrow: 1, paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingBottom: 24 }]}
+          contentContainerStyle={[s.sessionDone, { paddingHorizontal: horizontalPadding, paddingLeft: Math.max(insets.left, horizontalPadding), paddingRight: Math.max(insets.right, horizontalPadding), paddingBottom: 24 }]}
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.doneEmoji}>{pct >= 80 ? '🌟' : pct >= 50 ? '👍' : '💪'}</Text>

@@ -119,6 +119,7 @@ export function recalculateLocalDeckCounters(deckId: number): void {
 
     decks[idx] = {
       ...decks[idx],
+      card_count: cards.length,
       review_count: reviewCount,
       learning_count: learningCount,
       new_count: newCount,
