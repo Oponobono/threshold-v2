@@ -8,7 +8,7 @@
  *  - La opción correcta siempre se revela en verde.
  *  - Se muestra la explicación de por qué la respuesta es correcta.
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, TouchableWithoutFeedback
 } from 'react-native';
@@ -28,13 +28,14 @@ interface Props {
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
-/** Fisher-Yates shuffle (mutates array, returns it) */
+/** Fisher-Yates shuffle (returns new array) */
 function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
-  return arr;
+  return copy;
 }
 
 export const MultipleChoiceView: React.FC<Props> = ({
@@ -45,16 +46,15 @@ export const MultipleChoiceView: React.FC<Props> = ({
   const hintAnim = useRef(new Animated.Value(0)).current;
   const isNavigating = useRef(false);
 
-  // Shuffle order: shuffledPos → originalIndex (resets per question)
-  const shuffledIndices = useRef<number[]>([]);
-  if (shuffledIndices.current.length === 0) {
-    shuffledIndices.current = shuffle([...Array(content.options.length).keys()]);
-  }
+  // Shuffle order once per question — estable mientras item.id no cambie
+  const shuffledIndices = useMemo(
+    () => shuffle([...Array(content.options.length).keys()]),
+    [item.id]
+  );
 
   useEffect(() => {
     setHintVisible(false);
     hintAnim.setValue(0);
-    shuffledIndices.current = shuffle([...Array(content.options.length).keys()]);
   }, [item.id, hintAnim]);
 
   const toggleHint = () => {
@@ -132,7 +132,7 @@ export const MultipleChoiceView: React.FC<Props> = ({
 
       {/* Options grid 2x2 — rendered in shuffled order */}
       <View style={s.optionsGrid}>
-        {shuffledIndices.current.map((originalIdx, shuffledPos) => (
+        {shuffledIndices.map((originalIdx, shuffledPos) => (
           <TouchableOpacity
             key={originalIdx}
             style={getOptionStyle(shuffledPos, originalIdx)}

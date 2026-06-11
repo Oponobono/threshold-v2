@@ -67,6 +67,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   const [confusionSuggestions, setConfusionSuggestions] = useState<any[]>([]);
   const [isAnalyzingConfusions, setIsAnalyzingConfusions] = useState(false);
   const [generatingDiff, setGeneratingDiff] = useState<string | null>(null); // stores conceptA key being generated
+  const [needsLocalModel, setNeedsLocalModel] = useState(false);
 
   // Estado por tipo de ítem
   const [isAnswered, setIsAnswered]           = useState(false);
@@ -123,6 +124,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     setSessionDone(false);
     setStats({ correct: 0, incorrect: 0, total: 0 });
     setCardStartTime(Date.now());
+    setNeedsLocalModel(false);
   }, [initialCards, resetItemState]);
 
   const handleReveal = useCallback(() => setIsRevealed(true), []);
@@ -342,6 +344,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   useEffect(() => {
     if (!sessionDone || !activeDeck?.id || isAnalyzingConfusions) return;
     setIsAnalyzingConfusions(true);
+    setNeedsLocalModel(false);
     
     // Garantizar mínimo 2.5 segundos de visualización del banner
     const minTimerPromise = new Promise<void>(resolve => {
@@ -349,10 +352,23 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     });
     
     Promise.all([
-      analyzeDeckConfusions(activeDeck.id).catch(() => null),
+      (async () => {
+        try {
+          return await analyzeDeckConfusions(activeDeck.id);
+        } catch (e: any) {
+          if (e?.message?.includes('Anclas cognitivas')) {
+            setNeedsLocalModel(true);
+          }
+          return null;
+        }
+      })(),
       minTimerPromise
     ])
-      .then(([result]) => setConfusionSuggestions(result?.suggestions ?? []))
+      .then(([result]) => {
+        if (result) {
+          setConfusionSuggestions(result.suggestions ?? []);
+        }
+      })
       .finally(() => setIsAnalyzingConfusions(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionDone]);
@@ -410,7 +426,13 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
               <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.searchingConfusions')}</Text>
             </View>
           )}
-          {!isAnalyzingConfusions && confusionSuggestions.length > 0 && (
+          {!isAnalyzingConfusions && needsLocalModel && (
+            <View style={confusionStyles.banner}>
+              <Text style={confusionStyles.bannerTitle}>{t('flashcards.anclaTitle')}</Text>
+              <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.noLocalModel')}</Text>
+            </View>
+          )}
+          {!isAnalyzingConfusions && !needsLocalModel && confusionSuggestions.length > 0 && (
             <View style={confusionStyles.banner}>
               <Text style={confusionStyles.bannerTitle}>{t('flashcards.confusionTitle')}</Text>
               <Text style={confusionStyles.bannerSubtitle}>{t('flashcards.confusionSubtitle', { count: confusionSuggestions.length, plural: confusionSuggestions.length > 1 ? 'es' : '' })}</Text>

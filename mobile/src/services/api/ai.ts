@@ -287,7 +287,7 @@ export const analyzeDeckConfusions = async (deckId: number | string): Promise<{ 
 };
 
 /**
- * Genera una tarjeta de diferenciación y la añade al mazo.
+ * Genera un ancla cognitiva y la añade al mazo.
  */
 export const generateDifferentiationCard = async (deckId: number | string, conceptA: string, conceptB: string, reason: string) => {
   try {
@@ -297,9 +297,9 @@ export const generateDifferentiationCard = async (deckId: number | string, conce
       body: JSON.stringify({ conceptA, conceptB, reason }),
     });
     const data = await parseJsonSafely(response);
-    if (!response.ok) throw new Error(data?.error || 'Error al generar la tarjeta de diferenciación');
+    if (!response.ok) throw new Error(data?.error || 'Error al generar el ancla cognitiva');
     return data;
   } catch (error: any) {
-    throw new Error(error.message || 'Error de red al generar tarjeta');
+    throw new Error(error.message || 'Error de red al generar ancla cognitiva');
   }
 };

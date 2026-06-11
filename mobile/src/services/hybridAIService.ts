@@ -457,9 +457,14 @@ async function getLocalCardsForAnalysis(deckId: string): Promise<{ front: string
   return cards;
 }
 
-/** Ejecuta el análisis de confusiones con el LLM local */
+/** Ejecuta el análisis de confusiones con el LLM local (si hay modelo disponible) */
 async function analyzeDeckConfusionsLocal(cards: { front: string; back: string }[]): Promise<{ suggestions: any[] }> {
   if (cards.length < 2) return { suggestions: [] };
+
+  // Salir rápido si no hay modelo local descargado (evita intento de carga costoso)
+  if (!useLocalAIStore.getState().activeModelId) {
+    throw new Error('Para generar Anclas cognitivas necesitas un modelo de IA local. Descarga uno en Configuración > Motor de IA local.');
+  }
 
   try {
     await ensureLocalModel();
@@ -506,6 +511,14 @@ ${cardsJson}`;
  */
 export async function analyzeDeckConfusionsHybrid(deckId: number | string) {
   const resolved = await resolveProvider();
+  // Mazos locales (id negativo) nunca existen en el backend — saltar API cloud
+  const isLocalDeck = (typeof deckId === 'number' && deckId < 0) ||
+    (typeof deckId === 'string' && /^-\d+$/.test(deckId) && Number(deckId) < 0);
+
+  if (isLocalDeck) {
+    const localCards = await getLocalCardsForAnalysis(String(deckId));
+    return analyzeDeckConfusionsLocal(localCards);
+  }
 
   if (!resolved) {
     throw new Error('No hay conexión a internet ni modelo local disponible.');
@@ -516,16 +529,18 @@ export async function analyzeDeckConfusionsHybrid(deckId: number | string) {
     return analyzeDeckConfusionsLocal(localCards);
   }
 
-  // Cloud: intentar API, si devuelve vacío hacer fallback a local
+  // Cloud: intentar API. Si responde con suggestions (incluso vacío), confiar en el resultado.
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { analyzeDeckConfusions } = require('./api/ai');
     const cloudResult = await analyzeDeckConfusions(deckId);
-    if (cloudResult?.suggestions?.length > 0) {
+    // Array.isArray distingue "respuesta válida con []" de "undefined/null"
+    if (cloudResult && Array.isArray(cloudResult.suggestions)) {
       return cloudResult;
     }
   } catch {}
 
+  // Fallback a local solo si cloud falló (error de red, timeout, etc.)
   const localCards = await getLocalCardsForAnalysis(String(deckId));
   if (localCards.length >= 2) {
     return analyzeDeckConfusionsLocal(localCards);
@@ -535,7 +550,7 @@ export async function analyzeDeckConfusionsHybrid(deckId: number | string) {
 }
 
 /**
- * Persiste una tarjeta de diferenciación en el almacenamiento local.
+ * Persiste un ancla cognitiva en el almacenamiento local.
  * - Mazos locales (MMKV): usa addLocalCard.
  * - Mazos cloud (SQLite): usa flashcardRepository.create.
  */
@@ -582,7 +597,7 @@ async function persistDifferentiationCardLocally(
 }
 
 /**
- * Genera tarjeta de diferenciación.
+ * Genera un ancla cognitiva.
  * - Cloud: llama al backend y luego persiste localmente.
  * - Local: genera con el LLM local y persiste en MMKV.
  */
@@ -602,9 +617,15 @@ export async function generateDifferentiationCardHybrid(
   }
 
   if (resolved === 'local' || isLocalDeck) {
+    // Salir rápido si no hay modelo local — evitar intento de carga costoso
+    if (!useLocalAIStore.getState().activeModelId) {
+      throw new Error(isLocalDeck
+        ? 'Para generar Anclas cognitivas necesitas un modelo de IA local. Descarga uno en Configuración > Motor de IA local.'
+        : 'No hay modelo local disponible. Descarga un modelo en Configuración > Motor de IA local.');
+    }
     await ensureLocalModel();
     const prompt = `${getSystemPrompt()}
-Genera UNA tarjeta de diferenciación entre "${conceptA}" y "${conceptB}".
+Genera UN ancla cognitiva entre "${conceptA}" y "${conceptB}".
 Razón: ${reason}
 
 La tarjeta debe tener:
