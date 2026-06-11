@@ -220,6 +220,9 @@ export async function prepareDeckForSync(deckId: number, userId: number): Promis
       description: deck.description,
       subject_id: deck.subject_id,
       cards: cards.map(c => ({
+        id: c.id,
+        front: c.front || c.content?.front || '',
+        back: c.back || c.content?.back || '',
         item_type: c.item_type || 'flashcard',
         content_json: c.content || c.data,
         hint: c.hint,

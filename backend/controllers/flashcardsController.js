@@ -218,13 +218,48 @@ exports.createFlashcardDeck = (req, res) => {
 
   const deckId = clientId || uuidv4();
 
+  // UPSERT: si el mazo ya existe (por ej. re-sync tras añadir tarjetas), actualiza en lugar de fallar
   db.run(
-    `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, title = excluded.title, description = excluded.description`,
     [deckId, subject_id || null, userId, safeTitle, safeDescription || ''],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      console.log(`[CreateDeck] Mazo creado: ID=${deckId}, user_id=${userId}, title=${safeTitle}`);
-      res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 });
+      console.log(`[CreateDeck] Mazo creado/actualizado: ID=${deckId}, user_id=${userId}, title=${safeTitle}`);
+
+      // Insertar tarjetas incluidas en el payload (vienen del sync de mazos locales)
+      const cards = req.body.cards;
+      if (Array.isArray(cards) && cards.length > 0) {
+        let inserted = 0;
+        let cardErr = null;
+        const cardDone = () => {
+          if (++inserted === cards.length) {
+            if (cardErr) {
+              return res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: cards.length, cardError: cardErr.message });
+            }
+            res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: cards.length });
+          }
+        };
+        for (const card of cards) {
+          const cid = card.id || uuidv4();
+          const front = card.front || card.content_json?.front || card.data?.front || '';
+          const back = card.back || card.content_json?.back || card.data?.back || '';
+          const hint = card.hint || null;
+          const explanation = card.explanation || null;
+          const itemType = card.item_type || 'flashcard';
+          const contentJson = JSON.stringify({ front, back });
+          db.run(
+            `INSERT OR IGNORE INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+            [cid, deckId, front, back, itemType, contentJson, hint, explanation],
+            (cErr) => {
+              if (cErr && !cardErr) cardErr = cErr;
+              cardDone();
+            }
+          );
+        }
+      } else {
+        res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 });
+      }
     }
   );
 };
