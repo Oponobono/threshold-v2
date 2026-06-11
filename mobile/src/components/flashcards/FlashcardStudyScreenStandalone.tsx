@@ -343,8 +343,10 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
   // ─── Session Done: trigger confusion analysis once ──────────────────────────
   useEffect(() => {
     if (!sessionDone || !activeDeck?.id || isAnalyzingConfusions) return;
+    console.log('[SessionDone] Iniciando análisis para mazo:', activeDeck.id);
     setIsAnalyzingConfusions(true);
     setNeedsLocalModel(false);
+    setConfusionSuggestions([]);
     
     // Garantizar mínimo 2.5 segundos de visualización del banner
     const minTimerPromise = new Promise<void>(resolve => {
@@ -354,9 +356,12 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
     Promise.all([
       (async () => {
         try {
-          return await analyzeDeckConfusions(activeDeck.id);
+          const result = await analyzeDeckConfusions(activeDeck.id);
+          console.log('[SessionDone] Análisis completado:', result?.suggestions?.length ?? 0, 'sugerencias');
+          return result;
         } catch (e: any) {
-          if (e?.message?.includes('Anclas cognitivas')) {
+          console.warn('[SessionDone] Error en análisis:', e?.message);
+          if (e?.message?.includes('Anclas cognitivas') || e?.message?.includes('modelo local') || e?.message?.includes('Groq')) {
             setNeedsLocalModel(true);
           }
           return null;

@@ -504,19 +504,91 @@ ${cardsJson}`;
   }
 }
 
+/** Analiza confusiones con Groq directamente (para mazos locales) */
+async function analyzeDeckConfusionsWithGroq(
+  cards: { front: string; back: string }[],
+  apiKey: string,
+): Promise<{ suggestions: any[] }> {
+  const cardsJson = JSON.stringify(cards);
+  const body = {
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      {
+        role: 'system',
+        content: 'Eres un analista educativo experto. Identifica pares de conceptos en flashcards que los estudiantes podrían confundir. Devuelve SOLO un JSON válido.',
+      },
+      {
+        role: 'user',
+        content: `Analiza estas flashcards y encuentra pares de conceptos que los estudiantes podrían confundir (similitud semántica o estructural).
+
+Reglas:
+1. Encuentra máximo 3 pares de conceptos altamente confundibles.
+2. Si no hay ninguno, devuelve un array vacío [].
+3. Responde ÚNICAMENTE con un JSON array válido.
+
+Formato esperado:
+[
+  {
+    "conceptA": "Nombre del Concepto 1",
+    "conceptB": "Nombre del Concepto 2",
+    "reason": "Explicación breve de por qué el estudiante podría confundirlos"
+  }
+]
+
+Flashcards a analizar:
+${cardsJson}`,
+      },
+    ],
+    temperature: 0.3,
+    max_tokens: 1024,
+  };
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Error de Groq: ${errText}`);
+  }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+  if (!content) return { suggestions: [] };
+
+  const parsed = JSON.parse(content);
+  const suggestions = Array.isArray(parsed) ? parsed : (parsed.confusions || []);
+  return { suggestions };
+}
+
 /**
  * Analiza confusiones de un deck.
  * - Cloud: llama al backend existente.
- * - Local / fallback: lee las tarjetas del almacenamiento local y usa el LLM local.
+ * - Local: intenta Groq directo primero, fallback a LLM local.
  */
 export async function analyzeDeckConfusionsHybrid(deckId: number | string) {
   const resolved = await resolveProvider();
-  // Mazos locales (id negativo) nunca existen en el backend — saltar API cloud
   const isLocalDeck = (typeof deckId === 'number' && deckId < 0) ||
     (typeof deckId === 'string' && /^-\d+$/.test(deckId) && Number(deckId) < 0);
 
   if (isLocalDeck) {
     const localCards = await getLocalCardsForAnalysis(String(deckId));
+    if (localCards.length < 2) return { suggestions: [] };
+
+    // Intentar Groq directo primero (si no está forzado a local y hay API key)
+    const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
+    if (groqApiKey && resolved !== 'local') {
+      try {
+        console.log('[analyzeDeckConfusionsHybrid] Analizando mazo local via Groq...');
+        return await analyzeDeckConfusionsWithGroq(localCards, groqApiKey);
+      } catch (e: any) {
+        console.warn('[analyzeDeckConfusionsHybrid] Groq falló:', e?.message);
+      }
+    }
+
+    // Fallback a LLM local
     return analyzeDeckConfusionsLocal(localCards);
   }
 
@@ -534,13 +606,12 @@ export async function analyzeDeckConfusionsHybrid(deckId: number | string) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { analyzeDeckConfusions } = require('./api/ai');
     const cloudResult = await analyzeDeckConfusions(deckId);
-    // Array.isArray distingue "respuesta válida con []" de "undefined/null"
     if (cloudResult && Array.isArray(cloudResult.suggestions)) {
       return cloudResult;
     }
   } catch {}
 
-  // Fallback a local solo si cloud falló (error de red, timeout, etc.)
+  // Fallback a local solo si cloud falló
   const localCards = await getLocalCardsForAnalysis(String(deckId));
   if (localCards.length >= 2) {
     return analyzeDeckConfusionsLocal(localCards);
@@ -596,35 +667,79 @@ async function persistDifferentiationCardLocally(
   }
 }
 
-/**
- * Genera un ancla cognitiva.
- * - Cloud: llama al backend y luego persiste localmente.
- * - Local: genera con el LLM local y persiste en MMKV.
- */
-export async function generateDifferentiationCardHybrid(
+/** Genera un ancla cognitiva con Groq (para mazos locales) */
+async function generateAnchorWithGroq(
+  conceptA: string,
+  conceptB: string,
+  reason: string,
+  apiKey: string,
+): Promise<{ front: string; back: string; hint?: string; explanation?: string }> {
+  const body = {
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      {
+        role: 'system',
+        content: 'Eres un pedagogo experto creando Anclas cognitivas para ayudar a estudiantes a diferenciar conceptos confundibles.',
+      },
+      {
+        role: 'user',
+        content: `Genera UN ancla cognitiva entre "${conceptA}" y "${conceptB}".
+Razón: ${reason}
+
+La tarjeta debe tener:
+- Front: Una pregunta o escenario que obligue a diferenciar ambos conceptos.
+- Back: Respuesta que contraste ambos conceptos de forma clara y memorable.
+- Hint: Una regla mnemotécnica o pista rápida.
+- Explanation: Profundización técnica de por qué son distintos.
+
+Devuelve SOLO un JSON válido con: front, back, hint, explanation.`,
+      },
+    ],
+    temperature: 0.3,
+    max_tokens: 1024,
+  };
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Error de Groq: ${errText}`);
+  }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+  if (!content) throw new Error('Groq no devolvió contenido');
+
+  let card: { front: string; back: string; hint?: string; explanation?: string };
+  try {
+    card = JSON.parse(content);
+  } catch {
+    card = { front: conceptA, back: conceptB, hint: '', explanation: content };
+  }
+
+  if (!card.front || !card.back) {
+    throw new Error('Groq no generó el formato esperado (front/back).');
+  }
+
+  return card;
+}
+
+/** Genera un ancla cognitiva con el LLM local */
+async function generateAnchorLocally(
   deckId: number | string,
   conceptA: string,
   conceptB: string,
   reason: string,
-) {
-  const resolved = await resolveProvider();
-  // Los mazos locales (id negativo) no existen en el backend, siempre deben usar generación local
-  const isLocalDeck = (typeof deckId === 'number' && deckId < 0) ||
-    (typeof deckId === 'string' && /^-\d+$/.test(deckId) && Number(deckId) < 0);
-
-  if (!resolved && !isLocalDeck) {
-    throw new Error('No hay conexión a internet ni modelo local disponible.');
+): Promise<{ front: string; back: string; hint?: string; explanation?: string }> {
+  if (!useLocalAIStore.getState().activeModelId) {
+    throw new Error('No hay modelo local disponible. Descarga un modelo en Configuración > Motor de IA local.');
   }
-
-  if (resolved === 'local' || isLocalDeck) {
-    // Salir rápido si no hay modelo local — evitar intento de carga costoso
-    if (!useLocalAIStore.getState().activeModelId) {
-      throw new Error(isLocalDeck
-        ? 'Para generar Anclas cognitivas necesitas un modelo de IA local. Descarga uno en Configuración > Motor de IA local.'
-        : 'No hay modelo local disponible. Descarga un modelo en Configuración > Motor de IA local.');
-    }
-    await ensureLocalModel();
-    const prompt = `${getSystemPrompt()}
+  await ensureLocalModel();
+  const prompt = `${getSystemPrompt()}
 Genera UN ancla cognitiva entre "${conceptA}" y "${conceptB}".
 Razón: ${reason}
 
@@ -636,26 +751,67 @@ La tarjeta debe tener:
 
 Devuelve SOLO un JSON válido con: front, back, hint, explanation.`;
 
-    const result = await runInference({
-      prompt,
-      grammarType: 'differentiation',
-      temperature: 0.3,
-      maxTokens: 1024,
-    });
+  const result = await runInference({
+    prompt,
+    grammarType: 'differentiation',
+    temperature: 0.3,
+    maxTokens: 1024,
+  });
 
-    let card: { front: string; back: string; hint?: string; explanation?: string };
-    try {
-      card = JSON.parse(result.text);
-    } catch {
-      card = { front: conceptA, back: conceptB, hint: '', explanation: result.text };
+  let card: { front: string; back: string; hint?: string; explanation?: string };
+  try {
+    card = JSON.parse(result.text);
+  } catch {
+    card = { front: conceptA, back: conceptB, hint: '', explanation: result.text };
+  }
+
+  if (!card.front || !card.back) {
+    throw new Error('La IA local no generó el formato esperado (front/back).');
+  }
+
+  await persistDifferentiationCardLocally(deckId, card.front, card.back, card.hint, card.explanation);
+  return card;
+}
+
+/**
+ * Genera un ancla cognitiva.
+ * - Cloud: llama al backend y luego persiste localmente.
+ * - Local: intenta Groq directo primero, fallback a LLM local.
+ */
+export async function generateDifferentiationCardHybrid(
+  deckId: number | string,
+  conceptA: string,
+  conceptB: string,
+  reason: string,
+) {
+  const resolved = await resolveProvider();
+  const isLocalDeck = (typeof deckId === 'number' && deckId < 0) ||
+    (typeof deckId === 'string' && /^-\d+$/.test(deckId) && Number(deckId) < 0);
+
+  if (isLocalDeck) {
+    // Intentar Groq directo primero (si no está forzado a local y hay API key)
+    const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
+    if (groqApiKey && resolved !== 'local') {
+      try {
+        console.log('[generateDifferentiationCardHybrid] Generando ancla via Groq...');
+        const card = await generateAnchorWithGroq(conceptA, conceptB, reason, groqApiKey);
+        await persistDifferentiationCardLocally(deckId, card.front, card.back, card.hint, card.explanation);
+        return card;
+      } catch (e: any) {
+        console.warn('[generateDifferentiationCardHybrid] Groq falló:', e?.message);
+      }
     }
 
-    if (!card.front || !card.back) {
-      throw new Error('La IA local no generó el formato esperado (front/back).');
-    }
+    // Fallback a LLM local
+    return generateAnchorLocally(deckId, conceptA, conceptB, reason);
+  }
 
-    await persistDifferentiationCardLocally(deckId, card.front, card.back, card.hint, card.explanation);
-    return card;
+  if (!resolved) {
+    throw new Error('No hay conexión a internet ni modelo local disponible.');
+  }
+
+  if (resolved === 'local') {
+    return generateAnchorLocally(deckId, conceptA, conceptB, reason);
   }
 
   // Cloud: llamar al backend y luego persistir localmente para visibilidad inmediata
@@ -663,7 +819,6 @@ Devuelve SOLO un JSON válido con: front, back, hint, explanation.`;
   const { generateDifferentiationCard } = require('./api/ai');
   const cloudResponse = await generateDifferentiationCard(deckId, conceptA, conceptB, reason);
 
-  // Persistir localmente la respuesta del backend (con su mismo ID para evitar duplicados)
   if (cloudResponse?.front && cloudResponse?.back) {
     await persistDifferentiationCardLocally(
       deckId,
