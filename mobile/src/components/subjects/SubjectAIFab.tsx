@@ -26,7 +26,7 @@ import { SubjectAIChatModal } from './SubjectAIChatModal';
 import { RecordingItem } from '../../hooks/useAudioRecorder';
 import { YouTubeVideo } from '../../services/api/types';
 import { AIContextItemData } from '../ai/AIContextItem';
-import { buildAIContext } from '../../services/api/ai';
+import { buildAIContextHybrid } from '../../services/hybridAIService';
 import LottieView from 'lottie-react-native';
 
 const zyrenOrbAnimation = require('../../lottieFiles/ai_orb.json');
@@ -163,20 +163,21 @@ export const SubjectAIFab: React.FC<SubjectAIFabProps> = ({
           label: item.label,
         };
 
-        // En modo offline, incluir el ocr_text del cliente para que el servidor
-        // pueda usarlo si no encuentra el documento en la BD
-        if (item.type === 'document' || item.type === 'photo') {
-          if (item.rawItem?.ocr_text) {
-            payloadItem.ocr_text = item.rawItem.ocr_text;
-          }
+        // En modo offline, pasamos el texto extraído (OCR o transcripción) para construir el contexto localmente
+        if (item.searchText) {
+          payloadItem.extracted_text = item.searchText;
+        } else if (item.rawItem?.ocr_text) {
+          payloadItem.extracted_text = item.rawItem.ocr_text;
+        } else if (item.rawItem?.transcript_text) {
+          payloadItem.extracted_text = item.rawItem.transcript_text;
         }
 
         return payloadItem;
       });
 
-      console.log('[buildAIContext] Payload:', payload);
+      console.log('[buildAIContext] Payload preparado con', payload.length, 'items');
 
-      const result = await buildAIContext(payload);
+      const result = await buildAIContextHybrid(payload);
 
       setBuiltContext(result.context);
       setBuiltContextCount(result.itemsCount);

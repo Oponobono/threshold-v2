@@ -236,6 +236,46 @@ const migrations: Migration[] = [
       `ALTER TABLE youtube_videos ADD COLUMN cloud_url TEXT`,
     ],
   },
+  {
+    version: 3,
+    up: [
+      `CREATE TABLE IF NOT EXISTS assessment_files (
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        file_type TEXT,
+        local_uri TEXT,
+        cloud_url TEXT,
+        file_size INTEGER,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_assessment_files_assessment ON assessment_files(assessment_id)`,
+    ],
+  },
+  {
+    version: 4,
+    up: [
+      `ALTER TABLE audio_recordings ADD COLUMN summary_text TEXT`,
+      `ALTER TABLE youtube_videos ADD COLUMN summary_text TEXT`,
+    ],
+  },
+  {
+    version: 5,
+    up: [
+      `CREATE TABLE IF NOT EXISTS grade_history (
+        id TEXT PRIMARY KEY,
+        assessment_result_id TEXT NOT NULL,
+        old_raw_value REAL,
+        new_raw_value REAL NOT NULL,
+        changed_by TEXT,
+        changed_at TEXT DEFAULT (datetime('now')),
+        reason TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_grade_history_result ON grade_history(assessment_result_id)`,
+    ],
+  },
 ];
 
 export default migrations;

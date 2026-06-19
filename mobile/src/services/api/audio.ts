@@ -136,7 +136,19 @@ export const deleteAudioRecording = async (id: string) => {
   return { success: true };
 };
 
-export const upsertAudioTranscript = async (payload: { recording_id: string; transcript_uri?: string; transcript_text?: string; summary_uri?: string }) => {
+export const upsertAudioTranscript = async (payload: { recording_id: string; transcript_uri?: string; transcript_text?: string; summary_uri?: string; summary_text?: string }) => {
+  // Offline-First: Guardar localmente
+  if (payload.transcript_text || payload.summary_text) {
+    try {
+      await audioRepository.update(payload.recording_id, {
+        ...(payload.transcript_text ? { transcript_text: payload.transcript_text } : {}),
+        ...(payload.summary_text ? { summary_text: payload.summary_text } : {})
+      });
+    } catch (e) {
+      console.warn('[upsertAudioTranscript] No se pudo guardar transcript/summary localmente:', e);
+    }
+  }
+
   try {
     const response = await fetchWithFallback('/audio-transcripts', {
       method: 'POST',

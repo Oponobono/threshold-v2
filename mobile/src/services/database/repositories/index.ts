@@ -13,3 +13,4 @@ export { StudySessionRepository, studySessionRepository, type StudySession } fro
 export { CardLogRepository, cardLogRepository, type CardLog } from './CardLogRepository';
 export { SyncQueueRepository, syncQueueRepository, type SyncQueueItem } from './SyncQueueRepository';
 export { UserRepository, userRepository, type User } from './UserRepository';
+export { assessmentFileRepository, type AssessmentFile } from './AssessmentFileRepository';

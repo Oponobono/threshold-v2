@@ -100,7 +100,19 @@ export const deleteYouTubeVideo = async (id: string) => {
   }
 };
 
-export const upsertYouTubeTranscript = async (payload: { video_id: string; transcript_uri?: string; transcript_text?: string; summary_uri?: string }) => {
+export const upsertYouTubeTranscript = async (payload: { video_id: string; transcript_uri?: string; transcript_text?: string; summary_uri?: string; summary_text?: string }) => {
+  // Offline-First: Guardar localmente
+  if (payload.transcript_text || payload.summary_text) {
+    try {
+      await youTubeRepository.update(payload.video_id, {
+        ...(payload.transcript_text ? { transcript_text: payload.transcript_text } : {}),
+        ...(payload.summary_text ? { summary_text: payload.summary_text } : {})
+      });
+    } catch (e) {
+      console.warn('[upsertYouTubeTranscript] No se pudo guardar transcript/summary localmente:', e);
+    }
+  }
+
   try {
     const response = await fetchWithFallback('/youtube-transcripts', {
       method: 'POST',

@@ -301,15 +301,105 @@ export async function sendHybridChatMessage(
   return cloudResult;
 }
 
-/**
- * Obtiene el historial de chat (siempre desde cloud).
- */
-export { getChatHistory, clearChatHistory } from './api/ai';
+import { getChatHistory as cloudGetHistory, clearChatHistory as cloudClearHistory } from './api/ai';
 
 /**
- * Construye contexto académico (siempre desde cloud).
+ * Obtiene el historial de chat con fallback a caché local (MMKV).
  */
-export { buildAIContext } from './api/ai';
+export async function getChatHistory(userId: string | number, subjectId: string | number) {
+  const resolved = await resolveProvider();
+  
+  if (resolved !== 'local') {
+    try {
+      const result = await cloudGetHistory(userId, subjectId);
+      // Guardar en caché para uso offline
+      try {
+        const mmkv = require('react-native-mmkv').createMMKV();
+        mmkv.set(`cache:chat_history:${userId}:${subjectId}`, JSON.stringify(result));
+      } catch (e) {
+        console.warn('Error guardando historial de chat en caché:', e);
+      }
+      return result;
+    } catch (err: any) {
+      console.warn('[getChatHistory] Falló API, intentando leer caché local:', err.message);
+    }
+  }
+
+  // Fallback local
+  try {
+    const mmkv = require('react-native-mmkv').createMMKV();
+    const raw = mmkv.getString(`cache:chat_history:${userId}:${subjectId}`);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.warn('Error leyendo historial de chat desde caché:', e);
+  }
+  return { history: [] };
+}
+
+/**
+ * Limpia el historial de chat (local y en nube).
+ */
+export async function clearChatHistory(userId: string | number, subjectId: string | number) {
+  try {
+    const mmkv = require('react-native-mmkv').createMMKV();
+    mmkv.delete(`cache:chat_history:${userId}:${subjectId}`);
+  } catch (e) {
+    console.warn('Error borrando caché local de historial:', e);
+  }
+
+  const resolved = await resolveProvider();
+  if (resolved !== 'local') {
+    try {
+      return await cloudClearHistory(userId, subjectId);
+    } catch (err: any) {
+      console.warn('[clearChatHistory] Falló API, pero caché local fue borrada:', err.message);
+    }
+  }
+  return { success: true };
+}
+
+/**
+ * Construye contexto académico híbrido:
+ * Si hay red, usa el backend.
+ * Si no hay red (o forzado offline), ensambla el texto extraído (OCR/transcripciones) localmente.
+ */
+export async function buildAIContextHybrid(items: any[]) {
+  const resolved = await resolveProvider();
+
+  if (resolved !== 'local') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { buildAIContext } = require('./api/ai');
+      return await buildAIContext(items);
+    } catch (err: any) {
+      console.warn('[buildAIContextHybrid] Falló API, intentando construcción local:', err.message);
+    }
+  }
+
+  // Fallback a construcción local
+  console.log(`[buildAIContextHybrid] Ensamblando contexto localmente para ${items.length} items`);
+  let contextParts: string[] = [];
+  
+  for (const item of items) {
+    const text = item.extracted_text || item.ocr_text || item.transcript_text;
+    if (text && text.trim().length > 0) {
+      const typeLabel = 
+        item.type === 'document' ? 'Documento' :
+        item.type === 'photo' ? 'Foto/Imagen' :
+        item.type === 'video' ? 'Video' : 'Grabación';
+      
+      contextParts.push(`--- Inicio de ${typeLabel}: ${item.label} ---\n${text.trim()}\n--- Fin de ${typeLabel} ---`);
+    }
+  }
+
+  const assembledContext = contextParts.join('\n\n');
+  return {
+    context: assembledContext,
+    itemsCount: contextParts.length,
+  };
+}
 
 /**
  * Genera flashcards desde texto usando el proveedor resuelto.
@@ -637,7 +727,9 @@ async function persistDifferentiationCardLocally(
   if (!Number.isNaN(deckIdNum) && deckIdNum < 0) {
     // Mazo local MMKV
     try {
-      const { addLocalCard, recalculateLocalDeckCounters, enqueueLocalDeckForSync } = await import('./localFlashcardService');
+      const { addLocalCard, recalculateLocalDeckCounters, prepareDeckForSync } = await import('./localFlashcardService');
+      const { getUserId } = await import('./api');
+      
       addLocalCard(deckIdNum, {
         type: 'flashcard',
         data: { front, back },
@@ -645,7 +737,9 @@ async function persistDifferentiationCardLocally(
         explanation,
       });
       recalculateLocalDeckCounters(deckIdNum);
-      enqueueLocalDeckForSync(deckIdNum).catch(e =>
+      
+      const userId = Number(await getUserId());
+      prepareDeckForSync(deckIdNum, userId).catch(e =>
         console.warn('[persistDifferentiationCardLocally] Error encolando deck para sync:', e)
       );
     } catch (e) {

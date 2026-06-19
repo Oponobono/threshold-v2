@@ -381,3 +381,200 @@ export async function getLocalPredictions(userId: string): Promise<PredictionRes
     cards: cards.slice(0, 20),
   };
 }
+
+export async function getLocalDeckStats(deckId: number, userId: number): Promise<any> {
+  const db = databaseService.getDb();
+  
+  const deckRow = await db.getFirstAsync(
+    `SELECT d.*, s.name as subject_name 
+     FROM flashcard_decks d 
+     LEFT JOIN subjects s ON d.subject_id = s.id 
+     WHERE d.id = ? AND d.user_id = ?`,
+    deckId, userId
+  ) as any;
+  
+  if (!deckRow) throw new Error('Mazo no encontrado localmente');
+  
+  const cards = await db.getAllAsync(`SELECT * FROM flashcards WHERE deck_id = ?`, deckId) as any[];
+  const cardIds = cards.map(c => c.id);
+  
+  let totalReviews = 0;
+  let correctReviews = 0;
+  let difficult_cards: any[] = [];
+  let mastery_trend: any[] = [];
+  
+  if (cardIds.length > 0) {
+    const placeholders = cardIds.map(() => '?').join(',');
+    
+    // Total reviews
+    const logs = await db.getAllAsync(
+      `SELECT result, DATE(created_at) as review_date FROM card_logs WHERE card_id IN (${placeholders}) ORDER BY created_at ASC`,
+      ...cardIds
+    ) as any[];
+    
+    const trendMap: Record<string, { total: number; correct: number }> = {};
+    
+    for (const log of logs) {
+      totalReviews++;
+      const isCorrect = log.result === 'correct';
+      if (isCorrect) correctReviews++;
+      
+      const date = log.review_date || new Date().toISOString().split('T')[0];
+      if (!trendMap[date]) trendMap[date] = { total: 0, correct: 0 };
+      trendMap[date].total++;
+      if (isCorrect) trendMap[date].correct++;
+    }
+    
+    mastery_trend = Object.keys(trendMap).sort().map(date => ({
+      review_date: date,
+      total_attempts: trendMap[date].total,
+      correct_attempts: trendMap[date].correct,
+    }));
+    
+    // Difficult cards
+    const errorStats = await db.getAllAsync(
+      `SELECT card_id, 
+              COUNT(*) as total_attempts, 
+              SUM(CASE WHEN result = 'incorrect' THEN 1 ELSE 0 END) as error_count 
+       FROM card_logs 
+       WHERE card_id IN (${placeholders}) 
+       GROUP BY card_id 
+       HAVING error_count > 0
+       ORDER BY error_count DESC LIMIT 5`,
+      ...cardIds
+    ) as any[];
+    
+    difficult_cards = errorStats.map(stat => {
+      const card = cards.find(c => String(c.id) === String(stat.card_id));
+      return {
+        id: stat.card_id,
+        front: card?.front || 'Desconocida',
+        total_attempts: stat.total_attempts,
+        error_count: stat.error_count,
+        failure_rate: Math.round((stat.error_count / stat.total_attempts) * 100),
+        fsrs_stability: 0,
+        fsrs_difficulty: 0,
+      };
+    });
+  }
+
+  const now = new Date().toISOString();
+  
+  return {
+    deck_id: deckId,
+    title: deckRow.title,
+    description: deckRow.description || '',
+    subject_name: deckRow.subject_name || 'General',
+    mastery_percentage: totalReviews > 0 ? Math.round((correctReviews / totalReviews) * 100) : 0,
+    total_cards: cards.length,
+    mastered_cards: cards.filter(c => c.status === 'mastered').length,
+    learning_cards: cards.filter(c => c.status === 'learning' || c.status === 'review').length,
+    new_cards: cards.filter(c => c.status === 'new').length,
+    due_cards: cards.filter(c => c.next_review_date && c.next_review_date <= now && c.status !== 'mastered').length,
+    total_reviews: totalReviews,
+    difficult_cards,
+    mastery_trend,
+  };
+}
+
+export async function getLocalProgressTrends(userId: number, days: number = 30): Promise<any> {
+  const db = databaseService.getDb();
+  
+  // daily_mastery
+  const dailyLogs = await db.getAllAsync(
+    `SELECT DATE(created_at) as date, 
+            COUNT(*) as total_attempts, 
+            SUM(CASE WHEN result = 'correct' THEN 1 ELSE 0 END) as correct_attempts
+     FROM card_logs 
+     WHERE user_id = ? AND created_at >= date('now', '-${days} days')
+     GROUP BY DATE(created_at)
+     ORDER BY date ASC`,
+    userId
+  ) as any[];
+  
+  const daily_mastery = dailyLogs.map(row => ({
+    date: row.date,
+    total_attempts: row.total_attempts,
+    correct_attempts: row.correct_attempts,
+    daily_accuracy: row.total_attempts > 0 ? Math.round((row.correct_attempts / row.total_attempts) * 100) : 0,
+  }));
+  
+  // Subject progress
+  const masteryData = await getLocalMasteryData(String(userId), 'all');
+  const subject_progress = masteryData.radar.map(item => ({
+    subject_name: item.name,
+    mastery_percentage: item.value,
+    total_reviews: 0, // Simplified for offline
+    correct_reviews: 0,
+  }));
+  
+  return {
+    user_id: userId,
+    period_days: days,
+    daily_mastery,
+    cards_timeline: daily_mastery.map(d => ({ date: d.date, cards_reviewed: d.total_attempts, cards_mastered: 0 })),
+    subject_progress,
+  };
+}
+
+export async function getLocalSemesterSummary(userId: number): Promise<any> {
+  const db = databaseService.getDb();
+  
+  const subjects = await db.getAllAsync(`SELECT * FROM subjects WHERE user_id = ?`, userId) as any[];
+  const gpaData = await getLocalGlobalGPA(String(userId));
+  
+  const criticalSubjects: any[] = [];
+  let approvedCount = 0;
+  let atRiskCount = 0;
+  
+  for (const sub of subjects) {
+    const subGpa = sub.avg_score || sub.gpa_equivalent || 0;
+    const target = sub.target_grade || 3.0; // Assume 3.0 passing if not set
+    
+    if (subGpa >= target) approvedCount++;
+    else if (subGpa > 0) atRiskCount++;
+    
+    if (subGpa > 0 && subGpa < target) {
+      criticalSubjects.push({
+        id: sub.id,
+        name: sub.name,
+        avgScore: parseFloat(subGpa.toFixed(2)),
+        delta: parseFloat((subGpa - target).toFixed(2)),
+        color: sub.color || '#3B82F6',
+        targetGrade: target,
+        icon: sub.icon || 'book',
+      });
+    }
+  }
+  
+  criticalSubjects.sort((a, b) => a.delta - b.delta); // most negative first
+  
+  // Recent activity
+  const recentLogs = await db.getAllAsync(
+    `SELECT a.id, a.name, a.subject_id, s.name as subjectName, s.color as subjectColor, a.created_at as date
+     FROM assessments a
+     JOIN subjects s ON a.subject_id = s.id
+     WHERE s.user_id = ?
+     ORDER BY a.created_at DESC LIMIT 5`,
+    userId
+  ) as any[];
+  
+  const recentActivity = recentLogs.map(r => ({
+    id: r.id,
+    name: r.name,
+    subjectId: r.subject_id,
+    subjectName: r.subjectName,
+    subjectColor: r.subjectColor,
+    date: r.date,
+  }));
+  
+  return {
+    overallGpa: gpaData.currentAverage,
+    totalCredits: subjects.reduce((sum, s) => sum + (s.credits || 0), 0),
+    subjectCount: subjects.length,
+    approvedCount,
+    atRiskCount,
+    criticalSubjects: criticalSubjects.slice(0, 3),
+    recentActivity,
+  };
+}

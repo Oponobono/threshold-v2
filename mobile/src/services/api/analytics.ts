@@ -289,6 +289,16 @@ export const getUserStats = async (userId: number): Promise<UserStats> => {
  * Obtiene estadísticas detalladas de un mazo específico
  */
 export const getDeckStats = async (deckId: number, userId: number): Promise<DeckStats> => {
+  try {
+    const { getLocalDeckStats } = await import('../localMasteryService');
+    const localData = await getLocalDeckStats(deckId, userId);
+    if (localData && localData.total_cards > 0) {
+      return localData as DeckStats;
+    }
+  } catch (err) {
+    console.warn('[Analytics] Local deck stats calculation failed:', err);
+  }
+
   const response = await fetchWithFallback(`/analytics/deck-stats/${deckId}/${userId}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
@@ -304,6 +314,16 @@ export const getDeckStats = async (deckId: number, userId: number): Promise<Deck
  * @param days Número de días a analizar (7-365, default 30)
  */
 export const getProgressTrends = async (userId: number, days?: number): Promise<ProgressTrends> => {
+  try {
+    const { getLocalProgressTrends } = await import('../localMasteryService');
+    const localData = await getLocalProgressTrends(userId, days || 30);
+    if (localData && localData.daily_mastery.length > 0) {
+      return localData as ProgressTrends;
+    }
+  } catch (err) {
+    console.warn('[Analytics] Local progress trends calculation failed:', err);
+  }
+
   const query = days ? `?days=${days}` : '';
   const response = await fetchWithFallback(`/analytics/progress-trends/${userId}${query}`, {
     method: 'GET',
@@ -365,12 +385,21 @@ export const getSemesterSummary = async (): Promise<SemesterSummary> => {
     return data;
   } catch (error) {
     console.warn('[Analytics] Network error, falling back to cached semester summary:', error);
-    const cached = await storageService.getLocal('app:cache:semester_summary');
-    if (cached) {
-      console.log('[Analytics] ✅ Loaded semester summary from cache (offline mode)');
-      return JSON.parse(cached) as SemesterSummary;
+    
+    try {
+      const { getLocalSemesterSummary } = await import('../localMasteryService');
+      const localData = await getLocalSemesterSummary(Number(userId));
+      console.log('[Analytics] ✅ Loaded semester summary from local calculation (offline mode)');
+      return localData as SemesterSummary;
+    } catch (localErr) {
+      console.warn('[Analytics] Local semester summary calculation failed:', localErr);
+      const cached = await storageService.getLocal('app:cache:semester_summary');
+      if (cached) {
+        console.log('[Analytics] ✅ Loaded semester summary from cache (offline mode)');
+        return JSON.parse(cached) as SemesterSummary;
+      }
+      throw error;
     }
-    throw error;
   }
 };
 

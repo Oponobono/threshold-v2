@@ -169,6 +169,7 @@ export interface AudioRecording {
   transcript_uri?: string;
   transcript_text?: string;
   summary_uri?: string;
+  summary_text?: string;
   cloud_url?: string;
   is_backed_up?: number;
   id_string?: string;
@@ -192,6 +193,7 @@ export interface YouTubeVideo {
   transcript_uri?: string;
   transcript_text?: string;
   summary_uri?: string;
+  summary_text?: string;
 }
 
 export interface AssessmentCategory {

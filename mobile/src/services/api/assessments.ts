@@ -133,9 +133,40 @@ export const getProjectionAnalytics = async (subjectId: string) => {
   try {
     const response = await fetchWithFallback(`/assessments/analytics/subject/${subjectId}/projection`);
     const data = await parseJsonSafely(response);
-    if (response.ok && data) return data;
-    return null;
+    if (response.ok && data && data.assessmentCount > 0) return data;
+    // API returned empty data — fall through to local calculation
+    throw new Error('empty_response');
   } catch {
-    return null;
+    // ── Fallback: calcular proyección 100% local desde SQLite ──
+    try {
+      const localAssessments = await assessmentRepository.getBySubject(subjectId) as Assessment[];
+      if (!localAssessments || localAssessments.length === 0) return null;
+
+      const { calculateProjection } = await import('../../utils/projectionEngine');
+      const result = calculateProjection(localAssessments, null, null);
+
+      const gradedCount = localAssessments.filter(
+        a => a.score != null || a.grade_value != null || a.normalized_value != null
+      ).length;
+
+      if (gradedCount === 0) return null;
+
+      console.log(`[getProjectionAnalytics] ✅ Proyección local calculada offline para materia ${subjectId}`);
+      return {
+        currentAverage: result.currentAverage,
+        currentEMA: result.currentEMA,
+        projectedGrade: result.projectedGrade,
+        delta: result.delta,
+        evaluatedWeight: result.evaluatedWeight,
+        remainingWeight: result.remainingWeight,
+        assessmentCount: gradedCount,
+        maxScale: 5, // SCALE_MAX
+        _isLocal: true,
+      };
+    } catch (localErr) {
+      console.warn('[getProjectionAnalytics] Cálculo local falló:', localErr);
+      return null;
+    }
   }
 };
+

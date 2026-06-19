@@ -21,8 +21,8 @@ import {
  Image as RNImage } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getChatHistory, clearChatHistory, generateStudyMaterialFromChat } from '../../services/api/ai';
-import { sendHybridChatMessage, processDocumentUploadHybrid } from '../../services/hybridAIService';
+import { generateStudyMaterialFromChat } from '../../services/api/ai';
+import { sendHybridChatMessage, generateHybridStudyMaterial, getChatHistory, clearChatHistory, processDocumentUploadHybrid } from '../../services/hybridAIService';
 import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import * as DocumentPicker from 'expo-document-picker';

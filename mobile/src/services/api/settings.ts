@@ -36,10 +36,21 @@ export interface TwoFactorStatus {
 }
 
 export const getGradingPeriods = async (): Promise<GradingPeriod[]> => {
-  const response = await fetchWithFallback('/grading-periods');
-  if (!response.ok) throw new Error('Error al obtener períodos');
-  const data = await parseJsonSafely(response);
-  return data?.periods || [];
+  const mmkv = require('react-native-mmkv').createMMKV();
+  const cacheKey = 'cache:settings:grading_periods';
+  
+  try {
+    const response = await fetchWithFallback('/grading-periods');
+    if (!response.ok) throw new Error('Error al obtener períodos');
+    const data = await parseJsonSafely(response);
+    const periods = data?.periods || [];
+    mmkv.set(cacheKey, JSON.stringify(periods));
+    return periods;
+  } catch (error) {
+    const cached = mmkv.getString(cacheKey);
+    if (cached) return JSON.parse(cached);
+    throw error;
+  }
 };
 
 export const createGradingPeriod = async (name: string, period_type: string = 'custom', start_date?: string, end_date?: string): Promise<any> => {
@@ -70,10 +81,21 @@ export const deleteGradingPeriod = async (id: string): Promise<void> => {
 };
 
 export const getThresholdOverrides = async (): Promise<ThresholdOverride[]> => {
-  const response = await fetchWithFallback('/threshold-overrides');
-  if (!response.ok) throw new Error('Error al obtener excepciones');
-  const data = await parseJsonSafely(response);
-  return data?.overrides || [];
+  const mmkv = require('react-native-mmkv').createMMKV();
+  const cacheKey = 'cache:settings:threshold_overrides';
+  
+  try {
+    const response = await fetchWithFallback('/threshold-overrides');
+    if (!response.ok) throw new Error('Error al obtener excepciones');
+    const data = await parseJsonSafely(response);
+    const overrides = data?.overrides || [];
+    mmkv.set(cacheKey, JSON.stringify(overrides));
+    return overrides;
+  } catch (error) {
+    const cached = mmkv.getString(cacheKey);
+    if (cached) return JSON.parse(cached);
+    throw error;
+  }
 };
 
 export const saveThresholdOverrides = async (overrides: { subjectId: string; threshold: string }[]): Promise<void> => {
@@ -111,9 +133,20 @@ export const createCustomGradingSystem = async (data: {
 };
 
 export const getTwoFactorStatus = async (): Promise<TwoFactorStatus> => {
-  const response = await fetchWithFallback('/two-factor/status');
-  if (!response.ok) throw new Error('Error al obtener estado 2FA');
-  return await parseJsonSafely(response);
+  const mmkv = require('react-native-mmkv').createMMKV();
+  const cacheKey = 'cache:settings:two_factor_status';
+  
+  try {
+    const response = await fetchWithFallback('/two-factor/status');
+    if (!response.ok) throw new Error('Error al obtener estado 2FA');
+    const data = await parseJsonSafely(response);
+    mmkv.set(cacheKey, JSON.stringify(data));
+    return data;
+  } catch (error) {
+    const cached = mmkv.getString(cacheKey);
+    if (cached) return JSON.parse(cached);
+    throw error;
+  }
 };
 
 export const enableTwoFactor = async (): Promise<TwoFactorStatus> => {
@@ -129,10 +162,21 @@ export const disableTwoFactor = async (): Promise<TwoFactorStatus> => {
 };
 
 export const getLmsAccounts = async (): Promise<LmsAccount[]> => {
-  const response = await fetchWithFallback('/lms-accounts');
-  if (!response.ok) throw new Error('Error al obtener cuentas LMS');
-  const data = await parseJsonSafely(response);
-  return data?.accounts || [];
+  const mmkv = require('react-native-mmkv').createMMKV();
+  const cacheKey = 'cache:settings:lms_accounts';
+  
+  try {
+    const response = await fetchWithFallback('/lms-accounts');
+    if (!response.ok) throw new Error('Error al obtener cuentas LMS');
+    const data = await parseJsonSafely(response);
+    const accounts = data?.accounts || [];
+    mmkv.set(cacheKey, JSON.stringify(accounts));
+    return accounts;
+  } catch (error) {
+    const cached = mmkv.getString(cacheKey);
+    if (cached) return JSON.parse(cached);
+    throw error;
+  }
 };
 
 export const addLmsAccount = async (platform: string, instance_url: string, username: string): Promise<LmsAccount> => {

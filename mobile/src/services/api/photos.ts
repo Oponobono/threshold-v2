@@ -164,9 +164,37 @@ export const updatePhoto = async (photoId: string, data: { ocr_text?: string; ta
 };
 
 export const searchPhotosByTag = async (subjectId: string, tag: string): Promise<Photo[]> => {
+  // 1. Búsqueda local en SQLite (tags + ocr_text) — funciona 100% offline
+  try {
+    const localResults = await photoRepository.searchByTagOrOcr(subjectId, tag);
+    if (localResults.length > 0) {
+      // Sincronizar en background para tener resultados de la nube también
+      (async () => {
+        try {
+          const response = await fetchWithFallback(`/photos/${subjectId}/search?tag=${encodeURIComponent(tag)}`);
+          const data = await parseJsonSafely(response);
+          if (response.ok && Array.isArray(data)) {
+            for (const p of data) await photoRepository.upsert(p);
+          }
+        } catch {}
+      })();
+      return localResults as Photo[];
+    }
+  } catch (localErr) {
+    console.warn('[searchPhotosByTag] Error en búsqueda local:', localErr);
+  }
+
+  // 2. Fallback a API si no hubo resultados locales
   try {
     const response = await fetchWithFallback(`/photos/${subjectId}/search?tag=${encodeURIComponent(tag)}`);
     const data = await parseJsonSafely(response);
+    if (response.ok && Array.isArray(data)) {
+      // Persistir resultados para futuras búsquedas offline
+      for (const p of data) {
+        try { await photoRepository.upsert(p); } catch {}
+      }
+      return data;
+    }
     return data || [];
   } catch {
     return [];
