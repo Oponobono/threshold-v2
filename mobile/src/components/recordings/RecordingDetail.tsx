@@ -352,7 +352,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       try {
         const result = await Audio.Sound.createAsync(
           { uri: audioUri },
-          { shouldPlay: true, progressUpdateIntervalMillis: 100 },
+          { shouldPlay: true, progressUpdateIntervalMillis: 500 },
         );
         sound = result.sound;
       } catch (firstErr) {
@@ -361,7 +361,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
           console.warn('[RecordingDetail] Reintentando playback sin prefijo file://:', rawPath);
           const fallbackResult = await Audio.Sound.createAsync(
             { uri: rawPath },
-            { shouldPlay: true, progressUpdateIntervalMillis: 100 },
+            { shouldPlay: true, progressUpdateIntervalMillis: 500 },
           );
           sound = fallbackResult.sound;
         } else {

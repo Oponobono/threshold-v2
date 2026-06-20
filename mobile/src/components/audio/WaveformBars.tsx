@@ -41,23 +41,31 @@ export const WaveformBars: React.FC<WaveformBarsProps> = ({ isPlaying }) => {
 
     activeRef.current = true;
 
-    const animateBar = (anim: Animated.Value) => {
-      if (!activeRef.current) return;
-      const target = 0.25 + Math.random() * 0.85;
-      Animated.timing(anim, {
-        toValue: target,
-        duration: 120 + Math.random() * 220,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished && activeRef.current) animateBar(anim);
-      });
-    };
-
+    // Usar Animated.loop para ejecutar todo nativamente sin bloquear el bridge de JS
     anims.forEach((anim, i) => {
-      setTimeout(() => animateBar(anim), i * 25);
+      setTimeout(() => {
+        if (!activeRef.current) return;
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, {
+              toValue: 1.0, // Altura máxima
+              duration: 250,
+              useNativeDriver: true,
+            }),
+            Animated.timing(anim, {
+              toValue: 0.3, // Altura mínima
+              duration: 250,
+              useNativeDriver: true,
+            })
+          ])
+        ).start();
+      }, i * 50); // Desfase inicial para efecto visual
     });
 
-    return () => { activeRef.current = false; };
+    return () => {
+      activeRef.current = false;
+      anims.forEach(anim => anim.stopAnimation());
+    };
   }, [isPlaying]);
 
   return (
