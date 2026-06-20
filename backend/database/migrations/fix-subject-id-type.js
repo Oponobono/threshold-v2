@@ -15,7 +15,7 @@ const SUBJECT_ID_TABLES = [
   { table: 'youtube_videos',                   column: 'subject_id', fk: true },
   { table: 'flashcard_decks',                  column: 'subject_id', fk: true },
   { table: 'learning_analytics',               column: 'subject_id', fk: true },
-  { table: 'review_predictions',               column: 'subject_id', fk: true },
+
   { table: 'subject_threshold_overrides',      column: 'subject_id', fk: true },
   { table: 'subject_grade_snapshots',          column: 'subject_id', fk: true },
   { table: 'calendar_events',                  column: 'subject_id', fk: true },
