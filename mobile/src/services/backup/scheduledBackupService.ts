@@ -91,6 +91,7 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
         includeAudio: true,
         includeDocs: true,
         includeTranscripts: true,
+        includeAssessmentFiles: true,
       });
       console.log(`[ScheduledBackup] 🗂️ Multimedia: ${result.uploaded} subidos, ${result.errors} errores`);
     }
@@ -211,6 +212,7 @@ export const testScheduledBackupNow = async (
         includeAudio: true,
         includeDocs: true,
         includeTranscripts: true,
+        includeAssessmentFiles: true,
       });
       if (result.uploaded > 0) hasNewData = true;
       totalUploaded = result.uploaded;

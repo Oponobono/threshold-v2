@@ -1,10 +1,13 @@
-import React from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 
 import { subjectsStyles } from '../../styles/Subjects.styles';
 import { normalizeGrade, SCALE_MAX } from '../../utils/grades';
+import { assessmentFileRepository } from '../../services/database';
+import { ImageViewerModal } from '../modals/ImageViewerModal';
+import { alertRef } from '../ui/CustomAlert';
 
 interface AssessmentsSectionProps {
   subject: any;
@@ -21,7 +24,57 @@ const ICON_MAP: Record<string, string> = {
 
 const BAR_COLORS = ['#5856D6', '#FF9500', '#34C759', '#FF2D55'];
 
+const getFileIcon = (fileName: string): string => {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return 'image-outline';
+  if (['pdf'].includes(ext)) return 'file-pdf-box';
+  if (['doc', 'docx'].includes(ext)) return 'file-word-box';
+  if (['xls', 'xlsx'].includes(ext)) return 'file-excel-box';
+  if (['ppt', 'pptx'].includes(ext)) return 'file-powerpoint-box';
+  return 'file-document-outline';
+};
+
 export const AssessmentsSection: React.FC<AssessmentsSectionProps> = ({ subject, assessments, t }) => {
+  const [filesMap, setFilesMap] = useState<Record<string, any[]>>({});
+  const [previewPhotos, setPreviewPhotos] = useState<any[]>([]);
+  const [isViewerVisible, setIsViewerVisible] = useState(false);
+
+  useEffect(() => {
+    const fetchFiles = async () => {
+      const newMap: Record<string, any[]> = {};
+      for (const a of assessments) {
+        if (a.id) {
+          try {
+            const files = await assessmentFileRepository.getByAssessment(a.id);
+            if (files && files.length > 0) {
+              newMap[a.id] = files;
+            }
+          } catch (e) {
+            console.warn('Error fetching assessment files:', e);
+          }
+        }
+      }
+      setFilesMap(newMap);
+    };
+    if (assessments.length > 0) {
+      fetchFiles();
+    }
+  }, [assessments]);
+
+  const handleFileIconPress = (file: any) => {
+    const ext = file.file_name.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+      setPreviewPhotos([{ id: file.id, local_uri: file.local_uri }]);
+      setIsViewerVisible(true);
+    } else {
+      alertRef.show({
+        title: t('common.notice') || 'Aviso',
+        message: t('assessments.noPreviewAvailable') || 'La previsualización solo está disponible para imágenes.',
+        type: 'info'
+      });
+    }
+  };
+
   return (
     <View style={subjectsStyles.assessCard}>
       <View style={[subjectsStyles.assessHeader, { marginBottom: 16 }]}>
@@ -84,7 +137,25 @@ export const AssessmentsSection: React.FC<AssessmentsSectionProps> = ({ subject,
                   </View>
                   <View style={subjectsStyles.assessBody}>
                     <Text style={subjectsStyles.assessName} numberOfLines={1}>{a.name}</Text>
-                    <Text style={subjectsStyles.assessMeta}>{a.date || 'Sin fecha'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <Text style={subjectsStyles.assessMeta}>{a.date || 'Sin fecha'}</Text>
+                      {filesMap[a.id] && filesMap[a.id].length > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, gap: 4 }}>
+                          {filesMap[a.id].slice(0, 3).map((file, fIndex) => (
+                            <TouchableOpacity key={file.id || fIndex} onPress={() => handleFileIconPress(file)}>
+                              <MaterialCommunityIcons 
+                                name={getFileIcon(file.file_name) as any} 
+                                size={14} 
+                                color={theme.colors.text.secondary} 
+                              />
+                            </TouchableOpacity>
+                          ))}
+                          {filesMap[a.id].length > 3 && (
+                            <Text style={{ fontSize: 10, color: theme.colors.text.secondary }}>+{filesMap[a.id].length - 3}</Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
                   </View>
                   <View style={subjectsStyles.assessRight}>
                     <Text style={[subjectsStyles.assessScore, { color: a.display_color || color }]}>
@@ -133,6 +204,17 @@ export const AssessmentsSection: React.FC<AssessmentsSectionProps> = ({ subject,
             </View>
           </View>
         </>
+      )}
+
+      {isViewerVisible && (
+        <ImageViewerModal
+          isVisible={isViewerVisible}
+          photos={previewPhotos}
+          onClose={() => setIsViewerVisible(false)}
+          onPhotoDeleted={() => {
+            setIsViewerVisible(false);
+          }}
+        />
       )}
     </View>
   );

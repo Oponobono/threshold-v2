@@ -56,6 +56,7 @@ export interface CloudItemsResponse {
   audio: CloudItem[];
   docs: CloudItem[];
   transcripts: CloudItem[];
+  assessmentFiles: CloudItem[];
 }
 
 export interface DownloadProgress {
@@ -243,6 +244,37 @@ export const downloadCloudItems = async (
     }
   }
 
+  // ── Soportes de Evaluaciones ──
+  if (prefs.includeAssessmentFiles) {
+    const assessFilesDir = await getDownloadSubdirUri('assessment_files');
+    for (const item of data.assessmentFiles || []) {
+      tasks.push(async () => {
+        const ext = item.name?.split('.').pop() || 'bin';
+        const baseName = (item.name || `assessment_file_${item.id}`).replace(/\.[^.]+$/, '').replace(/[/\\:*?"<>|]/g, '_');
+        const filename = `${baseName}.${ext}`;
+        const localUri = `${assessFilesDir}${filename}`;
+
+        const info = await FileSystem.getInfoAsync(localUri);
+        if (info.exists) { result.skipped++; return; }
+        if (item.cloud_url === 'ghost_file') { result.skipped++; return; }
+
+        try {
+          console.log(`[DownloadService] Descargando Soporte de Evaluación: ${item.cloud_url} -> ${localUri}`);
+          await FileSystem.downloadAsync(item.cloud_url, localUri);
+          await fetchWithFallback('/backup/restore-local-uri', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'assessment_file', id: item.id, local_uri: localUri }),
+          });
+          result.downloaded++;
+        } catch (err) {
+          console.error(`[DownloadService] ERROR descargando soporte de evaluación ${item.id}:`, err);
+          result.errors++;
+        }
+      });
+    }
+  }
+
   // Ejecutar con progreso
   const total = tasks.length;
   let done = 0;
@@ -274,7 +306,8 @@ export const getCloudItemsCount = async (): Promise<number> => {
       (data.photos?.length || 0) +
       (data.audio?.length || 0) +
       (data.docs?.length || 0) +
-      (data.transcripts?.length || 0)
+      (data.transcripts?.length || 0) +
+      (data.assessmentFiles?.length || 0)
     );
   } catch {
     return 0;

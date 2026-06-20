@@ -68,6 +68,7 @@ export const useBackupLogic = () => {
     includeAudio: true,
     includeDocs: true,
     includeTranscripts: true,
+    includeAssessmentFiles: true,
     lastRun: null,
     lastDownload: null,
   });
@@ -77,6 +78,7 @@ export const useBackupLogic = () => {
     audio: { total: 0, backed: 0 },
     docs: { total: 0, backed: 0 },
     transcripts: { total: 0, backed: 0 },
+    assessmentFiles: { total: 0, backed: 0 },
   });
 
   const [cloudItemsCount, setCloudItemsCount] = useState(0);
@@ -179,6 +181,7 @@ export const useBackupLogic = () => {
           includeTranscripts: true,
           includePhotos: true,
           includeAudio: true,
+          includeAssessmentFiles: true,
         };
 
         await showBackupUploadNotification(0);
@@ -329,10 +332,11 @@ export const useBackupLogic = () => {
     (Number(stats.photos.total) - Number(stats.photos.backed)) +
     (Number(stats.audio.total) - Number(stats.audio.backed)) +
     (Number(stats.docs.total) - Number(stats.docs.backed)) +
-    (Number(stats.transcripts.total) - Number(stats.transcripts.backed));
+    (Number(stats.transcripts.total) - Number(stats.transcripts.backed)) +
+    (Number(stats.assessmentFiles?.total || 0) - Number(stats.assessmentFiles?.backed || 0));
 
-  const totalCount = Number(stats.photos.total) + Number(stats.audio.total) + Number(stats.docs.total) + Number(stats.transcripts.total);
-  const backedCount = Number(stats.photos.backed) + Number(stats.audio.backed) + Number(stats.docs.backed) + Number(stats.transcripts.backed);
+  const totalCount = Number(stats.photos.total) + Number(stats.audio.total) + Number(stats.docs.total) + Number(stats.transcripts.total) + Number(stats.assessmentFiles?.total || 0);
+  const backedCount = Number(stats.photos.backed) + Number(stats.audio.backed) + Number(stats.docs.backed) + Number(stats.transcripts.backed) + Number(stats.assessmentFiles?.backed || 0);
 
   const isBackupRunning = isUploading || isDownloading;
 

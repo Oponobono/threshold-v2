@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert } from
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../styles/theme';
 import { globalStyles } from '../../styles/globalStyles';
 import { alertRef } from '../ui/CustomAlert';
@@ -44,7 +45,17 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
   const handlePickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*', 'application/msword', 'text/plain'],
+        type: [
+          'application/pdf', 
+          'image/*', 
+          'application/msword', 
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'text/plain'
+        ],
         multiple: false,
       });
 
@@ -63,6 +74,45 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
       await handleUpload(file);
     } catch (error) {
       console.error('[AssessmentFileManager] Error picking file:', error);
+      alertRef.show({
+        title: t('common.error'),
+        message: t('assessments.filePickError'),
+        type: 'error',
+      });
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        alertRef.show({
+          title: t('common.error'),
+          message: t('common.cameraPermissionRequired') || 'Se requiere permiso de cámara',
+          type: 'error',
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        if (!asset.uri) return;
+        
+        const fileName = asset.uri.split('/').pop() || `photo_${Date.now()}.jpg`;
+        await handleUpload({
+          uri: asset.uri,
+          name: fileName,
+          size: asset.fileSize,
+          mimeType: asset.mimeType || 'image/jpeg',
+        });
+      }
+    } catch (error) {
+      console.error('[AssessmentFileManager] Error taking photo:', error);
       alertRef.show({
         title: t('common.error'),
         message: t('assessments.filePickError'),
@@ -208,39 +258,67 @@ export const AssessmentFileManager = ({ assessmentId, onFilesUpdated }: Assessme
         />
       )}
 
-      <TouchableOpacity
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderStyle: 'dashed',
-          borderColor: theme.colors.primary,
-          backgroundColor: theme.colors.card,
-          opacity: isUploading ? 0.6 : 1,
-        }}
-        onPress={handlePickFile}
-        disabled={isUploading}
-      >
-        {isUploading ? (
-          <>
-            <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: 8 }} />
-            <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '500' }}>
-              {t('assessments.uploading')}
-            </Text>
-          </>
-        ) : (
-          <>
-            <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} style={{ marginRight: 8 }} />
-            <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '500' }}>
-              {t('assessments.attachFile')}
-            </Text>
-          </>
-        )}
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 12,
+            paddingHorizontal: 10,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: theme.colors.primary,
+            backgroundColor: theme.colors.card,
+            opacity: isUploading ? 0.6 : 1,
+          }}
+          onPress={handlePickFile}
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          ) : (
+            <>
+              <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '500' }}>
+                {t('assessments.attachFile')}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 12,
+            paddingHorizontal: 10,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: theme.colors.primary,
+            backgroundColor: theme.colors.card,
+            opacity: isUploading ? 0.6 : 1,
+          }}
+          onPress={handleTakePhoto}
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          ) : (
+            <>
+              <Ionicons name="camera-outline" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '500' }}>
+                {t('dashboard.quickAddMenu.takePhotoLabel') || 'Tomar foto'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };

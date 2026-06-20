@@ -22,13 +22,14 @@ export class MediaSyncService {
       const tables = [
         { name: 'photos', type: 'image/jpeg' }, 
         { name: 'audio_recordings', type: 'audio/m4a' },
-        { name: 'scanned_documents', type: 'application/pdf' }
+        { name: 'scanned_documents', type: 'application/pdf' },
+        { name: 'assessment_files', type: 'application/octet-stream' },
       ];
 
       for (const table of tables) {
         // Encontrar registros con local_uri pero sin cloud_url
         const rows: any[] = await db.getAllAsync(
-          `SELECT id, local_uri FROM ${table.name} WHERE local_uri IS NOT NULL AND cloud_url IS NULL`
+          `SELECT id, local_uri, file_type FROM ${table.name} WHERE local_uri IS NOT NULL AND cloud_url IS NULL`
         );
 
         for (const row of rows) {
@@ -42,11 +43,15 @@ export class MediaSyncService {
               continue; 
             }
 
+            const mimeType = (table.name === 'assessment_files' && row.file_type)
+              ? row.file_type
+              : table.type;
+
             const formData = new FormData();
             formData.append('file', {
               uri: row.local_uri,
               name: row.local_uri.split('/').pop() || `file_${row.id}`,
-              type: table.type,
+              type: mimeType,
             } as any);
 
             const response = await fetchWithFallback('/upload', {
@@ -64,7 +69,10 @@ export class MediaSyncService {
             const cloudUrl = data.url;
 
             if (cloudUrl) {
-              await db.runAsync(`UPDATE ${table.name} SET cloud_url = ? WHERE id = ?`, [cloudUrl, row.id]);
+              await db.runAsync(
+                `UPDATE ${table.name} SET cloud_url = ?, is_backed_up = 1 WHERE id = ?`,
+                [cloudUrl, row.id]
+              );
               console.log(`[MediaSync] ✅ Fase 1 Exitosa: ${table.name}/${row.id} -> ${cloudUrl}`);
             } else {
               throw new Error('Respuesta del servidor no contiene URL.');

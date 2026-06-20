@@ -100,6 +100,7 @@ export const BACKUP_PREFS = {
   INCLUDE_AUDIO: 'backup_include_audio',
   INCLUDE_DOCS: 'backup_include_docs',
   INCLUDE_TRANSCRIPTS: 'backup_include_transcripts',
+  INCLUDE_ASSESSMENT_FILES: 'backup_include_assessment_files',
   LAST_RUN: 'backup_last_run',
   LAST_DOWNLOAD: 'backup_last_download',
   // Backup programado
@@ -129,6 +130,7 @@ export interface BackupPreferences {
   includeAudio: boolean;
   includeDocs: boolean;
   includeTranscripts: boolean;
+  includeAssessmentFiles: boolean;
   lastRun: string | null;
   lastDownload: string | null;
 }
@@ -138,6 +140,7 @@ export interface BackupStats {
   audio: { total: number; backed: number };
   docs: { total: number; backed: number };
   transcripts: { total: number; backed: number };
+  assessmentFiles: { total: number; backed: number };
 }
 
 export interface BackupProgress {
@@ -150,7 +153,7 @@ export interface BackupProgress {
 // ─── Leer / Escribir preferencias ───────────────────────────────────────────
 
 export const getBackupPreferences = async (): Promise<BackupPreferences> => {
-  const [enabled, autoUpload, autoDownload, photos, audio, docs, transcripts, lastRun, lastDownload] = await Promise.all([
+  const [enabled, autoUpload, autoDownload, photos, audio, docs, transcripts, assessmentFiles, lastRun, lastDownload] = await Promise.all([
     storageService.getSecure(BACKUP_PREFS.ENABLED),
     storageService.getSecure(BACKUP_PREFS.AUTO_UPLOAD),
     storageService.getSecure(BACKUP_PREFS.AUTO_DOWNLOAD),
@@ -158,6 +161,7 @@ export const getBackupPreferences = async (): Promise<BackupPreferences> => {
     storageService.getSecure(BACKUP_PREFS.INCLUDE_AUDIO),
     storageService.getSecure(BACKUP_PREFS.INCLUDE_DOCS),
     storageService.getSecure(BACKUP_PREFS.INCLUDE_TRANSCRIPTS),
+    storageService.getSecure(BACKUP_PREFS.INCLUDE_ASSESSMENT_FILES),
     storageService.getSecure(BACKUP_PREFS.LAST_RUN),
     storageService.getSecure(BACKUP_PREFS.LAST_DOWNLOAD),
   ]);
@@ -170,6 +174,7 @@ export const getBackupPreferences = async (): Promise<BackupPreferences> => {
     includeAudio: audio !== 'false',
     includeDocs: docs !== 'false',
     includeTranscripts: transcripts !== 'false',
+    includeAssessmentFiles: assessmentFiles !== 'false',
     lastRun: lastRun || null,
     lastDownload: lastDownload || null,
   };
@@ -191,6 +196,8 @@ export const saveBackupPreferences = async (prefs: Partial<BackupPreferences>): 
     promises.push(storageService.saveSecure(BACKUP_PREFS.INCLUDE_DOCS, String(prefs.includeDocs)));
   if (prefs.includeTranscripts !== undefined)
     promises.push(storageService.saveSecure(BACKUP_PREFS.INCLUDE_TRANSCRIPTS, String(prefs.includeTranscripts)));
+  if (prefs.includeAssessmentFiles !== undefined)
+    promises.push(storageService.saveSecure(BACKUP_PREFS.INCLUDE_ASSESSMENT_FILES, String(prefs.includeAssessmentFiles)));
   await Promise.all(promises);
 };
 
@@ -264,12 +271,13 @@ async function getLocalBackupStats(): Promise<BackupStats> {
   try {
     const db = databaseService.getDb();
 
-    const [photoRow, audioRow, docRow, audioTransRow, ytTransRow] = await Promise.all([
+    const [photoRow, audioRow, docRow, audioTransRow, ytTransRow, assessFileRow] = await Promise.all([
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE transcript_text IS NOT NULL AND transcript_text != ''`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, 0 as backed FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`) as Promise<{ total: number; backed: number } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM assessment_files WHERE local_uri IS NOT NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
     ]);
 
     const photoTotal = (photoRow as { total: number; backed: number | null } | undefined)?.total ?? 0;
@@ -279,18 +287,21 @@ async function getLocalBackupStats(): Promise<BackupStats> {
     const docTotal = (docRow as { total: number; backed: number | null } | undefined)?.total ?? 0;
     const docBacked = (docRow as { total: number; backed: number | null } | undefined)?.backed ?? 0;
     
-    const transcriptTotal = ((audioTransRow as { total: number; backed: number | null } | undefined)?.total ?? 0) + ((ytTransRow as { total: number; backed: number } | undefined)?.total ?? 0);
-    const transcriptBacked = ((audioTransRow as { total: number; backed: number | null } | undefined)?.backed ?? 0) + ((ytTransRow as { total: number; backed: number } | undefined)?.backed ?? 0);
+    const transcriptTotal = ((audioTransRow as any)?.total ?? 0) + ((ytTransRow as any)?.total ?? 0);
+    const transcriptBacked = ((audioTransRow as any)?.backed ?? 0) + ((ytTransRow as any)?.backed ?? 0);
+    const assessFileTotal = (assessFileRow as any)?.total ?? 0;
+    const assessFileBacked = (assessFileRow as any)?.backed ?? 0;
 
     return {
       photos: { total: photoTotal, backed: photoBacked },
       audio: { total: audioTotal, backed: audioBacked },
       docs: { total: docTotal, backed: docBacked },
       transcripts: { total: transcriptTotal, backed: transcriptBacked },
+      assessmentFiles: { total: assessFileTotal, backed: assessFileBacked },
     };
   } catch (err) {
     console.error('[BackupService] Error obteniendo estadísticas locales:', err);
-    return { photos: { total: 0, backed: 0 }, audio: { total: 0, backed: 0 }, docs: { total: 0, backed: 0 }, transcripts: { total: 0, backed: 0 } };
+    return { photos: { total: 0, backed: 0 }, audio: { total: 0, backed: 0 }, docs: { total: 0, backed: 0 }, transcripts: { total: 0, backed: 0 }, assessmentFiles: { total: 0, backed: 0 } };
   }
 }
 
@@ -303,6 +314,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   audio: { id: string; local_uri: string; name: string; subject_id?: string }[];
   docs: { id: string; local_uri: string; name?: string; subject_id?: string }[];
   transcripts: { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[];
+  assessmentFiles: { id: string; local_uri: string; file_name: string; file_type?: string; assessment_id: string }[];
 }> {
   const db = databaseService.getDb();
   const result = {
@@ -310,6 +322,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     audio: [] as { id: string; local_uri: string; name: string; subject_id?: string }[],
     docs: [] as { id: string; local_uri: string; name?: string; subject_id?: string }[],
     transcripts: [] as { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[],
+    assessmentFiles: [] as { id: string; local_uri: string; file_name: string; file_type?: string; assessment_id: string }[],
   };
 
   try {
@@ -355,6 +368,14 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
       );
       result.transcripts.push(...ytTranscripts.map((t: any) => ({ id: String(t.id), type: 'youtube' as const, text: t.transcript_text, video_id: String(t.video_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${ytTranscripts.length} transcripción(es) de YouTube pendiente(s)`);
+    }
+    // Soportes de evaluaciones no respaldados
+    if (prefs.includeAssessmentFiles) {
+      const assessFiles = await db.getAllAsync(
+        `SELECT id, local_uri, file_name, file_type, assessment_id FROM assessment_files WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+      );
+      result.assessmentFiles = assessFiles.map((f: any) => ({ id: String(f.id), local_uri: f.local_uri, file_name: f.file_name, file_type: f.file_type, assessment_id: String(f.assessment_id) }));
+      console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.assessmentFiles.length} soporte(s) de evaluación pendiente(s)`);
     }
   } catch (err) {
     console.error('[BackupService] Error obteniendo items pendientes desde DB local:', err);
@@ -548,6 +569,27 @@ export const runBackup = async (
         console.warn('[BackupService] Fase 0c: Error leyendo documentos locales:', e);
       }
     }
+    // ── Fase 0d: Soportes de evaluaciones sin registro en backend ──
+    if (prefs.includeAssessmentFiles) {
+      try {
+        const localOnlyFiles: any[] = await db.getAllAsync(
+          `SELECT id, assessment_id, file_name, file_type, local_uri, file_size FROM assessment_files
+           WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
+        );
+        console.log(`[BackupService] Fase 0d: ${localOnlyFiles.length} soporte(s) de evaluación sin registro en backend.`);
+        for (const f of localOnlyFiles) {
+          try {
+            await fetchWithFallback(`/assessments/${f.assessment_id}/files`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: f.id, file_name: f.file_name, file_type: f.file_type, local_uri: f.local_uri, file_size: f.file_size }),
+            });
+          } catch (_e) { /* ignorar — se registrará al marcar */ }
+        }
+      } catch (e) {
+        console.warn('[BackupService] Fase 0d: Error leyendo soportes de evaluaciones locales:', e);
+      }
+    }
   } // Cierre de if (!isOffline)
 
   // ──────────────────────────────────────────────────────────────────
@@ -555,7 +597,8 @@ export const runBackup = async (
   // Siempre usa la BD local como fuente de verdad (is_backed_up = 0).
   // ──────────────────────────────────────────────────────────────────
   const pending = await getPendingItemsFromLocalDB(prefs);
-  console.log(`[BackupService] Fase 1: ${pending.photos.length + pending.audio.length + pending.docs.length + pending.transcripts.length} item(s) pendientes desde BD local`);
+  const pendingCount = pending.photos.length + pending.audio.length + pending.docs.length + pending.transcripts.length + pending.assessmentFiles.length;
+  console.log(`[BackupService] Fase 1: ${pendingCount} item(s) pendientes desde BD local`);
 
   const tasks: (() => Promise<void>)[] = [];
 
@@ -786,6 +829,49 @@ export const runBackup = async (
     }
   }
 
+  // ── Soportes de Evaluaciones ──
+  if (prefs.includeAssessmentFiles) {
+    for (const af of (pending.assessmentFiles || [])) {
+      tasks.push(async () => {
+        try {
+          console.log(`[BackupService] Iniciando backup de soporte de evaluación ID: ${af.id} (${af.file_name})`);
+          const fileInfo = await FileSystem.getInfoAsync(af.local_uri);
+          if (!fileInfo.exists) {
+            console.warn(`[BackupService] Archivo fantasma detectado (soporte ${af.id}). Marcando localmente.`);
+            await db.runAsync(
+              `UPDATE assessment_files SET is_backed_up = 1, cloud_url = 'ghost_file' WHERE id = ?`,
+              [af.id]
+            );
+            uploaded++;
+            return;
+          }
+          const ext = af.file_name.split('.').pop() || 'bin';
+          const mime = af.file_type || 'application/octet-stream';
+          const result = await uploadFileToUploadthing(af.local_uri, `assessment_file_${af.id}.${ext}`, mime);
+          console.log(`[BackupService] ÉXITO: Soporte de evaluación subido. URL: ${result.url}`);
+          // Marcar en backend
+          try {
+            await fetchWithFallback(`/assessments/${af.assessment_id}/files`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: af.id, file_name: af.file_name, file_type: af.file_type, cloud_url: result.url }),
+            });
+          } catch (_e) { /* Ignorar fallo de marca en backend */ }
+          // Marcar localmente siempre
+          await db.runAsync(
+            `UPDATE assessment_files SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+            [result.url, af.id]
+          );
+          console.log(`[BackupService] ÉXITO: Soporte ${af.id} respaldado.`);
+          uploaded++;
+        } catch (err) {
+          console.error(`[BackupService] ERROR: Falló el backup de soporte ${af.id}:`, err);
+          errors++;
+        }
+      });
+    }
+  }
+
   // Ejecutar todas las tareas secuencialmente con progreso
   const total = tasks.length;
   let done = 0;
@@ -854,7 +940,7 @@ export const syncLocalFlashcardsToBackend = async (): Promise<void> => {
 
         // Eliminar copia local tras sincronización exitosa
         deleteLocalDeck(String(deck.id));
-        storage.delete(cardsKey);
+        storage.remove(cardsKey);
         console.log(`[BackupService] Mazo local ${deck.id} eliminado.`);
       } catch (deckErr) {
         console.warn(`[BackupService] Error sincronizando mazo ${deck.id}:`, deckErr);

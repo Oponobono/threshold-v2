@@ -7,7 +7,7 @@ const { db } = require('../db');
 exports.uploadAssessmentFile = (req, res) => {
   const { assessmentId } = req.params;
   const userId = req.user.id;
-  const { file_name, file_type, local_uri, file_size } = req.body;
+  const { file_name, file_type, local_uri, file_size, cloud_url } = req.body;
 
   if (!assessmentId || !file_name) {
     return res.status(400).json({ error: 'assessmentId y file_name son requeridos' });
@@ -24,13 +24,16 @@ exports.uploadAssessmentFile = (req, res) => {
 
       const fileId = req.body.id || uuidv4();
       const query = `
-        INSERT INTO assessment_files (id, assessment_id, file_name, file_type, local_uri, file_size)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO assessment_files (id, assessment_id, file_name, file_type, local_uri, file_size, cloud_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          cloud_url = COALESCE(EXCLUDED.cloud_url, assessment_files.cloud_url),
+          is_backed_up = CASE WHEN EXCLUDED.cloud_url IS NOT NULL THEN 1 ELSE assessment_files.is_backed_up END
       `;
 
       db.run(
         query,
-        [fileId, assessmentId, file_name, file_type || null, local_uri || null, file_size || null],
+        [fileId, assessmentId, file_name, file_type || null, local_uri || null, file_size || null, cloud_url || null],
         function(err) {
           if (err) {
             console.error('[POST] Error subiendo archivo:', err.message);
@@ -43,7 +46,9 @@ exports.uploadAssessmentFile = (req, res) => {
             file_name,
             file_type,
             local_uri,
+            cloud_url: cloud_url || null,
             file_size,
+            is_backed_up: cloud_url ? 1 : 0,
             created_at: new Date().toISOString()
           });
         }

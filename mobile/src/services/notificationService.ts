@@ -90,13 +90,13 @@ export async function cancelDownloadNotification(): Promise<void> {
 
 const BACKUP_UPLOAD_ID = 'backup_upload';
 
-export async function showBackupUploadNotification(t: (key: string) => string, total: number): Promise<void> {
+export async function showBackupUploadNotification(total: number): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
   await Notifications.scheduleNotificationAsync({
     identifier: BACKUP_UPLOAD_ID,
     content: {
-      title: `⬆️ ${t('backup.backingUp')}`,
+      title: `⬆️ ${i18n.t('backup.backingUp')}`,
       body: `0 / ${total}`,
       data: { type: 'backup_upload_progress' },
       sound: true,
@@ -106,13 +106,13 @@ export async function showBackupUploadNotification(t: (key: string) => string, t
   });
 }
 
-export async function updateBackupUploadNotification(t: (key: string) => string, done: number, total: number, currentItem: string): Promise<void> {
+export async function updateBackupUploadNotification(done: number, total: number, currentItem: string): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
   await Notifications.scheduleNotificationAsync({
     identifier: BACKUP_UPLOAD_ID,
     content: {
-      title: `⬆️ ${t('backup.backingUp')}`,
+      title: `⬆️ ${i18n.t('backup.backingUp')}`,
       body: `${done} / ${total} · ${currentItem}`,
       data: { type: 'backup_upload_progress' },
       sound: true,
@@ -122,7 +122,7 @@ export async function updateBackupUploadNotification(t: (key: string) => string,
   });
 }
 
-export async function completeBackupUploadNotification(t: (key: string) => string, title: string, body: string): Promise<void> {
+export async function completeBackupUploadNotification(title: string, body: string): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
   await Notifications.scheduleNotificationAsync({
@@ -140,13 +140,13 @@ export async function cancelBackupUploadNotification(): Promise<void> {
 
 const BACKUP_DOWNLOAD_ID = 'backup_download';
 
-export async function showBackupDownloadNotification(t: (key: string) => string, total: number): Promise<void> {
+export async function showBackupDownloadNotification(total: number): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
   await Notifications.scheduleNotificationAsync({
     identifier: BACKUP_DOWNLOAD_ID,
     content: {
-      title: `⬇️ ${t('backup.downloading')}`,
+      title: `⬇️ ${i18n.t('backup.downloading')}`,
       body: `0 / ${total}`,
       data: { type: 'backup_download_progress' },
       sound: true,
@@ -156,13 +156,13 @@ export async function showBackupDownloadNotification(t: (key: string) => string,
   });
 }
 
-export async function updateBackupDownloadNotification(t: (key: string) => string, done: number, total: number, currentItem: string): Promise<void> {
+export async function updateBackupDownloadNotification(done: number, total: number, currentItem: string): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
   await Notifications.scheduleNotificationAsync({
     identifier: BACKUP_DOWNLOAD_ID,
     content: {
-      title: `⬇️ ${t('backup.downloading')}`,
+      title: `⬇️ ${i18n.t('backup.downloading')}`,
       body: `${done} / ${total} · ${currentItem}`,
       data: { type: 'backup_download_progress' },
       sound: true,
@@ -172,7 +172,7 @@ export async function updateBackupDownloadNotification(t: (key: string) => strin
   });
 }
 
-export async function completeBackupDownloadNotification(t: (key: string) => string, title: string, body: string): Promise<void> {
+export async function completeBackupDownloadNotification(title: string, body: string): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
   await Notifications.scheduleNotificationAsync({

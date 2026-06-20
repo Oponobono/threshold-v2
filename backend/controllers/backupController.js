@@ -20,6 +20,7 @@ exports.getBackupStats = (req, res) => {
     audio:       { total: 0, backed: 0 },
     docs:        { total: 0, backed: 0 },
     transcripts: { total: 0, backed: 0 },
+    assessmentFiles: { total: 0, backed: 0 },
   };
 
   // ── Fotos: almacenadas en `photos` vinculadas via subjects.user_id ──
@@ -82,8 +83,26 @@ exports.getBackupStats = (req, res) => {
                              WHERE yv.user_id = ? AND COALESCE(yt.is_backed_up, 0) = 1`,
                             [userId], (err, r) => {
                               if (!err && r) stats.transcripts.backed += Number(r.backed);
-                              console.log(`[BackupStats] User ${userId}:`, JSON.stringify(stats));
-                              res.json(stats);
+                              db.get(
+                                `SELECT COUNT(*) as total FROM assessment_files af
+                                 JOIN assessments a ON a.id = af.assessment_id
+                                 JOIN subjects s ON s.id = a.subject_id
+                                 WHERE s.user_id = ? AND af.local_uri IS NOT NULL`,
+                                [userId], (err, r) => {
+                                  if (!err && r) stats.assessmentFiles.total = Number(r.total);
+                                  db.get(
+                                    `SELECT COUNT(*) as backed FROM assessment_files af
+                                     JOIN assessments a ON a.id = af.assessment_id
+                                     JOIN subjects s ON s.id = a.subject_id
+                                     WHERE s.user_id = ? AND COALESCE(af.is_backed_up, 0) = 1`,
+                                    [userId], (err, r) => {
+                                      if (!err && r) stats.assessmentFiles.backed = Number(r.backed);
+                                      console.log(`[BackupStats] User ${userId}:`, JSON.stringify(stats));
+                                      res.json(stats);
+                                    }
+                                  );
+                                }
+                              );
                             }
                           );
                         }
@@ -108,7 +127,7 @@ exports.getPendingItems = (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
-  const result = { photos: [], audio: [], docs: [], transcripts: [] };
+  const result = { photos: [], audio: [], docs: [], transcripts: [], assessmentFiles: [] };
 
   db.all(
     `SELECT p.id, p.local_uri as uri 
@@ -142,13 +161,24 @@ exports.getPendingItems = (req, res) => {
                WHERE yv.user_id = ? AND COALESCE(yt.is_backed_up, 0) = 0 AND yt.transcript_text IS NOT NULL`,
               [userId], (err, rows) => {
                 if (!err && rows) result.transcripts = [...result.transcripts, ...rows];
-                console.log(`[PendingItems] User ${userId}:`, {
-                  photos: result.photos.length,
-                  audio: result.audio.length,
-                  docs: result.docs.length,
-                  transcripts: result.transcripts.length
-                });
-                res.json(result);
+                db.all(
+                  `SELECT af.id, af.local_uri as uri, af.file_name as name, af.assessment_id
+                   FROM assessment_files af
+                   JOIN assessments a ON a.id = af.assessment_id
+                   JOIN subjects s ON s.id = a.subject_id
+                   WHERE s.user_id = ? AND COALESCE(af.is_backed_up, 0) = 0`,
+                  [userId], (err, rows) => {
+                    if (!err && rows) result.assessmentFiles = rows;
+                    console.log(`[PendingItems] User ${userId}:`, {
+                      photos: result.photos.length,
+                      audio: result.audio.length,
+                      docs: result.docs.length,
+                      transcripts: result.transcripts.length,
+                      assessmentFiles: result.assessmentFiles.length
+                    });
+                    res.json(result);
+                  }
+                );
               }
             );
           }
@@ -236,9 +266,39 @@ exports.markAsBackedUp = (req, res) => {
   const tableMap = {
     audio: 'audio_recordings',
     document: 'scanned_documents',
+    assessment_file: 'assessment_files',
   };
   const table = tableMap[type];
   if (!table) return res.status(400).json({ error: `Tipo desconocido: ${type}` });
+
+  if (table === 'assessment_files') {
+    db.run(
+      `UPDATE ${table} SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND assessment_id IN (SELECT a.id FROM assessments a JOIN subjects s ON s.id = a.subject_id WHERE s.user_id = ?)`,
+      [cloud_url, id, userId],
+      function (err) {
+        if (err) { console.error('[Backup] Error al marcar ítem:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar ítem.' }); }
+        if (this.changes > 0) return res.json({ ok: true });
+        
+        const resolvedAssessmentId = req.body.assessment_id || null;
+        const resolvedFileName = req.body.file_name || 'Respaldo Offline';
+        const resolvedFileType = req.body.file_type || 'application/octet-stream';
+        db.run(
+          `INSERT INTO assessment_files (id, assessment_id, file_name, file_type, local_uri, cloud_url, is_backed_up)
+           VALUES (?, ?, ?, ?, '', ?, 1)
+           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+          [id, resolvedAssessmentId, resolvedFileName, resolvedFileType, cloud_url],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[Backup] Error al insertar soporte de evaluación offline:', insertErr.message, insertErr.code, insertErr.stack);
+              return res.status(500).json({ error: 'Error al registrar soporte offline.', details: insertErr.message });
+            }
+            res.json({ ok: true, inserted: true });
+          }
+        );
+      }
+    );
+    return;
+  }
 
   // Primero intentar UPDATE normal
   db.run(
@@ -263,6 +323,23 @@ exports.markAsBackedUp = (req, res) => {
             if (insertErr) {
               console.error('[Backup] Error al insertar audio offline:', insertErr.message, insertErr.code, insertErr.stack);
               return res.status(500).json({ error: 'Error al registrar audio offline.', details: insertErr.message });
+            }
+            res.json({ ok: true, inserted: true });
+          }
+        );
+      } else if (table === 'assessment_files') {
+        const resolvedAssessmentId = req.body.assessment_id || null;
+        const resolvedFileName = req.body.file_name || 'Respaldo Offline';
+        const resolvedFileType = req.body.file_type || 'application/octet-stream';
+        db.run(
+          `INSERT INTO assessment_files (id, assessment_id, file_name, file_type, local_uri, cloud_url, is_backed_up)
+           VALUES (?, ?, ?, ?, '', ?, 1)
+           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+          [id, resolvedAssessmentId, resolvedFileName, resolvedFileType, cloud_url],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[Backup] Error al insertar soporte de evaluación offline:', insertErr.message, insertErr.code, insertErr.stack);
+              return res.status(500).json({ error: 'Error al registrar soporte offline.', details: insertErr.message });
             }
             res.json({ ok: true, inserted: true });
           }
@@ -313,9 +390,21 @@ exports.restoreLocalUri = (req, res) => {
     return;
   }
 
-  const tableMap = { audio: 'audio_recordings', document: 'scanned_documents' };
+  const tableMap = { audio: 'audio_recordings', document: 'scanned_documents', assessment_file: 'assessment_files' };
   const table = tableMap[type];
   if (!table) return res.status(400).json({ error: `Tipo desconocido: ${type}` });
+
+  if (table === 'assessment_files') {
+    db.run(
+      `UPDATE assessment_files SET local_uri = ? WHERE id = ? AND assessment_id IN (SELECT a.id FROM assessments a JOIN subjects s ON s.id = a.subject_id WHERE s.user_id = ?)`,
+      [local_uri, id, userId],
+      function (err) {
+        if (err) return res.status(500).json({ error: 'Error al restaurar URI de soporte.' });
+        res.json({ ok: true, changes: this.changes });
+      }
+    );
+    return;
+  }
 
   db.run(
     `UPDATE ${table} SET local_uri = ? WHERE id = ? AND user_id = ?`,
@@ -336,7 +425,7 @@ exports.getCloudItems = (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
-  const result = { photos: [], audio: [], docs: [], transcripts: [] };
+  const result = { photos: [], audio: [], docs: [], transcripts: [], assessmentFiles: [] };
 
   // Fotos (vinculadas a materias via subjects.user_id)
   db.all(
@@ -393,7 +482,19 @@ exports.getCloudItems = (req, res) => {
                     (err, rows) => {
                       if (err) console.error(`[CloudItems] Error transcripts youtube (User ${userId}):`, err.message);
                       if (!err && rows) result.transcripts = [...result.transcripts, ...rows];
-                      res.json(result);
+                      db.all(
+                        `SELECT af.id, af.cloud_url, af.file_name as name, af.assessment_id, af.created_at
+                         FROM assessment_files af
+                         JOIN assessments a ON a.id = af.assessment_id
+                         JOIN subjects s ON s.id = a.subject_id
+                         WHERE s.user_id = ? AND COALESCE(af.is_backed_up, 0) = 1 AND af.cloud_url IS NOT NULL`,
+                        [userId],
+                        (err, rows) => {
+                          if (err) console.error(`[CloudItems] Error assessment files (User ${userId}):`, err.message);
+                          if (!err && rows) result.assessmentFiles = rows;
+                          res.json(result);
+                        }
+                      );
                     }
                   );
                 }

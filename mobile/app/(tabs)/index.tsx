@@ -115,10 +115,19 @@ export default function HybridDashboardScreen() {
 
   const loadData = useCallback(async (skipFullReload = false) => {
     try {
+      // ── Iniciar carga del store global (SQLite instantáneo + Cloud background) ──
+      const now = Date.now();
+      let storePromise = Promise.resolve();
+      if (!skipFullReload && (now - lastFocusRefreshRef.current > FOCUS_REFRESH_THROTTLE_MS)) {
+        lastFocusRefreshRef.current = now;
+        storePromise = loadAllData(true);
+      }
+
       const [userProfile, schedulesToday, groups] = await Promise.all([
         getCurrentUserProfile(),
         getTodaySchedules(),
         getUserGroups(),
+        storePromise
       ]);
 
       setProfile(userProfile);
@@ -134,17 +143,6 @@ export default function HybridDashboardScreen() {
         setUserGroups(groups);
       }
       
-      // 💾 Profile is cached by getCurrentUserProfile internally
-      
-      // ── Cargar datos globales del store (subjects, assessments, schedules) ──
-      // Solo refresca del cloud si ha pasado suficiente tiempo desde la última vez.
-      // En focus normal se salta la recarga completa para evitar cloud call storm.
-      const now = Date.now();
-      if (!skipFullReload && (now - lastFocusRefreshRef.current > FOCUS_REFRESH_THROTTLE_MS)) {
-        lastFocusRefreshRef.current = now;
-        await loadAllData(true);
-      }
-
       // ── Obtener GPA general ──
       try {
         const gpaData = await getGlobalGPAAnalytics();

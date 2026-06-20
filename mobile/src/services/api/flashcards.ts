@@ -75,7 +75,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
   return localData;
 };
 
-export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string }): Promise<any> => {
+export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string; id?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = (payload as any).id || uuidv4();
 

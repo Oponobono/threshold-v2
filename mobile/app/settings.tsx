@@ -562,6 +562,18 @@ export default function SettingsScreen() {
                   />
                 }
               />
+              <SettingRow
+                title={t('backup.assessmentFiles', 'Soportes de Evaluaciones')}
+                desc={t('backup.inCloud', { backed: backupStats.assessmentFiles?.backed || 0, total: backupStats.assessmentFiles?.total || 0 })}
+                right={
+                  <Switch
+                    value={backupPrefs.includeAssessmentFiles}
+                    onValueChange={(v) => updateBackupPref('includeAssessmentFiles', v)}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
 
               {/* ── Estado general ── */}
               {totalCount > 0 && (
