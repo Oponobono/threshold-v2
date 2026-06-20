@@ -126,17 +126,13 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // ---------------------------------------------------------------------------
   useEffect(() => {
     return () => {
-      // Stop playback and cleanup
       if (soundRef.current) {
-        try {
-          soundRef.current.stopAsync().catch(() => {});
-          soundRef.current.unloadAsync().catch(() => {});
-        } catch (err) {
-          console.warn('[RecordingDetail] Cleanup error:', err);
-        }
+        const s = soundRef.current;
         soundRef.current = null;
+        setIsPlaying(false);
+        s.stopAsync().catch(() => {});
+        s.unloadAsync().catch(() => {});
       }
-      setIsPlaying(false);
     };
   }, []);
 
@@ -377,7 +373,14 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       setPositionMs(0);
 
       sound.setOnPlaybackStatusUpdate((s: AVPlaybackStatus) => {
-        if (!s.isLoaded) return;
+        if (!s.isLoaded) {
+          if ('error' in s) {
+            console.error('[RecordingDetail] Playback error:', s.error);
+          }
+          setIsPlaying(false);
+          setPositionMs(0);
+          return;
+        }
         if (s.durationMillis) setDurationMs(s.durationMillis);
         
         if (s.didJustFinish) {

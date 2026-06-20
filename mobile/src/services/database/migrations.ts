@@ -276,6 +276,24 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_grade_history_result ON grade_history(assessment_result_id)`,
     ],
   },
+  {
+    version: 6,
+    up: [
+      `CREATE TABLE IF NOT EXISTS assessment_files (
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        file_type TEXT,
+        local_uri TEXT,
+        cloud_url TEXT,
+        file_size INTEGER,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_assessment_files_assessment ON assessment_files(assessment_id)`,
+    ],
+  },
 ];
 
 export default migrations;

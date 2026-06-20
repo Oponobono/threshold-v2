@@ -145,6 +145,7 @@ export function useAudioRecorder() {
   const [isPaused, setIsPaused] = useState(false);
   const [recordings, setRecordings] = useState<RecordingItem[]>([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const durationRef = useRef(0);
   const [meteringDb, setMeteringDb] = useState<number>(-160);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const isPlayingRef = useRef(false);
@@ -157,9 +158,11 @@ export function useAudioRecorder() {
     loadRecordings();
     return () => {
       if (soundRef.current) {
-        soundRef.current.unloadAsync().catch(() => {});
+        const s = soundRef.current;
         soundRef.current = null;
         setPlayingId(null);
+        s.stopAsync().catch(() => {});
+        s.unloadAsync().catch(() => {});
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -284,6 +287,7 @@ export function useAudioRecorder() {
           // Fired ~every 100ms — update duration and metering in real time
           if (status.isRecording) {
             const secs = Math.floor((status.durationMillis ?? 0) / 1000);
+            durationRef.current = secs;
             setRecordingDuration(secs);
             if (status.metering !== undefined) {
               setMeteringDb(status.metering); // dBFS, typically -160 … 0
@@ -329,7 +333,7 @@ export function useAudioRecorder() {
   async function stopRecording() {
     if (!recording) return;
 
-    const currentDuration = recordingDuration;
+    const currentDuration = durationRef.current;
     setIsRecording(false);
     setIsPaused(false);
     setRecording(null);
@@ -400,16 +404,13 @@ export function useAudioRecorder() {
     }
     isPlayingRef.current = true;
 
+    // Optimistic UI: el botón cambia al instante
+    setPlayingId(id);
+
     try {
       if (soundRef.current) {
-        try {
-          await soundRef.current.stopAsync();
-          await soundRef.current.unloadAsync();
-        } catch (stopErr) {
-          console.warn('[useAudioRecorder] Error deteniendo audio anterior:', stopErr);
-        }
         soundRef.current = null;
-        setPlayingId(null);
+        playingUriRef.current = null;
       }
 
       let targetUri = uri;
@@ -423,6 +424,7 @@ export function useAudioRecorder() {
             targetUri = item.cloud_url;
           } else {
             alertRef.show({ title: 'Error', message: 'El archivo local no existe y no hay respaldo en la nube.', type: 'error' });
+            setPlayingId(null);
             isPlayingRef.current = false;
             return;
           }
@@ -439,7 +441,7 @@ export function useAudioRecorder() {
       try {
         const result = await Audio.Sound.createAsync(
           { uri: targetUri },
-          { shouldPlay: true }
+          { shouldPlay: true, progressUpdateIntervalMillis: 500 }
         );
         newSound = result.sound;
       } catch (firstErr) {
@@ -448,7 +450,7 @@ export function useAudioRecorder() {
           console.warn('[useAudioRecorder] Reintentando playback sin prefijo file://:', rawPath);
           const fallbackResult = await Audio.Sound.createAsync(
             { uri: rawPath },
-            { shouldPlay: true }
+            { shouldPlay: true, progressUpdateIntervalMillis: 500 }
           );
           newSound = fallbackResult.sound;
         } else {
@@ -458,10 +460,19 @@ export function useAudioRecorder() {
 
       soundRef.current = newSound;
       playingUriRef.current = targetUri;
-      setPlayingId(id);
 
       newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
+        if (!status.isLoaded) {
+          if ('error' in status) {
+            console.error('[useAudioRecorder] Playback error:', status.error);
+          }
+          setPlayingId(null);
+          soundRef.current = null;
+          playingUriRef.current = null;
+          isPlayingRef.current = false;
+          return;
+        }
+        if (status.didJustFinish) {
           setPlayingId(null);
           soundRef.current = null;
           playingUriRef.current = null;
@@ -472,24 +483,26 @@ export function useAudioRecorder() {
       console.error('Error playing sound', error);
       soundRef.current = null;
       playingUriRef.current = null;
+      setPlayingId(null);
       alertRef.show({ title: 'Error', message: 'No se pudo reproducir el audio.', type: 'error' });
       isPlayingRef.current = false;
     }
   }
 
   async function stopSound() {
+    isPlayingRef.current = false;
+    setPlayingId(null);
+    playingUriRef.current = null;
     if (soundRef.current) {
+      const s = soundRef.current;
+      soundRef.current = null;
       try {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
+        await s.stopAsync();
+        await s.unloadAsync();
       } catch (err) {
         console.warn('[useAudioRecorder] Error stopping sound:', err);
       }
-      soundRef.current = null;
-      playingUriRef.current = null;
-      setPlayingId(null);
     }
-    isPlayingRef.current = false;
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
@@ -569,15 +582,20 @@ export function useAudioRecorder() {
   const cleanupAudio = useCallback(async () => {
     isPlayingRef.current = false;
     if (soundRef.current) {
-      try {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-      } catch (err) {
-        console.warn('[useAudioRecorder] Cleanup error:', err);
-      }
+      const s = soundRef.current;
       soundRef.current = null;
       playingUriRef.current = null;
       setPlayingId(null);
+      try {
+        await s.stopAsync();
+        await s.unloadAsync();
+      } catch (err: any) {
+        if (err?.message?.includes('accessed on the wrong thread')) {
+          console.warn('[useAudioRecorder] ExoPlayer thread error during cleanup (safe to ignore)');
+        } else {
+          console.warn('[useAudioRecorder] Cleanup error:', err);
+        }
+      }
     }
   }, []);
 

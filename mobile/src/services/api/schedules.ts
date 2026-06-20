@@ -8,6 +8,14 @@ const getUserIdNumber = async (): Promise<string> => {
   return String(uid);
 };
 
+let lastTodaySync = 0;
+let lastAllSync = 0;
+let lastSubjectSync = 0;
+let todaySyncInProgress = false;
+let allSyncInProgress = false;
+let subjectSyncInProgress = false;
+const SYNC_THROTTLE_MS = 30000;
+
 export const getTodaySchedules = async (): Promise<any[]> => {
   const userId = await getUserIdNumber();
   
@@ -16,19 +24,25 @@ export const getTodaySchedules = async (): Promise<any[]> => {
   const today = new Date().getDay();
   const localToday = allLocal.filter(s => s.day_of_week === today);
 
-  // 2. Sincronizar en background
-  (async () => {
-    try {
-      const response = await fetchWithFallback(`/schedules/today/${userId}`);
-      if (response.ok) {
-        const data = await parseJsonSafely(response);
-        if (Array.isArray(data)) {
-          const mapped = data.map(s => ({ ...s, user_id: userId }));
-          for (const s of mapped) await scheduleRepository.upsert(s);
+  // 2. Sincronizar en background con throttling
+  const now = Date.now();
+  if (now - lastTodaySync > SYNC_THROTTLE_MS && !todaySyncInProgress) {
+    todaySyncInProgress = true;
+    lastTodaySync = now;
+    (async () => {
+      try {
+        const response = await fetchWithFallback(`/schedules/today/${userId}`);
+        if (response.ok) {
+          const data = await parseJsonSafely(response);
+          if (Array.isArray(data)) {
+            const mapped = data.map(s => ({ ...s, user_id: userId }));
+            for (const s of mapped) await scheduleRepository.upsert(s);
+          }
         }
-      }
-    } catch {}
-  })();
+      } catch {}
+      finally { todaySyncInProgress = false; }
+    })();
+  }
 
   return localToday;
 };
@@ -77,19 +91,25 @@ export const getSchedulesBySubject = async (subjectId: string): Promise<any[]> =
   // 1. Leer localmente primero
   const localData = await scheduleRepository.getBySubject(subjectId);
 
-  // 2. Sincronizar en background
-  (async () => {
-    try {
-      const response = await fetchWithFallback(`/schedules/subject/${subjectId}`);
-      if (response.ok) {
-        const data = await parseJsonSafely(response);
-        if (Array.isArray(data)) {
-          const mapped = data.map(s => ({ ...s, user_id: userId }));
-          for (const s of mapped) await scheduleRepository.upsert(s);
+  // 2. Sincronizar en background con throttling
+  const now = Date.now();
+  if (now - lastSubjectSync > SYNC_THROTTLE_MS && !subjectSyncInProgress) {
+    subjectSyncInProgress = true;
+    lastSubjectSync = now;
+    (async () => {
+      try {
+        const response = await fetchWithFallback(`/schedules/subject/${subjectId}`);
+        if (response.ok) {
+          const data = await parseJsonSafely(response);
+          if (Array.isArray(data)) {
+            const mapped = data.map(s => ({ ...s, user_id: userId }));
+            for (const s of mapped) await scheduleRepository.upsert(s);
+          }
         }
-      }
-    } catch {}
-  })();
+      } catch {}
+      finally { subjectSyncInProgress = false; }
+    })();
+  }
 
   return localData || [];
 };
@@ -115,19 +135,25 @@ export const getAllSchedules = async (): Promise<any[]> => {
     return [];
   }
 
-  // 2. Sincronizar en background
-  (async () => {
-    try {
-      const response = await fetchWithFallback(`/schedules/user/${userId}`);
-      if (response.ok) {
-        const data = await parseJsonSafely(response);
-        if (Array.isArray(data)) {
-          const mapped = data.map(s => ({ ...s, user_id: userId }));
-          for (const s of mapped) await scheduleRepository.upsert(s);
+  // 2. Sincronizar en background con throttling
+  const now = Date.now();
+  if (now - lastAllSync > SYNC_THROTTLE_MS && !allSyncInProgress) {
+    allSyncInProgress = true;
+    lastAllSync = now;
+    (async () => {
+      try {
+        const response = await fetchWithFallback(`/schedules/user/${userId}`);
+        if (response.ok) {
+          const data = await parseJsonSafely(response);
+          if (Array.isArray(data)) {
+            const mapped = data.map(s => ({ ...s, user_id: userId }));
+            for (const s of mapped) await scheduleRepository.upsert(s);
+          }
         }
-      }
-    } catch {}
-  })();
+      } catch {}
+      finally { allSyncInProgress = false; }
+    })();
+  }
 
   return localData;
 };

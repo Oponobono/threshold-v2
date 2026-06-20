@@ -256,6 +256,10 @@ export function useSubjectDetail() {
             try {
               setIsLoading(true);
               await deleteSubject(subjectId);
+              
+              // Remove from global store so it disappears immediately
+              await useDataStore.getState().refreshSubjects();
+              
               router.back();
               // Evitar freeze de Modal de React Native usando un timeout para permitir 
               // que la animación de navegación y el dismiss del primer Modal terminen.

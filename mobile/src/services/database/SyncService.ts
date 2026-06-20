@@ -1,6 +1,8 @@
 import { syncQueueRepository } from './repositories/SyncQueueRepository';
 import { databaseService } from './DatabaseService';
 import { mediaSyncService } from './MediaSyncService';
+import { useLocalAIStore } from '../../store/useLocalAIStore';
+import { useConnectivityStore } from '../../store/useConnectivityStore';
 
 type SyncHandler = (operation: {
   entity_type: string;
@@ -43,11 +45,20 @@ export class SyncService {
   }
 
   async enqueueDelete(entityType: string, entityId: string): Promise<void> {
-    await syncQueueRepository.enqueue({
-      entity_type: entityType,
-      entity_id: entityId,
-      operation: 'DELETE',
-    });
+    const pendingOps = await syncQueueRepository.getPendingOperations(entityType, entityId);
+    const isCreatePending = pendingOps.some(op => op.operation === 'CREATE');
+
+    if (pendingOps.length > 0) {
+      await syncQueueRepository.cancelPendingOperations(entityType, entityId);
+    }
+
+    if (!isCreatePending) {
+      await syncQueueRepository.enqueue({
+        entity_type: entityType,
+        entity_id: entityId,
+        operation: 'DELETE',
+      });
+    }
     this.triggerSync();
   }
 
@@ -63,6 +74,13 @@ export class SyncService {
   async sync(): Promise<{ success: number; failed: number; pending: number }> {
     if (this.isSyncing) {
       console.log('[SyncService] Sync ya en progreso, ignorando');
+      return { success: 0, failed: 0, pending: 0 };
+    }
+
+    const forceOffline = useLocalAIStore.getState().forceOfflineMode;
+    const isGloballyOffline = !useConnectivityStore.getState().isOnline;
+    if (forceOffline || isGloballyOffline) {
+      console.log('[SyncService] Modo offline (forzado o sin red) — saltando sync');
       return { success: 0, failed: 0, pending: 0 };
     }
     

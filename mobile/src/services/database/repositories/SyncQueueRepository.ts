@@ -23,6 +23,22 @@ export class SyncQueueRepository {
     );
   }
 
+  async getPendingOperations(entityType: string, entityId: string): Promise<SyncQueueItem[]> {
+    const db = databaseService.getDb();
+    return db.getAllAsync(
+      `SELECT * FROM sync_queue WHERE entity_type = ? AND entity_id = ? AND status = 'pending'`,
+      entityType, entityId
+    ) as Promise<SyncQueueItem[]>;
+  }
+
+  async cancelPendingOperations(entityType: string, entityId: string): Promise<void> {
+    const db = databaseService.getDb();
+    await db.runAsync(
+      `DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ? AND status = 'pending'`,
+      entityType, entityId
+    );
+  }
+
   async getPending(): Promise<SyncQueueItem[]> {
     const db = databaseService.getDb();
     return db.getAllAsync(

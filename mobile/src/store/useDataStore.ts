@@ -64,11 +64,11 @@ export const useDataStore = create<DataState>((set, get) => ({
       await databaseService.open();
 
       const dbSubjects = await subjectRepository.getAll() as any;
-      if (dbSubjects.length > 0) set({ subjects: dbSubjects });
+      set({ subjects: dbSubjects });
       const dbAssessments = await assessmentRepository.getAll() as any;
-      if (dbAssessments.length > 0) set({ assessments: dbAssessments });
+      set({ assessments: dbAssessments });
       const dbSchedules = await scheduleRepository.getAll() as any;
-      if (dbSchedules.length > 0) set({ schedules: dbSchedules });
+      set({ schedules: dbSchedules });
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
 
@@ -79,11 +79,11 @@ export const useDataStore = create<DataState>((set, get) => ({
         getAllSchedules().catch(() => null),
       ]);
 
-      // Only overwrite with cloud data if we got real results back.
-      // Empty arrays from failed cloud calls must NOT erase local SQLite data.
-      if (subjectsData && Array.isArray(subjectsData) && subjectsData.length > 0) set({ subjects: subjectsData });
-      if (assessmentsData && Array.isArray(assessmentsData) && assessmentsData.length > 0) set({ assessments: assessmentsData });
-      if (schedulesData && Array.isArray(schedulesData) && schedulesData.length > 0) set({ schedules: schedulesData });
+      // Si subjectsData es un array (incluso vacío), lo guardamos.
+      // Así evitamos el bug donde borrar la última materia no se refleja.
+      if (subjectsData && Array.isArray(subjectsData)) set({ subjects: subjectsData });
+      if (assessmentsData && Array.isArray(assessmentsData)) set({ assessments: assessmentsData });
+      if (schedulesData && Array.isArray(schedulesData)) set({ schedules: schedulesData });
 
       const hasCloudData = (subjectsData && subjectsData.length > 0) ||
         (assessmentsData && assessmentsData.length > 0) ||

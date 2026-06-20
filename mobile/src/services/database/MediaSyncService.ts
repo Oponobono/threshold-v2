@@ -1,5 +1,6 @@
 import { databaseService } from './DatabaseService';
 import { fetchWithFallback } from '../api/client';
+import { useLocalAIStore } from '../../store/useLocalAIStore';
 import * as FileSystem from 'expo-file-system/legacy';
 
 export class MediaSyncService {
@@ -14,6 +15,12 @@ export class MediaSyncService {
     const failedEntityIds = new Set<string>();
 
     if (this.isSyncing) return failedEntityIds;
+
+    if (useLocalAIStore.getState().forceOfflineMode) {
+      console.log('[MediaSync] Modo offline forzado — saltando Fase 1');
+      return failedEntityIds;
+    }
+
     this.isSyncing = true;
 
     try {
@@ -27,9 +34,9 @@ export class MediaSyncService {
       ];
 
       for (const table of tables) {
-        // Encontrar registros con local_uri pero sin cloud_url
+        const selectCols = table.name === 'assessment_files' ? 'id, local_uri, file_type' : 'id, local_uri';
         const rows: any[] = await db.getAllAsync(
-          `SELECT id, local_uri, file_type FROM ${table.name} WHERE local_uri IS NOT NULL AND cloud_url IS NULL`
+          `SELECT ${selectCols} FROM ${table.name} WHERE local_uri IS NOT NULL AND cloud_url IS NULL`
         );
 
         for (const row of rows) {

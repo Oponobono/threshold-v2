@@ -18,8 +18,7 @@ class AssessmentFileRepository extends BaseRepository<AssessmentFile> {
   }
 
   async getByAssessment(assessmentId: string): Promise<AssessmentFile[]> {
-    const query = `SELECT * FROM ${this.tableName} WHERE assessment_id = ? ORDER BY created_at DESC`;
-    return this.executeQuery(query, [assessmentId]);
+    return this.getByField('assessment_id', assessmentId);
   }
 }
 

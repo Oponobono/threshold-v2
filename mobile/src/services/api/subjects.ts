@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { Subject } from './types';
 import { subjectRepository, syncService } from '../database';
+import { storageService } from '../storageService';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -9,23 +10,38 @@ const getUserIdNumber = async (): Promise<string> => {
   return String(uid);
 };
 
+let lastSyncTimestamp = 0;
+let syncInProgress = false;
+let fetchInProgress = false;
+const SYNC_THROTTLE_MS = 30000;
+const pendingDelete = new Set<string>();
+
 export const getSubjectById = async (subjectId: string): Promise<Subject | null> => {
+  if (pendingDelete.has(subjectId)) return null;
+
   // 1. Leer localmente primero
   const localData = await subjectRepository.getById(subjectId);
 
-  // 2. Sincronizar en background
-  (async () => {
-    try {
-      const response = await fetchWithFallback(`/subject/${subjectId}`);
-      if (response.ok) {
-        const data = await parseJsonSafely(response);
-        if (data) await subjectRepository.upsert(data);
-      }
-    } catch {}
-  })();
+  // 2. Sincronizar en background con throttling para evitar 429
+  const now = Date.now();
+  if (now - lastSyncTimestamp > SYNC_THROTTLE_MS) {
+    lastSyncTimestamp = now;
+    (async () => {
+      try {
+        const response = await fetchWithFallback(`/subject/${subjectId}`);
+        if (response.ok) {
+          const data = await parseJsonSafely(response);
+          if (data && !pendingDelete.has(subjectId)) await subjectRepository.upsert(data);
+        }
+      } catch {}
+    })();
+  }
 
   return localData;
 };
+
+const filterDeleted = (subjects: Subject[]): Subject[] =>
+  subjects.filter(s => !pendingDelete.has(s.id));
 
 export const getSubjects = async (): Promise<Subject[]> => {
   const userId = await getUserIdNumber();
@@ -35,33 +51,44 @@ export const getSubjects = async (): Promise<Subject[]> => {
 
   // Si no hay datos locales (primer inicio o caché limpia), esperar la red obligatoriamente
   if (!localData || localData.length === 0) {
+    if (fetchInProgress) {
+      return [];
+    }
+    fetchInProgress = true;
     try {
       const response = await fetchWithFallback(`/subjects/${userId}`);
-      if (response.ok) {
+      if (response.ok && !response.headers.get('X-Offline-Cache')) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const s of data) await subjectRepository.upsert(s);
-          return data;
+          for (const s of data) if (!pendingDelete.has(s.id)) await subjectRepository.upsert(s);
+          return filterDeleted(data);
         }
       }
     } catch {}
+    finally { fetchInProgress = false; }
     return [];
   }
 
-  // 2. Sincronizar en background
-  (async () => {
-    try {
-      const response = await fetchWithFallback(`/subjects/${userId}`);
-      if (response.ok) {
-        const data = await parseJsonSafely(response);
-        if (Array.isArray(data)) {
-          for (const s of data) await subjectRepository.upsert(s);
+  // 2. Sincronizar en background con throttling para evitar 429
+  const now = Date.now();
+  if (now - lastSyncTimestamp > SYNC_THROTTLE_MS && !syncInProgress) {
+    syncInProgress = true;
+    lastSyncTimestamp = now;
+    (async () => {
+      try {
+        const response = await fetchWithFallback(`/subjects/${userId}`);
+        if (response.ok && !response.headers.get('X-Offline-Cache')) {
+          const data = await parseJsonSafely(response);
+          if (Array.isArray(data)) {
+            for (const s of data) if (!pendingDelete.has(s.id)) await subjectRepository.upsert(s);
+          }
         }
-      }
-    } catch {}
-  })();
+      } catch {}
+      finally { syncInProgress = false; }
+    })();
+  }
 
-  return localData;
+  return filterDeleted(localData);
 };
 
 export const createSubject = async (payload: {
@@ -134,13 +161,30 @@ export const updateSubject = async (subjectId: string, payload: Partial<Subject>
 };
 
 export const deleteSubject = async (subjectId: string) => {
+  pendingDelete.add(subjectId);
   await subjectRepository.delete(subjectId);
+
+  // Invalidar toda caché relacionada con subjects para evitar que una lectura
+  // posterior (loadAllData, getSubjectById) en modo offline restaure la materia
+  // desde la caché obsoleta.
+  const userId = await getUserIdNumber();
+  await Promise.all([
+    storageService.removeLocal(`api_cache_/subjects/${userId}`).catch(() => {}),
+    storageService.removeLocal(`api_cache_/subject/${subjectId}`).catch(() => {}),
+    storageService.removeLocal(`api_cache_/subjects/user/${userId}`).catch(() => {}),
+    storageService.removeLocal(`api_cache_/subjects/${userId}?`).catch(() => {}),
+  ]);
+  // Resetear timestamp de sync para que el próximo getSubjects/getSubjectById
+  // no haga background sync con caché obsoleta.
+  lastSyncTimestamp = Date.now();
 
   try {
     const response = await fetchWithFallback(`/subjects/${subjectId}`, { method: 'DELETE' });
+    pendingDelete.delete(subjectId);
     return await parseJsonSafely(response);
   } catch {
     await syncService.enqueueDelete('subject', subjectId);
+    pendingDelete.delete(subjectId);
     return { success: true, _isPending: true };
   }
 };
