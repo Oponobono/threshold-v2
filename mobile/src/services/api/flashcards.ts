@@ -184,11 +184,58 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
   return localData;
 };
 
-export const getCardById = async (cardId: string): Promise<Flashcard> => {
-  const response = await fetchWithFallback(`/flashcards/${cardId}`);
-  const data = await parseJsonSafely(response);
-  if (!response.ok) throw new Error(data?.error || 'Error al obtener tarjeta');
-  return data;
+function searchCardInMMKV(cardId: string): any | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mmkv = require('react-native-mmkv').createMMKV();
+    const allKeys = mmkv.getAllKeys() as string[];
+    const deckKeys = allKeys.filter((k: string) => k.startsWith('cache:flashcards_by_deck:'));
+    for (const key of deckKeys) {
+      const raw = mmkv.getString(key);
+      if (raw) {
+        const entry = JSON.parse(raw);
+        const cards = entry.data || entry || [];
+        const found = cards.find((c: any) => String(c.id) === cardId);
+        if (found) return found;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+export const getCardById = async (cardId: string): Promise<Flashcard | null> => {
+  // 1. Leer localmente primero (SQLite)
+  const localCard = await flashcardRepository.getById(cardId);
+  if (localCard) {
+    // 2. Sincronizar en background
+    (async () => {
+      try {
+        const response = await fetchWithFallback(`/flashcards/${cardId}`);
+        if (response.ok) {
+          const data = await parseJsonSafely(response);
+          if (data) await flashcardRepository.upsert(data);
+        }
+      } catch {}
+    })();
+    return localCard;
+  }
+
+  // 3. Buscar en MMKV (tarjetas importadas localmente)
+  const mmkvCard = searchCardInMMKV(cardId);
+  if (mmkvCard) return mmkvCard;
+
+  // 4. Intentar red si no está en local
+  try {
+    const response = await fetchWithFallback(`/flashcards/${cardId}`);
+    const data = await parseJsonSafely(response);
+    if (response.ok && data) {
+      await flashcardRepository.upsert(data);
+      return data;
+    }
+    throw new Error(data?.error || 'Error al obtener tarjeta');
+  } catch {
+    return null;
+  }
 };
 
 export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; id?: string }): Promise<any> => {
