@@ -11,7 +11,8 @@ export async function initializeDatabase(): Promise<void> {
     syncService.onSync(async ({ entity_type, entity_id, operation, payload }) => {
       let path = `/${entity_type}s`;
       if (entity_type === 'assessment_category') path = '/assessmentCategories';
-      if (entity_type === 'audio_recording') path = '/audio';
+      if (entity_type === 'audio_recording') path = '/audio-recordings';  // ← Fix: was '/audio'
+      if (entity_type === 'audio-transcript') path = '/audio-transcripts'; // ← Explicit mapping
       if (entity_type === 'scanned_document') path = '/scanned_documents';
       if (entity_type === 'flashcard_deck') path = '/flashcard-decks';
       if (entity_type === 'assessment_files') path = `/assessments/${payload?.assessment_id}/files`;
@@ -41,6 +42,24 @@ export async function initializeDatabase(): Promise<void> {
 
       // Para CREATE de assessment_files la ruta ya tiene el assessmentId embebido; para UPDATE/DELETE agregar el fileId
       if (entity_id && operation !== 'CREATE') path += `/${entity_id}`;
+
+      // ── Guard: audio-transcript needs its parent recording on the server ──
+      // If the recording was created offline (no sync yet), the FK constraint
+      // will reject the INSERT with a 403/500. We defer and let the queue retry
+      // naturally once the recording has been synced.
+      if (entity_type === 'audio-transcript' && operation === 'CREATE' && payload?.recording_id) {
+        try {
+          const parentRes = await fetchWithFallback(`/audio-recordings/check/${payload.recording_id}`, { method: 'GET' });
+          if (!parentRes.ok) {
+            throw new Error(`Grabación padre ${payload.recording_id} aún no existe en el servidor. Reintentando más tarde.`);
+          }
+        } catch (checkErr: any) {
+          // If the check endpoint doesn't exist or the recording isn't there yet,
+          // defer this transcript by re-throwing so SyncService marks it failed
+          // (it will be retried on the next sync cycle).
+          throw new Error(`Grabación padre pendiente de sync: ${checkErr.message}`);
+        }
+      }
 
       // Conflict Resolution: LWW (Last Write Wins) for UPDATE
       if (operation === 'UPDATE' && entity_id && payload) {

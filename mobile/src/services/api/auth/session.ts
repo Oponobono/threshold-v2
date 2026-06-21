@@ -2,6 +2,7 @@ import { storageService } from '../../storageService';
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { databaseService } from '../../database/DatabaseService';
 import { clearProfileImageCache } from '../../profileImageCache';
+import { clearAllUserData } from '../../sessionClearService';
 
 /**
  * Obtiene el ID del usuario actual almacenado localmente
@@ -113,17 +114,47 @@ export const signOut = async (): Promise<void> => {
     await storageService.removeSecure('app_user_email');
     await storageService.removeSecure('app_user_id');
     
-    // Limpiar todos los datos locales
+    // Limpiar SQLite
     await databaseService.clearAll();
     await clearProfileImageCache();
-    await storageService.removeLocal('app:cached_profile');
-    await storageService.removeLocal('app:cache:predictions');
-    await storageService.removeLocal('app:cache:semester_summary');
-    await storageService.removeLocal('app:cache:global_gpa');
-    await storageService.removeLocal('app:cache:grading_systems');
+
+    // Limpiar TODOS los datos de usuario: MMKV (mazos, cartas, reviews) + AsyncStorage (caché)
+    // Esto evita que una cuenta nueva vea datos residuales de la sesión anterior.
+    await clearAllUserData();
     
-    console.log('[Auth] Sesión cerrada. Datos de autenticación y caché eliminados.');
+    console.log('[Auth] Sesión cerrada. Datos de autenticación, SQLite, MMKV y caché eliminados.');
   } catch (error) {
     console.warn('[Auth] Advertencia al limpiar sesión:', error);
+  }
+};
+
+/**
+ * Solicita un código OTP para recuperar la contraseña.
+ * Envía un correo electrónico con el código al email especificado.
+ */
+export const forgotPassword = async (email: string): Promise<void> => {
+  const response = await fetchWithFallback('/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error al enviar el código de recuperación.');
+  }
+};
+
+/**
+ * Verifica el código OTP y actualiza la contraseña del usuario.
+ */
+export const resetPassword = async (email: string, code: string, newPassword: string): Promise<void> => {
+  const response = await fetchWithFallback('/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, newPassword }),
+  });
+  const data = await parseJsonSafely(response);
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error al restablecer la contraseña.');
   }
 };

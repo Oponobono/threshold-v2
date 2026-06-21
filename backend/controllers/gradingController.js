@@ -14,17 +14,12 @@ const {
  * Devuelve todos los sistemas de calificación disponibles (seeded + custom del usuario).
  */
 const getGradingSystems = (req, res) => {
-  const userId = req.user?.id;
+  const userId = req.user ? req.user.id : null;
   
   // Log para depuración
   console.log('[GradingController] GET /grading-systems');
   console.log('  req.user:', req.user);
   console.log('  userId:', userId);
-  
-  if (!userId) {
-    console.error('[GradingController] No userId en req.user');
-    return res.status(401).json({ error: 'No autenticado' });
-  }
   
   db.all(
     `SELECT gs.*,
@@ -37,9 +32,9 @@ const getGradingSystems = (req, res) => {
        AND (gv.owner_type = 'system'
             OR (gv.owner_type = 'user' AND gv.owner_id = ?))
      WHERE CAST(gs.is_system_seeded AS INTEGER) = 1
-        OR gs.created_by_user_id = ?
+        OR (gs.created_by_user_id IS NOT NULL AND gs.created_by_user_id = ?)
      ORDER BY gs.is_system_seeded DESC, gs.name ASC`,
-    [String(userId), userId],
+    [userId ? String(userId) : null, userId || null],
     (err, rows) => {
       if (err) {
         console.error('[GradingController] Error fetching systems:', err.message);

@@ -30,5 +30,26 @@
   "cancelBtn": "Cancel",
   "accountRecovered": "Your account has been successfully recovered.",
   "footerText": "Students at over 1,200 campuses trust Threshold for smarter studying",
-  "copyright": "Â© 2026 Threshold Inc."
+  "copyright": "Â© 2026 Threshold Inc.",
+  "forgotPassword": {
+    "title": "Recover password",
+    "subtitle": "Enter your email and we'll send you a verification code.",
+    "emailLabel": "Email address",
+    "sendCode": "Send code",
+    "sending": "Sending...",
+    "codeSent": "Code sent. Check your inbox.",
+    "step2Title": "Enter the code",
+    "step2Subtitle": "Check your email {{email}} and enter the 6-digit code.",
+    "codePlaceholder": "000000",
+    "newPasswordLabel": "New password",
+    "newPasswordPlaceholder": "At least 8 characters",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat your new password",
+    "resetBtn": "Reset password",
+    "resendCode": "Resend code",
+    "resending": "Resending...",
+    "passwordMismatch": "Passwords do not match.",
+    "success": "Password reset! You can now sign in.",
+    "backToLogin": "Back to sign in"
+  }
 }

@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getFlashcardDecksWithMetrics, type FlashcardDeck, type Subject } from '../services/api';
 import { flashcardDeckRepository } from '../services/database';
-import { getLocalDecks, type LocalDeck } from '../services/localFlashcardService';
+import { getLocalDecksForCurrentUser, type LocalDeck } from '../services/localFlashcardService';
+import { getUserId } from '../services/api/auth';
 
 export interface FlashcardsManagerResult {
   decks: FlashcardDeck[];
@@ -54,8 +55,9 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
    */
   const loadGenRef = useRef(0);
 
-  function mergeLocalDecks(remoteDecks: FlashcardDeck[]): FlashcardDeck[] {
-    const localDecks = getLocalDecks().map(localDeckToFlashcardDeck);
+  function mergeLocalDecks(remoteDecks: FlashcardDeck[], userId?: string | null): FlashcardDeck[] {
+    // Filtrar mazos locales por userId activo para evitar contaminación entre cuentas
+    const localDecks = getLocalDecksForCurrentUser(userId).map(localDeckToFlashcardDeck);
     const seen = new Set(remoteDecks.map(d => d.id));
     return [...remoteDecks, ...localDecks.filter(d => !seen.has(d.id))];
   }
@@ -64,9 +66,12 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
     const generation = ++loadGenRef.current;
     setIsLoading(true);
 
+    // Resolver userId actual para aislar mazos por cuenta
+    const currentUserId = await getUserId();
+
     // Fase 1: Cache-first — mostrar datos instantáneos desde SQLite + locales
     const cached = await flashcardDeckRepository.getAll();
-    const cachedWithLocal = mergeLocalDecks(cached as any);
+    const cachedWithLocal = mergeLocalDecks(cached as any, currentUserId);
     if (cachedWithLocal.length > 0 && generation === loadGenRef.current) {
       setDecks(cachedWithLocal);
       setIsLoading(false);
@@ -76,12 +81,12 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
     try {
       const data = await getFlashcardDecksWithMetrics();
       if (generation === loadGenRef.current) {
-        setDecks(mergeLocalDecks(Array.isArray(data) ? data : []));
+        setDecks(mergeLocalDecks(Array.isArray(data) ? data : [], currentUserId));
       }
     } catch (e) {
       console.warn('[useFlashcardsManager] Error cargando mazos:', e);
       if (generation === loadGenRef.current && decks.length === 0) {
-        setDecks(mergeLocalDecks([]));
+        setDecks(mergeLocalDecks([], currentUserId));
       }
     } finally {
       if (generation === loadGenRef.current) {

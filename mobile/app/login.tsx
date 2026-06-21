@@ -133,7 +133,7 @@ export default function LoginScreen() {
               <Text style={[loginStyles.checkboxText, { color: '#1A1A1A', fontWeight: '300', marginLeft: 0 }]}>{t('login.rememberMe')}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/forgot-password')}>
               <Text style={[globalStyles.textLink, { color: '#8A8A8E', fontWeight: '400' }]}>{t('login.forgot')}</Text>
             </TouchableOpacity>
           </View>

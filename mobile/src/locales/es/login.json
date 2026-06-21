@@ -30,5 +30,26 @@
   "cancelBtn": "Cancelar",
   "accountRecovered": "Tu cuenta ha sido recuperada exitosamente.",
   "footerText": "Estudiantes en más de 1,200 campus confían en Threshold para estudiar mejor",
-  "copyright": "© 2026 Threshold Inc."
+  "copyright": "© 2026 Threshold Inc.",
+  "forgotPassword": {
+    "title": "Recuperar contraseña",
+    "subtitle": "Ingresa tu correo y te enviaremos un código de verificación.",
+    "emailLabel": "Correo electrónico",
+    "sendCode": "Enviar código",
+    "sending": "Enviando...",
+    "codeSent": "Código enviado. Revisa tu bandeja de entrada.",
+    "step2Title": "Ingresa el código",
+    "step2Subtitle": "Revisa tu correo {{email}} y escribe el código de 6 dígitos.",
+    "codePlaceholder": "000000",
+    "newPasswordLabel": "Nueva contraseña",
+    "newPasswordPlaceholder": "Mínimo 8 caracteres",
+    "confirmPasswordLabel": "Confirmar contraseña",
+    "confirmPasswordPlaceholder": "Repite tu nueva contraseña",
+    "resetBtn": "Restablecer contraseña",
+    "resendCode": "Reenviar código",
+    "resending": "Reenviando...",
+    "passwordMismatch": "Las contraseñas no coinciden.",
+    "success": "¡Contraseña restablecida! Ya puedes iniciar sesión.",
+    "backToLogin": "Volver al inicio de sesión"
+  }
 }

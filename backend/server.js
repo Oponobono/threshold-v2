@@ -92,6 +92,10 @@ app.get('/api/status', (req, res) => {
 // Registrar rutas públicas (Login, Registro)
 app.use('/api', authRoutes);
 
+// Ruta pública auxiliar para el flujo de registro (obtener sistemas de calificación)
+const gradingController = require('./controllers/gradingController');
+app.get('/api/grading-systems', gradingController.getGradingSystems);
+
 // 🛡️ Fase 1: Escudo de Autenticación JWT
 // A partir de esta línea, TODAS las rutas requerirán un token válido
 const { authenticateToken } = require('./middlewares/authMiddleware');

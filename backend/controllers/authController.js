@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { getUniqueSharePin } = require('../utils/pinHelper');
 const { JWT_SECRET } = require('../middlewares/authMiddleware');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 // Patrón de email válido
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -51,8 +52,20 @@ exports.registerUser = async (req, res) => {
     const query = `INSERT INTO users (id, email, password_hash, name, lastname, username, major, university, semester, study_goal, reference_language, share_pin, profile_image, active_grading_version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     db.run(query, [userId, email, passwordHash, name, lastname, username, major, university, semester || null, study_goal || null, reference_language || null, sharePin, profile_image || null, active_grading_version_id || 3], function (err) {
       if (err) {
+        console.error('[Register] DB error:', err.message);
+        console.error('[Register] Datos recibidos - email:', email, '| username:', username, '| id:', userId);
         if (err.message.includes('UNIQUE constraint failed')) {
-          return res.status(409).json({ error: 'El correo ya está registrado.' });
+          if (err.message.includes('users.username')) {
+            return res.status(409).json({ error: 'El nombre de usuario ya está en uso. Por favor elige otro.' });
+          }
+          if (err.message.includes('users.email')) {
+            return res.status(409).json({ error: 'El correo ya está registrado.' });
+          }
+          if (err.message.includes('users.id')) {
+            return res.status(409).json({ error: 'ID de cuenta duplicado. Por favor reinicia el registro.' });
+          }
+          // Fallback: devolver el mensaje raw para depurar
+          return res.status(409).json({ error: `Conflicto: ${err.message}` });
         }
         return res.status(500).json({ error: 'Error interno del servidor.' });
       }
@@ -210,4 +223,122 @@ exports.biometricLogin = (req, res) => {
       });
     }
   );
+};
+
+/**
+ * Solicita un código OTP para recuperar contraseña.
+ * Genera un código de 6 dígitos, lo guarda en la BD con expiración de 15 min,
+ * y lo envía al email del usuario via Resend.
+ */
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || !EMAIL_REGEX.test(email)) {
+    return res.status(400).json({ error: 'Por favor ingresa un correo electrónico válido.' });
+  }
+
+  try {
+    db.get(`SELECT id, name, email FROM users WHERE email = ?`, [email], async (err, user) => {
+      if (err) {
+        console.error('[forgotPassword] DB error:', err.message);
+        return res.status(500).json({ error: 'Error interno del servidor.' });
+      }
+
+      // Respuesta genérica para no revelar si el email existe (seguridad)
+      if (!user) {
+        return res.json({ message: 'Si el correo está registrado, recibirás un código de verificación.' });
+      }
+
+      // Generar código OTP de 6 dígitos
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiryDate = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutos
+
+      db.run(
+        `UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?`,
+        [otpCode, expiryDate, user.id],
+        async (updateErr) => {
+          if (updateErr) {
+            console.error('[forgotPassword] Error guardando token:', updateErr.message);
+            return res.status(500).json({ error: 'Error interno del servidor.' });
+          }
+
+          try {
+            await sendPasswordResetEmail(email, otpCode, user.name || 'estudiante');
+            console.log(`[forgotPassword] OTP enviado a ${email} para userId=${user.id}`);
+            res.json({ message: 'Si el correo está registrado, recibirás un código de verificación.' });
+          } catch (emailErr) {
+            console.error('[forgotPassword] Error enviando email:', emailErr.message);
+            res.status(500).json({ error: 'No se pudo enviar el correo. Intenta de nuevo más tarde.' });
+          }
+        }
+      );
+    });
+  } catch (error) {
+    console.error('[forgotPassword] Error:', error);
+    res.status(500).json({ error: 'Error al procesar la solicitud.' });
+  }
+};
+
+/**
+ * Verifica el código OTP y actualiza la contraseña del usuario.
+ */
+exports.resetPassword = async (req, res) => {
+  const { email, code, newPassword } = req.body;
+
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({ error: 'Faltan campos requeridos (email, code, newPassword).' });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres.' });
+  }
+
+  try {
+    db.get(
+      `SELECT id, reset_token, reset_token_expiry FROM users WHERE email = ?`,
+      [email],
+      async (err, user) => {
+        if (err) {
+          console.error('[resetPassword] DB error:', err.message);
+          return res.status(500).json({ error: 'Error interno del servidor.' });
+        }
+
+        if (!user || !user.reset_token) {
+          return res.status(400).json({ error: 'Código inválido o expirado. Solicita uno nuevo.' });
+        }
+
+        // Verificar que el código no expiró
+        const now = new Date();
+        const expiry = new Date(user.reset_token_expiry);
+        if (now > expiry) {
+          return res.status(400).json({ error: 'El código ha expirado. Solicita uno nuevo.' });
+        }
+
+        // Verificar que el código coincide
+        if (user.reset_token !== code.trim()) {
+          return res.status(400).json({ error: 'El código ingresado no es correcto.' });
+        }
+
+        // Hashear la nueva contraseña y limpiar el token
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+
+        db.run(
+          `UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?`,
+          [passwordHash, user.id],
+          (updateErr) => {
+            if (updateErr) {
+              console.error('[resetPassword] Error actualizando contraseña:', updateErr.message);
+              return res.status(500).json({ error: 'Error interno del servidor.' });
+            }
+
+            console.log(`[resetPassword] ✅ Contraseña restablecida para userId=${user.id}`);
+            res.json({ message: 'Contraseña restablecida exitosamente. Ya puedes iniciar sesión.' });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('[resetPassword] Error:', error);
+    res.status(500).json({ error: 'Error al procesar la solicitud.' });
+  }
 };

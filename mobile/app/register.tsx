@@ -122,7 +122,7 @@ export default function RegisterScreen() {
     if (status !== 'granted') return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
+      allowsEditing: Platform.OS === 'ios',
       aspect: [1, 1],
       quality: 0.8,
     });
@@ -291,7 +291,7 @@ export default function RegisterScreen() {
           {system.min_value}–{system.max_value}
         </Text>
         <Text style={[localStyles.segmentSubText, isActive && localStyles.segmentTextActive]} numberOfLines={1}>
-          {system.name}
+          {system.name.includes('.') ? t(system.name) : system.name}
         </Text>
       </TouchableOpacity>
     );
@@ -605,23 +605,6 @@ export default function RegisterScreen() {
                     onChangeText={setConfirmPassword}
                   />
 
-                  {/* Indicador de coincidencia de contraseñas */}
-                  {confirmPassword.length > 0 && (
-                    <View style={localStyles.matchRow}>
-                      <Feather
-                        name={password === confirmPassword ? 'check-circle' : 'x-circle'}
-                        size={14}
-                        color={password === confirmPassword ? theme.colors.success : theme.colors.danger}
-                      />
-                      <Text style={[
-                        localStyles.matchText,
-                        { color: password === confirmPassword ? theme.colors.success : theme.colors.danger },
-                      ]}>
-                        {password === confirmPassword ? t('register.passwordMatch') : t('register.passwordMismatch')}
-                      </Text>
-                    </View>
-                  )}
-
                   {/* Requisitos de contraseña */}
                   <View style={localStyles.reqCard}>
                     <Text style={localStyles.reqTitle}>{t('register.reqTitle')}</Text>
@@ -629,6 +612,12 @@ export default function RegisterScreen() {
                     <RequirementItem fulfilled={reqs.upper} text={t('register.reqUpper')} />
                     <RequirementItem fulfilled={reqs.number} text={t('register.reqNumber')} />
                     <RequirementItem fulfilled={reqs.special} text={t('register.reqSpecial')} />
+                    {confirmPassword.length > 0 && (
+                      <RequirementItem 
+                        fulfilled={password === confirmPassword} 
+                        text={password === confirmPassword ? t('register.passwordMatch') : t('register.passwordMismatch')} 
+                      />
+                    )}
                   </View>
                 </View>
 

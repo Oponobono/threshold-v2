@@ -22,7 +22,9 @@ const tableSchema = {
         last_login DATETIME DEFAULT CURRENT_TIMESTAMP,
         share_pin VARCHAR(8) UNIQUE,
         display_name TEXT,
-        profile_image TEXT
+        profile_image TEXT,
+        reset_token TEXT,
+        reset_token_expiry DATETIME
       )
     `,
     postgres: `
@@ -45,7 +47,9 @@ const tableSchema = {
         last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         share_pin VARCHAR(8) UNIQUE,
         display_name TEXT,
-        profile_image TEXT
+        profile_image TEXT,
+        reset_token TEXT,
+        reset_token_expiry TIMESTAMP
       )
     `,
     columns: [
@@ -64,7 +68,9 @@ const tableSchema = {
       { name: 'display_name', type: 'TEXT' },
       { name: 'profile_image', type: 'TEXT' },
       { name: 'active_grading_version_id', type: 'INTEGER' },
-      { name: 'approval_threshold', type: 'REAL DEFAULT 50.0' }
+      { name: 'approval_threshold', type: 'REAL DEFAULT 50.0' },
+      { name: 'reset_token', type: 'TEXT' },
+      { name: 'reset_token_expiry', type: 'TIMESTAMP' }
     ]
   },
   deleted_users: {

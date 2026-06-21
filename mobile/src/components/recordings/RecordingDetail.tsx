@@ -217,7 +217,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
     }
   };
 
-  useEffect(() => { loadInitialData(); }, [recordingId, loadInitialData]);
+  useEffect(() => { loadInitialData(); }, [recordingId]);
 
   const loadPersistedTexts = async (fileKey: string, serverKey: string | null, rec: AudioRecording | null) => {
     const dir = TRANSCRIPTS_DIR();

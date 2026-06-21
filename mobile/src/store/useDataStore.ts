@@ -22,6 +22,7 @@ interface DataState {
   hasLoadedOnce: boolean;
   isSyncing: boolean;
   syncStatusMessage: string;
+  _lastLoadAllDataTimestamp: number;
 
   loadAllData: (forceRefresh?: boolean) => Promise<void>;
   refreshSubjects: () => Promise<void>;
@@ -48,16 +49,24 @@ export const useDataStore = create<DataState>((set, get) => ({
   hasLoadedOnce: false,
   isSyncing: false,
   syncStatusMessage: '',
+  _lastLoadAllDataTimestamp: 0,
 
   loadAllData: async (forceRefresh = false) => {
     const state = get();
     if (state.isInitialLoading || state.isRefreshing) return;
     if (state.hasLoadedOnce && !forceRefresh) return;
 
+    // Debounce: evitar que llamadas rápidas consecutivas disparen otra carga
+    const LOAD_ALL_DATA_DEBOUNCE_MS = 5000;
+    const now = Date.now();
+    if (state._lastLoadAllDataTimestamp && (now - state._lastLoadAllDataTimestamp < LOAD_ALL_DATA_DEBOUNCE_MS)) {
+      return;
+    }
+
     if (!state.hasLoadedOnce) {
-      set({ isInitialLoading: true });
+      set({ isInitialLoading: true, _lastLoadAllDataTimestamp: now });
     } else {
-      set({ isRefreshing: true });
+      set({ isRefreshing: true, _lastLoadAllDataTimestamp: now });
     }
 
     try {

@@ -4,6 +4,26 @@ const audioController = require('../controllers/audioController');
 
 /**
  * @swagger
+ * /api/audio-recordings/check/{id}:
+ *   get:
+ *     summary: Verifica si una grabación existe en el servidor (usado antes de sincronizar transcripts)
+ *     tags: [Audio]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Grabación encontrada
+ *       404:
+ *         description: Grabación no encontrada
+ */
+router.get('/audio-recordings/check/:id', audioController.checkRecordingExists);
+
+/**
+ * @swagger
  * /api/audio-recordings/{userId}:
  *   get:
  *     summary: Obtiene todas las grabaciones de audio de un usuario
@@ -13,12 +33,14 @@ const audioController = require('../controllers/audioController');
  *         name: userId
  *         required: true
  *         schema:
- *           type: integer
+ *           type: string
  *     responses:
  *       200:
  *         description: Lista de grabaciones
  */
 router.get('/audio-recordings/:userId', audioController.getAudioRecordings);
+
+
 
 /**
  * @swagger

@@ -8,6 +8,8 @@ router.use('/login', authLimiter);
 router.use('/register', authLimiter);
 router.use('/biometric-login', authLimiter);
 router.use('/auth/enroll-biometric', authLimiter);
+router.use('/auth/forgot-password', authLimiter);
+router.use('/auth/reset-password', authLimiter);
 /**
  * @swagger
  * /api/register:
@@ -136,5 +138,8 @@ router.post('/auth/enroll-biometric', authController.enrollBiometric);
  *         description: Token inválido o no encontrado
  */
 router.post('/biometric-login', authController.biometricLogin);
+
+router.post('/auth/forgot-password', authController.forgotPassword);
+router.post('/auth/reset-password', authController.resetPassword);
 
 module.exports = router;

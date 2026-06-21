@@ -16,16 +16,32 @@ let fetchInProgress = false;
 const SYNC_THROTTLE_MS = 30000;
 const pendingDelete = new Set<string>();
 
+// Seguimiento separado para getSubjectById — no debe compartir lastSyncTimestamp
+// con getSubjects para evitar que una función interrumpa el throttle de la otra.
+let lastSubjectByIdSyncTimestamp = 0;
+let subjectByIdSyncInProgress = false;
+const lastSubjectSyncTimestamps = new Map<string, number>();
+
+const SUBJECT_BY_ID_THROTTLE_MS = 30000;
+
 export const getSubjectById = async (subjectId: string): Promise<Subject | null> => {
   if (pendingDelete.has(subjectId)) return null;
 
   // 1. Leer localmente primero
   const localData = await subjectRepository.getById(subjectId);
 
-  // 2. Sincronizar en background con throttling para evitar 429
+  // 2. Sincronizar en background con throttling separado del de getSubjects
+  //    y con debounce por materia para evitar llamadas redundantes.
   const now = Date.now();
-  if (now - lastSyncTimestamp > SYNC_THROTTLE_MS) {
-    lastSyncTimestamp = now;
+  const lastPerSubject = lastSubjectSyncTimestamps.get(subjectId) || 0;
+  if (
+    now - lastSubjectByIdSyncTimestamp > SUBJECT_BY_ID_THROTTLE_MS &&
+    now - lastPerSubject > SUBJECT_BY_ID_THROTTLE_MS &&
+    !subjectByIdSyncInProgress
+  ) {
+    subjectByIdSyncInProgress = true;
+    lastSubjectByIdSyncTimestamp = now;
+    lastSubjectSyncTimestamps.set(subjectId, now);
     (async () => {
       try {
         const response = await fetchWithFallback(`/subject/${subjectId}`);
@@ -34,6 +50,7 @@ export const getSubjectById = async (subjectId: string): Promise<Subject | null>
           if (data && !pendingDelete.has(subjectId)) await subjectRepository.upsert(data);
         }
       } catch {}
+      finally { subjectByIdSyncInProgress = false; }
     })();
   }
 

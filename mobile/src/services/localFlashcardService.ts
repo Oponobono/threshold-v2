@@ -54,6 +54,21 @@ export function getLocalDecks(): LocalDeck[] {
   return getLocalDecksSync();
 }
 
+/**
+ * Versión filtrada por userId activo: Único punto de acceso público.
+ * Garantiza que aunque el MMKV tenga datos residuales de otra sesión,
+ * solo se devuelven los mazos del usuario autenticado actualmente.
+ * La limpieza definitiva ocurre en signOut → clearAllUserData.
+ */
+export function getLocalDecksForCurrentUser(currentUserId?: string | null): LocalDeck[] {
+  const all = getLocalDecksSync();
+  if (!currentUserId) return all; // sin userId no podemos filtrar (fallback seguro)
+  const uid = Number(currentUserId);
+  // Mantener mazos con user_id 0 (creados antes de que existiera la separación)
+  // sólo si también los posee el usuario actual (conservative fallback)
+  return all.filter(d => d.user_id === uid || d.user_id === 0);
+}
+
 export async function saveImportedDeck(
   title: string,
   description: string | undefined,

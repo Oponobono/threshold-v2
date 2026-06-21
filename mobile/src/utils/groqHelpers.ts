@@ -229,62 +229,78 @@ export async function transcribeWithFallback(
   audioUri: string,
   apiKey?: string,
 ): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useLocalAIStore } = require('../store/useLocalAIStore');
   const store = useLocalAIStore.getState();
-  if (store.forceOfflineMode || store.activeProvider === 'local') {
-    console.warn('[GroqHelpers] Usando Whisper local (offline forzado o provider local)...');
+
+  // Ruta local SOLO si el modo offline está forzado explícitamente por el usuario.
+  // El campo `activeProvider` puede quedar con valor 'local' de sesiones anteriores
+  // aunque haya red; no debe usarse como señal exclusiva para elegir el motor.
+  if (store.forceOfflineMode) {
+    console.log('[GroqHelpers] Modo offline forzado: usando Whisper local para transcripción.');
     return transcribeWithWhisperLocal(audioUri);
   }
 
-  if (!apiKey) {
-    console.warn('[GroqHelpers] No hay API key, usando Whisper local...');
-    return transcribeWithWhisperLocal(audioUri);
+  // Cloud-first: intentar Groq Whisper si hay API key
+  if (apiKey) {
+    try {
+      console.log('[GroqHelpers] Cloud disponible: usando Groq Whisper para transcripción.');
+      return await transcribeWithWhisper(audioUri, apiKey);
+    } catch (error: any) {
+      const isNetworkError =
+        error.message?.includes('fetch') ||
+        error.message?.includes('Network') ||
+        error.message?.includes('ERR_INTERNET') ||
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('timeout');
+
+      if (!isNetworkError) throw error; // Error de API (clave inválida, etc.) → propagar al usuario
+
+      console.warn('[GroqHelpers] Red no disponible, intentando Whisper local como fallback...');
+    }
+  } else {
+    console.log('[GroqHelpers] Sin API key de Groq: usando Whisper local.');
   }
 
-  try {
-    return await transcribeWithWhisper(audioUri, apiKey);
-  } catch (error: any) {
-    const isNetworkError =
-      error.message?.includes('fetch') ||
-      error.message?.includes('Network') ||
-      error.message?.includes('ERR_INTERNET');
-
-    if (!isNetworkError) throw error;
-
-    console.warn('[GroqHelpers] Red no disponible, intentando Whisper local...');
-    return transcribeWithWhisperLocal(audioUri);
-  }
+  return transcribeWithWhisperLocal(audioUri);
 }
 
 export async function summarizeWithFallback(
   transcription: string,
   apiKey?: string,
 ): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useLocalAIStore } = require('../store/useLocalAIStore');
   const store = useLocalAIStore.getState();
-  if (store.forceOfflineMode || store.activeProvider === 'local') {
-    console.warn('[GroqHelpers] Usando resumen local (offline forzado o provider local)...');
+
+  // Ruta local SOLO si el modo offline está forzado explícitamente.
+  if (store.forceOfflineMode) {
+    console.log('[GroqHelpers] Modo offline forzado: usando LLM local para resumen.');
     return summarizeWithLocalLLM(transcription);
   }
 
-  if (!apiKey) {
-    console.warn('[GroqHelpers] No hay API key, usando resumen local...');
-    return summarizeWithLocalLLM(transcription);
+  // Cloud-first: intentar Groq LLM si hay API key
+  if (apiKey) {
+    try {
+      console.log('[GroqHelpers] Cloud disponible: usando Groq para resumen.');
+      return await summarizeWithGroq(transcription, apiKey);
+    } catch (error: any) {
+      const isNetworkError =
+        error.message?.includes('fetch') ||
+        error.message?.includes('Network') ||
+        error.message?.includes('ERR_INTERNET') ||
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('timeout');
+
+      if (!isNetworkError) throw error; // Error de API → propagar
+
+      console.warn('[GroqHelpers] Red no disponible, intentando resumen local como fallback...');
+    }
+  } else {
+    console.log('[GroqHelpers] Sin API key de Groq: usando LLM local para resumen.');
   }
 
-  try {
-    return await summarizeWithGroq(transcription, apiKey);
-  } catch (error: any) {
-    const isNetworkError =
-      error.message?.includes('fetch') ||
-      error.message?.includes('Network') ||
-      error.message?.includes('ERR_INTERNET');
-
-    if (!isNetworkError) throw error;
-
-    console.warn('[GroqHelpers] Red no disponible, intentando resumen local...');
-    return summarizeWithLocalLLM(transcription);
-  }
+  return summarizeWithLocalLLM(transcription);
 }
 
 async function summarizeWithLocalLLM(transcription: string): Promise<string> {

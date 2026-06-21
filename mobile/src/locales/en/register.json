@@ -77,9 +77,9 @@
     "gradingCard": "Grading preferences",
     "gradingScaleLabel": "Grading scale",
     "approvalThresholdLabel": "What is the minimum passing grade?",
+    "academicContextCard": "Academic context",
     "credentialsCard": "Access credentials",
     "finishBtn": "Create Account"
   },
-  "approvalWithValues": "Approval: {{passing}} / {{max}}",
-  "photoUploadWarning": "Your account was created successfully, but we couldn't save your profile photo. You can add it later in Settings."
+  "approvalWithValues": "Approval: {{passing}} / {{max}}"
 }

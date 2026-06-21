@@ -292,13 +292,63 @@ export async function sendHybridChatMessage(
     };
   }
 
-  const cloudResult = await cloudSendChat(contextText, messages, sessionId, resolved);
-  if (cloudResult?.reply?.content) {
-    cloudResult.reply.content = cloudResult.reply.content
-      .replace(/!\[.*?\]\(.*?\)/g, '')
-      .replace(/%%DECK_ACTION%%(?!\{)/g, '');
+  let cloudError = null;
+
+  try {
+    const cloudResult = await cloudSendChat(contextText, messages, sessionId, resolved);
+    if (cloudResult?.reply?.content) {
+      cloudResult.reply.content = cloudResult.reply.content
+        .replace(/!\[.*?\]\(.*?\)/g, '')
+        .replace(/%%DECK_ACTION%%(?!\{)/g, '');
+    }
+    return cloudResult;
+  } catch (error: any) {
+    const isNetworkError =
+      error.message?.includes('fetch') ||
+      error.message?.includes('Network') ||
+      error.message?.includes('ERR_INTERNET') ||
+      error.message?.includes('Failed to fetch') ||
+      error.message?.includes('timeout');
+
+    if (!isNetworkError) throw error;
+    console.warn('[HybridAIService] Red no disponible, haciendo fallback a chat local...');
+    cloudError = error;
   }
-  return cloudResult;
+
+  // Fallback a local si falló por red
+  if (cloudError) {
+    await ensureLocalModel();
+    const prompt = buildChatPrompt(messages, contextText);
+    const store = useLocalAIStore.getState();
+    const tmpl = getChatTemplate(store.activeModelId || 'essential');
+
+    if (onStreamToken) {
+      setStreamCallbacks({ onToken: onStreamToken });
+    }
+
+    const result = await runInference(
+      {
+        prompt,
+        maxTokens: 1024,
+        temperature: 0.7,
+        stop: tmpl.stop,
+      },
+      onStreamToken ? { onToken: onStreamToken } : undefined,
+    );
+
+    clearStreamCallbacks();
+
+    // Strip markdown images from response
+    result.text = result.text.replace(/!\[.*?\]\(.*?\)/g, '');
+    // Strip stray DECK_ACTION markers without valid JSON
+    result.text = result.text.replace(/%%DECK_ACTION%%(?!\{)/g, '');
+
+    return {
+      reply: { content: result.text },
+      model: `local:${result.modelName}`,
+      tokensPerSecond: result.tokensPerSecond,
+    };
+  }
 }
 
 import { getChatHistory as cloudGetHistory, clearChatHistory as cloudClearHistory } from './api/ai';
@@ -411,7 +461,7 @@ export async function generateHybridFlashcards(contextText: string, count: numbe
     throw new Error('No hay conexión a internet ni modelo local disponible.');
   }
 
-  if (resolved === 'local') {
+  const tryLocal = async () => {
     await ensureLocalModel();
 
     // Para generar flashcards offline necesitamos la info completa del prompt
@@ -448,12 +498,20 @@ ${contextText}`;
         data: { flashcards: [{ front: 'Error de formato', back: result.text, topic: '', tags: [] }], model: `local:${result.modelName}` },
       };
     }
-  }
+  };
 
-  // Cloud: importar función original
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { generateFlashcardsFromContext } = require('./api/ai');
-  return generateFlashcardsFromContext(contextText, count);
+  if (resolved === 'local') return tryLocal();
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { generateFlashcardsFromContext } = require('./api/ai');
+    return await generateFlashcardsFromContext(contextText, count);
+  } catch (error: any) {
+    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network') || error.message?.includes('ERR_INTERNET') || error.message?.includes('Failed to fetch') || error.message?.includes('timeout');
+    if (!isNetworkError) throw error;
+    console.warn('[HybridAIService] Cloud generation failed, fallback to local:', error.message);
+    return tryLocal();
+  }
 }
 
 /**
@@ -473,7 +531,7 @@ export async function generateHybridStudyMaterial(params: {
     throw new Error('No hay conexión a internet ni modelo local disponible.');
   }
 
-  if (resolved === 'local') {
+  const tryLocal = async () => {
     await ensureLocalModel();
     const prompt = `${getSystemPrompt()}
 
@@ -496,11 +554,20 @@ ${params.contextText || ''}`;
     } catch {
       return { id: 0, title: params.title, card_count: 0, cards: [] };
     }
-  }
+  };
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { generateStudyMaterialFromChat } = require('./api/ai');
-  return generateStudyMaterialFromChat(params);
+  if (resolved === 'local') return tryLocal();
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { generateStudyMaterialFromChat } = require('./api/ai');
+    return await generateStudyMaterialFromChat(params);
+  } catch (error: any) {
+    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network') || error.message?.includes('ERR_INTERNET') || error.message?.includes('Failed to fetch') || error.message?.includes('timeout');
+    if (!isNetworkError) throw error;
+    console.warn('[HybridAIService] Cloud generation failed, fallback to local:', error.message);
+    return tryLocal();
+  }
 }
 
 // ───────────────────────────────────────────
@@ -908,27 +975,36 @@ export async function generateDifferentiationCardHybrid(
     throw new Error('No hay conexión a internet ni modelo local disponible.');
   }
 
-  if (resolved === 'local') {
+  const tryLocal = async () => {
     return generateAnchorLocally(deckId, conceptA, conceptB, reason);
+  };
+
+  if (resolved === 'local') return tryLocal();
+
+  try {
+    // Cloud: llamar al backend y luego persistir localmente para visibilidad inmediata
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { generateDifferentiationCard } = require('./api/ai');
+    const cloudResponse = await generateDifferentiationCard(deckId, conceptA, conceptB, reason);
+
+    if (cloudResponse?.front && cloudResponse?.back) {
+      await persistDifferentiationCardLocally(
+        deckId,
+        cloudResponse.front,
+        cloudResponse.back,
+        cloudResponse.hint,
+        cloudResponse.explanation,
+        cloudResponse.id,
+      );
+    }
+
+    return cloudResponse;
+  } catch (error: any) {
+    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network') || error.message?.includes('ERR_INTERNET') || error.message?.includes('Failed to fetch') || error.message?.includes('timeout');
+    if (!isNetworkError) throw error;
+    console.warn('[HybridAIService] Cloud generation failed, fallback to local:', error.message);
+    return tryLocal();
   }
-
-  // Cloud: llamar al backend y luego persistir localmente para visibilidad inmediata
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { generateDifferentiationCard } = require('./api/ai');
-  const cloudResponse = await generateDifferentiationCard(deckId, conceptA, conceptB, reason);
-
-  if (cloudResponse?.front && cloudResponse?.back) {
-    await persistDifferentiationCardLocally(
-      deckId,
-      cloudResponse.front,
-      cloudResponse.back,
-      cloudResponse.hint,
-      cloudResponse.explanation,
-      cloudResponse.id,
-    );
-  }
-
-  return cloudResponse;
 }
 
 /**
@@ -941,7 +1017,7 @@ export async function summarizeHybrid(text: string, title?: string) {
     throw new Error('No hay conexión a internet ni modelo local disponible.');
   }
 
-  if (resolved === 'local') {
+  const tryLocal = async () => {
     await ensureLocalModel();
     const prompt = `${getSystemPrompt()}
 Resume el siguiente texto académico${title ? ` ("${title}")` : ''}.
@@ -957,12 +1033,21 @@ Devuelve SOLO un JSON válido con: title, keyPoints (array), conclusion.`;
     } catch {
       return { success: true, data: { title: title || 'Resumen', keyPoints: [result.text], conclusion: '' } };
     }
-  }
+  };
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { summarizeWithGroq } = require('../utils/groqHelpers');
-  const result = await summarizeWithGroq(text, '');
-  return { success: true, data: result };
+  if (resolved === 'local') return tryLocal();
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { summarizeWithGroq } = require('../utils/groqHelpers');
+    const result = await summarizeWithGroq(text, '');
+    return { success: true, data: result };
+  } catch (error: any) {
+    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network') || error.message?.includes('ERR_INTERNET') || error.message?.includes('Failed to fetch') || error.message?.includes('timeout');
+    if (!isNetworkError) throw error;
+    console.warn('[HybridAIService] Cloud summarization failed, fallback to local:', error.message);
+    return tryLocal();
+  }
 }
 
 /**
@@ -1089,7 +1174,7 @@ export async function generateFlashcardsFromImageHybrid(payload: {
     throw new Error(i18n.t('documents.noAiAvailable', { feature: 'generación de flashcards desde imagen' }));
   }
 
-  if (resolved === 'local') {
+  const tryLocal = async () => {
     // 1. Extraer texto de la imagen con ML Kit
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { extractTextFromImageLocal } = require('./localOCRService');
@@ -1101,11 +1186,20 @@ export async function generateFlashcardsFromImageHybrid(payload: {
 
     // 2. Generar flashcards desde el texto con el LLM local
     return generateHybridFlashcards(ocrText, payload.count);
-  }
+  };
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { generateFlashcardsFromImage } = require('./api/flashcards');
-  return generateFlashcardsFromImage(payload);
+  if (resolved === 'local') return tryLocal();
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { generateFlashcardsFromImage } = require('./api/flashcards');
+    return await generateFlashcardsFromImage(payload);
+  } catch (error: any) {
+    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network') || error.message?.includes('ERR_INTERNET') || error.message?.includes('Failed to fetch') || error.message?.includes('timeout');
+    if (!isNetworkError) throw error;
+    console.warn('[HybridAIService] Cloud generation from image failed, fallback to local:', error.message);
+    return tryLocal();
+  }
 }
 
 /**

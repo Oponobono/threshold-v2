@@ -9,6 +9,7 @@ import {
   deleteAudioRecording,
   AudioRecording,
 } from '../services/api';
+import { getUserId } from '../services/api/auth';
 
 export interface RecordingItem extends AudioRecording {
   // Aliases for compatibility
@@ -20,14 +21,24 @@ export interface RecordingItem extends AudioRecording {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-const AUDIO_DIR = () => `${FileSystem.documentDirectory}Threshold/audio/`;
+const AUDIO_DIR = (userId?: string | null) =>
+  userId
+    ? `${FileSystem.documentDirectory}Threshold/audio/${userId}/`
+    : `${FileSystem.documentDirectory}Threshold/audio/`;
 
 /**
- * Reads all local .m4a files from the audio directory and returns them as
- * lightweight RecordingItems. This works even when the backend is offline.
+ * Tombstone de eliminaciones pendientes — evita que registros borrados
+ * reaparezcan durante la ventana async entre el delete optimista y el
+ * refresco de loadRecordings. Las entradas se limpian tras el reload.
  */
-const readLocalFiles = async (t: (key: string, opts?: any) => string): Promise<RecordingItem[]> => {
-  const audioDir = AUDIO_DIR();
+const pendingDeleteIds = new Set<string>();
+
+/**
+ * Reads all local .m4a files from the audio directory of the current user.
+ * Uses a per-user subdirectory to avoid cross-user contamination.
+ */
+const readLocalFiles = async (t: (key: string, opts?: any) => string, userId?: string | null): Promise<RecordingItem[]> => {
+  const audioDir = AUDIO_DIR(userId);
   const dirInfo = await FileSystem.getInfoAsync(audioDir);
   if (!dirInfo.exists) {
     await FileSystem.makeDirectoryAsync(audioDir, { intermediates: true });
@@ -68,11 +79,19 @@ function mergeLocalAndDb(
   dbRecordings: AudioRecording[],
   t: (key: string, opts?: any) => string
 ): RecordingItem[] {
-  const dbByUri = new Map<string, AudioRecording>(
-    dbRecordings.filter((r): r is AudioRecording & { local_uri: string } => !!r.local_uri).map((r) => [r.local_uri, r])
+  // Filtrar registros cuya eliminación está pendiente
+  const safeDbs = dbRecordings.filter(
+    (r) => !pendingDeleteIds.has(String(r.id)) && !pendingDeleteIds.has(r.local_uri ?? '')
+  );
+  const safeLocals = localFiles.filter(
+    (r) => !pendingDeleteIds.has(r.uri) && !pendingDeleteIds.has(r.id_string ?? '')
   );
 
-  const merged: RecordingItem[] = localFiles.map((local) => {
+  const dbByUri = new Map<string, AudioRecording>(
+    safeDbs.filter((r): r is AudioRecording & { local_uri: string } => !!r.local_uri).map((r) => [r.local_uri, r])
+  );
+
+  const merged: RecordingItem[] = safeLocals.map((local) => {
     const db = dbByUri.get(local.uri);
     if (db) {
       return {
@@ -93,7 +112,7 @@ function mergeLocalAndDb(
   // Also include DB entries whose local file no longer exists — mark them
   // so the UI can show a "file missing" state and let the user delete the record.
   const mergedUris = new Set(merged.map((r) => r.uri));
-  for (const db of dbRecordings) {
+  for (const db of safeDbs) {
     if (!db.local_uri || !mergedUris.has(db.local_uri)) {
       const hasCloudBackup = db.cloud_url && db.cloud_url !== 'ghost_file';
       
@@ -149,12 +168,21 @@ export function useAudioRecorder() {
   const [meteringDb, setMeteringDb] = useState<number>(-160);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const isPlayingRef = useRef(false);
+  const isLoadingAudioRef = useRef(false); // true solo mientras se carga un nuevo archivo
   const soundRef = useRef<Audio.Sound | null>(null);
   const playingUriRef = useRef<string | null>(null);
   const isLoadingRecordingsRef = useRef(false);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   useEffect(() => {
+    // Configurar el modo de audio una sola vez al montar — evita la latencia
+    // de llamar setAudioModeAsync en cada click de reproducción.
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+    }).catch(() => {});
+
     loadRecordings();
     return () => {
       if (soundRef.current) {
@@ -189,8 +217,11 @@ export function useAudioRecorder() {
     if (isLoadingRecordingsRef.current) return;
     isLoadingRecordingsRef.current = true;
     try {
-      // Step 1: Show local files right away
-      const localFiles = await readLocalFiles(t);
+      // Step 0: Resolver userId actual para aislar archivos por usuario
+      const currentUserId = await getUserId();
+
+      // Step 1: Show local files right away (filtradas por userId)
+      const localFiles = await readLocalFiles(t, currentUserId);
       if (localFiles.length > 0) {
         setRecordings(localFiles);
       }
@@ -263,17 +294,20 @@ export function useAudioRecorder() {
             extension: '.m4a',
             outputFormat: Audio.AndroidOutputFormat.MPEG_4,
             audioEncoder: Audio.AndroidAudioEncoder.AAC,
-            sampleRate: 16000,
-            numberOfChannels: 1,
-            bitRate: 64000,
+            // 44100 Hz elimina el efecto "tarrito de plástico" del 16kHz.
+            // Whisper acepta cualquier sample rate, así que la transcripción
+            // sigue funcionando correctamente.
+            sampleRate: 44100,
+            numberOfChannels: 1,  // mono es suficiente para voz y reduce tamaño
+            bitRate: 128000,      // 128kbps = calidad de podcast profesional
           },
           ios: {
             extension: '.m4a',
             outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-            audioQuality: Audio.IOSAudioQuality.HIGH,
-            sampleRate: 16000,
-            numberOfChannels: 1,
-            bitRate: 64000,
+            audioQuality: Audio.IOSAudioQuality.MAX,  // máxima calidad del codec
+            sampleRate: 44100,
+            numberOfChannels: 2,  // estéreo en iOS para capturar ambiance real
+            bitRate: 128000,
             linearPCMBitDepth: 16,
             linearPCMIsBigEndian: false,
             linearPCMIsFloat: false,
@@ -345,7 +379,8 @@ export function useAudioRecorder() {
       const tempUri = recording.getURI();
 
       if (tempUri) {
-        const audioDir = AUDIO_DIR();
+        const currentUserId = await getUserId();
+        const audioDir = AUDIO_DIR(currentUserId);
         const fileName = `rec_${Date.now()}.m4a`;
         const permanentUri = audioDir + fileName;
 
@@ -397,25 +432,43 @@ export function useAudioRecorder() {
 
   // ── Playback ───────────────────────────────────────────────────────────────
   async function playSound(uri: string, id: string) {
-    // Prevenir múltiples clicks simultáneos (idempotencia)
-    if (isPlayingRef.current) {
-      console.warn('[useAudioRecorder] Reproducción ya en progreso, ignorando click');
+    // Si ya se está cargando un audio, ignorar clicks adicionales
+    if (isLoadingAudioRef.current) return;
+
+    // Si este mismo audio ya está sonando → pausar/detener
+    if (playingId === id && soundRef.current) {
+      // UI instantánea: el botón cambia de inmediato
+      setPlayingId(null);
+      isPlayingRef.current = false;
+      playingUriRef.current = null;
+      const s = soundRef.current;
+      soundRef.current = null;
+      // Operación async en background — no bloquea la UI
+      s.stopAsync().catch(() => {});
+      s.unloadAsync().catch(() => {});
       return;
     }
+
+    // Detener cualquier audio previo en background y cargar el nuevo
+    isLoadingAudioRef.current = true;
+
+    // UI instantánea: mostrar el nuevo audio como "activo"
+    setPlayingId(id);
     isPlayingRef.current = true;
 
-    // Optimistic UI: el botón cambia al instante
-    setPlayingId(id);
+    // Descargar audio anterior sin esperar
+    if (soundRef.current) {
+      const prev = soundRef.current;
+      soundRef.current = null;
+      prev.stopAsync().catch(() => {});
+      prev.unloadAsync().catch(() => {});
+    }
+    playingUriRef.current = null;
 
     try {
-      if (soundRef.current) {
-        soundRef.current = null;
-        playingUriRef.current = null;
-      }
-
       let targetUri = uri;
-      
-      // Check if it's a local path
+
+      // Verificar existencia solo para archivos locales
       if (uri.startsWith('file://') || uri.startsWith('/')) {
         const fileInfo = await FileSystem.getInfoAsync(uri);
         if (!fileInfo.exists) {
@@ -426,31 +479,27 @@ export function useAudioRecorder() {
             alertRef.show({ title: 'Error', message: 'El archivo local no existe y no hay respaldo en la nube.', type: 'error' });
             setPlayingId(null);
             isPlayingRef.current = false;
+            isLoadingAudioRef.current = false;
             return;
           }
         }
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-      });
-
+      // Nota: setAudioModeAsync ya se llamó una vez al montar el hook
       let newSound: Audio.Sound;
       try {
         const result = await Audio.Sound.createAsync(
           { uri: targetUri },
-          { shouldPlay: true, progressUpdateIntervalMillis: 500 }
+          { shouldPlay: true, progressUpdateIntervalMillis: 200 }
         );
         newSound = result.sound;
       } catch (firstErr) {
         if (targetUri.startsWith('file://')) {
-          const rawPath = targetUri.replace(/^file:\/\//, '');
+          const rawPath = targetUri.replace(/^\/\//, '');
           console.warn('[useAudioRecorder] Reintentando playback sin prefijo file://:', rawPath);
           const fallbackResult = await Audio.Sound.createAsync(
             { uri: rawPath },
-            { shouldPlay: true, progressUpdateIntervalMillis: 500 }
+            { shouldPlay: true, progressUpdateIntervalMillis: 200 }
           );
           newSound = fallbackResult.sound;
         } else {
@@ -484,24 +533,24 @@ export function useAudioRecorder() {
       soundRef.current = null;
       playingUriRef.current = null;
       setPlayingId(null);
-      alertRef.show({ title: 'Error', message: 'No se pudo reproducir el audio.', type: 'error' });
       isPlayingRef.current = false;
+      alertRef.show({ title: 'Error', message: 'No se pudo reproducir el audio.', type: 'error' });
+    } finally {
+      isLoadingAudioRef.current = false;
     }
   }
 
   async function stopSound() {
-    isPlayingRef.current = false;
+    // UI instantánea primero
     setPlayingId(null);
+    isPlayingRef.current = false;
     playingUriRef.current = null;
-    if (soundRef.current) {
-      const s = soundRef.current;
-      soundRef.current = null;
-      try {
-        await s.stopAsync();
-        await s.unloadAsync();
-      } catch (err) {
-        console.warn('[useAudioRecorder] Error stopping sound:', err);
-      }
+    const s = soundRef.current;
+    soundRef.current = null;
+    // Luego la operación lenta en background
+    if (s) {
+      s.stopAsync().catch(() => {});
+      s.unloadAsync().catch(() => {});
     }
   }
 
@@ -513,10 +562,17 @@ export function useAudioRecorder() {
       await stopSound();
     }
 
+    // 0. Registrar en el tombstone ANTES de cualquier operación async —
+    //    esto evita que loadRecordings o mergeLocalAndDb reintroduzcan
+    //    el registro mientras la red confirma la eliminación.
+    const idStr = String(id);
+    pendingDeleteIds.add(idStr);
+    if (uri) pendingDeleteIds.add(uri);
+
     // 1. Optimistic update: remove from UI immediately
     const previousRecordings = [...recordings];
     setRecordings((prev) =>
-      prev.filter((r) => r.uri !== uri && r.id_string !== String(id))
+      prev.filter((r) => r.uri !== uri && r.id_string !== idStr)
     );
 
     try {
@@ -524,7 +580,7 @@ export function useAudioRecorder() {
       let wasQueuedOffline = false;
       if (id) {
         try {
-          const result = await deleteAudioRecording(String(id));
+          const result = await deleteAudioRecording(idStr);
           wasQueuedOffline = !!(result as any)?._isPending;
         } catch (dbErr) {
           console.error('Error deleting from DB:', dbErr);
@@ -543,15 +599,29 @@ export function useAudioRecorder() {
         // Continue anyway - file might not exist locally
       }
 
-      // Refresh after a small delay to ensure everything is in sync.
-      // Skip if the delete was queued offline — the optimistic update already
-      // removed the item from state, and re-reading from cache would bring it back.
+      // 4. Refresh y luego limpiar el tombstone para que reloads futuros
+      //    no queden bloqueados permanentemente.
       if (!wasQueuedOffline) {
-        setTimeout(() => loadRecordings(), 500);
+        setTimeout(() => {
+          loadRecordings().finally(() => {
+            pendingDeleteIds.delete(idStr);
+            if (uri) pendingDeleteIds.delete(uri);
+          });
+        }, 600);
+      } else {
+        // Offline: limpiar tombstone más tarde (3s) para dar tiempo a la cola de sync
+        setTimeout(() => {
+          pendingDeleteIds.delete(idStr);
+          if (uri) pendingDeleteIds.delete(uri);
+        }, 3000);
       }
     } catch (error) {
       console.error('Error in deleteRecordingConfirmed:', error);
       
+      // Limpiar tombstone ya que vamos a revertir el estado
+      pendingDeleteIds.delete(idStr);
+      if (uri) pendingDeleteIds.delete(uri);
+
       // Revert optimistic update on failure
       setRecordings(previousRecordings);
       

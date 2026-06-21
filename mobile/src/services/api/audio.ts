@@ -55,12 +55,11 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
   const recording: any = { id, user_id: String(userId), ...payload };
   await audioRepository.create(recording);
 
-  // 2. Sincronizar con la nube SOLO si el usuario habilitó auto-upload (background, no bloqueante)
+  // 2. Sincronizar SIEMPRE el registro de metadatos al servidor (necesario para que
+  //    las transcripciones puedan referenciarlo mediante FK).
+  //    El upload del archivo binario sigue siendo opcional (detrás del flag de backup).
   (async () => {
     try {
-      const prefs = await getBackupPreferences();
-      if (!prefs?.enabled || !prefs?.autoUpload || !prefs?.includeAudio) return;
-
       const response = await fetchWithFallback('/audio-recordings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,13 +72,14 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
         throw new Error(data?.error || 'Error del servidor');
       }
     } catch {
-      // Auto-upload desactivado o falló: encolar para backup manual
+      // Sin red: encolar para sincronizar cuando haya conexión
       await syncService.enqueueCreate('audio-recording', id, { ...payload, user_id: userId });
     }
   })();
 
   return recording;
 };
+
 
 export const updateAudioRecording = async (id: string, payload: { subject_id?: string | null; name?: string }): Promise<any> => {
   // 1. Actualizar localmente de forma inmediata
@@ -149,19 +149,10 @@ export const upsertAudioTranscript = async (payload: { recording_id: string; tra
     }
   }
 
-  try {
-    const response = await fetchWithFallback('/audio-transcripts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await parseJsonSafely(response);
-    if (!response.ok) throw new Error(data?.error || 'Error del servidor');
-    return data;
-  } catch {
-    const { uuidv4 } = await import('../../utils/uuid');
-    const id = uuidv4();
-    await syncService.enqueueCreate('audio-transcript', id, payload);
-    return { id, ...payload, _isPending: true };
-  }
+  // Siempre enqueue un sync en lugar de intentar POST inline, para evitar 403
+  // cuando la grabación padre aún no existe en el servidor (creada offline).
+  const { uuidv4 } = await import('../../utils/uuid');
+  const id = uuidv4();
+  await syncService.enqueueCreate('audio-transcript', id, payload);
+  return { id, ...payload, _isPending: true };
 };

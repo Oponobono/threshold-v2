@@ -44,7 +44,13 @@ exports.createAudioRecording = (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?)
   `;
   db.run(query, [recordingId, user_id, subject_id || null, name || null, local_uri, duration || 0], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      // Handle duplicate ID gracefully (idempotent create from offline sync)
+      if (err.message && err.message.includes('UNIQUE constraint failed')) {
+        return res.status(200).json({ id: recordingId, already_exists: true });
+      }
+      return res.status(500).json({ error: err.message });
+    }
     res.status(201).json({ 
       id: recordingId, 
       user_id, 
@@ -53,6 +59,19 @@ exports.createAudioRecording = (req, res) => {
       local_uri, 
       duration: duration || 0 
     });
+  });
+};
+
+/**
+ * Verificar si una grabación existe (usado por el cliente antes de sincronizar transcripts)
+ */
+exports.checkRecordingExists = (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  db.get(`SELECT id FROM audio_recordings WHERE id = ? AND user_id = ?`, [id, userId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ exists: false });
+    return res.status(200).json({ exists: true, id: row.id });
   });
 };
 
@@ -123,13 +142,18 @@ exports.upsertAudioTranscript = (req, res) => {
     return res.status(400).json({ error: 'Falta recording_id' });
   }
 
-  const userId = req.user.id;
+  // Verify the recording exists on the server before inserting the transcript.
+  // If not, return 409 Conflict so the client knows to defer and retry.
+  db.get(`SELECT id FROM audio_recordings WHERE id = ?`, [recording_id], (checkErr, recordingRow) => {
+    if (checkErr) return res.status(500).json({ error: checkErr.message });
+    if (!recordingRow) {
+      return res.status(409).json({ 
+        error: 'Grabación padre no encontrada en el servidor. Sincroniza la grabación primero.',
+        code: 'PARENT_NOT_SYNCED'
+      });
+    }
 
-  // Verificar propiedad
-  db.get('SELECT id FROM audio_recordings WHERE id = ? AND user_id = ?', [recording_id, userId], (err, recording) => {
-    if (err || !recording) return res.status(403).json({ error: 'Grabación no encontrada o acceso denegado' });
-
-    db.get(`SELECT id FROM audio_transcripts WHERE recording_id = ?`, [recording_id], (err, row) => {
+  db.get(`SELECT id FROM audio_transcripts WHERE recording_id = ?`, [recording_id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
 
     if (row) {
