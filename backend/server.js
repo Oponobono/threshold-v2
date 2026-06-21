@@ -84,6 +84,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
 });
 
+// Root route for Render health checks if configured to /
+app.get('/', (req, res) => {
+  res.json({ status: 'OK', message: 'API running' });
+});
+
 // Ruta de estado (deprecated - usar /health)
 app.get('/api/status', (req, res) => {
   res.json({ status: 'OK' });
