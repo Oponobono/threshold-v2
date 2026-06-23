@@ -13,7 +13,8 @@ if (isProduction) {
     ssl: { rejectUnauthorized: false },
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000,
+    family: 4,
   });
 
   const convertQuery = (sql) => {
@@ -67,7 +68,7 @@ if (isProduction) {
     }
   };
 
-  console.log('✓ Conectado a PostgreSQL con pool (max: 20 conexiones).');
+  console.log('✓ Configurado pool PostgreSQL (IPv4 forzado, timeout 10s).');
 } else {
   const sqlite3 = require('sqlite3').verbose();
   const dbPath = path.resolve(__dirname, '..', 'database.sqlite');

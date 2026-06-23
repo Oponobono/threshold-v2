@@ -207,7 +207,18 @@ function startServer(port, retriesLeft) {
 // Esto evita race conditions: el servidor no acepta peticiones
 // hasta que todas las tablas y semillas estén listas.
 (async () => {
-  await initializeDb();
-  startServer(PORT, MAX_PORT_RETRIES);
+  try {
+    await initializeDb();
+    startServer(PORT, MAX_PORT_RETRIES);
+  } catch (err) {
+    console.error(`
+╔═══════════════════════════════════════════════════════════╗
+║        ❌ SERVIDOR DETENIDO — DB NO DISPONIBLE          ║
+╠═══════════════════════════════════════════════════════════╣
+║ ${err.message.padEnd(61)}
+╚═══════════════════════════════════════════════════════════╝
+    `);
+    process.exit(1);
+  }
 })();
 

@@ -9,6 +9,20 @@ const { fixIdTypes } = require('./migrations/fix-id-type');
 const { fixSubjectIdTypes } = require('./migrations/fix-subject-id-type');
 
 const initializePostgresDb = async (pool) => {
+  // ── Validar conexión antes de cualquier DDL ──────────────
+  // Si el pool no puede conectarse (IPv6, DNS, credenciales),
+  // el servidor DEBE fallar — no tiene sentido operar sin DB.
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT 1 AS connection_ok');
+    client.release();
+    console.log('✓ Conexión PostgreSQL verificada (SELECT 1 ok).');
+  } catch (connErr) {
+    console.error('❌ No se puede conectar a PostgreSQL:', connErr.message);
+    console.error('   El servidor NO arrancará hasta que la DB esté accesible.');
+    throw connErr;
+  }
+
   try {
     // Crear todas las tablas
     for (const [tableName, schema] of Object.entries(tableSchema)) {
