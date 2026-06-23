@@ -41,7 +41,22 @@ if (isProduction) {
       }
       pool.query(convertQuery(sql), params, (err, res) => {
         if (err && err.code === '23505') {
-          err.message = 'UNIQUE constraint failed: ' + err.message;
+          // PostgreSQL unique violations exponen el nombre del constraint en err.constraint
+          // y la columna en err.detail. Traducimos a formato SQLite para que
+          // authController.js pueda identificar la columna afectada correctamente.
+          const constraint = (err.constraint || '').toLowerCase();
+          const detail = (err.detail || err.message || '').toLowerCase();
+          if (constraint.includes('email') || detail.includes('email')) {
+            err.message = 'UNIQUE constraint failed: users.email';
+          } else if (constraint.includes('username') || detail.includes('username')) {
+            err.message = 'UNIQUE constraint failed: users.username';
+          } else if (constraint.includes('share_pin') || detail.includes('share_pin')) {
+            err.message = 'UNIQUE constraint failed: users.share_pin';
+          } else if (constraint.includes('users_pkey') || (constraint.includes('users') && constraint.includes('id'))) {
+            err.message = 'UNIQUE constraint failed: users.id';
+          } else {
+            err.message = 'UNIQUE constraint failed: ' + (err.constraint || err.message);
+          }
         }
         if (callback) {
           const context = {
