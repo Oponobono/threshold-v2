@@ -317,46 +317,57 @@ exports.createSubject = (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    db.run(
-      query,
-      [
-        subjectId,
-        user_id,
-        normalizedCode,
-        name,
-        credits || null,
-        professor || null,
-        color || '#CCCCCC',
-        icon || 'book-outline',
-        target_grade || null,
-        course_id || null,
-        external_url || null,
-        total_lessons || 0,
-        completed_lessons || 0,
-        next_micro_milestone || null,
-      ],
-      function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({
-      id: subjectId,
-      user_id,
-      code: normalizedCode,
-      name,
-      credits: credits || null,
-      professor: professor || null,
-      color: color || '#CCCCCC',
-      icon: icon || 'book-outline',
-      target_grade: target_grade || null,
-      course_id: course_id || null,
-      external_url: external_url || null,
-      total_lessons: total_lessons || 0,
-      completed_lessons: completed_lessons || 0,
-      next_micro_milestone: next_micro_milestone || null,
-      avg_score: 0,
-      completion_percent: 0,
-      message: 'Materia creada',
-    });
-  });
+    const proceedCreate = (validCourseId) => {
+      db.run(
+        query,
+        [
+          subjectId,
+          user_id,
+          normalizedCode,
+          name,
+          credits || null,
+          professor || null,
+          color || '#CCCCCC',
+          icon || 'book-outline',
+          target_grade || null,
+          validCourseId,
+          external_url || null,
+          total_lessons || 0,
+          completed_lessons || 0,
+          next_micro_milestone || null,
+        ],
+        function(err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.status(201).json({
+            id: subjectId,
+            user_id,
+            code: normalizedCode,
+            name,
+            credits: credits || null,
+            professor: professor || null,
+            color: color || '#CCCCCC',
+            icon: icon || 'book-outline',
+            target_grade: target_grade || null,
+            course_id: validCourseId,
+            external_url: external_url || null,
+            total_lessons: total_lessons || 0,
+            completed_lessons: completed_lessons || 0,
+            next_micro_milestone: next_micro_milestone || null,
+            avg_score: 0,
+            completion_percent: 0,
+            message: 'Materia creada',
+          });
+        }
+      );
+    };
+
+    if (course_id) {
+      db.get('SELECT id FROM courses WHERE id = ?', [course_id], (err, row) => {
+        proceedCreate(row ? course_id : null);
+      });
+    } else {
+      proceedCreate(null);
+    }
 });
 };
 
@@ -409,14 +420,27 @@ exports.updateSubject = (req, res) => {
     return res.status(400).json({ error: 'No se proporcionaron campos válidos para actualizar' });
   }
 
-  const columns = Object.keys(fieldsToUpdate).map(key => `${key} = ?`).join(', ');
-  const values = [...Object.values(fieldsToUpdate), subjectId, req.user.id];
+  const proceedUpdate = () => {
+    const columns = Object.keys(fieldsToUpdate).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(fieldsToUpdate), subjectId, req.user.id];
 
-  const query = `UPDATE subjects SET ${columns} WHERE id = ? AND user_id = ?`;
+    const query = `UPDATE subjects SET ${columns} WHERE id = ? AND user_id = ?`;
 
-  db.run(query, values, function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ error: 'Materia no encontrada o acceso denegado' });
-    res.json({ success: true, message: 'Materia actualizada' });
-  });
+    db.run(query, values, function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (this.changes === 0) return res.status(404).json({ error: 'Materia no encontrada o acceso denegado' });
+      res.json({ success: true, message: 'Materia actualizada' });
+    });
+  };
+
+  if (fieldsToUpdate.course_id) {
+    db.get('SELECT id FROM courses WHERE id = ?', [fieldsToUpdate.course_id], (err, row) => {
+      if (err || !row) {
+        fieldsToUpdate.course_id = null; // Fallback robusto si el curso no ha sincronizado o split-brain
+      }
+      proceedUpdate();
+    });
+  } else {
+    proceedUpdate();
+  }
 };
