@@ -141,7 +141,8 @@ export default function FlashcardsScreen() {
                   />
                 }
                 renderItem={({ item: deck }) => {
-                  const isShared = deck.user_id != null && Number(deck.user_id) !== Number(currentUserId);
+                  // OFFLINE-FIRST: Un mazo local recién importado se considera del usuario
+                  const isShared = deck.user_id != null && String(deck.user_id) !== String(currentUserId) && !(deck as any)._local;
                   const duedeckIds = getDuedeckIds();
                   const isDue = duedeckIds.has(deck.id);
                   const { pillWidth, onAddPress, onSharePress, onDeletePress } = renderSwipeActions(deck, () => {});

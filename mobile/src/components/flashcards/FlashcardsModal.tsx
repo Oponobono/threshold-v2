@@ -148,15 +148,15 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
       setDecks(data || []);
 
       // Merge local MMKV decks
-      const { getLocalDecks } = await import('../../services/localFlashcardService');
-      const localDecks = getLocalDecks();
+      const { getLocalDecksForCurrentUser } = await import('../../services/localFlashcardService');
+      const localDecks = getLocalDecksForCurrentUser(await getUserId());
       if (localDecks.length > 0) {
         setDecks(prev => {
           const seen = new Set(prev.map(d => d.id));
           const merged = [...prev];
           for (const ld of localDecks) {
-            if (!seen.has(ld.id)) {
-              seen.add(ld.id);
+            if (!seen.has(String(ld.id))) {
+              seen.add(String(ld.id));
               merged.push(ld as any);
             }
           }
@@ -384,7 +384,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                 />
               }
               renderItem={({ item }) => {
-                const isShared = item.user_id != null && item.user_id !== currentUserId && !(item as any)._local;
+                const isShared = item.user_id != null && String(item.user_id) !== String(currentUserId) && !(item as any)._local;
                 const duedeckIds = getDuedeckIds();
                 const isDue = duedeckIds.has(item.id);
                 return (

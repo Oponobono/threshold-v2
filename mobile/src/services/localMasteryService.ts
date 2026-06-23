@@ -1,5 +1,5 @@
 import { databaseService } from './database/DatabaseService';
-import { getLocalDecks, getPendingReviews } from './localFlashcardService';
+import { getLocalDecksForCurrentUser, getPendingReviews } from './localFlashcardService';
 import type { MasteryRadarData, MasteryRadarItem, GlobalGPAAnalytics, PredictionResponse, PredictionItem } from './api/analytics';
 
 interface SubjectAgg {
@@ -64,7 +64,7 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
   const deckParams: any[] = subjectId === 'all' ? [userId] : [userId, subjectId];
   const sqliteDecks = await db.getAllAsync(deckQuery, ...deckParams) as any[];
 
-  const localDecks = getLocalDecks();
+  const localDecks = getLocalDecksForCurrentUser(userId);
   const deckToSubject: Record<string, string | null> = {};
 
   for (const d of sqliteDecks) {
@@ -292,7 +292,7 @@ export async function getLocalPredictions(userId: string): Promise<PredictionRes
   } catch { /* ignore */ }
 
   // 2. Local cards (MMKV)
-  const localDecks = getLocalDecks().filter(d => d.user_id === Number(userId) || d.id < 0);
+  const localDecks = getLocalDecksForCurrentUser(userId);
   const localDue: any[] = [];
   const mmkv = require('react-native-mmkv').createMMKV();
   for (const deck of localDecks) {

@@ -21,7 +21,7 @@ export interface LocalDeck {
   description: string;
   subject_id: number | null;
   card_count: number;
-  user_id: number;
+  user_id: string | number;
   created_at: string;
   review_count: number;
   learning_count: number;
@@ -63,10 +63,11 @@ export function getLocalDecks(): LocalDeck[] {
 export function getLocalDecksForCurrentUser(currentUserId?: string | null): LocalDeck[] {
   const all = getLocalDecksSync();
   if (!currentUserId) return all; // sin userId no podemos filtrar (fallback seguro)
-  const uid = Number(currentUserId);
-  // Mantener mazos con user_id 0 (creados antes de que existiera la separación)
-  // sólo si también los posee el usuario actual (conservative fallback)
-  return all.filter(d => d.user_id === uid || d.user_id === 0);
+  
+  return all.filter(d => {
+    // Soportar tanto UUIDs (strings) como IDs numéricos legacy
+    return String(d.user_id) === String(currentUserId);
+  });
 }
 
 export async function saveImportedDeck(
@@ -75,13 +76,14 @@ export async function saveImportedDeck(
   cards: LocalCard[],
   subject_id: number | null,
 ): Promise<LocalDeck> {
+  const uid = await getUserId();
   const deck: LocalDeck = {
     id: nextLocalId(),
     title: title.trim(),
     description: description?.trim() || '',
     subject_id,
     card_count: cards.length,
-    user_id: Number(await getUserId()) || 0,
+    user_id: uid || 0,
     created_at: new Date().toISOString(),
     review_count: 0,
     learning_count: 0,
@@ -202,7 +204,7 @@ export async function exportDeckToJSON(deckId: number): Promise<any> {
 /**
  * OFFLINE-FIRST: Prepara sincronización de mazos importados
  */
-export async function prepareDeckForSync(deckId: number, userId: number): Promise<void> {
+export async function prepareDeckForSync(deckId: number, userId: string | number): Promise<void> {
   try {
     const decks = getLocalDecks();
     const idx = decks.findIndex(d => d.id === deckId);
