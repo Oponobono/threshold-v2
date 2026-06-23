@@ -106,7 +106,7 @@ export function updateLocalDeckSubject(deckId: number, subjectId: number): void 
 }
 
 export function deleteLocalDeck(deckId: string): void {
-  const decks = getLocalDecks().filter(d => String(d.id) !== deckId);
+  const decks = getLocalDecks().filter(d => String(d.id) !== String(deckId));
   saveLocalDecksSync(decks);
 }
 
