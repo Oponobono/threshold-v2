@@ -18,6 +18,7 @@ import { StarredRow } from '../../src/components/gallery/StarredRow';
 import { GridItem } from '../../src/components/gallery/GridItem';
 import { EmptyState } from '../../src/components/gallery/EmptyState';
 import { OcrModal } from '../../src/components/gallery/OcrModal';
+import { CoursePills } from '../../src/components/ui/CoursePills';
 
 const ImageViewerModal = lazy(() =>
   import('../../src/components/modals/ImageViewerModal').then(m => ({ default: m.ImageViewerModal }))
@@ -113,8 +114,18 @@ export default function GalleryScreen() {
         t={t}
       />
 
+      <CoursePills
+        courses={g.courses}
+        selectedCourseId={g.selectedCourseId}
+        onSelectCourse={(id) => {
+          g.setSelectedCourseId(id);
+          // Al cambiar de curso, resetear el filtro de materia
+          g.setSelectedSubjectId(null);
+        }}
+      />
+
       <SubjectChips
-        subjects={g.subjects}
+        subjects={g.subjectsForCourse}
         selectedSubjectId={g.selectedSubjectId as string | null}
         onSelectSubject={g.setSelectedSubjectId as (id: string | null) => void}
         t={t}

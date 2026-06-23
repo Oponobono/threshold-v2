@@ -18,6 +18,7 @@ import { PerformanceCard } from '../../src/components/grades/PerformanceCard';
 import { AssessmentItem } from '../../src/components/grades/AssessmentItem';
 import { ProjectionSimulator } from '../../src/components/grades/ProjectionSimulator';
 import { ActionCard } from '../../src/components/grades/ActionCard';
+import { CoursePills } from '../../src/components/ui/CoursePills';
 
 export default function GradesScreen() {
   const { t } = useTranslation();
@@ -35,8 +36,18 @@ export default function GradesScreen() {
 
       <FilterBar t={t} />
 
+      <CoursePills
+        courses={g.courses}
+        selectedCourseId={g.selectedCourseId}
+        onSelectCourse={(id) => {
+          g.setSelectedCourseId(id);
+          // Al cambiar de curso, resetear el filtro de materia
+          g.setSelectedSubjectId(null);
+        }}
+      />
+
       <SubjectFilterBar
-        subjects={g.subjects}
+        subjects={g.subjectsForCourse}
         selectedSubjectId={g.selectedSubjectId as string | null}
         onSelectSubject={g.setSelectedSubjectId as (id: string | null) => void}
         t={t}

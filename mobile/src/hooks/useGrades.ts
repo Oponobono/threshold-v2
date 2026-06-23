@@ -10,12 +10,16 @@ import { DEFAULT_GRADING_SYSTEMS, US_LETTER_SCALES } from '../services/api/gradi
 import { fetchSystemScales } from '../services/api/grading';
 import { buildDisplayGrade, type DisplayGrade } from '../services/gradingEngineDisplay';
 import { alertRef } from '../components/ui/CustomAlert';
+import { courseRepository } from '../services/database';
+import type { Course } from '../services/api/types';
 
 export function useGrades(t: any) {
   const { subjects, assessments, refreshAssessments } = useDataStore();
 
   const [profile, setProfile] = useState<any>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
@@ -56,15 +60,29 @@ export function useGrades(t: any) {
     useCallback(() => {
       const task = InteractionManager.runAfterInteractions(() => {
         refreshAssessments();
+        courseRepository.getAll().then(c => setCourses(c as Course[])).catch(() => {});
       });
       return () => task.cancel();
     }, [refreshAssessments])
   );
 
+  // Materias visibles según el curso seleccionado
+  const subjectsForCourse = useMemo(() =>
+    selectedCourseId
+      ? subjects.filter(s => (s as any).course_id === selectedCourseId)
+      : subjects,
+  [subjects, selectedCourseId]);
+
   const filteredAssessments = useMemo(() => {
-    if (selectedSubjectId === null) return assessments;
-    return assessments.filter(a => a.subject_id === selectedSubjectId);
-  }, [assessments, selectedSubjectId]);
+    let base = assessments;
+    // Filtro por curso: solo assessments de materias del curso activo
+    if (selectedCourseId) {
+      const ids = new Set(subjectsForCourse.map(s => s.id));
+      base = base.filter(a => ids.has(a.subject_id));
+    }
+    if (selectedSubjectId === null) return base;
+    return base.filter(a => a.subject_id === selectedSubjectId);
+  }, [assessments, selectedSubjectId, selectedCourseId, subjectsForCourse]);
 
   const selectedSubject = useMemo(() =>
     subjects.find(s => s.id === selectedSubjectId) || null,
@@ -199,6 +217,8 @@ export function useGrades(t: any) {
   return {
     subjects, filteredAssessments, gradedAssessments,
     selectedSubjectId, setSelectedSubjectId,
+    selectedCourseId, setSelectedCourseId,
+    courses, subjectsForCourse,
     userId,
     displayGPA, displayProjectedGPA, displayDelta, globalGpaLetter, globalProjectedLetter, activeSystem,
     termGpa, evaluatedPercentage, selectedSubject,

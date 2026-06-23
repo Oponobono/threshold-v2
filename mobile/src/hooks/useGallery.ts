@@ -2,9 +2,10 @@ import { useState, useCallback, useMemo } from 'react';
 import { InteractionManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { updatePhoto } from '../services/api';
-import { photoRepository } from '../services/database';
+import { photoRepository, courseRepository } from '../services/database';
 import { useDataStore } from '../store/useDataStore';
 import { GalleryPhoto, FilterTab } from '../types/gallery';
+import type { Course } from '../services/api/types';
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return '';
@@ -19,6 +20,8 @@ export function useGallery(t: any) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -59,6 +62,7 @@ export function useGallery(t: any) {
       const task = InteractionManager.runAfterInteractions(() => {
         loadAllData();
         loadPhotos();
+        courseRepository.getAll().then(c => setCourses(c as Course[])).catch(() => {});
       });
       return () => task.cancel();
     }, [loadAllData, loadPhotos])
@@ -95,7 +99,14 @@ export function useGallery(t: any) {
   const { imagePhotos, starred, totalPhotoCount } = useMemo(() => {
     const allImgs = photos.filter((p) => !p.local_uri?.endsWith('.pdf'));
 
+    // Derivan las materias visibles según el curso seleccionado
+    const subjectIdsInCourse = selectedCourseId
+      ? new Set(subjects.filter(s => (s as any).course_id === selectedCourseId).map(s => s.id))
+      : null;
+
     const filteredBySubjectAndSearch = allImgs.filter((p) => {
+      // Filtro de curso: solo fotos de materias del curso activo
+      if (subjectIdsInCourse && !subjectIdsInCourse.has(p.subject_id)) return false;
       const matchesSubject = selectedSubjectId === null || p.subject_id === selectedSubjectId;
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch = !q ||
@@ -144,12 +155,18 @@ export function useGallery(t: any) {
       starred: starredPhotos,
       totalPhotoCount: totalPhotos,
     };
-  }, [photos, filterTab, selectedSubjectId, searchQuery]);
+  }, [photos, filterTab, selectedSubjectId, selectedCourseId, searchQuery, subjects]);
 
   return {
     photos, isLoading, isRefreshing,
     filterTab, setFilterTab,
     selectedSubjectId, setSelectedSubjectId,
+    selectedCourseId, setSelectedCourseId,
+    courses,
+    // Materias filtradas por curso (para los SubjectChips)
+    subjectsForCourse: selectedCourseId
+      ? subjects.filter(s => (s as any).course_id === selectedCourseId)
+      : subjects,
     searchQuery, setSearchQuery,
     isSearchOpen, setIsSearchOpen,
     viewerVisible, setViewerVisible,
