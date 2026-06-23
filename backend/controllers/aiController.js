@@ -1536,15 +1536,16 @@ CONTEXTO DEL ESTUDIANTE:
 
 INSTRUCCIONES:
 1. Analiza los apuntes del estudiante adjuntos abajo.
-2. Extrae los conceptos clave que se alineen estrictamente con la materia y el hito actual.
-3. Genera tarjetas con el formato Pregunta/Respuesta atómicas (una sola idea por tarjeta para optimizar FSRS).
-4. Genera entre 5 y 15 tarjetas dependiendo de la cantidad y densidad del contenido.
+2. Extrae el tema central absoluto de los apuntes (máximo 3 palabras, ej: "Fundamentos de Docker").
+3. Extrae los conceptos clave que se alineen estrictamente con la materia y el hito actual.
+4. Genera tarjetas con el formato Pregunta/Respuesta atómicas (una sola idea por tarjeta para optimizar FSRS).
+5. Genera entre 5 y 15 tarjetas dependiendo de la cantidad y densidad del contenido.
 
 CONTRATO DE SALIDA (ESTRICTO):
-Debes responder ÚNICAMENTE con un objeto JSON válido. No incluyas introducciones, ni saludos, ni bloques de código de Markdown (\`\`\`json). Si no hay datos suficientes, devuelve el objeto vacío: {"cards":[]}.
+Debes responder ÚNICAMENTE con un objeto JSON válido. No incluyas introducciones, ni saludos, ni bloques de código de Markdown (\`\`\`json). Si no hay datos suficientes, devuelve el objeto vacío: {"topic": "", "cards":[]}.
 
 Formato JSON esperado:
-{"cards":[{"front":"Pregunta concisa y directa","back":"Respuesta clara y específica"}]}`;
+{"topic": "Tema Central", "cards":[{"front":"Pregunta concisa y directa","back":"Respuesta clara y específica"}]}`;
 
   try {
     const trimmedNotes = rawTextFromOCROrNotes.length > 6000
@@ -1595,7 +1596,8 @@ Formato JSON esperado:
     }
 
     const cards = Array.isArray(parsed?.cards) ? parsed.cards : [];
-    return res.status(200).json({ cards, count: cards.length });
+    const topic = parsed?.topic || 'Zyren';
+    return res.status(200).json({ cards, count: cards.length, topic });
 
   } catch (error) {
     console.error('[aiController] Error en generateClassFlashcards:', error);

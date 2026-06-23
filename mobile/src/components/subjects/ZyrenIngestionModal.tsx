@@ -40,6 +40,7 @@ export function ZyrenIngestionModal({
   const [loading, setLoading] = useState(false);
   const [extractingIndex, setExtractingIndex] = useState<number | null>(null); // qué imagen se está procesando
   const [generatedCards, setGeneratedCards] = useState<GeneratedCard[]>([]);
+  const [generatedTopic, setGeneratedTopic] = useState<string>('Zyren');
   const [removedIndexes, setRemovedIndexes] = useState<Set<number>>(new Set());
   const [showPicker, setShowPicker] = useState(false);
 
@@ -50,6 +51,7 @@ export function ZyrenIngestionModal({
     setLoading(false);
     setExtractingIndex(null);
     setGeneratedCards([]);
+    setGeneratedTopic('Zyren');
     setRemovedIndexes(new Set());
     setShowPicker(false);
   };
@@ -187,6 +189,7 @@ export function ZyrenIngestionModal({
         return;
       }
       setGeneratedCards(data.cards);
+      setGeneratedTopic(data.topic || 'Zyren');
       setStep('preview');
     } catch (err: any) {
       Alert.alert('Error', err.message || 'No se pudieron generar las tarjetas. Intenta de nuevo.');
@@ -215,7 +218,7 @@ export function ZyrenIngestionModal({
       const numericSubjectId = subjectId ? (parseInt(subjectId, 10) || null) : null;
 
       const deck = await saveImportedDeck(
-        `Zyren — ${subjectName} (${new Date().toLocaleDateString('es')})`,
+        `${generatedTopic} — ${subjectName} (${new Date().toLocaleDateString('es')})`,
         `Mazo generado por Zyren desde apuntes de clase`,
         toSave.map(card => ({
           type: 'flashcard' as const,
