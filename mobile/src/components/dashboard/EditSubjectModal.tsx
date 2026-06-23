@@ -83,7 +83,7 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
         target_grade: subjectTarget ? Number(subjectTarget) : undefined,
         color: selectedColor,
         icon: selectedIcon,
-        course_id: selectedCourseId || undefined,
+        course_id: selectedCourseId,
       });
 
       await refreshSubjects();

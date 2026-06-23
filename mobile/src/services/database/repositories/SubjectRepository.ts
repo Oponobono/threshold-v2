@@ -18,6 +18,11 @@ export interface Subject {
   gpa_equivalent?: number;
   created_at?: string;
   updated_at?: string;
+  course_id?: string | null;
+  external_url?: string | null;
+  total_lessons?: number;
+  completed_lessons?: number;
+  next_micro_milestone?: string | null;
 }
 
 export class SubjectRepository extends BaseRepository<Subject> {

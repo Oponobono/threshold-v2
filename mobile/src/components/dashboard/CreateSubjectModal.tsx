@@ -79,7 +79,7 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
         icon: selectedIcon,
         credits: subjectCredits ? Number(subjectCredits) : undefined,
         target_grade: subjectTarget ? Number(subjectTarget) : undefined,
-        course_id: selectedCourseId || undefined,
+        course_id: selectedCourseId,
       });
 
       await loadAllData(true);

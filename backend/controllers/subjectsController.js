@@ -277,7 +277,7 @@ exports.getSubjectsByUser = (req, res) => {
  * Agregar una nueva materia
  */
 exports.createSubject = (req, res) => {
-  const { id: clientId, user_id, code, name, credits, professor, color, icon, target_grade } = req.body;
+  const { id: clientId, user_id, code, name, credits, professor, color, icon, target_grade, course_id, external_url, total_lessons, completed_lessons, next_micro_milestone } = req.body;
   const authenticatedUserId = req.user.id;
 
   if (!user_id || !name) {
@@ -313,8 +313,8 @@ exports.createSubject = (req, res) => {
 
     const subjectId = clientId || uuidv4();
     const query = `
-      INSERT INTO subjects (id, user_id, code, name, credits, professor, color, icon, target_grade)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO subjects (id, user_id, code, name, credits, professor, color, icon, target_grade, course_id, external_url, total_lessons, completed_lessons, next_micro_milestone)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     db.run(
@@ -329,6 +329,11 @@ exports.createSubject = (req, res) => {
         color || '#CCCCCC',
         icon || 'book-outline',
         target_grade || null,
+        course_id || null,
+        external_url || null,
+        total_lessons || 0,
+        completed_lessons || 0,
+        next_micro_milestone || null,
       ],
       function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -342,6 +347,11 @@ exports.createSubject = (req, res) => {
       color: color || '#CCCCCC',
       icon: icon || 'book-outline',
       target_grade: target_grade || null,
+      course_id: course_id || null,
+      external_url: external_url || null,
+      total_lessons: total_lessons || 0,
+      completed_lessons: completed_lessons || 0,
+      next_micro_milestone: next_micro_milestone || null,
       avg_score: 0,
       completion_percent: 0,
       message: 'Materia creada',
@@ -385,7 +395,7 @@ exports.updateSubject = (req, res) => {
   const { subjectId } = req.params;
   const fields = req.body;
   
-  const allowedFields = ['code', 'name', 'credits', 'professor', 'color', 'icon', 'target_grade'];
+  const allowedFields = ['code', 'name', 'credits', 'professor', 'color', 'icon', 'target_grade', 'course_id', 'external_url', 'total_lessons', 'completed_lessons', 'next_micro_milestone'];
   const fieldsToUpdate = {};
   
   // Filtrar solo los campos permitidos
