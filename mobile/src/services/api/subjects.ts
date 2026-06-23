@@ -60,6 +60,26 @@ export const getSubjectById = async (subjectId: string): Promise<Subject | null>
 const filterDeleted = (subjects: Subject[]): Subject[] =>
   subjects.filter(s => !pendingDelete.has(s.id));
 
+/**
+ * Fusiona datos del servidor con el registro local preservando campos
+ * que pueden ser nulos en el servidor por condiciones de carrera de FK
+ * (ej: course_id si el curso aún no se sincronizó al servidor).
+ */
+const mergeWithLocal = async (serverSubject: Subject): Promise<Subject> => {
+  const localRecord = await subjectRepository.getById(serverSubject.id);
+  if (!localRecord) return serverSubject;
+  return {
+    ...serverSubject,
+    // Preservar course_id local si el servidor lo manda nulo
+    course_id: serverSubject.course_id ?? localRecord.course_id ?? null,
+    // Preservar otros campos del Hub que pueden estar desfasados en el server
+    external_url: serverSubject.external_url ?? localRecord.external_url ?? null,
+    total_lessons: serverSubject.total_lessons ?? localRecord.total_lessons ?? 0,
+    completed_lessons: serverSubject.completed_lessons ?? localRecord.completed_lessons ?? 0,
+    next_micro_milestone: serverSubject.next_micro_milestone ?? localRecord.next_micro_milestone ?? null,
+  };
+};
+
 export const getSubjects = async (): Promise<Subject[]> => {
   const userId = await getUserIdNumber();
   
@@ -77,7 +97,12 @@ export const getSubjects = async (): Promise<Subject[]> => {
       if (response.ok && !response.headers.get('X-Offline-Cache')) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const s of data) if (!pendingDelete.has(s.id)) await subjectRepository.upsert(s);
+          for (const s of data) {
+            if (!pendingDelete.has(s.id)) {
+              const merged = await mergeWithLocal(s);
+              await subjectRepository.upsert(merged);
+            }
+          }
           return filterDeleted(data);
         }
       }
@@ -97,7 +122,12 @@ export const getSubjects = async (): Promise<Subject[]> => {
         if (response.ok && !response.headers.get('X-Offline-Cache')) {
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
-            for (const s of data) if (!pendingDelete.has(s.id)) await subjectRepository.upsert(s);
+            for (const s of data) {
+              if (!pendingDelete.has(s.id)) {
+                const merged = await mergeWithLocal(s);
+                await subjectRepository.upsert(merged);
+              }
+            }
           }
         }
       } catch {}
