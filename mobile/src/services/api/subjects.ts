@@ -116,7 +116,7 @@ export const createSubject = async (payload: {
   icon?: string;
   credits?: number;
   target_grade?: number;
-  course_id?: string;
+  course_id?: string | null;
 }): Promise<Subject> => {
   const userId = await getUserIdNumber();
   const { uuidv4 } = await import('../../utils/uuid');
