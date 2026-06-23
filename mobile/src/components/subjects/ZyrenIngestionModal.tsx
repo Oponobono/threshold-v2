@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { fetchWithFallback } from '../../services/api/client';
 import { saveImportedDeck, addLocalCard, recalculateLocalDeckCounters } from '../../services/localFlashcardService';
-import { extractTextFromImageHybrid } from '../../services/hybridAIService';
+import { extractTextFromImageHybrid, generateClassFlashcardsHybrid } from '../../services/hybridAIService';
 
 interface GeneratedCard { front: string; back: string; }
 
@@ -162,24 +162,13 @@ export function ZyrenIngestionModal({
 
     // ── 2. Enviar a Zyren para generar flashcards ──
     try {
-      const res = await fetchWithFallback('/ai/class-flashcards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          courseName,
-          subjectName,
-          currentMilestone,
-          rawTextFromOCROrNotes: combinedText,
-        }),
+      const data = await generateClassFlashcardsHybrid({
+        courseName,
+        subjectName,
+        currentMilestone,
+        rawTextFromOCROrNotes: combinedText,
       });
-      let data;
-      try {
-        data = await res.json();
-      } catch (e) {
-        data = { error: `Error del servidor (${res.status}): Ruta no encontrada o no disponible.` };
-      }
       
-      if (!res.ok) throw new Error(data.error || 'Error en el servidor');
       if (!data.cards || data.cards.length === 0) {
         Alert.alert(
           'Sin tarjetas',

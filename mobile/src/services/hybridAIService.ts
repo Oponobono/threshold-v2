@@ -1270,3 +1270,95 @@ export function isHybridAIAvailable(): boolean {
   const isOnline = useConnectivityStore.getState().isOnline;
   return isOnline || (store.activeModelId !== null && store.inferenceStatus !== 'error');
 }
+
+/**
+ * Genera flashcards de clase (para Zyren Ingestion Modal) usando el proveedor resuelto.
+ */
+export async function generateClassFlashcardsHybrid(params: {
+  courseName: string;
+  subjectName: string;
+  currentMilestone?: string;
+  rawTextFromOCROrNotes: string;
+}) {
+  const resolved = await resolveProvider();
+
+  if (!resolved) {
+    throw new Error('No hay conexión a internet ni modelo local disponible.');
+  }
+
+  const tryLocal = async () => {
+    await ensureLocalModel();
+
+    const prompt = `${getSystemPrompt()}
+
+Vas a generar flashcards académicas para estudiar a partir de la siguiente información de una clase.
+
+Clase/Materia: ${params.subjectName}
+Curso: ${params.courseName}
+${params.currentMilestone ? `Hito/Tema actual: ${params.currentMilestone}` : ''}
+
+Información proporcionada por el estudiante (apuntes o texto de imágenes):
+${params.rawTextFromOCROrNotes}
+
+Debes generar entre 3 y 10 flashcards basadas ESTRICTAMENTE en la información proporcionada.
+Cada flashcard debe tener:
+- "front": la pregunta o término
+- "back": la respuesta o definición
+
+Devuelve SOLO un JSON válido con la siguiente estructura, sin texto adicional:
+{
+  "topic": "Nombre del tema o concepto principal",
+  "cards": [
+    { "front": "...", "back": "..." }
+  ]
+}`;
+
+    const { runInference } = await import('./localInferenceService');
+    const result = await runInference({
+      prompt,
+      temperature: 0.3,
+      maxTokens: 2048,
+    });
+
+    try {
+      let jsonText = result.text.trim();
+      const match = jsonText.match(/\{[\s\S]*\}/);
+      if (match) jsonText = match[0];
+      
+      const parsed = JSON.parse(jsonText);
+      if (!parsed.cards || !Array.isArray(parsed.cards)) {
+        throw new Error('Formato JSON inválido: falta el arreglo cards');
+      }
+      return parsed;
+    } catch {
+      throw new Error('El modelo local no pudo generar tarjetas con el formato JSON esperado.');
+    }
+  };
+
+  if (resolved === 'local') return tryLocal();
+
+  try {
+    const { fetchWithFallback } = require('./api/client');
+    const res = await fetchWithFallback('/ai/class-flashcards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      data = { error: `Error del servidor (${res.status}): Ruta no encontrada o no disponible.` };
+    }
+    
+    if (!res.ok) throw new Error(data.error || 'Error en el servidor');
+    return data;
+  } catch (error: any) {
+    const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network') || error.message?.includes('ERR_INTERNET') || error.message?.includes('Failed to fetch') || error.message?.includes('timeout');
+    if (!isNetworkError) throw error;
+    console.warn('[HybridAIService] Cloud generation failed, fallback to local:', error.message);
+    return tryLocal();
+  }
+}
+
