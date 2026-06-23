@@ -111,15 +111,20 @@ exports.loginUser = async (req, res) => {
     const query = `SELECT * FROM users WHERE email = ?`;
     db.get(query, [email], async (err, user) => {
       if (err) {
+        console.error('[Login] ❌ Error de BD:', err.message);
         return res.status(500).json({ error: 'Error interno del servidor.' });
       }
 
       if (!user) {
+        console.warn(`[Login] ⚠️ Usuario no encontrado para email: "${email}" (longitud: ${email.length})`);
         return res.status(401).json({ error: 'Credenciales inválidas.' });
       }
 
+      console.log(`[Login] ✓ Usuario encontrado: id=${user.id}, email="${user.email}", tiene_hash=${!!user.password_hash}`);
+
       const match = await bcrypt.compare(password, user.password_hash);
       if (!match) {
+        console.warn(`[Login] ⚠️ Contraseña incorrecta para email: "${user.email}"`);
         return res.status(401).json({ error: 'Credenciales inválidas.' });
       }
 
