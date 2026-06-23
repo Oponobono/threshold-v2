@@ -21,6 +21,7 @@ import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubject
 import { CreateCourseModal } from '../../src/components/dashboard/CreateCourseModal';
 import { MomentumService } from '../../src/services/MomentumService';
 import { useDataStore } from '../../src/store/useDataStore';
+import { CoursePills } from '../../src/components/ui/CoursePills';
 
 const MomentumCard = ({ score }: { score: number }) => {
   const isDanger = score < 0.5;
@@ -95,24 +96,12 @@ export default function SubjectsScreen() {
     return g.subjects.length - approvedCount;
   }, [g.subjects, approvedCount]);
 
-  // ── Course tabs for horizontal bar ──
-  const courseTabs = useMemo(() => {
-    const PLATFORM_COLORS: Record<string, string> = {
-      Platzi: '#98CA3F', Udemy: '#A435F0', Coursera: '#0056D2', YouTube: '#FF0000', Otro: '#8E8E93',
-    };
-    const tabs: { id: string | null; label: string; color: string; count: number }[] = [
-      { id: null, label: 'Todas', color: theme.colors.primary, count: g.filteredSubjects.length },
-    ];
-    groupedSections.forEach(section => {
-      if (section.courseId !== 'independent') {
-        const color = section.coursePlatform ? (PLATFORM_COLORS[section.coursePlatform] || '#555') : theme.colors.primary;
-        tabs.push({ id: section.courseId, label: section.courseName, color, count: section.data.length });
-      }
-    });
-    const indep = groupedSections.find(s => s.courseId === 'independent');
-    if (indep) tabs.push({ id: 'independent', label: 'Sueltas', color: '#8E8E93', count: indep.data.length });
-    return tabs;
-  }, [groupedSections, g.filteredSubjects.length]);
+  // ── Cursos para CoursePills (derivados de las secciones agrupadas) ──
+  const coursesForPills = useMemo(() => {
+    return groupedSections
+      .filter(s => s.courseId !== 'independent' && s.courseId)
+      .map(s => ({ id: s.courseId as string, name: s.courseName, platform: s.coursePlatform }));
+  }, [groupedSections]);
 
   // ── Subjects filtered by selected tab ──
   const displayedSubjects = useMemo(() => {
@@ -354,35 +343,13 @@ export default function SubjectsScreen() {
                 </View>
               </View>
             )}
-            {/* ── Course Tab Bar ── */}
-            {courseTabs.length > 1 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{ marginBottom: 12 }}
-                contentContainerStyle={{ gap: 8 }}
-              >
-                {courseTabs.map(tab => {
-                  const isActive = selectedCourseId === tab.id;
-                  return (
-                    <TouchableOpacity
-                      key={tab.id ?? '__all'}
-                      style={[
-                        tabStyles.pill,
-                        isActive && { backgroundColor: tab.color, borderColor: tab.color },
-                      ]}
-                      onPress={() => setSelectedCourseId(tab.id)}
-                    >
-                      <Text style={[tabStyles.pillText, isActive && { color: '#fff' }]} numberOfLines={1}>
-                        {tab.label}
-                      </Text>
-                      <View style={[tabStyles.countDot, { backgroundColor: isActive ? 'rgba(255,255,255,0.3)' : tab.color + '20' }]}>
-                        <Text style={[tabStyles.countText, { color: isActive ? '#fff' : tab.color }]}>{tab.count}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+            {/* ── CoursePills (filtro de cursos) ── */}
+            {coursesForPills.length > 0 && (
+              <CoursePills
+                courses={coursesForPills}
+                selectedCourseId={selectedCourseId}
+                onSelectCourse={setSelectedCourseId}
+              />
             )}
             </>
           ) : null
@@ -462,33 +429,4 @@ export default function SubjectsScreen() {
   );
 }
 
-import { StyleSheet } from 'react-native';
-const tabStyles = StyleSheet.create({
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
-  },
-  pillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginRight: 6,
-  },
-  countDot: {
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  countText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-});
+

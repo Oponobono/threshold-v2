@@ -5,15 +5,6 @@ import { theme } from '../../styles/theme';
 import { SubjectIcon } from './SubjectIcon';
 import { SCALE_MAX } from '../../utils/grades';
 
-/** Darkens a hex color by factor (0–1). Same logic as SubjectRow. */
-function darkenHex(hex: string, factor: number = 0.4): string {
-  const clean = hex.replace('#', '');
-  const r = Math.max(0, Math.round(parseInt(clean.substring(0, 2), 16) * (1 - factor)));
-  const g = Math.max(0, Math.round(parseInt(clean.substring(2, 4), 16) * (1 - factor)));
-  const b = Math.max(0, Math.round(parseInt(clean.substring(4, 6), 16) * (1 - factor)));
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
-
 interface SubjectCardProps {
   subject: any;
   onPress: () => void;
@@ -24,23 +15,30 @@ interface SubjectCardProps {
 export const SubjectCard = React.memo(({
   subject, onPress, onContinue, onComplete,
 }: SubjectCardProps) => {
-  // ── Colores: fondo sólido + ícono oscurecido ──
   const color = subject.color || theme.colors.primary;
-  const iconColor = darkenHex(color, 0.35);
 
-  // ── Nota ──
+  // Grade calculation
   const raw = subject.avg_score ?? 0;
   const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
   const hasGrade = avg > 0;
-  const statusColor = !hasGrade
-    ? '#999999'
-    : avg >= 3.0
-    ? theme.colors.success
-    : avg >= 2.5
-    ? theme.colors.warning
-    : theme.colors.danger;
+  
+  let statusColor = '#999999';
+  let statusBgColor = '#F2F2F2';
+  
+  if (hasGrade) {
+    if (avg >= 3.0) {
+      statusColor = '#059669'; // Emerald 600
+      statusBgColor = '#D1FAE5'; // Emerald 100
+    } else if (avg >= 2.5) {
+      statusColor = '#D97706'; // Amber 600
+      statusBgColor = '#FEF3C7'; // Amber 100
+    } else {
+      statusColor = '#DC2626'; // Red 600
+      statusBgColor = '#FEE2E2'; // Red 100
+    }
+  }
 
-  // ── Progreso ──
+  // Progress calculation
   const progress = subject.total_lessons && subject.total_lessons > 0
     ? (subject.completed_lessons || 0) / subject.total_lessons
     : (subject.completion_percent || 0) / 100;
@@ -48,88 +46,80 @@ export const SubjectCard = React.memo(({
 
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
+      activeOpacity={0.8}
       style={styles.card}
       onPress={onPress}
     >
-      {/* ── Franja de color superior ── */}
-      <View style={[styles.colorStripe, { backgroundColor: color }]} />
-
-      {/* ── Contenido ── */}
-      <View style={styles.body}>
-
-        {/* Fila superior: avatar + badge */}
-        <View style={styles.topRow}>
-          {/* Avatar: fondo sólido + ícono oscurecido */}
-          <View style={[styles.avatar, { backgroundColor: color }]}>
-            <SubjectIcon iconName={subject.icon} color={iconColor} size={18} />
+      <View style={styles.content}>
+        {/* Header: Icon & Badge */}
+        <View style={styles.header}>
+          <View style={[styles.iconContainer, { backgroundColor: color }]}>
+            <SubjectIcon iconName={subject.icon} color="#FFFFFF" size={18} />
           </View>
-
-          {/* Badge: nota si existe, créditos si no */}
+          
           {hasGrade ? (
-            <View style={[styles.badge, { backgroundColor: statusColor + '20', borderColor: statusColor + '60' }]}>
+            <View style={[styles.badge, { backgroundColor: statusBgColor }]}>
               <Text style={[styles.badgeText, { color: statusColor }]}>{avg.toFixed(1)}</Text>
             </View>
           ) : subject.credits ? (
-            <View style={[styles.badge, { backgroundColor: '#00000010', borderColor: '#00000020' }]}>
-              <Text style={[styles.badgeText, { color: '#666' }]}>{subject.credits}cr</Text>
+            <View style={[styles.badge, { backgroundColor: '#F3F4F6' }]}>
+              <Text style={[styles.badgeText, { color: '#4B5563' }]}>{subject.credits} cr</Text>
             </View>
           ) : null}
         </View>
 
-        {/* Nombre de la materia */}
-        <Text style={styles.name} numberOfLines={2}>{subject.name}</Text>
-
-        {/* Milestone */}
-        {(subject.next_micro_milestone || subject.next_milestone) ? (
-          <View style={styles.milestoneRow}>
-            <Text style={styles.milestoneIcon}>🎯</Text>
-            <Text style={styles.milestoneText} numberOfLines={2}>
-              {subject.next_micro_milestone || subject.next_milestone}
-            </Text>
-          </View>
-        ) : null}
+        {/* Title & Details */}
+        <View style={styles.infoContainer}>
+          <Text style={styles.title} numberOfLines={2}>
+            {subject.name}
+          </Text>
+          
+          {(subject.next_micro_milestone || subject.next_milestone) && (
+            <View style={styles.milestoneContainer}>
+              <Ionicons name="flag-outline" size={12} color="#6B7280" />
+              <Text style={styles.milestoneText} numberOfLines={1}>
+                {subject.next_micro_milestone || subject.next_milestone}
+              </Text>
+            </View>
+          )}
+        </View>
 
         <View style={{ flex: 1 }} />
 
-        {/* Barra de progreso */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Progreso</Text>
-            <Text style={[styles.progressPct, { color }]}>{progressPct}%</Text>
+        {/* Progress & Actions */}
+        <View style={styles.footer}>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressLabelRow}>
+              <Text style={styles.progressLabel}>PROGRESO</Text>
+              <Text style={styles.progressPercent}>{progressPct}%</Text>
+            </View>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: `${progressPct}%`, backgroundColor: color }]} />
+            </View>
           </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPct}%`, backgroundColor: color }]} />
-          </View>
-        </View>
 
-        {/* Botones de acción */}
-        <View style={styles.actionsRow}>
-          {onContinue && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: color, flex: 1 }]}
-              onPress={onContinue}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            >
-              <Ionicons name="play" size={10} color="#fff" />
-              <Text style={styles.actionLabelWhite}>Continuar</Text>
-            </TouchableOpacity>
-          )}
-          {onComplete && (
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                { backgroundColor: '#00000008', borderWidth: 1, borderColor: '#00000015' },
-                !onContinue && { flex: 1 },
-              ]}
-              onPress={onComplete}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            >
-              <Ionicons name="checkmark-done" size={10} color={theme.colors.success} />
-              <Text style={[styles.actionLabel, { color: theme.colors.success }]}>
-                {onContinue ? '' : 'Clase lista'}
-              </Text>
-            </TouchableOpacity>
+          {/* Actions */}
+          {(onContinue || onComplete) && (
+            <View style={styles.actionsRow}>
+              {onContinue && (
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnPrimary, { backgroundColor: color }]}
+                  onPress={onContinue}
+                >
+                  <Ionicons name="play" size={12} color="#FFFFFF" />
+                  <Text style={styles.btnPrimaryText}>Continuar</Text>
+                </TouchableOpacity>
+              )}
+              {onComplete && (
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnSecondary, !onContinue && { flex: 1 }]}
+                  onPress={onComplete}
+                >
+                  <Ionicons name="sparkles" size={14} color="#059669" />
+                  <Text style={styles.btnSecondaryText}>Procesar clase</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
         </View>
       </View>
@@ -141,123 +131,134 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-    overflow: 'hidden',
-    minHeight: 180,
-    // Sombra ligera
+    borderRadius: 20,
+    minHeight: 190,
+    // Soft, diffuse drop shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6', // Very subtle border to define edge
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+    flexDirection: 'column',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  iconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  // Franja de acento de color en la parte superior
-  colorStripe: {
-    height: 4,
-    width: '100%',
-  },
-  body: {
-    flex: 1,
-    padding: 11,
-    gap: 8,
-    flexDirection: 'column',  // asegura que el spacer flex:1 empuje contenido al fondo
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  // Fondo sólido + ícono oscurecido (idéntico a SubjectRow)
-  avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   badge: {
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  name: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1A1A1A',
-    letterSpacing: -0.2,
-    lineHeight: 18,
+    letterSpacing: -0.3,
   },
-  milestoneRow: {
+  infoContainer: {
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827', // Gray 900
+    lineHeight: 20,
+    letterSpacing: -0.4,
+    marginBottom: 6,
+  },
+  milestoneContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 3,
-  },
-  milestoneIcon: {
-    fontSize: 9,
-    marginTop: 1,
-  },
-  milestoneText: {
-    fontSize: 10,
-    color: '#888888',
-    flex: 1,
-    lineHeight: 13,
-  },
-  progressSection: {
+    alignItems: 'center',
     gap: 4,
   },
-  progressHeader: {
+  milestoneText: {
+    fontSize: 12,
+    color: '#6B7280', // Gray 500
+    fontWeight: '500',
+    flex: 1,
+  },
+  footer: {
+    marginTop: 'auto',
+  },
+  progressContainer: {
+    marginBottom: 12,
+  },
+  progressLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#AAAAAA',
-    textTransform: 'uppercase',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#9CA3AF', // Gray 400
     letterSpacing: 0.5,
   },
-  progressPct: {
-    fontSize: 11,
-    fontWeight: '700',
+  progressPercent: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#374151', // Gray 700
   },
-  progressTrack: {
-    height: 4,
-    backgroundColor: '#EEEEEE',
-    borderRadius: 2,
+  progressBarBg: {
+    height: 6,
+    backgroundColor: '#F3F4F6', // Gray 100
+    borderRadius: 3,
     overflow: 'hidden',
   },
-  progressFill: {
+  progressBarFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   actionsRow: {
     flexDirection: 'row',
-    gap: 5,
+    gap: 8,
   },
-  actionBtn: {
+  btn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    borderRadius: 8,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
   },
-  actionLabel: {
-    fontSize: 10,
-    fontWeight: '600',
+  btnPrimary: {
+    flex: 1,
   },
-  actionLabelWhite: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#fff',
+  btnPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  btnSecondary: {
+    backgroundColor: '#F0FDF4', // Green 50
+    borderWidth: 1,
+    borderColor: '#DCFCE7', // Green 100
+  },
+  btnSecondaryText: {
+    color: '#059669', // Emerald 600
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
