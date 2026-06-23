@@ -35,6 +35,25 @@ const initializePostgresDb = async (pool) => {
     // Fix subject_id columns from INTEGER to TEXT
     await fixSubjectIdTypes(pool);
 
+    // Triggers de actualización de timestamps
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+         NEW.updated_at = NOW();
+         RETURN NEW;
+      END;
+      $$ language 'plpgsql';
+    `);
+
+    await pool.query(`
+      DROP TRIGGER IF EXISTS update_courses_timestamp ON courses;
+      CREATE TRIGGER update_courses_timestamp
+      BEFORE UPDATE ON courses
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `);
+
     // Crear índices únicos (DESPUÉS de asegurarse que las columnas existen)
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_unique 

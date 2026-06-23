@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState, useCallback } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -11,14 +11,68 @@ import { AutoUploadIndicator } from '../../src/components/ui/AutoUploadIndicator
 import { OfflineIndicator } from '../../src/components/ui/OfflineIndicator';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { useSubjects, ACTIVITY_CONFIG } from '../../src/hooks/useSubjects';
-import { SubjectIcon } from '../../src/components/subjects/SubjectIcon';
 import { ScheduleGrid } from '../../src/components/subjects/ScheduleGrid';
 import { SCALE_MAX } from '../../src/utils/grades';
+import { useGroupedSubjects } from '../../src/hooks/useGroupedSubjects';
+import { SubjectCard } from '../../src/components/subjects/SubjectCard';
+import { openCourseLink } from '../../src/utils/linking';
+import { ZyrenIngestionModal } from '../../src/components/subjects/ZyrenIngestionModal';
+import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
+import { CreateCourseModal } from '../../src/components/dashboard/CreateCourseModal';
+import { MomentumService } from '../../src/services/MomentumService';
+import { useDataStore } from '../../src/store/useDataStore';
+
+const MomentumCard = ({ score }: { score: number }) => {
+  const isDanger = score < 0.5;
+  return (
+    <View style={[
+      styles.miniCard, 
+      isDanger && { backgroundColor: 'rgba(231, 76, 60, 0.08)', borderColor: 'rgba(231, 76, 60, 0.2)' }
+    ]}>
+      <Text style={styles.miniCardTitle}>MOMENTUM</Text>
+      <Text style={[styles.miniCardValue, isDanger && { color: '#E74C3C' }]}>
+        {isDanger ? '⚠️' : '🔥'} {Math.round(score * 100)}%
+      </Text>
+    </View>
+  );
+};
 
 export default function SubjectsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const g = useSubjects(t);
+  const { loadAllData } = useDataStore();
+  const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore, refreshCourses } = useGroupedSubjects(g.filteredSubjects);
+
+  // ── Fase 5: Estado del modal de ingesta de Zyren ──
+  const [zyrenModalVisible, setZyrenModalVisible] = useState(false);
+  const [zyrenSubject, setZyrenSubject] = useState<{ id: string; name: string; courseId?: string | null; courseName?: string; milestone?: string } | null>(null);
+
+  // ── Estado para Crear Materia / Curso ──
+  const [isCreationMenuVisible, setIsCreationMenuVisible] = useState(false);
+  const [isCreateSubjectModalVisible, setIsCreateSubjectModalVisible] = useState(false);
+  const [isCreateCourseModalVisible, setIsCreateCourseModalVisible] = useState(false);
+
+  // ── Tab de curso seleccionado (null = todas) ──
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+
+  const handleClassComplete = useCallback(async (subject: any, courseName: string) => {
+    if (subject.course_id) {
+      MomentumService.boostMomentum(subject.course_id).catch(console.warn);
+    }
+    setZyrenSubject({
+      id: subject.id,
+      name: subject.name,
+      courseId: subject.course_id,
+      courseName,
+      milestone: subject.next_micro_milestone || subject.next_milestone,
+    });
+    setZyrenModalVisible(true);
+  }, []);
+
+  const handleContinueClass = useCallback(async (url: string) => {
+    await openCourseLink(url);
+  }, []);
 
   const overallGpa = useMemo(() => {
     if (g.subjects.length === 0) return 0;
@@ -41,16 +95,62 @@ export default function SubjectsScreen() {
     return g.subjects.length - approvedCount;
   }, [g.subjects, approvedCount]);
 
+  // ── Course tabs for horizontal bar ──
+  const courseTabs = useMemo(() => {
+    const PLATFORM_COLORS: Record<string, string> = {
+      Platzi: '#98CA3F', Udemy: '#A435F0', Coursera: '#0056D2', YouTube: '#FF0000', Otro: '#8E8E93',
+    };
+    const tabs: { id: string | null; label: string; color: string; count: number }[] = [
+      { id: null, label: 'Todas', color: theme.colors.primary, count: g.filteredSubjects.length },
+    ];
+    groupedSections.forEach(section => {
+      if (section.courseId !== 'independent') {
+        const color = section.coursePlatform ? (PLATFORM_COLORS[section.coursePlatform] || '#555') : theme.colors.primary;
+        tabs.push({ id: section.courseId, label: section.courseName, color, count: section.data.length });
+      }
+    });
+    const indep = groupedSections.find(s => s.courseId === 'independent');
+    if (indep) tabs.push({ id: 'independent', label: 'Sueltas', color: '#8E8E93', count: indep.data.length });
+    return tabs;
+  }, [groupedSections, g.filteredSubjects.length]);
+
+  // ── Subjects filtered by selected tab ──
+  const displayedSubjects = useMemo(() => {
+    if (selectedCourseId === null) return g.filteredSubjects;
+    const section = groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId);
+    return section?.data ?? [];
+  }, [selectedCourseId, groupedSections, g.filteredSubjects]);
+
+  // ── Course name for selected tab (for handleClassComplete) ──
+  const selectedCourseName = useMemo(() => {
+    if (!selectedCourseId) return '';
+    return groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId)?.courseName ?? '';
+  }, [selectedCourseId, groupedSections]);
+
+  // ── Agrupar materias en pares para grilla de 2 columnas ──
+  const displayedPairs = useMemo(() => {
+    const pairs: [any, any | null][] = [];
+    for (let i = 0; i < displayedSubjects.length; i += 2) {
+      pairs.push([displayedSubjects[i], displayedSubjects[i + 1] ?? null]);
+    }
+    return pairs;
+  }, [displayedSubjects]);
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <View style={globalStyles.row}>
-            <Ionicons name="book-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
-            <Text style={styles.headerTitle}>{t('subjects.title') || 'Materias'}</Text>
-            <AutoUploadIndicator size={18} />
+        <View style={[globalStyles.row, { justifyContent: 'space-between', flex: 1 }]}>
+          <View>
+            <View style={globalStyles.row}>
+              <Ionicons name="book-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+              <Text style={styles.headerTitle}>{t('subjects.title') || 'Materias'}</Text>
+              <AutoUploadIndicator size={18} />
+            </View>
+            <OfflineIndicator />
           </View>
-          <OfflineIndicator />
+          <TouchableOpacity style={styles.addBtn} onPress={() => setIsCreationMenuVisible(true)}>
+            <Ionicons name="add" size={24} color={theme.colors.text.inverse} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -70,10 +170,55 @@ export default function SubjectsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {g.subjects.length > 0 && (
-          <>
-            <View style={styles.semesterHero}>
+      <FlatList
+        data={displayedPairs}
+        keyExtractor={(_, index) => `pair-${index}`}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scroll, { gap: 10 }]}
+        renderItem={({ item: [left, right] }) => (
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <SubjectCard
+              subject={left}
+              onPress={() => router.push(`/subjects/${left.id}`)}
+              onContinue={left.external_url ? () => handleContinueClass(left.external_url) : undefined}
+              onComplete={() => handleClassComplete(left, left.courseName || selectedCourseName)}
+            />
+            {right ? (
+              <SubjectCard
+                subject={right}
+                onPress={() => router.push(`/subjects/${right.id}`)}
+                onContinue={right.external_url ? () => handleContinueClass(right.external_url) : undefined}
+                onComplete={() => handleClassComplete(right, right.courseName || selectedCourseName)}
+              />
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
+          </View>
+        )}
+        ListEmptyComponent={
+          g.filteredSubjects.length === 0 ? (
+            <View style={[globalStyles.center, { paddingVertical: 60 }]}>
+              <MaterialCommunityIcons name="book-open-variant" size={48} color="rgba(255,255,255,0.1)" />
+              <Text style={[{ color: theme.colors.text.secondary }, globalStyles.mt16]}>
+                {g.search ? t('subjects.noResults', 'Sin resultados') : t('subjects.noSubjects', 'No hay materias')}
+              </Text>
+              {!g.search && (
+                <TouchableOpacity 
+                  style={[globalStyles.mt24, styles.addBtn, { width: 'auto', paddingHorizontal: 20, borderRadius: 24, flexDirection: 'row', gap: 8 }]} 
+                  onPress={() => setIsCreationMenuVisible(true)}
+                >
+                  <Ionicons name="add" size={20} color={theme.colors.text.inverse} />
+                  <Text style={{ color: theme.colors.text.inverse, fontWeight: '700' }}>Crear materia o curso</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null
+        }
+        ListFooterComponent={g.subjects.length > 0 ? <ScheduleGrid /> : null}
+        ListHeaderComponent={
+          g.subjects.length > 0 ? (
+            <>
+              <View style={styles.semesterHero}>
               {/* Background decorations: concentric arcs emanating from the GPA circle */}
               <View style={styles.gpaAmbientGlow} />
               <View style={styles.heroArc1} />
@@ -107,14 +252,7 @@ export default function SubjectsScreen() {
                     <Text style={styles.miniCardValue}>{approvedCount}</Text>
                   </View>
 
-                  <View style={atRiskCount > 0 ? styles.miniCardInRisk : styles.miniCard}>
-                    <Text style={atRiskCount > 0 ? styles.miniCardTitleRisk : styles.miniCardTitle}>
-                      {t('subjects.semesterAtRisk', { defaultValue: 'EN RIESGO' })}
-                    </Text>
-                    <Text style={atRiskCount > 0 ? styles.miniCardValueRisk : styles.miniCardValue}>
-                      {atRiskCount}
-                    </Text>
-                  </View>
+                  <MomentumCard score={aggregatedMomentumScore} />
                 </View>
               </View>
 
@@ -216,123 +354,141 @@ export default function SubjectsScreen() {
                 </View>
               </View>
             )}
-            </>
-          )}
-
-        {g.filteredSubjects.length === 0 ? (
-          <View style={[globalStyles.center, { paddingVertical: 60 }]}>
-            <MaterialCommunityIcons name="book-open-variant" size={48} color="rgba(255,255,255,0.1)" />
-            <Text style={[{ color: theme.colors.text.secondary }, globalStyles.mt16]}>
-              {g.search ? t('subjects.noResults', 'Sin resultados') : t('subjects.noSubjects', 'No hay materias')}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.gridSection}>
-            <View style={styles.gridHeader}>
-              <Text style={styles.gridTitle}>{t('subjects.enrolledSubjects')}</Text>
-              <Text style={styles.gridCount}>{g.filteredSubjects.length} {t('subjects.items')}</Text>
-            </View>
-            <View style={styles.grid}>
-              {g.filteredSubjects.map((subject, index) => {
-                const raw = subject.avg_score ?? 0;
-                const avgScore = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
-                const delta = (subject as any).delta ?? parseFloat((avgScore - 3.0).toFixed(2));
-                const isPositive = delta >= 0;
-                const cardColor = subject.color || '#5856D6';
-                const isLow = avgScore < 3.0;
-
-                return (
-                  <View key={subject.id || index} style={styles.gridCol}>
+            {/* ── Course Tab Bar ── */}
+            {courseTabs.length > 1 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginBottom: 12 }}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {courseTabs.map(tab => {
+                  const isActive = selectedCourseId === tab.id;
+                  return (
                     <TouchableOpacity
-                      style={styles.gridCard}
-                      activeOpacity={0.7}
-                      onPress={() => router.push(`/subjects/${subject.id}`)}
+                      key={tab.id ?? '__all'}
+                      style={[
+                        tabStyles.pill,
+                        isActive && { backgroundColor: tab.color, borderColor: tab.color },
+                      ]}
+                      onPress={() => setSelectedCourseId(tab.id)}
                     >
-                      <View style={styles.gridTopRow}>
-                        <View style={[styles.gridIcon, { backgroundColor: cardColor }]}>
-                          <SubjectIcon iconName={subject.icon} color={theme.colors.text.primary} size={18} />
-                        </View>
-
-                        <View style={styles.gridScoreGroup}>
-                          <View style={styles.gridScoreRow}>
-                            <Text style={[styles.gridScore, { color: isLow ? theme.colors.danger : theme.colors.text.primary }]}>
-                              {avgScore.toFixed(1)}
-                            </Text>
-                            <Text style={styles.gridScoreMax}>/5.0</Text>
-                          </View>
-                          <View style={styles.gridDelta}>
-                            <Ionicons
-                              name={isPositive ? 'arrow-up' : 'arrow-down'}
-                              size={10}
-                              color={isPositive ? theme.colors.success : theme.colors.danger}
-                            />
-                            <Text style={[styles.gridDeltaText, { color: isPositive ? theme.colors.success : theme.colors.danger }]}>
-                              {isPositive ? '+' : ''}{delta.toFixed(2)}
-                            </Text>
-                          </View>
-                          {((subject as any).due_cards || (subject as any).pending_flashcards) ? (
-                            <View style={styles.dueMiniBadge}>
-                              <Text style={styles.dueMiniText}>
-                                {((subject as any).due_cards || (subject as any).pending_flashcards) === 1
-                                  ? '1 mazo pendiente'
-                                  : `${(subject as any).due_cards || (subject as any).pending_flashcards} mazos pendientes`}
-                              </Text>
-                            </View>
-                          ) : (
-                            <View style={{ height: 20, marginTop: 4 }} />
-                          )}
-                        </View>
-                      </View>
-
-                      <View style={styles.gridBody}>
-                        <Text style={styles.gridName} numberOfLines={1}>{subject.name}</Text>
-                        <Text style={styles.gridProf} numberOfLines={1}>
-                          {subject.professor ? `Prof. ${subject.professor}${(subject as any).room ? ` • Aula ${(subject as any).room}` : ''}` : ''}
-                        </Text>
-                      </View>
-
-                      <View style={styles.gridMetaRow}>
-                        {subject.credits ? (
-                          <View style={styles.gridMetaBadge}>
-                            <Text style={styles.gridMetaBadgeText}>{subject.credits} {t('subjects.credits')}</Text>
-                          </View>
-                        ) : null}
-                        <Text style={styles.gridTargetText}>{t('subjects.requiredPass')}: {(subject.target_grade ?? 3.0).toFixed(1)}</Text>
-                      </View>
-
-                      {((subject as any).next_milestone || (subject as any).next_assessment) && (
-                        <Text style={styles.gridNextMilestone} numberOfLines={1}>
-                          {t('subjects.nextMilestone', 'Próximo hito')}: {((subject as any).next_milestone || (subject as any).next_assessment)}
-                        </Text>
-                      )}
-
-                      <View style={styles.gridProgress}>
-                        <View style={styles.gridProgressTrack}>
-                          <View style={[styles.gridProgressFill, {
-                            width: `${Math.min(subject.completion_percent ?? 0, 100)}%`,
-                            backgroundColor: isLow ? theme.colors.danger : cardColor,
-                          }]} />
-                        </View>
-                        <Text style={styles.gridProgressText}>
-                          {Math.round(subject.completion_percent ?? 0)}%
-                        </Text>
+                      <Text style={[tabStyles.pillText, isActive && { color: '#fff' }]} numberOfLines={1}>
+                        {tab.label}
+                      </Text>
+                      <View style={[tabStyles.countDot, { backgroundColor: isActive ? 'rgba(255,255,255,0.3)' : tab.color + '20' }]}>
+                        <Text style={[tabStyles.countText, { color: isActive ? '#fff' : tab.color }]}>{tab.count}</Text>
                       </View>
                     </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {g.subjects.length > 0 && <ScheduleGrid />}
-      </ScrollView>
+                  );
+                })}
+              </ScrollView>
+            )}
+            </>
+          ) : null
+        }
+      />
 
       <ExplanationOverlay
         visible={g.overlayVisible}
         explanation={g.overlayText}
         onDismiss={() => g.setOverlayVisible(false)}
       />
+
+      <CreateSubjectModal
+        visible={isCreateSubjectModalVisible}
+        onClose={() => {
+          setIsCreateSubjectModalVisible(false);
+          loadAllData(true);
+          refreshCourses();
+        }}
+      />
+
+      <CreateCourseModal
+        visible={isCreateCourseModalVisible}
+        onClose={() => {
+          setIsCreateCourseModalVisible(false);
+          loadAllData(true);
+          refreshCourses();
+        }}
+      />
+
+      <Modal visible={isCreationMenuVisible} transparent animationType="fade" onRequestClose={() => setIsCreationMenuVisible(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setIsCreationMenuVisible(false)}>
+          <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }} onPress={() => null}>
+            <View style={{ width: 40, height: 4, backgroundColor: theme.colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 16 }}>¿Qué deseas crear?</Text>
+            
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16, marginBottom: 12 }}
+              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsCreateSubjectModalVisible(true), 300); }}
+            >
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                <Ionicons name="book" size={24} color={theme.colors.primary} />
+              </View>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Para clases individuales de tu Universidad</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16 }}
+              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsCreateCourseModalVisible(true), 300); }}
+            >
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#FF950020', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                <Ionicons name="layers" size={24} color="#FF9500" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nuevo Curso</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Agrupa materias de Udemy, Platzi, etc.</Text>
+              </View>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {zyrenSubject && (
+        <ZyrenIngestionModal
+          visible={zyrenModalVisible}
+          onClose={() => setZyrenModalVisible(false)}
+          courseName={zyrenSubject.courseName || ''}
+          subjectName={zyrenSubject.name}
+          subjectId={zyrenSubject.id}
+          currentMilestone={zyrenSubject.milestone}
+        />
+      )}
     </SafeAreaView>
   );
 }
+
+import { StyleSheet } from 'react-native';
+const tabStyles = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    marginRight: 6,
+  },
+  countDot: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});

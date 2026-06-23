@@ -82,6 +82,7 @@ export const globalStyles = StyleSheet.create({
   mb32: { marginBottom: 32 },
   mt8: { marginTop: 8 },
   mt16: { marginTop: 16 },
+  mt24: { marginTop: 24 },
   mr4: { marginRight: 4 },
   mr8: { marginRight: 8 },
   ml8: { marginLeft: 8 },

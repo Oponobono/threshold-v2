@@ -1510,3 +1510,95 @@ Formato requerido EXACTO (JSON Object):
     res.status(500).json({ error: 'Error generando tarjeta de contraste', details: error.message });
   }
 };
+
+/**
+ * POST /api/ai/class-flashcards
+ * Flujo Clase ➔ Nota ➔ Mazo (Fase 5 del Hub Multi-Plataforma)
+ * Recibe metadatos del curso/materia + apuntes del usuario y retorna
+ * un array de flashcards JSON puro, sin prosa, listo para insertar en FSRS.
+ */
+exports.generateClassFlashcards = async (req, res) => {
+  const { courseName, subjectName, currentMilestone, rawTextFromOCROrNotes } = req.body;
+
+  if (!subjectName || !rawTextFromOCROrNotes) {
+    return res.status(400).json({ error: 'Faltan campos: subjectName, rawTextFromOCROrNotes' });
+  }
+
+  const groqApiKey = require('../config/secrets').GROQ_API_KEY;
+  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no configurada' });
+
+  const systemPrompt = `Actúas como Zyren, el motor de IA de Threshold. Tu objetivo es transformar apuntes en flashcards optimizadas para Repetición Espaciada (FSRS).
+
+CONTEXTO DEL ESTUDIANTE:
+- Curso: ${courseName || 'Sin curso'}
+- Materia: ${subjectName}
+- Hito alcanzado: ${currentMilestone || 'Sin hito definido'}
+
+INSTRUCCIONES:
+1. Analiza los apuntes del estudiante adjuntos abajo.
+2. Extrae los conceptos clave que se alineen estrictamente con la materia y el hito actual.
+3. Genera tarjetas con el formato Pregunta/Respuesta atómicas (una sola idea por tarjeta para optimizar FSRS).
+4. Genera entre 5 y 15 tarjetas dependiendo de la cantidad y densidad del contenido.
+
+CONTRATO DE SALIDA (ESTRICTO):
+Debes responder ÚNICAMENTE con un objeto JSON válido. No incluyas introducciones, ni saludos, ni bloques de código de Markdown (\`\`\`json). Si no hay datos suficientes, devuelve el objeto vacío: {"cards":[]}.
+
+Formato JSON esperado:
+{"cards":[{"front":"Pregunta concisa y directa","back":"Respuesta clara y específica"}]}`;
+
+  try {
+    const trimmedNotes = rawTextFromOCROrNotes.length > 6000
+      ? rawTextFromOCROrNotes.substring(0, 6000) + '\n[...apuntes truncados]'
+      : rawTextFromOCROrNotes;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `APUNTES DEL ESTUDIANTE:\n${trimmedNotes}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      return res.status(500).json({ error: 'Error en Groq API', details: err });
+    }
+
+    const groqData = await response.json();
+    let raw = groqData.choices[0].message.content.trim();
+
+    // Limpiar bloque de Markdown si el LLM lo incluye a pesar del contrato
+    raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_) {
+      // Fallback: intentar extraer el objeto JSON del string
+      const objMatch = raw.match(/\{[\s\S]*\}/);
+      if (objMatch) {
+        try { parsed = JSON.parse(objMatch[0]); } catch (__) {
+          return res.status(500).json({ error: 'Zyren no retornó JSON válido', raw: raw.substring(0, 300) });
+        }
+      } else {
+        return res.status(500).json({ error: 'Zyren no retornó JSON válido', raw: raw.substring(0, 300) });
+      }
+    }
+
+    const cards = Array.isArray(parsed?.cards) ? parsed.cards : [];
+    return res.status(200).json({ cards, count: cards.length });
+
+  } catch (error) {
+    console.error('[aiController] Error en generateClassFlashcards:', error);
+    res.status(500).json({ error: 'Error generando flashcards de clase', details: error.message });
+  }
+};

@@ -14,6 +14,8 @@ import { getUserGroups } from '../../src/services/api/learning/groups';
 import { getGlobalGPAAnalytics } from '../../src/services/api/analytics';
 import { calculateProjection } from '../../src/utils/projectionEngine';
 import { useDataStore } from '../../src/store/useDataStore';
+import { courseRepository } from '../../src/services/database/repositories';
+import { Course } from '../../src/services/api/types';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { useCachePreload } from '../../src/hooks/useCachePreload';
 import { downloadProfileImage, getLocalProfileImageUri } from '../../src/services/profileImageCache';
@@ -28,7 +30,9 @@ import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal
 import { FlashcardsModal } from '../../src/components/flashcards/FlashcardsModal';
 import { SubjectTile, MetricCard, ActionCircle } from '../../src/components/dashboard/DashboardWidgets';
 import { GroupPerformanceLeaderboard } from '../../src/components/dashboard/GroupPerformanceLeaderboard';
+import { CourseHeroCard, AllSubjectsHeroCard, HERO_CARD_WIDTH } from '../../src/components/dashboard/CourseHeroCard';
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
+import { CreateCourseModal } from '../../src/components/dashboard/CreateCourseModal';
 import { EditSubjectModal } from '../../src/components/dashboard/EditSubjectModal';
 import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModal';
 import { CreateTaskModal } from '../../src/components/dashboard/CreateTaskModal';
@@ -62,9 +66,15 @@ export default function HybridDashboardScreen() {
   }, []);
   const { preloadRelatedData } = useCachePreload();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
+  const [isCourseModalVisible, setIsCourseModalVisible] = useState(false);
+  const [isCreationMenuVisible, setIsCreationMenuVisible] = useState(false);
   const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const subjectsCarouselRef = useRef<FlatList<any> | null>(null);
+  
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedDashboardCourseId, setSelectedDashboardCourseId] = useState<string | null>(null); // null = "todas"
+  const heroCarouselRef = useRef<FlatList<any> | null>(null);
 
   // Quick Add Menu states
   const [isQuickAddMenuVisible, setIsQuickAddMenuVisible] = useState(false);
@@ -141,6 +151,13 @@ export default function HybridDashboardScreen() {
 
       if (Array.isArray(groups) && groups.length > 0) {
         setUserGroups(groups);
+      }
+      
+      try {
+        const dbCourses = await courseRepository.getAll();
+        setCourses(dbCourses);
+      } catch (err) {
+        console.warn('Error loading courses in dashboard:', err);
       }
       
       // ── Obtener GPA general ──
@@ -312,27 +329,46 @@ export default function HybridDashboardScreen() {
     });
   }, [subjects, assessments]);
 
-  const carouselSubjects = useMemo(() => {
-    if (!enrichedSubjects.length) return [] as (Subject & { __key: string })[];
-
-    if (!shouldUseInfiniteCarousel) {
-      return enrichedSubjects.map((subject) => ({
-        ...subject,
-        __key: `${subject.id}`,
-      }));
+  const filteredEnrichedSubjects = useMemo(() => {
+    if (selectedDashboardCourseId === 'independent') {
+      return enrichedSubjects.filter(s => !s.course_id);
     }
+    if (selectedDashboardCourseId) {
+      return enrichedSubjects.filter(s => s.course_id === selectedDashboardCourseId);
+    }
+    return enrichedSubjects; // 'all'
+  }, [enrichedSubjects, selectedDashboardCourseId]);
 
+  const carouselSubjects = useMemo(() => {
+    if (!filteredEnrichedSubjects.length) return [] as (Subject & { __key: string })[];
+    const base = filteredEnrichedSubjects;
+    if (base.length <= SUBJECT_LOOP_THRESHOLD) {
+      return base.map(subject => ({ ...subject, __key: subject.id }));
+    }
     const result: (Subject & { __key: string })[] = [];
-    for (let loop = 0; loop < SUBJECT_LOOP_MULTIPLIER; loop += 1) {
-      for (const subject of enrichedSubjects) {
-        result.push({
-          ...subject,
-          __key: `${subject.id}-${loop}`,
-        });
+    for (let loop = 0; loop < SUBJECT_LOOP_MULTIPLIER; loop++) {
+      for (const subject of base) {
+        result.push({ ...subject, __key: `${subject.id}-${loop}` });
       }
     }
     return result;
-  }, [enrichedSubjects, shouldUseInfiniteCarousel]);
+  }, [filteredEnrichedSubjects]);
+
+  // Items para el hero carousel: tarjeta "Todas" + un card por curso + "Independientes" si hay
+  const heroCourseItems = useMemo(() => {
+    const items: Array<{ type: 'all' } | { type: 'course'; course: Course } | { type: 'independent' }> = [
+      { type: 'all' },
+      ...courses.map(c => ({ type: 'course' as const, course: c })),
+    ];
+    const hasIndependent = enrichedSubjects.some(s => !s.course_id);
+    if (hasIndependent) items.push({ type: 'independent' });
+    return items;
+  }, [courses, enrichedSubjects]);
+
+  const handleHeroCardSelect = useCallback((courseId: string | null) => {
+    setSelectedDashboardCourseId(courseId);
+    subjectsCarouselRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, []);
 
   const initialScrollIndex = useMemo(() => {
     if (!shouldUseInfiniteCarousel || !subjects.length) return 0;
@@ -477,58 +513,136 @@ export default function HybridDashboardScreen() {
           </View>
         ) : null}
 
-        {/* 2. YOUR SUBJECTS */}
+        {/* 2. COURSE HERO + YOUR SUBJECTS */}
         <View style={styles.section}>
+          {/* Section header */}
           <View style={styles.subjectsHeaderRow}>
-            <Text style={styles.sectionTitle}>{t('dashboard.yourSubjects')}</Text>
-            <TouchableOpacity style={styles.subjectsAddBtn} onPress={() => setIsSubjectModalVisible(true)}>
+            <Text style={styles.sectionTitle}>Tus cursos</Text>
+            <TouchableOpacity style={styles.subjectsAddBtn} onPress={() => setIsCreationMenuVisible(true)}>
               <Ionicons name="add" size={18} color={theme.colors.white} />
             </TouchableOpacity>
           </View>
 
-          {subjects.length === 0 ? (
-            <View style={styles.emptySubjectsCard}>
-              <Feather name="layout" size={22} color={theme.colors.text.placeholder} />
-              <Text style={styles.emptySubjectsText}>{t('dashboard.newSubject.emptyState')}</Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={subjectsCarouselRef}
-              horizontal
-              data={carouselSubjects}
-              keyExtractor={(item) => item.__key}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.subjectsCarousel}
-              renderItem={({ item }) => <SubjectTile subject={item} onEdit={handleEditSubject} onDelete={handleDeleteSubject} />}
-              ItemSeparatorComponent={() => <View style={{ width: SUBJECT_CARD_GAP }} />}
-              initialScrollIndex={initialScrollIndex}
-              getItemLayout={(_, index) => ({
-                length: SUBJECT_CARD_WIDTH + SUBJECT_CARD_GAP,
-                offset: (SUBJECT_CARD_WIDTH + SUBJECT_CARD_GAP) * index,
-                index,
-              })}
-              onMomentumScrollEnd={(event) => normalizeCarouselPosition(event.nativeEvent.contentOffset.x)}
-              onScrollToIndexFailed={({ index }) => {
-                setTimeout(() => {
-                  subjectsCarouselRef.current?.scrollToIndex({ index, animated: false });
-                }, 50);
-              }}
-            />
+          {/* Hero Carousel — one card per course, paginated */}
+          {(courses.length > 0 || enrichedSubjects.length > 0) && (
+            <>
+              {/* marginHorizontal: -24 neutraliza el paddingHorizontal del ScrollView padre */}
+              <View style={{ marginHorizontal: -24 }}>
+              <FlatList
+                ref={heroCarouselRef}
+                horizontal
+                data={heroCourseItems}
+                keyExtractor={(item, idx) => item.type === 'course' ? item.course.id : `${item.type}-${idx}`}
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={HERO_CARD_WIDTH + 16}
+                decelerationRate="fast"
+                contentContainerStyle={{ paddingHorizontal: 24 }}
+                ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+                onMomentumScrollEnd={(e) => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / (HERO_CARD_WIDTH + 16));
+                  const item = heroCourseItems[idx];
+                  if (!item) return;
+                  if (item.type === 'all') handleHeroCardSelect(null);
+                  else if (item.type === 'independent') handleHeroCardSelect('independent');
+                  else handleHeroCardSelect(item.course.id);
+                }}
+                renderItem={({ item }) => {
+                  if (item.type === 'all') {
+                    return (
+                      <AllSubjectsHeroCard
+                        subjects={enrichedSubjects}
+                        isActive={selectedDashboardCourseId === null}
+                        onPress={() => handleHeroCardSelect(null)}
+                      />
+                    );
+                  }
+                  if (item.type === 'independent') {
+                    const independentSubjects = enrichedSubjects.filter(s => !s.course_id);
+                    return (
+                      <CourseHeroCard
+                        course={{ id: 'independent', user_id: '', name: 'Materias Independientes' }}
+                        subjects={independentSubjects}
+                        isActive={selectedDashboardCourseId === 'independent'}
+                        onPress={() => handleHeroCardSelect('independent')}
+                      />
+                    );
+                  }
+                  const courseSubjects = enrichedSubjects.filter(s => s.course_id === item.course.id);
+                  return (
+                    <CourseHeroCard
+                      course={item.course}
+                      subjects={courseSubjects}
+                      isActive={selectedDashboardCourseId === item.course.id}
+                      onPress={() => handleHeroCardSelect(item.course.id)}
+                    />
+                  );
+                }}
+              />
+              </View>
+
+              {/* Pagination dots */}
+              {heroCourseItems.length > 1 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 }}>
+                  {heroCourseItems.map((item, idx) => {
+                    const itemCourseId = item.type === 'course' ? item.course.id : item.type === 'independent' ? 'independent' : null;
+                    const isActive = itemCourseId === selectedDashboardCourseId;
+                    return (
+                      <View
+                        key={idx}
+                        style={{
+                          width: isActive ? 18 : 6,
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: isActive ? theme.colors.primary : theme.colors.border,
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              )}
+            </>
           )}
+
+          {/* Subjects carousel filtered by active course */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>
+              {selectedDashboardCourseId === null
+                ? 'Todas las materias'
+                : selectedDashboardCourseId === 'independent'
+                ? 'Materias independientes'
+                : courses.find(c => c.id === selectedDashboardCourseId)?.name ?? 'Materias'}
+            </Text>
+
+            {filteredEnrichedSubjects.length === 0 ? (
+              <View style={styles.emptySubjectsCard}>
+                <Feather name="layout" size={22} color={theme.colors.text.placeholder} />
+                <Text style={styles.emptySubjectsText}>
+                  {selectedDashboardCourseId ? 'Sin materias en este curso' : t('dashboard.newSubject.emptyState')}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                ref={subjectsCarouselRef}
+                horizontal
+                data={carouselSubjects}
+                keyExtractor={(item) => item.__key}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.subjectsCarousel}
+                renderItem={({ item }) => <SubjectTile subject={item} onEdit={handleEditSubject} onDelete={handleDeleteSubject} />}
+                ItemSeparatorComponent={() => <View style={{ width: SUBJECT_CARD_GAP }} />}
+                getItemLayout={(_, index) => ({
+                  length: SUBJECT_CARD_WIDTH + SUBJECT_CARD_GAP,
+                  offset: (SUBJECT_CARD_WIDTH + SUBJECT_CARD_GAP) * index,
+                  index,
+                })}
+              />
+            )}
+          </View>
         </View>
 
         {/* 3. QUICK ADD & NEXT CLASS */}
         <View style={styles.section}>
-          <View style={styles.quickAddCard}>
-            <View style={[globalStyles.rowCenter, globalStyles.mb8]}>
-              <Ionicons name="calendar-outline" size={20} color={theme.colors.text.primary} style={globalStyles.mr8} />
-              <Text style={styles.quickAddTitle}>{t('dashboard.quickAdd')}</Text>
-            </View>
-            <Text style={styles.quickAddDesc}>{t('dashboard.quickAddDesc')}</Text>
-            <TouchableOpacity style={styles.quickAddBtn} onPress={() => setIsQuickAddMenuVisible(true)}>
-              <Text style={styles.quickAddBtnText}>{t('dashboard.addBtn')}</Text>
-            </TouchableOpacity>
-          </View>
+
 
           <Text style={styles.sectionTitle}>{t('dashboard.nextClass')}</Text>
           <View style={styles.nextClassCard}>
@@ -701,12 +815,59 @@ export default function HybridDashboardScreen() {
 
         <CreateSubjectModal 
           visible={isSubjectModalVisible}
-          onClose={() => setIsSubjectModalVisible(false)}
+          onClose={() => {
+            setIsSubjectModalVisible(false);
+            loadData(true);
+          }}
+        />
+
+        <CreateCourseModal
+          visible={isCourseModalVisible}
+          onClose={() => {
+            setIsCourseModalVisible(false);
+            loadData(true);
+          }}
         />
 
       </ScrollView>
     </SafeAreaView>
       
+      {/* CREATION MENU MODAL */}
+      <Modal visible={isCreationMenuVisible} transparent animationType="fade" onRequestClose={() => setIsCreationMenuVisible(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setIsCreationMenuVisible(false)}>
+          <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }} onPress={() => null}>
+            <View style={{ width: 40, height: 4, backgroundColor: theme.colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 16 }}>¿Qué deseas crear?</Text>
+            
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16, marginBottom: 12 }}
+              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsSubjectModalVisible(true), 300); }}
+            >
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                <Ionicons name="book" size={24} color={theme.colors.primary} />
+              </View>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Para clases individuales de tu Universidad</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16 }}
+              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsCourseModalVisible(true), 300); }}
+            >
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#FF950020', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                <Ionicons name="layers" size={24} color="#FF9500" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nuevo Curso</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Agrupa materias de Udemy, Platzi, etc.</Text>
+              </View>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* TOAST FEEDBACK */}
       {toastMessage ? (
         <View style={styles.toastContainer}>

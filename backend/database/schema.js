@@ -113,6 +113,37 @@ const tableSchema = {
       )
     `
   },
+  courses: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS courses (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        platform TEXT,
+        certificate_url TEXT,
+        momentum_score REAL DEFAULT 1.0,
+        last_studied_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_backed_up INTEGER DEFAULT 0
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS courses (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        name TEXT NOT NULL,
+        platform TEXT,
+        certificate_url TEXT,
+        momentum_score REAL DEFAULT 1.0,
+        last_studied_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_backed_up INTEGER DEFAULT 0
+      )
+    `,
+    columns: []
+  },
   subjects: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS subjects (
@@ -148,6 +179,11 @@ const tableSchema = {
       { name: 'icon', type: "TEXT DEFAULT 'book-outline'" },
       { name: 'target_grade', type: 'REAL' },
       { name: 'folder_path', type: 'TEXT' },
+      { name: 'course_id', type: 'TEXT REFERENCES courses(id) ON DELETE SET NULL' },
+      { name: 'external_url', type: 'TEXT' },
+      { name: 'total_lessons', type: 'INTEGER DEFAULT 0' },
+      { name: 'completed_lessons', type: 'INTEGER DEFAULT 0' },
+      { name: 'next_micro_milestone', type: 'TEXT' }
     ]
   },
   photos: {

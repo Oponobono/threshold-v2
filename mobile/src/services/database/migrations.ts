@@ -294,6 +294,34 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_assessment_files_assessment ON assessment_files(assessment_id)`,
     ],
   },
+  {
+    version: 7,
+    up: [
+      `CREATE TABLE IF NOT EXISTS courses (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        platform TEXT,
+        certificate_url TEXT,
+        momentum_score REAL DEFAULT 1.0,
+        last_studied_at TEXT,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )`,
+      `CREATE TRIGGER IF NOT EXISTS update_courses_timestamp
+      AFTER UPDATE ON courses
+      FOR EACH ROW
+      BEGIN
+          UPDATE courses SET updated_at = datetime('now') WHERE id = OLD.id;
+      END;`,
+      `ALTER TABLE subjects ADD COLUMN course_id TEXT REFERENCES courses(id) ON DELETE SET NULL`,
+      `ALTER TABLE subjects ADD COLUMN external_url TEXT`,
+      `ALTER TABLE subjects ADD COLUMN total_lessons INTEGER DEFAULT 0`,
+      `ALTER TABLE subjects ADD COLUMN completed_lessons INTEGER DEFAULT 0`,
+      `ALTER TABLE subjects ADD COLUMN next_micro_milestone TEXT`
+    ],
+  },
 ];
 
 export default migrations;

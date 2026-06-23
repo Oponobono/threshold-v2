@@ -29,6 +29,7 @@ const gradingRoutes = require('./routes/grading');
 const assessmentCategoriesRoutes = require('./routes/assessmentCategories');
 const calendarRoutes = require('./routes/calendar');
 const settingsRoutes = require('./routes/settings');
+const coursesRoutes = require('./routes/courses');
 
 const app = express();
 
@@ -127,6 +128,7 @@ app.use('/api', gradingRoutes);
 app.use('/api', assessmentCategoriesRoutes);
 app.use('/api', calendarRoutes);
 app.use('/api', settingsRoutes);
+app.use('/api', coursesRoutes);
 
 
 

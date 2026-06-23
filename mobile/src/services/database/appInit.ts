@@ -10,6 +10,7 @@ export async function initializeDatabase(): Promise<void> {
 
     syncService.onSync(async ({ entity_type, entity_id, operation, payload }) => {
       let path = `/${entity_type}s`;
+      if (entity_type === 'course') path = '/courses';
       if (entity_type === 'assessment_category') path = '/assessmentCategories';
       if (entity_type === 'audio_recording') path = '/audio-recordings';  // ← Fix: was '/audio'
       if (entity_type === 'audio-transcript') path = '/audio-transcripts'; // ← Explicit mapping
@@ -108,6 +109,12 @@ export async function initializeDatabase(): Promise<void> {
         console.warn('[DB] Sync on init failed (will retry later):', err)
       );
     }
+    // ── Calcular y actualizar el Momentum Score de todos los cursos en background (On-App-Start) ──
+    const { MomentumService } = await import('../MomentumService');
+    MomentumService.updateAllMomentumScores().catch(err => 
+      console.warn('[DB] Error al recalcular Momentum:', err)
+    );
+
   } catch (error) {
     console.warn('[DB] Initialization failed:', error);
   }

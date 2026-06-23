@@ -319,4 +319,11 @@ router.get('/ai/deck/:deckId/confusions', aiController.analyzeDeckConfusions);
  */
 router.post('/ai/deck/:deckId/differentiate', aiController.generateDifferentiationCard);
 
+/**
+ * POST /api/ai/class-flashcards
+ * Flujo Clase ➔ Nota ➔ Mazo. Recibe apuntes y metadatos del curso/materia,
+ * retorna flashcards JSON puras listas para insertar en FSRS local.
+ */
+router.post('/ai/class-flashcards', aiController.generateClassFlashcards);
+
 module.exports = router;

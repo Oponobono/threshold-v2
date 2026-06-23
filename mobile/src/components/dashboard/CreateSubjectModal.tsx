@@ -7,6 +7,8 @@ import { theme } from '../../styles/theme';
 import { alertRef } from '../ui/CustomAlert';
 import { createSubject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
+import { courseRepository } from '../../services/database/repositories';
+import { Course } from '../../services/api/types';
 
 const SUBJECT_COLORS = [
   '#E7EDF8', '#DDE7FF', '#EAF4EE', '#FCEFD9', '#F7E9EE', '#ECE8FF',
@@ -37,6 +39,14 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
   const [subjectTarget, setSubjectTarget] = useState('');
   const [selectedColor, setSelectedColor] = useState(SUBJECT_COLORS[0]);
   const [selectedIcon, setSelectedIcon] = useState<(typeof SUBJECT_ICONS)[number]>('book-outline');
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (visible) {
+      courseRepository.getAll().then(setCourses).catch(console.error);
+    }
+  }, [visible]);
 
   const resetForm = () => {
     setSubjectName('');
@@ -45,6 +55,7 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
     setSubjectTarget('');
     setSelectedColor(SUBJECT_COLORS[0]);
     setSelectedIcon('book-outline');
+    setSelectedCourseId(null);
     setIsSavingSubject(false);
   };
 
@@ -68,6 +79,7 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
         icon: selectedIcon,
         credits: subjectCredits ? Number(subjectCredits) : undefined,
         target_grade: subjectTarget ? Number(subjectTarget) : undefined,
+        course_id: selectedCourseId || undefined,
       });
 
       await loadAllData(true);
@@ -96,6 +108,39 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
               placeholder={t('dashboard.newSubject.namePlaceholder')}
               placeholderTextColor={theme.colors.text.placeholder}
             />
+
+            {courses.length > 0 && (
+              <>
+                <Text style={styles.sheetLabel}>Curso asociado (Opcional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, gap: 10 }}>
+                  <TouchableOpacity
+                    style={[
+                      { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+                      selectedCourseId === null && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
+                    ]}
+                    onPress={() => setSelectedCourseId(null)}
+                  >
+                    <Text style={{ color: selectedCourseId === null ? theme.colors.primary : theme.colors.text.secondary, fontWeight: selectedCourseId === null ? '600' : '400' }}>
+                      Independiente
+                    </Text>
+                  </TouchableOpacity>
+                  {courses.map(course => (
+                    <TouchableOpacity
+                      key={course.id}
+                      style={[
+                        { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+                        selectedCourseId === course.id && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
+                      ]}
+                      onPress={() => setSelectedCourseId(course.id)}
+                    >
+                      <Text style={{ color: selectedCourseId === course.id ? theme.colors.primary : theme.colors.text.secondary, fontWeight: selectedCourseId === course.id ? '600' : '400' }}>
+                        {course.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
 
             <Text style={styles.sheetLabel}>{t('dashboard.newSubject.professor')}</Text>
             <TextInput

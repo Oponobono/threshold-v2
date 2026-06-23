@@ -20,6 +20,20 @@ export type UserProfile = {
   grading_scale?: string | null;
 };
 
+export type Course = {
+  id: string;
+  user_id: string;
+  name: string;
+  platform?: string;
+  certificate_url?: string;
+  momentum_score?: number;
+  last_studied_at?: string;
+  is_backed_up?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+
 export type Subject = {
   id: string;
   user_id: string;
@@ -36,6 +50,11 @@ export type Subject = {
   display_label?: string;
   display_color?: string;
   gpa_equivalent?: number;
+  course_id?: string | null;
+  external_url?: string | null;
+  total_lessons?: number;
+  completed_lessons?: number;
+  next_micro_milestone?: string | null;
 };
 
 export type Assessment = {

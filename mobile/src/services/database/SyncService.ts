@@ -100,7 +100,17 @@ export class SyncService {
         return { success: 0, failed: 0, pending: 0 };
       }
 
-      console.log(`[SyncService] Iniciando Fase 2: sync de ${items.length} operaciones JSON`);
+      // Orden Atómico: Garantizar que 'course' se procese ANTES que 'subject' para evitar FK Constraint
+      items.sort((a, b) => {
+        const order = { course: 1, subject: 2 };
+        const rankA = (order as any)[a.entity_type] || 99;
+        const rankB = (order as any)[b.entity_type] || 99;
+        if (rankA !== rankB) return rankA - rankB;
+        // Si tienen el mismo rango, FIFO (menor ID primero)
+        return a.id! - b.id!;
+      });
+
+      console.log(`[SyncService] Iniciando Fase 2: sync de ${items.length} operaciones JSON (Orden Atómico aplicado)`);
 
       for (const item of items) {
         // Fallo silencioso: si el ID está en la lista de media fallida, saltar

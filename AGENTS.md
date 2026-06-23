@@ -1,13 +1,14 @@
 # Session Context
 
 ## Goal
-Enable full offline functionality for flashcards (decks, cards, import) and document text extraction; fix calendar/UI positioning behind native navbar; show backup upload/download progress in system notifications; improve Zyren context selector with search, pagination, and category pills.
+Enable full offline functionality for flashcards (decks, cards, import) and document text extraction; fix calendar/UI positioning behind native navbar; show backup upload/download progress in system notifications; improve Zyren context selector with search, pagination, and category pills. Additionally: build a unified Multi-Platform Course Hub (Platzi, Udemy, etc.) with hierarchical SectionList UI, atomic sync, Momentum tracking and AI-powered class ingestion.
 
 ## Constraints & Preferences
 - Spanish-language app (i18next).
 - Offline-first architecture: SQLite + MMKV local storage, cloud sync when online.
 - ForceOfflineMode toggle (useLocalAIStore) must be respected.
 - Native navbar space must not be overlapped by modal content.
+- `React.memo` on list cards must be preserved — always wrap SectionList item handlers in `useCallback`.
 
 ## Progress
 ### Done
@@ -18,15 +19,28 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - **PDF import hybrid OCR**: `PDFImportModal.tsx` — switched from `extractTextFromPDF` (cloud-first) to `extractTextFromPDFHybrid` (offline-first via `resolveProvider()`). Added user-visible alert on failure.
 - **Scanner OCR for images**: `DocumentScannerModal.tsx` — moved OCR block before PDF/image bifurcation; now both export formats run `extractTextFromImageHybrid` and pass `ocr_text` to `createPhoto()` / `createScannedDocument()`.
 - **Calendar modal bottom safe-area**: `EventCreationModal.tsx` — added `paddingBottom: insets.bottom` to content view and `paddingBottom: Math.max(insets.bottom, 20)` to `SubjectPickerSheet`'s pickerContent, preventing buttons and subject selector from clipping behind the native navbar.
-- **Backup progress notifications**: `notificationService.ts` — added 8 functions (`showBackupUploadNotification`, `updateBackupUploadNotification`, `completeBackupUploadNotification`, `cancelBackupUploadNotification` and download equivalents) that show ongoing progress (X/Y items) and result (success/partial/error) in system notifications. `useBackupLogic.ts` — integrated them into `handleBackupNow` and `handleDownloadNow`. `scheduledBackupService.ts` — integrated into the background task for automatic backups. `locales/*/backup.json` — added missing `backup.partial` key.
-- **Dashboard sheet modals bottom safe-area**: `CreateTaskModal.tsx`, `SubjectSelectorModal.tsx`, `CategorySelectorModal.tsx` — each now imports `useSafeAreaInsets` and applies `paddingBottom: Math.max(insets.bottom, 20)` to `sheetContent`, preventing action buttons from clipping behind the native navbar.
-- **Zyren context selector redesigned**: `SubjectAIContextModal.tsx` — replaced bento grid with search bar (filters by OCR/transcript text), horizontally scrollable category pills with counts (Todos, Docs, Fotos, Grabaciones, Videos), content hidden until user searches or picks a category, max 10 items per page with "Ver más" pagination, compact list items with type icon + status. `AIContextItem.tsx` — added `searchText` field. `aiContextMappers.ts` — populate `searchText` from OCR/transcript. `locales/*/ai.json` — added `searchPlaceholder`, `searchPrompt`, `seeMore`, `ready`, `noText` keys; updated filter labels (filterAll→"Todos", filterAudio→"Grabaciones"/"Recordings").
-- **Backup flow resilience**: `backupService.ts` — `POST /backup/mark` failures no longer throw; files that uploaded successfully to Uploadthing are always marked `is_backed_up = 1` locally even if the backend mark fails. This prevents infinite re-upload loops on retry.
-- **YouTube transcripts query fixed**: `backupService.ts` — removed `WHERE (is_backed_up IS NULL OR is_backed_up = 0)` from the `youtube_videos` query (that table lacks the column). Migration `v2` adds `is_backed_up` and `cloud_url` columns to `youtube_videos`.
-- **Migration runner fixed**: `DatabaseService.ts` — removed `PRAGMA user_version = 0` hack so versions are properly tracked; incremental migrations now run exactly once.
-- **Backend mark logging**: `backupController.js` — added `console.error` logging of `err.message`, `err.code`, and `err.stack` on every `db.run` failure in the mark endpoint, so the actual PostgreSQL error is visible in server logs.
-- **PostgreSQL id type fix**: `migrations/fix-id-type.js` — new migration converts `photos.id`, `audio_recordings.id`, `scanned_documents.id` from `INTEGER`/`SERIAL` to `TEXT` in production. Registered in `postgres.js`.
-- **Scheduled backup UI clean up**: `settings.tsx` — replaced nested card-in-card layout for scheduled backup with flat `SettingRow` + `actionRow` pattern consistent with the rest of settings. Removed obsolete `scheduledBackup*` styles; now uses standard `actionRow`, `outlinePill`, `settingTitle`/`settingDesc`. Added `backup.includedItems` key to locales.
+- **Backup progress notifications**: `notificationService.ts` — added 8 functions for upload/download progress and result. `useBackupLogic.ts` + `scheduledBackupService.ts` integrated. `locales/*/backup.json` — added `backup.partial` key.
+- **Dashboard sheet modals bottom safe-area**: `CreateTaskModal.tsx`, `SubjectSelectorModal.tsx`, `CategorySelectorModal.tsx` — each now imports `useSafeAreaInsets` and applies `paddingBottom: Math.max(insets.bottom, 20)` to `sheetContent`.
+- **Zyren context selector redesigned**: `SubjectAIContextModal.tsx` — search bar, horizontal category pills, "Ver mas" pagination (max 10/page), content hidden until interaction. `AIContextItem.tsx` — added `searchText`. `aiContextMappers.ts` — populate `searchText` from OCR/transcript.
+- **Backup flow resilience**: `backupService.ts` — `POST /backup/mark` failures no longer throw. Files successfully uploaded to Uploadthing always marked `is_backed_up = 1` locally.
+- **YouTube transcripts query fixed**: `backupService.ts` — removed invalid column filter. Migration v2 adds `is_backed_up` + `cloud_url` to `youtube_videos`.
+- **Migration runner fixed**: `DatabaseService.ts` — removed `PRAGMA user_version = 0` hack; incremental migrations now run exactly once. `PRAGMA foreign_keys = ON` active.
+- **Backend mark logging**: `backupController.js` — `console.error` on every `db.run` failure.
+- **PostgreSQL id type fix**: `migrations/fix-id-type.js` — converts PK id columns from INTEGER to TEXT.
+- **Scheduled backup UI clean up**: `settings.tsx` — flat `SettingRow` + `actionRow` pattern.
+- **[HUB] Migration v7**: `migrations.ts` — `courses` table (momentum_score, last_studied_at, platform). Added `course_id`, `external_url`, `total_lessons`, `completed_lessons`, `next_micro_milestone` to `subjects`. `ON DELETE SET NULL` on `course_id`.
+- **[HUB] CourseRepository**: `CourseRepository.ts` — SQLite CRUD. Registered in `repositories/index.ts`.
+- **[HUB] Backend UPSERT for courses**: `coursesController.js` — `INSERT ... ON CONFLICT (id) DO UPDATE SET`. Route registered in `server.js`.
+- **[HUB] Atomic sync ordering**: `SyncService.ts` — items sorted `course -> subject -> *` before processing.
+- **[HUB] useGroupedSubjects hook**: `useGroupedSubjects.ts` — SectionList sections grouped by course, `collapsedCourses` state, `aggregatedMomentumScore` (average of all courses' momentum_score).
+- **[HUB] CourseAccordion**: `CourseAccordion.tsx` — sticky header, animated chevron, platform pill.
+- **[HUB] CourseSubjectCard**: `CourseSubjectCard.tsx` — `React.memo` card with pills, "Continuar" deep-link button, "Marcar clase terminada" bicephalous trigger.
+- **[HUB] subjects.tsx refactor**: Replaced ScrollView+map with `SectionList`. All `renderItem` handlers wrapped in `useCallback` to preserve `React.memo`. `MomentumCard` reads `aggregatedMomentumScore` (was hardcoded 0.85).
+- **[HUB] MomentumService**: `MomentumService.ts` — logarithmic decay after 72h (`0.05 * Math.log1p(hoursOverdue)`), `boostMomentum` (+15%), `updateAllMomentumScores` on app start via `appInit.ts`.
+- **[HUB] Deep Linking**: `linking.ts` — `openCourseLink(url)`: `Linking.openURL` with `expo-web-browser` fallback.
+- **[HUB] Zyren Ingestion endpoint**: `aiController.js` — `generateClassFlashcards` uses `llama-3.3-70b-versatile`. Strict JSON contract in system prompt. Double sanitization (Markdown strip + regex fallback). Route: `POST /api/ai/class-flashcards`.
+- **[HUB] ZyrenIngestionModal**: `ZyrenIngestionModal.tsx` — 3-step (Input->Preview->Saving). Saves via `saveImportedDeck` + `addLocalCard` + `recalculateLocalDeckCounters`. `subjectId` passed correctly.
+- **[HUB] Audit**: `useCallback` applied to handlers; `aggregatedMomentumScore` connected to Hero Card; `subjectId` fixed in modal.
 
 ### In Progress
 - *(none)*
@@ -35,14 +49,20 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - *(none)*
 
 ## Key Decisions
-- **Dual storage merge**: For imported decks, keep MMKV as canonical store for deck+cards, but merge with SQLite at read time so that cards added later via `createEvaluationItem` (which writes SQLite) are also visible. This avoids rewriting the entire card creation pipeline.
-- **Hybrid routing for OCR/PDF extraction**: Use `extractTextFromImageHybrid` / `extractTextFromPDFHybrid` everywhere instead of raw cloud functions, so `forceOfflineMode` and connectivity are respected before attempting a network call.
-- **Inline safe-area padding for modals**: Use `useSafeAreaInsets()` with inline `paddingBottom` rather than modifying StyleSheet definitions, to keep styles static and avoid per-device StyleSheet recreation.
-- **Context selector: pagination over virtualization**: Show max 10 items per page with "Ver más" button instead of implementing virtualized lists. Simpler to maintain, gives user explicit control, and the typical dataset (<200 items) doesn't require windowing.
-- **Context selector: content hidden until interaction**: Files not shown until user searches or selects a category. Drastically reduces cognitive load when there are many files.
+- **Dual storage merge**: MMKV canonical for deck+cards; merge with SQLite at read time.
+- **Hybrid routing for OCR/PDF extraction**: `extractTextFromImageHybrid` / `extractTextFromPDFHybrid` everywhere.
+- **Inline safe-area padding for modals**: `useSafeAreaInsets()` with inline `paddingBottom`.
+- **Context selector: pagination over virtualization**: Max 10 items/page with "Ver mas" button.
+- **Context selector: content hidden until interaction**: Reduces cognitive load.
+- **Hub: Data-Driven collapse**: SectionList data array emptied on collapse (not CSS hidden).
+- **Hub: aggregatedMomentumScore**: Arithmetic mean of all courses exposed from `useGroupedSubjects`.
+- **Hub: useCallback for SectionList handlers**: All handlers to `CourseSubjectCard` must be `useCallback` — otherwise `React.memo` is bypassed on every parent re-render.
+- **Hub: Zyren ingestion reuses Groq infra**: No new API key. `generateClassFlashcards` follows same pattern as `generateStudyMaterial` with stricter JSON-only prompt.
 
 ## Next Steps
-- Consider whether `Dashboard.styles.ts` `sheetContent` hardcoded `paddingBottom: 44/52` should be replaced with dynamic inset values passed via props or context.
+- Consider whether `Dashboard.styles.ts` `sheetContent` hardcoded `paddingBottom: 44/52` should be replaced with dynamic inset values.
+- Audit note (INFO): Migration v6 duplicates `assessment_files` table already in v3. No crash (`IF NOT EXISTS`), but dirty log. Consider cleanup migration.
+- Future: After user returns from external class URL, trigger `boostMomentum` automatically.
 
 ## Relevant Files
 - `mobile/src/components/flashcards/FlashcardNewDeckScreen.tsx`: subject made optional
@@ -51,28 +71,40 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - `mobile/src/services/api/flashcards.ts`: card-read functions merge SQLite + MMKV
 - `mobile/src/components/modals/PDFImportModal.tsx`: switched to `extractTextFromPDFHybrid`
 - `mobile/src/components/modals/DocumentScannerModal.tsx`: OCR runs for both image and PDF export
-- `mobile/src/components/modals/EventCreationModal.tsx`: added bottom safe-area padding to content and SubjectPickerSheet
-- `mobile/src/components/dashboard/CreateTaskModal.tsx`: task creation; now uses `useSafeAreaInsets` + inline `paddingBottom`
-- `mobile/src/components/dashboard/SubjectSelectorModal.tsx`: subject selector; now uses `useSafeAreaInsets` + inline `paddingBottom`
-- `mobile/src/components/dashboard/CategorySelectorModal.tsx`: category selector; now uses `useSafeAreaInsets` + inline `paddingBottom`
-- `mobile/src/services/hybridAIService.ts`: `extractTextFromImageHybrid` and `extractTextFromPDFHybrid`
+- `mobile/src/components/modals/EventCreationModal.tsx`: added bottom safe-area padding
+- `mobile/src/components/dashboard/CreateTaskModal.tsx`: useSafeAreaInsets + inline paddingBottom
+- `mobile/src/components/dashboard/SubjectSelectorModal.tsx`: useSafeAreaInsets + inline paddingBottom
+- `mobile/src/components/dashboard/CategorySelectorModal.tsx`: useSafeAreaInsets + inline paddingBottom
+- `mobile/src/services/hybridAIService.ts`: extractTextFromImageHybrid and extractTextFromPDFHybrid
 - `mobile/src/services/localOCRService.ts`: ML Kit text recognition (offline)
 - `mobile/src/services/localPDFService.ts`: native PDF text extraction (offline)
 - `mobile/src/services/notificationService.ts`: backup upload/download progress notification functions
 - `mobile/src/hooks/useBackupLogic.ts`: backup/download hook with integrated notification calls
-- `mobile/src/services/backup/backupService.ts`: resilient mark flow (no throw on backend fail), youtube_videos query fixed
-- `mobile/src/services/database/DatabaseService.ts`: removed user_version=0 hack; proper incremental migrations
-- `mobile/src/services/database/migrations.ts`: v2 adds `is_backed_up` + `cloud_url` to `youtube_videos`
-- `backend/controllers/backupController.js`: added error detail logging to mark endpoint
-- `backend/database/migrations/fix-id-type.js`: converts primary key id columns from INTEGER to TEXT
+- `mobile/src/services/backup/backupService.ts`: resilient mark flow; youtube_videos query fixed
+- `mobile/src/services/database/DatabaseService.ts`: PRAGMA foreign_keys = ON; incremental migrations
+- `mobile/src/services/database/migrations.ts`: v7 adds courses table + subjects columns
+- `mobile/src/services/database/repositories/CourseRepository.ts`: SQLite CRUD for courses
+- `mobile/src/services/database/repositories/index.ts`: exports CourseRepository
+- `mobile/src/services/database/appInit.ts`: sync handler; MomentumService startup call
+- `mobile/src/services/database/SyncService.ts`: atomic ordering course->subject
+- `mobile/src/services/MomentumService.ts`: logarithmic decay, boostMomentum, updateAllMomentumScores
+- `mobile/src/hooks/useGroupedSubjects.ts`: SectionList sections, collapse state, aggregatedMomentumScore
+- `mobile/src/components/subjects/CourseAccordion.tsx`: sticky header with animated chevron
+- `mobile/src/components/subjects/CourseSubjectCard.tsx`: React.memo card with pills and bicephalous trigger
+- `mobile/src/components/subjects/ZyrenIngestionModal.tsx`: 3-step ingestion modal (Input->Preview->Saving)
+- `mobile/src/utils/linking.ts`: openCourseLink with expo-web-browser fallback
+- `mobile/app/(tabs)/subjects.tsx`: SectionList hub with useCallback handlers, reactive MomentumCard
+- `backend/controllers/aiController.js`: generateClassFlashcards endpoint (Groq llama-3.3-70b)
+- `backend/routes/ai.js`: POST /api/ai/class-flashcards registered
+- `backend/controllers/coursesController.js`: UPSERT logic for courses
+- `backend/controllers/backupController.js`: error detail logging to mark endpoint
+- `backend/database/migrations/fix-id-type.js`: converts PK id columns from INTEGER to TEXT
 - `mobile/src/styles/Settings.styles.ts`: removed obsolete scheduledBackup* styles
-- `mobile/src/styles/Dashboard.styles.ts`: `sheetContent` with hardcoded bottom padding
-- `mobile/src/locales/es/backup.json`: Spanish backup translations (added `partial` key)
-- `mobile/src/locales/en/backup.json`: English backup translations (added `partial` key)
-- `mobile/src/locales/es/backup.json`: Spanish backup translations (added `partial` key)
-- `mobile/src/locales/en/backup.json`: English backup translations (added `partial` key)
-- `mobile/src/components/subjects/SubjectAIContextModal.tsx`: redesigned context selector with search, horizontal pills, pagination
-- `mobile/src/components/ai/AIContextItem.tsx`: added `searchText` field to data type
-- `mobile/src/utils/aiContextMappers.ts`: populate `searchText` from OCR/transcript
-- `mobile/src/locales/es/ai.json`: Spanish AI translations (added search, seeMore, ready, noText; updated filter labels)
-- `mobile/src/locales/en/ai.json`: English AI translations (added search, seeMore, ready, noText; updated filter labels)
+- `mobile/src/styles/Dashboard.styles.ts`: sheetContent with hardcoded bottom padding
+- `mobile/src/locales/es/backup.json`: added partial key
+- `mobile/src/locales/en/backup.json`: added partial key
+- `mobile/src/components/subjects/SubjectAIContextModal.tsx`: redesigned context selector
+- `mobile/src/components/ai/AIContextItem.tsx`: added searchText field
+- `mobile/src/utils/aiContextMappers.ts`: populate searchText from OCR/transcript
+- `mobile/src/locales/es/ai.json`: added search, seeMore, ready, noText keys
+- `mobile/src/locales/en/ai.json`: added search, seeMore, ready, noText keys

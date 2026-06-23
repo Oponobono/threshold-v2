@@ -15,3 +15,4 @@ export * from './analytics';
 export * from './assessmentCategories';
 export * from './calendar';
 export * from './settings';
+export * from './courses';

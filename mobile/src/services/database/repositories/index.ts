@@ -14,3 +14,4 @@ export { CardLogRepository, cardLogRepository, type CardLog } from './CardLogRep
 export { SyncQueueRepository, syncQueueRepository, type SyncQueueItem } from './SyncQueueRepository';
 export { UserRepository, userRepository, type User } from './UserRepository';
 export { assessmentFileRepository, type AssessmentFile } from './AssessmentFileRepository';
+export { CourseRepository, courseRepository } from './CourseRepository';

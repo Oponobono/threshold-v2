@@ -8,6 +8,8 @@ import { alertRef } from '../ui/CustomAlert';
 import { updateSubject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 import type { Subject } from '../../services/api';
+import { courseRepository } from '../../services/database/repositories';
+import { Course } from '../../services/api/types';
 
 const SUBJECT_COLORS = [
   '#E7EDF8', '#DDE7FF', '#EAF4EE', '#FCEFD9', '#F7E9EE', '#ECE8FF',
@@ -39,6 +41,14 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
   const [subjectTarget, setSubjectTarget] = useState('');
   const [selectedColor, setSelectedColor] = useState(SUBJECT_COLORS[0]);
   const [selectedIcon, setSelectedIcon] = useState<(typeof SUBJECT_ICONS)[number]>('book-outline');
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      courseRepository.getAll().then(setCourses).catch(console.error);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (subject) {
@@ -48,6 +58,7 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
       setSubjectTarget(subject.target_grade != null ? String(subject.target_grade) : '');
       setSelectedColor(subject.color || SUBJECT_COLORS[0]);
       setSelectedIcon((subject.icon as any) || 'book-outline');
+      setSelectedCourseId((subject as any).course_id || null);
     }
   }, [subject]);
 
@@ -72,6 +83,7 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
         target_grade: subjectTarget ? Number(subjectTarget) : undefined,
         color: selectedColor,
         icon: selectedIcon,
+        course_id: selectedCourseId || undefined,
       });
 
       await refreshSubjects();
@@ -99,6 +111,39 @@ export const EditSubjectModal = ({ visible, subject, onClose }: EditSubjectModal
               placeholder={t('dashboard.newSubject.namePlaceholder')}
               placeholderTextColor={theme.colors.text.placeholder}
             />
+
+            {courses.length > 0 && (
+              <>
+                <Text style={styles.sheetLabel}>Curso asociado (Opcional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, gap: 10 }}>
+                  <TouchableOpacity
+                    style={[
+                      { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+                      selectedCourseId === null && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
+                    ]}
+                    onPress={() => setSelectedCourseId(null)}
+                  >
+                    <Text style={{ color: selectedCourseId === null ? theme.colors.primary : theme.colors.text.secondary, fontWeight: selectedCourseId === null ? '600' : '400' }}>
+                      Independiente
+                    </Text>
+                  </TouchableOpacity>
+                  {courses.map(course => (
+                    <TouchableOpacity
+                      key={course.id}
+                      style={[
+                        { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+                        selectedCourseId === course.id && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
+                      ]}
+                      onPress={() => setSelectedCourseId(course.id)}
+                    >
+                      <Text style={{ color: selectedCourseId === course.id ? theme.colors.primary : theme.colors.text.secondary, fontWeight: selectedCourseId === course.id ? '600' : '400' }}>
+                        {course.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
 
             <Text style={styles.sheetLabel}>{t('dashboard.newSubject.professor')}</Text>
             <TextInput
