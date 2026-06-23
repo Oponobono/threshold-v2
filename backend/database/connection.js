@@ -1,5 +1,13 @@
 const path = require('path');
+const dns = require('dns');
 const secrets = require('../config/secrets');
+
+// ── Forzar IPv4 en resolución DNS ────────────────────────────────────────────
+// Render no soporta conexiones salientes por IPv6. Supabase "Direct Connection"
+// resuelve a IPv6 (2600:...), lo que causa ENETUNREACH. Al establecer el orden
+// de resolución a IPv4 primero, el pool de pg usará la dirección IPv4 correcta.
+// Esto también funciona si se usa el pooler de Supabase (pooler.supabase.com).
+dns.setDefaultResultOrder('ipv4first');
 
 const isProduction = secrets.NODE_ENV === 'production' || !!secrets.DATABASE_URL;
 
@@ -14,7 +22,6 @@ if (isProduction) {
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
-    family: 4,
   });
 
   const convertQuery = (sql) => {
