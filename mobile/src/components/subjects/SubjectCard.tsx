@@ -5,6 +5,30 @@ import { theme } from '../../styles/theme';
 import { SubjectIcon } from './SubjectIcon';
 import { SCALE_MAX } from '../../utils/grades';
 
+function hexToRgba(hex: string, alpha: number): string {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(0,0,0,${alpha})`;
+  let clean = hex.replace('#', '');
+  if (clean.length === 3) clean = clean.split('').map(c => c + c).join('');
+  if (clean.length !== 6) return `rgba(0,0,0,${alpha})`;
+
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function darkenHex(hex: string, factor: number = 0.5): string {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return hex || '#000000';
+  let clean = hex.replace('#', '');
+  if (clean.length === 3) clean = clean.split('').map(c => c + c).join('');
+  if (clean.length !== 6) return hex;
+  
+  const r = Math.max(0, Math.round(parseInt(clean.substring(0, 2), 16) * (1 - factor)));
+  const g = Math.max(0, Math.round(parseInt(clean.substring(2, 4), 16) * (1 - factor)));
+  const b = Math.max(0, Math.round(parseInt(clean.substring(4, 6), 16) * (1 - factor)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 interface SubjectCardProps {
   subject: any;
   onPress: () => void;
@@ -54,7 +78,7 @@ export const SubjectCard = React.memo(({
         {/* Header: Icon & Badge */}
         <View style={styles.header}>
           <View style={[styles.iconContainer, { backgroundColor: color }]}>
-            <SubjectIcon iconName={subject.icon} color="#FFFFFF" size={18} />
+            <SubjectIcon iconName={subject.icon} color={darkenHex(color, 0.45)} size={20} />
           </View>
           
           {hasGrade ? (
