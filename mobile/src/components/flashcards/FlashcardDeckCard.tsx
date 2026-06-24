@@ -104,7 +104,7 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
               <Text style={{ fontSize: 11, color: '#388E3C', fontWeight: '600' }}>
                 ✓ {Number((deck as any).review_count ?? 0)}
               </Text>
-              <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>
+              <Text style={{ fontSize: 11, color: '#FF9800', fontWeight: '600' }}>
                 💪 {Number((deck as any).learning_count ?? 0) + Number((deck as any).new_count ?? 0)}
               </Text>
             </View>
