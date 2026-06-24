@@ -145,24 +145,18 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const loadDecks = async () => {
     try {
       const data = await getFlashcardDecksWithMetrics();
-      setDecks(data || []);
-
-      // Merge local MMKV decks (reemplazan a los de SQLite si existe el mismo ID)
       const { getLocalDecksForCurrentUser } = await import('../../services/localFlashcardService');
       const localDecks = getLocalDecksForCurrentUser(await getUserId());
-      if (localDecks.length > 0) {
-        setDecks(prev => {
-          const localIds = new Set(localDecks.map(ld => String(ld.id)));
-          const merged = prev.filter(d => {
-            if (localIds.has(String(d.id))) return false;
-            const isNegativeId = !isNaN(Number(d.id)) && Number(d.id) < 0;
-            if (isNegativeId) return false;
-            return true;
-          });
-          merged.push(...localDecks as any);
-          return merged;
-        });
-      }
+      
+      const localIds = new Set(localDecks.map(ld => String(ld.id)));
+      const filteredData = (data || []).filter((d: any) => {
+        if (localIds.has(String(d.id))) return false;
+        const isNegativeId = !isNaN(Number(d.id)) && Number(d.id) < 0;
+        if (isNegativeId) return false;
+        return true;
+      });
+      
+      setDecks([...filteredData, ...localDecks] as any);
     } catch (e) {
       console.warn('Error loading decks:', e);
     }
