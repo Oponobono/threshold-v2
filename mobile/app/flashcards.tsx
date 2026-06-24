@@ -23,6 +23,7 @@ import { FlashcardFloatingButton } from '../src/components/flashcards/FlashcardF
 import { NewDeckModal } from '../src/components/flashcards/NewDeckModal';
 import { NewCardModal } from '../src/components/flashcards/NewCardModal';
 import { EditDeckModal } from '../src/components/flashcards/EditDeckModal';
+import { LinkExamModal } from '../src/components/flashcards/LinkExamModal';
 import { MenuModal } from '../src/components/flashcards/MenuModal';
 import { useFlashcards } from '../src/hooks/useFlashcards';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +44,8 @@ export default function FlashcardsScreen() {
     shareDeckTarget, setShareDeckTarget,
     sharePin, setSharePin,
     isSharing, handleShareDeck,
+    // Exam
+    linkExamTarget, setLinkExamTarget,
     // Groups
     activeTab, setActiveTab,
     groups, activeGroupPin, setActiveGroupPin,
@@ -145,7 +148,7 @@ export default function FlashcardsScreen() {
                   const isShared = deck.user_id != null && String(deck.user_id) !== String(currentUserId) && !(deck as any)._local;
                   const duedeckIds = getDuedeckIds();
                   const isDue = duedeckIds.has(deck.id);
-                  const { pillWidth, onAddPress, onSharePress, onDeletePress } = renderSwipeActions(deck, () => {});
+                  const { pillWidth, onAddPress, onSharePress, onExamLinkPress, onDeletePress } = renderSwipeActions(deck, () => {});
                   return (
                     <SwipeableCard
                       onOpen={(closeFn) => {
@@ -172,6 +175,18 @@ export default function FlashcardsScreen() {
                                 activeOpacity={0.6}
                               >
                                 <Ionicons name="share-social-outline" size={17} color={theme.colors.text.secondary} />
+                              </TouchableOpacity>
+                            </>
+                          )}
+                          {onExamLinkPress && (
+                            <>
+                              <View style={flashcardStyles.swipeActionDivider} />
+                              <TouchableOpacity
+                                style={flashcardStyles.swipeActionBtn}
+                                onPress={() => { close(); onExamLinkPress(); }}
+                                activeOpacity={0.6}
+                              >
+                                <Ionicons name="calendar-outline" size={17} color={theme.colors.text.secondary} />
                               </TouchableOpacity>
                             </>
                           )}
@@ -355,6 +370,21 @@ export default function FlashcardsScreen() {
           )}
         </View>
       </Modal>
+
+      {/* ─── LINK EXAM MODAL ─── */}
+      <LinkExamModal
+        visible={!!linkExamTarget}
+        deck={linkExamTarget}
+        onClose={() => setLinkExamTarget(null)}
+        onLinked={(examTitle) => {
+          showAlert({
+            title: '¡Modo Examen activo!',
+            message: `El mazo "${linkExamTarget?.title}" ya está vinculado a "${examTitle}". Los intervalos se comprimirán automáticamente.`,
+            type: 'success',
+          });
+          setLinkExamTarget(null);
+        }}
+      />
 
       {/* ─── SHARE DECK MODAL ─── */}
       <Modal visible={!!shareDeckTarget} transparent animationType="fade">

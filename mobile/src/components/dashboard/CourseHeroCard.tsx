@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { Course, Subject } from '../../services/api/types';
@@ -20,9 +20,11 @@ interface CourseHeroCardProps {
   subjects: Subject[];
   isActive: boolean;
   onPress: () => void;
+  onEditPress?: () => void;
+  onDeletePress?: () => void;
 }
 
-export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress }: CourseHeroCardProps) => {
+export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress, onEditPress, onDeletePress }: CourseHeroCardProps) => {
   const platform = course.platform ? PLATFORM_CONFIG[course.platform] ?? PLATFORM_CONFIG['Otro'] : null;
   const subjectCount = subjects.length;
   const totalCredits = subjects.reduce((sum, s) => sum + (s.credits ?? 0), 0);
@@ -44,33 +46,43 @@ export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress 
 
   const isIndependent = course.id === 'independent';
 
-  return (
-    <TouchableOpacity
-      activeOpacity={0.92}
-      onPress={onPress}
-      style={[styles.card, isActive && styles.cardActive]}
-    >
-      {/* Top Row: Platform badge + Momentum */}
-      <View style={styles.topRow}>
-        {platform && !isIndependent ? (
-          <View style={[styles.platformBadge, { backgroundColor: platform.color + '18', borderColor: platform.color + '40' }]}>
-            <MaterialCommunityIcons name={platform.icon} size={13} color={platform.color} />
-            <Text style={[styles.platformText, { color: platform.color }]}>{platform.label}</Text>
-          </View>
-        ) : isIndependent ? (
-          <View style={[styles.platformBadge, { backgroundColor: theme.colors.text.secondary + '18', borderColor: theme.colors.text.secondary + '40' }]}>
-            <MaterialCommunityIcons name="bookshelf" size={13} color={theme.colors.text.secondary} />
-            <Text style={[styles.platformText, { color: theme.colors.text.secondary }]}>Sin Asignar</Text>
-          </View>
-        ) : <View />}
+  const [menuVisible, setMenuVisible] = React.useState(false);
 
-        {!isIndependent && (
-          <View style={styles.momentumBadge}>
-            <Ionicons name="flame" size={12} color="#FF9500" />
-            <Text style={styles.momentumText}>{momentumPct}%</Text>
-          </View>
-        )}
-      </View>
+  return (
+    <View style={{ overflow: 'visible' }}>
+      <TouchableOpacity
+        activeOpacity={0.92}
+        onPress={onPress}
+        style={[styles.card, isActive && styles.cardActive]}
+      >
+        {/* Top Row: Platform badge + Momentum */}
+        <View style={styles.topRow}>
+          {platform && !isIndependent ? (
+            <View style={[styles.platformBadge, { backgroundColor: platform.color + '18', borderColor: platform.color + '40' }]}>
+              <MaterialCommunityIcons name={platform.icon} size={13} color={platform.color} />
+              <Text style={[styles.platformText, { color: platform.color }]}>{platform.label}</Text>
+            </View>
+          ) : isIndependent ? (
+            <View style={[styles.platformBadge, { backgroundColor: theme.colors.text.secondary + '18', borderColor: theme.colors.text.secondary + '40' }]}>
+              <MaterialCommunityIcons name="bookshelf" size={13} color={theme.colors.text.secondary} />
+              <Text style={[styles.platformText, { color: theme.colors.text.secondary }]}>Sin Asignar</Text>
+            </View>
+          ) : <View />}
+
+          {!isIndependent && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={styles.momentumBadge}>
+                <Ionicons name="flame" size={12} color="#FF9500" />
+                <Text style={styles.momentumText}>{momentumPct}%</Text>
+              </View>
+              {onEditPress || onDeletePress ? (
+                <TouchableOpacity onPress={() => setMenuVisible(true)} style={{ padding: 4 }}>
+                  <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.text.secondary} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
+        </View>
 
       {/* Course Name */}
       <Text style={styles.courseName} numberOfLines={2}>{course.name}</Text>
@@ -104,13 +116,64 @@ export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress 
         </View>
       </View>
 
-      {/* Progress bar */}
-      {subjectCount > 0 && (
-        <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: `${Math.round(progressRatio * 100)}%` as any }]} />
-        </View>
+        {/* Progress bar */}
+        {subjectCount > 0 && (
+          <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarFill, { width: `${Math.round(progressRatio * 100)}%` as any }]} />
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {menuVisible && (
+        <>
+          <Pressable
+            style={{
+              position: 'absolute',
+              top: -1000,
+              left: -1000,
+              width: 3000,
+              height: 3000,
+              zIndex: 20,
+            }}
+            onPress={() => setMenuVisible(false)}
+          />
+          <View style={{
+            position: 'absolute', top: 50, right: 20, zIndex: 21,
+            backgroundColor: theme.colors.card,
+            borderRadius: 12,
+            paddingVertical: 4,
+            minWidth: 130,
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+          }}>
+            {onEditPress && (
+              <>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14 }}
+                  onPress={() => { setMenuVisible(false); onEditPress(); }}
+                >
+                  <Ionicons name="pencil-outline" size={16} color={theme.colors.text.primary} />
+                  <Text style={{ fontSize: 13, color: theme.colors.text.primary }}>Editar</Text>
+                </TouchableOpacity>
+                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.05)' }} />
+              </>
+            )}
+            {onDeletePress && (
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14 }}
+                onPress={() => { setMenuVisible(false); onDeletePress(); }}
+              >
+                <Ionicons name="trash-outline" size={16} color="#FF2D55" />
+                <Text style={{ fontSize: 13, color: '#FF2D55' }}>Eliminar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </>
       )}
-    </TouchableOpacity>
+    </View>
   );
 });
 

@@ -40,6 +40,9 @@ export function useFlashcards() {
   const [sharePin, setSharePin] = useState('');
   const [isSharing, setIsSharing] = useState(false);
 
+  // Exam mode state
+  const [linkExamTarget, setLinkExamTarget] = useState<FlashcardDeck | null>(null);
+
   const handleRemoveFromGroup = useCallback(async (deck: FlashcardDeck, groupPin: string) => {
     showAlert({
       title: t('modals.removeFromGroup'),
@@ -214,11 +217,12 @@ export function useFlashcards() {
 
   const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
     const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
-    const pillWidth = isOwner ? 152 : 101;
+    const pillWidth = isOwner ? 202 : 152;
     return {
       pillWidth,
       onAddPress: () => { close(); setActiveDeck(deck); setShowNewCardModal(true); },
       onSharePress: isOwner ? () => { close(); setShareDeckTarget(deck); setSharePin(''); } : undefined,
+      onExamLinkPress: () => { close(); setLinkExamTarget(deck); },
       onDeletePress: () => { close(); handleDeleteDeck(deck); },
     };
   }, [handleDeleteDeck, currentUserId]);
@@ -337,6 +341,8 @@ export function useFlashcards() {
     shareDeckTarget, setShareDeckTarget,
     sharePin, setSharePin,
     isSharing, handleShareDeck,
+    // Exam
+    linkExamTarget, setLinkExamTarget,
     // Groups
     activeTab, setActiveTab,
     groups, activeGroupPin, setActiveGroupPin,

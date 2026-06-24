@@ -46,3 +46,37 @@ export const createCourse = async (payload: {
     return course;
   }
 };
+
+export const updateCourse = async (id: string, payload: Partial<Course>): Promise<void> => {
+  const userId = await getUserIdNumber();
+  await courseRepository.update(id, payload);
+
+  try {
+    const response = await fetchWithFallback(`/courses/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, user_id: userId }),
+    });
+    const data = await parseJsonSafely(response);
+    if (!response.ok) {
+      throw new Error(data?.error || 'Error del servidor al actualizar curso');
+    }
+  } catch {
+    await syncService.enqueueUpdate('course', id, { ...payload, user_id: userId });
+  }
+};
+
+export const deleteCourse = async (id: string): Promise<void> => {
+  await courseRepository.delete(id);
+
+  try {
+    const response = await fetchWithFallback(`/courses/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error al eliminar curso');
+    }
+  } catch {
+    await syncService.enqueueDelete('course', id);
+  }
+};

@@ -221,6 +221,40 @@ export default function HybridDashboardScreen() {
     });
   }, [t, loadAllData]);
 
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+
+  const handleEditCourse = useCallback((course: Course) => {
+    setEditingCourse(course);
+    setIsCourseModalVisible(true);
+  }, []);
+
+  const handleDeleteCourse = useCallback((course: Course) => {
+    alertRef.show({
+      title: 'Eliminar Curso',
+      message: `¿Estás seguro de que deseas eliminar el curso "${course.name}"? Las materias asociadas quedarán "Sin Asignar".`,
+      type: 'confirm',
+      buttons: [
+        { text: 'Cancelar', style: 'cancel' as const },
+        {
+          text: 'Eliminar',
+          style: 'destructive' as const,
+          onPress: async () => {
+            try {
+              const { deleteCourse } = await import('../../src/services/api/courses');
+              await deleteCourse(course.id);
+              setSelectedDashboardCourseId(null);
+              heroCarouselRef.current?.scrollToOffset({ offset: 0, animated: true });
+              await loadData(true);
+              alertRef.show({ title: 'Curso eliminado', message: 'El curso se ha eliminado con éxito.', type: 'success' });
+            } catch {
+              alertRef.show({ title: 'Error', message: 'No se pudo eliminar el curso.', type: 'error' });
+            }
+          },
+        },
+      ],
+    });
+  }, [loadData]);
+
   // Derivar el próximo examen directamente de los datos del store
   const nextAssessment = useMemo(() => {
     if (!Array.isArray(assessments) || assessments.length === 0) return null;
@@ -574,6 +608,8 @@ export default function HybridDashboardScreen() {
                       subjects={courseSubjects}
                       isActive={selectedDashboardCourseId === item.course.id}
                       onPress={() => handleHeroCardSelect(item.course.id)}
+                      onEditPress={() => handleEditCourse(item.course)}
+                      onDeletePress={() => handleDeleteCourse(item.course)}
                     />
                   );
                 }}
@@ -613,7 +649,17 @@ export default function HybridDashboardScreen() {
                 : courses.find(c => c.id === selectedDashboardCourseId)?.name ?? 'Materias'}
             </Text>
 
-            {filteredEnrichedSubjects.length === 0 ? (
+            {courses.length === 0 ? (
+              <View style={styles.emptyCourseCard}>
+                <Ionicons name="school" size={40} color={theme.colors.primary} />
+                <Text style={styles.emptyCourseTitle}>Aún no tienes cursos</Text>
+                <Text style={styles.emptyCourseSubtext}>Crea un curso o semestre para organizar tus materias y evaluar tu rendimiento académico.</Text>
+                <TouchableOpacity style={styles.emptyCourseBtn} onPress={() => setIsCourseModalVisible(true)}>
+                  <Ionicons name="add" size={18} color={theme.colors.white} />
+                  <Text style={styles.emptyCourseBtnText}>Crear mi primer curso</Text>
+                </TouchableOpacity>
+              </View>
+            ) : filteredEnrichedSubjects.length === 0 ? (
               <View style={styles.emptySubjectsCard}>
                 <Feather name="layout" size={22} color={theme.colors.text.placeholder} />
                 <Text style={styles.emptySubjectsText}>
@@ -823,8 +869,10 @@ export default function HybridDashboardScreen() {
 
         <CreateCourseModal
           visible={isCourseModalVisible}
+          editingCourse={editingCourse}
           onClose={() => {
             setIsCourseModalVisible(false);
+            setEditingCourse(null);
             loadData(true);
           }}
         />
@@ -854,7 +902,7 @@ export default function HybridDashboardScreen() {
 
             <TouchableOpacity 
               style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16 }}
-              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsCourseModalVisible(true), 300); }}
+              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => { setEditingCourse(null); setIsCourseModalVisible(true); }, 300); }}
             >
               <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#FF950020', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
                 <Ionicons name="layers" size={24} color="#FF9500" />
