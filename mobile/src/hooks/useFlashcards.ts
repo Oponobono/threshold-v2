@@ -142,9 +142,12 @@ export function useFlashcards() {
   }, []);
 
   const handleDeleteDeck = useCallback((deck: FlashcardDeck) => {
+    const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
     showAlert({
-      title: t('modals.deleteDeck'),
-      message: t('modals.deleteDeckConfirm', { title: deck.title }),
+      title: isOwner ? t('modals.deleteDeck') : t('flashcards.removeShared'),
+      message: isOwner
+        ? t('modals.deleteDeckConfirm', { title: deck.title })
+        : t('flashcards.removeSharedConfirm', { title: deck.title, defaultValue: `¿Deseas quitar el mazo "${deck.title}" de tu lista?` }),
       type: 'confirm',
       buttons: [
         { text: t('common.cancel'), style: 'cancel' },
@@ -210,7 +213,7 @@ export function useFlashcards() {
   }, [t, showAlert]);
 
   const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
-    const isOwner = deck.user_id === currentUserId || deck.user_id === String(currentUserId);
+    const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
     const pillWidth = isOwner ? 152 : 101;
     return {
       pillWidth,

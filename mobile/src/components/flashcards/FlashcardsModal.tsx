@@ -153,7 +153,12 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
       if (localDecks.length > 0) {
         setDecks(prev => {
           const localIds = new Set(localDecks.map(ld => String(ld.id)));
-          const merged = prev.filter(d => !localIds.has(String(d.id)));
+          const merged = prev.filter(d => {
+            if (localIds.has(String(d.id))) return false;
+            const isNegativeId = !isNaN(Number(d.id)) && Number(d.id) < 0;
+            if (isNegativeId) return false;
+            return true;
+          });
           merged.push(...localDecks as any);
           return merged;
         });
@@ -230,7 +235,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   };
 
   const handleDeleteDeck = (deck: FlashcardDeck) => {
-    const isOwner = deck.user_id === currentUserId;
+    const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
     showAlert({
       title: isOwner ? t('modals.deleteDeck') : t('flashcards.removeShared'),
       message: isOwner
@@ -258,7 +263,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   // ── Swipe actions ─────────────────────────────────────────────────────────
 
   const renderSwipeActions = (deck: FlashcardDeck, close: () => void) => {
-    const isOwner = deck.user_id === currentUserId;
+    const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
     // Explicit width is CRITICAL for react-native-gesture-handler to know how far to swipe
     const pillWidth = isOwner ? 152 : 101;
     

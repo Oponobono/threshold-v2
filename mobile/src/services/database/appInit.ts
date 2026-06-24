@@ -95,6 +95,21 @@ export async function initializeDatabase(): Promise<void> {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData?.error || `HTTP ${response.status}`);
       }
+
+      // ── Post-sync cleanup: si se sincronizó exitosamente un flashcard-deck local
+      // (ID negativo), eliminarlo del MMKV para evitar duplicados con el UUID del backend.
+      if (operation === 'CREATE' && entity_type === 'flashcard-deck' && entity_id) {
+        const isNegativeId = !isNaN(Number(entity_id)) && Number(entity_id) < 0;
+        if (isNegativeId) {
+          try {
+            const { deleteLocalDeck } = await import('../localFlashcardService');
+            deleteLocalDeck(entity_id);
+            console.log(`[SyncService] Limpiado deck local ${entity_id} del MMKV tras sync exitoso`);
+          } catch (cleanupErr) {
+            console.warn('[SyncService] Error limpiando deck local de MMKV:', cleanupErr);
+          }
+        }
+      }
     });
 
     console.log('[DB] Sync handler registered');

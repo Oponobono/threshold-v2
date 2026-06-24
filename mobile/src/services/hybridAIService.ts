@@ -792,21 +792,52 @@ async function persistDifferentiationCardLocally(
 ): Promise<void> {
   const deckIdNum = Number(deckId);
   if (!Number.isNaN(deckIdNum) && deckIdNum < 0) {
-    const { addLocalCard, recalculateLocalDeckCounters, prepareDeckForSync } = await import('./localFlashcardService');
-    const { getUserId } = await import('./api');
+    const { addLocalCard, recalculateLocalDeckCounters, getLocalDecks } = await import('./localFlashcardService');
 
-    addLocalCard(deckIdNum, {
-      type: 'flashcard',
-      data: { front, back },
-      hint,
-      explanation,
-    });
-    recalculateLocalDeckCounters(deckIdNum);
+    // Verificar si el deck local aún existe en MMKV (no fue sincronizado y eliminado aún)
+    const localDecks = getLocalDecks();
+    const deckStillLocal = localDecks.some(d => d.id === deckIdNum);
 
-    const userId = Number(await getUserId());
-    prepareDeckForSync(deckIdNum, userId).catch(e =>
-      console.warn('[persistDifferentiationCardLocally] Error encolando deck para sync:', e)
-    );
+    if (deckStillLocal) {
+      // Deck aún es local: guardar en MMKV
+      addLocalCard(deckIdNum, {
+        type: 'flashcard',
+        data: { front, back },
+        hint,
+        explanation,
+      });
+      recalculateLocalDeckCounters(deckIdNum);
+    } else {
+      // El deck ya fue sincronizado al backend: usar createFlashcard con la API
+      // El deck tendrá un UUID en el backend con el mismo título, buscamos el match
+      try {
+        const { createFlashcard } = await import('./api/flashcards');
+        const { uuidv4 } = await import('../utils/uuid');
+        const { getUserId } = await import('./api/auth');
+        const userId = await getUserId();
+        // Buscar el deck en SQLite que coincida (por título) — fallback a SQLite directo
+        const { databaseService } = await import('./database/DatabaseService');
+        const db = databaseService.getDb();
+        // Buscar deck por user_id en SQLite (el deck fue creado en el backend con el mismo título)
+        const deckRow: any = await db.getFirstAsync(
+          'SELECT id FROM flashcard_decks WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+          String(userId)
+        ).catch(() => null);
+
+        const targetDeckId = deckRow?.id || String(deckId);
+        await createFlashcard({ deck_id: String(targetDeckId), front, back, id: uuidv4() });
+        console.log(`[persistDifferentiationCardLocally] Ancla agregada al deck del backend: ${targetDeckId}`);
+      } catch (e) {
+        console.warn('[persistDifferentiationCardLocally] Error agregando ancla al backend, guardando localmente:', e);
+        // Fallback: crear un nuevo deck temporal en MMKV con la tarjeta
+        addLocalCard(deckIdNum, {
+          type: 'flashcard',
+          data: { front, back },
+          hint,
+          explanation,
+        });
+      }
+    }
   } else {
     const { uuidv4 } = await import('../utils/uuid');
     const { flashcardRepository } = await import('./database');

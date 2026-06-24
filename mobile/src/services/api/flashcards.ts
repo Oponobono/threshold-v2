@@ -356,12 +356,12 @@ export const removeDeckFromGroup = async (deckId: string, groupPinId: string): P
 export const deleteFlashcardDeck = async (deckId: string) => {
   await flashcardDeckRepository.delete(deckId);
 
-  // OFFLINE-FIRST: Si el ID es numérico negativo (mazo local no sincronizado), eliminar de MMKV y omitir red
+  // OFFLINE-FIRST: mazos locales (ID negativo) solo existen en MMKV, no tienen backend
   const isLocalId = !isNaN(Number(deckId)) && Number(deckId) < 0;
   if (isLocalId) {
     const { deleteLocalDeck } = await import('../localFlashcardService');
     deleteLocalDeck(deckId);
-    return { success: true };
+    return { success: true }; // termina aquí, no llamar al backend
   }
 
   try {

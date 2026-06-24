@@ -58,7 +58,14 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
   function mergeLocalDecks(remoteDecks: FlashcardDeck[], userId?: string | null): FlashcardDeck[] {
     const localDecks = getLocalDecksForCurrentUser(userId).map(localDeckToFlashcardDeck);
     const localIds = new Set(localDecks.map(d => d.id));
-    const remoteWithoutLocal = remoteDecks.filter(d => !localIds.has(d.id));
+    // Filtrar remotos que están en locales (reemplazar) y también remotos con ID
+    // negativo que ya no existen en MMKV (eliminados localmente pero aún en servidor)
+    const remoteWithoutLocal = remoteDecks.filter(d => {
+      if (localIds.has(d.id)) return false;
+      const isNegativeId = !isNaN(Number(d.id)) && Number(d.id) < 0;
+      if (isNegativeId) return false;
+      return true;
+    });
     return [...remoteWithoutLocal, ...localDecks];
   }
 
