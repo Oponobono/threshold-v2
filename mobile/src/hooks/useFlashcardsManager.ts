@@ -56,10 +56,10 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
   const loadGenRef = useRef(0);
 
   function mergeLocalDecks(remoteDecks: FlashcardDeck[], userId?: string | null): FlashcardDeck[] {
-    // Filtrar mazos locales por userId activo para evitar contaminación entre cuentas
     const localDecks = getLocalDecksForCurrentUser(userId).map(localDeckToFlashcardDeck);
-    const seen = new Set(remoteDecks.map(d => d.id));
-    return [...remoteDecks, ...localDecks.filter(d => !seen.has(d.id))];
+    const localIds = new Set(localDecks.map(d => d.id));
+    const remoteWithoutLocal = remoteDecks.filter(d => !localIds.has(d.id));
+    return [...remoteWithoutLocal, ...localDecks];
   }
 
   const loadDecks = useCallback(async () => {

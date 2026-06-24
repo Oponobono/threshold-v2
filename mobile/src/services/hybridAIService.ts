@@ -792,43 +792,33 @@ async function persistDifferentiationCardLocally(
 ): Promise<void> {
   const deckIdNum = Number(deckId);
   if (!Number.isNaN(deckIdNum) && deckIdNum < 0) {
-    // Mazo local MMKV
-    try {
-      const { addLocalCard, recalculateLocalDeckCounters, prepareDeckForSync } = await import('./localFlashcardService');
-      const { getUserId } = await import('./api');
-      
-      addLocalCard(deckIdNum, {
-        type: 'flashcard',
-        data: { front, back },
-        hint,
-        explanation,
-      });
-      recalculateLocalDeckCounters(deckIdNum);
-      
-      const userId = Number(await getUserId());
-      prepareDeckForSync(deckIdNum, userId).catch(e =>
-        console.warn('[persistDifferentiationCardLocally] Error encolando deck para sync:', e)
-      );
-    } catch (e) {
-      console.warn('[persistDifferentiationCardLocally] Error guardando en MMKV:', e);
-    }
+    const { addLocalCard, recalculateLocalDeckCounters, prepareDeckForSync } = await import('./localFlashcardService');
+    const { getUserId } = await import('./api');
+
+    addLocalCard(deckIdNum, {
+      type: 'flashcard',
+      data: { front, back },
+      hint,
+      explanation,
+    });
+    recalculateLocalDeckCounters(deckIdNum);
+
+    const userId = Number(await getUserId());
+    prepareDeckForSync(deckIdNum, userId).catch(e =>
+      console.warn('[persistDifferentiationCardLocally] Error encolando deck para sync:', e)
+    );
   } else {
-    // Mazo cloud — guardar en SQLite local con el mismo ID que asignó el backend
-    try {
-      const { uuidv4 } = await import('../utils/uuid');
-      const { flashcardRepository } = await import('./database');
-      await flashcardRepository.create({
-        id: existingId || uuidv4(),
-        deck_id: String(deckId),
-        front,
-        back,
-        status: 'new',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.warn('[persistDifferentiationCardLocally] Error guardando en SQLite:', e);
-    }
+    const { uuidv4 } = await import('../utils/uuid');
+    const { flashcardRepository } = await import('./database');
+    await flashcardRepository.create({
+      id: existingId || uuidv4(),
+      deck_id: String(deckId),
+      front,
+      back,
+      status: 'new',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
   }
 }
 

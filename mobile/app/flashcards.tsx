@@ -349,6 +349,7 @@ export default function FlashcardsScreen() {
                 setShowStudyModal(false);
                 setActiveDeck(null);
                 setStudyDeckCards([]);
+                loadDecks();
               }}
             />
           )}

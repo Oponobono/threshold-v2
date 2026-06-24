@@ -32,7 +32,7 @@ import {
 } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 import { getUserGroups, getGroupDecks } from '../../services/api/learning/groups';
-import { deleteLocalDeck } from '../../services/localFlashcardService';
+
 import { GroupPills } from './GroupPills';
 
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
@@ -147,19 +147,14 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
       const data = await getFlashcardDecksWithMetrics();
       setDecks(data || []);
 
-      // Merge local MMKV decks
+      // Merge local MMKV decks (reemplazan a los de SQLite si existe el mismo ID)
       const { getLocalDecksForCurrentUser } = await import('../../services/localFlashcardService');
       const localDecks = getLocalDecksForCurrentUser(await getUserId());
       if (localDecks.length > 0) {
         setDecks(prev => {
-          const seen = new Set(prev.map(d => d.id));
-          const merged = [...prev];
-          for (const ld of localDecks) {
-            if (!seen.has(String(ld.id))) {
-              seen.add(String(ld.id));
-              merged.push(ld as any);
-            }
-          }
+          const localIds = new Set(localDecks.map(ld => String(ld.id)));
+          const merged = prev.filter(d => !localIds.has(String(d.id)));
+          merged.push(...localDecks as any);
           return merged;
         });
       }
@@ -235,7 +230,6 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   };
 
   const handleDeleteDeck = (deck: FlashcardDeck) => {
-    const isLocal = (deck as any)._local === true;
     const isOwner = deck.user_id === currentUserId;
     showAlert({
       title: isOwner ? t('modals.deleteDeck') : t('flashcards.removeShared'),
@@ -250,11 +244,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           style: 'destructive',
           onPress: async () => {
             try {
-              if (isLocal) {
-                deleteLocalDeck(deck.id);
-              } else {
-                await deleteFlashcardDeck(deck.id);
-              }
+              await deleteFlashcardDeck(deck.id);
               await loadDecks();
             } catch (e: any) {
               showAlert({ title: t('common.error'), message: e.message || t('common.error'), type: 'error' });
