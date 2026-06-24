@@ -120,12 +120,16 @@ export interface FlashcardDeck {
   owner_name?: string;
 }
 
+export type CardDirection = 'forward' | 'backward' | 'bidirectional';
+
 export interface Flashcard {
   id: string;
   deck_id: string;
   front: string;
   back?: string;
   status?: string;
+  direction?: CardDirection;
+  source_context?: string;
   created_at?: string;
 }
 
@@ -156,6 +160,7 @@ export interface EvaluationItem {
   content: EvaluationContent;
   hint?: string;
   explanation?: string;
+  source_context?: string;
   status: 'new' | 'learning' | 'review';
   created_at: string;
   front?: string;

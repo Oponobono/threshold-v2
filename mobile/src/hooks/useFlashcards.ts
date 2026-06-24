@@ -157,7 +157,7 @@ export function useFlashcards() {
           onPress: async () => {
             try {
               await deleteFlashcardDeck(deck.id);
-              await loadDecks();
+              await loadDecks({ skipCache: true });
               const userId = await getUserId();
               if (userId) {
                 await refreshPredictions(userId);
@@ -226,7 +226,7 @@ export function useFlashcards() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await loadDecks();
+      await loadDecks({ skipCache: true });
     } catch (e) {
       console.warn('Error refreshing decks:', e);
     } finally {

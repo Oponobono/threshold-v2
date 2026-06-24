@@ -3,6 +3,8 @@ export interface Migration {
   up: string[];
 }
 
+export const EXAM_COMPRESSION_WINDOW_DAYS = 30;
+
 const migrations: Migration[] = [
   {
     version: 1,
@@ -320,6 +322,18 @@ const migrations: Migration[] = [
       `ALTER TABLE subjects ADD COLUMN total_lessons INTEGER DEFAULT 0`,
       `ALTER TABLE subjects ADD COLUMN completed_lessons INTEGER DEFAULT 0`,
       `ALTER TABLE subjects ADD COLUMN next_micro_milestone TEXT`
+    ],
+  },
+  {
+    version: 8,
+    up: [
+      `ALTER TABLE flashcards ADD COLUMN direction TEXT NOT NULL DEFAULT 'forward'`
+    ],
+  },
+  {
+    version: 9,
+    up: [
+      `ALTER TABLE flashcards ADD COLUMN source_context TEXT`
     ],
   },
 ];

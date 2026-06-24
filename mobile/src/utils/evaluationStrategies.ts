@@ -147,6 +147,18 @@ export function adaptFlashcardsToEvaluationItems(cards: any[]): EvaluationItem[]
       }
     }
 
+    // Aplicar direction flag: backward ↔ swap front/back, bidirectional ↔ random
+    const direction = card.direction || 'forward';
+    if (itemType === 'flashcard') {
+      if (direction === 'backward') {
+        content = { front: content.back || '', back: content.front || '' };
+      } else if (direction === 'bidirectional') {
+        if (Math.random() < 0.5) {
+          content = { front: content.back || '', back: content.front || '' };
+        }
+      }
+    }
+
     return {
       id: card.id,
       deck_id: card.deck_id,
@@ -154,10 +166,11 @@ export function adaptFlashcardsToEvaluationItems(cards: any[]): EvaluationItem[]
       content,
       hint: card.hint || null,
       explanation: card.explanation || null,
+      source_context: card.source_context || null,
       status: card.status || 'new',
       created_at: card.created_at,
-      front: card.front,
-      back: card.back,
+      front: content.front,
+      back: content.back,
     };
   });
 }

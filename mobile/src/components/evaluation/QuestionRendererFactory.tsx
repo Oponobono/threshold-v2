@@ -17,6 +17,7 @@ interface Props {
   onAnswer: (answer: unknown) => void;
   onReveal: () => void;
   onShowExplanation: () => void;
+  onShowContext: () => void;
   isAnswered: boolean;
   // Para flashcard
   selectedRating: 'learning' | 'review' | null;
@@ -29,7 +30,7 @@ interface Props {
 }
 
 export const QuestionRendererFactory: React.FC<Props> = ({
-  item, onAnswer, onReveal, onShowExplanation, isAnswered,
+  item, onAnswer, onReveal, onShowExplanation, onShowContext, isAnswered,
   selectedRating, selectedIndex, selectedBoolean, onNext
 }) => {
   switch (item.item_type) {
@@ -40,6 +41,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
           onReveal={onReveal}
           onAnswer={(rating) => onAnswer(rating)}
           onShowExplanation={onShowExplanation}
+          onShowContext={onShowContext}
           isAnswered={isAnswered}
           selectedRating={selectedRating}
           onNext={onNext}
@@ -52,6 +54,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
           item={item}
           onAnswer={(idx) => onAnswer(idx)}
           onShowExplanation={onShowExplanation}
+          onShowContext={onShowContext}
           isAnswered={isAnswered}
           selectedIndex={selectedIndex}
           onNext={onNext}
@@ -64,6 +67,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
           item={item}
           onAnswer={(val) => onAnswer(val)}
           onShowExplanation={onShowExplanation}
+          onShowContext={onShowContext}
           isAnswered={isAnswered}
           selectedAnswer={selectedBoolean}
           onNext={onNext}

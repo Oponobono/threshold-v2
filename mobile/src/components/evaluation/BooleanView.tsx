@@ -10,12 +10,13 @@ interface Props {
   item: EvaluationItem;
   onAnswer: (answer: boolean) => void;
   onShowExplanation: () => void;
+  onShowContext: () => void;
   isAnswered: boolean;
   selectedAnswer: boolean | null;
   onNext?: () => void;
 }
 
-export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation, isAnswered, selectedAnswer, onNext }) => {
+export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation, onShowContext, isAnswered, selectedAnswer, onNext }) => {
   const { t } = useTranslation();
   const content = item.content as BooleanContent;
   const [hintVisible, setHintVisible] = useState(false);
@@ -87,6 +88,14 @@ export const BooleanView: React.FC<Props> = ({ item, onAnswer, onShowExplanation
               <View style={s.questionTextWrapper}>
                 <MarkdownWithCode>{content.question}</MarkdownWithCode>
               </View>
+
+              {item.source_context && (
+                <View style={{ marginTop: 12, alignItems: 'flex-start' }}>
+                  <TouchableOpacity style={s.contextBtn} onPress={onShowContext} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="book-outline" size={15} color={theme.colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
             <View style={{ gap: 8, flexShrink: 0, marginTop: 4 }}>
               {item.hint && !isAnswered && (
@@ -144,6 +153,7 @@ const s = StyleSheet.create({
   hintBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: '#E0E0E0', marginLeft: 8, flexShrink: 0 },
   hintBtnActive: { backgroundColor: 'rgba(255,149,0,0.12)', borderColor: '#FF9500' },
   explanationBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,122,255,0.08)', borderWidth: 1, borderColor: 'rgba(0,122,255,0.3)', flexShrink: 0 },
+  contextBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(92,107,192,0.08)', borderWidth: 1, borderColor: 'rgba(92,107,192,0.3)', flexShrink: 0 },
   questionCard: { backgroundColor: theme.colors.background, borderRadius: 20, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: theme.colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   questionLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: theme.colors.text.placeholder, marginBottom: 10 },
   questionTextWrapper: { flex: 1, width: '100%', justifyContent: 'flex-start' },

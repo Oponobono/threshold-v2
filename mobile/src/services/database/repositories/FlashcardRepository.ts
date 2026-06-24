@@ -1,4 +1,5 @@
 import { BaseRepository } from '../BaseRepository';
+import type { CardDirection } from '../../api/types';
 
 export interface Flashcard {
   id: string;
@@ -6,6 +7,7 @@ export interface Flashcard {
   front: string;
   back?: string;
   status?: string;
+  direction?: CardDirection;
   created_at?: string;
   updated_at?: string;
 }

@@ -226,5 +226,9 @@
   "question": "Pregunta",
   "answer": "Respuesta",
   "tapToContinue": "Toca para continuar",
-  "itemsReviewed": "{{count}} ítem{{plural}} revisados"
+  "itemsReviewed": "{{count}} ítem{{plural}} revisados",
+  "directionLabel": "Dirección de estudio",
+  "directionForward": "Frente → Reverso",
+  "directionBackward": "Reverso → Frente",
+  "directionBidirectional": "Aleatorio"
 }

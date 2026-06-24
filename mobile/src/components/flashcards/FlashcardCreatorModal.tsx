@@ -37,6 +37,7 @@ interface EditableCard {
   type: string;
   options?: string[]; // Para multiple_choice y boolean
   correctIndex?: number; // Índice de la respuesta correcta
+  direction?: 'forward' | 'backward' | 'bidirectional'; // Dirección de la tarjeta
 }
 
 export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
@@ -113,6 +114,7 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
             question: card.content?.front || card.content?.question || card.front || card.question || '',
             answer: card.content?.back || card.content?.correctAnswer?.toString() || card.back || card.answer || '',
             type: itemType,
+            direction: card.content?.direction || card.direction || 'forward',
           };
         }
       });
@@ -146,6 +148,7 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
           
           if (card.type === 'flashcard') {
             updateData.back = card.answer;
+            if (card.direction) updateData.direction = card.direction;
           } else if (card.type === 'multiple_choice') {
             updateData.options = card.options;
             updateData.correctIndex = card.correctIndex ?? 0;
@@ -251,7 +254,7 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
                     multiline
                   />
 
-                  {/* Flashcard: Mostrar respuesta simple */}
+                  {/* Flashcard: Mostrar respuesta simple y dirección */}
                   {card.type === 'flashcard' && (
                     <>
                       <Text style={styles.cardLabel}>{t('flashcards.answerBack')}</Text>
@@ -261,6 +264,28 @@ export const FlashcardCreatorModal: React.FC<FlashcardCreatorModalProps> = ({
                         onChangeText={(text) => setEditableCards(cards => cards.map(c => c.id === card.id ? { ...c, answer: text } : c))}
                         multiline
                       />
+
+                      <Text style={styles.cardLabel}>Dirección de estudio</Text>
+                      <View style={styles.directionRow}>
+                        <TouchableOpacity 
+                          style={[styles.directionBtn, (card.direction || 'forward') === 'forward' && styles.directionBtnActive]}
+                          onPress={() => setEditableCards(cards => cards.map(c => c.id === card.id ? { ...c, direction: 'forward' } : c))}
+                        >
+                          <Text style={[styles.directionText, (card.direction || 'forward') === 'forward' && styles.directionTextActive]}>Normal</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.directionBtn, card.direction === 'backward' && styles.directionBtnActive]}
+                          onPress={() => setEditableCards(cards => cards.map(c => c.id === card.id ? { ...c, direction: 'backward' } : c))}
+                        >
+                          <Text style={[styles.directionText, card.direction === 'backward' && styles.directionTextActive]}>Inversa</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.directionBtn, card.direction === 'bidirectional' && styles.directionBtnActive]}
+                          onPress={() => setEditableCards(cards => cards.map(c => c.id === card.id ? { ...c, direction: 'bidirectional' } : c))}
+                        >
+                          <Text style={[styles.directionText, card.direction === 'bidirectional' && styles.directionTextActive]}>Bidireccional</Text>
+                        </TouchableOpacity>
+                      </View>
                     </>
                   )}
 
@@ -435,4 +460,10 @@ const styles = StyleSheet.create({
   completeSection: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   successText: { fontSize: 20, fontWeight: '700', color: '#4CAF50', marginBottom: 12 },
   completeMessage: { fontSize: 14, color: '#666' },
+
+  directionRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  directionBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', alignItems: 'center', backgroundColor: '#fff' },
+  directionBtnActive: { borderColor: '#4CAF50', backgroundColor: '#f1f8f5' },
+  directionText: { fontSize: 12, color: '#666', fontWeight: '500' },
+  directionTextActive: { color: '#4CAF50', fontWeight: '700' },
 });

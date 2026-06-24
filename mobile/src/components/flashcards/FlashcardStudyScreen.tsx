@@ -19,11 +19,13 @@ import {
 import { updateFlashcardStatus, deleteFlashcard, snoozeCard, createCardLog } from '../../services/api';
 import { analyzeDeckConfusionsHybrid as analyzeDeckConfusions, generateDifferentiationCardHybrid as generateDifferentiationCard } from '../../services/hybridAIService';
 import { recordCardReview } from '../../services/api/analytics';
+import { ExamSchedulerService } from '../../services/ExamSchedulerService';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { QuestionRendererFactory } from '../evaluation/QuestionRendererFactory';
 import { ExplanationOverlay } from '../evaluation/ExplanationOverlay';
 import { SnoozeModal } from '../modals/SnoozeModal';
 import { useDueCardSnooze, SnoozeOption } from '../../hooks/useDueCardSnooze';
+import { ContextBottomSheet } from '../evaluation/ContextBottomSheet';
 
 interface Props {
   activeDeck: FlashcardDeck | null;
@@ -69,6 +71,9 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   const [generatingDiff, setGeneratingDiff] = useState<string | null>(null); // stores conceptA key being generated
   const [needsLocalModel, setNeedsLocalModel] = useState(false);
 
+  // Exam Mode
+  const [examMultiplier, setExamMultiplier] = useState<number>(1.0);
+
   // Estado por tipo de ítem
   const [isAnswered, setIsAnswered]           = useState(false);
   const [isRevealed, setIsRevealed]           = useState(false);
@@ -78,6 +83,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
 
   // Overlay de explicación
   const [overlayVisible, setOverlayVisible]   = useState(false);
+  const [contextVisible, setContextVisible]   = useState(false);
   const [isProcessing, setIsProcessing]       = useState(false); // Previene race conditions
 
   // Learning Engineering Feedback
@@ -90,6 +96,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     setSelectedIndex(null);
     setSelectedBoolean(null);
     setOverlayVisible(false);
+    setContextVisible(false);
     setIsProcessing(false);
   }, []);
 
@@ -118,18 +125,40 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   }, [itemIndex, items.length, resetItemState]);
 
   useEffect(() => {
-    setItems(adaptFlashcardsToEvaluationItems(initialCards));
+    const sortByExam = async () => {
+      const sid = activeDeck?.subject_id ?? null;
+      const multiplier = await ExamSchedulerService.getCompressionMultiplier(sid);
+      setExamMultiplier(multiplier);
+      const now = Date.now();
+      const sorted = [...initialCards].sort((a, b) => {
+        const nrdA = a.next_review_date ? new Date(a.next_review_date).getTime() : 0;
+        const nrdB = b.next_review_date ? new Date(b.next_review_date).getTime() : 0;
+        const effectiveA = nrdA ? now + (nrdA - now) * multiplier : Infinity;
+        const effectiveB = nrdB ? now + (nrdB - now) * multiplier : Infinity;
+        return effectiveA - effectiveB;
+      });
+      setItems(adaptFlashcardsToEvaluationItems(sorted));
+    };
+    sortByExam();
     resetItemState();
     setItemIndex(0);
     setSessionDone(false);
     setStats({ correct: 0, incorrect: 0, total: 0 });
     setCardStartTime(Date.now());
     setNeedsLocalModel(false);
-  }, [initialCards, resetItemState]);
+  }, [initialCards, resetItemState, activeDeck?.subject_id]);
 
   const handleReveal = useCallback(() => setIsRevealed(true), []);
 
-  const handleShowExplanation = useCallback(() => setOverlayVisible(true), []);
+  const handleShowExplanation = useCallback(() => {
+    setContextVisible(false); // Oculta contexto si se abre explicación
+    setOverlayVisible(true);
+  }, []);
+
+  const handleShowContext = useCallback(() => {
+    setOverlayVisible(false); // Oculta explicación si se abre contexto
+    setContextVisible(true);
+  }, []);
 
   /** Cierra el overlay y ejecuta la función de avance */
   const handleOverlayDismiss = useCallback(() => {
@@ -182,7 +211,8 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
           String(item.id),
           String(currentUserId),
           result.passed ? 'correct' : 'incorrect',
-          responseTime
+          responseTime,
+          activeDeck?.subject_id,
         );
         console.log('[FlashcardReview] FSRS metrics:', {
           quality: reviewResult.quality,
@@ -226,7 +256,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     if (activeDeck?.id) {
       if (isLocalCard) {
         const { updateLocalCard, recalculateLocalDeckCounters } = await import('../../services/localFlashcardService');
-        await updateLocalCard(Number(activeDeck.id), item.id, {}, newStatus);
+        await updateLocalCard(Number(activeDeck.id), Number(item.id), {}, newStatus);
         await recalculateLocalDeckCounters(Number(activeDeck.id));
       } else {
         // Cloud: persistir status en SQLite + backend
@@ -520,6 +550,16 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         </View>
       </View>
 
+      {/* ── Exam Mode Banner ── */}
+      {examMultiplier < 1.0 && (
+        <View style={examBannerStyle}>
+          <Ionicons name="alarm-outline" size={14} color="#E65100" />
+          <Text style={examBannerText}>
+            Modo Examen · Intervalos al {Math.round(examMultiplier * 100)}%
+          </Text>
+        </View>
+      )}
+
       {/* ── Progress bar ── */}
       <View style={[s.progressBg, { marginHorizontal: -horizontalPadding, marginLeft: -Math.max(insets.left, horizontalPadding), marginRight: -Math.max(insets.right, horizontalPadding) }]}>
         <View style={[s.progressFill, { width: `${((itemIndex + 1) / items.length) * 100}%` as any }]} />
@@ -532,6 +572,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
           onAnswer={handleAnswer}
           onReveal={handleReveal}
           onShowExplanation={handleShowExplanation}
+          onShowContext={handleShowContext}
           isAnswered={isAnswered}
           selectedRating={selectedRating}
           selectedIndex={selectedIndex}
@@ -545,6 +586,13 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
         visible={overlayVisible}
         explanation={item.explanation ?? null}
         onDismiss={handleOverlayDismiss}
+      />
+
+      {/* ── Bottom Sheet de Contexto ── */}
+      <ContextBottomSheet
+        visible={contextVisible}
+        contextJson={item.source_context ?? null}
+        onDismiss={() => setContextVisible(false)}
       />
 
       {/* ── Modal de Snooze ── */}
@@ -719,3 +767,23 @@ const confusionStyles = StyleSheet.create({
     fontSize: 11,
   },
 });
+
+// ── Exam Mode Banner inline styles (defined outside StyleSheet for reuse in JSX) ──
+const examBannerStyle = {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  gap: 6,
+  backgroundColor: '#FFF3E0',
+  borderRadius: 8,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  marginBottom: 8,
+  borderWidth: 1,
+  borderColor: '#FFB74D',
+};
+
+const examBannerText = {
+  fontSize: 12,
+  fontWeight: '700' as const,
+  color: '#E65100',
+};

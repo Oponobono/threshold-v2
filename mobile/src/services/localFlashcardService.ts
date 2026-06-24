@@ -8,11 +8,14 @@ function nextLocalId(): number {
   return _localIdCounter;
 }
 
+export type LocalCardDirection = 'forward' | 'backward' | 'bidirectional';
+
 export interface LocalCard {
   type: 'flashcard' | 'multiple_choice' | 'boolean';
   data: any;
   hint?: string;
   explanation?: string;
+  direction?: LocalCardDirection;
 }
 
 export interface LocalDeck {
@@ -189,6 +192,7 @@ export async function exportDeckToJSON(deckId: number): Promise<any> {
 
         if (card.hint) cardExport.hint = card.hint;
         if (card.explanation) cardExport.explanation = card.explanation;
+        if (card.direction && card.direction !== 'forward') cardExport.direction = card.direction;
 
         return cardExport;
       }),
@@ -306,6 +310,7 @@ export function addLocalCard(deckId: number, card: Omit<LocalCard, 'id'>): void 
       created_at: new Date().toISOString(),
       front: card.data?.front || '',
       back: card.data?.back || '',
+      direction: card.type === 'flashcard' ? (card.direction || 'forward') : undefined,
       _local: true,
       _isPending: true,
     };

@@ -94,7 +94,9 @@ exports.generateStudyMaterial = async (req, res) => {
 - Back: Respuesta precisa y técnica (máximo 2-3 oraciones).
 - Hint: Pista que active el recuerdo (ej. "Considera el factor Z"), no letras iniciales.
 - Explanation: Profundiza en el concepto con el "por qué" fundamental o un ejemplo.
-Esquema: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }`,
+- Direction: Determina la dirección de práctica. Si el concepto se puede aprender en ambos sentidos (como vocabulario, idiomas o anatomía), asigna "bidirectional". De lo contrario, "forward".
+- Source Context: Extrae textualmente 1-2 oraciones clave del contexto original.
+Esquema: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "...", "direction": "forward", "source_context": {"text": "...", "source_type": "generated"} }`,
 
     multiple_choice: `Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES/SABER PRO).
 - Opciones: Exactamente 4 opciones con contenido semántico ÚNICO y diferenciado. PROHIBIDO que dos opciones representen el mismo concepto incluso con palabras distintas.
@@ -109,7 +111,7 @@ Esquema: { "type": "boolean", "data": { "question": "...", "correctAnswer": true
 
     mixed: `Genera exactamente ${count} ÍTEMS MIXTOS (40% Flashcard, 40% Selección Múltiple, 20% V/F).
 Debes usar estrictamente estos 3 esquemas según el ítem:
-1. Flashcard: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "..." }
+1. Flashcard: { "type": "flashcard", "data": { "front": "...", "back": "..." }, "hint": "...", "explanation": "...", "direction": "forward", "source_context": {"text": "...", "source_type": "generated"} }
 2. Selección Múltiple: { "type": "multiple_choice", "data": { "question": "...", "options": ["A","B","C","D"], "correctIndex": N }, "hint": "...", "explanation": "..." }
 3. Verdadero/Falso: { "type": "boolean", "data": { "question": "...", "correctAnswer": true/false }, "hint": "...", "explanation": "..." }`,
   };
@@ -198,10 +200,13 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
           const contentStr = JSON.stringify(content);
           const hint = item.hint || null;
           const explanation = item.explanation || null;
+          const direction = item.direction || 'forward';
+          const sourceContextObj = item.source_context || null;
+          const sourceContextStr = sourceContextObj ? JSON.stringify(sourceContextObj) : null;
 
           db.run(
-            `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
-            [deckId, front, back, itemType, contentStr, hint, explanation],
+            `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, direction, source_context) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)`,
+            [deckId, front, back, itemType, contentStr, hint, explanation, direction, sourceContextStr],
             function(e) { 
               if (e) {
                 console.error(`[aiController] ❌ Error al insertar tarjeta #${idx} en el mazo ${deckId}:`, e.message);
@@ -545,10 +550,13 @@ ${deckIntent.shouldGenerate ? deckGenerationInstructions : ''}`;
                       const contentStr = JSON.stringify(content);
                       const hint = item.hint || null;
                       const explanation = item.explanation || null;
+                      const direction = item.direction || 'forward';
+                      const sourceContextObj = item.source_context || null;
+                      const sourceContextStr = sourceContextObj ? JSON.stringify(sourceContextObj) : null;
 
                       db.run(
-                        `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
-                        [persistedDeck.id, front, back, itemType, contentStr, hint, explanation],
+                        `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, direction, source_context) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)`,
+                        [persistedDeck.id, front, back, itemType, contentStr, hint, explanation, direction, sourceContextStr],
                         (err) => {
                           if (err) reject(err);
                           else resolve();
@@ -1545,7 +1553,7 @@ CONTRATO DE SALIDA (ESTRICTO):
 Debes responder ÚNICAMENTE con un objeto JSON válido. No incluyas introducciones, ni saludos, ni bloques de código de Markdown (\`\`\`json). Si no hay datos suficientes, devuelve el objeto vacío: {"topic": "", "cards":[]}.
 
 Formato JSON esperado:
-{"topic": "Tema Central", "cards":[{"front":"Pregunta concisa y directa","back":"Respuesta clara y específica"}]}`;
+{"topic": "Tema Central", "cards":[{"front":"Pregunta concisa y directa","back":"Respuesta clara y específica","direction":"forward o bidirectional","source_context":{"text":"fragmento literal de los apuntes", "source_type":"generated"}}]}`;
 
   try {
     const trimmedNotes = rawTextFromOCROrNotes.length > 6000

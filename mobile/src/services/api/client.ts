@@ -19,6 +19,38 @@ import { detectAvailableBackend, resetBackendDetectionCache } from './backendDet
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { useConnectivityStore } from '../../store/useConnectivityStore';
 
+/**
+ * Caché de fallos recientes por URL: evita reintentar servidores
+ * que sabemos que no responden (circuit breaker suave).
+ */
+const FAILURE_CACHE_TTL_MS = 15_000;
+const recentUrlFailures = new Map<string, number>();
+
+/**
+ * Si TODAS las URLs fallaron en la última llamada en menos de N ms,
+ * abortamos rápido en lugar de iterar todos los candidatos otra vez.
+ */
+const FULL_CIRCUIT_TTL_MS = 10_000;
+let lastFullCircuitFailureAt = 0;
+
+function recordUrlFailure(url: string): void {
+  recentUrlFailures.set(url, Date.now());
+}
+
+function recordUrlSuccess(url: string): void {
+  recentUrlFailures.delete(url);
+}
+
+function hasUrlFailedRecently(url: string): boolean {
+  const ts = recentUrlFailures.get(url);
+  if (!ts) return false;
+  if (Date.now() - ts > FAILURE_CACHE_TTL_MS) {
+    recentUrlFailures.delete(url);
+    return false;
+  }
+  return true;
+}
+
 /** Valida que un string tenga formato de dirección IPv4 válida */
 export const isValidIpv4 = (value: string): boolean => {
   const parts = value.split('.');
@@ -242,63 +274,47 @@ export const buildApiError = (message: string): Error => new Error(message);
 export const fetchWithFallback = async (path: string, init?: RequestInit): Promise<Response> => {
   const method = init?.method?.toUpperCase() || 'GET';
   
+  // 🛡️ Circuit breaker rápido: si hace <10s TODAS las URLs fallaron,
+  //      ni intentamos — fallamos al instante.
+  if (lastFullCircuitFailureAt > 0 && Date.now() - lastFullCircuitFailureAt < FULL_CIRCUIT_TTL_MS) {
+    const cacheResult = await tryServeFromCache(path, method);
+    if (cacheResult) return cacheResult;
+    throw buildApiError('Sin conexión al servidor (circuit breaker activo)');
+  }
+
   // 🛡️ Si el modo offline forzado está activo, no hacer llamadas de red
   const forceOffline = useLocalAIStore.getState().forceOfflineMode;
   const isGloballyOffline = !useConnectivityStore.getState().isOnline;
   const isOffline = forceOffline || isGloballyOffline;
   if (isOffline) {
-    const isCacheable = method === 'GET';
-    const cacheKey = `api_cache_${path}`;
-    if (isCacheable) {
-      try {
-        const cachedEntry = await storageService.getLocal(cacheKey);
-        if (cachedEntry) {
-          let data: string | undefined;
-          try {
-            const parsed = JSON.parse(cachedEntry);
-            data = parsed.data;
-          } catch {
-            data = cachedEntry;
-          }
-          if (data) {
-            console.log(`[Offline] Sirviendo desde cache: ${path}`);
-            return new Response(data, {
-              status: 200,
-              statusText: 'OK',
-              headers: new Headers({ 
-                'Content-Type': 'application/json',
-                'X-Offline-Cache': 'true'
-              })
-            });
-          }
-        }
-      } catch {}
-    }
+    const cacheResult = await tryServeFromCache(path, method);
+    if (cacheResult) return cacheResult;
     throw buildApiError('Modo offline forzado — no hay conexión al servidor.');
   }
   
   // 🛡️ Rutas excluidas de cache (IA, OCR, etc.)
-  // Nota: YouTube videos INCLUYEN caché para fallback cuando hay error de conexión
   const isExcluded = path.includes('/ocr') || 
                      path.includes('/ai') || 
                      path.includes('/transcribe') || 
                      path.includes('/generate') ||
                      path.includes('/analyze') ||
                      path.includes('/pdf-extract') ||
-                     path.includes('/youtube-transcripts'); // Solo excluir transcripts, no videos
+                     path.includes('/youtube-transcripts');
                      
-  const API_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
-const isCacheable = method === 'GET' && !isExcluded;
-const cacheKey = `api_cache_${path}`;
+  const API_CACHE_TTL_MS = 10 * 60 * 1000;
+  const isCacheable = method === 'GET' && !isExcluded;
+  const cacheKey = `api_cache_${path}`;
 
-  const candidates = [
+  // Filtrar candidatos: saltar URLs que fallaron recientemente
+  let candidates = [
     activeBaseUrl,
     ...API_BASE_URLS.filter((base) => base !== activeBaseUrl),
   ];
+  candidates = candidates.filter((base) => !hasUrlFailedRecently(base));
 
   let lastError: unknown = null;
 
-  // 🛡️ Fase 5: Inyectar el Token JWT automáticamente en cada petición
+  // 🛡️ Inyectar el Token JWT automáticamente en cada petición
   const token = await storageService.getSecure('jwt_token');
   const headers = new Headers(init?.headers || {});
   
@@ -320,14 +336,13 @@ const cacheKey = `api_cache_${path}`;
       const fullUrl = `${base}${path}`;
       let requestInit = customInit;
       
-      let timeoutMs = 2000;
+      let timeoutMs = 800;
       const isSlowEndpoint = path.includes('/ocr') || path.includes('/ai') || path.includes('/transcribe') || path.includes('/generate') || path.includes('/upload');
       if (isSlowEndpoint) {
         timeoutMs = 30000;
       }
 
-      // Aplicar timeout rápido a IPs locales para evitar bloquear la app
-      // si el servidor local está apagado y queremos saltar rápido a Render.
+      // Timeout rápido a IPs locales para no bloquear la app
       if (base.includes('192.168') || base.includes('10.0') || base.includes('localhost') || base.includes('127.0')) {
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -336,16 +351,18 @@ const cacheKey = `api_cache_${path}`;
 
       const response = await fetch(fullUrl, requestInit);
       if (timeoutId) clearTimeout(timeoutId);
-      
-      // ✅ Solo actualizar activeBaseUrl si la conexión fue exitosa
+
+      // ✅ Restaurar URL en caso de éxito
       if (response.ok) {
+        recordUrlSuccess(base);
         activeBaseUrl = base;
+        lastFullCircuitFailureAt = 0;
         console.log(`[✓ API] ${method} ${path} → ${response.status} (${base.split('/api')[0]})`);
       } else {
         console.warn(`[⚠ API] ${method} ${path} → ${response.status} (${base.split('/api')[0]})`);
       }
       
-      // ✅ Interceptar 304 Not Modified y servir desde caché (incluso expirado — stale-while-revalidate)
+      // ✅ Interceptar 304 Not Modified y servir desde caché
       if (response.status === 304 && isCacheable) {
         console.log(`[Cache] 304 Not Modified interceptado para ${path}. Sirviendo caché local.`);
         const cachedEntry = await storageService.getLocal(cacheKey);
@@ -362,7 +379,6 @@ const cacheKey = `api_cache_${path}`;
               headers: new Headers({ 'Content-Type': 'application/json' })
             });
           } catch {
-            // old format without TTL wrapper, serve it anyway
             return new Response(cachedEntry, {
               status: 200,
               statusText: 'OK',
@@ -372,7 +388,7 @@ const cacheKey = `api_cache_${path}`;
         }
       }
 
-      // ✅ Guardar en cache si es exitosa y cacheable (con timestamp para TTL)
+      // ✅ Guardar en cache si es exitosa y cacheable
       if (response.ok && isCacheable) {
         try {
           const clone = response.clone();
@@ -391,45 +407,54 @@ const cacheKey = `api_cache_${path}`;
       if (timeoutId) clearTimeout(timeoutId);
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.warn(`[✗ API] Fallo conectando a ${base}${path} — ${errorMsg}`);
+      recordUrlFailure(base);
       lastError = error;
     }
   }
 
-  // 🛡️ Fallback: Si no hay conexión (fallaron las URLs) y es cacheable, devolvemos del cache local
-  // Stale-while-revalidate: servimos datos incluso si expiraron, porque estando offline
-  // es mejor mostrar datos antiguos que una pantalla vacía.
+  // 🛡️ Activar circuit breaker: todas las URLs fallaron
+  lastFullCircuitFailureAt = Date.now();
+
+  // 🛡️ Fallback: si no hay conexión y es cacheable, servir del cache local
   if (isCacheable) {
-    try {
-      const cachedEntry = await storageService.getLocal(cacheKey);
-      if (cachedEntry) {
-        let data: string;
-        try {
-          const parsed = JSON.parse(cachedEntry);
-          const age = Date.now() - (parsed.timestamp || 0);
-          if (age > API_CACHE_TTL_MS) {
-            console.log(`[Cache Fallback] Cache expirado para ${path} (${Math.round(age / 60000)}min), sirviendo stale`);
-          }
-          data = parsed.data;
-        } catch {
-          data = cachedEntry; // old format
-        }
-        console.log(`[Cache Fallback] Modo Offline. Sirviendo desde cache: ${path}`);
-        return new Response(data, {
-          status: 200,
-          statusText: 'OK',
-          headers: new Headers({ 
-            'Content-Type': 'application/json',
-            'X-Offline-Cache': 'true'
-          })
-        });
-      }
-    } catch (cacheError) {
-      console.error('[Cache Fallback] Error leyendo de cache', cacheError);
-    }
+    const cacheResult = await tryServeFromCache(path, method);
+    if (cacheResult) return cacheResult;
   }
 
   throw lastError || buildApiError('No se pudo conectar con el servidor.');
 };
+
+/**
+ * Intenta servir una respuesta desde el caché local.
+ * Útil para fallbacks offline o circuit breaker.
+ */
+async function tryServeFromCache(path: string, method: string): Promise<Response | null> {
+  if (method !== 'GET') return null;
+  const cacheKey = `api_cache_${path}`;
+  try {
+    const cachedEntry = await storageService.getLocal(cacheKey);
+    if (!cachedEntry) return null;
+    let data: string;
+    try {
+      const parsed = JSON.parse(cachedEntry);
+      data = parsed.data;
+    } catch {
+      data = cachedEntry;
+    }
+    if (data) {
+      console.log(`[Cache Fallback] Sirviendo desde cache: ${path}`);
+      return new Response(data, {
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({
+          'Content-Type': 'application/json',
+          'X-Offline-Cache': 'true'
+        })
+      });
+    }
+  } catch {}
+  return null;
+}
 
 /** Deserializa el cuerpo JSON de una `Response`. Retorna `null` si el cuerpo está vacío o es inválido */
 export const parseJsonSafely = async (response: Response) => {

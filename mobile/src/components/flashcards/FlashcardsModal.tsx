@@ -34,6 +34,7 @@ import { useDataStore } from '../../store/useDataStore';
 import { getUserGroups, getGroupDecks } from '../../services/api/learning/groups';
 
 import { GroupPills } from './GroupPills';
+import { LinkExamModal } from './LinkExamModal';
 
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
 import { FlashcardNewDeckScreen } from './FlashcardNewDeckScreen';
@@ -85,6 +86,9 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const [shareDeckTarget, setShareDeckTarget] = useState<FlashcardDeck | null>(null);
   const [sharePin, setSharePin] = useState('');
   const [isSharing, setIsSharing] = useState(false);
+
+  // Link exam modal state
+  const [linkExamTarget, setLinkExamTarget] = useState<FlashcardDeck | null>(null);
 
   // Check if user is admin of the active group
   const isGroupAdmin = activeGroupPin ? groups.some(
@@ -258,8 +262,9 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
 
   const renderSwipeActions = (deck: FlashcardDeck, close: () => void) => {
     const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
-    // Explicit width is CRITICAL for react-native-gesture-handler to know how far to swipe
-    const pillWidth = isOwner ? 152 : 101;
+    // owner: add(+) + share + exam + trash = 4 buttons → ~202px
+    // non-owner: add(+) + exam + trash = 3 buttons → ~152px
+    const pillWidth = isOwner ? 202 : 152;
     
     return (
       <View style={[s.swipeActionsPill, { width: pillWidth }]}>
@@ -283,6 +288,15 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
             </TouchableOpacity>
           </>
         )}
+
+        <View style={s.swipeActionDivider} />
+        <TouchableOpacity
+          style={s.swipeActionBtn}
+          onPress={() => { close(); setLinkExamTarget(deck); }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="calendar-outline" size={17} color={theme.colors.primary} />
+        </TouchableOpacity>
 
         <View style={s.swipeActionDivider} />
         <TouchableOpacity
@@ -576,6 +590,21 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           </Pressable>
         </GestureHandlerRootView>
       </Modal>
+
+      {/* ─── LINK EXAM MODAL ─── */}
+      <LinkExamModal
+        visible={!!linkExamTarget}
+        deck={linkExamTarget}
+        onClose={() => setLinkExamTarget(null)}
+        onLinked={(examTitle) => {
+          showAlert({
+            title: '¡Modo Examen activo!',
+            message: `El mazo "${linkExamTarget?.title}" ya está vinculado a "${examTitle}". Los intervalos se comprimirán automáticamente.`,
+            type: 'success',
+          });
+          setLinkExamTarget(null);
+        }}
+      />
 
       {/* ─── SHARE DECK MODAL ─── */}
       <Modal visible={!!shareDeckTarget} transparent animationType="fade">

@@ -302,21 +302,21 @@ export default function FlashcardsScreen() {
         visible={showNewDeckModal}
         subjects={subjects}
         onClose={() => setShowNewDeckModal(false)}
-        onDeckCreated={() => { setShowNewDeckModal(false); loadDecks(); }}
+        onDeckCreated={() => { setShowNewDeckModal(false); loadDecks({ skipCache: true }); }}
       />
 
       <FlashcardImportModal
         isVisible={showImportModal}
         onClose={() => setShowImportModal(false)}
         subjects={subjects}
-        onImportSuccess={() => loadDecks()}
+        onImportSuccess={() => loadDecks({ skipCache: true })}
       />
 
       <NewCardModal
         visible={showNewCardModal}
         deck={activeDeck}
         onClose={() => setShowNewCardModal(false)}
-        onCardCreated={() => { setShowNewCardModal(false); loadDecks(); }}
+        onCardCreated={() => { setShowNewCardModal(false); loadDecks({ skipCache: true }); }}
       />
 
       <EditDeckModal
@@ -324,7 +324,7 @@ export default function FlashcardsScreen() {
         deck={editingDeck}
         subjects={subjects}
         onClose={() => setShowEditDeckModal(false)}
-        onSaved={() => loadDecks()}
+        onSaved={() => loadDecks({ skipCache: true })}
       />
 
       <MenuModal
@@ -349,7 +349,7 @@ export default function FlashcardsScreen() {
                 setShowStudyModal(false);
                 setActiveDeck(null);
                 setStudyDeckCards([]);
-                loadDecks();
+                loadDecks({ skipCache: true });
               }}
             />
           )}

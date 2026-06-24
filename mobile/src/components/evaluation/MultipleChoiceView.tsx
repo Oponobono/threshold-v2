@@ -21,6 +21,7 @@ interface Props {
   item: EvaluationItem;
   onAnswer: (selectedIndex: number) => void;
   onShowExplanation: () => void;
+  onShowContext: () => void;
   isAnswered: boolean;
   selectedIndex: number | null;
   onNext?: () => void;
@@ -39,7 +40,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export const MultipleChoiceView: React.FC<Props> = ({
-  item, onAnswer, onShowExplanation, isAnswered, selectedIndex, onNext
+  item, onAnswer, onShowExplanation, onShowContext, isAnswered, selectedIndex, onNext
 }) => {
   const content = item.content as MultipleChoiceContent;
   const [hintVisible, setHintVisible] = useState(false);
@@ -114,6 +115,14 @@ export const MultipleChoiceView: React.FC<Props> = ({
             <View style={s.questionTextWrapper}>
               <MarkdownWithCode>{content.question}</MarkdownWithCode>
             </View>
+            
+            {item.source_context && (
+              <View style={{ marginTop: 12, alignItems: 'flex-start' }}>
+                <TouchableOpacity style={s.contextBtn} onPress={onShowContext} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="book-outline" size={15} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
           <View style={{ gap: 8, flexShrink: 0, marginTop: 4 }}>
             {item.hint && !isAnswered && (
@@ -183,6 +192,7 @@ const s = StyleSheet.create({
   hintBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: '#E0E0E0', marginLeft: 8, flexShrink: 0 },
   hintBtnActive: { backgroundColor: 'rgba(255,149,0,0.12)', borderColor: '#FF9500' },
   explanationBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,122,255,0.08)', borderWidth: 1, borderColor: 'rgba(0,122,255,0.3)', flexShrink: 0 },
+  contextBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(92,107,192,0.08)', borderWidth: 1, borderColor: 'rgba(92,107,192,0.3)', flexShrink: 0 },
   questionCard: {
     backgroundColor: theme.colors.background, borderRadius: 20, padding: 18,
     marginBottom: 14, borderWidth: 1, borderColor: theme.colors.border,

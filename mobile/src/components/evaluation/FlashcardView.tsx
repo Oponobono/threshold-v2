@@ -13,13 +13,14 @@ interface Props {
   onReveal: () => void;
   onAnswer: (rating: 'learning' | 'review') => void;
   onShowExplanation: () => void;
+  onShowContext: () => void;
   isAnswered: boolean;
   selectedRating: 'learning' | 'review' | null;
   onNext?: () => void;
 }
 
 export const FlashcardView: React.FC<Props> = ({
-  item, onReveal, onAnswer, onShowExplanation, isAnswered, selectedRating, onNext
+  item, onReveal, onAnswer, onShowExplanation, onShowContext, isAnswered, selectedRating, onNext
 }) => {
   const { t } = useTranslation();
   const content = item.content as FlashcardContent;
@@ -164,6 +165,16 @@ export const FlashcardView: React.FC<Props> = ({
             </TouchableOpacity>
           )}
 
+          {item.source_context && (
+            <TouchableOpacity
+              style={s.contextBtn}
+              onPress={onShowContext}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            >
+              <Ionicons name="book-outline" size={16} color={theme.colors.primary} />
+            </TouchableOpacity>
+          )}
+
           {item.explanation && isAnswered && (
             <TouchableOpacity
               style={s.explanationBtn}
@@ -257,6 +268,13 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,122,255,0.08)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(0,122,255,0.3)',
+  },
+  contextBtn: {
+    position: 'absolute', bottom: 36, left: 14,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(92,107,192,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(92,107,192,0.3)',
   },
   tapHint: {
     position: 'absolute', bottom: 12, left: 20,

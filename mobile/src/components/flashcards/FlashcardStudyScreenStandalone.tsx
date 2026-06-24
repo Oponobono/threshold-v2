@@ -19,6 +19,7 @@ import {
 import { updateFlashcardStatus, deleteFlashcard, snoozeCard, createCardLog } from '../../services/api';
 import { analyzeDeckConfusionsHybrid as analyzeDeckConfusions, generateDifferentiationCardHybrid as generateDifferentiationCard } from '../../services/hybridAIService';
 import { recordCardReview } from '../../services/api/analytics';
+import { ExamSchedulerService } from '../../services/ExamSchedulerService';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { QuestionRendererFactory } from '../evaluation/QuestionRendererFactory';
 import { ExplanationOverlay } from '../evaluation/ExplanationOverlay';
@@ -118,14 +119,27 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
   }, [itemIndex, items.length, resetItemState]);
 
   useEffect(() => {
-    setItems(adaptFlashcardsToEvaluationItems(initialCards));
+    const sortByExam = async () => {
+      const sid = activeDeck?.subject_id ?? null;
+      const multiplier = await ExamSchedulerService.getCompressionMultiplier(sid);
+      const now = Date.now();
+      const sorted = [...initialCards].sort((a, b) => {
+        const nrdA = a.next_review_date ? new Date(a.next_review_date).getTime() : 0;
+        const nrdB = b.next_review_date ? new Date(b.next_review_date).getTime() : 0;
+        const effectiveA = nrdA ? now + (nrdA - now) * multiplier : Infinity;
+        const effectiveB = nrdB ? now + (nrdB - now) * multiplier : Infinity;
+        return effectiveA - effectiveB;
+      });
+      setItems(adaptFlashcardsToEvaluationItems(sorted));
+    };
+    sortByExam();
     resetItemState();
     setItemIndex(0);
     setSessionDone(false);
     setStats({ correct: 0, incorrect: 0, total: 0 });
     setCardStartTime(Date.now());
     setNeedsLocalModel(false);
-  }, [initialCards, resetItemState]);
+  }, [initialCards, resetItemState, activeDeck?.subject_id]);
 
   const handleReveal = useCallback(() => setIsRevealed(true), []);
 
@@ -182,7 +196,8 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           String(item.id),
           String(currentUserId),
           result.passed ? 'correct' : 'incorrect',
-          responseTime
+          responseTime,
+          activeDeck?.subject_id,
         );
         console.log('[FlashcardReview] FSRS metrics:', {
           quality: reviewResult.quality,

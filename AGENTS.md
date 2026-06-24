@@ -108,3 +108,43 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - `mobile/src/utils/aiContextMappers.ts`: populate searchText from OCR/transcript
 - `mobile/src/locales/es/ai.json`: added search, seeMore, ready, noText keys
 - `mobile/src/locales/en/ai.json`: added search, seeMore, ready, noText keys
+
+## Strategic Reference: RemNote Benchmarking
+
+Feature priorities adapted from RemNote for mobile-first offline architecture:
+
+### P1 — High Impact, Low Effort
+
+1. **Direction flag on cards** (`direction: 'forward' | 'backward' | 'bidirectional'`)
+   - Add `direction` column to `flashcards` table in SQLite (default `'forward'`)
+   - Study session engine reads flag and generates inverse render dynamically (no duplicate cards)
+   - Schema: `ALTER TABLE flashcards ADD COLUMN direction TEXT NOT NULL DEFAULT 'forward'`
+   - Migration v8, ~50 lines in `useStudySession.ts`
+
+2. **Source Context** (source_context TEXT on flashcards)
+   - Add `source_context` column; populated by OCR/import/creation flows
+   - Study screen shows discreet "Context" button → opens bottom sheet with original text
+   - No graph engine needed — just a TEXT field per card
+
+### P2 — High Impact, Moderate Effort
+
+3. **Exam Scheduler** (temporal SRS compression)
+   - Exam date flag on deck/subject (`exam_date` nullable TIMESTAMP in subjects or flashcard_decks)
+   - Zustand store reads exam date → overrides SRS interval multiplier in `MomentumService.getNextReview`
+   - Algorithm: `compressedInterval = baseInterval * max(0.2, 1 - (daysUntilExam / totalDaysToStudy))`
+   - Integrates with existing `MomentumService.ts`
+
+### P3 — Differentiator, Higher Effort
+
+4. **Touch-native image occlusion**
+   - Canvas overlay on image using `react-native-svg` or `react-native-canvas`
+   - User draws rectangles to hide portions → stores shapes as JSON in `flashcard.source_context` or new `image_occlusion` table
+   - Study mode renders image + occlusions as touch-to-reveal zones
+
+5. **Inline floating toolbar over keyboard**
+   - Custom `InputAccessoryView` (iOS) / `WindowInsets` (Android) with card-type shortcuts
+   - Avoids symbol typing on mobile keyboards
+
+6. **Contextual AI generation from local text**
+   - After OCR/PDF capture, auto-suggest front/back pairs using Groq
+   - Reuses existing `generateClassFlashcards` endpoint with captured text as context

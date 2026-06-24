@@ -99,7 +99,12 @@ FORMATOS DE RESPUESTA (JSON ESTRICTO - SIN TEXTO ADICIONAL):
       "back": "Solución técnica precisa, paso a paso si es procedural"
     },
     "hint": "Empujón direccional sin revelar (15-20 palabras max)",
-    "explanation": "Lección magistral breve explicando el principio y por qué funciona (80-150 palabras)"
+    "explanation": "Lección magistral breve explicando el principio y por qué funciona (80-150 palabras)",
+    "direction": "Si el concepto puede ser evaluado en ambos sentidos (ej. anatomía, vocabulario), usa 'bidirectional'. Si no, 'forward'.",
+    "source_context": {
+      "text": "Fragmento exacto del texto original que origina esta tarjeta (1-2 oraciones clave)",
+      "source_type": "generated"
+    }
   }
 ]`,
 
@@ -339,7 +344,7 @@ DISTRIBUCIÓN COGNITIVA:
 Formato: Array JSON con todos los ítems
 Ejemplo:
 [
-  {"type":"flashcard","data":{"front":"Pregunta compleja","back":"Respuesta técnica"},"hint":"Considera X","explanation":"La respuesta es Y porque..."},
+  {"type":"flashcard","data":{"front":"Pregunta compleja","back":"Respuesta técnica"},"hint":"Considera X","explanation":"La respuesta es Y porque...", "direction": "forward", "source_context": {"text": "Fragmento exacto del texto", "source_type": "generated"}},
   {"type":"multiple_choice","data":{"question":"Pregunta de análisis","options":["Error tipo 1","Error tipo 2","CORRECTA","Error tipo 3"],"correctIndex":2},"hint":"Pista","explanation":"Explicación"}
 ]
 

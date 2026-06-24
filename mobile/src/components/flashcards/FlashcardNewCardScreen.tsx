@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { flashcardsStyles as s } from '../../styles/FlashcardsModal.styles';
 import { FlashcardDeck, createEvaluationItem } from '../../services/api';
-import { EvaluationItemType } from '../../services/api/types';
+import { EvaluationItemType, CardDirection } from '../../services/api/types';
 import { useCustomAlert } from '../ui/CustomAlert';
 
 interface Props {
@@ -43,6 +43,7 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
   // Flashcard fields
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
+  const [direction, setDirection] = useState<CardDirection>('forward');
 
   // Multiple choice fields
   const [mcQuestion, setMcQuestion] = useState('');
@@ -92,6 +93,7 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
         deck_id: activeDeck.id,
         item_type: selectedType,
         content_json: contentJson,
+        direction: selectedType === 'flashcard' ? direction : undefined,
         hint: hint.trim() || undefined,
         explanation: explanation.trim() || undefined,
       });
@@ -157,6 +159,26 @@ export const FlashcardNewCardScreen: React.FC<Props> = ({ activeDeck, onBack, on
           <TextInput style={[s.input, ls.textarea]} value={front} onChangeText={setFront} multiline placeholder={t('flashcards.frontPlaceholder')} placeholderTextColor={theme.colors.text.placeholder} />
           <Text style={s.formLabel}>{t('flashcards.backLabel')}</Text>
           <TextInput style={[s.input, ls.textarea]} value={back} onChangeText={setBack} multiline placeholder={t('flashcards.backPlaceholder')} placeholderTextColor={theme.colors.text.placeholder} />
+
+          <Text style={s.formLabel}>{t('flashcards.directionLabel')}</Text>
+          <View style={ls.directionRow}>
+            {(['forward', 'backward', 'bidirectional'] as CardDirection[]).map(dir => {
+              const icons: Record<CardDirection, string> = { forward: '→', backward: '←', bidirectional: '↔' };
+              const labels: Record<CardDirection, string> = { forward: t('flashcards.directionForward'), backward: t('flashcards.directionBackward'), bidirectional: t('flashcards.directionBidirectional') };
+              const isActive = direction === dir;
+              return (
+                <TouchableOpacity
+                  key={dir}
+                  style={[ls.directionPill, isActive && ls.directionPillActive]}
+                  onPress={() => setDirection(dir)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[ls.directionIcon, isActive && ls.directionIconActive]}>{icons[dir]}</Text>
+                  <Text style={[ls.directionLabel, isActive && ls.directionLabelActive]}>{labels[dir]}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </>
       )}
 
@@ -232,4 +254,11 @@ const ls = StyleSheet.create({
   optionInput: { flex: 1, fontSize: 14, color: theme.colors.text.primary },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 14, backgroundColor: theme.colors.inputBackground, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border },
   switchLabel: { fontSize: 15, fontWeight: '700', color: theme.colors.text.primary },
+  directionRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  directionPill: { flex: 1, paddingVertical: 10, paddingHorizontal: 6, borderRadius: 12, borderWidth: 1.5, borderColor: theme.colors.border, alignItems: 'center', gap: 2, backgroundColor: theme.colors.inputBackground },
+  directionPillActive: { borderColor: '#5C6BC0', backgroundColor: '#EDE7F6' },
+  directionIcon: { fontSize: 18, color: theme.colors.text.secondary },
+  directionIconActive: { color: '#5C6BC0' },
+  directionLabel: { fontSize: 11, fontWeight: '600', color: theme.colors.text.secondary, textAlign: 'center' },
+  directionLabelActive: { color: '#5C6BC0' },
 });

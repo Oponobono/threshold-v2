@@ -1,6 +1,6 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
-import type { FlashcardDeck, Flashcard } from './types';
+import type { FlashcardDeck, Flashcard, CardDirection } from './types';
 import { flashcardDeckRepository, flashcardRepository, syncService } from '../database';
 
 export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
@@ -238,7 +238,7 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
   }
 };
 
-export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; id?: string }): Promise<any> => {
+export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; direction?: CardDirection; id?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
   const card: any = { id, ...payload, status: 'new', created_at: new Date().toISOString() };
@@ -263,7 +263,7 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
   }
 };
 
-export const createEvaluationItem = async (payload: { deck_id: string; item_type: 'flashcard' | 'multiple_choice' | 'boolean'; content_json: any; hint?: string; explanation?: string; id?: string }): Promise<any> => {
+export const createEvaluationItem = async (payload: { deck_id: string; item_type: 'flashcard' | 'multiple_choice' | 'boolean'; content_json: any; direction?: CardDirection; hint?: string; explanation?: string; id?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
   const item: any = { id, status: 'new', created_at: new Date().toISOString(), ...payload };

@@ -86,7 +86,8 @@ export const recordCardReview = async (
   cardId: string,
   userId: string,
   result: 'correct' | 'incorrect',
-  responseTimeMs: number
+  responseTimeMs: number,
+  subjectId?: string | number | null,
 ): Promise<CardReviewResponse> => {
   try {
     // Local cards (negative IDs) - save pending review to MMKV instead of API
@@ -100,11 +101,13 @@ export const recordCardReview = async (
         stability: 0,
         difficulty: 0,
       });
+      const baseInterval = 86400000;
+      const compressed = await getCompressedInterval(subjectId, baseInterval);
       return {
         success: true,
         cardId,
         quality: result === 'correct' ? 4 : 1,
-        nextReviewDate: new Date(Date.now() + 86400000).toISOString(),
+        nextReviewDate: new Date(Date.now() + compressed).toISOString(),
         newStability: 0,
         newDifficulty: 0,
         newRepetitions: 1,
@@ -125,11 +128,13 @@ export const recordCardReview = async (
   } catch (error) {
     console.warn(`[Analytics] Offline: encolando recordCardReview para card ${cardId}`, error);
     await syncService.enqueueCreate('card-review', String(cardId), { userId, result, responseTimeMs });
+    const baseInterval = 86400000;
+    const compressed = await getCompressedInterval(subjectId, baseInterval);
     return {
       success: true,
       cardId,
       quality: 3,
-      nextReviewDate: new Date(Date.now() + 86400000).toISOString(),
+      nextReviewDate: new Date(Date.now() + compressed).toISOString(),
       newStability: 0,
       newDifficulty: 0,
       newRepetitions: 1,
@@ -139,6 +144,16 @@ export const recordCardReview = async (
     } as CardReviewResponse & { _isPending?: boolean };
   }
 };
+
+async function getCompressedInterval(subjectId: string | number | null | undefined, baseMs: number): Promise<number> {
+  if (subjectId == null) return baseMs;
+  try {
+    const { ExamSchedulerService } = await import('../ExamSchedulerService');
+    return ExamSchedulerService.compressInterval(subjectId, baseMs);
+  } catch {
+    return baseMs;
+  }
+}
 
 /**
  * Descarga el informe PDF de dominio del estudiante y lo comparte usando

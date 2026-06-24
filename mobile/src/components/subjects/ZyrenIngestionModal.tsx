@@ -11,6 +11,7 @@ import { theme } from '../../styles/theme';
 import { fetchWithFallback } from '../../services/api/client';
 import { saveImportedDeck, addLocalCard, recalculateLocalDeckCounters } from '../../services/localFlashcardService';
 import { extractTextFromImageHybrid, generateClassFlashcardsHybrid } from '../../services/hybridAIService';
+import type { CardDirection } from '../../services/api/types';
 
 interface GeneratedCard { front: string; back: string; }
 
@@ -43,6 +44,7 @@ export function ZyrenIngestionModal({
   const [generatedTopic, setGeneratedTopic] = useState<string>('Zyren');
   const [removedIndexes, setRemovedIndexes] = useState<Set<number>>(new Set());
   const [showPicker, setShowPicker] = useState(false);
+  const [direction, setDirection] = useState<CardDirection>('forward');
 
   const resetModal = () => {
     setStep('input');
@@ -54,6 +56,7 @@ export function ZyrenIngestionModal({
     setGeneratedTopic('Zyren');
     setRemovedIndexes(new Set());
     setShowPicker(false);
+    setDirection('forward');
   };
 
   const handleClose = () => { resetModal(); onClose(); };
@@ -220,6 +223,7 @@ export function ZyrenIngestionModal({
         addLocalCard(deck.id, {
           type: 'flashcard',
           data: { front: card.front, back: card.back },
+          direction,
         });
       }
 
@@ -398,6 +402,27 @@ export function ZyrenIngestionModal({
                 );
               })}
             </ScrollView>
+
+            {/* Direction picker */}
+            <Text style={styles.dirLabel}>Dirección de estudio</Text>
+            <View style={styles.dirRow}>
+              {(['forward', 'backward', 'bidirectional'] as CardDirection[]).map(dir => {
+                const icons: Record<CardDirection, string> = { forward: '→', backward: '←', bidirectional: '↔' };
+                const names: Record<CardDirection, string> = { forward: 'Frente → Reverso', backward: 'Reverso → Frente', bidirectional: 'Aleatorio' };
+                const isActive = direction === dir;
+                return (
+                  <TouchableOpacity
+                    key={dir}
+                    style={[styles.dirPill, isActive && styles.dirPillActive]}
+                    onPress={() => setDirection(dir)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.dirIcon, isActive && styles.dirIconActive]}>{icons[dir]}</Text>
+                    <Text style={[styles.dirPillLabel, isActive && styles.dirPillLabelActive]}>{names[dir]}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             <TouchableOpacity
               style={[styles.primaryBtn, approvedCount === 0 && { opacity: 0.4 }]}
@@ -707,6 +732,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   removeBtn: { padding: 4 },
+  // ── Direction Picker ──
+  dirLabel: {
+    color: theme.colors.text.secondary,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  dirRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  dirPill: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: theme.colors.inputBackground,
+  },
+  dirPillActive: {
+    borderColor: '#5C6BC0',
+    backgroundColor: '#EDE7F6',
+  },
+  dirIcon: {
+    fontSize: 16,
+    color: theme.colors.text.secondary,
+  },
+  dirIconActive: {
+    color: '#5C6BC0',
+  },
+  dirPillLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+  },
+  dirPillLabelActive: {
+    color: '#5C6BC0',
+  },
   // ── Picker Modal ──
   pickerOverlay: {
     flex: 1,
