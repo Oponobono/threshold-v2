@@ -12,7 +12,7 @@
   "transcripts": "Transcripts & summaries",
   "lastUpload": "Last upload: {{date}}",
   "lastDownload": "Last download: {{date}}",
-  "itemsBackedUp": "{{count}} of {{total}} items backed up",
+  "itemsBackedUp": "{{count}} of {{total}} media files backed up",
   "inCloud": "{{backed}}/{{total}} in the cloud",
   "pendingCount": "• {{count}} pending",
   "cloudCount": "• {{count}} in the cloud",

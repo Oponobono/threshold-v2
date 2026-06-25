@@ -12,7 +12,7 @@
   "transcripts": "Transcripciones y resúmenes",
   "lastUpload": "Última subida: {{date}}",
   "lastDownload": "Última descarga: {{date}}",
-  "itemsBackedUp": "{{count}} de {{total}} elementos respaldados",
+  "itemsBackedUp": "{{count}} de {{total}} archivos multimedia respaldados",
   "inCloud": "{{backed}}/{{total}} en la nube",
   "pendingCount": "• {{count}} pendiente(s)",
   "cloudCount": "• {{count}} en la nube",

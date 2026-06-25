@@ -9,6 +9,69 @@ const getUserIdNumber = async (): Promise<string> => {
   return String(uid);
 };
 
+let lastSyncTimestamp = 0;
+let syncInProgress = false;
+let fetchInProgress = false;
+const SYNC_THROTTLE_MS = 30000;
+const pendingDelete = new Set<string>();
+
+const filterDeleted = (courses: Course[]): Course[] =>
+  courses.filter(c => !pendingDelete.has(c.id));
+
+export const getCourses = async (): Promise<Course[]> => {
+  // 1. Leer localmente primero
+  const localData = await courseRepository.getAll();
+
+  // Si no hay datos locales, esperar red obligatoriamente
+  if (!localData || localData.length === 0) {
+    if (fetchInProgress) {
+      return [];
+    }
+    fetchInProgress = true;
+    try {
+      const response = await fetchWithFallback('/courses');
+      if (response.ok && !response.headers.get('X-Offline-Cache')) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data)) {
+          for (const c of data) {
+            if (!pendingDelete.has(c.id)) {
+              await courseRepository.upsert(c);
+            }
+          }
+          return filterDeleted(data);
+        }
+      }
+    } catch {}
+    finally { fetchInProgress = false; }
+    return [];
+  }
+
+  // 2. Sincronizar en background con throttling
+  const now = Date.now();
+  if (now - lastSyncTimestamp > SYNC_THROTTLE_MS && !syncInProgress) {
+    syncInProgress = true;
+    lastSyncTimestamp = now;
+    (async () => {
+      try {
+        const response = await fetchWithFallback('/courses');
+        if (response.ok && !response.headers.get('X-Offline-Cache')) {
+          const data = await parseJsonSafely(response);
+          if (Array.isArray(data)) {
+            for (const c of data) {
+              if (!pendingDelete.has(c.id)) {
+                await courseRepository.upsert(c);
+              }
+            }
+          }
+        }
+      } catch {}
+      finally { syncInProgress = false; }
+    })();
+  }
+
+  return filterDeleted(localData);
+};
+
 export const createCourse = async (payload: {
   name: string;
   platform?: string;
@@ -83,16 +146,19 @@ export const updateCourse = async (id: string, payload: Partial<Course>): Promis
 };
 
 export const deleteCourse = async (id: string): Promise<void> => {
+  pendingDelete.add(id);
   await courseRepository.delete(id);
 
   try {
     const response = await fetchWithFallback(`/courses/${id}`, {
       method: 'DELETE',
     });
+    pendingDelete.delete(id);
     if (!response.ok) {
       throw new Error('Error al eliminar curso');
     }
   } catch {
     await syncService.enqueueDelete('course', id);
+    pendingDelete.delete(id);
   }
 };

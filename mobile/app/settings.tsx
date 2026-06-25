@@ -623,7 +623,7 @@ export default function SettingsScreen() {
 
                 <TouchableOpacity
                   style={[styles.backupButton, styles.backupButtonSecondary, isBackupRunning && { opacity: 0.6 }]}
-                  onPress={handleDownloadNow}
+                  onPress={() => handleDownloadNow('ambos')}
                   disabled={isBackupRunning}
                 >
                   {isDownloading ? (
@@ -631,7 +631,7 @@ export default function SettingsScreen() {
                   ) : (
                     <Ionicons name="cloud-download" size={16} color="#fff" />
                   )}
-                  <Text style={styles.backupButtonTextLight}>{t('backup.downloadNow', 'Descargar')}</Text>
+                  <Text style={styles.backupButtonTextLight}>{t('backup.downloadAll', 'Descargar Todo')}</Text>
                 </TouchableOpacity>
               </View>
 
