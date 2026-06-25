@@ -270,7 +270,7 @@ export default function FlashcardsScreen() {
                                   por @{item.owner_username || t('flashcards.classmate')}
                                 </Text>
                               )}
-                              <Text style={flashcardStyles.deckMeta} numberOfLines={1}>{item.subject_name}</Text>
+                              <Text style={flashcardStyles.deckMeta} numberOfLines={1}>{(item as any).subject_name || t('flashcards.noSubject')}</Text>
                               <View style={flashcardStyles.deckStatsRow}>
                                 <Text style={flashcardStyles.statLabel}>{Number(item.card_count ?? 0)} tarjetas</Text>
                                 {Number(item.card_count ?? 0) > 0 && (

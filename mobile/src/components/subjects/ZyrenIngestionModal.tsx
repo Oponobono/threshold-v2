@@ -26,13 +26,15 @@ interface ZyrenIngestionModalProps {
   courseName: string;
   subjectName: string;
   subjectId: string;
+  subjectColor?: string;
+  subjectIcon?: string;
   currentMilestone?: string;
 }
 
 type Step = 'input' | 'extracting' | 'preview' | 'saving';
 
 export function ZyrenIngestionModal({
-  visible, onClose, courseName, subjectName, subjectId, currentMilestone,
+  visible, onClose, courseName, subjectName, subjectId, subjectColor, subjectIcon, currentMilestone,
 }: ZyrenIngestionModalProps) {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>('input');
@@ -215,6 +217,9 @@ export function ZyrenIngestionModal({
           data: { front: card.front, back: card.back },
         })),
         subjectId || null,
+        subjectName,
+        subjectColor || null,
+        subjectIcon || null,
       );
 
       for (const card of toSave) {

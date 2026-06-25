@@ -23,6 +23,9 @@ export interface LocalDeck {
   title: string;
   description: string;
   subject_id: string | null;
+  subject_name?: string | null;
+  subject_color?: string | null;
+  subject_icon?: string | null;
   card_count: number;
   user_id: string | number;
   created_at: string;
@@ -78,6 +81,9 @@ export async function saveImportedDeck(
   description: string | undefined,
   cards: LocalCard[],
   subject_id: string | null,
+  subject_name?: string | null,
+  subject_color?: string | null,
+  subject_icon?: string | null,
 ): Promise<LocalDeck> {
   const uid = await getUserId();
   const deck: LocalDeck = {
@@ -85,6 +91,9 @@ export async function saveImportedDeck(
     title: title.trim(),
     description: description?.trim() || '',
     subject_id,
+    subject_name,
+    subject_color,
+    subject_icon,
     card_count: cards.length,
     user_id: uid || 0,
     created_at: new Date().toISOString(),
@@ -100,11 +109,23 @@ export async function saveImportedDeck(
   return deck;
 }
 
-export function updateLocalDeckSubject(deckId: number, subjectId: string | null): void {
+export function updateLocalDeckSubject(
+  deckId: number,
+  subjectId: string | null,
+  subjectName?: string | null,
+  subjectColor?: string | null,
+  subjectIcon?: string | null,
+): void {
   const decks = getLocalDecks();
   const idx = decks.findIndex(d => d.id === deckId);
   if (idx === -1) return;
-  decks[idx] = { ...decks[idx], subject_id: subjectId };
+  decks[idx] = {
+    ...decks[idx],
+    subject_id: subjectId,
+    ...(subjectName !== undefined ? { subject_name: subjectName } : {}),
+    ...(subjectColor !== undefined ? { subject_color: subjectColor } : {}),
+    ...(subjectIcon !== undefined ? { subject_icon: subjectIcon } : {}),
+  };
   saveLocalDecksSync(decks);
 }
 

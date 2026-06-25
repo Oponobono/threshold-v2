@@ -345,11 +345,16 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         }
       }
 
+      const importSubjectId = deckData.subject_id ? String(deckData.subject_id) : null;
+      const importSubject = importSubjectId ? subjects.find(s => s.id === importSubjectId) : undefined;
       const deck = await saveImportedDeck(
         sanitizeText(deckData.title),
         sanitizeText(deckData.description),
         cards,
-        deckData.subject_id ? String(deckData.subject_id) : null,
+        importSubjectId,
+        importSubject?.name,
+        importSubject?.color,
+        importSubject?.icon,
       );
 
       // OFFLINE-FIRST: Persistir cada tarjeta individualmente en MMKV
@@ -415,7 +420,14 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       
       // Si se seleccionó materia, actualizarla
       if (selectedSubjectId) {
-        updateLocalDeckSubject(importedDeck.id, String(selectedSubjectId));
+        const sub = subjects.find(s => s.id === String(selectedSubjectId));
+        updateLocalDeckSubject(
+          importedDeck.id,
+          String(selectedSubjectId),
+          sub?.name,
+          sub?.color,
+          sub?.icon,
+        );
       }
       
       showAlert({

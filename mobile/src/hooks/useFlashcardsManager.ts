@@ -18,11 +18,15 @@ export interface FlashcardsManagerResult {
   loadDecks: (options?: { skipCache?: boolean; cooldownMs?: number }) => Promise<void>;
 }
 
-function localDeckToFlashcardDeck(local: LocalDeck): FlashcardDeck {
+function localDeckToFlashcardDeck(local: LocalDeck, subjects: Subject[] = []): FlashcardDeck {
+  const subject = local.subject_id ? subjects.find(s => s.id === local.subject_id) : undefined;
   return {
     id: String(local.id),
     user_id: String(local.user_id),
     subject_id: local.subject_id != null ? String(local.subject_id) : undefined,
+    subject_name: local.subject_name ?? subject?.name ?? null,
+    subject_color: local.subject_color ?? subject?.color ?? null,
+    subject_icon: local.subject_icon ?? subject?.icon ?? null,
     title: local.title,
     description: local.description,
     card_count: local.card_count,
@@ -59,7 +63,7 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
   const pendingLoadRef = useRef<Promise<void> | null>(null);
 
   function mergeLocalDecks(remoteDecks: FlashcardDeck[], userId?: string | null): FlashcardDeck[] {
-    const localDecks = getLocalDecksForCurrentUser(userId).map(localDeckToFlashcardDeck);
+    const localDecks = getLocalDecksForCurrentUser(userId).map(d => localDeckToFlashcardDeck(d, subjects));
     const localIds = new Set(localDecks.map(d => d.id));
     // Filtrar remotos que están en locales (reemplazar) y también remotos con ID
     // negativo que ya no existen en MMKV (eliminados localmente pero aún en servidor)

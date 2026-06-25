@@ -396,6 +396,8 @@ export default function SubjectsScreen() {
           courseName={zyrenSubject.courseName || ''}
           subjectName={zyrenSubject.name}
           subjectId={zyrenSubject.id}
+          subjectColor={zyrenSubject.color}
+          subjectIcon={zyrenSubject.icon}
           currentMilestone={zyrenSubject.milestone}
         />
       )}

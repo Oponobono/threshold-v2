@@ -42,8 +42,16 @@ export const FlashcardNewDeckScreen: React.FC<Props> = ({ subjects, onBack, onDe
     }
     try {
       setIsSavingDeck(true);
+      const selectedSubject = deckSubjectId ? subjects.find(s => s.id === deckSubjectId) : undefined;
       await createFlashcardDeck({
-        ...(deckSubjectId ? { subject_id: deckSubjectId } : {}),
+        ...(deckSubjectId
+          ? {
+              subject_id: deckSubjectId,
+              subject_name: selectedSubject?.name,
+              subject_color: selectedSubject?.color,
+              subject_icon: selectedSubject?.icon,
+            }
+          : {}),
         title: deckTitle.trim(),
         description: deckDesc.trim(),
       });

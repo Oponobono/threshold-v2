@@ -178,9 +178,11 @@ exports.getGroupDecks = (req, res) => {
 
       // Obtener todos los mazos de los miembros del grupo
       db.all(
-        `SELECT fd.*, u.username as owner_username
+        `SELECT fd.*, u.username as owner_username,
+                s.name as subject_name, s.color as subject_color, s.icon as subject_icon
          FROM flashcard_decks fd
          JOIN users u ON fd.user_id = u.id
+         LEFT JOIN subjects s ON fd.subject_id = s.id
          WHERE fd.user_id IN (
            SELECT user_id FROM group_memberships
            WHERE group_pin_id = ?
