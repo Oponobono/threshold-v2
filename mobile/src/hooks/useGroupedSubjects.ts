@@ -8,6 +8,7 @@ export interface SubjectSection {
   courseId: string | null;
   courseName: string;
   coursePlatform?: string;
+  mainUrl?: string;
   data: any[]; // Las materias enriquecidas (filteredSubjects)
 }
 
@@ -60,6 +61,7 @@ export function useGroupedSubjects(subjects: any[]) {
         courseId: course.id,
         courseName: course.name,
         coursePlatform: course.platform,
+        mainUrl: course.main_url,
         data: isCollapsed ? [] : (courseMap.get(course.id) || [])
       });
       courseMap.delete(course.id); // Remover para identificar huérfanos

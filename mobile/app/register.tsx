@@ -55,17 +55,14 @@ export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [lastname, setLastname] = useState('');
   const [username, setUsername] = useState('');
-  const [semester, setSemester] = useState('');
   const [studyGoal, setStudyGoal] = useState<string>('');
   const [referenceLanguage, setReferenceLanguage] = useState<string>('');
 
-  // === Paso 2: Escala académica + Contexto + Credenciales ===
+  // === Paso 2: Escala académica + Credenciales ===
   const [gradingSystems, setGradingSystems] = useState<GradingSystem[]>([]);
   const [isLoadingSystems, setIsLoadingSystems] = useState(false);
   const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null);
   const [approvalThreshold, setApprovalThreshold] = useState('3.0');
-  const [major, setMajor] = useState('');
-  const [university, setUniversity] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -158,8 +155,6 @@ export default function RegisterScreen() {
   const isStep2Valid =
     selectedSystemId !== null &&
     !isNaN(parseFloat(approvalThreshold)) &&
-    university.trim().length > 0 &&
-    major.trim().length > 0 &&
     isEmailValid(email) &&
     isPasswordValid &&
     isPasswordConfirmed;
@@ -191,9 +186,6 @@ export default function RegisterScreen() {
         lastname,
         username,
         active_grading_version_id: selectedSystem?.active_version_id ?? null,
-        major,
-        university,
-        semester,
         study_goal: studyGoal,
         reference_language: referenceLanguage,
         profile_image: undefined, // Se guardará después si hay foto
@@ -432,19 +424,6 @@ export default function RegisterScreen() {
                   />
                 </View>
 
-                {/* ── Contexto Académico Card ── */}
-                <View style={localStyles.bentoCard}>
-                  <View style={localStyles.bentoCardHeader}>
-                    <Feather name="book-open" size={15} color={theme.colors.text.secondary} />
-                    <Text style={localStyles.bentoCardLabel}>{t('register.step1.academicCard')}</Text>
-                  </View>
-                  <CustomInput
-                    label={t('register.step1.semesterLabel')}
-                    value={semester}
-                    onChangeText={setSemester}
-                  />
-                </View>
-
                 {/* ── Objetivos IA Card ── */}
                 <View style={localStyles.bentoCard}>
                   <View style={localStyles.bentoCardHeader}>
@@ -557,24 +536,6 @@ export default function RegisterScreen() {
                       textAlign="center"
                     />
                   </View>
-                </View>
-
-                {/* ── Contexto Académico Card ── */}
-                <View style={localStyles.bentoCard}>
-                  <View style={localStyles.bentoCardHeader}>
-                    <Feather name="book-open" size={15} color={theme.colors.text.secondary} />
-                    <Text style={localStyles.bentoCardLabel}>{t('register.step2.academicContextCard')}</Text>
-                  </View>
-                  <CustomInput
-                    label={t('register.step1.majorLabel')}
-                    value={major}
-                    onChangeText={setMajor}
-                  />
-                  <CustomInput
-                    label={t('register.step1.universityLabel')}
-                    value={university}
-                    onChangeText={setUniversity}
-                  />
                 </View>
 
                 {/* ── Credenciales Card ── */}

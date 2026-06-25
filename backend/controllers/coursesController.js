@@ -10,7 +10,7 @@ exports.getCourses = (req, res) => {
 };
 
 exports.createCourse = (req, res) => {
-  const { id: clientId, user_id, name, platform, certificate_url, momentum_score, last_studied_at } = req.body;
+  const { id: clientId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours, total_classes, completed_classes, status, global_notes, tags, momentum_score, last_studied_at } = req.body;
   const authenticatedUserId = req.user.id;
 
   if (!user_id || !name) {
@@ -24,20 +24,29 @@ exports.createCourse = (req, res) => {
   const courseId = clientId || uuidv4();
   
   const query = `
-    INSERT INTO courses (id, user_id, name, platform, certificate_url, momentum_score, last_studied_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO courses (id, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours, total_classes, completed_classes, status, global_notes, tags, momentum_score, last_studied_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT (id) DO UPDATE SET 
       name = EXCLUDED.name,
       platform = EXCLUDED.platform,
       certificate_url = EXCLUDED.certificate_url,
+      main_url = EXCLUDED.main_url,
+      deep_link_url = EXCLUDED.deep_link_url,
+      instructor = EXCLUDED.instructor,
+      total_hours = EXCLUDED.total_hours,
+      total_classes = EXCLUDED.total_classes,
+      completed_classes = EXCLUDED.completed_classes,
+      status = EXCLUDED.status,
+      global_notes = EXCLUDED.global_notes,
+      tags = EXCLUDED.tags,
       momentum_score = EXCLUDED.momentum_score,
       last_studied_at = EXCLUDED.last_studied_at,
       updated_at = CURRENT_TIMESTAMP
   `;
 
-  db.run(query, [courseId, user_id, name, platform, certificate_url, momentum_score || 1.0, last_studied_at], function(err) {
+  db.run(query, [courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours || 0, total_classes || 0, completed_classes || 0, status || 'active', global_notes, tags, momentum_score || 1.0, last_studied_at], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: courseId, user_id, name, platform, certificate_url, momentum_score: momentum_score || 1.0, last_studied_at });
+    res.status(201).json({ id: courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours: total_hours || 0, total_classes: total_classes || 0, completed_classes: completed_classes || 0, status: status || 'active', global_notes, tags, momentum_score: momentum_score || 1.0, last_studied_at });
   });
 };
 
@@ -45,7 +54,7 @@ exports.updateCourse = (req, res) => {
   const { courseId } = req.params;
   const fields = req.body;
   
-  const allowedFields = ['name', 'platform', 'certificate_url', 'momentum_score', 'last_studied_at', 'updated_at'];
+  const allowedFields = ['name', 'platform', 'certificate_url', 'main_url', 'deep_link_url', 'instructor', 'total_hours', 'total_classes', 'completed_classes', 'status', 'global_notes', 'tags', 'momentum_score', 'last_studied_at', 'updated_at'];
   const fieldsToUpdate = {};
   
   for (const key of Object.keys(fields)) {

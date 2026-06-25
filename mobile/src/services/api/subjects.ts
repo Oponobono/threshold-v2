@@ -178,7 +178,7 @@ export const createSubject = async (payload: {
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await subjectRepository.upsert(data);
+      await subjectRepository.upsert(await mergeWithLocal(data));
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -199,7 +199,7 @@ export const updateSubject = async (subjectId: string, payload: Partial<Subject>
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await subjectRepository.upsert(data);
+      await subjectRepository.upsert(await mergeWithLocal(data));
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');

@@ -20,15 +20,10 @@ export const registerUser = async (userData: {
   name?: string;
   lastname?: string;
   username?: string;
-  grading_scale?: string;
-  approval_threshold?: number;
   active_grading_version_id?: number | null;
-  major?: string;
-  university?: string;
-  semester?: string;
   study_goal?: string;
   reference_language?: string;
-  profile_image?: string;  // URL pública de Firebase Storage
+  profile_image?: string;
 }) => {
   try {
     const response = await fetchWithFallback('/register', {

@@ -13,6 +13,13 @@ export const createCourse = async (payload: {
   name: string;
   platform?: string;
   certificate_url?: string;
+  main_url?: string;
+  deep_link_url?: string;
+  instructor?: string;
+  total_hours?: number;
+  total_classes?: number;
+  tags?: string;
+  global_notes?: string;
 }): Promise<Course> => {
   const userId = await getUserIdNumber();
   const { uuidv4 } = await import('../../utils/uuid');
@@ -24,6 +31,15 @@ export const createCourse = async (payload: {
     name: payload.name,
     platform: payload.platform,
     certificate_url: payload.certificate_url,
+    main_url: payload.main_url,
+    deep_link_url: payload.deep_link_url,
+    instructor: payload.instructor,
+    total_hours: payload.total_hours,
+    total_classes: payload.total_classes || 0,
+    completed_classes: 0,
+    tags: payload.tags,
+    global_notes: payload.global_notes,
+    status: 'active',
     momentum_score: 1.0,
   };
 

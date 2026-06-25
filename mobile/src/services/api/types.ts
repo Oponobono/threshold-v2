@@ -26,6 +26,15 @@ export type Course = {
   name: string;
   platform?: string;
   certificate_url?: string;
+  main_url?: string;
+  deep_link_url?: string;
+  instructor?: string;
+  total_hours?: number;
+  total_classes?: number;
+  completed_classes?: number;
+  status?: string;
+  global_notes?: string;
+  tags?: string;
   momentum_score?: number;
   last_studied_at?: string;
   is_backed_up?: number;

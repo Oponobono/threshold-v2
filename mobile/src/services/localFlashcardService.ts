@@ -22,7 +22,7 @@ export interface LocalDeck {
   id: number;
   title: string;
   description: string;
-  subject_id: number | null;
+  subject_id: string | null;
   card_count: number;
   user_id: string | number;
   created_at: string;
@@ -77,7 +77,7 @@ export async function saveImportedDeck(
   title: string,
   description: string | undefined,
   cards: LocalCard[],
-  subject_id: number | null,
+  subject_id: string | null,
 ): Promise<LocalDeck> {
   const uid = await getUserId();
   const deck: LocalDeck = {
@@ -100,7 +100,7 @@ export async function saveImportedDeck(
   return deck;
 }
 
-export function updateLocalDeckSubject(deckId: number, subjectId: number): void {
+export function updateLocalDeckSubject(deckId: number, subjectId: string | null): void {
   const decks = getLocalDecks();
   const idx = decks.findIndex(d => d.id === deckId);
   if (idx === -1) return;

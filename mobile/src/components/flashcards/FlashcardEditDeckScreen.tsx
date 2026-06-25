@@ -42,7 +42,7 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
     try {
       setIsSavingDeck(true);
       await updateFlashcardDeck(deck.id, { 
-        subject_id: deckSubjectId || undefined, 
+        subject_id: deckSubjectId, 
         title: deckTitle.trim() 
       });
       onDeckUpdated();

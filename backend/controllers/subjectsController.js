@@ -317,7 +317,7 @@ exports.createSubject = (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    const proceedCreate = (validCourseId) => {
+    const proceedCreate = (finalCourseId) => {
       db.run(
         query,
         [
@@ -330,7 +330,7 @@ exports.createSubject = (req, res) => {
           color || '#CCCCCC',
           icon || 'book-outline',
           target_grade || null,
-          validCourseId,
+          finalCourseId,
           external_url || null,
           total_lessons || 0,
           completed_lessons || 0,
@@ -348,7 +348,7 @@ exports.createSubject = (req, res) => {
             color: color || '#CCCCCC',
             icon: icon || 'book-outline',
             target_grade: target_grade || null,
-            course_id: validCourseId,
+            course_id: finalCourseId,
             external_url: external_url || null,
             total_lessons: total_lessons || 0,
             completed_lessons: completed_lessons || 0,
@@ -361,13 +361,7 @@ exports.createSubject = (req, res) => {
       );
     };
 
-    if (course_id) {
-      db.get('SELECT id FROM courses WHERE id = ?', [course_id], (err, row) => {
-        proceedCreate(row ? course_id : null);
-      });
-    } else {
-      proceedCreate(null);
-    }
+    proceedCreate(course_id || null);
 });
 };
 
@@ -433,14 +427,5 @@ exports.updateSubject = (req, res) => {
     });
   };
 
-  if (fieldsToUpdate.course_id) {
-    db.get('SELECT id FROM courses WHERE id = ?', [fieldsToUpdate.course_id], (err, row) => {
-      if (err || !row) {
-        fieldsToUpdate.course_id = null; // Fallback robusto si el curso no ha sincronizado o split-brain
-      }
-      proceedUpdate();
-    });
-  } else {
-    proceedUpdate();
-  }
+  proceedUpdate();
 };

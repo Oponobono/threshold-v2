@@ -51,8 +51,9 @@ exports.createCalendarEvent = (req, res) => {
     return res.status(400).json({ error: 'Las fechas son requeridas' });
   }
 
-  // Para eventos académicos, la materia es obligatoria
-  if (eventType !== 'other' && !subjectId) {
+  // Para eventos académicos (task, class) la materia es obligatoria.
+  // 'exam' se permite sin materia para soportar mazos sin subject_id (<- subject optional en FlashcardNewDeckScreen).
+  if (eventType !== 'other' && eventType !== 'exam' && !subjectId) {
     return res.status(400).json({ error: 'Se requiere una materia para este tipo de evento' });
   }
 

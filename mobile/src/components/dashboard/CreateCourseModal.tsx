@@ -29,20 +29,48 @@ export const CreateCourseModal = ({ visible, onClose, editingCourse }: CreateCou
   const [isSaving, setIsSaving] = useState(false);
   const [courseName, setCourseName] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('Platzi');
+  const [customPlatform, setCustomPlatform] = useState('');
+  const [mainUrl, setMainUrl] = useState('');
+  const [instructor, setInstructor] = useState('');
+  const [tags, setTags] = useState('');
+  const [totalClasses, setTotalClasses] = useState('');
+
+  const isKnownPlatform = (p: string) => PLATFORM_OPTIONS.some(opt => opt.name === p);
 
   React.useEffect(() => {
     if (visible && editingCourse) {
+      const platform = editingCourse.platform || 'Platzi';
+      if (isKnownPlatform(platform)) {
+        setSelectedPlatform(platform);
+        setCustomPlatform('');
+      } else {
+        setSelectedPlatform('Otro');
+        setCustomPlatform(platform);
+      }
       setCourseName(editingCourse.name || '');
-      setSelectedPlatform(editingCourse.platform || 'Platzi');
+      setMainUrl(editingCourse.main_url || '');
+      setInstructor(editingCourse.instructor || '');
+      setTags(editingCourse.tags || '');
+      setTotalClasses(editingCourse.total_classes ? String(editingCourse.total_classes) : '');
     } else if (visible && !editingCourse) {
       setCourseName('');
       setSelectedPlatform('Platzi');
+      setCustomPlatform('');
+      setMainUrl('');
+      setInstructor('');
+      setTags('');
+      setTotalClasses('');
     }
   }, [visible, editingCourse]);
 
   const resetForm = () => {
     setCourseName('');
     setSelectedPlatform('Platzi');
+    setCustomPlatform('');
+    setMainUrl('');
+    setInstructor('');
+    setTags('');
+    setTotalClasses('');
     setIsSaving(false);
   };
 
@@ -59,15 +87,26 @@ export const CreateCourseModal = ({ visible, onClose, editingCourse }: CreateCou
 
     try {
       setIsSaving(true);
+      const totalClassesNum = totalClasses ? parseInt(totalClasses, 10) : undefined;
+      const resolvedPlatform = selectedPlatform === 'Otro' && customPlatform.trim()
+        ? customPlatform.trim() : selectedPlatform;
       if (editingCourse) {
         await updateCourse(editingCourse.id, {
           name: courseName.trim(),
-          platform: selectedPlatform,
+          platform: resolvedPlatform,
+          main_url: mainUrl.trim() || undefined,
+          instructor: instructor.trim() || undefined,
+          tags: tags.trim() || undefined,
+          total_classes: totalClassesNum && !isNaN(totalClassesNum) ? totalClassesNum : undefined,
         });
       } else {
         await createCourse({
           name: courseName.trim(),
-          platform: selectedPlatform,
+          platform: resolvedPlatform,
+          main_url: mainUrl.trim() || undefined,
+          instructor: instructor.trim() || undefined,
+          tags: tags.trim() || undefined,
+          total_classes: totalClassesNum && !isNaN(totalClassesNum) ? totalClassesNum : undefined,
         });
       }
 
@@ -131,6 +170,55 @@ export const CreateCourseModal = ({ visible, onClose, editingCourse }: CreateCou
                 </TouchableOpacity>
               ))}
             </View>
+
+            {selectedPlatform === 'Otro' && (
+              <TextInput
+                value={customPlatform}
+                onChangeText={setCustomPlatform}
+                style={[styles.sheetInput, { marginTop: 10 }]}
+                placeholder={'Ej. Universidad Nacional, SENA, etc.'}
+                placeholderTextColor={theme.colors.text.placeholder}
+              />
+            )}
+
+            <Text style={[styles.sheetLabel, { marginTop: 12 }]}>{'Total de clases (opcional)'}</Text>
+            <TextInput
+              value={totalClasses}
+              onChangeText={setTotalClasses}
+              style={styles.sheetInput}
+              placeholder={'Ej. 50'}
+              placeholderTextColor={theme.colors.text.placeholder}
+              keyboardType="number-pad"
+            />
+
+            <Text style={[styles.sheetLabel, { marginTop: 16 }]}>{'URL del curso (opcional)'}</Text>
+            <TextInput
+              value={mainUrl}
+              onChangeText={setMainUrl}
+              style={styles.sheetInput}
+              placeholder={'https://platzi.com/cursos/react-native/'}
+              placeholderTextColor={theme.colors.text.placeholder}
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+
+            <Text style={[styles.sheetLabel, { marginTop: 12 }]}>{'Instructor (opcional)'}</Text>
+            <TextInput
+              value={instructor}
+              onChangeText={setInstructor}
+              style={styles.sheetInput}
+              placeholder={'Ej. Juan Pérez'}
+              placeholderTextColor={theme.colors.text.placeholder}
+            />
+
+            <Text style={[styles.sheetLabel, { marginTop: 12 }]}>{'Etiquetas (opcional)'}</Text>
+            <TextInput
+              value={tags}
+              onChangeText={setTags}
+              style={styles.sheetInput}
+              placeholder={'Frontend, React, Mobile'}
+              placeholderTextColor={theme.colors.text.placeholder}
+            />
           </ScrollView>
 
           <View style={styles.sheetActions}>

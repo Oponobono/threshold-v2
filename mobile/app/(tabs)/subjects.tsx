@@ -18,7 +18,6 @@ import { SubjectCard } from '../../src/components/subjects/SubjectCard';
 import { openCourseLink } from '../../src/utils/linking';
 import { ZyrenIngestionModal } from '../../src/components/subjects/ZyrenIngestionModal';
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
-import { CreateCourseModal } from '../../src/components/dashboard/CreateCourseModal';
 import { MomentumService } from '../../src/services/MomentumService';
 import { useDataStore } from '../../src/store/useDataStore';
 import { CoursePills } from '../../src/components/ui/CoursePills';
@@ -49,11 +48,8 @@ export default function SubjectsScreen() {
   const [zyrenModalVisible, setZyrenModalVisible] = useState(false);
   const [zyrenSubject, setZyrenSubject] = useState<{ id: string; name: string; courseId?: string | null; courseName?: string; milestone?: string } | null>(null);
 
-  // ── Estado para Crear Materia / Curso ──
   const [isCreationMenuVisible, setIsCreationMenuVisible] = useState(false);
   const [isCreateSubjectModalVisible, setIsCreateSubjectModalVisible] = useState(false);
-  const [isCreateCourseModalVisible, setIsCreateCourseModalVisible] = useState(false);
-
   // ── Tab de curso seleccionado (null = todas) ──
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
@@ -197,7 +193,7 @@ export default function SubjectsScreen() {
                   onPress={() => setIsCreationMenuVisible(true)}
                 >
                   <Ionicons name="add" size={20} color={theme.colors.text.inverse} />
-                  <Text style={{ color: theme.colors.text.inverse, fontWeight: '700' }}>Crear materia o curso</Text>
+                  <Text style={{ color: theme.colors.text.inverse, fontWeight: '700' }}>Crear materia</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -371,15 +367,6 @@ export default function SubjectsScreen() {
         }}
       />
 
-      <CreateCourseModal
-        visible={isCreateCourseModalVisible}
-        onClose={() => {
-          setIsCreateCourseModalVisible(false);
-          loadAllData(true);
-          refreshCourses();
-        }}
-      />
-
       <Modal visible={isCreationMenuVisible} transparent animationType="fade" onRequestClose={() => setIsCreationMenuVisible(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setIsCreationMenuVisible(false)}>
           <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }} onPress={() => null}>
@@ -396,19 +383,6 @@ export default function SubjectsScreen() {
               <View>
                 <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
                 <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Para clases individuales de tu Universidad</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16 }}
-              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsCreateCourseModalVisible(true), 300); }}
-            >
-              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#FF950020', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
-                <Ionicons name="layers" size={24} color="#FF9500" />
-              </View>
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nuevo Curso</Text>
-                <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Agrupa materias de Udemy, Platzi, etc.</Text>
               </View>
             </TouchableOpacity>
           </Pressable>

@@ -15,7 +15,7 @@ export async function initializeDatabase(): Promise<void> {
       if (entity_type === 'audio_recording') path = '/audio-recordings';  // ← Fix: was '/audio'
       if (entity_type === 'audio-transcript') path = '/audio-transcripts'; // ← Explicit mapping
       if (entity_type === 'scanned_document') path = '/scanned_documents';
-      if (entity_type === 'flashcard_deck') path = '/flashcard-decks';
+      // flashcard-deck: default path `${entity_type}s` already produces `/flashcard-decks`
       if (entity_type === 'assessment_files') path = `/assessments/${payload?.assessment_id}/files`;
 
       // Inyectar cloud_url fresca desde SQLite antes de enviar payload a la nube
@@ -96,17 +96,42 @@ export async function initializeDatabase(): Promise<void> {
         throw new Error(errData?.error || `HTTP ${response.status}`);
       }
 
-      // ── Post-sync cleanup: si se sincronizó exitosamente un flashcard-deck local
-      // (ID negativo), eliminarlo del MMKV para evitar duplicados con el UUID del backend.
-      if (operation === 'CREATE' && entity_type === 'flashcard-deck' && entity_id) {
-        const isNegativeId = !isNaN(Number(entity_id)) && Number(entity_id) < 0;
-        if (isNegativeId) {
-          try {
-            const { deleteLocalDeck } = await import('../localFlashcardService');
-            deleteLocalDeck(entity_id);
-            console.log(`[SyncService] Limpiado deck local ${entity_id} del MMKV tras sync exitoso`);
-          } catch (cleanupErr) {
-            console.warn('[SyncService] Error limpiando deck local de MMKV:', cleanupErr);
+      // ── Post-sync: guardar response de CREATE flashcard-deck en SQLite ──
+      // El mazo se creó en MMKV via saveImportedDeck pero el sync handler
+      // nunca persiste la respuesta del servidor en SQLite. Sin esto, el mazo
+      // desaparece tras el cleanup de MMKV y cualquier UPDATE posterior
+      // falla con "Mazo no encontrado" (404).
+      if (operation === 'CREATE' && entity_type === 'flashcard-deck') {
+        try {
+          const body = await response.json().catch(() => null);
+          if (body?.id) {
+            const { flashcardDeckRepository } = await import('./repositories/FlashcardDeckRepository');
+            await flashcardDeckRepository.upsert({
+              id: body.id,
+              user_id: body.user_id || payload?.user_id || '',
+              title: body.title || payload?.title || '',
+              description: body.description ?? payload?.description,
+              subject_id: body.subject_id ?? payload?.subject_id,
+              card_count: body.card_count ?? 0,
+              created_at: body.created_at || new Date().toISOString(),
+            });
+            console.log(`[SyncService] Mazo ${body.id} persistido en SQLite tras sync`);
+          }
+        } catch (saveErr) {
+          console.warn('[SyncService] Error guardando mazo en SQLite:', saveErr);
+        }
+
+        // Limpiar MMKV si era un ID negativo (deck puramente local)
+        if (entity_id) {
+          const isNegativeId = !isNaN(Number(entity_id)) && Number(entity_id) < 0;
+          if (isNegativeId) {
+            try {
+              const { deleteLocalDeck } = await import('../localFlashcardService');
+              deleteLocalDeck(entity_id);
+              console.log(`[SyncService] Limpiado deck local ${entity_id} del MMKV tras sync exitoso`);
+            } catch (cleanupErr) {
+              console.warn('[SyncService] Error limpiando deck local de MMKV:', cleanupErr);
+            }
           }
         }
       }

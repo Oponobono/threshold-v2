@@ -630,6 +630,27 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     if (messages.length > 0) scrollToBottom();
   }, [messages, isLoading, scrollToBottom]);
 
+  // ── Persistir historial a MMKV tras cada intercambio ──
+  // Sin esto, al cerrar y reabrir el modal (o si la nube no está disponible)
+  // el historial se pierde porque el estado React se descarta y la caché MMKV
+  // solo se escribía una vez en getChatHistory (stale snapshot).
+  const effectiveUserId = userId || 1;
+  useEffect(() => {
+    if (!subjectId || messages.length === 0) return;
+    const timer = setTimeout(() => {
+      try {
+        const mmkv = require('react-native-mmkv').createMMKV();
+        mmkv.set(
+          `cache:chat_history:${effectiveUserId}:${subjectId}`,
+          JSON.stringify({ session_id: sessionId, messages })
+        );
+      } catch (e) {
+        console.warn('[AIChat] Error guardando historial en caché:', e);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [messages, sessionId, subjectId, effectiveUserId]);
+
   /** Limpiar historial al cerrar */
   const handleClose = useCallback(() => {
     setMessages([]);

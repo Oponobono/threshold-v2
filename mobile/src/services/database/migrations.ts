@@ -336,6 +336,26 @@ const migrations: Migration[] = [
       `ALTER TABLE flashcards ADD COLUMN source_context TEXT`
     ],
   },
+  {
+    version: 10,
+    up: [
+      `ALTER TABLE courses ADD COLUMN main_url TEXT`,
+      `ALTER TABLE courses ADD COLUMN deep_link_url TEXT`,
+      `ALTER TABLE courses ADD COLUMN instructor TEXT`,
+      `ALTER TABLE courses ADD COLUMN total_hours INTEGER DEFAULT 0`,
+      `ALTER TABLE courses ADD COLUMN status TEXT DEFAULT 'active'`,
+      `ALTER TABLE courses ADD COLUMN global_notes TEXT`,
+      `ALTER TABLE courses ADD COLUMN tags TEXT`,
+    ],
+  },
+  {
+    version: 11,
+    up: [
+      `ALTER TABLE courses ADD COLUMN total_classes INTEGER DEFAULT 0`,
+      `ALTER TABLE courses ADD COLUMN completed_classes INTEGER DEFAULT 0`,
+      `UPDATE courses SET total_classes = COALESCE((SELECT SUM(total_lessons) FROM subjects WHERE course_id = courses.id), 0), completed_classes = COALESCE((SELECT SUM(completed_lessons) FROM subjects WHERE course_id = courses.id), 0)`,
+    ],
+  },
 ];
 
 export default migrations;

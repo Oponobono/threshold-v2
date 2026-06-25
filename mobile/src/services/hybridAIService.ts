@@ -385,7 +385,7 @@ export async function getChatHistory(userId: string | number, subjectId: string 
   } catch (e) {
     console.warn('Error leyendo historial de chat desde caché:', e);
   }
-  return { history: [] };
+  return { session_id: undefined, messages: [] };
 }
 
 /**

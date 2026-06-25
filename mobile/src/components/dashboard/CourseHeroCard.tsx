@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Pressable } from 
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { Course, Subject } from '../../services/api/types';
+import { openCourseLink } from '../../utils/linking';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export const HERO_CARD_WIDTH = SCREEN_WIDTH - 48; // 16px visible margin each side + 16px gap between cards
@@ -84,8 +85,37 @@ export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress,
           )}
         </View>
 
+      {course.instructor ? (
+        <View style={styles.instructorRow}>
+          <Ionicons name="person-outline" size={12} color={theme.colors.text.placeholder} />
+          <Text style={styles.instructorText} numberOfLines={1}>{course.instructor}</Text>
+        </View>
+      ) : null}
+
       {/* Course Name */}
       <Text style={styles.courseName} numberOfLines={2}>{course.name}</Text>
+
+      {/* Tags */}
+      {course.tags ? (
+        <View style={styles.tagsRow}>
+          {course.tags.split(',').map((tag, i) => (
+            <View key={i} style={styles.tagBadge}>
+              <Text style={styles.tagText}>{tag.trim()}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {/* main_url external link */}
+      {course.main_url && (
+        <TouchableOpacity
+          style={styles.mainUrlRow}
+          onPress={() => openCourseLink(course.main_url!)}
+        >
+          <Ionicons name="open-outline" size={12} color={theme.colors.primary} />
+          <Text style={styles.mainUrlText} numberOfLines={1}>Ir al curso original</Text>
+        </TouchableOpacity>
+      )}
 
       {/* URL hint */}
       {displayUrl && (
@@ -274,6 +304,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#FF9500',
+  },
+  instructorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  instructorText: {
+    fontSize: 12,
+    color: theme.colors.text.placeholder,
+    fontWeight: '500',
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 8,
+  },
+  tagBadge: {
+    backgroundColor: theme.colors.primary + '18',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  tagText: {
+    fontSize: 10,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  mainUrlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  mainUrlText: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   courseName: {
     fontSize: 20,

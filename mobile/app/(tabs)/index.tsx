@@ -373,6 +373,42 @@ export default function HybridDashboardScreen() {
     return enrichedSubjects; // 'all'
   }, [enrichedSubjects, selectedDashboardCourseId]);
 
+  const selectedCourse = useMemo(() => {
+    if (!selectedDashboardCourseId || selectedDashboardCourseId === 'independent') return null;
+    return courses.find(c => c.id === selectedDashboardCourseId) ?? null;
+  }, [selectedDashboardCourseId, courses]);
+
+  const isFlatCourse = useMemo(() => {
+    if (!selectedCourse) return false;
+    return filteredEnrichedSubjects.length === 0 || (selectedCourse.total_classes ?? 0) > 0;
+  }, [selectedCourse, filteredEnrichedSubjects]);
+
+  const handleIncrementClass = useCallback(async () => {
+    if (!selectedCourse) return;
+    try {
+      await courseRepository.incrementClass(selectedCourse.id);
+      const updated = await courseRepository.getById(selectedCourse.id);
+      if (updated) {
+        setCourses(prev => prev.map(c => c.id === updated.id ? updated : c));
+      }
+    } catch (err) {
+      console.error('[Dashboard] Error incrementando clase:', err);
+    }
+  }, [selectedCourse]);
+
+  const handleDecrementClass = useCallback(async () => {
+    if (!selectedCourse) return;
+    try {
+      await courseRepository.decrementClass(selectedCourse.id);
+      const updated = await courseRepository.getById(selectedCourse.id);
+      if (updated) {
+        setCourses(prev => prev.map(c => c.id === updated.id ? updated : c));
+      }
+    } catch (err) {
+      console.error('[Dashboard] Error decrementando clase:', err);
+    }
+  }, [selectedCourse]);
+
   const carouselSubjects = useMemo(() => {
     if (!filteredEnrichedSubjects.length) return [] as (Subject & { __key: string })[];
     const base = filteredEnrichedSubjects;
@@ -557,8 +593,21 @@ export default function HybridDashboardScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Empty state: no courses */}
+          {courses.length === 0 && enrichedSubjects.length === 0 ? (
+            <View style={styles.emptyCourseCard}>
+              <Ionicons name="school" size={40} color={theme.colors.primary} />
+              <Text style={styles.emptyCourseTitle}>Aún no tienes cursos</Text>
+              <Text style={styles.emptyCourseSubtext}>Crea un curso o semestre para organizar tus materias y evaluar tu rendimiento académico.</Text>
+              <TouchableOpacity style={styles.emptyCourseBtn} onPress={() => setIsCourseModalVisible(true)}>
+                <Ionicons name="add" size={18} color={theme.colors.white} />
+                <Text style={styles.emptyCourseBtnText}>Crear mi primer curso</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {/* Hero Carousel — one card per course, paginated */}
-          {(courses.length > 0 || enrichedSubjects.length > 0) && (
+          {courses.length > 0 && (
             <>
               {/* marginHorizontal: -24 neutraliza el paddingHorizontal del ScrollView padre */}
               <View style={{ marginHorizontal: -24 }}>
@@ -639,6 +688,92 @@ export default function HybridDashboardScreen() {
             </>
           )}
 
+          {/* QuickActionRow: class progress for flat courses */}
+          {selectedCourse && isFlatCourse && selectedCourse.total_classes ? (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 12,
+              paddingHorizontal: 8,
+              paddingVertical: 10,
+              backgroundColor: theme.colors.card,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <TouchableOpacity
+                onPress={handleDecrementClass}
+                disabled={(selectedCourse.completed_classes ?? 0) === 0}
+                style={{
+                  width: 40, height: 40, borderRadius: 20,
+                  backgroundColor: (selectedCourse.completed_classes ?? 0) === 0
+                    ? theme.colors.border : theme.colors.primary + '20',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Ionicons
+                  name="remove"
+                  size={22}
+                  color={(selectedCourse.completed_classes ?? 0) === 0
+                    ? theme.colors.text.placeholder : theme.colors.primary}
+                />
+              </TouchableOpacity>
+
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <View style={{
+                  flexDirection: 'row', alignItems: 'baseline', gap: 2,
+                }}>
+                  <Text style={{
+                    fontSize: 26, fontWeight: '800', color: theme.colors.text.primary,
+                  }}>
+                    {selectedCourse.completed_classes ?? 0}
+                  </Text>
+                  <Text style={{
+                    fontSize: 18, fontWeight: '600', color: theme.colors.text.placeholder,
+                  }}>
+                    /{selectedCourse.total_classes}
+                  </Text>
+                </View>
+                <View style={{
+                  width: '80%', height: 4, borderRadius: 2,
+                  backgroundColor: theme.colors.border, marginTop: 4, overflow: 'hidden',
+                }}>
+                  <View style={{
+                    width: `${Math.min(
+                      ((selectedCourse.completed_classes ?? 0) / selectedCourse.total_classes) * 100, 100
+                    )}%` as any,
+                    height: '100%', borderRadius: 2,
+                    backgroundColor: theme.colors.primary,
+                  }} />
+                </View>
+                <Text style={{
+                  fontSize: 11, color: theme.colors.text.placeholder, marginTop: 4,
+                }}>
+                  clases vistas
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleIncrementClass}
+                disabled={(selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes}
+                style={{
+                  width: 40, height: 40, borderRadius: 20,
+                  backgroundColor: (selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes
+                    ? theme.colors.border : theme.colors.primary + '20',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Ionicons
+                  name="add"
+                  size={22}
+                  color={(selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes
+                    ? theme.colors.text.placeholder : theme.colors.primary}
+                />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {/* Subjects carousel filtered by active course */}
           <View style={{ marginTop: 16 }}>
             <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>
@@ -649,17 +784,7 @@ export default function HybridDashboardScreen() {
                 : courses.find(c => c.id === selectedDashboardCourseId)?.name ?? 'Materias'}
             </Text>
 
-            {courses.length === 0 ? (
-              <View style={styles.emptyCourseCard}>
-                <Ionicons name="school" size={40} color={theme.colors.primary} />
-                <Text style={styles.emptyCourseTitle}>Aún no tienes cursos</Text>
-                <Text style={styles.emptyCourseSubtext}>Crea un curso o semestre para organizar tus materias y evaluar tu rendimiento académico.</Text>
-                <TouchableOpacity style={styles.emptyCourseBtn} onPress={() => setIsCourseModalVisible(true)}>
-                  <Ionicons name="add" size={18} color={theme.colors.white} />
-                  <Text style={styles.emptyCourseBtnText}>Crear mi primer curso</Text>
-                </TouchableOpacity>
-              </View>
-            ) : filteredEnrichedSubjects.length === 0 ? (
+            {filteredEnrichedSubjects.length === 0 ? (
               <View style={styles.emptySubjectsCard}>
                 <Feather name="layout" size={22} color={theme.colors.text.placeholder} />
                 <Text style={styles.emptySubjectsText}>

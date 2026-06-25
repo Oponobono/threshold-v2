@@ -207,8 +207,6 @@ export function ZyrenIngestionModal({
     }
     setStep('saving');
     try {
-      const numericSubjectId = subjectId ? (parseInt(subjectId, 10) || null) : null;
-
       const deck = await saveImportedDeck(
         `${generatedTopic} — ${subjectName} (${new Date().toLocaleDateString('es')})`,
         `Mazo generado por Zyren desde apuntes de clase`,
@@ -216,7 +214,7 @@ export function ZyrenIngestionModal({
           type: 'flashcard' as const,
           data: { front: card.front, back: card.back },
         })),
-        numericSubjectId,
+        subjectId || null,
       );
 
       for (const card of toSave) {

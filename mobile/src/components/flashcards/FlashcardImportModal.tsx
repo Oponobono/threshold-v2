@@ -349,7 +349,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         sanitizeText(deckData.title),
         sanitizeText(deckData.description),
         cards,
-        null,
+        deckData.subject_id ? String(deckData.subject_id) : null,
       );
 
       // OFFLINE-FIRST: Persistir cada tarjeta individualmente en MMKV
@@ -415,7 +415,7 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       
       // Si se seleccionó materia, actualizarla
       if (selectedSubjectId) {
-        updateLocalDeckSubject(importedDeck.id, Number(selectedSubjectId));
+        updateLocalDeckSubject(importedDeck.id, String(selectedSubjectId));
       }
       
       showAlert({

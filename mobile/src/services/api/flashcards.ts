@@ -90,7 +90,7 @@ export const createFlashcardDeck = async (payload: { subject_id?: string; title:
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardDeckRepository.upsert(data);
+      await flashcardDeckRepository.upsert(await mergeDeckWithLocal(data));
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -98,6 +98,18 @@ export const createFlashcardDeck = async (payload: { subject_id?: string; title:
     await syncService.enqueueCreate('flashcard-deck', id, { ...payload, id });
     return deck;
   }
+};
+
+const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
+  const localRecord = await flashcardDeckRepository.getById(serverDeck.id);
+  if (!localRecord) return serverDeck;
+  return {
+    ...serverDeck,
+    subject_id: serverDeck.subject_id ?? localRecord.subject_id ?? null,
+    subject_name: serverDeck.subject_name ?? localRecord.subject_name ?? null,
+    subject_color: serverDeck.subject_color ?? localRecord.subject_color ?? null,
+    subject_icon: serverDeck.subject_icon ?? localRecord.subject_icon ?? null,
+  };
 };
 
 export const updateFlashcardDeck = async (deckId: string, payload: any): Promise<any> => {
@@ -111,7 +123,7 @@ export const updateFlashcardDeck = async (deckId: string, payload: any): Promise
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardDeckRepository.upsert(data);
+      await flashcardDeckRepository.upsert(await mergeDeckWithLocal(data));
       return data;
     }
     throw new Error(data?.error || 'Error al actualizar el mazo');
