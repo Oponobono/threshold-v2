@@ -81,13 +81,16 @@ export const useDataStore = create<DataState>((set, get) => ({
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
 
-      const { getSubjects, getAllAssessments, getAllSchedules, getCourses } = await import('../services/api');
+      const { getSubjects, getAllAssessments, getAllSchedules, getCourses, repairSubjectCourseLinks } = await import('../services/api');
       const [subjectsData, assessmentsData, schedulesData, _] = await Promise.all([
         getSubjects().catch(() => null),
         getAllAssessments().catch(() => null),
         getAllSchedules().catch(() => null),
         getCourses().catch(() => null), // <-- Descarga de cursos
       ]);
+
+      // Reparar enlaces curso-materia y actualizar contadores
+      await repairSubjectCourseLinks().catch(() => {});
 
       // Si subjectsData es un array (incluso vacío), lo guardamos.
       // Así evitamos el bug donde borrar la última materia no se refleja.
@@ -111,10 +114,11 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshSubjects: async () => {
     try {
-      const { getSubjects, getCourses } = await import('../services/api');
+      const { getSubjects, getCourses, repairSubjectCourseLinks } = await import('../services/api');
       await getCourses(); // Sincroniza cursos también al refrescar materias
       const data = await getSubjects();
       if (data) set({ subjects: data as any });
+      await repairSubjectCourseLinks().catch(() => {});
     } catch (error) {
       console.error('[DataStore] refreshSubjects error:', error);
     }

@@ -47,7 +47,10 @@ export const getSubjectById = async (subjectId: string): Promise<Subject | null>
         const response = await fetchWithFallback(`/subject/${subjectId}`);
         if (response.ok) {
           const data = await parseJsonSafely(response);
-          if (data && !pendingDelete.has(subjectId)) await subjectRepository.upsert(data);
+          if (data && !pendingDelete.has(subjectId)) {
+            const merged = await mergeWithLocal(data);
+            await subjectRepository.upsert(merged);
+          }
         }
       } catch {}
       finally { subjectByIdSyncInProgress = false; }
@@ -74,17 +77,18 @@ const mergeWithLocal = async (serverSubject: Subject): Promise<Subject> => {
   if (!localRecord) return serverSubject;
   return {
     ...serverSubject,
-    // Si el servidor manda course_id explícito (incluso null), usar ese valor.
-    // Solo preservar el local si el servidor manda undefined (campo no incluido en respuesta).
-    course_id: serverSubject.course_id !== undefined
+    // Preservar el valor local si el servidor devuelve null (condición de carrera:
+    // el curso aún no se sincronizó o el servidor no tiene el campo).
+    // Solo sobreescribir cuando el servidor envía un valor no nulo.
+    course_id: serverSubject.course_id != null
       ? serverSubject.course_id
       : (localRecord.course_id ?? null),
-    external_url: serverSubject.external_url !== undefined
+    external_url: serverSubject.external_url != null
       ? serverSubject.external_url
       : (localRecord.external_url ?? null),
     total_lessons: serverSubject.total_lessons ?? localRecord.total_lessons ?? 0,
     completed_lessons: serverSubject.completed_lessons ?? localRecord.completed_lessons ?? 0,
-    next_micro_milestone: serverSubject.next_micro_milestone !== undefined
+    next_micro_milestone: serverSubject.next_micro_milestone != null
       ? serverSubject.next_micro_milestone
       : (localRecord.next_micro_milestone ?? null),
   };
@@ -172,13 +176,14 @@ export const createSubject = async (payload: {
     icon: payload.icon || 'book-outline',
     credits: payload.credits || 0,
     target_grade: payload.target_grade,
-    course_id: payload.course_id || null,
+    course_id: payload.course_id ?? null,
     avg_score: 0,
     normalized_avg_score: 0,
     completion_percent: 0,
   };
 
   await subjectRepository.create(subject);
+  await updateCourseCounters(subject.course_id);
 
   try {
     const response = await fetchWithFallback('/subjects', {
@@ -198,9 +203,34 @@ export const createSubject = async (payload: {
   }
 };
 
+const updateCourseCounters = async (courseId: string | null | undefined): Promise<void> => {
+  if (!courseId) return;
+  try {
+    const { courseRepository } = await import('../database/repositories/CourseRepository');
+    const linked = await subjectRepository.getByField('course_id', courseId);
+    const total = linked.reduce((sum, s) => sum + ((s as any).total_lessons ?? 0), 0);
+    const completed = linked.reduce((sum, s) => sum + ((s as any).completed_lessons ?? 0), 0);
+    await courseRepository.update(courseId, {
+      total_classes: total as any,
+      completed_classes: completed as any,
+    } as any);
+  } catch (e) {
+    console.warn('[updateCourseCounters] Error:', e);
+  }
+};
+
 export const updateSubject = async (subjectId: string, payload: Partial<Subject>): Promise<any> => {
-  // 1. Persistir localmente primero (offline-first)
+  // 1. Leer subject actual para detectar cambio de course_id
+  const prev = await subjectRepository.getById(subjectId);
+
+  // 2. Persistir localmente primero (offline-first)
   await subjectRepository.update(subjectId, payload);
+
+  // 3. Actualizar contadores del curso anterior y nuevo si cambió course_id
+  if (prev?.course_id !== payload.course_id) {
+    await updateCourseCounters(prev?.course_id);
+    await updateCourseCounters(payload.course_id);
+  }
 
   try {
     const response = await fetchWithFallback(`/subjects/${subjectId}`, {
@@ -254,6 +284,46 @@ export const deleteSubject = async (subjectId: string) => {
     await syncService.enqueueDelete('subject', subjectId);
     pendingDelete.delete(subjectId);
     return { success: true, _isPending: true };
+  }
+};
+
+/**
+ * Repara enlaces curso-materia perdidos y actualiza contadores.
+ * Se ejecuta en cada inicio de app vía loadAllData().
+ *
+ * 1. Recalcula total_classes / completed_classes de cada curso
+ *    a partir de las materias vinculadas en SQLite local.
+ * 2. Si una materia tiene course_id pero el curso no existe localmente,
+ *    desvincula la materia (course_id = null).
+ */
+export const repairSubjectCourseLinks = async (): Promise<void> => {
+  try {
+    const { courseRepository } = await import('../database/repositories/CourseRepository');
+    const subjects = await subjectRepository.getAll();
+    const courses = await courseRepository.getAll();
+    const courseIds = new Set(courses.map(c => c.id));
+
+    // Desvincular materias cuyo curso fue eliminado
+    for (const sub of subjects) {
+      if (sub.course_id && !courseIds.has(sub.course_id)) {
+        await subjectRepository.update(sub.id, { course_id: null });
+      }
+    }
+
+    // Recalcular contadores de cada curso
+    for (const course of courses) {
+      const linked = subjects.filter(s => s.course_id === course.id);
+      const total = linked.reduce((sum, s) => sum + (s.total_lessons ?? 0), 0);
+      const completed = linked.reduce((sum, s) => sum + (s.completed_lessons ?? 0), 0);
+      if (course.total_classes !== total || course.completed_classes !== completed) {
+        await courseRepository.update(course.id, {
+          total_classes: total,
+          completed_classes: completed,
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('[repairSubjectCourseLinks] Error:', e);
   }
 };
 
