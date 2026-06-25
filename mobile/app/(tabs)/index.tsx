@@ -689,14 +689,14 @@ export default function HybridDashboardScreen() {
           )}
 
           {/* QuickActionRow: class progress for flat courses */}
-          {selectedCourse && isFlatCourse && selectedCourse.total_classes ? (
+          {selectedCourse && (selectedCourse.total_classes ?? 0) > 0 ? (
             <View style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
               marginTop: 12,
-              paddingHorizontal: 8,
-              paddingVertical: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 12,
               backgroundColor: theme.colors.card,
               borderRadius: 14,
               borderWidth: 1,
@@ -705,16 +705,17 @@ export default function HybridDashboardScreen() {
               <TouchableOpacity
                 onPress={handleDecrementClass}
                 disabled={(selectedCourse.completed_classes ?? 0) === 0}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={{
-                  width: 40, height: 40, borderRadius: 20,
+                  width: 32, height: 32, borderRadius: 16,
                   backgroundColor: (selectedCourse.completed_classes ?? 0) === 0
-                    ? theme.colors.border : theme.colors.primary + '20',
+                    ? theme.colors.border : theme.colors.primary + '15',
                   alignItems: 'center', justifyContent: 'center',
                 }}
               >
                 <Ionicons
                   name="remove"
-                  size={22}
+                  size={16}
                   color={(selectedCourse.completed_classes ?? 0) === 0
                     ? theme.colors.text.placeholder : theme.colors.primary}
                 />
@@ -722,22 +723,22 @@ export default function HybridDashboardScreen() {
 
               <View style={{ alignItems: 'center', flex: 1 }}>
                 <View style={{
-                  flexDirection: 'row', alignItems: 'baseline', gap: 2,
+                  flexDirection: 'row', alignItems: 'baseline', gap: 1,
                 }}>
                   <Text style={{
-                    fontSize: 26, fontWeight: '800', color: theme.colors.text.primary,
+                    fontSize: 20, fontWeight: '600', color: theme.colors.text.primary,
                   }}>
                     {selectedCourse.completed_classes ?? 0}
                   </Text>
                   <Text style={{
-                    fontSize: 18, fontWeight: '600', color: theme.colors.text.placeholder,
+                    fontSize: 13, fontWeight: '400', color: theme.colors.text.placeholder,
                   }}>
                     /{selectedCourse.total_classes}
                   </Text>
                 </View>
                 <View style={{
-                  width: '80%', height: 4, borderRadius: 2,
-                  backgroundColor: theme.colors.border, marginTop: 4, overflow: 'hidden',
+                  width: '64%', height: 3, borderRadius: 2,
+                  backgroundColor: theme.colors.border, marginTop: 6, overflow: 'hidden',
                 }}>
                   <View style={{
                     width: `${Math.min(
@@ -748,7 +749,7 @@ export default function HybridDashboardScreen() {
                   }} />
                 </View>
                 <Text style={{
-                  fontSize: 11, color: theme.colors.text.placeholder, marginTop: 4,
+                  fontSize: 10, color: theme.colors.text.placeholder, marginTop: 6, fontWeight: '400',
                 }}>
                   clases vistas
                 </Text>
@@ -757,16 +758,17 @@ export default function HybridDashboardScreen() {
               <TouchableOpacity
                 onPress={handleIncrementClass}
                 disabled={(selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={{
-                  width: 40, height: 40, borderRadius: 20,
+                  width: 32, height: 32, borderRadius: 16,
                   backgroundColor: (selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes
-                    ? theme.colors.border : theme.colors.primary + '20',
+                    ? theme.colors.border : theme.colors.primary + '15',
                   alignItems: 'center', justifyContent: 'center',
                 }}
               >
                 <Ionicons
                   name="add"
-                  size={22}
+                  size={16}
                   color={(selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes
                     ? theme.colors.text.placeholder : theme.colors.primary}
                 />
