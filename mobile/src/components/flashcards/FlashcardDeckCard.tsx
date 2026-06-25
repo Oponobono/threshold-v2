@@ -33,6 +33,23 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
   deck, isShared, currentUserId, isDue, onPress, onLongPress,
 }: DeckCardProps) {
   const { t } = useTranslation();
+
+  const hasExam = !!(deck as any).linked_exam_title;
+  const examDate = (deck as any).linked_exam_date;
+  const examDays = examDate ? (() => {
+    try {
+      let d: Date;
+      if (examDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        d = new Date(examDate);
+      } else {
+        const [day, month, year] = examDate.split('-').map(Number);
+        d = new Date(year, month - 1, day);
+      }
+      return Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    } catch { return null; }
+  })() : null;
+  const examColor = examDays === null ? '#9E9E9E' : examDays <= 3 ? '#D32F2F' : examDays <= 7 ? '#F57C00' : examDays <= 14 ? '#F9A825' : '#388E3C';
+
   return (
     <Pressable
       onPress={onPress}
@@ -95,7 +112,20 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
         >
           {(deck as any).subject_name || t('flashcards.noSubject')}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+        {hasExam && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: examColor + '18', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
+              <Ionicons name="calendar" size={11} color={examColor} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: examColor }} numberOfLines={1}>
+                {(deck as any).linked_exam_title}
+              </Text>
+              <Text style={{ fontSize: 10, color: examColor, opacity: 0.7 }} numberOfLines={1}>
+                {examDays !== null ? (examDays < 0 ? '· Pasado' : examDays === 0 ? '· Hoy' : examDays === 1 ? '· Mañana' : `· ${examDays}d`) : ''}
+              </Text>
+            </View>
+          </View>
+        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: hasExam ? 4 : 6 }}>
           <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
             {Number(deck.card_count ?? 0)} {t('flashcards.cards')}
           </Text>

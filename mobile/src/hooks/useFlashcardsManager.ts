@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { getFlashcardDecksWithMetrics, type FlashcardDeck, type Subject } from '../services/api';
-import { flashcardDeckRepository } from '../services/database';
+import { flashcardDeckRepository, calendarEventRepository } from '../services/database';
 import { getLocalDecksForCurrentUser, type LocalDeck } from '../services/localFlashcardService';
 import { getUserId } from '../services/api/auth';
 
@@ -16,6 +16,28 @@ export interface FlashcardsManagerResult {
   subjects: Subject[];
   filteredDecks: FlashcardDeck[];
   loadDecks: (options?: { skipCache?: boolean; cooldownMs?: number }) => Promise<void>;
+}
+
+async function enrichDecksWithExamInfo(decks: FlashcardDeck[]): Promise<FlashcardDeck[]> {
+  try {
+    const allEvents = await calendarEventRepository.getAll();
+    const examMap = new Map<string, { title: string; start_date: string }>();
+    for (const evt of allEvents) {
+      const deckId = (evt as any).linked_deck_id;
+      if (deckId) {
+        examMap.set(deckId, { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
+      }
+    }
+    return decks.map(d => {
+      const exam = examMap.get(d.id);
+      if (exam) {
+        return { ...d, linked_exam_title: exam.title, linked_exam_date: exam.start_date };
+      }
+      return d;
+    });
+  } catch {
+    return decks;
+  }
 }
 
 function localDeckToFlashcardDeck(local: LocalDeck, subjects: Subject[] = []): FlashcardDeck {
@@ -101,8 +123,11 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
 
       // Solo mostrar loading si realmente no hay datos previos
       if (cachedWithLocal.length > 0 && generation === loadGenRef.current) {
-        setDecks(cachedWithLocal);
-        setIsLoading(false);
+        const enriched = await enrichDecksWithExamInfo(cachedWithLocal);
+        if (generation === loadGenRef.current) {
+          setDecks(enriched);
+          setIsLoading(false);
+        }
       } else if (generation === loadGenRef.current) {
         setIsLoading(true);
       }
@@ -111,13 +136,21 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
       try {
         const data = await getFlashcardDecksWithMetrics();
         if (generation === loadGenRef.current) {
-          setDecks(mergeLocalDecks(Array.isArray(data) ? data : [], currentUserId));
-          lastLoadedAtRef.current = Date.now();
+          const merged = mergeLocalDecks(Array.isArray(data) ? data : [], currentUserId);
+          const enriched = await enrichDecksWithExamInfo(merged);
+          if (generation === loadGenRef.current) {
+            setDecks(enriched);
+            lastLoadedAtRef.current = Date.now();
+          }
         }
       } catch (e) {
         console.warn('[useFlashcardsManager] Error cargando mazos:', e);
         if (generation === loadGenRef.current && cachedWithLocal.length === 0) {
-          setDecks(mergeLocalDecks([], currentUserId));
+          const merged = mergeLocalDecks([], currentUserId);
+          const enriched = await enrichDecksWithExamInfo(merged);
+          if (generation === loadGenRef.current) {
+            setDecks(enriched);
+          }
         }
       } finally {
         if (generation === loadGenRef.current) {

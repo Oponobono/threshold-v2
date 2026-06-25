@@ -376,13 +376,14 @@ export default function FlashcardsScreen() {
         visible={!!linkExamTarget}
         deck={linkExamTarget}
         onClose={() => setLinkExamTarget(null)}
-        onLinked={(examTitle) => {
+        onLinked={async (examTitle) => {
           showAlert({
             title: '¡Modo Examen activo!',
             message: `El mazo "${linkExamTarget?.title}" ya está vinculado a "${examTitle}". Los intervalos se comprimirán automáticamente.`,
             type: 'success',
           });
           setLinkExamTarget(null);
+          await loadDecks({ skipCache: true });
         }}
       />
 

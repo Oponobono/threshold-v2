@@ -35,6 +35,7 @@ import { getUserGroups, getGroupDecks } from '../../services/api/learning/groups
 
 import { GroupPills } from './GroupPills';
 import { LinkExamModal } from './LinkExamModal';
+import { calendarEventRepository } from '../../services/database';
 
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
 import { FlashcardNewDeckScreen } from './FlashcardNewDeckScreen';
@@ -146,6 +147,28 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
+  async function enrichWithExamInfo(decks: FlashcardDeck[]): Promise<FlashcardDeck[]> {
+    try {
+      const allEvents = await calendarEventRepository.getAll();
+      const examMap = new Map<string, { title: string; start_date: string }>();
+      for (const evt of allEvents) {
+        const deckId = (evt as any).linked_deck_id;
+        if (deckId) {
+          examMap.set(deckId, { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
+        }
+      }
+      return decks.map(d => {
+        const exam = examMap.get(d.id);
+        if (exam) {
+          return { ...d, linked_exam_title: exam.title, linked_exam_date: exam.start_date } as FlashcardDeck;
+        }
+        return d;
+      });
+    } catch {
+      return decks;
+    }
+  }
+
   const loadDecks = async () => {
     try {
       const data = await getFlashcardDecksWithMetrics();
@@ -160,7 +183,9 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
         return true;
       });
       
-      setDecks([...filteredData, ...localDecks] as any);
+      const merged = [...filteredData, ...localDecks] as FlashcardDeck[];
+      const enriched = await enrichWithExamInfo(merged);
+      setDecks(enriched);
     } catch (e) {
       console.warn('Error loading decks:', e);
     }
@@ -596,13 +621,14 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
         visible={!!linkExamTarget}
         deck={linkExamTarget}
         onClose={() => setLinkExamTarget(null)}
-        onLinked={(examTitle) => {
+        onLinked={async (examTitle) => {
           showAlert({
             title: '¡Modo Examen activo!',
             message: `El mazo "${linkExamTarget?.title}" ya está vinculado a "${examTitle}". Los intervalos se comprimirán automáticamente.`,
             type: 'success',
           });
           setLinkExamTarget(null);
+          await loadDecks();
         }}
       />
 
