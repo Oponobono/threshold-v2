@@ -41,8 +41,8 @@ export default function SubjectsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const g = useSubjects(t);
-  const { loadAllData } = useDataStore();
-  const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore, refreshCourses } = useGroupedSubjects(g.filteredSubjects);
+  const { courses, loadAllData, refreshCourses } = useDataStore();
+  const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore } = useGroupedSubjects(courses, g.filteredSubjects);
 
   // ── Fase 5: Estado del modal de ingesta de Zyren ──
   const [zyrenModalVisible, setZyrenModalVisible] = useState(false);

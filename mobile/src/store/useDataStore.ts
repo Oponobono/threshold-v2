@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { Subject, Assessment, Schedule } from '../services/api';
+import { Course, Subject, Assessment, Schedule } from '../services/api';
 import {
+  courseRepository,
   subjectRepository,
   assessmentRepository,
   scheduleRepository,
@@ -9,6 +10,7 @@ import {
 } from '../services/database';
 
 interface DataState {
+  courses: Course[];
   subjects: Subject[];
   assessments: Assessment[];
   schedules: Schedule[];
@@ -25,6 +27,7 @@ interface DataState {
   _lastLoadAllDataTimestamp: number;
 
   loadAllData: (forceRefresh?: boolean) => Promise<void>;
+  refreshCourses: () => Promise<void>;
   refreshSubjects: () => Promise<void>;
   refreshAssessments: () => Promise<void>;
   refreshSchedules: () => Promise<void>;
@@ -36,6 +39,7 @@ interface DataState {
 }
 
 export const useDataStore = create<DataState>((set, get) => ({
+  courses: [],
   subjects: [],
   assessments: [],
   schedules: [],
@@ -72,6 +76,8 @@ export const useDataStore = create<DataState>((set, get) => ({
     try {
       await databaseService.open();
 
+      const dbCourses = await courseRepository.getAll() as any;
+      set({ courses: dbCourses });
       const dbSubjects = await subjectRepository.getAll() as any;
       set({ subjects: dbSubjects });
       const dbAssessments = await assessmentRepository.getAll() as any;
@@ -81,19 +87,18 @@ export const useDataStore = create<DataState>((set, get) => ({
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
 
-      const { getSubjects, getAllAssessments, getAllSchedules, getCourses, repairSubjectCourseLinks } = await import('../services/api');
-      const [subjectsData, assessmentsData, schedulesData, _] = await Promise.all([
+      const { getCourses, getSubjects, getAllAssessments, getAllSchedules, repairSubjectCourseLinks } = await import('../services/api');
+      const [coursesData, subjectsData, assessmentsData, schedulesData] = await Promise.all([
+        getCourses().catch(() => null),
         getSubjects().catch(() => null),
         getAllAssessments().catch(() => null),
         getAllSchedules().catch(() => null),
-        getCourses().catch(() => null), // <-- Descarga de cursos
       ]);
 
       // Reparar enlaces curso-materia y actualizar contadores
       await repairSubjectCourseLinks().catch(() => {});
 
-      // Si subjectsData es un array (incluso vacío), lo guardamos.
-      // Así evitamos el bug donde borrar la última materia no se refleja.
+      if (coursesData && Array.isArray(coursesData)) set({ courses: coursesData });
       if (subjectsData && Array.isArray(subjectsData)) set({ subjects: subjectsData });
       if (assessmentsData && Array.isArray(assessmentsData)) set({ assessments: assessmentsData });
       if (schedulesData && Array.isArray(schedulesData)) set({ schedules: schedulesData });
@@ -112,10 +117,21 @@ export const useDataStore = create<DataState>((set, get) => ({
     }
   },
 
+  refreshCourses: async () => {
+    try {
+      const { getCourses } = await import('../services/api');
+      const data = await getCourses();
+      if (data && Array.isArray(data)) set({ courses: data as any });
+    } catch (error) {
+      console.error('[DataStore] refreshCourses error:', error);
+    }
+  },
+
   refreshSubjects: async () => {
     try {
-      const { getSubjects, getCourses, repairSubjectCourseLinks } = await import('../services/api');
-      await getCourses(); // Sincroniza cursos también al refrescar materias
+      const { getCourses, getSubjects, repairSubjectCourseLinks } = await import('../services/api');
+      const coursesData = await getCourses();
+      if (coursesData && Array.isArray(coursesData)) set({ courses: coursesData as any });
       const data = await getSubjects();
       if (data) set({ subjects: data as any });
       await repairSubjectCourseLinks().catch(() => {});

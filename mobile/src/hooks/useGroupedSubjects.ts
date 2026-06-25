@@ -1,7 +1,4 @@
 import { useState, useCallback, useMemo } from 'react';
-import { useFocusEffect } from 'expo-router';
-import { InteractionManager } from 'react-native';
-import { courseRepository } from '../services/database';
 import { Course } from '../services/api/types';
 
 export interface SubjectSection {
@@ -9,29 +6,11 @@ export interface SubjectSection {
   courseName: string;
   coursePlatform?: string;
   mainUrl?: string;
-  data: any[]; // Las materias enriquecidas (filteredSubjects)
+  data: any[];
 }
 
-export function useGroupedSubjects(subjects: any[]) {
-  const [courses, setCourses] = useState<Course[]>([]);
+export function useGroupedSubjects(courses: Course[], subjects: any[]) {
   const [collapsedCourses, setCollapsedCourses] = useState<Record<string, boolean>>({});
-  
-  const loadCourses = useCallback(async () => {
-    try {
-      const dbCourses = await courseRepository.getAll();
-      setCourses(dbCourses);
-    } catch (error) {
-      console.error('[useGroupedSubjects] Error cargando cursos:', error);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      InteractionManager.runAfterInteractions(() => {
-        loadCourses();
-      });
-    }, [loadCourses])
-  );
 
   const toggleCourse = useCallback((courseId: string) => {
     setCollapsedCourses(prev => ({ ...prev, [courseId]: !prev[courseId] }));
@@ -42,7 +21,6 @@ export function useGroupedSubjects(subjects: any[]) {
     const courseMap = new Map<string, any[]>();
     const independentSubjects: any[] = [];
 
-    // Agrupar por curso
     subjects.forEach(subject => {
       if (subject.course_id) {
         if (!courseMap.has(subject.course_id)) {
@@ -54,7 +32,6 @@ export function useGroupedSubjects(subjects: any[]) {
       }
     });
 
-    // Construir secciones para TODOS los cursos registrados (incluso los vacíos)
     courses.forEach(course => {
       const isCollapsed = collapsedCourses[course.id] ?? false;
       sections.push({
@@ -64,24 +41,22 @@ export function useGroupedSubjects(subjects: any[]) {
         mainUrl: course.main_url,
         data: isCollapsed ? [] : (courseMap.get(course.id) || [])
       });
-      courseMap.delete(course.id); // Remover para identificar huérfanos
+      courseMap.delete(course.id);
     });
 
-    // Materias que tienen course_id pero el curso no está cargado/borrado
     courseMap.forEach((subs, cId) => {
       const isCollapsed = collapsedCourses[cId] ?? false;
       sections.push({
         courseId: cId,
-        courseName: `Curso ${cId.substring(0, 4).toUpperCase()}`, // Fallback
+        courseName: `Curso ${cId.substring(0, 4).toUpperCase()}`,
         data: isCollapsed ? [] : subs
       });
     });
 
-    // Añadir materias independientes (sueltas) siempre al final
     if (independentSubjects.length > 0) {
       const isCollapsed = collapsedCourses['independent'] ?? false;
       sections.push({
-        courseId: 'independent', // ID artificial para la sección de huérfanos
+        courseId: 'independent',
         courseName: 'INDEPENDIENTES / CURSOS SUELTOS',
         data: isCollapsed ? [] : independentSubjects
       });
@@ -90,8 +65,6 @@ export function useGroupedSubjects(subjects: any[]) {
     return sections;
   }, [subjects, courses, collapsedCourses]);
 
-  // Score de momentum agregado: promedio de todos los cursos cargados.
-  // Si no hay cursos con score, devuelve 1.0 (estado neutro).
   const aggregatedMomentumScore = useMemo(() => {
     if (courses.length === 0) return 1.0;
     const coursesWithScore = courses.filter(c => c.momentum_score != null);
@@ -100,5 +73,5 @@ export function useGroupedSubjects(subjects: any[]) {
     return total / coursesWithScore.length;
   }, [courses]);
 
-  return { groupedSections, courses, refreshCourses: loadCourses, toggleCourse, collapsedCourses, aggregatedMomentumScore };
+  return { groupedSections, courses, refreshCourses: () => {}, toggleCourse, collapsedCourses, aggregatedMomentumScore };
 }

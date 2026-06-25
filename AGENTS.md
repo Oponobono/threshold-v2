@@ -41,6 +41,9 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - **[HUB] Zyren Ingestion endpoint**: `aiController.js` — `generateClassFlashcards` uses `llama-3.3-70b-versatile`. Strict JSON contract in system prompt. Double sanitization (Markdown strip + regex fallback). Route: `POST /api/ai/class-flashcards`.
 - **[HUB] ZyrenIngestionModal**: `ZyrenIngestionModal.tsx` — 3-step (Input->Preview->Saving). Saves via `saveImportedDeck` + `addLocalCard` + `recalculateLocalDeckCounters`. `subjectId` passed correctly.
 - **[HUB] Audit**: `useCallback` applied to handlers; `aggregatedMomentumScore` connected to Hero Card; `subjectId` fixed in modal.
+- **Fix subject-course link persistence**: `mergeWithLocal()` cambia `!== undefined` por `!= null` para `course_id`, `external_url`, `next_micro_milestone`. `getSubjectById()` usa `mergeWithLocal()`. Se agregan `updateCourseCounters()` y `repairSubjectCourseLinks()` en `subjects.ts`.
+- **Fix deck subject display**: `localDeckToFlashcardDeck()` resuelve subject metadata desde `subjects[]`. Backend `getGroupDecks` hace `LEFT JOIN subjects`. `LocalDeck` agrega `subject_name/color/icon`.
+- **Fix course loading sync**: `useDataStore` ahora almacena `courses[]` en Zustand, cargándolos síncronamente desde SQLite local. `getCourses()` ya no descarta el resultado. `useGroupedSubjects` recibe `courses` como prop eliminando `useFocusEffect` + `courseRepository.getAll()` asíncrona.
 
 ### In Progress
 - *(none)*
