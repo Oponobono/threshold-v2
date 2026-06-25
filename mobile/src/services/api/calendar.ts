@@ -6,6 +6,7 @@ export interface CalendarEventData {
   title: string;
   eventType: 'exam' | 'task' | 'class' | 'other';
   subjectId?: string;
+  deckId?: string;
   startDate: string;
   endDate: string;
   startTime?: string;
@@ -27,6 +28,7 @@ const normalizeEventForLocal = (e: any, fallbackUserId?: string): any => ({
   title: e.title,
   event_type: e.event_type ?? e.eventType,
   subject_id: e.subject_id ?? e.subjectId ?? null,
+  linked_deck_id: e.linked_deck_id ?? e.deckId ?? null,
   start_date: e.start_date ?? e.startDate,
   end_date: e.end_date ?? e.endDate,
   all_day: e.all_day != null ? e.all_day : (e.allDay ? 1 : 0),
@@ -42,7 +44,7 @@ export const createCalendarEvent = async (event: CalendarEventData): Promise<Cal
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');
 
-  const evt: any = { id, user_id: String(userId), title: event.title, event_type: event.eventType, subject_id: event.subjectId, start_date: event.startDate, end_date: event.endDate, all_day: event.allDay ? 1 : 0, description: event.description, study_plan_flag: event.createStudyPlan ? 1 : 0 };
+  const evt: any = { id, user_id: String(userId), title: event.title, event_type: event.eventType, subject_id: event.subjectId, linked_deck_id: event.deckId, start_date: event.startDate, end_date: event.endDate, all_day: event.allDay ? 1 : 0, description: event.description, study_plan_flag: event.createStudyPlan ? 1 : 0 };
   await calendarEventRepository.create(evt);
 
   try {
@@ -118,6 +120,7 @@ export const updateCalendarEvent = async (eventId: string, updates: Partial<Cale
   if (updates.title) data.title = updates.title;
   if (updates.eventType) data.event_type = updates.eventType;
   if (updates.subjectId !== undefined) data.subject_id = updates.subjectId;
+  if (updates.deckId !== undefined) data.linked_deck_id = updates.deckId;
   if (updates.startDate) data.start_date = updates.startDate;
   if (updates.endDate) data.end_date = updates.endDate;
   if (updates.description !== undefined) data.description = updates.description;

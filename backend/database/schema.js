@@ -880,6 +880,7 @@ const tableSchema = {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         subject_id TEXT,
+        linked_deck_id TEXT,
         title TEXT NOT NULL,
         event_type TEXT NOT NULL,
         description TEXT,
@@ -892,7 +893,8 @@ const tableSchema = {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL,
+        FOREIGN KEY (linked_deck_id) REFERENCES flashcard_decks(id) ON DELETE SET NULL
       )
     `,
     postgres: `
@@ -900,6 +902,7 @@ const tableSchema = {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
+        linked_deck_id TEXT REFERENCES flashcard_decks(id) ON DELETE SET NULL,
         title TEXT NOT NULL,
         event_type TEXT NOT NULL,
         description TEXT,
@@ -916,6 +919,7 @@ const tableSchema = {
     columns: [
       { name: 'user_id', type: 'TEXT NOT NULL' },
       { name: 'subject_id', type: 'TEXT' },
+      { name: 'linked_deck_id', type: 'TEXT' },
       { name: 'title', type: 'TEXT NOT NULL' },
       { name: 'event_type', type: 'TEXT NOT NULL' },
       { name: 'description', type: 'TEXT' },

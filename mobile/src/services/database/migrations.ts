@@ -356,6 +356,12 @@ const migrations: Migration[] = [
       `UPDATE courses SET total_classes = COALESCE((SELECT SUM(total_lessons) FROM subjects WHERE course_id = courses.id), 0), completed_classes = COALESCE((SELECT SUM(completed_lessons) FROM subjects WHERE course_id = courses.id), 0)`,
     ],
   },
+  {
+    version: 12,
+    up: [
+      `ALTER TABLE calendar_events ADD COLUMN linked_deck_id TEXT`,
+    ],
+  },
 ];
 
 export default migrations;

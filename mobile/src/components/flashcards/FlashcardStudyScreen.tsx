@@ -126,8 +126,8 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
 
   useEffect(() => {
     const sortByExam = async () => {
-      const sid = activeDeck?.subject_id ?? null;
-      const multiplier = await ExamSchedulerService.getCompressionMultiplier(sid);
+      const did = activeDeck?.id ?? null;
+      const multiplier = await ExamSchedulerService.getCompressionMultiplier(did);
       setExamMultiplier(multiplier);
       const now = Date.now();
       const sorted = [...initialCards].sort((a, b) => {

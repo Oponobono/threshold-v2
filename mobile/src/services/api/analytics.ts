@@ -149,7 +149,7 @@ async function getCompressedInterval(subjectId: string | number | null | undefin
   if (subjectId == null) return baseMs;
   try {
     const { ExamSchedulerService } = await import('../ExamSchedulerService');
-    return ExamSchedulerService.compressInterval(subjectId, baseMs);
+    return ExamSchedulerService.compressInterval(null, baseMs, subjectId);
   } catch {
     return baseMs;
   }

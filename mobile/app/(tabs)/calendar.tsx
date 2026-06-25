@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { useDataStore } from '../../src/store/useDataStore';
@@ -46,6 +46,12 @@ export default function CalendarScreen() {
     .toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
 
   const subjects = useDataStore().subjects || [];
+
+  useFocusEffect(
+    useCallback(() => {
+      calendar.reloadEventsForMonth();
+    }, [calendar.reloadEventsForMonth])
+  );
 
   const handleEditEvent = (item: any) => {
     const eventIdStr = item.id ? String(item.id).replace('event-', '') : null;

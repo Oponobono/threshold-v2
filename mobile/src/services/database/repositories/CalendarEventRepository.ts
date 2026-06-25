@@ -10,6 +10,7 @@ export interface CalendarEvent {
   end_date?: string;
   all_day?: number;
   subject_id?: string;
+  linked_deck_id?: string;
   study_plan_flag?: number;
   created_at?: string;
   updated_at?: string;

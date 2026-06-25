@@ -29,6 +29,7 @@ exports.createCalendarEvent = (req, res) => {
     title,
     eventType,
     subjectId,
+    deckId,
     startDate,
     endDate,
     startTime,
@@ -67,6 +68,7 @@ exports.createCalendarEvent = (req, res) => {
       id,
       user_id,
       subject_id,
+      linked_deck_id,
       title,
       event_type,
       description,
@@ -78,7 +80,7 @@ exports.createCalendarEvent = (req, res) => {
       create_study_plan,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `;
 
   // Si hay subjectId, primero verificar que pertenezca al usuario
@@ -108,6 +110,7 @@ exports.createCalendarEvent = (req, res) => {
         eventId,
         userId,
         subjectId || null,
+        deckId || null,
         title.trim(),
         eventType,
         description || null,
@@ -142,6 +145,7 @@ exports.createCalendarEvent = (req, res) => {
               title: event.title,
               eventType: event.event_type,
               subjectId: event.subject_id,
+              deckId: event.linked_deck_id,
               startDate: event.start_date,
               endDate: event.end_date,
               startTime: event.start_time,
@@ -204,6 +208,7 @@ exports.getUserCalendarEvents = (req, res) => {
       title: row.title,
       eventType: row.event_type,
       subjectId: row.subject_id,
+      deckId: row.linked_deck_id,
       subjectName: row.subject_name,
       subjectColor: row.subject_color,
       startDate: row.start_date,
@@ -258,6 +263,7 @@ exports.getCalendarEvent = (req, res) => {
         title: row.title,
         eventType: row.event_type,
         subjectId: row.subject_id,
+        deckId: row.linked_deck_id,
         subjectName: row.subject_name,
         subjectColor: row.subject_color,
         startDate: row.start_date,
@@ -290,6 +296,7 @@ exports.updateCalendarEvent = (req, res) => {
     title,
     eventType,
     subjectId,
+    deckId,
     startDate,
     endDate,
     startTime,
@@ -351,6 +358,10 @@ exports.updateCalendarEvent = (req, res) => {
       updates.push('subject_id = ?');
       values.push(subjectId || null);
     }
+    if (deckId !== undefined) {
+      updates.push('linked_deck_id = ?');
+      values.push(deckId || null);
+    }
     if (startDate !== undefined) {
       updates.push('start_date = ?');
       values.push(startDate);
@@ -411,6 +422,7 @@ exports.updateCalendarEvent = (req, res) => {
             title: event.title,
             eventType: event.event_type,
             subjectId: event.subject_id,
+            deckId: event.linked_deck_id,
             startDate: event.start_date,
             endDate: event.end_date,
             startTime: event.start_time,

@@ -120,17 +120,13 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
       .finally(() => setLoading(false));
   }, [visible]);
 
-  // ── Link existing exam to deck's subject ────────────────────────────────
+  // ── Link existing exam to deck (one-to-one by deck_id) ───────────────────
   const handleLinkExisting = async (exam: any) => {
     if (!deck || linking) return;
     setLinking(true);
     try {
-      // We update the exam to associate it with the deck's subject
       const { updateCalendarEvent } = await import('../../services/api/calendar');
-      const subjectId = deck.subject_id ?? (deck as any).subject_id;
-      if (subjectId) {
-        await updateCalendarEvent(exam.id, { subjectId: String(subjectId) });
-      }
+      await updateCalendarEvent(exam.id, { deckId: deck.id });
       onLinked(exam.title);
       onClose();
     } catch (e: any) {
@@ -140,17 +136,16 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
     }
   };
 
-  // ── Create new exam and link ─────────────────────────────────────────────
+  // ── Create new exam and link to this deck ────────────────────────────────
   const handleCreateAndLink = async () => {
     if (!deck || creating || !examTitle.trim()) return;
     setCreating(true);
     try {
-      const subjectId = deck.subject_id ?? (deck as any).subject_id;
       const dateISO = formatDateISO(examDate);
       await createCalendarEvent({
         title: examTitle.trim(),
         eventType: 'exam',
-        subjectId: subjectId ? String(subjectId) : undefined,
+        deckId: deck.id,
         startDate: dateISO,
         endDate: dateISO,
         allDay: true,

@@ -13,23 +13,40 @@ function daysBetween(a: Date, b: Date): number {
 
 export class ExamSchedulerService {
   /**
-   * Busca el examen más próximo vinculado a un subject_id
+   * Busca el examen más próximo vinculado a un deck (linked_deck_id)
    * y devuelve un multiplicador de compresión (0.2 – 1.0).
+   * Si no hay examen vinculado al deck, cae a subject_id como fallback.
    * 0.2 → 20% del intervalo original (máxima compresión).
    * 1.0 → sin compresión.
    */
-  static async getCompressionMultiplier(subjectId: string | number | null): Promise<number> {
-    if (subjectId == null) return 1.0;
+  static async getCompressionMultiplier(deckId: string | number | null, subjectId?: string | number | null): Promise<number> {
+    if (deckId == null && subjectId == null) return 1.0;
 
     try {
       const db = databaseService.getDb();
-      const rows = await db.getAllAsync(
-        `SELECT start_date FROM calendar_events
-         WHERE event_type = 'exam' AND subject_id = ?
-         ORDER BY start_date ASC
-         LIMIT 1`,
-        String(subjectId),
-      );
+      let rows;
+
+      if (deckId != null) {
+        rows = await db.getAllAsync(
+          `SELECT start_date FROM calendar_events
+           WHERE event_type = 'exam' AND linked_deck_id = ?
+           ORDER BY start_date ASC
+           LIMIT 1`,
+          String(deckId),
+        );
+      }
+
+      if (!rows || rows.length === 0) {
+        if (subjectId != null) {
+          rows = await db.getAllAsync(
+            `SELECT start_date FROM calendar_events
+             WHERE event_type = 'exam' AND subject_id = ?
+             ORDER BY start_date ASC
+             LIMIT 1`,
+            String(subjectId),
+          );
+        }
+      }
 
       if (!rows || rows.length === 0) return 1.0;
 
@@ -54,21 +71,20 @@ export class ExamSchedulerService {
    * Aplica compresión a un intervalo base en milisegundos.
    */
   static async compressInterval(
-    subjectId: string | number | null,
+    deckId: string | number | null,
     baseIntervalMs: number,
+    subjectId?: string | number | null,
   ): Promise<number> {
-    const multiplier = await this.getCompressionMultiplier(subjectId);
+    const multiplier = await this.getCompressionMultiplier(deckId, subjectId);
     return Math.round(baseIntervalMs * multiplier);
   }
 
   /**
-   * Dada una lista de cards con deck_id, busca el subject_id del deck
-   * y reordena dando prioridad a las que pertenecen a materias con
-   * examen próximo (menor compressionMultiplier = mayor prioridad).
+   * Dada una lista de cards con deck_id, busca el examen vinculado a cada deck
+   * y reordena dando prioridad a los que tienen examen próximo (menor compressionMultiplier = mayor prioridad).
    */
   static async prioritizeCardsByExam<T extends { deck_id?: string | number }>(
     cards: T[],
-    deckIdToSubjectId: Record<string, string | number | null>,
   ): Promise<T[]> {
     const multipliers = new Map<string | number, number>();
     const seen = new Set<string | number>();
@@ -77,8 +93,7 @@ export class ExamSchedulerService {
       const did = card.deck_id;
       if (did == null || seen.has(did)) continue;
       seen.add(did);
-      const sid = deckIdToSubjectId[String(did)];
-      const m = await this.getCompressionMultiplier(sid ?? null);
+      const m = await this.getCompressionMultiplier(did ?? null);
       multipliers.set(did, m);
     }
 
