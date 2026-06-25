@@ -102,17 +102,53 @@ export const createFlashcardDeck = async (payload: { subject_id?: string; title:
 
 const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
   const localRecord = await flashcardDeckRepository.getById(serverDeck.id);
-  if (!localRecord) return serverDeck;
-  return {
-    ...serverDeck,
-    subject_id: serverDeck.subject_id ?? localRecord.subject_id ?? null,
-    subject_name: serverDeck.subject_name ?? localRecord.subject_name ?? null,
-    subject_color: serverDeck.subject_color ?? localRecord.subject_color ?? null,
-    subject_icon: serverDeck.subject_icon ?? localRecord.subject_icon ?? null,
-  };
+  const merged = { ...serverDeck };
+
+  if (localRecord) {
+    // Usar !== undefined para distinguir entre:
+    //   - servidor devuelve null  → desvinculación explícita, respetar
+    //   - servidor no incluye el campo (undefined) → preservar local
+    merged.subject_id = serverDeck.subject_id !== undefined
+      ? serverDeck.subject_id
+      : (localRecord.subject_id ?? null);
+    merged.subject_name = serverDeck.subject_name !== undefined
+      ? serverDeck.subject_name
+      : (localRecord.subject_name ?? null);
+    merged.subject_color = serverDeck.subject_color !== undefined
+      ? serverDeck.subject_color
+      : (localRecord.subject_color ?? null);
+    merged.subject_icon = serverDeck.subject_icon !== undefined
+      ? serverDeck.subject_icon
+      : (localRecord.subject_icon ?? null);
+  }
+
+  // Si tenemos subject_id pero nos faltan los metadatos visuales, hidratar desde SQLite local
+  if (!merged.subject_name && merged.subject_id) {
+    try {
+      const { databaseService } = await import('../database/DatabaseService');
+      const subject: any = await databaseService.getDb().getFirstAsync('SELECT name, color, icon FROM subjects WHERE id = ?', [merged.subject_id]);
+      if (subject) {
+        merged.subject_name = subject.name;
+        merged.subject_color = subject.color;
+        merged.subject_icon = subject.icon;
+      }
+    } catch (e) {
+      console.warn('Error resolviendo subject local:', e);
+    }
+  }
+
+  return merged;
 };
 
 export const updateFlashcardDeck = async (deckId: string, payload: any): Promise<any> => {
+  const isLocalId = !isNaN(Number(deckId)) && Number(deckId) < 0;
+
+  if (isLocalId) {
+    const { updateLocalDeck } = await import('../localFlashcardService');
+    updateLocalDeck(Number(deckId), payload);
+    return { ...payload, id: deckId, _isPending: true };
+  }
+
   await flashcardDeckRepository.update(deckId, payload);
 
   try {

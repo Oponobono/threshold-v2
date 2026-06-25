@@ -423,7 +423,11 @@ exports.updateSubject = (req, res) => {
     db.run(query, values, function(err) {
       if (err) return res.status(500).json({ error: err.message });
       if (this.changes === 0) return res.status(404).json({ error: 'Materia no encontrada o acceso denegado' });
-      res.json({ success: true, message: 'Materia actualizada' });
+      // Devolver la materia completa para que el cliente pueda upsert sin perder course_id u otros campos
+      db.get('SELECT * FROM subjects WHERE id = ?', [subjectId], (err2, row) => {
+        if (err2 || !row) return res.json({ success: true });
+        res.json(row);
+      });
     });
   };
 

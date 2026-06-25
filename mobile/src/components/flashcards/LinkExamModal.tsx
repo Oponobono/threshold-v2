@@ -17,15 +17,17 @@ import {
   ActivityIndicator,
   StyleSheet,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../styles/theme';
-import { FlashcardDeck, CalendarEvent } from '../../services/api/types';
+import { FlashcardDeck } from '../../services/api/types';
 import {
   getCalendarEvents,
   createCalendarEvent,
+  CalendarEvent,
 } from '../../services/api/calendar';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -86,6 +88,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
 
   const [step, setStep] = useState<Step>('pick');
   const [exams, setExams] = useState<CalendarEvent[]>([]);
+  const [currentLinkedExam, setCurrentLinkedExam] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [linking, setLinking] = useState(false);
 
@@ -104,25 +107,49 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
     if (!visible) return;
     setStep('pick');
     setExamTitle('');
+    setCurrentLinkedExam(null);
     setLoading(true);
     getCalendarEvents()
       .then((all) => {
+        let linked: any = null;
         const upcoming = (all as any[])
           .filter((e: any) => e.event_type === 'exam' || e.eventType === 'exam')
+          .filter((e: any) => {
+            const eDeckId = e.linked_deck_id || e.deckId;
+            if (eDeckId === deck?.id) {
+              linked = e;
+              return false; // Don't show in the list of available exams
+            }
+            if (eDeckId && eDeckId !== deck?.id) {
+              return false; // Linked to another deck, filter it out to keep 1-to-1 relationship
+            }
+            return true;
+          })
           .sort((a: any, b: any) => {
             const da = daysBetween(a.start_date ?? a.startDate) ?? 999;
             const db = daysBetween(b.start_date ?? b.startDate) ?? 999;
             return da - db;
           });
-        setExams(upcoming as any);
+        setExams(upcoming);
+        setCurrentLinkedExam(linked);
       })
       .catch(() => setExams([]))
       .finally(() => setLoading(false));
-  }, [visible]);
+  }, [visible, deck]);
 
   // ── Link existing exam to deck (one-to-one by deck_id) ───────────────────
   const handleLinkExisting = async (exam: any) => {
     if (!deck || linking) return;
+    
+    if (!deck.subject_id) {
+      Alert.alert(
+        'Atención',
+        'Primero debes vincular este mazo a una materia para poder asignarle un examen.',
+        [{ text: 'Entendido' }]
+      );
+      return;
+    }
+
     setLinking(true);
     try {
       const { updateCalendarEvent } = await import('../../services/api/calendar');
@@ -139,6 +166,16 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
   // ── Create new exam and link to this deck ────────────────────────────────
   const handleCreateAndLink = async () => {
     if (!deck || creating || !examTitle.trim()) return;
+
+    if (!deck.subject_id) {
+      Alert.alert(
+        'Atención',
+        'Primero debes vincular este mazo a una materia para poder crear y asignarle un examen.',
+        [{ text: 'Entendido' }]
+      );
+      return;
+    }
+
     setCreating(true);
     try {
       const dateISO = formatDateISO(examDate);
@@ -146,6 +183,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
         title: examTitle.trim(),
         eventType: 'exam',
         deckId: deck.id,
+        subjectId: deck.subject_id,
         startDate: dateISO,
         endDate: dateISO,
         allDay: true,
@@ -202,7 +240,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
                 <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 32 }} />
               ) : (
                 <>
-                  {exams.length === 0 ? (
+                  {exams.length === 0 && !currentLinkedExam ? (
                     <View style={styles.emptyState}>
                       <Ionicons name="calendar-outline" size={40} color={theme.colors.text.placeholder} />
                       <Text style={styles.emptyText}>No tienes exámenes próximos</Text>
@@ -210,42 +248,67 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
                     </View>
                   ) : (
                     <>
-                      <Text style={styles.sectionLabel}>Exámenes del calendario</Text>
-                      <FlatList
-                        data={exams}
-                        keyExtractor={(e) => e.id}
-                        style={{ maxHeight: 280 }}
-                        renderItem={({ item }) => {
-                          const rawDate = (item as any).start_date ?? (item as any).startDate;
-                          const days = daysBetween(rawDate);
-                          const color = urgencyColor(days);
-                          return (
-                            <TouchableOpacity
-                              style={styles.examRow}
-                              onPress={() => handleLinkExisting(item)}
-                              disabled={linking}
-                              activeOpacity={0.7}
-                            >
-                              <View style={[styles.urgencyDot, { backgroundColor: color }]} />
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.examTitle} numberOfLines={1}>{item.title}</Text>
-                                <Text style={styles.examSubject} numberOfLines={1}>
-                                  {(item as any).subject_name ?? 'Sin materia'}
-                                </Text>
-                              </View>
-                              <View style={[styles.daysBadge, { borderColor: color }]}>
-                                <Text style={[styles.daysText, { color }]}>{urgencyLabel(days)}</Text>
-                              </View>
-                              {linking ? (
-                                <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginLeft: 8 }} />
-                              ) : (
-                                <Ionicons name="link-outline" size={18} color={theme.colors.primary} style={{ marginLeft: 8 }} />
-                              )}
-                            </TouchableOpacity>
-                          );
-                        }}
-                        ItemSeparatorComponent={() => <View style={styles.separator} />}
-                      />
+                      {currentLinkedExam && (
+                        <>
+                          <Text style={styles.sectionLabel}>Vinculado actualmente</Text>
+                          <View style={[styles.examRow, { borderColor: theme.colors.primary, borderWidth: 1, marginBottom: 12 }]}>
+                            <View style={[styles.urgencyDot, { backgroundColor: theme.colors.primary }]} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.examTitle} numberOfLines={1}>{currentLinkedExam.title}</Text>
+                              <Text style={styles.examSubject} numberOfLines={1}>
+                                {(currentLinkedExam as any).subject_name ?? 'Sin materia'}
+                              </Text>
+                            </View>
+                            <View style={[styles.daysBadge, { borderColor: theme.colors.primary }]}>
+                              <Text style={[styles.daysText, { color: theme.colors.primary }]}>
+                                {urgencyLabel(daysBetween((currentLinkedExam as any).start_date ?? (currentLinkedExam as any).startDate))}
+                              </Text>
+                            </View>
+                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} style={{ marginLeft: 8 }} />
+                          </View>
+                        </>
+                      )}
+                      
+                      {exams.length > 0 && (
+                        <>
+                          <Text style={styles.sectionLabel}>Exámenes del calendario</Text>
+                          <FlatList
+                            data={exams}
+                            keyExtractor={(e) => e.id}
+                            style={{ maxHeight: currentLinkedExam ? 200 : 280 }}
+                            renderItem={({ item }) => {
+                              const rawDate = (item as any).start_date ?? (item as any).startDate;
+                              const days = daysBetween(rawDate);
+                              const color = urgencyColor(days);
+                              return (
+                                <TouchableOpacity
+                                  style={styles.examRow}
+                                  onPress={() => handleLinkExisting(item)}
+                                  disabled={linking}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={[styles.urgencyDot, { backgroundColor: color }]} />
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.examTitle} numberOfLines={1}>{item.title}</Text>
+                                    <Text style={styles.examSubject} numberOfLines={1}>
+                                      {(item as any).subject_name ?? 'Sin materia'}
+                                    </Text>
+                                  </View>
+                                  <View style={[styles.daysBadge, { borderColor: color }]}>
+                                    <Text style={[styles.daysText, { color }]}>{urgencyLabel(days)}</Text>
+                                  </View>
+                                  {linking ? (
+                                    <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginLeft: 8 }} />
+                                  ) : (
+                                    <Ionicons name="link-outline" size={18} color={theme.colors.primary} style={{ marginLeft: 8 }} />
+                                  )}
+                                </TouchableOpacity>
+                              );
+                            }}
+                            ItemSeparatorComponent={() => <View style={styles.separator} />}
+                          />
+                        </>
+                      )}
                     </>
                   )}
 

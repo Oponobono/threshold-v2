@@ -120,6 +120,7 @@ interface Message {
   documentStatus?: 'loading' | 'success' | 'error';
   documentName?: string;
   documentId?: string;
+  isSystemMessage?: boolean;
 }
 
 export interface SubjectAIChatModalProps {
@@ -594,7 +595,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       ])
         .then(([data, provider]) => {
           setSessionId(data.session_id);
-          setMessages(data.messages || []);
+          setMessages((data.messages || []).slice(-6));
           setCurrentProvider(provider);
         })
         .catch(err => console.warn('[AIChat] Error cargando historial:', err))
@@ -664,7 +665,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     if (!text || isLoading) return;
 
     const userMsg: Message = { role: 'user', content: text };
-    const updatedMessages = [...messages, userMsg];
+    const updatedMessages = [...messages, userMsg].slice(-6);
     setMessages(updatedMessages);
     setInputText('');
     setIsLoading(true);
@@ -735,9 +736,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         
         setMessages(prev => [
           ...prev,
-          { role: 'assistant', content: replyContent || '✨' },
-          { role: 'assistant', content: deckMsg, isSystemMessage: true }
-        ]);
+          { role: 'assistant' as const, content: replyContent || '✨' },
+          { role: 'assistant' as const, content: deckMsg, isSystemMessage: true }
+        ].slice(-6));
         setIsLoading(false);
         showToast(t('ai.deckGeneratedToast', { title: data.deck.deckTitle, count: data.deck.count, defaultValue: `Deck "${data.deck.deckTitle}" ready with ${data.deck.count} items! 🎉` }));
       } else {
@@ -754,7 +755,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           replyContent = replyContent.replace(/%+DECK_ACTION%+[\s\S]*?%+END%+/g, '').trim();
 
           // Mostrar el mensaje limpio inmediatamente
-          setMessages(prev => [...prev, { role: 'assistant', content: replyContent }]);
+          setMessages(prev => [...prev, { role: 'assistant' as const, content: replyContent }].slice(-6));
           setIsLoading(false);
 
           // Parsear parámetros y generar el mazo en segundo plano
@@ -770,7 +771,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           }
         } else {
           // Respuesta normal del chat sin generación de mazo
-          setMessages(prev => [...prev, { role: 'assistant', content: cleanReply }]);
+          setMessages(prev => [...prev, { role: 'assistant' as const, content: cleanReply }].slice(-6));
           setIsLoading(false);
         }
       }

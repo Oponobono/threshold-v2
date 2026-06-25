@@ -64,19 +64,29 @@ const filterDeleted = (subjects: Subject[]): Subject[] =>
  * Fusiona datos del servidor con el registro local preservando campos
  * que pueden ser nulos en el servidor por condiciones de carrera de FK
  * (ej: course_id si el curso aún no se sincronizó al servidor).
+ * 
+ * IMPORTANTE: serverSubject.course_id toma precedencia si es no nulo.
+ * Solo se usa el valor local como fallback cuando el servidor devuelve null,
+ * lo que indica una condición de carrera temporal (el curso aún no sincronizó).
  */
 const mergeWithLocal = async (serverSubject: Subject): Promise<Subject> => {
   const localRecord = await subjectRepository.getById(serverSubject.id);
   if (!localRecord) return serverSubject;
   return {
     ...serverSubject,
-    // Preservar course_id local si el servidor lo manda nulo
-    course_id: serverSubject.course_id ?? localRecord.course_id ?? null,
-    // Preservar otros campos del Hub que pueden estar desfasados en el server
-    external_url: serverSubject.external_url ?? localRecord.external_url ?? null,
+    // Si el servidor manda course_id explícito (incluso null), usar ese valor.
+    // Solo preservar el local si el servidor manda undefined (campo no incluido en respuesta).
+    course_id: serverSubject.course_id !== undefined
+      ? serverSubject.course_id
+      : (localRecord.course_id ?? null),
+    external_url: serverSubject.external_url !== undefined
+      ? serverSubject.external_url
+      : (localRecord.external_url ?? null),
     total_lessons: serverSubject.total_lessons ?? localRecord.total_lessons ?? 0,
     completed_lessons: serverSubject.completed_lessons ?? localRecord.completed_lessons ?? 0,
-    next_micro_milestone: serverSubject.next_micro_milestone ?? localRecord.next_micro_milestone ?? null,
+    next_micro_milestone: serverSubject.next_micro_milestone !== undefined
+      ? serverSubject.next_micro_milestone
+      : (localRecord.next_micro_milestone ?? null),
   };
 };
 
@@ -189,6 +199,7 @@ export const createSubject = async (payload: {
 };
 
 export const updateSubject = async (subjectId: string, payload: Partial<Subject>): Promise<any> => {
+  // 1. Persistir localmente primero (offline-first)
   await subjectRepository.update(subjectId, payload);
 
   try {
@@ -198,9 +209,17 @@ export const updateSubject = async (subjectId: string, payload: Partial<Subject>
       body: JSON.stringify(payload),
     });
     const data = await parseJsonSafely(response);
-    if (response.ok && data) {
-      await subjectRepository.upsert(await mergeWithLocal(data));
-      return data;
+    if (response.ok) {
+      // El backend devuelve la materia completa; si no tiene id es la respuesta
+      // antigua {success: true} — en ese caso usar el payload local como fuente de verdad.
+      if (data?.id) {
+        const merged = await mergeWithLocal(data);
+        await subjectRepository.upsert(merged);
+        return merged;
+      }
+      // Respuesta sin id (backend antiguo): enriquecer localmente desde SQLite
+      const fresh = await subjectRepository.getById(subjectId);
+      return fresh ?? payload;
     }
     throw new Error(data?.error || 'Error del servidor');
   } catch {

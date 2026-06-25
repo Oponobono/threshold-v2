@@ -675,7 +675,7 @@ exports.getChatHistory = async (req, res) => {
   }
 
   db.all(
-    'SELECT role, content FROM ai_chat_messages WHERE session_id = ? ORDER BY created_at ASC',
+    'SELECT role, content FROM (SELECT role, content, created_at FROM ai_chat_messages WHERE session_id = ? ORDER BY created_at DESC LIMIT 6) ORDER BY created_at ASC',
     [session.id],
     (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
