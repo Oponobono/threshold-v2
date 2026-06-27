@@ -28,7 +28,7 @@ export class CalendarEventRepository extends BaseRepository<CalendarEvent> {
       FROM calendar_events ce
       LEFT JOIN subjects s ON ce.subject_id = s.id
     `);
-    return this.mapRows(rows);
+    return (rows as any[]).map(row => this.mapRow(row));
   }
 
   async getByUser(userId: string): Promise<CalendarEvent[]> {
@@ -39,7 +39,7 @@ export class CalendarEventRepository extends BaseRepository<CalendarEvent> {
       LEFT JOIN subjects s ON ce.subject_id = s.id
       WHERE ce.user_id = ?
     `, userId);
-    return this.mapRows(rows);
+    return (rows as any[]).map(row => this.mapRow(row));
   }
 }
 

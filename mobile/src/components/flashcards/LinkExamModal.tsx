@@ -175,7 +175,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
       const newEvent = await createCalendarEvent({
         title: examTitle.trim(),
         eventType: 'exam',
-        subjectId: deck.subject_id,
+        subjectId: deck.subject_id || undefined,
         startDate: dateISO,
         endDate: dateISO,
         allDay: true,
@@ -480,10 +480,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: 12,
-    backgroundColor: theme.colors.background.card,
+    backgroundColor: theme.colors.card,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: theme.colors.border.light + '40',
+    borderColor: theme.colors.border + '40',
   },
   urgencyDot: {
     width: 6,
