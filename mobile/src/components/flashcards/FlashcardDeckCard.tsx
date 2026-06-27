@@ -113,16 +113,38 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
           {(deck as any).subject_name || t('flashcards.noSubject')}
         </Text>
         {hasExam && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: examColor + '18', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
-              <Ionicons name="calendar" size={11} color={examColor} />
-              <Text style={{ fontSize: 11, fontWeight: '700', color: examColor }} numberOfLines={1}>
-                {(deck as any).linked_exam_title}
-              </Text>
-              <Text style={{ fontSize: 10, color: examColor, opacity: 0.7 }} numberOfLines={1}>
-                {examDays !== null ? (examDays < 0 ? '· Pasado' : examDays === 0 ? '· Hoy' : examDays === 1 ? '· Mañana' : `· ${examDays}d`) : ''}
-              </Text>
-            </View>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            marginTop: 6,
+            paddingTop: 5,
+            borderTopWidth: 0.5,
+            borderTopColor: examColor + '30',
+          }}>
+            <Ionicons name="calendar-outline" size={10} color={examColor} style={{ opacity: 0.8 }} />
+            <Text style={{
+              fontSize: 10.5,
+              color: examColor,
+              fontWeight: '500',
+              flex: 1,
+              opacity: 0.85,
+            }} numberOfLines={1}>
+              {(deck as any).linked_exam_title}
+            </Text>
+            {examDays !== null && (
+              <View style={{
+                paddingHorizontal: 5,
+                paddingVertical: 1.5,
+                borderRadius: 4,
+                borderWidth: 0.5,
+                borderColor: examColor + '45',
+              }}>
+                <Text style={{ fontSize: 9.5, color: examColor, fontWeight: '600', opacity: 0.75 }}>
+                  {examDays < 0 ? 'Pasado' : examDays === 0 ? 'Hoy' : examDays === 1 ? 'Mañana' : `${examDays}d`}
+                </Text>
+              </View>
+            )}
           </View>
         )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: hasExam ? 4 : 6 }}>

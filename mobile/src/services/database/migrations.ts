@@ -362,6 +362,12 @@ const migrations: Migration[] = [
       `ALTER TABLE calendar_events ADD COLUMN linked_deck_id TEXT`,
     ],
   },
+  {
+    version: 13,
+    up: [
+      `ALTER TABLE flashcard_decks ADD COLUMN linked_event_id TEXT`,
+    ],
+  },
 ];
 
 export default migrations;

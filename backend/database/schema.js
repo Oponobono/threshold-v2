@@ -515,9 +515,11 @@ const tableSchema = {
         description TEXT,
         is_public BOOLEAN DEFAULT 0,
         total_reviews INTEGER DEFAULT 0,
+        linked_event_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (linked_event_id) REFERENCES calendar_events(id) ON DELETE SET NULL
       )
     `,
     postgres: `
@@ -529,12 +531,14 @@ const tableSchema = {
         description TEXT,
         is_public INTEGER DEFAULT 0,
         total_reviews INTEGER DEFAULT 0,
+        linked_event_id TEXT REFERENCES calendar_events(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `,
     columns: [
       { name: 'is_public', type: 'BOOLEAN DEFAULT false' },
-      { name: 'total_reviews', type: 'INTEGER DEFAULT 0' }
+      { name: 'total_reviews', type: 'INTEGER DEFAULT 0' },
+      { name: 'linked_event_id', type: 'TEXT REFERENCES calendar_events(id) ON DELETE SET NULL' }
     ]
   },
   flashcards: {

@@ -15,6 +15,7 @@ export interface FlashcardDeck {
   subject_icon?: string;
   owner_username?: string;
   owner_name?: string;
+  linked_event_id?: string;
   created_at?: string;
   updated_at?: string;
 }

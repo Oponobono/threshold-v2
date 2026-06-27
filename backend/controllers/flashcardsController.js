@@ -407,7 +407,7 @@ exports.deleteDeck = (req, res) => {
 exports.updateFlashcardDeck = (req, res) => {
   const { deckId } = req.params;
   const userId = req.user.id;
-  let { title, description, subject_id } = req.body;
+  let { title, description, subject_id, linked_event_id } = req.body;
 
   // Validación inicial
   if (title !== undefined && typeof title === 'string') {
@@ -417,7 +417,7 @@ exports.updateFlashcardDeck = (req, res) => {
     }
   }
 
-  if (!title && description === undefined && subject_id === undefined) {
+  if (!title && description === undefined && subject_id === undefined && linked_event_id === undefined) {
     return res.status(400).json({ error: 'No hay campos para actualizar.' });
   }
 
@@ -448,6 +448,7 @@ exports.updateFlashcardDeck = (req, res) => {
       if (title !== undefined)       { fields.push('title = ?');       values.push(title); }
       if (description !== undefined) { fields.push('description = ?'); values.push(description); }
       if (subject_id !== undefined)  { fields.push('subject_id = ?');  values.push(subject_id); }
+      if (linked_event_id !== undefined) { fields.push('linked_event_id = ?'); values.push(linked_event_id); }
 
       values.push(deckId);
 

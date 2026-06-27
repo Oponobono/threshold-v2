@@ -43,11 +43,13 @@ export class ExamSchedulerService {
 
       if (deckId != null) {
         const today = formatTodayForSQL();
+        // Nueva relación: el MAZO guarda linked_event_id → muchos mazos → un evento
         rows = await db.getAllAsync(
-          `SELECT start_date FROM calendar_events
-           WHERE linked_deck_id = ?
-             AND start_date >= ?
-           ORDER BY start_date ASC
+          `SELECT ce.start_date FROM flashcard_decks fd
+           JOIN calendar_events ce ON ce.id = fd.linked_event_id
+           WHERE fd.id = ?
+             AND ce.start_date >= ?
+           ORDER BY ce.start_date ASC
            LIMIT 1`,
           String(deckId),
           today,

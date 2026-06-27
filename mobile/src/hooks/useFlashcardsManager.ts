@@ -21,17 +21,19 @@ export interface FlashcardsManagerResult {
 async function enrichDecksWithExamInfo(decks: FlashcardDeck[]): Promise<FlashcardDeck[]> {
   try {
     const allEvents = await calendarEventRepository.getAll();
-    const examMap = new Map<string, { title: string; start_date: string }>();
+    // Mapa de eventId → metadata del evento
+    const eventMap = new Map<string, { title: string; start_date: string }>();
     for (const evt of allEvents) {
-      const deckId = (evt as any).linked_deck_id;
-      if (deckId) {
-        examMap.set(String(deckId), { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
-      }
+      eventMap.set(String(evt.id), { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
     }
+    // Enriquecer cada mazo usando su propio linked_event_id
     return decks.map(d => {
-      const exam = examMap.get(String(d.id));
-      if (exam) {
-        return { ...d, linked_exam_title: exam.title, linked_exam_date: exam.start_date };
+      const linkedEventId = (d as any).linked_event_id;
+      if (linkedEventId) {
+        const evt = eventMap.get(String(linkedEventId));
+        if (evt) {
+          return { ...d, linked_exam_title: evt.title, linked_exam_date: evt.start_date };
+        }
       }
       return d;
     });
