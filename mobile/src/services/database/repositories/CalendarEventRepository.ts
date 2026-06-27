@@ -21,8 +21,25 @@ export class CalendarEventRepository extends BaseRepository<CalendarEvent> {
     super('calendar_events');
   }
 
+  async getAll(): Promise<CalendarEvent[]> {
+    const db = await this.getDb();
+    const rows = await db.getAllAsync(`
+      SELECT ce.*, s.name as subject_name 
+      FROM calendar_events ce
+      LEFT JOIN subjects s ON ce.subject_id = s.id
+    `);
+    return this.mapRows(rows);
+  }
+
   async getByUser(userId: string): Promise<CalendarEvent[]> {
-    return this.getByField('user_id', userId);
+    const db = await this.getDb();
+    const rows = await db.getAllAsync(`
+      SELECT ce.*, s.name as subject_name 
+      FROM calendar_events ce
+      LEFT JOIN subjects s ON ce.subject_id = s.id
+      WHERE ce.user_id = ?
+    `, userId);
+    return this.mapRows(rows);
   }
 }
 

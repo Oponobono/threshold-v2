@@ -368,6 +368,12 @@ const migrations: Migration[] = [
       `ALTER TABLE flashcard_decks ADD COLUMN linked_event_id TEXT`,
     ],
   },
+  {
+    version: 14,
+    up: [
+      `UPDATE flashcard_decks SET linked_event_id = (SELECT id FROM calendar_events WHERE linked_deck_id = flashcard_decks.id LIMIT 1) WHERE EXISTS (SELECT 1 FROM calendar_events WHERE linked_deck_id = flashcard_decks.id)`
+    ],
+  },
 ];
 
 export default migrations;

@@ -248,15 +248,15 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
                       {currentLinkedExam && (
                         <>
                           <Text style={styles.sectionLabel}>Vinculado actualmente</Text>
-                          <View style={[styles.examRow, { borderColor: theme.colors.primary, borderWidth: 1, marginBottom: 12 }]}>
+                          <View style={[styles.examRow, { backgroundColor: theme.colors.primary + '10', marginBottom: 16 }]}>
                             <View style={[styles.urgencyDot, { backgroundColor: theme.colors.primary }]} />
                             <View style={{ flex: 1 }}>
-                              <Text style={styles.examTitle} numberOfLines={1}>{currentLinkedExam.title}</Text>
+                              <Text style={[styles.examTitle, { color: theme.colors.primary }]} numberOfLines={1}>{currentLinkedExam.title}</Text>
                               <Text style={styles.examSubject} numberOfLines={1}>
                                 {(currentLinkedExam as any).subject_name ?? 'Sin materia'}
                               </Text>
                             </View>
-                            <View style={[styles.daysBadge, { borderColor: theme.colors.primary }]}>
+                            <View style={[styles.daysBadge, { borderColor: theme.colors.primary + '45' }]}>
                               <Text style={[styles.daysText, { color: theme.colors.primary }]}>
                                 {urgencyLabel(daysBetween((currentLinkedExam as any).start_date ?? (currentLinkedExam as any).startDate))}
                               </Text>
@@ -478,33 +478,38 @@ const styles = StyleSheet.create({
   examRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: theme.colors.background.card,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light + '40',
   },
   urgencyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 10,
   },
   examTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: theme.colors.text.primary,
+    marginBottom: 2,
   },
   examSubject: {
     fontSize: 12,
     color: theme.colors.text.secondary,
-    marginTop: 1,
   },
   daysBadge: {
-    borderWidth: 1,
-    borderRadius: 12,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
   },
   daysText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '600',
   },
   separator: {
     height: 1,

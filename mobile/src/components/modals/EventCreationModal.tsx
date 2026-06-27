@@ -113,20 +113,31 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
   useEffect(() => {
     if (visible && editingEvent) {
       setTitle(editingEvent.title || '');
-      setEventType(editingEvent.eventType || 'task');
-      setSelectedSubjectId(editingEvent.subjectId);
-      setAllDay(editingEvent.allDay ?? true);
+      setEventType(editingEvent.event_type || editingEvent.eventType || 'task');
+      setSelectedSubjectId(editingEvent.subject_id || editingEvent.subjectId);
+      setAllDay(editingEvent.all_day ?? editingEvent.allDay ?? true);
       setDescription(editingEvent.description || '');
-      setCreateStudyPlan(editingEvent.createStudyPlan ?? false);
+      setCreateStudyPlan(editingEvent.create_study_plan ?? editingEvent.createStudyPlan ?? false);
 
-      if (editingEvent.startDate) {
-        const [d, m, y] = editingEvent.startDate.split('-').map(Number);
-        setStartDate(new Date(y, m - 1, d));
+      const startD = editingEvent.start_date || editingEvent.startDate;
+      if (startD) {
+        // Formato esperado: YYYY-MM-DD
+        const parts = startD.split('-');
+        if (parts.length === 3) {
+          const [y, m, d] = parts.map(Number);
+          setStartDate(new Date(y, m - 1, d));
+        }
       }
-      if (editingEvent.endDate) {
-        const [d, m, y] = editingEvent.endDate.split('-').map(Number);
-        setEndDate(new Date(y, m - 1, d));
+      
+      const endD = editingEvent.end_date || editingEvent.endDate;
+      if (endD) {
+        const parts = endD.split('-');
+        if (parts.length === 3) {
+          const [y, m, d] = parts.map(Number);
+          setEndDate(new Date(y, m - 1, d));
+        }
       }
+      
       const parseTime = (t: string) => {
         if (!t) return EMPTY_DATE;
         const [h, min] = t.split(':').map(Number);
@@ -134,8 +145,8 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
         d.setHours(h, min, 0, 0);
         return d;
       };
-      setStartTime(parseTime(editingEvent.startTime));
-      setEndTime(parseTime(editingEvent.endTime));
+      setStartTime(parseTime(editingEvent.start_time || editingEvent.startTime));
+      setEndTime(parseTime(editingEvent.end_time || editingEvent.endTime));
     } else if (visible && !editingEvent) {
       resetForm();
     }
