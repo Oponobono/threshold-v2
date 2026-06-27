@@ -110,9 +110,20 @@ const LinkedDeckRow = ({ deckId }: { deckId: string }) => {
   const [deckTitle, setDeckTitle] = React.useState<string>('Cargando mazo...');
   React.useEffect(() => {
     import('../../services/database').then(({ flashcardDeckRepository }) => {
-      flashcardDeckRepository.getById(deckId).then(d => {
-        if (d && (d as any).title) setDeckTitle((d as any).title);
-        else setDeckTitle('Mazo vinculado');
+      import('../../services/localFlashcardService').then(({ getLocalDecks }) => {
+        flashcardDeckRepository.getById(deckId).then(d => {
+          if (d && (d as any).title) {
+            setDeckTitle((d as any).title);
+          } else {
+            const localDecks = getLocalDecks();
+            const localDeck = localDecks.find((ld: any) => String(ld.id) === String(deckId));
+            if (localDeck && localDeck.title) {
+              setDeckTitle(localDeck.title);
+            } else {
+              setDeckTitle('Mazo vinculado');
+            }
+          }
+        });
       });
     });
   }, [deckId]);

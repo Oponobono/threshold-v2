@@ -25,11 +25,11 @@ async function enrichDecksWithExamInfo(decks: FlashcardDeck[]): Promise<Flashcar
     for (const evt of allEvents) {
       const deckId = (evt as any).linked_deck_id;
       if (deckId) {
-        examMap.set(deckId, { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
+        examMap.set(String(deckId), { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
       }
     }
     return decks.map(d => {
-      const exam = examMap.get(d.id);
+      const exam = examMap.get(String(d.id));
       if (exam) {
         return { ...d, linked_exam_title: exam.title, linked_exam_date: exam.start_date };
       }

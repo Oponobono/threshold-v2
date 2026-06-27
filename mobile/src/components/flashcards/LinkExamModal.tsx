@@ -116,11 +116,14 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
           .filter((e: any) => ['exam', 'task', 'other'].includes(e.event_type || e.eventType))
           .filter((e: any) => {
             const eDeckId = e.linked_deck_id || e.deckId;
-            if (eDeckId === deck?.id) {
+            const strEDeckId = eDeckId != null ? String(eDeckId) : null;
+            const strDeckId = deck?.id != null ? String(deck?.id) : null;
+            
+            if (strEDeckId === strDeckId) {
               linked = e;
               return false; // Don't show in the list of available exams
             }
-            if (eDeckId && eDeckId !== deck?.id) {
+            if (strEDeckId && strEDeckId !== strDeckId) {
               return false; // Linked to another deck, filter it out to keep 1-to-1 relationship
             }
             return true;
