@@ -27,6 +27,7 @@ import { FlashcardDeck } from '../../services/api/types';
 import {
   createCalendarEvent,
   CalendarEvent,
+  updateCalendarEvent,
 } from '../../services/api/calendar';
 import { calendarEventRepository, flashcardDeckRepository } from '../../services/database';
 import { updateFlashcardDeck } from '../../services/api/flashcards';
@@ -113,27 +114,20 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
 
     calendarEventRepository.getAll()
       .then(async (all) => {
-        // Resolver el evento vinculado desde el MAZO (no desde el evento)
         const linkedEventId = (deck as any)?.linked_event_id;
         let linked: any = null;
 
         if (linkedEventId) {
-          // Buscar el evento por ID (puede estar en la lista o necesitar consulta directa)
           linked = (all as any[]).find(e => String(e.id) === String(linkedEventId)) ?? null;
           if (!linked) {
-            // Intentar leer directamente si no estaba en getAll
             linked = await calendarEventRepository.getById(String(linkedEventId)).catch(() => null);
           }
         }
 
-        // Mostrar TODOS los eventos válidos — la relación es muchos mazos → un evento
+        // Mostrar todos los eventos excepto el ya vinculado
         const upcoming = (all as any[])
           .filter((e: any) => ['exam', 'task', 'other'].includes(e.event_type || e.eventType))
-          .filter((e: any) => {
-            // Excluir solo el que ya está vinculado a este mazo (se muestra arriba)
-            if (linked && String(e.id) === String(linked.id)) return false;
-            return true;
-          })
+          .filter((e: any) => !linked || String(e.id) !== String(linked.id))
           .sort((a: any, b: any) => {
             const da = daysBetween(a.start_date ?? a.startDate) ?? 999;
             const db = daysBetween(b.start_date ?? b.startDate) ?? 999;
@@ -150,13 +144,19 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
       .finally(() => setLoading(false));
   }, [visible, deck]);
 
-  // ── Link existing event → store linked_event_id on the DECK (many-to-one) ──
+  // ── Link existing event → store linked_event_id on the DECK (many decks → one event) ──
   const handleLinkExisting = async (exam: any) => {
     if (!deck || linking) return;
     setLinking(true);
     try {
-      // Guardar el ID del evento en el mazo (no al revés)
+      // Guardar el ID del evento en el mazo (un mazo → un examen)
       await updateFlashcardDeck(String(deck.id), { linked_event_id: String(exam.id) });
+      // Actualizar el evento para indicar que tiene mazos vinculados (para el ícono en agenda)
+      // No sobreescribimos, solo ponemos el deck_id como referencia del primero (indicador)
+      const existingLinked = exam.linked_deck_id;
+      if (!existingLinked) {
+        await updateCalendarEvent(String(exam.id), { deckId: String(deck.id) });
+      }
       onLinked(exam.title);
       onClose();
     } catch (e: any) {
@@ -176,12 +176,12 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
         title: examTitle.trim(),
         eventType: 'exam',
         subjectId: deck.subject_id || undefined,
+        deckId: String(deck.id),
         startDate: dateISO,
         endDate: dateISO,
         allDay: true,
         createStudyPlan: false,
       });
-      // Guardar el evento en el MAZO (relación muchos mazos → un evento)
       const eventId = newEvent?.id;
       if (eventId) {
         await updateFlashcardDeck(String(deck.id), { linked_event_id: String(eventId) });

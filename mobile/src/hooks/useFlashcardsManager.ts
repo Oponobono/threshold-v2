@@ -26,7 +26,7 @@ async function enrichDecksWithExamInfo(decks: FlashcardDeck[]): Promise<Flashcar
     for (const evt of allEvents) {
       eventMap.set(String(evt.id), { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
     }
-    // Enriquecer cada mazo usando su propio linked_event_id
+    // Enriquecer cada mazo usando su propio linked_event_id (un mazo → un examen)
     return decks.map(d => {
       const linkedEventId = (d as any).linked_event_id;
       if (linkedEventId) {

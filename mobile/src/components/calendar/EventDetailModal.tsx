@@ -88,8 +88,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ visible, onC
                 </View>
               ) : null}
 
-              {event.linked_deck_id && (
-                <LinkedDeckRow deckId={event.linked_deck_id} />
+              {event.id && (
+                <LinkedDecksSection eventId={String(event.id)} />
               )}
             </View>
           </ScrollView>
@@ -106,32 +106,71 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ visible, onC
   );
 };
 
-const LinkedDeckRow = ({ deckId }: { deckId: string }) => {
-  const [deckTitle, setDeckTitle] = React.useState<string>('Cargando mazo...');
+
+// ─── LinkedDecksSection ───────────────────────────────────────────────────────
+// Muestra TODOS los mazos vinculados a un examen (relación 1 examen → muchos mazos)
+const LinkedDecksSection = ({ eventId }: { eventId: string }) => {
+  const [decks, setDecks] = React.useState<{ id: string; title: string }[] | null>(null);
+
   React.useEffect(() => {
-    import('../../services/database').then(({ flashcardDeckRepository }) => {
-      import('../../services/localFlashcardService').then(({ getLocalDecks }) => {
-        flashcardDeckRepository.getById(deckId).then(d => {
-          if (d && (d as any).title) {
-            setDeckTitle((d as any).title);
-          } else {
-            const localDecks = getLocalDecks();
-            const localDeck = localDecks.find((ld: any) => String(ld.id) === String(deckId));
-            if (localDeck && localDeck.title) {
-              setDeckTitle(localDeck.title);
-            } else {
-              setDeckTitle('Mazo vinculado');
-            }
-          }
-        });
-      });
-    });
-  }, [deckId]);
+    if (!eventId) return;
+    Promise.all([
+      import('../../services/database').then(m => m.flashcardDeckRepository.getByLinkedEvent(eventId)),
+      import('../../services/localFlashcardService').then(m => m.getLocalDecks()),
+    ]).then(([sqliteDecks, localDecks]) => {
+      // Mazos de SQLite vinculados a este evento
+      const fromSqlite = (sqliteDecks || []).map((d: any) => ({ id: String(d.id), title: d.title }));
+      // Mazos locales MMKV vinculados a este evento
+      const fromLocal = (localDecks || [])
+        .filter((ld: any) => String(ld.linked_event_id) === String(eventId))
+        .map((ld: any) => ({ id: String(ld.id), title: ld.title }));
+      // Merge sin duplicados
+      const merged = [...fromSqlite];
+      for (const ld of fromLocal) {
+        if (!merged.find(d => d.id === ld.id)) merged.push(ld);
+      }
+      setDecks(merged);
+    }).catch(() => setDecks([]));
+  }, [eventId]);
+
+  if (decks === null) {
+    // Cargando
+    return (
+      <View style={[modalStyles.detailRow, { marginTop: 8 }]}>
+        <Ionicons name="layers-outline" size={16} color={theme.colors.primary} />
+        <Text style={[modalStyles.detailText, { color: theme.colors.text.secondary }]}>Cargando mazos...</Text>
+      </View>
+    );
+  }
+
+  if (decks.length === 0) return null;
 
   return (
-    <View style={[modalStyles.detailRow, { marginTop: 8, padding: 8, backgroundColor: theme.colors.primary + '15', borderRadius: 8 }]}>
-      <Ionicons name="layers-outline" size={16} color={theme.colors.primary} />
-      <Text style={[modalStyles.detailText, { color: theme.colors.primary, fontWeight: '600' }]}>{deckTitle}</Text>
+    <View style={{ marginTop: 8, gap: 6 }}>
+      <View style={modalStyles.detailRow}>
+        <Ionicons name="layers-outline" size={16} color={theme.colors.primary} />
+        <Text style={[modalStyles.detailText, { color: theme.colors.primary, fontWeight: '700' }]}>
+          {decks.length === 1 ? 'Mazo vinculado' : `${decks.length} mazos vinculados`}
+        </Text>
+      </View>
+      {decks.map((d) => (
+        <View
+          key={d.id}
+          style={[
+            modalStyles.detailRow,
+            { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: theme.colors.primary + '10', borderRadius: 8, marginLeft: 4 },
+          ]}
+        >
+          <Ionicons name="layers-outline" size={13} color={theme.colors.primary} style={{ opacity: 0.7 }} />
+          <Text
+            style={[modalStyles.detailText, { color: theme.colors.primary, fontWeight: '600', fontSize: 13 }]}
+            numberOfLines={1}
+          >
+            {d.title}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 };
+

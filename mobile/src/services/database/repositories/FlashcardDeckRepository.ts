@@ -32,6 +32,10 @@ export class FlashcardDeckRepository extends BaseRepository<FlashcardDeck> {
   async getBySubject(subjectId: string): Promise<FlashcardDeck[]> {
     return this.getByField('subject_id', subjectId);
   }
+
+  async getByLinkedEvent(eventId: string): Promise<FlashcardDeck[]> {
+    return this.getByField('linked_event_id', eventId);
+  }
 }
 
 export const flashcardDeckRepository = new FlashcardDeckRepository();

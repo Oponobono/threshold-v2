@@ -8,6 +8,40 @@ import { calendarScreenStyles } from '../../styles/CalendarScreen.styles';
 import { ScheduleItem } from '../../types/calendar';
 import { alertRef } from '../ui/CustomAlert';
 
+const LinkedDeckIndicator = ({ eventId }: { eventId: string }) => {
+  const [deckCount, setDeckCount] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    if (!eventId) return;
+    let isMounted = true;
+    Promise.all([
+      import('../../services/database').then(m => m.flashcardDeckRepository.getByLinkedEvent(eventId)),
+      import('../../services/localFlashcardService').then(m => m.getLocalDecks()),
+    ]).then(([sqliteDecks, localDecks]) => {
+      if (!isMounted) return;
+      const fromSqlite = (sqliteDecks || []).map((d: any) => ({ id: String(d.id) }));
+      const fromLocal = (localDecks || [])
+        .filter((ld: any) => String(ld.linked_event_id) === String(eventId))
+        .map((ld: any) => ({ id: String(ld.id) }));
+      const merged = [...fromSqlite];
+      for (const ld of fromLocal) {
+        if (!merged.find(d => d.id === ld.id)) merged.push(ld);
+      }
+      setDeckCount(merged.length);
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [eventId]);
+
+  if (deckCount === 0) return null;
+
+  return (
+    <View style={{ marginRight: 8, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: theme.colors.primary + '15', borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <Ionicons name="layers-outline" size={14} color={theme.colors.primary} />
+      <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary }}>{deckCount}</Text>
+    </View>
+  );
+};
+
 interface AgendaListProps {
   selectedDayLabel: string;
   events: ScheduleItem[];
@@ -120,9 +154,7 @@ export const AgendaList: React.FC<AgendaListProps> = ({
                   {(item.type === 'event' || item.type === 'task') && (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       {item.linked_deck_id && (
-                        <View style={{ marginRight: 8, padding: 4, backgroundColor: theme.colors.primary + '15', borderRadius: 12 }}>
-                          <Ionicons name="layers-outline" size={14} color={theme.colors.primary} />
-                        </View>
+                        <LinkedDeckIndicator eventId={item.id.replace('event-', '')} />
                       )}
                       <TouchableOpacity
                         style={calendarAgendaStyles.menuButton}
