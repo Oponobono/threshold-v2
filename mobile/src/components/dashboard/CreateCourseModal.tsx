@@ -94,20 +94,20 @@ export const CreateCourseModal = ({ visible, onClose, editingCourse }: CreateCou
         await updateCourse(editingCourse.id, {
           name: courseName.trim(),
           platform: resolvedPlatform,
-          main_url: mainUrl.trim() || undefined,
-          instructor: instructor.trim() || undefined,
-          tags: tags.trim() || undefined,
-          total_classes: totalClassesNum && !isNaN(totalClassesNum) ? totalClassesNum : undefined,
-        });
+          main_url: mainUrl.trim() || null,
+          instructor: instructor.trim() || null,
+          tags: tags.trim() || null,
+          total_classes: totalClasses.trim() ? parseInt(totalClasses, 10) : null,
+        } as any);
       } else {
         await createCourse({
           name: courseName.trim(),
           platform: resolvedPlatform,
-          main_url: mainUrl.trim() || undefined,
-          instructor: instructor.trim() || undefined,
-          tags: tags.trim() || undefined,
-          total_classes: totalClassesNum && !isNaN(totalClassesNum) ? totalClassesNum : undefined,
-        });
+          main_url: mainUrl.trim() || null,
+          instructor: instructor.trim() || null,
+          tags: tags.trim() || null,
+          total_classes: totalClasses.trim() ? parseInt(totalClasses, 10) : null,
+        } as any);
       }
 
       await loadAllData(true);

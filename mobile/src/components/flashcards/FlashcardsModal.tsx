@@ -463,6 +463,14 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                             </View>
                           )}
                         </View>
+                        {(item as any).linked_exam_title && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                            <Ionicons name="calendar" size={12} color={theme.colors.primary} />
+                            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '500' }}>
+                              {(item as any).linked_exam_title}
+                            </Text>
+                          </View>
+                        )}
                       </View>
 
                       {/* Swipe hint indicator */}

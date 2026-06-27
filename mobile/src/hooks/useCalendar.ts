@@ -176,6 +176,7 @@ export function useCalendar(t: any, language: string = 'es-ES') {
         description: event.description,
         allDay: event.allDay || event.all_day,
         time: event.allDay || event.all_day ? t('calendar.allDay') : `${event.startTime || event.start_time || '08:00'} - ${event.endTime || event.end_time || '09:00'}`,
+        linked_deck_id: event.linked_deck_id || event.deckId,
       }));
 
     return [...classes, ...tasks, ...calendarDayEvents].sort((a: any, b: any) =>

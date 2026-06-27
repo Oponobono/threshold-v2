@@ -27,9 +27,11 @@ import { LinkExamModal } from '../src/components/flashcards/LinkExamModal';
 import { MenuModal } from '../src/components/flashcards/MenuModal';
 import { useFlashcards } from '../src/hooks/useFlashcards';
 import { useTranslation } from 'react-i18next';
+import { useCustomAlert } from '../src/components/ui/CustomAlert';
 
 export default function FlashcardsScreen() {
   const { t } = useTranslation();
+  const { showAlert } = useCustomAlert();
   const {
     showSearch, showNewDeckModal, showImportModal, showMenuModal, showNewCardModal,
     showStudyModal, showEditDeckModal, subjects, activeDeck, editingDeck, studyDeckCards,

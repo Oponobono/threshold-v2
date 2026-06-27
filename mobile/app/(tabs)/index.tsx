@@ -52,7 +52,7 @@ export default function HybridDashboardScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
   // ── Usar store global para subjects, assessments, schedules y predicciones ──
-  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions, isSyncing, syncStatusMessage } = useDataStore();
+  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions, isSyncing, syncStatusMessage, courses } = useDataStore();
 
   // Cargar perfil desde caché al montar para hidratación instantánea
   useEffect(() => {
@@ -72,7 +72,6 @@ export default function HybridDashboardScreen() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const subjectsCarouselRef = useRef<FlatList<any> | null>(null);
   
-  const [courses, setCourses] = useState<Course[]>([]);
   const [selectedDashboardCourseId, setSelectedDashboardCourseId] = useState<string | null>(null); // null = "todas"
   const heroCarouselRef = useRef<FlatList<any> | null>(null);
 
@@ -155,7 +154,7 @@ export default function HybridDashboardScreen() {
       
       try {
         const dbCourses = await courseRepository.getAll();
-        setCourses(dbCourses);
+        useDataStore.setState({ courses: dbCourses as any });
       } catch (err) {
         console.warn('Error loading courses in dashboard:', err);
       }
@@ -389,7 +388,9 @@ export default function HybridDashboardScreen() {
       await courseRepository.incrementClass(selectedCourse.id);
       const updated = await courseRepository.getById(selectedCourse.id);
       if (updated) {
-        setCourses(prev => prev.map(c => c.id === updated.id ? updated : c));
+        useDataStore.setState(state => ({
+          courses: state.courses.map(c => c.id === updated.id ? updated as any : c)
+        }));
       }
     } catch (err) {
       console.error('[Dashboard] Error incrementando clase:', err);
@@ -402,7 +403,9 @@ export default function HybridDashboardScreen() {
       await courseRepository.decrementClass(selectedCourse.id);
       const updated = await courseRepository.getById(selectedCourse.id);
       if (updated) {
-        setCourses(prev => prev.map(c => c.id === updated.id ? updated : c));
+        useDataStore.setState(state => ({
+          courses: state.courses.map(c => c.id === updated.id ? updated as any : c)
+        }));
       }
     } catch (err) {
       console.error('[Dashboard] Error decrementando clase:', err);
@@ -689,92 +692,69 @@ export default function HybridDashboardScreen() {
           )}
 
           {/* QuickActionRow: class progress for flat courses */}
-          {selectedCourse && (selectedCourse.total_classes ?? 0) > 0 ? (
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginTop: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 12,
-              backgroundColor: theme.colors.card,
-              borderRadius: 14,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <TouchableOpacity
-                onPress={handleDecrementClass}
-                disabled={(selectedCourse.completed_classes ?? 0) === 0}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{
-                  width: 32, height: 32, borderRadius: 16,
-                  backgroundColor: (selectedCourse.completed_classes ?? 0) === 0
-                    ? theme.colors.border : theme.colors.primary + '15',
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Ionicons
-                  name="remove"
-                  size={16}
-                  color={(selectedCourse.completed_classes ?? 0) === 0
-                    ? theme.colors.text.placeholder : theme.colors.primary}
-                />
-              </TouchableOpacity>
+          {selectedCourse && (selectedCourse.total_classes ?? 0) > 0 ? (() => {
+            const completed = selectedCourse.completed_classes ?? 0;
+            const total = selectedCourse.total_classes!;
+            const pct = Math.min(Math.round((completed / total) * 100), 100);
+            const isMin = completed === 0;
+            const isMax = completed >= total;
+            return (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 7,
+                backgroundColor: theme.colors.card,
+                borderRadius: 10,
+                borderWidth: 0.5,
+                borderColor: theme.colors.border,
+              }}>
+                <TouchableOpacity
+                  onPress={handleDecrementClass}
+                  disabled={isMin}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={{
+                    width: 24, height: 24, borderRadius: 12,
+                    backgroundColor: isMin ? theme.colors.border + '60' : theme.colors.primary + '12',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="remove" size={13} color={isMin ? theme.colors.text.placeholder : theme.colors.primary} />
+                </TouchableOpacity>
 
-              <View style={{ alignItems: 'center', flex: 1 }}>
-                <View style={{
-                  flexDirection: 'row', alignItems: 'baseline', gap: 1,
-                }}>
-                  <Text style={{
-                    fontSize: 20, fontWeight: '600', color: theme.colors.text.primary,
-                  }}>
-                    {selectedCourse.completed_classes ?? 0}
-                  </Text>
-                  <Text style={{
-                    fontSize: 13, fontWeight: '400', color: theme.colors.text.placeholder,
-                  }}>
-                    /{selectedCourse.total_classes}
-                  </Text>
-                </View>
-                <View style={{
-                  width: '64%', height: 3, borderRadius: 2,
-                  backgroundColor: theme.colors.border, marginTop: 6, overflow: 'hidden',
-                }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.text.primary, minWidth: 38, textAlign: 'center' }}>
+                  {completed}<Text style={{ fontWeight: '400', color: theme.colors.text.placeholder, fontSize: 11 }}>/{total}</Text>
+                </Text>
+
+                <View style={{ flex: 1, height: 3, borderRadius: 1.5, backgroundColor: theme.colors.border + '80', overflow: 'hidden' }}>
                   <View style={{
-                    width: `${Math.min(
-                      ((selectedCourse.completed_classes ?? 0) / selectedCourse.total_classes) * 100, 100
-                    )}%` as any,
-                    height: '100%', borderRadius: 2,
-                    backgroundColor: theme.colors.primary,
+                    width: `${pct}%` as any,
+                    height: '100%', borderRadius: 1.5,
+                    backgroundColor: pct >= 100 ? '#34C759' : theme.colors.primary,
                   }} />
                 </View>
-                <Text style={{
-                  fontSize: 10, color: theme.colors.text.placeholder, marginTop: 6, fontWeight: '400',
-                }}>
-                  clases vistas
-                </Text>
-              </View>
 
-              <TouchableOpacity
-                onPress={handleIncrementClass}
-                disabled={(selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{
-                  width: 32, height: 32, borderRadius: 16,
-                  backgroundColor: (selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes
-                    ? theme.colors.border : theme.colors.primary + '15',
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Ionicons
-                  name="add"
-                  size={16}
-                  color={(selectedCourse.completed_classes ?? 0) >= selectedCourse.total_classes
-                    ? theme.colors.text.placeholder : theme.colors.primary}
-                />
-              </TouchableOpacity>
-            </View>
-          ) : null}
+                <Text style={{ fontSize: 10, color: theme.colors.text.placeholder, fontWeight: '500', minWidth: 28, textAlign: 'right' }}>
+                  {pct}%
+                </Text>
+
+                <TouchableOpacity
+                  onPress={handleIncrementClass}
+                  disabled={isMax}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={{
+                    width: 24, height: 24, borderRadius: 12,
+                    backgroundColor: isMax ? theme.colors.border + '60' : theme.colors.primary + '12',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="add" size={13} color={isMax ? theme.colors.text.placeholder : theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+            );
+          })() : null}
 
           {/* Subjects carousel filtered by active course */}
           <View style={{ marginTop: 16 }}>

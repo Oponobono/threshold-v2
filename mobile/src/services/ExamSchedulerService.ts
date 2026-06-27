@@ -1,7 +1,13 @@
 import { databaseService } from './database/DatabaseService';
 import { EXAM_COMPRESSION_WINDOW_DAYS } from './database/migrations';
 
-function parseDDMMYYYY(dateStr: string): Date {
+function parseDateString(dateStr: string): Date {
+  if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    // YYYY-MM-DD
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  // DD-MM-YYYY
   const [d, m, y] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
@@ -9,6 +15,15 @@ function parseDDMMYYYY(dateStr: string): Date {
 function daysBetween(a: Date, b: Date): number {
   const ms = a.getTime() - b.getTime();
   return Math.round(ms / (1000 * 60 * 60 * 24));
+}
+
+/** Returns today in DD-MM-YYYY format (the app's canonical date storage format) */
+function formatTodayForSQL(): string {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
 }
 
 export class ExamSchedulerService {
@@ -27,23 +42,29 @@ export class ExamSchedulerService {
       let rows;
 
       if (deckId != null) {
+        const today = formatTodayForSQL();
         rows = await db.getAllAsync(
           `SELECT start_date FROM calendar_events
-           WHERE event_type = 'exam' AND linked_deck_id = ?
+           WHERE linked_deck_id = ?
+             AND start_date >= ?
            ORDER BY start_date ASC
            LIMIT 1`,
           String(deckId),
+          today,
         );
       }
 
       if (!rows || rows.length === 0) {
         if (subjectId != null) {
+          const today = formatTodayForSQL();
           rows = await db.getAllAsync(
             `SELECT start_date FROM calendar_events
-             WHERE event_type = 'exam' AND subject_id = ?
+             WHERE event_type IN ('exam', 'task') AND subject_id = ?
+               AND start_date >= ?
              ORDER BY start_date ASC
              LIMIT 1`,
             String(subjectId),
+            today,
           );
         }
       }
@@ -53,7 +74,7 @@ export class ExamSchedulerService {
       const examDateStr = (rows[0] as any).start_date;
       if (!examDateStr) return 1.0;
 
-      const examDate = parseDDMMYYYY(examDateStr);
+      const examDate = parseDateString(examDateStr);
       const now = new Date();
       now.setHours(0, 0, 0, 0);
 

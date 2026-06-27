@@ -118,13 +118,20 @@ export const AgendaList: React.FC<AgendaListProps> = ({
                     />
                   </View>
                   {(item.type === 'event' || item.type === 'task') && (
-                    <TouchableOpacity
-                      style={calendarAgendaStyles.menuButton}
-                      onPress={() => showActions(item)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.text.secondary} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      {item.linked_deck_id && (
+                        <View style={{ marginRight: 8, padding: 4, backgroundColor: theme.colors.primary + '15', borderRadius: 12 }}>
+                          <Ionicons name="layers-outline" size={14} color={theme.colors.primary} />
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={calendarAgendaStyles.menuButton}
+                        onPress={() => showActions(item)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.text.secondary} />
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               </TouchableOpacity>

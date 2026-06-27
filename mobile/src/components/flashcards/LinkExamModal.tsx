@@ -113,7 +113,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
       .then((all) => {
         let linked: any = null;
         const upcoming = (all as any[])
-          .filter((e: any) => e.event_type === 'exam' || e.eventType === 'exam')
+          .filter((e: any) => ['exam', 'task', 'other'].includes(e.event_type || e.eventType))
           .filter((e: any) => {
             const eDeckId = e.linked_deck_id || e.deckId;
             if (eDeckId === deck?.id) {

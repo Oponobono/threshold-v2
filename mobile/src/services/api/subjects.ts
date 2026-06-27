@@ -212,8 +212,10 @@ const updateCourseCounters = async (courseId: string | null | undefined): Promis
     const completed = linked.reduce((sum, s) => sum + ((s as any).completed_lessons ?? 0), 0);
     // Solo sobrescribir si hay materias vinculadas (cursos planos preservan su valor manual)
     if (linked.length > 0) {
+      const course = await courseRepository.getById(courseId);
+      const newTotalClasses = course?.total_classes ? course.total_classes : total;
       await courseRepository.update(courseId, {
-        total_classes: total as any,
+        total_classes: newTotalClasses as any,
         completed_classes: completed as any,
       } as any);
     }
@@ -319,9 +321,12 @@ export const repairSubjectCourseLinks = async (): Promise<void> => {
       if (linked.length === 0) continue; // cursos planos preservan su valor manual
       const total = linked.reduce((sum, s) => sum + (s.total_lessons ?? 0), 0);
       const completed = linked.reduce((sum, s) => sum + (s.completed_lessons ?? 0), 0);
-      if (course.total_classes !== total || course.completed_classes !== completed) {
+      
+      const newTotalClasses = course.total_classes ? course.total_classes : total;
+      
+      if (course.total_classes !== newTotalClasses || course.completed_classes !== completed) {
         await courseRepository.update(course.id, {
-          total_classes: total,
+          total_classes: newTotalClasses,
           completed_classes: completed,
         });
       }

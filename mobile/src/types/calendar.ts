@@ -14,6 +14,7 @@ export interface ScheduleItem {
   allAssessments?: any[];
   description?: string;
   allDay?: boolean;
+  linked_deck_id?: string;
 }
 
 export interface CalendarEventItem {
@@ -32,6 +33,7 @@ export interface CalendarEventItem {
   allAssessments?: any[];
   description?: string;
   allDay?: boolean;
+  linked_deck_id?: string;
 }
 
 export interface ActivitySummary {

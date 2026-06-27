@@ -87,6 +87,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ visible, onC
                   <Text style={modalStyles.detailText}>{event.description}</Text>
                 </View>
               ) : null}
+
+              {event.linked_deck_id && (
+                <LinkedDeckRow deckId={event.linked_deck_id} />
+              )}
             </View>
           </ScrollView>
 
@@ -99,5 +103,24 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ visible, onC
         </View>
       </Animated.View>
     </Modal>
+  );
+};
+
+const LinkedDeckRow = ({ deckId }: { deckId: string }) => {
+  const [deckTitle, setDeckTitle] = React.useState<string>('Cargando mazo...');
+  React.useEffect(() => {
+    import('../../services/database').then(({ flashcardDeckRepository }) => {
+      flashcardDeckRepository.getById(deckId).then(d => {
+        if (d && (d as any).title) setDeckTitle((d as any).title);
+        else setDeckTitle('Mazo vinculado');
+      });
+    });
+  }, [deckId]);
+
+  return (
+    <View style={[modalStyles.detailRow, { marginTop: 8, padding: 8, backgroundColor: theme.colors.primary + '15', borderRadius: 8 }]}>
+      <Ionicons name="layers-outline" size={16} color={theme.colors.primary} />
+      <Text style={[modalStyles.detailText, { color: theme.colors.primary, fontWeight: '600' }]}>{deckTitle}</Text>
+    </View>
   );
 };
