@@ -1106,7 +1106,14 @@ export const runBackup = async (
           await fetchWithFallback('/backup/mark', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'flashcard_deck', id: deck.id, cloud_url: uploadResult.url }),
+          body: JSON.stringify({
+            type: 'flashcard_deck',
+            id: deck.id,
+            cloud_url: uploadResult.url,
+            title: deck.title,
+            subject_id: deck.subject_id ?? null,
+            linked_event_id: deck.linked_event_id ?? null,
+          }),
           });
         } catch (_e) { /* ignorar fallo backend */ }
         try {
