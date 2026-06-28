@@ -77,8 +77,13 @@ export default function SubjectsScreen() {
     setZyrenModalVisible(true);
   }, [refreshSubjects, refreshCourses]);
 
-  const handleContinueClass = useCallback(async (url: string) => {
-    await openCourseLink(url);
+  const getCoursePlatform = useCallback((courseId?: string | null): string | undefined => {
+    if (!courseId) return undefined;
+    return courses.find(c => c.id === courseId)?.platform;
+  }, [courses]);
+
+  const handleContinueClass = useCallback(async (url: string, platform?: string) => {
+    await openCourseLink(url, platform);
   }, []);
 
   const overallGpa = useMemo(() => {
@@ -175,14 +180,14 @@ export default function SubjectsScreen() {
             <SubjectCard
               subject={left}
               onPress={() => router.push(`/subjects/${left.id}`)}
-              onContinue={left.external_url ? () => handleContinueClass(left.external_url) : undefined}
+              onContinue={left.external_url ? () => handleContinueClass(left.external_url, getCoursePlatform(left.course_id)) : undefined}
               onComplete={() => handleClassComplete(left, left.courseName || selectedCourseName)}
             />
             {right ? (
               <SubjectCard
                 subject={right}
                 onPress={() => router.push(`/subjects/${right.id}`)}
-                onContinue={right.external_url ? () => handleContinueClass(right.external_url) : undefined}
+                onContinue={right.external_url ? () => handleContinueClass(right.external_url, getCoursePlatform(right.course_id)) : undefined}
                 onComplete={() => handleClassComplete(right, right.courseName || selectedCourseName)}
               />
             ) : (
