@@ -19,6 +19,8 @@ const upload = multer({
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
+      // JSON para backups de flashcards, AI chats, preferencias
+      'application/json',
       // Fallback genérico (cuando el tipo no puede determinarse)
       'application/octet-stream',
     ];

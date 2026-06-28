@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely, activeBaseUrl } from './client';
 import { storageService } from '../storageService';
 import { syncService } from '../database';
+import { getLocalGlobalGPA } from '../localMasteryService';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -494,7 +495,6 @@ export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
 
   // 1. Calcular localmente (SQLite assessments)
   try {
-    const { getLocalGlobalGPA } = await import('../localMasteryService');
     const localData = await getLocalGlobalGPA(userId);
     if (localData.assessmentCount > 0) {
       await storageService.saveLocal('app:cache:global_gpa', JSON.stringify(localData));

@@ -101,6 +101,7 @@ function inferMimeType(uri: string): string {
     pdf: 'application/pdf',
     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     txt: 'text/plain',
+    json: 'application/json',
   };
   return map[ext || ''] || 'application/octet-stream';
 }

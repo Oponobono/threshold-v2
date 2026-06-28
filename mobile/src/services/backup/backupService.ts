@@ -1153,8 +1153,8 @@ export const runBackup = async (
 
 export const syncLocalFlashcardsToBackend = async (): Promise<void> => {
   try {
-    const { default: mmkv } = await import('react-native-mmkv');
-    const storage = mmkv.createMMKV();
+    const { createMMKV } = await import('react-native-mmkv');
+    const storage = createMMKV();
     const { getLocalDecks, deleteLocalDeck } = await import('../localFlashcardService');
     const { createFlashcardDeck } = await import('../api/flashcards');
 
@@ -1173,6 +1173,7 @@ export const syncLocalFlashcardsToBackend = async (): Promise<void> => {
           title: deck.title,
           description: deck.description,
           subject_id: deck.subject_id ? String(deck.subject_id) : undefined,
+          linked_event_id: (deck as any).linked_event_id ?? undefined,
           avg_ease_factor: (deck as any).avg_ease_factor ?? undefined,
           total_reviews: (deck as any).total_reviews ?? undefined,
           last_reviewed_at: (deck as any).last_reviewed_at ?? undefined,

@@ -75,11 +75,12 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
   return localData;
 };
 
-export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string; id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string }): Promise<any> => {
+export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string; id?: string; linked_event_id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = (payload as any).id || uuidv4();
+  const userId = await getUserId();
 
-  const deck: any = { id, ...payload, card_count: 0, created_at: new Date().toISOString() };
+  const deck: any = { id, user_id: userId, ...payload, card_count: 0, created_at: new Date().toISOString() };
   await flashcardDeckRepository.create(deck);
 
   try {
