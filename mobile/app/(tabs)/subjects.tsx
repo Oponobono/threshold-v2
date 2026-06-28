@@ -42,7 +42,7 @@ export default function SubjectsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const g = useSubjects(t);
-  const { courses, loadAllData, refreshCourses } = useDataStore();
+  const { courses, loadAllData, refreshCourses, refreshSubjects } = useDataStore();
   const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore } = useGroupedSubjects(courses, g.filteredSubjects);
 
   // ── Fase 5: Estado del modal de ingesta de Zyren ──
@@ -58,8 +58,10 @@ export default function SubjectsScreen() {
     try {
       const newCompleted = (subject.completed_lessons || 0) + 1;
       await updateSubject(subject.id, { completed_lessons: newCompleted });
+      await refreshSubjects();
       if (subject.course_id) {
         await updateCourseCounters(subject.course_id);
+        await refreshCourses();
         MomentumService.boostMomentum(subject.course_id).catch(console.warn);
       }
     } catch (e) {
@@ -73,7 +75,7 @@ export default function SubjectsScreen() {
       milestone: subject.next_micro_milestone || subject.next_milestone,
     });
     setZyrenModalVisible(true);
-  }, []);
+  }, [refreshSubjects, refreshCourses]);
 
   const handleContinueClass = useCallback(async (url: string) => {
     await openCourseLink(url);
