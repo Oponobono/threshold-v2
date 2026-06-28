@@ -1,7 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { YouTubeVideo } from './types';
-import { youTubeRepository, syncService } from '../database';
+import { youTubeRepository, youTubeTranscriptRepository, syncService } from '../database';
 
 export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
   const userId = await getUserId();
@@ -101,7 +101,7 @@ export const deleteYouTubeVideo = async (id: string) => {
 };
 
 export const upsertYouTubeTranscript = async (payload: { video_id: string; transcript_uri?: string; transcript_text?: string; summary_uri?: string; summary_text?: string }) => {
-  // Offline-First: Guardar localmente
+  // Offline-First: Guardar localmente (inline + tabla dedicada)
   if (payload.transcript_text || payload.summary_text) {
     try {
       await youTubeRepository.update(payload.video_id, {
@@ -109,7 +109,22 @@ export const upsertYouTubeTranscript = async (payload: { video_id: string; trans
         ...(payload.summary_text ? { summary_text: payload.summary_text } : {})
       });
     } catch (e) {
-      console.warn('[upsertYouTubeTranscript] No se pudo guardar transcript/summary localmente:', e);
+      console.warn('[upsertYouTubeTranscript] No se pudo guardar transcript/summary en youtube_videos:', e);
+    }
+
+    try {
+      const existing = await youTubeTranscriptRepository.getByVideo(payload.video_id);
+      const transcriptId = existing?.id || payload.video_id;
+      await youTubeTranscriptRepository.upsert({
+        id: transcriptId,
+        video_id: payload.video_id,
+        ...(payload.transcript_uri ? { transcript_uri: payload.transcript_uri } : {}),
+        ...(payload.transcript_text ? { transcript_text: payload.transcript_text } : {}),
+        ...(payload.summary_uri ? { summary_uri: payload.summary_uri } : {}),
+        ...(payload.summary_text ? { summary_text: payload.summary_text } : {}),
+      });
+    } catch (e) {
+      console.warn('[upsertYouTubeTranscript] No se pudo guardar en youtube_transcripts:', e);
     }
   }
 

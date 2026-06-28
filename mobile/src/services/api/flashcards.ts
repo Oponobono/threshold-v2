@@ -120,6 +120,9 @@ const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
     merged.subject_icon = serverDeck.subject_icon !== undefined
       ? serverDeck.subject_icon
       : (localRecord.subject_icon ?? null);
+    merged.linked_event_id = serverDeck.linked_event_id !== undefined
+      ? serverDeck.linked_event_id
+      : (localRecord.linked_event_id ?? null);
   }
 
   // Si tenemos subject_id pero nos faltan los metadatos visuales, hidratar desde SQLite local

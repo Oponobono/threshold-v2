@@ -59,6 +59,7 @@ function localDeckToFlashcardDeck(local: LocalDeck, subjects: Subject[] = []): F
     learning_count: local.learning_count,
     new_count: local.new_count,
     created_at: local.created_at,
+    linked_event_id: local.linked_event_id,
     _local: true,
   } as FlashcardDeck;
 }

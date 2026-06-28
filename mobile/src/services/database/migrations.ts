@@ -374,6 +374,41 @@ const migrations: Migration[] = [
       `UPDATE flashcard_decks SET linked_event_id = (SELECT id FROM calendar_events WHERE linked_deck_id = flashcard_decks.id LIMIT 1) WHERE EXISTS (SELECT 1 FROM calendar_events WHERE linked_deck_id = flashcard_decks.id)`
     ],
   },
+  {
+    version: 15,
+    up: [
+      `CREATE TABLE IF NOT EXISTS audio_transcripts (
+        id TEXT PRIMARY KEY,
+        recording_id TEXT NOT NULL UNIQUE,
+        transcript_uri TEXT,
+        transcript_text TEXT,
+        summary_uri TEXT,
+        summary_text TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
+        FOREIGN KEY (recording_id) REFERENCES audio_recordings(id) ON DELETE CASCADE
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_audio_transcripts_recording ON audio_transcripts(recording_id)`,
+      `CREATE TABLE IF NOT EXISTS youtube_transcripts (
+        id TEXT PRIMARY KEY,
+        video_id TEXT NOT NULL UNIQUE,
+        transcript_uri TEXT,
+        transcript_text TEXT,
+        summary_uri TEXT,
+        summary_text TEXT,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (video_id) REFERENCES youtube_videos(id) ON DELETE CASCADE
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_youtube_transcripts_video ON youtube_transcripts(video_id)`,
+      `INSERT OR IGNORE INTO audio_transcripts (id, recording_id, transcript_text, summary_text, is_backed_up) SELECT id, id, transcript_text, summary_text, COALESCE(is_backed_up, 0) FROM audio_recordings WHERE transcript_text IS NOT NULL AND transcript_text != ''`,
+      `INSERT OR IGNORE INTO youtube_transcripts (id, video_id, transcript_text, summary_text, is_backed_up) SELECT id, id, transcript_text, summary_text, COALESCE(is_backed_up, 0) FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`,
+      `UPDATE audio_transcripts SET cloud_url = (SELECT cloud_url FROM audio_recordings WHERE audio_recordings.id = audio_transcripts.recording_id) WHERE cloud_url IS NULL`,
+      `UPDATE youtube_transcripts SET cloud_url = (SELECT cloud_url FROM youtube_videos WHERE youtube_videos.id = youtube_transcripts.video_id) WHERE cloud_url IS NULL`,
+    ],
+  },
 ];
 
 export default migrations;

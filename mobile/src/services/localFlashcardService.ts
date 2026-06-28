@@ -33,6 +33,7 @@ export interface LocalDeck {
   learning_count: number;
   new_count: number;
   _local: boolean;
+  linked_event_id?: string;
 }
 
 const LOCAL_DECKS_KEY = 'local:flashcard_decks';

@@ -65,17 +65,24 @@ export const autoUploadIfEnabled = async (
 
     // Siempre marcar localmente para evitar re-subidas infinitas aunque falle el backend
     const db = databaseService.getDb();
-    const tableName =
-      type === 'photo' ? 'photos'
-      : type === 'audio' ? 'audio_recordings'
-      : type === 'document' ? 'scanned_documents'
-      : transcriptType === 'youtube' ? 'youtube_videos'
-      : 'audio_recordings';
     try {
-      await db.runAsync(
-        `UPDATE ${tableName} SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-        [result.url, itemId]
-      );
+      if (type === 'transcript') {
+        const transTable = transcriptType === 'youtube' ? 'youtube_transcripts' : 'audio_transcripts';
+        const idColumn = transcriptType === 'youtube' ? 'video_id' : 'recording_id';
+        await db.runAsync(
+          `UPDATE ${transTable} SET is_backed_up = 1, cloud_url = ? WHERE ${idColumn} = ?`,
+          [result.url, itemId]
+        );
+      } else {
+        const tableName =
+          type === 'photo' ? 'photos'
+          : type === 'audio' ? 'audio_recordings'
+          : 'scanned_documents';
+        await db.runAsync(
+          `UPDATE ${tableName} SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+          [result.url, itemId]
+        );
+      }
     } catch (dbErr) {
       console.warn(`[BackupService] No se pudo marcar localmente ${type} ${itemId}:`, dbErr);
     }
@@ -275,8 +282,8 @@ async function getLocalBackupStats(): Promise<BackupStats> {
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE transcript_text IS NOT NULL AND transcript_text != ''`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, 0 as backed FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`) as Promise<{ total: number; backed: number } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_transcripts`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM youtube_transcripts`) as Promise<{ total: number; backed: number } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM assessment_files WHERE local_uri IS NOT NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
     ]);
 
@@ -353,18 +360,16 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.docs.length} documento(s) pendiente(s)`);
     }
 
-    // Transcripciones no respaldadas
+    // Transcripciones no respaldadas (desde tablas dedicadas)
     if (prefs.includeTranscripts) {
-      // Audio transcripts (transcript_text está en la misma fila de audio_recordings)
       const audioTranscripts = await db.getAllAsync(
-        `SELECT id, transcript_text, id as recording_id FROM audio_recordings WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
+        `SELECT id, recording_id, transcript_text FROM audio_transcripts WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
       );
       result.transcripts.push(...audioTranscripts.map((t: any) => ({ id: String(t.id), type: 'audio' as const, text: t.transcript_text, recording_id: String(t.recording_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${audioTranscripts.length} transcripción(es) de audio pendiente(s)`);
 
-      // YouTube transcripts (la tabla no tiene columna is_backed_up, se filtra por NULL)
       const ytTranscripts = await db.getAllAsync(
-        `SELECT id, transcript_text, id as video_id FROM youtube_videos WHERE transcript_text IS NOT NULL AND transcript_text != ''`
+        `SELECT id, video_id, transcript_text FROM youtube_transcripts WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
       );
       result.transcripts.push(...ytTranscripts.map((t: any) => ({ id: String(t.id), type: 'youtube' as const, text: t.transcript_text, video_id: String(t.video_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${ytTranscripts.length} transcripción(es) de YouTube pendiente(s)`);
@@ -435,22 +440,22 @@ export const resetStuckBackupFlags = async (): Promise<{
 
   try {
     const { changes: audioTransChanges } = await db.runAsync(
-      `UPDATE audio_recordings SET is_backed_up = 0, cloud_url = NULL
+      `UPDATE audio_transcripts SET is_backed_up = 0, cloud_url = NULL
        WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
     );
     result.audioTranscripts = audioTransChanges ?? 0;
   } catch (e) {
-    console.warn('[BackupService] resetStuckBackupFlags: error en transcripciones de audio:', e);
+    console.warn('[BackupService] resetStuckBackupFlags: error en audio_transcripts:', e);
   }
 
   try {
     const { changes: ytTransChanges } = await db.runAsync(
-      `UPDATE youtube_videos SET is_backed_up = 0, cloud_url = NULL
+      `UPDATE youtube_transcripts SET is_backed_up = 0, cloud_url = NULL
        WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
     );
     result.ytTranscripts = ytTransChanges ?? 0;
   } catch (e) {
-    console.warn('[BackupService] resetStuckBackupFlags: error en transcripciones de YouTube:', e);
+    console.warn('[BackupService] resetStuckBackupFlags: error en youtube_transcripts:', e);
   }
 
   console.log('[BackupService] resetStuckBackupFlags completado:', result);
@@ -483,8 +488,18 @@ export const runBackup = async (
   let uploaded = 0;
   let errors = 0;
 
-  // Detectar si estamos en modo offline
-  const isOffline = !useConnectivityStore.getState().isOnline;
+  // Detectar si estamos en modo offline con probe de conectividad
+  const { useLocalAIStore } = await import('../../store/useLocalAIStore');
+  let isOffline = !useConnectivityStore.getState().isOnline || useLocalAIStore.getState().forceOfflineMode;
+  if (!isOffline) {
+    try {
+      const probe = await fetchWithFallback('/health', { method: 'HEAD' });
+      isOffline = !probe;
+    } catch {
+      isOffline = true;
+      console.warn('[BackupService] Probe de conectividad falló — asumiendo offline.');
+    }
+  }
   console.log(`[BackupService] Iniciando backup. Modo offline: ${isOffline}`);
 
   const db = databaseService.getDb();
@@ -807,13 +822,13 @@ export const runBackup = async (
           try {
             if (t.type === 'audio') {
               await db.runAsync(
-                `UPDATE audio_recordings SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-                [result.url, t.id]
+                `UPDATE audio_transcripts SET is_backed_up = 1, cloud_url = COALESCE(cloud_url, ?) WHERE recording_id = ?`,
+                [result.url, t.recording_id || t.id]
               );
             } else {
               await db.runAsync(
-                `UPDATE youtube_videos SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-                [result.url, t.id]
+                `UPDATE youtube_transcripts SET is_backed_up = 1, cloud_url = COALESCE(cloud_url, ?) WHERE video_id = ?`,
+                [result.url, t.video_id || t.id]
               );
             }
           } catch (e) {

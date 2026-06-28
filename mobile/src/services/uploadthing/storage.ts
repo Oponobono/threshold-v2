@@ -6,6 +6,8 @@
  * Este enfoque evita la necesidad de un SDK de Uploadthing para React Native.
  */
 import { storageService } from '../storageService';
+import { useConnectivityStore } from '../../store/useConnectivityStore';
+import { useLocalAIStore } from '../../store/useLocalAIStore';
 
 const getApiUrl = (): string => {
   return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
@@ -32,6 +34,12 @@ export const uploadFileToUploadthing = async (
   filename?: string,
   mimeType?: string
 ): Promise<UploadResult> => {
+  const forceOffline = useLocalAIStore.getState().forceOfflineMode;
+  const isOnline = useConnectivityStore.getState().isOnline;
+  if (forceOffline || !isOnline) {
+    throw new Error('Modo offline — no se puede subir archivos.');
+  }
+
   const token = await storageService.getSecure('jwt_token');
   if (!token) throw new Error('No hay sesión activa.');
 

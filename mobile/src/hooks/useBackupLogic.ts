@@ -158,18 +158,24 @@ export const useBackupLogic = () => {
     try {
       let dataMessage = '';
       
-      // 1. Respaldar Datos (JSON / SQLite)
+      // 1. Respaldar Datos (SyncQueue → Backend)
       if (type === 'datos' || type === 'ambos') {
-        const syncResult = await syncService.sync();
-        if (syncResult.success > 0 || syncResult.failed > 0) {
+        const syncResult = await syncService.sync({ force: true });
+        if (syncResult.success > 0) {
           dataMessage = `Datos sincronizados (${syncResult.success} subidos).`;
+        } else if (syncResult.failed > 0) {
+          dataMessage = `${syncResult.failed} operaciones fallaron. Reintenta o revisa conexión.`;
         } else {
           dataMessage = 'Tus datos ya están sincronizados.';
         }
         
         if (type === 'datos') {
           cancelBackupUploadNotification().catch(() => {});
-          alertRef.show({ title: t('backup.complete'), message: dataMessage, type: 'success' });
+          alertRef.show({
+            title: syncResult.failed > 0 ? t('backup.partial') : t('backup.complete'),
+            message: dataMessage,
+            type: syncResult.failed > 0 ? 'warning' : 'success',
+          });
           return;
         }
       }

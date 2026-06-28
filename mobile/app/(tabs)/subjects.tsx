@@ -21,6 +21,7 @@ import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubject
 import { MomentumService } from '../../src/services/MomentumService';
 import { useDataStore } from '../../src/store/useDataStore';
 import { CoursePills } from '../../src/components/ui/CoursePills';
+import { updateSubject, updateCourseCounters } from '../../src/services/api/subjects';
 
 const MomentumCard = ({ score }: { score: number }) => {
   const isDanger = score < 0.5;
@@ -54,8 +55,15 @@ export default function SubjectsScreen() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
   const handleClassComplete = useCallback(async (subject: any, courseName: string) => {
-    if (subject.course_id) {
-      MomentumService.boostMomentum(subject.course_id).catch(console.warn);
+    try {
+      const newCompleted = (subject.completed_lessons || 0) + 1;
+      await updateSubject(subject.id, { completed_lessons: newCompleted });
+      if (subject.course_id) {
+        await updateCourseCounters(subject.course_id);
+        MomentumService.boostMomentum(subject.course_id).catch(console.warn);
+      }
+    } catch (e) {
+      console.warn('[handleClassComplete] Error persisting completed_lessons:', e);
     }
     setZyrenSubject({
       id: subject.id,

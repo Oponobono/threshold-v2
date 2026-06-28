@@ -1,7 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { AudioRecording } from './types';
-import { audioRepository, syncService } from '../database';
+import { audioRepository, audioTranscriptRepository, syncService } from '../database';
 import { getBackupPreferences } from '../backup/backupService';
 
 export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
@@ -137,7 +137,7 @@ export const deleteAudioRecording = async (id: string) => {
 };
 
 export const upsertAudioTranscript = async (payload: { recording_id: string; transcript_uri?: string; transcript_text?: string; summary_uri?: string; summary_text?: string }) => {
-  // Offline-First: Guardar localmente
+  // Offline-First: Guardar localmente (inline + tabla dedicada)
   if (payload.transcript_text || payload.summary_text) {
     try {
       await audioRepository.update(payload.recording_id, {
@@ -145,7 +145,22 @@ export const upsertAudioTranscript = async (payload: { recording_id: string; tra
         ...(payload.summary_text ? { summary_text: payload.summary_text } : {})
       });
     } catch (e) {
-      console.warn('[upsertAudioTranscript] No se pudo guardar transcript/summary localmente:', e);
+      console.warn('[upsertAudioTranscript] No se pudo guardar transcript/summary en audio_recordings:', e);
+    }
+
+    try {
+      const existing = await audioTranscriptRepository.getByRecording(payload.recording_id);
+      const transcriptId = existing?.id || payload.recording_id;
+      await audioTranscriptRepository.upsert({
+        id: transcriptId,
+        recording_id: payload.recording_id,
+        ...(payload.transcript_uri ? { transcript_uri: payload.transcript_uri } : {}),
+        ...(payload.transcript_text ? { transcript_text: payload.transcript_text } : {}),
+        ...(payload.summary_uri ? { summary_uri: payload.summary_uri } : {}),
+        ...(payload.summary_text ? { summary_text: payload.summary_text } : {}),
+      });
+    } catch (e) {
+      console.warn('[upsertAudioTranscript] No se pudo guardar en audio_transcripts:', e);
     }
   }
 

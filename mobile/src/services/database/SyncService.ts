@@ -71,7 +71,7 @@ export class SyncService {
     this.sync().catch(console.error);
   }
 
-  async sync(): Promise<{ success: number; failed: number; pending: number }> {
+  async sync(options?: { force?: boolean }): Promise<{ success: number; failed: number; pending: number }> {
     if (this.isSyncing) {
       console.log('[SyncService] Sync ya en progreso, ignorando');
       return { success: 0, failed: 0, pending: 0 };
@@ -79,9 +79,16 @@ export class SyncService {
 
     const forceOffline = useLocalAIStore.getState().forceOfflineMode;
     const isGloballyOffline = !useConnectivityStore.getState().isOnline;
-    if (forceOffline || isGloballyOffline) {
+    if (!options?.force && (forceOffline || isGloballyOffline)) {
       console.log('[SyncService] Modo offline (forzado o sin red) — saltando sync');
       return { success: 0, failed: 0, pending: 0 };
+    }
+    // Si es forzado, resetear flag offline para que fetchWithFallback no bloquee
+    if (options?.force && forceOffline) {
+      useLocalAIStore.getState().setForceOfflineMode(false);
+    }
+    if (options?.force && isGloballyOffline) {
+      console.warn('[SyncService] Sync forzado pero sin conectividad de red — puede fallar.');
     }
     
     this.isSyncing = true;

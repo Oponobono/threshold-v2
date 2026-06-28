@@ -86,8 +86,8 @@ const mergeWithLocal = async (serverSubject: Subject): Promise<Subject> => {
     external_url: serverSubject.external_url != null
       ? serverSubject.external_url
       : (localRecord.external_url ?? null),
-    total_lessons: serverSubject.total_lessons ?? localRecord.total_lessons ?? 0,
-    completed_lessons: serverSubject.completed_lessons ?? localRecord.completed_lessons ?? 0,
+    total_lessons: Math.max(serverSubject.total_lessons ?? 0, localRecord.total_lessons ?? 0),
+    completed_lessons: Math.max(serverSubject.completed_lessons ?? 0, localRecord.completed_lessons ?? 0),
     next_micro_milestone: serverSubject.next_micro_milestone != null
       ? serverSubject.next_micro_milestone
       : (localRecord.next_micro_milestone ?? null),
@@ -203,7 +203,7 @@ export const createSubject = async (payload: {
   }
 };
 
-const updateCourseCounters = async (courseId: string | null | undefined): Promise<void> => {
+export const updateCourseCounters = async (courseId: string | null | undefined): Promise<void> => {
   if (!courseId) return;
   try {
     const { courseRepository } = await import('../database/repositories/CourseRepository');

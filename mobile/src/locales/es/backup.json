@@ -27,7 +27,6 @@
   "autoDownloadDesc": "Descarga tus archivos al entrar desde un dispositivo nuevo",
   "downloading": "Descargando...",
   "downloadNow": "Descargar ahora",
-  "disabled": "Backup desactivado",
   "enableFirst": "Activa el backup en la nube primero para poder respaldar tus archivos.",
   "enableFirstDownload": "Activa el backup en la nube para poder descargar archivos.",
   "starting": "Iniciando...",

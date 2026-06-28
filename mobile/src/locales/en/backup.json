@@ -27,7 +27,6 @@
   "autoDownloadDesc": "Download your files when signing in on a new device",
   "downloading": "Downloading...",
   "downloadNow": "Download now",
-  "disabled": "Backup disabled",
   "enableFirst": "Enable cloud backup first to back up your files.",
   "enableFirstDownload": "Enable cloud backup to download files.",
   "starting": "Starting...",

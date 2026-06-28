@@ -150,17 +150,32 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   async function enrichWithExamInfo(decks: FlashcardDeck[]): Promise<FlashcardDeck[]> {
     try {
       const allEvents = await calendarEventRepository.getAll();
-      const examMap = new Map<string, { title: string; start_date: string }>();
+      const eventMap = new Map<string, { title: string; start_date: string }>();
       for (const evt of allEvents) {
-        const deckId = (evt as any).linked_deck_id;
-        if (deckId) {
-          examMap.set(deckId, { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
+        eventMap.set(String(evt.id), { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
+      }
+      // Mapa de deckId → evento vía linked_deck_id (relación vieja, evento → mazo)
+      const deckToExamFromEvent = new Map<string, { title: string; start_date: string }>();
+      for (const evt of allEvents) {
+        const linkedDeckId = (evt as any).linked_deck_id;
+        if (linkedDeckId) {
+          deckToExamFromEvent.set(linkedDeckId, { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
         }
       }
       return decks.map(d => {
-        const exam = examMap.get(d.id);
-        if (exam) {
-          return { ...d, linked_exam_title: exam.title, linked_exam_date: exam.start_date } as FlashcardDeck;
+        // Prioridad 1: linked_event_id en el mazo (relación nueva, mazo → evento)
+        const linkedEventId = (d as any).linked_event_id;
+        if (linkedEventId) {
+          const rawId = String(linkedEventId).split(',')[0].trim();
+          const evt = eventMap.get(rawId);
+          if (evt) {
+            return { ...d, linked_exam_title: evt.title, linked_exam_date: evt.start_date } as FlashcardDeck;
+          }
+        }
+        // Prioridad 2: linked_deck_id en el evento (relación vieja)
+        const examFromEvent = deckToExamFromEvent.get(d.id);
+        if (examFromEvent) {
+          return { ...d, linked_exam_title: examFromEvent.title, linked_exam_date: examFromEvent.start_date } as FlashcardDeck;
         }
         return d;
       });
@@ -463,14 +478,57 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
                             </View>
                           )}
                         </View>
-                        {(item as any).linked_exam_title && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                            <Ionicons name="calendar" size={12} color={theme.colors.primary} />
-                            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '500' }}>
-                              {(item as any).linked_exam_title}
-                            </Text>
-                          </View>
-                        )}
+                        {(item as any).linked_exam_title && (() => {
+                          const examDate = (item as any).linked_exam_date;
+                          const examDays = examDate ? (() => {
+                            try {
+                              let d: Date;
+                              if (String(examDate).match(/^\d{4}-\d{2}-\d{2}$/)) {
+                                d = new Date(examDate);
+                              } else {
+                                const [day, month, year] = String(examDate).split('-').map(Number);
+                                d = new Date(year, month - 1, day);
+                              }
+                              return Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                            } catch { return null; }
+                          })() : null;
+                          const examColor = examDays === null ? '#9E9E9E' : examDays <= 3 ? '#D32F2F' : examDays <= 7 ? '#F57C00' : examDays <= 14 ? '#F9A825' : '#388E3C';
+                          return (
+                            <View style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 5,
+                              marginTop: 6,
+                              paddingTop: 5,
+                              borderTopWidth: 0.5,
+                              borderTopColor: examColor + '30',
+                            }}>
+                              <Ionicons name="calendar-outline" size={10} color={examColor} style={{ opacity: 0.8 }} />
+                              <Text style={{
+                                fontSize: 10.5,
+                                color: examColor,
+                                fontWeight: '500',
+                                flex: 1,
+                                opacity: 0.85,
+                              }} numberOfLines={1}>
+                                {(item as any).linked_exam_title}
+                              </Text>
+                              {examDays !== null && (
+                                <View style={{
+                                  paddingHorizontal: 5,
+                                  paddingVertical: 1.5,
+                                  borderRadius: 4,
+                                  borderWidth: 0.5,
+                                  borderColor: examColor + '45',
+                                }}>
+                                  <Text style={{ fontSize: 9.5, color: examColor, fontWeight: '600', opacity: 0.75 }}>
+                                    {examDays < 0 ? 'Pasado' : examDays === 0 ? 'Hoy' : examDays === 1 ? 'Mañana' : `${examDays}d`}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })()}
                       </View>
 
                       {/* Swipe hint indicator */}
