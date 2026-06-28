@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Linking } from 'react-native';
 import YoutubeIframe from 'react-native-youtube-iframe';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -68,6 +68,25 @@ export const FloatingYouTubePlayer = () => {
     ],
   }));
 
+  const openExternally = async () => {
+    if (!videoId) return;
+    closePlayer(); // Cerramos el reproductor interno
+    
+    const nativeUrl = `vnd.youtube:${videoId}`;
+    const webUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    
+    try {
+      const canOpen = await Linking.canOpenURL(nativeUrl);
+      if (canOpen) {
+        await Linking.openURL(nativeUrl);
+      } else {
+        await Linking.openURL(webUrl);
+      }
+    } catch {
+      await Linking.openURL(webUrl);
+    }
+  };
+
   if (!isVisible || !videoId) return null;
 
   return (
@@ -82,14 +101,23 @@ export const FloatingYouTubePlayer = () => {
         </View>
       </GestureDetector>
 
-      {/* Close button sits on top as absolute, outside the drag gesture */}
-      <TouchableOpacity
-        style={styles.closeButton}
-        onPress={closePlayer}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="close-circle" size={24} color="#fff" />
-      </TouchableOpacity>
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity
+          onPress={openExternally}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.actionButton}
+        >
+          <Ionicons name="open-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          onPress={closePlayer}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.actionButton}
+        >
+          <Ionicons name="close-circle" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.playerWrapper}>
         <YoutubeIframe
@@ -142,13 +170,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
     marginLeft: 8,
-    marginRight: 24, // Space for absolute close button
+    marginRight: 60, // Space for absolute buttons
   },
-  closeButton: {
+  actionsContainer: {
     position: 'absolute',
     top: 4,
     right: 8,
     zIndex: 100000, // above drag handle and video
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionButton: {
+    // optional styling for hit slop space
   },
   playerWrapper: {
     width: PLAYER_WIDTH,
