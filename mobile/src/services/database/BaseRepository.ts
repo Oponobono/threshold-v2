@@ -108,7 +108,23 @@ export class BaseRepository<T extends { id: string }> {
   async upsert(data: T): Promise<void> {
     const existing = await this.getById(data.id);
     if (existing) {
-      await this.update(data.id, data as any);
+      const parseDateSafe = (dateStr?: string) => {
+        if (!dateStr) return 0;
+        const formatted = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr) 
+          ? dateStr.replace(' ', 'T') + 'Z' 
+          : dateStr;
+        return new Date(formatted).getTime();
+      };
+
+      const localTime = parseDateSafe((existing as any).updated_at);
+      const remoteTime = parseDateSafe((data as any).updated_at);
+
+      // Si remote no tiene fecha o es más reciente/igual que local, sobrescribir.
+      if (remoteTime === 0 || localTime === 0 || remoteTime >= localTime) {
+        await this.update(data.id, data as any);
+      } else {
+        console.log(`[BaseRepository] Evitando sobrescribir ${data.id} en ${this.tableName} porque local es más reciente.`);
+      }
     } else {
       await this.create(data);
     }
