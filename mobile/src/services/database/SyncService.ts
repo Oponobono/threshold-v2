@@ -100,7 +100,7 @@ export class SyncService {
       const failedMediaIds = await mediaSyncService.syncPendingMedia();
 
       // 🛠️ FASE 2: JSON Payload Sync
-      const items = await syncQueueRepository.getPending();
+      const items = await syncQueueRepository.getPending(options?.force);
       
       if (items.length === 0) {
         console.log('[SyncService] No hay operaciones JSON pendientes');

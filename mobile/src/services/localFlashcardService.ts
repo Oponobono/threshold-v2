@@ -42,7 +42,13 @@ function getLocalDecksSync(): LocalDeck[] {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const raw = require('react-native-mmkv').createMMKV().getString(LOCAL_DECKS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Guard: handle { data: [...] } wrapper written accidentally, or any non-array
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.data)) return parsed.data;
+    console.warn('[LocalFlashcard] getLocalDecksSync: unexpected shape, resetting:', typeof parsed);
+    return [];
   } catch {
     return [];
   }
@@ -69,8 +75,10 @@ export function getLocalDecks(): LocalDeck[] {
  */
 export function getLocalDecksForCurrentUser(currentUserId?: string | null): LocalDeck[] {
   const all = getLocalDecksSync();
+  // Extra safety: getLocalDecksSync always returns [], but guard just in case
+  if (!Array.isArray(all)) return [];
   if (!currentUserId) return all; // sin userId no podemos filtrar (fallback seguro)
-  
+
   return all.filter(d => {
     // Soportar tanto UUIDs (strings) como IDs numéricos legacy
     return String(d.user_id) === String(currentUserId);

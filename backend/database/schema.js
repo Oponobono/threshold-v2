@@ -160,7 +160,22 @@ const tableSchema = {
         is_backed_up INTEGER DEFAULT 0
       )
     `,
-    columns: []
+    columns: [
+      { name: 'platform', type: 'TEXT' },
+      { name: 'certificate_url', type: 'TEXT' },
+      { name: 'main_url', type: 'TEXT' },
+      { name: 'deep_link_url', type: 'TEXT' },
+      { name: 'instructor', type: 'TEXT' },
+      { name: 'total_hours', type: 'INTEGER DEFAULT 0' },
+      { name: 'total_classes', type: 'INTEGER DEFAULT 0' },
+      { name: 'completed_classes', type: 'INTEGER DEFAULT 0' },
+      { name: 'status', type: "TEXT DEFAULT 'active'" },
+      { name: 'global_notes', type: 'TEXT' },
+      { name: 'tags', type: 'TEXT' },
+      { name: 'momentum_score', type: 'REAL DEFAULT 1.0' },
+      { name: 'last_studied_at', type: 'TIMESTAMP' },
+      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' }
+    ]
   },
   subjects: {
     sqlite: `

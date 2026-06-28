@@ -443,6 +443,13 @@ const migrations: Migration[] = [
       `ALTER TABLE flashcard_decks ADD COLUMN last_reviewed_at TEXT`,
     ],
   },
+  {
+    version: 17,
+    up: [
+      `ALTER TABLE flashcard_decks ADD COLUMN is_backed_up INTEGER DEFAULT 0`,
+      `ALTER TABLE flashcard_decks ADD COLUMN cloud_url TEXT`,
+    ],
+  },
 ];
 
 export default migrations;

@@ -76,13 +76,20 @@ export const useDataStore = create<DataState>((set, get) => ({
     try {
       await databaseService.open();
 
-      const dbCourses = await courseRepository.getAll() as any;
+      const { getCourses } = await import('../services/api/courses');
+      const dbCourses = await getCourses() as any;
       set({ courses: dbCourses });
-      const dbSubjects = await subjectRepository.getAll() as any;
+      
+      const { getSubjects } = await import('../services/api/subjects');
+      const dbSubjects = await getSubjects() as any;
       set({ subjects: dbSubjects });
-      const dbAssessments = await assessmentRepository.getAll() as any;
+      
+      const { getAllAssessments } = await import('../services/api/assessments');
+      const dbAssessments = await getAllAssessments() as any;
       set({ assessments: dbAssessments });
-      const dbSchedules = await scheduleRepository.getAll() as any;
+      
+      const { getAllSchedules } = await import('../services/api/schedules');
+      const dbSchedules = await getAllSchedules() as any;
       set({ schedules: dbSchedules });
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
@@ -106,7 +113,8 @@ export const useDataStore = create<DataState>((set, get) => ({
     // OFFLINE-FIRST: recargar desde SQLite local, no desde cloud.
     // El cloud es solo backup, nunca fuente de verdad.
     try {
-      const dbCourses = await courseRepository.getAll() as any;
+      const { getCourses } = await import('../services/api/courses');
+      const dbCourses = await getCourses() as any;
       set({ courses: dbCourses });
     } catch (error) {
       console.error('[DataStore] refreshCourses error:', error);
@@ -115,7 +123,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshSubjects: async () => {
     try {
-      const dbSubjects = await subjectRepository.getAll() as any;
+      const { getSubjects } = await import('../services/api/subjects');
+      const dbSubjects = await getSubjects() as any;
       set({ subjects: dbSubjects });
       const { repairSubjectCourseLinks } = await import('../services/api');
       await repairSubjectCourseLinks().catch(() => {});
@@ -126,7 +135,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshAssessments: async () => {
     try {
-      const dbAssessments = await assessmentRepository.getAll() as any;
+      const { getAllAssessments } = await import('../services/api/assessments');
+      const dbAssessments = await getAllAssessments() as any;
       set({ assessments: dbAssessments });
     } catch (error) {
       console.error('[DataStore] refreshAssessments error:', error);
@@ -135,7 +145,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshSchedules: async () => {
     try {
-      const dbSchedules = await scheduleRepository.getAll() as any;
+      const { getAllSchedules } = await import('../services/api/schedules');
+      const dbSchedules = await getAllSchedules() as any;
       set({ schedules: dbSchedules });
     } catch (error) {
       console.error('[DataStore] refreshSchedules error:', error);

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { subjectsStyles as styles } from '../../src/styles/Subjects.styles';
@@ -44,6 +45,13 @@ export default function SubjectsScreen() {
   const g = useSubjects(t);
   const { courses, loadAllData, refreshCourses, refreshSubjects } = useDataStore();
   const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore } = useGroupedSubjects(courses, g.filteredSubjects);
+
+  // ── Cargar cursos al enfocar la pantalla (lightweight: solo SQLite) ──
+  useFocusEffect(
+    useCallback(() => {
+      refreshCourses();
+    }, [refreshCourses])
+  );
 
   // ── Fase 5: Estado del modal de ingesta de Zyren ──
   const [zyrenModalVisible, setZyrenModalVisible] = useState(false);

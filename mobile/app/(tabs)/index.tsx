@@ -152,13 +152,7 @@ export default function HybridDashboardScreen() {
         setUserGroups(groups);
       }
       
-      try {
-        const dbCourses = await courseRepository.getAll();
-        useDataStore.setState({ courses: dbCourses as any });
-      } catch (err) {
-        console.warn('Error loading courses in dashboard:', err);
-      }
-      
+
       // ── Obtener GPA general ──
       try {
         const gpaData = await getGlobalGPAAnalytics();

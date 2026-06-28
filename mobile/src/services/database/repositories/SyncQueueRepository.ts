@@ -39,8 +39,13 @@ export class SyncQueueRepository {
     );
   }
 
-  async getPending(): Promise<SyncQueueItem[]> {
+  async getPending(includeFailed = false): Promise<SyncQueueItem[]> {
     const db = databaseService.getDb();
+    if (includeFailed) {
+      return db.getAllAsync(
+        `SELECT * FROM sync_queue WHERE status IN ('pending', 'failed') ORDER BY id ASC`
+      ) as Promise<SyncQueueItem[]>;
+    }
     return db.getAllAsync(
       `SELECT * FROM sync_queue WHERE status = 'pending' ORDER BY id ASC`
     ) as Promise<SyncQueueItem[]>;
