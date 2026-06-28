@@ -16,6 +16,29 @@ export interface SyncQueueItem {
 export class SyncQueueRepository {
   async enqueue(item: Omit<SyncQueueItem, 'id' | 'status' | 'retries' | 'created_at' | 'updated_at'>): Promise<void> {
     const db = databaseService.getDb();
+
+    // Deduplication: for UPDATE operations on the same entity, merge into the
+    // existing pending/failed row instead of creating a new one. This prevents
+    // unbounded queue growth when the same entity is updated many times offline.
+    if (item.operation === 'UPDATE' && item.entity_id) {
+      const existing: any = await db.getFirstAsync(
+        `SELECT id FROM sync_queue
+         WHERE entity_type = ? AND entity_id = ? AND operation = 'UPDATE'
+           AND status IN ('pending', 'failed')
+         ORDER BY id DESC LIMIT 1`,
+        item.entity_type, item.entity_id
+      );
+      if (existing) {
+        await db.runAsync(
+          `UPDATE sync_queue
+           SET payload = ?, status = 'pending', retries = 0, error = NULL, updated_at = datetime('now')
+           WHERE id = ?`,
+          item.payload ?? null, existing.id
+        );
+        return;
+      }
+    }
+
     await db.runAsync(
       `INSERT INTO sync_queue (entity_type, entity_id, operation, payload, status, retries)
        VALUES (?, ?, ?, ?, 'pending', 0)`,
@@ -58,11 +81,10 @@ export class SyncQueueRepository {
     );
   }
 
+  // Delete on complete — avoids leaving thousands of stale 'completed' rows.
   async markCompleted(id: number): Promise<void> {
     const db = databaseService.getDb();
-    await db.runAsync(
-      `UPDATE sync_queue SET status = 'completed', updated_at = datetime('now') WHERE id = ?`, id
-    );
+    await db.runAsync(`DELETE FROM sync_queue WHERE id = ?`, id);
   }
 
   async markFailed(id: number, error: string): Promise<void> {
@@ -76,12 +98,13 @@ export class SyncQueueRepository {
   async countPending(): Promise<number> {
     const db = databaseService.getDb();
     const row: any = await db.getFirstAsync(
-      `SELECT COUNT(*) as count FROM sync_queue WHERE status = 'pending'`
+      `SELECT COUNT(*) as count FROM sync_queue WHERE status IN ('pending', 'failed')`
     );
     return row?.count ?? 0;
   }
 
   async clearCompleted(): Promise<void> {
+    // No-op: markCompleted now deletes immediately. Kept for backwards-compat.
     const db = databaseService.getDb();
     await db.runAsync(`DELETE FROM sync_queue WHERE status = 'completed'`);
   }

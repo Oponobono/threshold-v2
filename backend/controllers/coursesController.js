@@ -9,6 +9,17 @@ exports.getCourses = (req, res) => {
   });
 };
 
+exports.getCourseById = (req, res) => {
+  const { courseId } = req.params;
+  const userId = req.user.id;
+  db.get('SELECT * FROM courses WHERE id = ? AND user_id = ?', [courseId, userId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Curso no encontrado' });
+    res.json(row);
+  });
+};
+
+
 exports.createCourse = (req, res) => {
   const { id: clientId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours, total_classes, completed_classes, status, global_notes, tags, momentum_score, last_studied_at } = req.body;
   const authenticatedUserId = req.user.id;
