@@ -108,10 +108,22 @@ export class SyncService {
       }
 
       // Orden Atómico: Garantizar que 'course' se procese ANTES que 'subject' para evitar FK Constraint
+      // y que 'audio-recording' se procese ANTES que 'audio-transcript' (FK padre-hijo)
       items.sort((a, b) => {
-        const order = { course: 1, subject: 2, 'flashcard-deck': 3, flashcard: 4, 'ai-chat': 5, 'user-preference': 6 };
-        const rankA = (order as any)[a.entity_type] || 99;
-        const rankB = (order as any)[b.entity_type] || 99;
+        const order: Record<string, number> = {
+          course: 1,
+          subject: 2,
+          'audio-recording': 3,
+          audio_recording: 3,
+          'flashcard-deck': 4,
+          flashcard: 5,
+          'audio-transcript': 6,
+          audio_transcript: 6,
+          'ai-chat': 7,
+          'user-preference': 8,
+        };
+        const rankA = order[a.entity_type] ?? 99;
+        const rankB = order[b.entity_type] ?? 99;
         if (rankA !== rankB) return rankA - rankB;
         // Si tienen el mismo rango, FIFO (menor ID primero)
         return a.id! - b.id!;

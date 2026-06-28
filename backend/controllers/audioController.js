@@ -85,7 +85,7 @@ exports.updateAudioRecording = (req, res) => {
   const fields = req.body;
   const userId = req.user.id;
 
-  const allowed = ['subject_id', 'name', 'cloud_url', 'is_backed_up', 'duration'];
+  const allowed = ['subject_id', 'name', 'cloud_url', 'is_backed_up', 'duration', 'local_uri', 'user_id'];
   const toUpdate = {};
   for (const key of Object.keys(fields)) {
     if (allowed.includes(key)) toUpdate[key] = fields[key];
@@ -100,13 +100,43 @@ exports.updateAudioRecording = (req, res) => {
   const values = [...Object.values(toUpdate), id, userId];
 
   db.run(
-    `UPDATE audio_recordings SET ${columns} WHERE id = ? AND user_id = ?`,
-    values,
+    `UPDATE audio_recordings SET ${columns} WHERE id = ?`,
+    [...Object.values(toUpdate), id],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      // Return 200 even if no rows matched (recording may belong to this user
-      // but the user_id was just updated in Supabase — tolerate the mismatch).
-      res.json({ success: true, changes: this.changes });
+
+      if (this.changes > 0) {
+        return res.json({ success: true, changes: this.changes });
+      }
+
+      // No rows matched — the recording doesn't exist in this DB yet.
+      // UPSERT: insert it so transcripts (child records) can sync afterward.
+      const insertUserId = fields.user_id || userId;
+      const local_uri   = fields.local_uri || `offline://${id}`;
+      db.run(
+        `INSERT INTO audio_recordings (id, user_id, subject_id, name, local_uri, duration, cloud_url, is_backed_up)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET
+           user_id      = EXCLUDED.user_id,
+           subject_id   = COALESCE(EXCLUDED.subject_id, audio_recordings.subject_id),
+           name         = COALESCE(EXCLUDED.name, audio_recordings.name),
+           cloud_url    = COALESCE(EXCLUDED.cloud_url, audio_recordings.cloud_url),
+           is_backed_up = COALESCE(EXCLUDED.is_backed_up, audio_recordings.is_backed_up)`,
+        [
+          id,
+          insertUserId,
+          fields.subject_id || null,
+          fields.name || null,
+          local_uri,
+          fields.duration || 0,
+          fields.cloud_url || null,
+          fields.is_backed_up || 0,
+        ],
+        function(upsertErr) {
+          if (upsertErr) return res.status(500).json({ error: upsertErr.message });
+          res.json({ success: true, changes: 1, upserted: true });
+        }
+      );
     }
   );
 };
