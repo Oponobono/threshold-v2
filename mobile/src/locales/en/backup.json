@@ -10,6 +10,8 @@
   "audio": "Audio recordings",
   "docs": "Scanned documents",
   "transcripts": "Transcripts & summaries",
+  "flashcardDecks": "Flashcard decks",
+  "aiChats": "Zyren chats",
   "lastUpload": "Last upload: {{date}}",
   "lastDownload": "Last download: {{date}}",
   "itemsBackedUp": "{{count}} of {{total}} media files backed up",
@@ -62,5 +64,8 @@
   "backupAll": "Backup",
   "dataOnly": "Data",
   "mediaOnly": "Media",
-  "both": "Both"
+  "both": "Both",
+  "backupActive": "Backup active",
+  "backupDisabled": "Backup disabled",
+  "autoBadge": "Auto"
 }

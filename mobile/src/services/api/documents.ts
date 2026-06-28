@@ -26,7 +26,7 @@ export const getScannedDocumentsBySubject = async (subjectId: string): Promise<S
       const response = await fetchWithFallback(`/scanned_documents/subject/${subjectId}`);
       const data = await parseJsonSafely(response);
       if (response.ok && Array.isArray(data)) {
-        for (const d of data) await documentRepository.upsert(d);
+        for (const d of data) await documentRepository.upsertFromCloud(d);
       }
     } catch {}
   })();
@@ -57,7 +57,7 @@ export const createScannedDocument = async (data: { subject_id?: string; name?: 
       });
       const responseData = await parseJsonSafely(response);
       if (response.ok) {
-        await documentRepository.upsert(responseData);
+        await documentRepository.update(responseData.id, responseData);
       } else {
         throw new Error(responseData?.error || 'Error del servidor');
       }

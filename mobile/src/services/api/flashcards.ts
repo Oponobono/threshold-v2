@@ -14,7 +14,7 @@ export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const d of data) await flashcardDeckRepository.upsert(d);
+          for (const d of data) await flashcardDeckRepository.upsertFromCloud(d);
           return data;
         }
       }
@@ -22,7 +22,7 @@ export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
     return [];
   }
 
-  // 2. Sincronizar en background
+  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
     try {
       const userId = await getUserId();
@@ -30,7 +30,7 @@ export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const d of data) await flashcardDeckRepository.upsert(d);
+          for (const d of data) await flashcardDeckRepository.upsertFromCloud(d);
         }
       }
     } catch {}
@@ -50,7 +50,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const d of data) await flashcardDeckRepository.upsert(d);
+          for (const d of data) await flashcardDeckRepository.upsertFromCloud(d);
           return data;
         }
       }
@@ -58,7 +58,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
     return [];
   }
 
-  // 2. Sincronizar en background
+  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
     try {
       const userId = await getUserId();
@@ -66,7 +66,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const d of data) await flashcardDeckRepository.upsert(d);
+          for (const d of data) await flashcardDeckRepository.upsertFromCloud(d);
         }
       }
     } catch {}
@@ -75,7 +75,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
   return localData;
 };
 
-export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string; id?: string }): Promise<any> => {
+export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string; id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = (payload as any).id || uuidv4();
 
@@ -90,7 +90,8 @@ export const createFlashcardDeck = async (payload: { subject_id?: string; title:
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardDeckRepository.upsert(await mergeDeckWithLocal(data));
+      const merged = await mergeDeckWithLocal(data);
+      await flashcardDeckRepository.update(data.id, merged);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -162,7 +163,8 @@ export const updateFlashcardDeck = async (deckId: string, payload: any): Promise
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardDeckRepository.upsert(await mergeDeckWithLocal(data));
+      const merged = await mergeDeckWithLocal(data);
+      await flashcardDeckRepository.update(data.id, merged);
       return data;
     }
     throw new Error(data?.error || 'Error al actualizar el mazo');
@@ -196,14 +198,14 @@ export const getFlashcards = async (deckId: string): Promise<Flashcard[]> => {
   const mmkvCards = getLocalCardsFromMMKV(deckId);
   const localData = mergeCards(sqliteCards || [], mmkvCards);
 
-  // 2. Sincronizar en background
+  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
     try {
       const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards`);
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const c of data) await flashcardRepository.upsert(c);
+          for (const c of data) await flashcardRepository.upsertFromCloud(c);
         }
       }
     } catch {}
@@ -218,7 +220,7 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
   const mmkvCards = getLocalCardsFromMMKV(deckId);
   const localData = mergeCards(sqliteCards || [], mmkvCards);
 
-  // 2. Sincronizar en background
+  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
     try {
       const userId = await getUserId();
@@ -226,7 +228,7 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const c of data) await flashcardRepository.upsert(c);
+          for (const c of data) await flashcardRepository.upsertFromCloud(c);
         }
       }
     } catch {}
@@ -258,13 +260,13 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
   // 1. Leer localmente primero (SQLite)
   const localCard = await flashcardRepository.getById(cardId);
   if (localCard) {
-    // 2. Sincronizar en background
+    // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
     (async () => {
       try {
         const response = await fetchWithFallback(`/flashcards/${cardId}`);
         if (response.ok) {
           const data = await parseJsonSafely(response);
-          if (data) await flashcardRepository.upsert(data);
+          if (data) await flashcardRepository.upsertFromCloud(data);
         }
       } catch {}
     })();
@@ -280,7 +282,7 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
     const response = await fetchWithFallback(`/flashcards/${cardId}`);
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardRepository.upsert(data);
+      await flashcardRepository.create(data);
       return data;
     }
     throw new Error(data?.error || 'Error al obtener tarjeta');
@@ -289,7 +291,7 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
   }
 };
 
-export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; direction?: CardDirection; id?: string }): Promise<any> => {
+export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; direction?: CardDirection; id?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_at?: string; fsrs_stability?: number; fsrs_difficulty?: number }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
   const card: any = { id, ...payload, status: 'new', created_at: new Date().toISOString() };
@@ -304,7 +306,7 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardRepository.upsert(data);
+      await flashcardRepository.update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error al crear tarjeta');
@@ -329,7 +331,7 @@ export const createEvaluationItem = async (payload: { deck_id: string; item_type
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardRepository.upsert(data);
+      await flashcardRepository.update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error al crear ítem');
@@ -480,7 +482,7 @@ export const getCardsNotSnoozed = async (deckId: string): Promise<Flashcard[]> =
   const mmkvCards = getLocalCardsFromMMKV(deckId);
   const localData = mergeCards(sqliteCards || [], mmkvCards);
 
-  // 2. Sincronizar en background
+  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
     try {
       const userId = await getUserId();
@@ -488,7 +490,7 @@ export const getCardsNotSnoozed = async (deckId: string): Promise<Flashcard[]> =
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const c of data) await flashcardRepository.upsert(c);
+          for (const c of data) await flashcardRepository.upsertFromCloud(c);
         }
       }
     } catch {}

@@ -148,6 +148,8 @@ export interface BackupStats {
   docs: { total: number; backed: number };
   transcripts: { total: number; backed: number };
   assessmentFiles: { total: number; backed: number };
+  flashcardDecks: { total: number; backed: number };
+  aiChats: { total: number; backed: number };
 }
 
 export interface BackupProgress {
@@ -176,7 +178,7 @@ export const getBackupPreferences = async (): Promise<BackupPreferences> => {
   return {
     enabled: enabled === 'true',
     autoUpload: autoUpload === 'true',
-    autoDownload: autoDownload === 'true',
+    autoDownload: autoDownload !== 'false',
     includePhotos: photos !== 'false',
     includeAudio: audio !== 'false',
     includeDocs: docs !== 'false',
@@ -278,13 +280,15 @@ async function getLocalBackupStats(): Promise<BackupStats> {
   try {
     const db = databaseService.getDb();
 
-    const [photoRow, audioRow, docRow, audioTransRow, ytTransRow, assessFileRow] = await Promise.all([
+    const [photoRow, audioRow, docRow, audioTransRow, ytTransRow, assessFileRow, deckRow, aiChatRow] = await Promise.all([
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_transcripts`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM youtube_transcripts`) as Promise<{ total: number; backed: number } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM assessment_files WHERE local_uri IS NOT NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM flashcard_decks`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM ai_chats`) as Promise<{ total: number; backed: number | null } | undefined>,
     ]);
 
     const photoTotal = (photoRow as { total: number; backed: number | null } | undefined)?.total ?? 0;
@@ -298,6 +302,10 @@ async function getLocalBackupStats(): Promise<BackupStats> {
     const transcriptBacked = ((audioTransRow as any)?.backed ?? 0) + ((ytTransRow as any)?.backed ?? 0);
     const assessFileTotal = (assessFileRow as any)?.total ?? 0;
     const assessFileBacked = (assessFileRow as any)?.backed ?? 0;
+    const deckTotal = (deckRow as any)?.total ?? 0;
+    const deckBacked = (deckRow as any)?.backed ?? 0;
+    const aiChatTotal = (aiChatRow as any)?.total ?? 0;
+    const aiChatBacked = (aiChatRow as any)?.backed ?? 0;
 
     return {
       photos: { total: photoTotal, backed: photoBacked },
@@ -305,10 +313,12 @@ async function getLocalBackupStats(): Promise<BackupStats> {
       docs: { total: docTotal, backed: docBacked },
       transcripts: { total: transcriptTotal, backed: transcriptBacked },
       assessmentFiles: { total: assessFileTotal, backed: assessFileBacked },
+      flashcardDecks: { total: deckTotal, backed: deckBacked },
+      aiChats: { total: aiChatTotal, backed: aiChatBacked },
     };
   } catch (err) {
     console.error('[BackupService] Error obteniendo estadísticas locales:', err);
-    return { photos: { total: 0, backed: 0 }, audio: { total: 0, backed: 0 }, docs: { total: 0, backed: 0 }, transcripts: { total: 0, backed: 0 }, assessmentFiles: { total: 0, backed: 0 } };
+    return { photos: { total: 0, backed: 0 }, audio: { total: 0, backed: 0 }, docs: { total: 0, backed: 0 }, transcripts: { total: 0, backed: 0 }, assessmentFiles: { total: 0, backed: 0 }, flashcardDecks: { total: 0, backed: 0 }, aiChats: { total: 0, backed: 0 } };
   }
 }
 
@@ -322,6 +332,8 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   docs: { id: string; local_uri: string; name?: string; subject_id?: string }[];
   transcripts: { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[];
   assessmentFiles: { id: string; local_uri: string; file_name: string; file_type?: string; assessment_id: string }[];
+  aiChats: { id: string; user_id: string; subject_id?: string; role: string; content: string }[];
+  userPreferences: { key: string; value: string }[];
 }> {
   const db = databaseService.getDb();
   const result = {
@@ -330,6 +342,8 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     docs: [] as { id: string; local_uri: string; name?: string; subject_id?: string }[],
     transcripts: [] as { id: string; type: 'audio' | 'youtube'; text: string; recording_id?: string; video_id?: string }[],
     assessmentFiles: [] as { id: string; local_uri: string; file_name: string; file_type?: string; assessment_id: string }[],
+    aiChats: [] as { id: string; user_id: string; subject_id?: string; role: string; content: string }[],
+    userPreferences: [] as { key: string; value: string }[],
   };
 
   try {
@@ -382,6 +396,37 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
       result.assessmentFiles = assessFiles.map((f: any) => ({ id: String(f.id), local_uri: f.local_uri, file_name: f.file_name, file_type: f.file_type, assessment_id: String(f.assessment_id) }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.assessmentFiles.length} soporte(s) de evaluación pendiente(s)`);
     }
+    // ── Chats de Zyren (AI) no respaldados ──
+    // Solo respaldar los últimos 6 mensajes
+    const unbackedChats: any[] = await db.getAllAsync(
+      `SELECT ac.id, ac.user_id, ac.subject_id, ac.role, ac.content
+       FROM ai_chats ac
+       WHERE (ac.is_backed_up IS NULL OR ac.is_backed_up = 0)
+       AND ac.content IS NOT NULL AND ac.content != ''
+       ORDER BY ac.created_at DESC
+       LIMIT 6`
+    );
+    result.aiChats = unbackedChats.map((c: any) => ({
+      id: String(c.id),
+      user_id: String(c.user_id),
+      subject_id: c.subject_id ? String(c.subject_id) : undefined,
+      role: String(c.role),
+      content: String(c.content),
+    }));
+    console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.aiChats.length} chat(s) de IA pendiente(s)`);
+
+    // ── Preferencias de usuario no respaldadas ──
+    // Agrupar todo en un solo blob JSON para backup
+    const unbackedPrefs: any[] = await db.getAllAsync(
+      `SELECT up.key, up.value FROM user_preferences up
+       WHERE (up.is_backed_up IS NULL OR up.is_backed_up = 0)`
+    );
+    result.userPreferences = unbackedPrefs.map((p: any) => ({
+      key: String(p.key),
+      value: String(p.value),
+    }));
+    console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.userPreferences.length} preferencia(s) pendiente(s)`);
+
   } catch (err) {
     console.error('[BackupService] Error obteniendo items pendientes desde DB local:', err);
   }
@@ -404,9 +449,11 @@ export const resetStuckBackupFlags = async (): Promise<{
   docs: number;
   audioTranscripts: number;
   ytTranscripts: number;
+  aiChats: number;
+  userPreferences: number;
 }> => {
   const db = databaseService.getDb();
-  const result = { photos: 0, audio: 0, docs: 0, audioTranscripts: 0, ytTranscripts: 0 };
+  const result = { photos: 0, audio: 0, docs: 0, audioTranscripts: 0, ytTranscripts: 0, aiChats: 0, userPreferences: 0 };
 
   try {
     const { changes: photoChanges } = await db.runAsync(
@@ -456,6 +503,26 @@ export const resetStuckBackupFlags = async (): Promise<{
     result.ytTranscripts = ytTransChanges ?? 0;
   } catch (e) {
     console.warn('[BackupService] resetStuckBackupFlags: error en youtube_transcripts:', e);
+  }
+
+  try {
+    const { changes: aiChatChanges } = await db.runAsync(
+      `UPDATE ai_chats SET is_backed_up = 0, cloud_url = NULL
+       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+    );
+    result.aiChats = aiChatChanges ?? 0;
+  } catch (e) {
+    console.warn('[BackupService] resetStuckBackupFlags: error en ai_chats:', e);
+  }
+
+  try {
+    const { changes: prefChanges } = await db.runAsync(
+      `UPDATE user_preferences SET is_backed_up = 0, cloud_url = NULL
+       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+    );
+    result.userPreferences = prefChanges ?? 0;
+  } catch (e) {
+    console.warn('[BackupService] resetStuckBackupFlags: error en user_preferences:', e);
   }
 
   console.log('[BackupService] resetStuckBackupFlags completado:', result);
@@ -605,14 +672,24 @@ export const runBackup = async (
         console.warn('[BackupService] Fase 0d: Error leyendo soportes de evaluaciones locales:', e);
       }
     }
-  } // Cierre de if (!isOffline)
+    } // Cierre de if (!isOffline)
+
+    // ── Fase 0e: Sincronizar mazos locales (MMKV) al backend ──
+    if (!isOffline) {
+      try {
+        await syncLocalFlashcardsToBackend();
+        console.log('[BackupService] Fase 0e: Sincronización de mazos locales completada.');
+      } catch (e) {
+        console.warn('[BackupService] Fase 0e: Error sincronizando mazos locales:', e);
+      }
+    }
 
   // ──────────────────────────────────────────────────────────────────
   // FASE 1: Obtener ítems pendientes desde SQLite local y subirlos
   // Siempre usa la BD local como fuente de verdad (is_backed_up = 0).
   // ──────────────────────────────────────────────────────────────────
   const pending = await getPendingItemsFromLocalDB(prefs);
-  const pendingCount = pending.photos.length + pending.audio.length + pending.docs.length + pending.transcripts.length + pending.assessmentFiles.length;
+  const pendingCount = pending.photos.length + pending.audio.length + pending.docs.length + pending.transcripts.length + pending.assessmentFiles.length + pending.aiChats.length;
   console.log(`[BackupService] Fase 1: ${pendingCount} item(s) pendientes desde BD local`);
 
   const tasks: (() => Promise<void>)[] = [];
@@ -887,6 +964,81 @@ export const runBackup = async (
     }
   }
 
+  // ── Chats de IA (subir como .json) ──
+  for (const chat of (pending.aiChats || [])) {
+    tasks.push(async () => {
+      try {
+        console.log(`[BackupService] Iniciando backup de chat IA ID: ${chat.id}`);
+        const chatPayload = JSON.stringify({ id: chat.id, user_id: chat.user_id, subject_id: chat.subject_id, role: chat.role, content: chat.content }, null, 2);
+        const tempUri = `${FileSystem.cacheDirectory}ai_chat_${chat.id}.json`;
+        await FileSystem.writeAsStringAsync(tempUri, chatPayload, { encoding: FileSystem.EncodingType.UTF8 });
+
+        const result = await uploadFileToUploadthing(tempUri, `ai_chat_${chat.id}.json`, 'application/json');
+        await FileSystem.deleteAsync(tempUri, { idempotent: true });
+
+        try {
+          await fetchWithFallback(`/backup/mark`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'ai_chat', id: chat.id, user_id: chat.user_id, subject_id: chat.subject_id, cloud_url: result.url }),
+          });
+        } catch (_e) { /* ignora fallo de marca en backend */ }
+        try {
+          await db.runAsync(
+            `UPDATE ai_chats SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+            [result.url, chat.id]
+          );
+        } catch (e) {
+          console.warn(`[BackupService] No se pudo marcar localmente chat IA ${chat.id}:`, e);
+        }
+        console.log(`[BackupService] ÉXITO: Chat IA ${chat.id} respaldado.`);
+        uploaded++;
+      } catch (err) {
+        console.error(`[BackupService] ERROR: Falló el backup de chat IA ${chat.id}:`, err);
+        errors++;
+      }
+    });
+  }
+
+  // ── Preferencias de usuario (subir todas como un solo .json) ──
+  if (pending.userPreferences.length > 0) {
+    tasks.push(async () => {
+      try {
+        console.log(`[BackupService] Iniciando backup de preferencias de usuario (${pending.userPreferences.length} clave(s))`);
+        const prefsPayload = JSON.stringify(pending.userPreferences, null, 2);
+        const tempUri = `${FileSystem.cacheDirectory}user_preferences.json`;
+        await FileSystem.writeAsStringAsync(tempUri, prefsPayload, { encoding: FileSystem.EncodingType.UTF8 });
+
+        const result = await uploadFileToUploadthing(tempUri, 'user_preferences.json', 'application/json');
+        await FileSystem.deleteAsync(tempUri, { idempotent: true });
+
+        // Marcar todas las preferencias como respaldadas
+        for (const pref of pending.userPreferences) {
+          try {
+            await fetchWithFallback(`/backup/mark`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'user_preference', key: pref.key, cloud_url: result.url }),
+            });
+          } catch (_e) { /* ignora */ }
+          try {
+            await db.runAsync(
+              `UPDATE user_preferences SET is_backed_up = 1, cloud_url = ? WHERE key = ?`,
+              [result.url, pref.key]
+            );
+          } catch (e) {
+            console.warn(`[BackupService] No se pudo marcar localmente preferencia ${pref.key}:`, e);
+          }
+        }
+        console.log(`[BackupService] ÉXITO: Preferencias de usuario respaldadas.`);
+        uploaded += pending.userPreferences.length;
+      } catch (err) {
+        console.error(`[BackupService] ERROR: Falló el backup de preferencias de usuario:`, err);
+        errors += pending.userPreferences.length;
+      }
+    });
+  }
+
   // Ejecutar todas las tareas secuencialmente con progreso
   const total = tasks.length;
   let done = 0;
@@ -927,6 +1079,9 @@ export const syncLocalFlashcardsToBackend = async (): Promise<void> => {
           title: deck.title,
           description: deck.description,
           subject_id: deck.subject_id ? String(deck.subject_id) : undefined,
+          avg_ease_factor: deck.avg_ease_factor ?? undefined,
+          total_reviews: deck.total_reviews ?? undefined,
+          last_reviewed_at: deck.last_reviewed_at ?? undefined,
         });
         console.log(`[BackupService] Mazo ${deck.id} sincronizado. Nuevo ID remoto: ${createdDeck?.id}`);
 
@@ -947,6 +1102,12 @@ export const syncLocalFlashcardsToBackend = async (): Promise<void> => {
               front: card.front || card.content?.front || '',
               back: card.back || card.content?.back || '',
               id: String(card.id),
+              ease_factor: card.ease_factor ?? card.ease ?? undefined,
+              interval_days: card.interval_days ?? card.interval ?? undefined,
+              repetitions: card.repetitions ?? card.reps ?? undefined,
+              next_review_at: card.next_review_at ?? undefined,
+              fsrs_stability: card.fsrs_stability ?? undefined,
+              fsrs_difficulty: card.fsrs_difficulty ?? undefined,
             });
           } catch (cardErr) {
             console.warn(`[BackupService] Error sincronizando card ${card.id}:`, cardErr);

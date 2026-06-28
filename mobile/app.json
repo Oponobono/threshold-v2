@@ -23,7 +23,10 @@
         "android.permission.READ_MEDIA_DOCUMENTS",
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK",
+        "android.permission.FOREGROUND_SERVICE"
       ]
     },
     "web": {
@@ -32,6 +35,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-background-fetch",
       "expo-camera",
       [
         "expo-splash-screen",

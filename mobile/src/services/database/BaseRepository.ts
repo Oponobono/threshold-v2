@@ -105,6 +105,10 @@ export class BaseRepository<T extends { id: string }> {
     return row?.count ?? 0;
   }
 
+  /**
+   * Crea o actualiza un registro local. Usado para respuestas de operaciones
+   * locales (create/update) que necesitan persistir la confirmación del servidor.
+   */
   async upsert(data: T): Promise<void> {
     const existing = await this.getById(data.id);
     if (existing) {
@@ -119,13 +123,23 @@ export class BaseRepository<T extends { id: string }> {
       const localTime = parseDateSafe((existing as any).updated_at);
       const remoteTime = parseDateSafe((data as any).updated_at);
 
-      // Si remote no tiene fecha o es más reciente/igual que local, sobrescribir.
       if (remoteTime === 0 || localTime === 0 || remoteTime >= localTime) {
         await this.update(data.id, data as any);
-      } else {
-        console.log(`[BaseRepository] Evitando sobrescribir ${data.id} en ${this.tableName} porque local es más reciente.`);
       }
     } else {
+      await this.create(data);
+    }
+  }
+
+  /**
+   * Versión para sync en background desde el cloud: solo crea registros que NO
+   * existen localmente. NUNCA sobreescribe datos locales existentes.
+   * Esto garantiza que el historial local, los cálculos y las ediciones offline
+   * se preserven intactos, como una calculadora.
+   */
+  async upsertFromCloud(data: T): Promise<void> {
+    const existing = await this.getById(data.id);
+    if (!existing) {
       await this.create(data);
     }
   }

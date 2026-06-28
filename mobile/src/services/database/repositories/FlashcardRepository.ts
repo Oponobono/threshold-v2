@@ -8,6 +8,13 @@ export interface Flashcard {
   back?: string;
   status?: string;
   direction?: CardDirection;
+  ease_factor?: number;
+  interval_days?: number;
+  repetitions?: number;
+  next_review_at?: string;
+  fsrs_stability?: number;
+  fsrs_difficulty?: number;
+  source_context?: string;
   created_at?: string;
   updated_at?: string;
 }

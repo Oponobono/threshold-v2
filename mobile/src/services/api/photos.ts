@@ -19,7 +19,7 @@ export const getGalleryItems = async () => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const p of data) await photoRepository.upsert(p);
+          for (const p of data) await photoRepository.upsertFromCloud(p);
           return data;
         }
       }
@@ -27,7 +27,7 @@ export const getGalleryItems = async () => {
     return [];
   }
   
-  // Sync attempt in background — solo si el usuario habilitó auto-upload
+  // Sync attempt in background — solo si el usuario habilitó auto-upload (solo crea registros nuevos)
   (async () => {
     try {
       const prefs = await getBackupPreferences();
@@ -36,7 +36,7 @@ export const getGalleryItems = async () => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const p of data) await photoRepository.upsert(p);
+          for (const p of data) await photoRepository.upsertFromCloud(p);
         }
       }
     } catch {}
@@ -73,7 +73,7 @@ export const createPhoto = async (photoData: {
       });
       const data = await parseJsonSafely(response);
       if (response.ok && data) {
-        await photoRepository.upsert(data);
+        await photoRepository.update(data.id, data);
       } else {
         throw new Error(data?.error || 'Error del servidor');
       }
@@ -98,7 +98,7 @@ export const getPhotosBySubject = async (subjectId: string): Promise<Photo[]> =>
       const response = await fetchWithFallback(`/photos/${subjectId}`);
       const data = await parseJsonSafely(response);
       if (response.ok && Array.isArray(data)) {
-        for (const p of data) await photoRepository.upsert(p);
+        for (const p of data) await photoRepository.upsertFromCloud(p);
       }
     } catch {}
   })();
@@ -174,7 +174,7 @@ export const searchPhotosByTag = async (subjectId: string, tag: string): Promise
           const response = await fetchWithFallback(`/photos/${subjectId}/search?tag=${encodeURIComponent(tag)}`);
           const data = await parseJsonSafely(response);
           if (response.ok && Array.isArray(data)) {
-            for (const p of data) await photoRepository.upsert(p);
+            for (const p of data) await photoRepository.upsertFromCloud(p);
           }
         } catch {}
       })();
@@ -189,9 +189,9 @@ export const searchPhotosByTag = async (subjectId: string, tag: string): Promise
     const response = await fetchWithFallback(`/photos/${subjectId}/search?tag=${encodeURIComponent(tag)}`);
     const data = await parseJsonSafely(response);
     if (response.ok && Array.isArray(data)) {
-      // Persistir resultados para futuras búsquedas offline
+      // Persistir resultados para futuras búsquedas offline (solo registros nuevos)
       for (const p of data) {
-        try { await photoRepository.upsert(p); } catch {}
+        try { await photoRepository.upsertFromCloud(p); } catch {}
       }
       return data;
     }

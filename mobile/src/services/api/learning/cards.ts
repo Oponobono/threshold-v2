@@ -19,7 +19,7 @@ export const getCardLogs = async (): Promise<CardLog[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const l of data) await cardLogRepository.upsert(l);
+          for (const l of data) await cardLogRepository.upsertFromCloud(l);
         }
       }
     } catch {}

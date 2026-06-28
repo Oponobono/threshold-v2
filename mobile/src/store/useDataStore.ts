@@ -87,29 +87,14 @@ export const useDataStore = create<DataState>((set, get) => ({
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
 
-      const { getCourses, getSubjects, getAllAssessments, getAllSchedules, repairSubjectCourseLinks } = await import('../services/api');
-      const [coursesData, subjectsData, assessmentsData, schedulesData] = await Promise.all([
-        getCourses().catch(() => null),
-        getSubjects().catch(() => null),
-        getAllAssessments().catch(() => null),
-        getAllSchedules().catch(() => null),
-      ]);
-
-      // Reparar enlaces curso-materia y actualizar contadores
+      // OFFLINE-FIRST: los datos locales de SQLite son la fuente de verdad.
+      // El cloud nunca sobreescribe el estado de la UI.
+      // Solo se usa para reparar enlaces y pre-cargar caché offline.
+      const { repairSubjectCourseLinks } = await import('../services/api');
       await repairSubjectCourseLinks().catch(() => {});
 
-      if (coursesData && Array.isArray(coursesData)) set({ courses: coursesData });
-      if (subjectsData && Array.isArray(subjectsData)) set({ subjects: subjectsData });
-      if (assessmentsData && Array.isArray(assessmentsData)) set({ assessments: assessmentsData });
-      if (schedulesData && Array.isArray(schedulesData)) set({ schedules: schedulesData });
-
-      const hasCloudData = (subjectsData && subjectsData.length > 0) ||
-        (assessmentsData && assessmentsData.length > 0) ||
-        (schedulesData && schedulesData.length > 0);
-      if (hasCloudData) {
-        set({ isSyncing: true, syncStatusMessage: 'Sincronizando datos...' });
-        await get().preloadOfflineCache();
-      }
+      // Pre-cargar caché offline en background sin reemplazar estado local
+      get().preloadOfflineCache().catch(() => {});
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
     } finally {
@@ -118,10 +103,11 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   refreshCourses: async () => {
+    // OFFLINE-FIRST: recargar desde SQLite local, no desde cloud.
+    // El cloud es solo backup, nunca fuente de verdad.
     try {
-      const { getCourses } = await import('../services/api');
-      const data = await getCourses();
-      if (data && Array.isArray(data)) set({ courses: data as any });
+      const dbCourses = await courseRepository.getAll() as any;
+      set({ courses: dbCourses });
     } catch (error) {
       console.error('[DataStore] refreshCourses error:', error);
     }
@@ -129,11 +115,9 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshSubjects: async () => {
     try {
-      const { getCourses, getSubjects, repairSubjectCourseLinks } = await import('../services/api');
-      const coursesData = await getCourses();
-      if (coursesData && Array.isArray(coursesData)) set({ courses: coursesData as any });
-      const data = await getSubjects();
-      if (data) set({ subjects: data as any });
+      const dbSubjects = await subjectRepository.getAll() as any;
+      set({ subjects: dbSubjects });
+      const { repairSubjectCourseLinks } = await import('../services/api');
       await repairSubjectCourseLinks().catch(() => {});
     } catch (error) {
       console.error('[DataStore] refreshSubjects error:', error);
@@ -142,9 +126,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshAssessments: async () => {
     try {
-      const { getAllAssessments } = await import('../services/api');
-      const data = await getAllAssessments();
-      if (data) set({ assessments: data as any });
+      const dbAssessments = await assessmentRepository.getAll() as any;
+      set({ assessments: dbAssessments });
     } catch (error) {
       console.error('[DataStore] refreshAssessments error:', error);
     }
@@ -152,9 +135,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshSchedules: async () => {
     try {
-      const { getAllSchedules } = await import('../services/api');
-      const data = await getAllSchedules();
-      if (data) set({ schedules: data as any });
+      const dbSchedules = await scheduleRepository.getAll() as any;
+      set({ schedules: dbSchedules });
     } catch (error) {
       console.error('[DataStore] refreshSchedules error:', error);
     }
@@ -204,8 +186,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   syncPendingOperations: async () => {
+    // OFFLINE-FIRST: sync solo PUSH local → cloud.
+    // No se recarga desde cloud porque local es la fuente de verdad.
     const result = await syncService.sync();
-    if (result.success > 0) await get().loadAllData(true);
     return result;
   },
 }));

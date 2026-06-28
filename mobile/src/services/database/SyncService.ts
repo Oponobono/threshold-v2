@@ -109,7 +109,7 @@ export class SyncService {
 
       // Orden Atómico: Garantizar que 'course' se procese ANTES que 'subject' para evitar FK Constraint
       items.sort((a, b) => {
-        const order = { course: 1, subject: 2 };
+        const order = { course: 1, subject: 2, 'flashcard-deck': 3, flashcard: 4, 'ai-chat': 5, 'user-preference': 6 };
         const rankA = (order as any)[a.entity_type] || 99;
         const rankB = (order as any)[b.entity_type] || 99;
         if (rankA !== rankB) return rankA - rankB;

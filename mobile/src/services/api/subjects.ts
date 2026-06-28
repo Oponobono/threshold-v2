@@ -48,8 +48,7 @@ export const getSubjectById = async (subjectId: string): Promise<Subject | null>
         if (response.ok) {
           const data = await parseJsonSafely(response);
           if (data && !pendingDelete.has(subjectId)) {
-            const merged = await mergeWithLocal(data);
-            await subjectRepository.upsert(merged);
+            await subjectRepository.upsertFromCloud(data);
           }
         }
       } catch {}
@@ -113,8 +112,7 @@ export const getSubjects = async (): Promise<Subject[]> => {
         if (Array.isArray(data)) {
           for (const s of data) {
             if (!pendingDelete.has(s.id)) {
-              const merged = await mergeWithLocal(s);
-              await subjectRepository.upsert(merged);
+              await subjectRepository.upsertFromCloud(s);
             }
           }
           return filterDeleted(data);
@@ -126,6 +124,7 @@ export const getSubjects = async (): Promise<Subject[]> => {
   }
 
   // 2. Sincronizar en background con throttling para evitar 429
+  // OFFLINE-FIRST: solo crea registros nuevos del cloud, nunca sobreescribe locales.
   const now = Date.now();
   if (now - lastSyncTimestamp > SYNC_THROTTLE_MS && !syncInProgress) {
     syncInProgress = true;
@@ -138,8 +137,7 @@ export const getSubjects = async (): Promise<Subject[]> => {
           if (Array.isArray(data)) {
             for (const s of data) {
               if (!pendingDelete.has(s.id)) {
-                const merged = await mergeWithLocal(s);
-                await subjectRepository.upsert(merged);
+                await subjectRepository.upsertFromCloud(s);
               }
             }
           }
@@ -193,7 +191,8 @@ export const createSubject = async (payload: {
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await subjectRepository.upsert(await mergeWithLocal(data));
+      const merged = await mergeWithLocal(data);
+      await subjectRepository.update(data.id, merged);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -249,7 +248,7 @@ export const updateSubject = async (subjectId: string, payload: Partial<Subject>
       // antigua {success: true} — en ese caso usar el payload local como fuente de verdad.
       if (data?.id) {
         const merged = await mergeWithLocal(data);
-        await subjectRepository.upsert(merged);
+        await subjectRepository.update(data.id, merged);
         return merged;
       }
       // Respuesta sin id (backend antiguo): enriquecer localmente desde SQLite

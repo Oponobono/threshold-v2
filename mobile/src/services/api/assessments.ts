@@ -13,14 +13,14 @@ export const getAssessments = async (subjectId: string): Promise<Assessment[]> =
   // 1. Leer localmente primero
   const localData = await assessmentRepository.getBySubject(subjectId) as Assessment[];
 
-  // 2. Sincronizar en background
+  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
     try {
       const response = await fetchWithFallback(`/assessments/${subjectId}`);
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await assessmentRepository.upsert(a);
+          for (const a of data) await assessmentRepository.upsertFromCloud(a);
         }
       }
     } catch {}
@@ -41,7 +41,7 @@ export const getAllAssessments = async (): Promise<Assessment[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await assessmentRepository.upsert(a);
+          for (const a of data) await assessmentRepository.upsertFromCloud(a);
           return data;
         }
       }
@@ -49,14 +49,14 @@ export const getAllAssessments = async (): Promise<Assessment[]> => {
     return [];
   }
 
-  // 2. Sincronizar en background
+  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
     try {
       const response = await fetchWithFallback(`/assessments/user/${userId}`);
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await assessmentRepository.upsert(a);
+          for (const a of data) await assessmentRepository.upsertFromCloud(a);
         }
       }
     } catch {}
@@ -86,7 +86,7 @@ export const createAssessment = async (payload: Assessment): Promise<Assessment>
     });
     const data = await parseJsonSafely(response);
     if (data?.id) {
-      await assessmentRepository.upsert(data);
+      await assessmentRepository.update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -106,8 +106,8 @@ export const updateAssessment = async (id: string, payload: Partial<Assessment>)
       body: JSON.stringify(payload),
     });
     const data = await parseJsonSafely(response);
-    if (response.ok) {
-      await assessmentRepository.upsert(data);
+    if (response.ok && data?.id) {
+      await assessmentRepository.update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');

@@ -24,7 +24,7 @@ export const getTodaySchedules = async (): Promise<any[]> => {
   const today = new Date().getDay();
   const localToday = allLocal.filter(s => s.day_of_week === today);
 
-  // 2. Sincronizar en background con throttling
+  // 2. Sincronizar en background con throttling (solo crea registros nuevos, nunca sobreescribe)
   const now = Date.now();
   if (now - lastTodaySync > SYNC_THROTTLE_MS && !todaySyncInProgress) {
     todaySyncInProgress = true;
@@ -36,7 +36,7 @@ export const getTodaySchedules = async (): Promise<any[]> => {
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             const mapped = data.map(s => ({ ...s, user_id: userId }));
-            for (const s of mapped) await scheduleRepository.upsert(s);
+            for (const s of mapped) await scheduleRepository.upsertFromCloud(s);
           }
         }
       } catch {}
@@ -63,7 +63,7 @@ export const createSchedule = async (payload: { subject_id: string; day_of_week:
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await scheduleRepository.upsert(data);
+      await scheduleRepository.update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -91,7 +91,7 @@ export const getSchedulesBySubject = async (subjectId: string): Promise<any[]> =
   // 1. Leer localmente primero
   const localData = await scheduleRepository.getBySubject(subjectId);
 
-  // 2. Sincronizar en background con throttling
+  // 2. Sincronizar en background con throttling (solo crea registros nuevos, nunca sobreescribe)
   const now = Date.now();
   if (now - lastSubjectSync > SYNC_THROTTLE_MS && !subjectSyncInProgress) {
     subjectSyncInProgress = true;
@@ -103,7 +103,7 @@ export const getSchedulesBySubject = async (subjectId: string): Promise<any[]> =
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             const mapped = data.map(s => ({ ...s, user_id: userId }));
-            for (const s of mapped) await scheduleRepository.upsert(s);
+            for (const s of mapped) await scheduleRepository.upsertFromCloud(s);
           }
         }
       } catch {}
@@ -127,7 +127,7 @@ export const getAllSchedules = async (): Promise<any[]> => {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
           const mapped = data.map(s => ({ ...s, user_id: userId }));
-          for (const s of mapped) await scheduleRepository.upsert(s);
+          for (const s of mapped) await scheduleRepository.upsertFromCloud(s);
           return mapped;
         }
       }
@@ -135,7 +135,7 @@ export const getAllSchedules = async (): Promise<any[]> => {
     return [];
   }
 
-  // 2. Sincronizar en background con throttling
+  // 2. Sincronizar en background con throttling (solo crea registros nuevos, nunca sobreescribe)
   const now = Date.now();
   if (now - lastAllSync > SYNC_THROTTLE_MS && !allSyncInProgress) {
     allSyncInProgress = true;
@@ -147,7 +147,7 @@ export const getAllSchedules = async (): Promise<any[]> => {
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             const mapped = data.map(s => ({ ...s, user_id: userId }));
-            for (const s of mapped) await scheduleRepository.upsert(s);
+            for (const s of mapped) await scheduleRepository.upsertFromCloud(s);
           }
         }
       } catch {}

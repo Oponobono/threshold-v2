@@ -129,6 +129,9 @@ export interface FlashcardDeck {
   owner_name?: string;
   linked_exam_title?: string;
   linked_exam_date?: string;
+  avg_ease_factor?: number;
+  total_reviews?: number;
+  last_reviewed_at?: string;
 }
 
 export type CardDirection = 'forward' | 'backward' | 'bidirectional';
@@ -141,6 +144,12 @@ export interface Flashcard {
   status?: string;
   direction?: CardDirection;
   source_context?: string;
+  ease_factor?: number;
+  interval_days?: number;
+  repetitions?: number;
+  next_review_at?: string;
+  fsrs_stability?: number;
+  fsrs_difficulty?: number;
   created_at?: string;
 }
 

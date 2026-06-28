@@ -15,7 +15,7 @@ export const getCategoriesBySubject = async (subjectId: string): Promise<Assessm
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const c of data) await assessmentCategoryRepository.upsert(c);
+          for (const c of data) await assessmentCategoryRepository.upsertFromCloud(c);
         }
       }
     } catch {}
@@ -38,7 +38,7 @@ export const createCategory = async (subjectId: string, data: Partial<Assessment
     });
     if (!response.ok) throw new Error('Error creating category');
     const result = await parseJsonSafely(response);
-    await assessmentCategoryRepository.upsert(result);
+    await assessmentCategoryRepository.update(result.id, result);
     return result;
   } catch {
     await syncService.enqueueCreate('category', id, { ...data, id });

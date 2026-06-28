@@ -50,15 +50,13 @@ export const useAutoSync = () => {
       ) {
         syncInProgressRef.current = true;
 
+        // OFFLINE-FIRST: al reconectar solo PUSH local → cloud.
+        // No se hace pull de cloud → local porque el store local es la fuente de verdad.
         syncPendingOperations()
           .then((result) => {
             if (result.success > 0) {
-              console.log(`[AutoSync] ✅ ${result.success} operaciones sincronizadas`);
+              console.log(`[AutoSync] ✅ ${result.success} operaciones sincronizadas al cloud`);
             }
-            return loadAllData(true);
-          })
-          .then(() => {
-            console.log('[AutoSync] ✅ Datos refrescados exitosamente');
             performCleanup();
           })
           .catch((error) => {

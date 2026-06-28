@@ -35,7 +35,7 @@ export const getCourses = async (): Promise<Course[]> => {
         if (Array.isArray(data)) {
           for (const c of data) {
             if (!pendingDelete.has(c.id)) {
-              await courseRepository.upsert(c);
+              await courseRepository.upsertFromCloud(c);
             }
           }
           return filterDeleted(data);
@@ -47,6 +47,7 @@ export const getCourses = async (): Promise<Course[]> => {
   }
 
   // 2. Sincronizar en background con throttling
+  // OFFLINE-FIRST: solo crea registros nuevos del cloud, nunca sobreescribe locales.
   const now = Date.now();
   if (now - lastSyncTimestamp > SYNC_THROTTLE_MS && !syncInProgress) {
     syncInProgress = true;
@@ -59,7 +60,7 @@ export const getCourses = async (): Promise<Course[]> => {
           if (Array.isArray(data)) {
             for (const c of data) {
               if (!pendingDelete.has(c.id)) {
-                await courseRepository.upsert(c);
+                await courseRepository.upsertFromCloud(c);
               }
             }
           }
@@ -116,7 +117,7 @@ export const createCourse = async (payload: {
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await courseRepository.upsert(data);
+      await courseRepository.update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor al crear curso');

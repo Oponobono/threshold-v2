@@ -16,6 +16,9 @@ export interface FlashcardDeck {
   owner_username?: string;
   owner_name?: string;
   linked_event_id?: string;
+  avg_ease_factor?: number;
+  total_reviews?: number;
+  last_reviewed_at?: string;
   created_at?: string;
   updated_at?: string;
 }

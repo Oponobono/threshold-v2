@@ -21,6 +21,8 @@ exports.getBackupStats = (req, res) => {
     docs:        { total: 0, backed: 0 },
     transcripts: { total: 0, backed: 0 },
     assessmentFiles: { total: 0, backed: 0 },
+    flashcardDecks: { total: 0, backed: 0 },
+    aiChats: { total: 0, backed: 0 },
   };
 
   // ── Fotos: almacenadas en `photos` vinculadas via subjects.user_id ──
@@ -97,8 +99,29 @@ exports.getBackupStats = (req, res) => {
                                      WHERE s.user_id = ? AND COALESCE(af.is_backed_up, 0) = 1`,
                                     [userId], (err, r) => {
                                       if (!err && r) stats.assessmentFiles.backed = Number(r.backed);
-                                      console.log(`[BackupStats] User ${userId}:`, JSON.stringify(stats));
-                                      res.json(stats);
+
+                                      // ── Mazos de flashcards ──
+                                      db.get('SELECT COUNT(*) as total FROM flashcard_decks WHERE user_id = ?', [userId], (err, r) => {
+                                        if (err) console.error(`[BackupStats] Error decks total (User ${userId}):`, err);
+                                        if (!err && r) stats.flashcardDecks.total = Number(r.total);
+                                        db.get('SELECT COUNT(*) as backed FROM flashcard_decks WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1', [userId], (err, r) => {
+                                          if (err) console.error(`[BackupStats] Error decks backed (User ${userId}):`, err);
+                                          if (!err && r) stats.flashcardDecks.backed = Number(r.backed);
+
+                                          // ── Chats de IA ──
+                                          db.get('SELECT COUNT(*) as total FROM ai_chats WHERE user_id = ?', [userId], (err, r) => {
+                                            if (err) console.error(`[BackupStats] Error aiChats total (User ${userId}):`, err);
+                                            if (!err && r) stats.aiChats.total = Number(r.total);
+                                            db.get('SELECT COUNT(*) as backed FROM ai_chats WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1', [userId], (err, r) => {
+                                              if (err) console.error(`[BackupStats] Error aiChats backed (User ${userId}):`, err);
+                                              if (!err && r) stats.aiChats.backed = Number(r.backed);
+
+                                              console.log(`[BackupStats] User ${userId}:`, JSON.stringify(stats));
+                                              res.json(stats);
+                                            });
+                                          });
+                                        });
+                                      });
                                     }
                                   );
                                 }
@@ -127,7 +150,7 @@ exports.getPendingItems = (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
-  const result = { photos: [], audio: [], docs: [], transcripts: [], assessmentFiles: [] };
+  const result = { photos: [], audio: [], docs: [], transcripts: [], assessmentFiles: [], flashcardDecks: [], aiChats: [] };
 
   db.all(
     `SELECT p.id, p.local_uri as uri 
@@ -169,14 +192,25 @@ exports.getPendingItems = (req, res) => {
                    WHERE s.user_id = ? AND COALESCE(af.is_backed_up, 0) = 0`,
                   [userId], (err, rows) => {
                     if (!err && rows) result.assessmentFiles = rows;
-                    console.log(`[PendingItems] User ${userId}:`, {
-                      photos: result.photos.length,
-                      audio: result.audio.length,
-                      docs: result.docs.length,
-                      transcripts: result.transcripts.length,
-                      assessmentFiles: result.assessmentFiles.length
+
+                  db.all('SELECT id, title, card_count FROM flashcard_decks WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 0', [userId], (err, rows) => {
+                    if (!err && rows) result.flashcardDecks = rows;
+
+                    db.all('SELECT id, role, content, subject_id FROM ai_chats WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 0 AND content IS NOT NULL ORDER BY created_at DESC', [userId], (err, rows) => {
+                      if (!err && rows) result.aiChats = rows;
+
+                      console.log(`[PendingItems] User ${userId}:`, {
+                        photos: result.photos.length,
+                        audio: result.audio.length,
+                        docs: result.docs.length,
+                        transcripts: result.transcripts.length,
+                        assessmentFiles: result.assessmentFiles.length,
+                        flashcardDecks: result.flashcardDecks.length,
+                        aiChats: result.aiChats.length,
+                      });
+                      res.json(result);
                     });
-                    res.json(result);
+                  });
                   }
                 );
               }
@@ -192,8 +226,8 @@ exports.getPendingItems = (req, res) => {
  * POST /api/backup/mark
  * Marca un ítem como respaldado y guarda su cloud_url.
  * Si el ítem no existe en el backend (fue creado offline), lo inserta automáticamente.
- * Body: { type: 'photo'|'audio'|'document'|'transcript', id, cloud_url, transcript_type?,
- *         subject_id?, user_id? (para inserción de items offline) }
+ * Body: { type: 'photo'|'audio'|'document'|'transcript'|'ai_chat'|'user_preference'|'flashcard_deck'|'flashcard',
+ *         id, cloud_url, transcript_type?, subject_id?, user_id?, key? }
  */
 exports.markAsBackedUp = (req, res) => {
   const userId = req.user?.id;
@@ -258,6 +292,86 @@ exports.markAsBackedUp = (req, res) => {
             res.json({ ok: true, inserted: true });
           }
         );
+      }
+    );
+    return;
+  }
+
+  if (type === 'ai_chat') {
+    const resolvedSubjectId = req.body.subject_id || null;
+    db.run(
+      `UPDATE ai_chats SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND user_id = ?`,
+      [cloud_url, id, userId],
+      function (err) {
+        if (err) { console.error('[Backup] Error al marcar chat IA:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar chat IA.' }); }
+        if (this.changes > 0) return res.json({ ok: true });
+
+        db.run(
+          `INSERT INTO ai_chats (id, user_id, subject_id, role, content, cloud_url, is_backed_up)
+           VALUES (?, ?, ?, 'user', 'Respaldo offline', ?, 1)
+           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+          [id, userId, resolvedSubjectId, cloud_url],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[Backup] Error al insertar chat IA offline:', insertErr.message, insertErr.code, insertErr.stack);
+              return res.status(500).json({ error: 'Error al registrar chat IA offline.', details: insertErr.message });
+            }
+            res.json({ ok: true, inserted: true });
+          }
+        );
+      }
+    );
+    return;
+  }
+
+  if (type === 'user_preference') {
+    const key = req.body.key || id;
+    db.run(
+      `UPDATE user_preferences SET cloud_url = ?, is_backed_up = 1, updated_at = datetime('now') WHERE key = ?`,
+      [cloud_url, key],
+      function (err) {
+        if (err) { console.error('[Backup] Error al marcar preferencia:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar preferencia.' }); }
+        if (this.changes > 0) return res.json({ ok: true });
+
+        db.run(
+          `INSERT INTO user_preferences (key, value, cloud_url, is_backed_up)
+           VALUES (?, 'Respaldo offline', ?, 1)
+           ON CONFLICT(key) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+          [key, cloud_url],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('[Backup] Error al insertar preferencia offline:', insertErr.message, insertErr.code, insertErr.stack);
+              return res.status(500).json({ error: 'Error al registrar preferencia offline.', details: insertErr.message });
+            }
+            res.json({ ok: true, inserted: true });
+          }
+        );
+      }
+    );
+    return;
+  }
+
+  if (type === 'flashcard_deck') {
+    db.run(
+      `UPDATE flashcard_decks SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND user_id = ?`,
+      [cloud_url, id, userId],
+      function (err) {
+        if (err) { console.error('[Backup] Error al marcar mazo:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar mazo.' }); }
+        if (this.changes > 0) return res.json({ ok: true });
+        res.json({ ok: true, warning: 'Mazo no encontrado en backend. Se sincronizará en el próximo sync.' });
+      }
+    );
+    return;
+  }
+
+  if (type === 'flashcard') {
+    db.run(
+      `UPDATE flashcards SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND deck_id IN (SELECT id FROM flashcard_decks WHERE user_id = ?)`,
+      [cloud_url, id, userId],
+      function (err) {
+        if (err) { console.error('[Backup] Error al marcar tarjeta:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar tarjeta.' }); }
+        if (this.changes > 0) return res.json({ ok: true });
+        res.json({ ok: true, warning: 'Tarjeta no encontrada en backend.' });
       }
     );
     return;
@@ -425,7 +539,7 @@ exports.getCloudItems = (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
 
-  const result = { photos: [], audio: [], docs: [], transcripts: [], assessmentFiles: [] };
+  const result = { photos: [], audio: [], docs: [], transcripts: [], assessmentFiles: [], flashcardDecks: [], aiChats: [] };
 
   // Fotos (vinculadas a materias via subjects.user_id)
   db.all(
@@ -492,7 +606,27 @@ exports.getCloudItems = (req, res) => {
                         (err, rows) => {
                           if (err) console.error(`[CloudItems] Error assessment files (User ${userId}):`, err.message);
                           if (!err && rows) result.assessmentFiles = rows;
-                          res.json(result);
+                          db.all(
+                            `SELECT id, cloud_url, title, card_count, avg_ease_factor, total_reviews, last_reviewed_at, subject_id, created_at
+                             FROM flashcard_decks
+                             WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1 AND cloud_url IS NOT NULL`,
+                            [userId],
+                            (err, rows) => {
+                              if (err) console.error(`[CloudItems] Error flashcard decks (User ${userId}):`, err.message);
+                              if (!err && rows) result.flashcardDecks = rows;
+                              db.all(
+                                `SELECT id, cloud_url, role, content, subject_id, created_at
+                                 FROM ai_chats
+                                 WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1 AND cloud_url IS NOT NULL`,
+                                [userId],
+                                (err, rows) => {
+                                  if (err) console.error(`[CloudItems] Error ai_chats (User ${userId}):`, err.message);
+                                  if (!err && rows) result.aiChats = rows;
+                                  res.json(result);
+                                }
+                              );
+                            }
+                          );
                         }
                       );
                     }

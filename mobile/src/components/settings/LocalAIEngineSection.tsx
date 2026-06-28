@@ -27,16 +27,6 @@ import {
   cancelDownloadNotification,
 } from '../../services/notificationService';
 
-const SectionHeader = ({ title, desc, icon }: { title: string; desc: string; icon: string }) => (
-  <View style={styles.sectionHeader}>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionDesc}>{desc}</Text>
-    </View>
-    <Ionicons name={icon as any} size={18} color={theme.colors.text.secondary} />
-  </View>
-);
-
 const SettingRow = ({ title, desc, right }: { title: string; desc?: string; right: React.ReactNode }) => (
   <View style={styles.settingRow}>
     <View style={{ flex: 1, paddingRight: 12 }}>
@@ -49,6 +39,7 @@ const SettingRow = ({ title, desc, right }: { title: string; desc?: string; righ
 
 export const LocalAIEngineSection = () => {
   const { t } = useTranslation();
+  const [aiExpanded, setAiExpanded] = useState(false);
   const [isRefreshingRam, setIsRefreshingRam] = useState(false);
   const isOnline = useConnectivityStore((s) => s.isOnline);
 
@@ -95,10 +86,11 @@ export const LocalAIEngineSection = () => {
   };
 
   const getStatusLabel = (): string => {
-    if (forceOfflineMode && activeModelId) return t('settings.localAI.localStatus');
-    if (isOnline && activeModelId && forceOfflineMode) return t('settings.localAI.localStatus');
-    if (isOnline) return t('settings.localAI.cloudStatus');
+    if (isOnline && activeModelId) return t('settings.localAI.localWithCloud', 'Local activo · Cloud disponible');
+    if (isOnline && hasLocalModels) return t('settings.localAI.cloudWithLocal', 'Online · Modelos locales disponibles');
+    if (isOnline) return t('settings.localAI.cloudOnly', 'Online');
     if (activeModelId) return t('settings.localAI.localStatus');
+    if (hasLocalModels) return t('settings.localAI.localAvailable', 'Local disponible');
     return t('settings.localAI.noModelStatus');
   };
 
@@ -434,13 +426,43 @@ export const LocalAIEngineSection = () => {
     markModelRemoved('whisper');
   };
 
+  const hasLocalModels = Object.keys(downloadedModels).length > 0;
+  const hasActiveLocalModel = activeModelId !== null && activeModelId !== undefined;
+
+  const headerBadgeLabel = forceOfflineMode
+    ? hasActiveLocalModel
+      ? t('settings.localAI.localModeOn', 'Offline · Local activo')
+      : t('settings.localAI.localModeNoModel', 'Offline · Sin modelo local')
+    : isOnline
+      ? hasActiveLocalModel
+        ? t('settings.localAI.localActive', 'Online · Usando local')
+        : t('settings.localAI.cloudOnly', 'Online')
+      : t('settings.localAI.offlineNoModel', 'Sin conexión · Descarga modelos');
+
   return (
     <View style={[styles.section, styles.localAISection]}>
-      <SectionHeader
-        title={t('settings.localAI.title')}
-        desc={t('settings.localAI.desc')}
-        icon="hardware-chip-outline"
-      />
+      <TouchableOpacity
+        onPress={() => setAiExpanded(prev => !prev)}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8 }}
+      >
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="hardware-chip-outline" size={18} color={theme.colors.text.secondary} />
+            <Text style={styles.sectionTitle}>{t('settings.localAI.title')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <View style={{
+              width: 6, height: 6, borderRadius: 3,
+              backgroundColor: forceOfflineMode && hasActiveLocalModel ? '#34C759' : isOnline ? '#34C759' : '#FF9500',
+            }} />
+            <Text style={styles.sectionDesc} numberOfLines={1}>{headerBadgeLabel}</Text>
+          </View>
+        </View>
+        <Ionicons name={aiExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} />
+      </TouchableOpacity>
+
+      {aiExpanded && (
+      <>
 
       {/* ─────────────────────────── */}
       {/* BLOQUE 1: Control Local y Privacidad */}
@@ -850,7 +872,21 @@ export const LocalAIEngineSection = () => {
           <Ionicons name="trash-outline" size={14} color="#fff" style={{ marginRight: 6 }} />
           <Text style={styles.darkPillText}>{t('settings.localAI.purgeCache')}</Text>
         </TouchableOpacity>
+
+        {!hasLocalModels && !hasActiveLocalModel && (
+          <View style={{
+            backgroundColor: '#2A2520',
+            borderRadius: 8,
+            padding: 12,
+            marginTop: 16,
+          }}>
+            <Text style={{ color: '#E8D5B7', fontSize: 13, lineHeight: 19 }}>
+              {t('settings.localAI.downloadRecommend', 'No tienes modelos locales descargados. Descarga al menos el modelo Essential para usar el motor de IA sin conexión a internet.')}
+            </Text>
+          </View>
+        )}
       </>
+      )}
     </View>
   );
 };

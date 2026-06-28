@@ -19,7 +19,7 @@ export const getStudySessions = async (): Promise<StudySession[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const s of data) await studySessionRepository.upsert(s);
+          for (const s of data) await studySessionRepository.upsertFromCloud(s);
         }
       }
     } catch {}

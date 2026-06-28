@@ -44,12 +44,16 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
     const scheduledTotalMinutes = config.hour * 60 + config.minute;
     
     // Ventana: 2 horas antes y después de la hora programada
+    // Normalizar a [0, 1440) para manejar el wrap de medianoche correctamente
     const WINDOW_MINUTES = 120;
-    const minAllowed = scheduledTotalMinutes - WINDOW_MINUTES;
-    const maxAllowed = scheduledTotalMinutes + WINDOW_MINUTES;
+    const normalizeMinute = (m: number) => ((m % 1440) + 1440) % 1440;
+    const minAllowed = normalizeMinute(scheduledTotalMinutes - WINDOW_MINUTES);
+    const maxAllowed = normalizeMinute(scheduledTotalMinutes + WINDOW_MINUTES);
     
-    // Comprobar si estamos dentro de la ventana
-    const inWindow = (currentTotalMinutes >= minAllowed && currentTotalMinutes <= maxAllowed);
+    // Comprobar si estamos dentro de la ventana (maneja wrap de medianoche)
+    const inWindow = minAllowed <= maxAllowed
+      ? (currentTotalMinutes >= minAllowed && currentTotalMinutes <= maxAllowed)
+      : (currentTotalMinutes >= minAllowed || currentTotalMinutes <= maxAllowed);
     
     if (!inWindow) {
       console.log(`[ScheduledBackup] ⏰ Hora actual (${String(currentHour).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}) fuera de ventana [${String(config.hour).padStart(2, '0')}:${String(config.minute).padStart(2, '0')} ±2h]. Saltando.`);
@@ -121,14 +125,16 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
  */
 export const registerScheduledBackup = async (): Promise<void> => {
   try {
+    // Siempre desregistrar primero para garantizar registro fresco.
+    // Esto evita que el task quede huérfano tras OTA, reinicios del SO
+    // sin RECEIVE_BOOT_COMPLETED, o cambios en la configuración.
     const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKUP_TASK_NAME);
     if (isRegistered) {
-      console.log('[ScheduledBackup] ✅ Task ya estaba registrado, actualizando intervalo...');
-      // No volvemos a registrar si ya existe - el SO mantiene la configuración
-      return;
+      console.log('[ScheduledBackup] 🔄 Task ya registrado, refrescando registro...');
+      await BackgroundFetch.unregisterTaskAsync(BACKUP_TASK_NAME);
     }
 
-    console.log('[ScheduledBackup] 📝 Registrando nuevo task de backup programado...');
+    console.log('[ScheduledBackup] 📝 Registrando task de backup programado...');
     await BackgroundFetch.registerTaskAsync(BACKUP_TASK_NAME, {
       minimumInterval: 15 * 60, // 15 minutos mínimo (el SO puede ejecutar más frecuentemente)
       stopOnTerminate: false,   // continúa aunque el usuario cierre la app

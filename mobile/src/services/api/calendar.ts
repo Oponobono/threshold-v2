@@ -55,7 +55,8 @@ export const createCalendarEvent = async (event: CalendarEventData): Promise<Cal
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await calendarEventRepository.upsert(normalizeEventForLocal(data, String(userId)));
+      const normalized = normalizeEventForLocal(data, String(userId));
+      await calendarEventRepository.update(normalized.id, normalized);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -84,7 +85,7 @@ export const getCalendarEvents = async (startDate?: string, endDate?: string): P
         const events = Array.isArray(data) ? data : [];
         for (const e of events) {
           const normalized = normalizeEventForLocal(e, String(userId));
-          if (normalized.user_id) await calendarEventRepository.upsert(normalized);
+          if (normalized.user_id) await calendarEventRepository.upsertFromCloud(normalized);
         }
       }
     } catch {}
@@ -107,7 +108,7 @@ export const getCalendarEventById = async (eventId: string): Promise<CalendarEve
       const response = await fetchWithFallback(`/calendar/events/${eventId}?user_id=${userId}`);
       if (response.ok) {
         const data = await parseJsonSafely(response);
-        if (data) await calendarEventRepository.upsert(normalizeEventForLocal(data, String(userId)));
+        if (data) await calendarEventRepository.upsertFromCloud(normalizeEventForLocal(data, String(userId)));
       }
     } catch {}
   })();

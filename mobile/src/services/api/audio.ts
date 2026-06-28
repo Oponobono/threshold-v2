@@ -19,7 +19,7 @@ export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await audioRepository.upsert(a);
+          for (const a of data) await audioRepository.upsertFromCloud(a);
           return data;
         }
       }
@@ -27,7 +27,7 @@ export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
     return [];
   }
 
-  // Sincronizar desde la nube en background solo si auto-upload activo
+  // Sincronizar desde la nube en background solo si auto-upload activo (solo crea registros nuevos)
   (async () => {
     try {
       const prefs = await getBackupPreferences();
@@ -36,7 +36,7 @@ export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await audioRepository.upsert(a);
+          for (const a of data) await audioRepository.upsertFromCloud(a);
         }
       }
     } catch {}
@@ -67,7 +67,7 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
       });
       const data = await parseJsonSafely(response);
       if (response.ok && data) {
-        await audioRepository.upsert(data);
+        await audioRepository.update(data.id, data);
       } else {
         throw new Error(data?.error || 'Error del servidor');
       }

@@ -90,6 +90,7 @@ const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
 
 export default function SettingsScreen() {
   const [scalesExpanded, setScalesExpanded] = useState(true);
+  const [backupExpanded, setBackupExpanded] = useState(false);
   const [showWeeklyPicker, setShowWeeklyPicker] = useState(false);
   const [weeklyConfig, setWeeklyConfig] = useState<WeeklyDigestConfig | null>(null);
   const [isZyrenInfoVisible, setIsZyrenInfoVisible] = useState(false);
@@ -356,7 +357,17 @@ export default function SettingsScreen() {
             onPress={() => setScalesExpanded(prev => !prev)}
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}
           >
-            <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
+              {!scalesExpanded && (() => {
+                const active = gradingSystems.find(s => s.id === selectedSystemId);
+                return active ? (
+                  <View style={[styles.activeBadge, { marginLeft: 8 }]}>
+                    <Text style={styles.activeBadgeText}>{active.is_custom ? active.name : t(active.name)}</Text>
+                  </View>
+                ) : null;
+              })()}
+            </View>
             <Ionicons name={scalesExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} />
           </TouchableOpacity>
           {scalesExpanded && (
@@ -467,8 +478,36 @@ export default function SettingsScreen() {
         {/* ── BACKUP & SYNC ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('backup.title')} desc={t('backup.desc')} icon="cloud-outline" />
+          <TouchableOpacity
+            onPress={() => setBackupExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8 }}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="cloud-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={styles.sectionTitle}>{t('backup.title')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: backupPrefs.enabled ? '#34C759' : '#FF9500' }} />
+                <Text style={styles.sectionDesc}>
+                  {backupPrefs.enabled
+                    ? t('backup.backupActive', 'Backup activado')
+                    : t('backup.backupDisabled', 'Backup desactivado')}
+                </Text>
+                {backupPrefs.enabled && scheduledConfig.enabled && (
+                  <View style={[styles.activeBadge, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+                    <Text style={[styles.activeBadgeText, { fontSize: 9 }]}>
+                      {t('backup.autoBadge', 'Auto')}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <Ionicons name={backupExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
 
+          {backupExpanded && (
+            <>
           {/* ── Toggle principal ── */}
           <SettingRow
             title={t('backup.enableCloud')}
@@ -573,6 +612,16 @@ export default function SettingsScreen() {
                     thumbColor={theme.colors.white}
                   />
                 }
+              />
+              <SettingRow
+                title={t('backup.flashcardDecks')}
+                desc={t('backup.inCloud', { backed: backupStats.flashcardDecks.backed, total: backupStats.flashcardDecks.total })}
+                right={<View />}
+              />
+              <SettingRow
+                title={t('backup.aiChats')}
+                desc={t('backup.inCloud', { backed: backupStats.aiChats.backed, total: backupStats.aiChats.total })}
+                right={<View />}
               />
 
               {/* ── Estado general ── */}
@@ -746,6 +795,8 @@ export default function SettingsScreen() {
             <Text style={[styles.settingDesc, { marginTop: 8, fontStyle: 'italic' }]}>
               {t('backup.disabled')}
             </Text>
+          )}
+          </>
           )}
         </View>
 

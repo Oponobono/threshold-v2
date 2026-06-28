@@ -17,3 +17,5 @@ export { assessmentFileRepository, type AssessmentFile } from './AssessmentFileR
 export { CourseRepository, courseRepository } from './CourseRepository';
 export { audioTranscriptRepository, type AudioTranscript } from './AudioTranscriptRepository';
 export { youTubeTranscriptRepository, type YouTubeTranscript } from './YouTubeTranscriptRepository';
+export { AiChatRepository, aiChatRepository, type AiChat } from './AiChatRepository';
+export { UserPreferenceRepository, userPreferenceRepository, type UserPreference } from './UserPreferenceRepository';

@@ -16,7 +16,7 @@ export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const v of data) await youTubeRepository.upsert(v);
+          for (const v of data) await youTubeRepository.upsertFromCloud(v);
           return data;
         }
       }
@@ -24,14 +24,14 @@ export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
     return [];
   }
 
-  // 2. Sincronizar en background
+  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
     try {
       const response = await fetchWithFallback(`/youtube-videos/${userId}`);
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const v of data) await youTubeRepository.upsert(v);
+          for (const v of data) await youTubeRepository.upsertFromCloud(v);
         }
       }
     } catch {}
@@ -57,7 +57,7 @@ export const createYouTubeVideo = async (payload: { subject_id?: string | null; 
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await youTubeRepository.upsert(data);
+      await youTubeRepository.update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');

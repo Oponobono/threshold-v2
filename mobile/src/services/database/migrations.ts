@@ -409,6 +409,40 @@ const migrations: Migration[] = [
       `UPDATE youtube_transcripts SET cloud_url = (SELECT cloud_url FROM youtube_videos WHERE youtube_videos.id = youtube_transcripts.video_id) WHERE cloud_url IS NULL`,
     ],
   },
+  {
+    version: 16,
+    up: [
+      `CREATE TABLE IF NOT EXISTS ai_chats (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
+        role TEXT NOT NULL DEFAULT 'user',
+        content TEXT NOT NULL,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_chats_user ON ai_chats(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_chats_subject ON ai_chats(subject_id)`,
+      `CREATE TABLE IF NOT EXISTS user_preferences (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now'))
+      )`,
+      `ALTER TABLE flashcards ADD COLUMN ease_factor REAL`,
+      `ALTER TABLE flashcards ADD COLUMN interval_days INTEGER`,
+      `ALTER TABLE flashcards ADD COLUMN repetitions INTEGER DEFAULT 0`,
+      `ALTER TABLE flashcards ADD COLUMN next_review_at TEXT`,
+      `ALTER TABLE flashcards ADD COLUMN fsrs_stability REAL`,
+      `ALTER TABLE flashcards ADD COLUMN fsrs_difficulty REAL`,
+      `ALTER TABLE flashcard_decks ADD COLUMN avg_ease_factor REAL`,
+      `ALTER TABLE flashcard_decks ADD COLUMN total_reviews INTEGER DEFAULT 0`,
+      `ALTER TABLE flashcard_decks ADD COLUMN last_reviewed_at TEXT`,
+    ],
+  },
 ];
 
 export default migrations;

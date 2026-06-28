@@ -17,6 +17,9 @@ export async function initializeDatabase(): Promise<void> {
       if (entity_type === 'scanned_document') path = '/scanned_documents';
       // flashcard-deck: default path `${entity_type}s` already produces `/flashcard-decks`
       if (entity_type === 'assessment_files') path = `/assessments/${payload?.assessment_id}/files`;
+      if (entity_type === 'ai-chat') path = '/ai/chats';
+      if (entity_type === 'user-preference') path = '/user-preferences';
+      if (entity_type === 'flashcard') path = `/flashcard-decks/${payload?.deck_id}/cards`;
 
       // Inyectar cloud_url fresca desde SQLite antes de enviar payload a la nube
       if (entity_id && (entity_type === 'photo' || entity_type === 'audio_recording' || entity_type === 'scanned_document' || entity_type === 'assessment_files')) {
@@ -98,9 +101,8 @@ export async function initializeDatabase(): Promise<void> {
 
       // ── Post-sync: guardar response de CREATE flashcard-deck en SQLite ──
       // El mazo se creó en MMKV via saveImportedDeck pero el sync handler
-      // nunca persiste la respuesta del servidor en SQLite. Sin esto, el mazo
-      // desaparece tras el cleanup de MMKV y cualquier UPDATE posterior
-      // falla con "Mazo no encontrado" (404).
+      // nunca persiste la respuesta del servidor en SQLite. Sin esto, UPDATE
+      // posteriores fallan con "Mazo no encontrado" (404).
       if (operation === 'CREATE' && entity_type === 'flashcard-deck') {
         try {
           const body = await response.json().catch(() => null);
@@ -119,20 +121,6 @@ export async function initializeDatabase(): Promise<void> {
           }
         } catch (saveErr) {
           console.warn('[SyncService] Error guardando mazo en SQLite:', saveErr);
-        }
-
-        // Limpiar MMKV si era un ID negativo (deck puramente local)
-        if (entity_id) {
-          const isNegativeId = !isNaN(Number(entity_id)) && Number(entity_id) < 0;
-          if (isNegativeId) {
-            try {
-              const { deleteLocalDeck } = await import('../localFlashcardService');
-              deleteLocalDeck(entity_id);
-              console.log(`[SyncService] Limpiado deck local ${entity_id} del MMKV tras sync exitoso`);
-            } catch (cleanupErr) {
-              console.warn('[SyncService] Error limpiando deck local de MMKV:', cleanupErr);
-            }
-          }
         }
       }
     });
