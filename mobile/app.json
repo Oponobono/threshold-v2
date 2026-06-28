@@ -58,6 +58,9 @@
       [
         "expo-splash-screen",
         {
+          "image": "./src/images/ThresholdIcons/AppIcon.appiconset/Icon-App-256x256@2x.png",
+          "imageWidth": 400,
+          "resizeMode": "contain",
           "backgroundColor": "#0E0E18",
           "dark": {
             "backgroundColor": "#0E0E18"

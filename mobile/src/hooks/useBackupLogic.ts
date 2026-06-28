@@ -79,6 +79,8 @@ export const useBackupLogic = () => {
     docs: { total: 0, backed: 0 },
     transcripts: { total: 0, backed: 0 },
     assessmentFiles: { total: 0, backed: 0 },
+    flashcardDecks: { total: 0, backed: 0 },
+    aiChats: { total: 0, backed: 0 },
   });
 
   const [cloudItemsCount, setCloudItemsCount] = useState(0);
