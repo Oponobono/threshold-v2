@@ -37,7 +37,7 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - **[HUB] CourseSubjectCard**: `CourseSubjectCard.tsx` — `React.memo` card with pills, "Continuar" deep-link button, "Marcar clase terminada" bicephalous trigger.
 - **[HUB] subjects.tsx refactor**: Replaced ScrollView+map with `SectionList`. All `renderItem` handlers wrapped in `useCallback` to preserve `React.memo`. `MomentumCard` reads `aggregatedMomentumScore` (was hardcoded 0.85).
 - **[HUB] MomentumService**: `MomentumService.ts` — logarithmic decay after 72h (`0.05 * Math.log1p(hoursOverdue)`), `boostMomentum` (+15%), `updateAllMomentumScores` on app start via `appInit.ts`.
-- **[HUB] Deep Linking**: `linking.ts` — `openCourseLink(url)`: `Linking.openURL` with `expo-web-browser` fallback.
+- **[HUB] Deep Linking fixed**: `linking.ts` — reescrito con estrategia correcta: (1) esquema nativo `vnd.youtube:` para YouTube, (2) `Linking.openURL(https_url)` directo para todas las demás plataformas (Udemy, Coursera, Platzi, etc.) — el SO intercepta Universal Links/App Links y abre la app si está instalada, (3) `WebBrowser` solo si Linking falla por completo. Eliminados esquemas falsos `coursera://`, `udemy://`, `platzi://`. `app.json` actualizado con `LSApplicationQueriesSchemes` (iOS) y `intentFilters` (Android) para YouTube. `CourseAccordion.tsx` y `CourseHeroCard.tsx` ahora pasan `platform` a `openCourseLink`.
 - **[HUB] Zyren Ingestion endpoint**: `aiController.js` — `generateClassFlashcards` uses `llama-3.3-70b-versatile`. Strict JSON contract in system prompt. Double sanitization (Markdown strip + regex fallback). Route: `POST /api/ai/class-flashcards`.
 - **[HUB] ZyrenIngestionModal**: `ZyrenIngestionModal.tsx` — 3-step (Input->Preview->Saving). Saves via `saveImportedDeck` + `addLocalCard` + `recalculateLocalDeckCounters`. `subjectId` passed correctly.
 - **[HUB] Audit**: `useCallback` applied to handlers; `aggregatedMomentumScore` connected to Hero Card; `subjectId` fixed in modal.
@@ -61,6 +61,7 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - **Hub: aggregatedMomentumScore**: Arithmetic mean of all courses exposed from `useGroupedSubjects`.
 - **Hub: useCallback for SectionList handlers**: All handlers to `CourseSubjectCard` must be `useCallback` — otherwise `React.memo` is bypassed on every parent re-render.
 - **Hub: Zyren ingestion reuses Groq infra**: No new API key. `generateClassFlashcards` follows same pattern as `generateStudyMaterial` with stricter JSON-only prompt.
+- **Hub: Deep link strategy**: NO usar esquemas custom inventados (`coursera://`, `udemy://`, `platzi://`). Solo `vnd.youtube:` para YouTube. Para todo lo demás: `Linking.openURL(https)` — el SO activa Universal Links/App Links. `WebBrowser` solo como último recurso de emergencia.
 
 ## Next Steps
 - Consider whether `Dashboard.styles.ts` `sheetContent` hardcoded `paddingBottom: 44/52` should be replaced with dynamic inset values.
@@ -95,7 +96,7 @@ Enable full offline functionality for flashcards (decks, cards, import) and docu
 - `mobile/src/components/subjects/CourseAccordion.tsx`: sticky header with animated chevron
 - `mobile/src/components/subjects/CourseSubjectCard.tsx`: React.memo card with pills and bicephalous trigger
 - `mobile/src/components/subjects/ZyrenIngestionModal.tsx`: 3-step ingestion modal (Input->Preview->Saving)
-- `mobile/src/utils/linking.ts`: openCourseLink with expo-web-browser fallback
+- `mobile/src/utils/linking.ts`: openCourseLink con estrategia en capas: vnd.youtube → Linking.openURL(https) → WebBrowser fallback
 - `mobile/app/(tabs)/subjects.tsx`: SectionList hub with useCallback handlers, reactive MomentumCard
 - `backend/controllers/aiController.js`: generateClassFlashcards endpoint (Groq llama-3.3-70b)
 - `backend/routes/ai.js`: POST /api/ai/class-flashcards registered

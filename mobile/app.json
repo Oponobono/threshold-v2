@@ -10,7 +10,13 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "vnd.youtube",
+          "youtube"
+        ]
+      }
     },
     "android": {
       "package": "com.oponobono.threshold",
@@ -27,6 +33,18 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.WAKE_LOCK",
         "android.permission.FOREGROUND_SERVICE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "www.youtube.com" },
+            { "scheme": "https", "host": "youtu.be" },
+            { "scheme": "vnd.youtube" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {

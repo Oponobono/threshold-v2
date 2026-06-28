@@ -37,7 +37,7 @@ export const CourseAccordion = React.memo(({ courseId, courseName, platform, mai
           {mainUrl ? (
             <TouchableOpacity
               style={styles.linkBtn}
-              onPress={() => openCourseLink(mainUrl)}
+              onPress={() => openCourseLink(mainUrl, platform)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Ionicons name="open-outline" size={16} color={theme.colors.primary} />
