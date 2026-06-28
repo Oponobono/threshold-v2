@@ -844,7 +844,6 @@ export const LocalAIEngineSection = () => {
         )}
       </View>
 
-      <>
         {/* Capacidades Offline */}
         <View style={{ marginTop: 14, marginBottom: 4 }}>
           <Text style={[styles.subSectionTitle, { marginTop: 0, marginBottom: 8 }]}>
