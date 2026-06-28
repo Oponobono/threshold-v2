@@ -1166,9 +1166,9 @@ export const syncLocalFlashcardsToBackend = async (): Promise<void> => {
           title: deck.title,
           description: deck.description,
           subject_id: deck.subject_id ? String(deck.subject_id) : undefined,
-          avg_ease_factor: deck.avg_ease_factor ?? undefined,
-          total_reviews: deck.total_reviews ?? undefined,
-          last_reviewed_at: deck.last_reviewed_at ?? undefined,
+          avg_ease_factor: (deck as any).avg_ease_factor ?? undefined,
+          total_reviews: (deck as any).total_reviews ?? undefined,
+          last_reviewed_at: (deck as any).last_reviewed_at ?? undefined,
         });
         console.log(`[BackupService] Mazo ${deck.id} sincronizado. Nuevo ID remoto: ${createdDeck?.id}`);
 
