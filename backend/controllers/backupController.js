@@ -622,7 +622,7 @@ exports.getCloudItems = (req, res) => {
                           if (err) console.error(`[CloudItems] Error assessment files (User ${userId}):`, err.message);
                           if (!err && rows) result.assessmentFiles = rows;
                           db.all(
-                            `SELECT id, cloud_url, title, card_count, avg_ease_factor, total_reviews, last_reviewed_at, subject_id, created_at
+                            `SELECT id, cloud_url, title, subject_id, linked_event_id
                              FROM flashcard_decks
                              WHERE user_id = ? AND COALESCE(is_backed_up, 0) = 1 AND cloud_url IS NOT NULL`,
                             [userId],

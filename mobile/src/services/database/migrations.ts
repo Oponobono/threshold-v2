@@ -450,6 +450,13 @@ const migrations: Migration[] = [
       `ALTER TABLE flashcard_decks ADD COLUMN cloud_url TEXT`,
     ],
   },
+  {
+    version: 18,
+    up: [
+      `UPDATE flashcard_decks SET is_backed_up = 0`,
+      `UPDATE flashcards SET is_backed_up = 0`,
+    ],
+  },
 ];
 
 export default migrations;

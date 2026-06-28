@@ -741,7 +741,7 @@ export const runBackup = async (
   // Siempre usa la BD local como fuente de verdad (is_backed_up = 0).
   // ──────────────────────────────────────────────────────────────────
   const pending = await getPendingItemsFromLocalDB(prefs);
-  const pendingCount = pending.photos.length + pending.audio.length + pending.docs.length + pending.transcripts.length + pending.assessmentFiles.length + pending.aiChats.length;
+  const pendingCount = pending.photos.length + pending.audio.length + pending.docs.length + pending.transcripts.length + pending.assessmentFiles.length + pending.aiChats.length + (pending.flashcardDecks?.length || 0) + (pending.flashcards?.length || 0);
   console.log(`[BackupService] Fase 1: ${pendingCount} item(s) pendientes desde BD local`);
 
   const tasks: (() => Promise<void>)[] = [];
