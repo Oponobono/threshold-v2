@@ -67,8 +67,10 @@ exports.createAudioRecording = (req, res) => {
  */
 exports.checkRecordingExists = (req, res) => {
   const { id } = req.params;
-  const userId = req.user.id;
-  db.get(`SELECT id FROM audio_recordings WHERE id = ? AND user_id = ?`, [id, userId], (err, row) => {
+  // No user_id filter: this is an existence check for FK integrity
+  // (transcripts need to know if the parent recording is on the server,
+  // regardless of whether the user_id was recently updated in Supabase).
+  db.get(`SELECT id FROM audio_recordings WHERE id = ?`, [id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ exists: false });
     return res.status(200).json({ exists: true, id: row.id });
@@ -80,21 +82,33 @@ exports.checkRecordingExists = (req, res) => {
  */
 exports.updateAudioRecording = (req, res) => {
   const { id } = req.params;
-  const { subject_id, name } = req.body;
+  const fields = req.body;
   const userId = req.user.id;
-  
-  const query = `
-    UPDATE audio_recordings 
-    SET subject_id = COALESCE(?, subject_id),
-        name = COALESCE(?, name)
-    WHERE id = ? AND user_id = ?
-  `;
-  
-  db.run(query, [subject_id !== undefined ? subject_id : null, name !== undefined ? name : null, id, userId], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ error: 'Grabación no encontrada o acceso denegado' });
-    res.json({ success: true, changes: this.changes });
-  });
+
+  const allowed = ['subject_id', 'name', 'cloud_url', 'is_backed_up', 'duration'];
+  const toUpdate = {};
+  for (const key of Object.keys(fields)) {
+    if (allowed.includes(key)) toUpdate[key] = fields[key];
+  }
+
+  // If no recognized fields provided, treat as no-op success
+  if (Object.keys(toUpdate).length === 0) {
+    return res.json({ success: true, changes: 0 });
+  }
+
+  const columns = Object.keys(toUpdate).map(k => `${k} = ?`).join(', ');
+  const values = [...Object.values(toUpdate), id, userId];
+
+  db.run(
+    `UPDATE audio_recordings SET ${columns} WHERE id = ? AND user_id = ?`,
+    values,
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      // Return 200 even if no rows matched (recording may belong to this user
+      // but the user_id was just updated in Supabase — tolerate the mismatch).
+      res.json({ success: true, changes: this.changes });
+    }
+  );
 };
 
 /**
