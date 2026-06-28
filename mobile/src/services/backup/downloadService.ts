@@ -16,6 +16,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchWithFallback, parseJsonSafely } from '../api/client';
 import { getBackupPreferences } from './backupService';
+import { databaseService } from '../database/DatabaseService';
 
 // ─── Directorios de descarga ─────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ export interface CloudItemsResponse {
   docs: CloudItem[];
   transcripts: CloudItem[];
   assessmentFiles: CloudItem[];
+  aiChats?: CloudItem[];
 }
 
 export interface DownloadProgress {
@@ -123,6 +125,18 @@ export const downloadCloudItems = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'photo', id: item.id, local_uri: localUri }),
           });
+          
+          try {
+            await databaseService.getDb().runAsync(
+              `INSERT INTO photos (id, subject_id, local_uri, cloud_url, created_at, is_backed_up)
+               VALUES (?, ?, ?, ?, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET local_uri = excluded.local_uri, cloud_url = excluded.cloud_url, is_backed_up = 1`,
+              [item.id, item.subject_id ?? null, localUri, item.cloud_url ?? null, item.created_at || new Date().toISOString()]
+            );
+          } catch (dbErr) {
+            console.warn(`[DownloadService] No se pudo guardar foto ${item.id} en SQLite local:`, dbErr);
+          }
+          
           result.downloaded++;
         } catch (err) {
           console.error(`[DownloadService] ERROR descargando foto ${item.id}:`, err);
@@ -155,6 +169,18 @@ export const downloadCloudItems = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'audio', id: item.id, local_uri: localUri }),
           });
+
+          try {
+            await databaseService.getDb().runAsync(
+              `INSERT INTO audio_recordings (id, name, local_uri, cloud_url, subject_id, duration, created_at, is_backed_up)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET local_uri = excluded.local_uri, cloud_url = excluded.cloud_url, is_backed_up = 1`,
+              [item.id, item.name || `Audio ${item.id}`, localUri, item.cloud_url ?? null, item.subject_id ?? null, item.duration ?? 0, item.created_at || new Date().toISOString()]
+            );
+          } catch (dbErr) {
+            console.warn(`[DownloadService] No se pudo guardar audio ${item.id} en SQLite local:`, dbErr);
+          }
+
           result.downloaded++;
         } catch (err) {
           console.error(`[DownloadService] ERROR descargando audio ${item.id}:`, err);
@@ -187,6 +213,18 @@ export const downloadCloudItems = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'document', id: item.id, local_uri: localUri }),
           });
+
+          try {
+            await databaseService.getDb().runAsync(
+              `INSERT INTO scanned_documents (id, name, local_uri, cloud_url, subject_id, created_at, is_backed_up)
+               VALUES (?, ?, ?, ?, ?, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET local_uri = excluded.local_uri, cloud_url = excluded.cloud_url, is_backed_up = 1`,
+              [item.id, item.name || `Doc ${item.id}`, localUri, item.cloud_url ?? null, item.subject_id ?? null, item.created_at || new Date().toISOString()]
+            );
+          } catch (dbErr) {
+            console.warn(`[DownloadService] No se pudo guardar doc ${item.id} en SQLite local:`, dbErr);
+          }
+
           result.downloaded++;
         } catch (err) {
           console.error(`[DownloadService] ERROR descargando doc ${item.id}:`, err);
@@ -235,6 +273,28 @@ export const downloadCloudItems = async (
             await FileSystem.writeAsStringAsync(summaryUri, summaryContent);
           }
           
+          try {
+            if (item.transcript_type === 'youtube') {
+              const videoId = item.video_id?.toString() ?? item.id?.toString() ?? '';
+              await databaseService.getDb().runAsync(
+                `INSERT INTO youtube_transcripts (id, video_id, transcript_text, summary_text, cloud_url, is_backed_up)
+                 VALUES (?, ?, ?, ?, ?, 1)
+                 ON CONFLICT(video_id) DO UPDATE SET transcript_text = excluded.transcript_text, summary_text = excluded.summary_text, cloud_url = excluded.cloud_url, is_backed_up = 1`,
+                [item.id, videoId, item.transcript_text ?? null, item.summary_text ?? null, item.cloud_url ?? null]
+              );
+            } else {
+              const recId = item.recording_id?.toString() ?? item.id?.toString() ?? '';
+              await databaseService.getDb().runAsync(
+                `INSERT INTO audio_transcripts (id, recording_id, transcript_text, summary_text, cloud_url, is_backed_up)
+                 VALUES (?, ?, ?, ?, ?, 1)
+                 ON CONFLICT(recording_id) DO UPDATE SET transcript_text = excluded.transcript_text, summary_text = excluded.summary_text, cloud_url = excluded.cloud_url, is_backed_up = 1`,
+                [item.id, recId, item.transcript_text ?? null, item.summary_text ?? null, item.cloud_url ?? null]
+              );
+            }
+          } catch (dbErr) {
+            console.warn(`[DownloadService] No se pudo guardar transcripción ${item.id} en SQLite local:`, dbErr);
+          }
+          
           result.downloaded++;
         } catch (err) {
           console.error(`[DownloadService] ERROR restaurando transcripción/resumen ${item.id}:`, err);
@@ -266,9 +326,44 @@ export const downloadCloudItems = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'assessment_file', id: item.id, local_uri: localUri }),
           });
+
+          try {
+            await databaseService.getDb().runAsync(
+              `INSERT INTO assessment_files (id, assessment_id, file_name, file_type, local_uri, cloud_url, created_at, is_backed_up)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET local_uri = excluded.local_uri, cloud_url = excluded.cloud_url, is_backed_up = 1`,
+              [item.id, (item as any).assessment_id ?? null, item.name || `Archivo ${item.id}`, 'application/octet-stream', localUri, item.cloud_url ?? null, item.created_at || new Date().toISOString()]
+            );
+          } catch (dbErr) {
+            console.warn(`[DownloadService] No se pudo guardar soporte ${item.id} en SQLite local:`, dbErr);
+          }
+
           result.downloaded++;
         } catch (err) {
           console.error(`[DownloadService] ERROR descargando soporte de evaluación ${item.id}:`, err);
+          result.errors++;
+        }
+      });
+    }
+  }
+
+  // ── Chats IA ──
+  if (data.aiChats && data.aiChats.length > 0) {
+    for (const chat of data.aiChats) {
+      tasks.push(async () => {
+        try {
+          const role = (chat as any).role || 'user';
+          const content = (chat as any).content || '';
+          const subjectId = chat.subject_id || null;
+          await databaseService.getDb().runAsync(
+            `INSERT INTO ai_chats (id, subject_id, role, content, cloud_url, created_at, is_backed_up)
+             VALUES (?, ?, ?, ?, ?, ?, 1)
+             ON CONFLICT(id) DO UPDATE SET content = excluded.content, cloud_url = excluded.cloud_url, is_backed_up = 1`,
+            [chat.id, subjectId ?? null, role, content, chat.cloud_url ?? null, chat.created_at || new Date().toISOString()]
+          );
+          result.downloaded++;
+        } catch (err) {
+          console.error(`[DownloadService] ERROR guardando chat IA ${chat.id} en SQLite local:`, err);
           result.errors++;
         }
       });

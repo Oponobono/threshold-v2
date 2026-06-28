@@ -178,9 +178,16 @@ export class SyncService {
           
           console.log(`[SyncService] ✅ ${item.entity_type}/${item.entity_id} sincronizado`);
         } catch (error: any) {
-          console.error(`[SyncService] ❌ Error sincronizando ${item.entity_type} ${item.entity_id}:`, error.message);
-          await syncQueueRepository.markFailed(item.id!, error.message);
-          failed++;
+          if (error.message?.includes('ORPHAN_DROP')) {
+            console.log(`[SyncService] ℹ️ Abortando sync huérfano (padre eliminado): ${item.entity_type}/${item.entity_id}`);
+            // Marcar como completado para borrarlo de la cola
+            await syncQueueRepository.markCompleted(item.id!);
+            success++;
+          } else {
+            console.error(`[SyncService] ❌ Error sincronizando ${item.entity_type} ${item.entity_id}:`, error.message);
+            await syncQueueRepository.markFailed(item.id!, error.message);
+            failed++;
+          }
         }
       }
 

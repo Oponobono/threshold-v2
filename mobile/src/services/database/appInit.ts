@@ -47,21 +47,57 @@ export async function initializeDatabase(): Promise<void> {
       // Para CREATE de assessment_files la ruta ya tiene el assessmentId embebido; para UPDATE/DELETE agregar el fileId
       if (entity_id && operation !== 'CREATE') path += `/${entity_id}`;
 
-      // ── Guard: audio-transcript needs its parent recording on the server ──
-      // If the recording was created offline (no sync yet), the FK constraint
-      // will reject the INSERT with a 403/500. We defer and let the queue retry
-      // naturally once the recording has been synced.
-      if (entity_type === 'audio-transcript' && operation === 'CREATE' && payload?.recording_id) {
+      // ── Generic Orphan Guard: Drop pending child syncs if parent deleted locally ──
+      // If a child (transcript, flashcard, etc.) was created offline but its parent was 
+      // later deleted offline before sync could occur, we drop the child's pending 
+      // operation to prevent infinite FK failures from the server.
+      if (operation === 'CREATE' && payload) {
+        let parentTable = '';
+        let parentIdField = '';
+
+        if (entity_type === 'audio-transcript' && payload.recording_id) {
+          parentTable = 'audio_recordings';
+          parentIdField = payload.recording_id;
+        } else if (entity_type === 'youtube-transcript' && payload.video_id) {
+          parentTable = 'youtube_videos';
+          parentIdField = payload.video_id;
+        } else if (entity_type === 'flashcard' && payload.deck_id) {
+          parentTable = 'flashcard_decks';
+          parentIdField = payload.deck_id;
+        } else if (entity_type === 'assessment_files' && payload.assessment_id) {
+          parentTable = 'assessments';
+          parentIdField = payload.assessment_id;
+        }
+
+        if (parentTable && parentIdField) {
+          const db = databaseService.getDb();
+          const parentLocal = await db.getFirstAsync(`SELECT id FROM ${parentTable} WHERE id = ?`, [parentIdField]);
+          if (!parentLocal) {
+            throw new Error(`ORPHAN_DROP: Padre eliminado localmente (${parentTable}/${parentIdField})`);
+          }
+        }
+      }
+
+      // ── Specific Guard: Parent server existence check for transcripts ──
+      // Some endpoints (like audio-transcripts) require the parent to ALREADY exist 
+      // on the server before accepting the child. If the parent exists locally but not
+      // on the server yet, we throw a normal error to DEFER the child until parent syncs.
+      if ((entity_type === 'audio-transcript' || entity_type === 'youtube-transcript') && operation === 'CREATE' && payload) {
         try {
-          const parentRes = await fetchWithFallback(`/audio-recordings/check/${payload.recording_id}`, { method: 'GET' });
-          if (!parentRes.ok) {
-            throw new Error(`Grabación padre ${payload.recording_id} aún no existe en el servidor. Reintentando más tarde.`);
+          const parentId = entity_type === 'audio-transcript' ? payload.recording_id : payload.video_id;
+          const checkPath = entity_type === 'audio-transcript' ? `/audio-recordings/check/${parentId}` : `/youtube-videos/check/${parentId}`;
+          
+          // Only check audio-recordings as it has a specific /check endpoint implemented.
+          // For youtube-videos, we skip the server check unless implemented in the future.
+          if (entity_type === 'audio-transcript') {
+            const parentRes = await fetchWithFallback(checkPath, { method: 'GET' });
+            if (!parentRes.ok) {
+              throw new Error(`Grabación padre ${parentId} aún no existe en el servidor. Reintentando más tarde.`);
+            }
           }
         } catch (checkErr: any) {
-          // If the check endpoint doesn't exist or the recording isn't there yet,
-          // defer this transcript by re-throwing so SyncService marks it failed
-          // (it will be retried on the next sync cycle).
-          throw new Error(`Grabación padre pendiente de sync: ${checkErr.message}`);
+          if (checkErr.message?.includes('ORPHAN_DROP')) throw checkErr;
+          throw new Error(`Entidad padre pendiente de sync: ${checkErr.message}`);
         }
       }
 
