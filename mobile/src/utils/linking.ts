@@ -1,5 +1,6 @@
 import { Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 /**
  * Esquemas nativos VERIFICADOS que sí existen en las apps.
@@ -62,17 +63,19 @@ const tryNativeOpen = async (url: string): Promise<boolean> => {
 /**
  * openCourseLink — Estrategia de apertura en capas:
  *
- * 1. Esquema nativo custom (solo YouTube vnd.youtube:// por ahora)
- *    → abre la app directamente sin pasar por el navegador
+ * 1. Reproductor in-app global para YouTube (NUEVO)
  *
- * 2. Linking.openURL(https_url) directamente
+ * 2. Esquema nativo custom (solo YouTube vnd.youtube:// por ahora)
+ *    → abre la app directamente sin pasar por el navegador (Fallback)
+ *
+ * 3. Linking.openURL(https_url) directamente
  *    → En iOS: Universal Links → abre la app si está instalada
  *    → En Android: App Links → abre la app si está instalada
  *    → Si no hay app: el SO abre el navegador nativo del dispositivo
  *    → Este comportamiento es CORRECTO y el esperado para Udemy,
  *      Coursera, Platzi, LinkedIn Learning, edX, Skillshare, etc.
  *
- * 3. WebBrowser in-app (expo-web-browser) — solo si Linking falla
+ * 4. WebBrowser in-app (expo-web-browser) — solo si Linking falla
  *    completamente (URL malformada, sin conectividad, etc.)
  *
  * Nota: Ya NO se usan esquemas inventados como `coursera://`,
@@ -80,7 +83,7 @@ const tryNativeOpen = async (url: string): Promise<boolean> => {
  * públicamente y causan que canOpenURL devuelva false en todos los
  * dispositivos, impidiendo llegar al paso de Universal Links.
  */
-export const openCourseLink = async (url: string, platform?: string): Promise<void> => {
+export const openCourseLink = async (url: string, platform?: string, options?: { subjectId?: string | null, courseId?: string | null, onVideoEnd?: () => void }): Promise<void> => {
   if (!url) return;
 
   // Normalizar nombre de plataforma (por campo o por dominio de la URL)
@@ -89,7 +92,23 @@ export const openCourseLink = async (url: string, platform?: string): Promise<vo
     DOMAIN_TO_PLATFORM[extractDomain(url)] ||
     null;
 
-  // Paso 1: esquema nativo custom (solo para plataformas confirmadas)
+  // Paso 1: YouTube in-app player (PiP)
+  if (resolvedPlatform === 'YouTube') {
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      const videoId = match[1];
+      usePlayerStore.getState().playVideo({
+        videoId,
+        subjectId: options?.subjectId,
+        courseId: options?.courseId,
+        onVideoEnd: options?.onVideoEnd
+      });
+      console.log(`[Linking] Abriendo YouTube in-app player para videoId: ${videoId}`);
+      return;
+    }
+  }
+
+  // Paso 2: esquema nativo custom (solo para plataformas confirmadas)
   if (resolvedPlatform) {
     const resolver = NATIVE_SCHEME_RESOLVERS[resolvedPlatform];
     if (resolver) {
@@ -100,13 +119,13 @@ export const openCourseLink = async (url: string, platform?: string): Promise<vo
           console.log(`[Linking] Abierto con esquema nativo: ${nativeUrl}`);
           return;
         }
-        // Si el esquema nativo falla (app no instalada), continúa al paso 2
+        // Si el esquema nativo falla (app no instalada), continúa al paso 3
         console.log(`[Linking] Esquema nativo no disponible, usando URL web: ${url}`);
       }
     }
   }
 
-  // Paso 2: Linking.openURL con la URL HTTPS original.
+  // Paso 3: Linking.openURL con la URL HTTPS original.
   // El SO intercepta Universal Links / App Links si la app está instalada.
   // Si no está instalada, el SO la abre en el navegador nativo del dispositivo.
   // Este es el comportamiento CORRECTO para Udemy, Coursera, Platzi, etc.
@@ -118,7 +137,7 @@ export const openCourseLink = async (url: string, platform?: string): Promise<vo
     console.warn(`[Linking] Linking.openURL falló para: ${url}`, err);
   }
 
-  // Paso 3: Fallback final con navegador in-app (solo si Linking.openURL falla)
+  // Paso 4: Fallback final con navegador in-app (solo si Linking.openURL falla)
   try {
     await WebBrowser.openBrowserAsync(url, {
       enableBarCollapsing: true,
@@ -138,9 +157,15 @@ export const openCourseByLink = async (course: {
   deep_link_url?: string;
   main_url?: string;
   platform?: string;
-}): Promise<void> => {
+  id?: string;
+  course_id?: string;
+}, options?: { onVideoEnd?: () => void }): Promise<void> => {
   const url = course.deep_link_url || course.main_url;
   if (url) {
-    await openCourseLink(url, course.platform);
+    await openCourseLink(url, course.platform, {
+      subjectId: course.id,
+      courseId: course.course_id,
+      onVideoEnd: options?.onVideoEnd
+    });
   }
 };

@@ -23,6 +23,7 @@ import { initializeApiClient } from '../src/services/api/client';
 import { requestPermissions } from '../src/services/notificationService';
 import { registerScheduledBackup } from '../src/services/backup/scheduledBackupService';
 import { getScheduledBackupConfig } from '../src/services/backup/backupService';
+import { FloatingYouTubePlayer } from '../src/components/player/FloatingYouTubePlayer';
 
 // Mantener el Splash Screen visible hasta que decidamos ocultarlo
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -242,6 +243,7 @@ function RootNavigator() {
               <Stack.Screen name="settings" options={{ headerShown: false }} />
               <Stack.Screen name="about" options={{ headerShown: false }} />
             </Stack>
+            <FloatingYouTubePlayer />
             <StatusBar style="auto" />
           </ThemeProvider>
         </CustomAlertProvider>

@@ -47,7 +47,15 @@ export default function SubjectsScreen() {
 
   // ── Fase 5: Estado del modal de ingesta de Zyren ──
   const [zyrenModalVisible, setZyrenModalVisible] = useState(false);
-  const [zyrenSubject, setZyrenSubject] = useState<{ id: string; name: string; courseId?: string | null; courseName?: string; milestone?: string } | null>(null);
+  const [zyrenSubject, setZyrenSubject] = useState<{ 
+    id: string; 
+    name: string; 
+    courseId?: string | null; 
+    courseName?: string; 
+    milestone?: string;
+    color?: string;
+    icon?: string;
+  } | null>(null);
 
   const [isCreationMenuVisible, setIsCreationMenuVisible] = useState(false);
   const [isCreateSubjectModalVisible, setIsCreateSubjectModalVisible] = useState(false);
@@ -73,6 +81,8 @@ export default function SubjectsScreen() {
       courseId: subject.course_id,
       courseName,
       milestone: subject.next_micro_milestone || subject.next_milestone,
+      color: subject.color,
+      icon: subject.icon,
     });
     setZyrenModalVisible(true);
   }, [refreshSubjects, refreshCourses]);
@@ -82,9 +92,17 @@ export default function SubjectsScreen() {
     return courses.find(c => c.id === courseId)?.platform;
   }, [courses]);
 
-  const handleContinueClass = useCallback(async (url: string, platform?: string) => {
-    await openCourseLink(url, platform);
-  }, []);
+  const handleContinueClass = useCallback(async (url: string, platform?: string, subject?: any, courseName?: string) => {
+    await openCourseLink(url, platform, {
+      subjectId: subject?.id,
+      courseId: subject?.course_id,
+      onVideoEnd: () => {
+        if (subject) {
+          handleClassComplete(subject, courseName || '');
+        }
+      }
+    });
+  }, [handleClassComplete]);
 
   const overallGpa = useMemo(() => {
     if (g.subjects.length === 0) return 0;
@@ -180,14 +198,14 @@ export default function SubjectsScreen() {
             <SubjectCard
               subject={left}
               onPress={() => router.push(`/subjects/${left.id}`)}
-              onContinue={left.external_url ? () => handleContinueClass(left.external_url, getCoursePlatform(left.course_id)) : undefined}
+              onContinue={left.external_url ? () => handleContinueClass(left.external_url, getCoursePlatform(left.course_id), left, left.courseName || selectedCourseName) : undefined}
               onComplete={() => handleClassComplete(left, left.courseName || selectedCourseName)}
             />
             {right ? (
               <SubjectCard
                 subject={right}
                 onPress={() => router.push(`/subjects/${right.id}`)}
-                onContinue={right.external_url ? () => handleContinueClass(right.external_url, getCoursePlatform(right.course_id)) : undefined}
+                onContinue={right.external_url ? () => handleContinueClass(right.external_url, getCoursePlatform(right.course_id), right, right.courseName || selectedCourseName) : undefined}
                 onComplete={() => handleClassComplete(right, right.courseName || selectedCourseName)}
               />
             ) : (
