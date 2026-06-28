@@ -59,6 +59,7 @@ export interface CloudItemsResponse {
   transcripts: CloudItem[];
   assessmentFiles: CloudItem[];
   aiChats?: CloudItem[];
+  flashcardDecks?: CloudItem[];
 }
 
 export interface DownloadProgress {
@@ -364,6 +365,91 @@ export const downloadCloudItems = async (
           result.downloaded++;
         } catch (err) {
           console.error(`[DownloadService] ERROR guardando chat IA ${chat.id} en SQLite local:`, err);
+          result.errors++;
+        }
+      });
+    }
+  }
+
+  // ── Mazos de Flashcards (JSON con deck + tarjetas) ──
+  if (data.flashcardDecks && data.flashcardDecks.length > 0) {
+    for (const item of data.flashcardDecks) {
+      tasks.push(async () => {
+        if (!item.cloud_url || item.cloud_url === 'ghost_file') { result.skipped++; return; }
+        try {
+          // Descargar el JSON del mazo desde Uploadthing
+          const res = await fetch(item.cloud_url);
+          if (!res.ok) { result.errors++; return; }
+          const payload = await res.json() as { deck: any; cards: any[] };
+          const { deck, cards = [] } = payload;
+          if (!deck?.id) { result.skipped++; return; }
+
+          // Verificar si ya existe localmente
+          const existing = await databaseService.getDb().getFirstAsync(
+            'SELECT id FROM flashcard_decks WHERE id = ?', [deck.id]
+          );
+          if (existing) { result.skipped++; return; }
+
+          // UPSERT del mazo con todos sus campos incl. linked_event_id y métricas
+          await databaseService.getDb().runAsync(
+            `INSERT INTO flashcard_decks
+               (id, user_id, subject_id, title, description, linked_event_id,
+                avg_ease_factor, total_reviews, last_reviewed_at,
+                cloud_url, is_backed_up, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               title = excluded.title, description = excluded.description,
+               linked_event_id = excluded.linked_event_id,
+               avg_ease_factor = excluded.avg_ease_factor,
+               total_reviews = excluded.total_reviews,
+               last_reviewed_at = excluded.last_reviewed_at,
+               cloud_url = excluded.cloud_url, is_backed_up = 1`,
+            [
+              deck.id, deck.user_id, deck.subject_id ?? null,
+              deck.title, deck.description ?? null, deck.linked_event_id ?? null,
+              deck.avg_ease_factor ?? null, deck.total_reviews ?? null,
+              deck.last_reviewed_at ?? null, item.cloud_url,
+              deck.created_at || new Date().toISOString(),
+            ]
+          );
+
+          // UPSERT de cada tarjeta con métricas SRS completas
+          for (const card of cards) {
+            if (!card?.id) continue;
+            try {
+              await databaseService.getDb().runAsync(
+                `INSERT INTO flashcards
+                   (id, deck_id, front, back, status, direction,
+                    ease_factor, interval_days, repetitions, next_review_at,
+                    fsrs_stability, fsrs_difficulty, source_context, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(id) DO UPDATE SET
+                   front = excluded.front, back = excluded.back,
+                   status = excluded.status, direction = excluded.direction,
+                   ease_factor = excluded.ease_factor, interval_days = excluded.interval_days,
+                   repetitions = excluded.repetitions, next_review_at = excluded.next_review_at,
+                   fsrs_stability = excluded.fsrs_stability, fsrs_difficulty = excluded.fsrs_difficulty,
+                   source_context = excluded.source_context`,
+                [
+                  card.id, deck.id,
+                  card.front ?? '', card.back ?? null,
+                  card.status ?? 'new', card.direction ?? 'forward',
+                  card.ease_factor ?? null, card.interval_days ?? null,
+                  card.repetitions ?? 0, card.next_review_at ?? null,
+                  card.fsrs_stability ?? null, card.fsrs_difficulty ?? null,
+                  card.source_context ?? null,
+                  card.created_at || new Date().toISOString(),
+                ]
+              );
+            } catch (cardErr) {
+              console.warn(`[DownloadService] Error restaurando tarjeta ${card.id}:`, cardErr);
+            }
+          }
+
+          console.log(`[DownloadService] Mazo ${deck.id} restaurado con ${cards.length} tarjeta(s).`);
+          result.downloaded++;
+        } catch (err) {
+          console.error(`[DownloadService] ERROR restaurando mazo ${item.id}:`, err);
           result.errors++;
         }
       });

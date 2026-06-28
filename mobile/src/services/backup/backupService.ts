@@ -334,6 +334,8 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   assessmentFiles: { id: string; local_uri: string; file_name: string; file_type?: string; assessment_id: string }[];
   aiChats: { id: string; user_id: string; subject_id?: string; role: string; content: string }[];
   userPreferences: { key: string; value: string }[];
+  flashcardDecks: { id: string; user_id: string; subject_id?: string; title: string; description?: string; linked_event_id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string }[];
+  flashcards: { id: string; deck_id: string; front: string; back?: string; status?: string; direction?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_at?: string; fsrs_stability?: number; fsrs_difficulty?: number; source_context?: string }[];
 }> {
   const db = databaseService.getDb();
   const result = {
@@ -344,6 +346,8 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     assessmentFiles: [] as { id: string; local_uri: string; file_name: string; file_type?: string; assessment_id: string }[],
     aiChats: [] as { id: string; user_id: string; subject_id?: string; role: string; content: string }[],
     userPreferences: [] as { key: string; value: string }[],
+    flashcardDecks: [] as { id: string; user_id: string; subject_id?: string; title: string; description?: string; linked_event_id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string }[],
+    flashcards: [] as { id: string; deck_id: string; front: string; back?: string; status?: string; direction?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_at?: string; fsrs_stability?: number; fsrs_difficulty?: number; source_context?: string }[],
   };
 
   try {
@@ -426,6 +430,54 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
       value: String(p.value),
     }));
     console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.userPreferences.length} preferencia(s) pendiente(s)`);
+
+    // ── Mazos de flashcards no respaldados ──
+    const unbackedDecks: any[] = await db.getAllAsync(
+      `SELECT id, user_id, subject_id, title, description, linked_event_id,
+              avg_ease_factor, total_reviews, last_reviewed_at
+       FROM flashcard_decks
+       WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
+    );
+    result.flashcardDecks = unbackedDecks.map((d: any) => ({
+      id: String(d.id),
+      user_id: String(d.user_id),
+      subject_id: d.subject_id ? String(d.subject_id) : undefined,
+      title: String(d.title),
+      description: d.description ? String(d.description) : undefined,
+      linked_event_id: d.linked_event_id ? String(d.linked_event_id) : undefined,
+      avg_ease_factor: d.avg_ease_factor ?? undefined,
+      total_reviews: d.total_reviews ?? undefined,
+      last_reviewed_at: d.last_reviewed_at ? String(d.last_reviewed_at) : undefined,
+    }));
+    console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.flashcardDecks.length} mazo(s) pendiente(s)`);
+
+    // ── Tarjetas individuales de los mazos pendientes (con métricas SRS) ──
+    if (result.flashcardDecks.length > 0) {
+      const deckIds = result.flashcardDecks.map(d => `'${d.id}'`).join(',');
+      const unbackedCards: any[] = await db.getAllAsync(
+        `SELECT id, deck_id, front, back, status, direction,
+                ease_factor, interval_days, repetitions, next_review_at,
+                fsrs_stability, fsrs_difficulty, source_context
+         FROM flashcards
+         WHERE deck_id IN (${deckIds})`
+      );
+      result.flashcards = unbackedCards.map((c: any) => ({
+        id: String(c.id),
+        deck_id: String(c.deck_id),
+        front: String(c.front),
+        back: c.back ? String(c.back) : undefined,
+        status: c.status ? String(c.status) : undefined,
+        direction: c.direction ? String(c.direction) : undefined,
+        ease_factor: c.ease_factor ?? undefined,
+        interval_days: c.interval_days ?? undefined,
+        repetitions: c.repetitions ?? undefined,
+        next_review_at: c.next_review_at ? String(c.next_review_at) : undefined,
+        fsrs_stability: c.fsrs_stability ?? undefined,
+        fsrs_difficulty: c.fsrs_difficulty ?? undefined,
+        source_context: c.source_context ? String(c.source_context) : undefined,
+      }));
+      console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.flashcards.length} tarjeta(s) pendiente(s)`);
+    }
 
   } catch (err) {
     console.error('[BackupService] Error obteniendo items pendientes desde DB local:', err);
@@ -1035,6 +1087,41 @@ export const runBackup = async (
       } catch (err) {
         console.error(`[BackupService] ERROR: Falló el backup de preferencias de usuario:`, err);
         errors += pending.userPreferences.length;
+      }
+    });
+  }
+
+  // ── Mazos de flashcards (mazo + tarjetas con métricas SRS en un solo JSON por mazo) ──
+  for (const deck of (pending.flashcardDecks || [])) {
+    tasks.push(async () => {
+      try {
+        const deckCards = (pending.flashcards || []).filter(c => c.deck_id === deck.id);
+        const deckPayload = JSON.stringify({ deck, cards: deckCards }, null, 2);
+        const tempUri = `${FileSystem.cacheDirectory}flashcard_deck_${deck.id}.json`;
+        await FileSystem.writeAsStringAsync(tempUri, deckPayload, { encoding: FileSystem.EncodingType.UTF8 });
+        const uploadResult = await uploadFileToUploadthing(tempUri, `flashcard_deck_${deck.id}.json`, 'application/json');
+        await FileSystem.deleteAsync(tempUri, { idempotent: true });
+
+        try {
+          await fetchWithFallback('/backup/mark', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'flashcard_deck', id: deck.id, cloud_url: uploadResult.url }),
+          });
+        } catch (_e) { /* ignorar fallo backend */ }
+        try {
+          await db.runAsync(
+            `UPDATE flashcard_decks SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+            [uploadResult.url, deck.id]
+          );
+        } catch (e) {
+          console.warn(`[BackupService] No se pudo marcar localmente mazo ${deck.id}:`, e);
+        }
+        console.log(`[BackupService] ÉXITO: Mazo ${deck.id} (${deckCards.length} tarjetas) respaldado.`);
+        uploaded++;
+      } catch (err) {
+        console.error(`[BackupService] ERROR: Falló el backup de mazo ${deck.id}:`, err);
+        errors++;
       }
     });
   }
