@@ -118,9 +118,10 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
         let linked: any = null;
 
         if (linkedEventId) {
-          linked = (all as any[]).find(e => String(e.id) === String(linkedEventId)) ?? null;
+          const rawId = String(linkedEventId).split(',')[0].trim();
+          linked = (all as any[]).find(e => String(e.id) === rawId) ?? null;
           if (!linked) {
-            linked = await calendarEventRepository.getById(String(linkedEventId)).catch(() => null);
+            linked = await calendarEventRepository.getById(rawId).catch(() => null);
           }
         }
 

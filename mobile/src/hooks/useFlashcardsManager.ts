@@ -30,7 +30,8 @@ async function enrichDecksWithExamInfo(decks: FlashcardDeck[]): Promise<Flashcar
     return decks.map(d => {
       const linkedEventId = (d as any).linked_event_id;
       if (linkedEventId) {
-        const evt = eventMap.get(String(linkedEventId));
+        const rawId = String(linkedEventId).split(',')[0].trim();
+        const evt = eventMap.get(rawId);
         if (evt) {
           return { ...d, linked_exam_title: evt.title, linked_exam_date: evt.start_date };
         }

@@ -1,6 +1,7 @@
 import { databaseService } from '../DatabaseService';
 import { Course } from '../../api/types';
 import { BaseRepository } from '../BaseRepository';
+import { syncService } from '../SyncService';
 
 export class CourseRepository extends BaseRepository<Course> {
   constructor() {
@@ -39,6 +40,7 @@ export class CourseRepository extends BaseRepository<Course> {
       'UPDATE courses SET completed_classes = ?, status = ?, updated_at = datetime(\'now\') WHERE id = ?',
       [nextCompleted, newStatus, courseId]
     );
+    await syncService.enqueueUpdate('course', courseId, { completed_classes: nextCompleted, status: newStatus });
     if (newStatus === 'completed' && course.status !== 'completed') {
       const { MomentumService } = await import('../../MomentumService');
       MomentumService.boostMomentum(courseId).catch(console.warn);
@@ -56,6 +58,7 @@ export class CourseRepository extends BaseRepository<Course> {
       'UPDATE courses SET completed_classes = ?, status = ?, updated_at = datetime(\'now\') WHERE id = ?',
       [prevCompleted, newStatus || 'active', courseId]
     );
+    await syncService.enqueueUpdate('course', courseId, { completed_classes: prevCompleted, status: newStatus || 'active' });
   }
 }
 

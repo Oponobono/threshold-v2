@@ -637,6 +637,8 @@ export default function HybridDashboardScreen() {
                     return (
                       <AllSubjectsHeroCard
                         subjects={enrichedSubjects}
+                        courses={courses}
+                        nextAssessment={nextAssessment}
                         isActive={selectedDashboardCourseId === null}
                         onPress={() => handleHeroCardSelect(null)}
                       />

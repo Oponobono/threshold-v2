@@ -89,7 +89,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ visible, onC
               ) : null}
 
               {event.id && (
-                <LinkedDecksSection eventId={String(event.id)} />
+                <LinkedDecksSection eventId={String(event.id).replace('event-', '')} />
               )}
             </View>
           </ScrollView>
