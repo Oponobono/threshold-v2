@@ -1,20 +1,43 @@
 import { create } from 'zustand';
-import { Course, Subject, Assessment, Schedule } from '../services/api';
+import type {
+  Course,
+  Subject,
+  Assessment,
+  Schedule,
+} from '../services/database/repositories';
 import {
   courseRepository,
   subjectRepository,
   assessmentRepository,
   scheduleRepository,
-  syncService,
   databaseService,
 } from '../services/database';
+import { syncManager } from '../services/sync/SyncManager';
+import { repositoryEventBus } from '../services/events/RepositoryEventBus';
+
+export interface PredictionItem {
+  cardId: number;
+  question: string;
+  deckId?: number;
+  deckTitle?: string;
+  subjectId: number;
+  mastery: number;
+  urgency: 'HIGH' | 'MEDIUM';
+  failureRate?: number;
+}
+
+export interface PredictionResponse {
+  dueCount: number;
+  deckCount?: number;
+  cards: PredictionItem[];
+}
 
 interface DataState {
   courses: Course[];
   subjects: Subject[];
   assessments: Assessment[];
   schedules: Schedule[];
-  predictions: any;
+  predictions: PredictionResponse | null;
   calendarEvents: any[];
   flashcardDecks: any[];
   userStats: any | null;
@@ -24,7 +47,7 @@ interface DataState {
   hasLoadedOnce: boolean;
   isSyncing: boolean;
   syncStatusMessage: string;
-  _lastLoadAllDataTimestamp: number;
+  syncState: string;
 
   loadAllData: (forceRefresh?: boolean) => Promise<void>;
   refreshCourses: () => Promise<void>;
@@ -38,7 +61,21 @@ interface DataState {
   getDuedeckIds: () => Set<string>;
 }
 
-export const useDataStore = create<DataState>((set, get) => ({
+export const useDataStore = create<DataState>((set, get) => {
+  repositoryEventBus.on('courses', () => {
+    get().refreshCourses();
+  });
+  repositoryEventBus.on('subjects', () => {
+    get().refreshSubjects();
+  });
+  repositoryEventBus.on('assessments', () => {
+    get().refreshAssessments();
+  });
+  repositoryEventBus.on('schedules', () => {
+    get().refreshSchedules();
+  });
+
+  return {
   courses: [],
   subjects: [],
   assessments: [],
@@ -53,55 +90,35 @@ export const useDataStore = create<DataState>((set, get) => ({
   hasLoadedOnce: false,
   isSyncing: false,
   syncStatusMessage: '',
-  _lastLoadAllDataTimestamp: 0,
+  syncState: 'UNAUTHENTICATED',
 
   loadAllData: async (forceRefresh = false) => {
     const state = get();
-    if (state.isInitialLoading || state.isRefreshing) return;
+    if (state.isInitialLoading && !forceRefresh) return;
     if (state.hasLoadedOnce && !forceRefresh) return;
 
-    // Debounce: evitar que llamadas rápidas consecutivas disparen otra carga
-    const LOAD_ALL_DATA_DEBOUNCE_MS = 5000;
-    const now = Date.now();
-    if (state._lastLoadAllDataTimestamp && (now - state._lastLoadAllDataTimestamp < LOAD_ALL_DATA_DEBOUNCE_MS)) {
-      return;
-    }
-
     if (!state.hasLoadedOnce) {
-      set({ isInitialLoading: true, _lastLoadAllDataTimestamp: now });
+      set({ isInitialLoading: true });
     } else {
-      set({ isRefreshing: true, _lastLoadAllDataTimestamp: now });
+      set({ isRefreshing: true });
     }
 
     try {
       await databaseService.open();
 
-      const { getCourses } = await import('../services/api/courses');
-      const dbCourses = await getCourses() as any;
-      set({ courses: dbCourses });
-      
-      const { getSubjects } = await import('../services/api/subjects');
-      const dbSubjects = await getSubjects() as any;
-      set({ subjects: dbSubjects });
-      
-      const { getAllAssessments } = await import('../services/api/assessments');
-      const dbAssessments = await getAllAssessments() as any;
-      set({ assessments: dbAssessments });
-      
-      const { getAllSchedules } = await import('../services/api/schedules');
-      const dbSchedules = await getAllSchedules() as any;
-      set({ schedules: dbSchedules });
+      const dbCourses = await courseRepository.getAll();
+      set({ courses: dbCourses || [] });
+
+      const dbSubjects = await subjectRepository.getAll();
+      set({ subjects: dbSubjects || [] });
+
+      const dbAssessments = await assessmentRepository.getAll();
+      set({ assessments: dbAssessments || [] });
+
+      const dbSchedules = await scheduleRepository.getAll();
+      set({ schedules: dbSchedules || [] });
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
-
-      // OFFLINE-FIRST: los datos locales de SQLite son la fuente de verdad.
-      // El cloud nunca sobreescribe el estado de la UI.
-      // Solo se usa para reparar enlaces y pre-cargar caché offline.
-      const { repairSubjectCourseLinks } = await import('../services/api');
-      await repairSubjectCourseLinks().catch(() => {});
-
-      // Pre-cargar caché offline en background sin reemplazar estado local
-      get().preloadOfflineCache().catch(() => {});
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
     } finally {
@@ -110,12 +127,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   refreshCourses: async () => {
-    // OFFLINE-FIRST: recargar desde SQLite local, no desde cloud.
-    // El cloud es solo backup, nunca fuente de verdad.
     try {
-      const { getCourses } = await import('../services/api/courses');
-      const dbCourses = await getCourses() as any;
-      set({ courses: dbCourses });
+      const dbCourses = await courseRepository.getAll();
+      set({ courses: dbCourses || [] });
     } catch (error) {
       console.error('[DataStore] refreshCourses error:', error);
     }
@@ -123,11 +137,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshSubjects: async () => {
     try {
-      const { getSubjects } = await import('../services/api/subjects');
-      const dbSubjects = await getSubjects() as any;
-      set({ subjects: dbSubjects });
-      const { repairSubjectCourseLinks } = await import('../services/api');
-      await repairSubjectCourseLinks().catch(() => {});
+      const dbSubjects = await subjectRepository.getAll();
+      set({ subjects: dbSubjects || [] });
     } catch (error) {
       console.error('[DataStore] refreshSubjects error:', error);
     }
@@ -135,9 +146,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshAssessments: async () => {
     try {
-      const { getAllAssessments } = await import('../services/api/assessments');
-      const dbAssessments = await getAllAssessments() as any;
-      set({ assessments: dbAssessments });
+      const dbAssessments = await assessmentRepository.getAll();
+      set({ assessments: dbAssessments || [] });
     } catch (error) {
       console.error('[DataStore] refreshAssessments error:', error);
     }
@@ -145,9 +155,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshSchedules: async () => {
     try {
-      const { getAllSchedules } = await import('../services/api/schedules');
-      const dbSchedules = await getAllSchedules() as any;
-      set({ schedules: dbSchedules });
+      const dbSchedules = await scheduleRepository.getAll();
+      set({ schedules: dbSchedules || [] });
     } catch (error) {
       console.error('[DataStore] refreshSchedules error:', error);
     }
@@ -155,8 +164,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshPredictions: async (userId: string | number) => {
     try {
-      const { getPredictions } = await import('../services/api');
-      const data = await getPredictions(userId);
+      const { getLocalPredictions } = await import('../services/localMasteryService');
+      const data = await getLocalPredictions(String(userId));
       set({ predictions: data || { dueCount: 0, cards: [] } });
     } catch (error) {
       console.error('[DataStore] refreshPredictions error:', error);
@@ -170,15 +179,13 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   preloadOfflineCache: async () => {
     try {
-      const { getFlashcardDecks, getGalleryItems, getAudioRecordings } = await import('../services/api');
-      const decks = await getFlashcardDecks().catch(() => []);
-
+      const { flashcardDeckRepository } = await import('../services/database/repositories/FlashcardDeckRepository');
+      const { flashcardRepository } = await import('../services/database/repositories/FlashcardRepository');
+      const decks = await flashcardDeckRepository.getAll();
       if (Array.isArray(decks) && decks.length > 0) set({ flashcardDecks: decks });
-
       if (Array.isArray(decks) && decks.length > 0) {
-        const { getFlashcards } = await import('../services/api');
         await Promise.all(decks.map(async (d: any) => {
-          await getFlashcards(d.id).catch(() => []);
+          await flashcardRepository.getByField('deck_id', d.id).catch(() => []);
         }));
       }
     } catch (error) {
@@ -197,9 +204,8 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   syncPendingOperations: async () => {
-    // OFFLINE-FIRST: sync solo PUSH local → cloud.
-    // No se recarga desde cloud porque local es la fuente de verdad.
-    const result = await syncService.sync();
-    return result;
+    const result = await syncManager.sync();
+    return { success: result.entitiesSynced, failed: result.errors.length, pending: 0 };
   },
-}));
+};
+});

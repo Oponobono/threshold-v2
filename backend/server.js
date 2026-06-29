@@ -30,6 +30,7 @@ const assessmentCategoriesRoutes = require('./routes/assessmentCategories');
 const calendarRoutes = require('./routes/calendar');
 const settingsRoutes = require('./routes/settings');
 const coursesRoutes = require('./routes/courses');
+const syncRoutes = require('./routes/sync');
 
 const app = express();
 
@@ -129,6 +130,7 @@ app.use('/api', assessmentCategoriesRoutes);
 app.use('/api', calendarRoutes);
 app.use('/api', settingsRoutes);
 app.use('/api', coursesRoutes);
+app.use('/api', syncRoutes);
 
 
 

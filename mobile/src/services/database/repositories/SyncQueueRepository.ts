@@ -9,6 +9,7 @@ export interface SyncQueueItem {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   retries: number;
   error?: string;
+  trace_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -31,18 +32,18 @@ export class SyncQueueRepository {
       if (existing) {
         await db.runAsync(
           `UPDATE sync_queue
-           SET payload = ?, status = 'pending', retries = 0, error = NULL, updated_at = datetime('now')
+           SET payload = ?, status = 'pending', retries = 0, error = NULL, trace_id = ?, updated_at = datetime('now')
            WHERE id = ?`,
-          item.payload ?? null, existing.id
+          item.payload ?? null, item.trace_id ?? null, existing.id
         );
         return;
       }
     }
 
     await db.runAsync(
-      `INSERT INTO sync_queue (entity_type, entity_id, operation, payload, status, retries)
-       VALUES (?, ?, ?, ?, 'pending', 0)`,
-      item.entity_type, item.entity_id ?? null, item.operation, item.payload ?? null
+      `INSERT INTO sync_queue (entity_type, entity_id, operation, payload, status, retries, trace_id)
+       VALUES (?, ?, ?, ?, 'pending', 0, ?)`,
+      item.entity_type, item.entity_id ?? null, item.operation, item.payload ?? null, item.trace_id ?? null
     );
   }
 
@@ -85,6 +86,16 @@ export class SyncQueueRepository {
   async markCompleted(id: number): Promise<void> {
     const db = databaseService.getDb();
     await db.runAsync(`DELETE FROM sync_queue WHERE id = ?`, id);
+  }
+
+  async markCompletedBatch(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    const db = databaseService.getDb();
+    const placeholders = ids.map(() => '?').join(',');
+    await db.runAsync(
+      `DELETE FROM sync_queue WHERE id IN (${placeholders})`,
+      ...ids
+    );
   }
 
   async markFailed(id: number, error: string): Promise<void> {

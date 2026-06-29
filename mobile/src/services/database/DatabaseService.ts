@@ -45,6 +45,30 @@ class DatabaseService {
     return row?.user_version ?? 0;
   }
 
+  async beginTransaction(): Promise<void> {
+    await this.db!.execAsync('BEGIN');
+  }
+
+  async commitTransaction(): Promise<void> {
+    await this.db!.execAsync('COMMIT');
+  }
+
+  async rollbackTransaction(): Promise<void> {
+    await this.db!.execAsync('ROLLBACK');
+  }
+
+  async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    await this.beginTransaction();
+    try {
+      const result = await fn();
+      await this.commitTransaction();
+      return result;
+    } catch (err) {
+      await this.rollbackTransaction();
+      throw err;
+    }
+  }
+
   async clearAll(): Promise<void> {
     const db = this.db;
     if (!db) return;

@@ -12,7 +12,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDeviceCapabilities, type DeviceCapabilities } from '../utils/deviceCapabilities';
 
-export type LocalModelId = 'essential' | 'advanced' | 'qwen_1_5b' | 'qwen_3b' | 'phi3_5' | 'gemma2_2b';
+export type LocalModelId = 'tiny' | 'essential' | 'advanced' | 'qwen_1_5b' | 'qwen_3b' | 'phi3_5' | 'gemma2_2b';
 export type DownloadStatus = 'none' | 'downloading' | 'downloaded' | 'error' | 'paused';
 export type InferenceStatus = 'idle' | 'loading_model' | 'ready' | 'running' | 'error';
 export type AIProvider = 'cloud' | 'local' | 'hybrid';
@@ -40,6 +40,19 @@ export const WHISPER_MODEL = {
 };
 
 export const MODELS: Record<LocalModelId, ModelInfo> = {
+  tiny: {
+    id: 'tiny',
+    label: 'Modelo Tiny',
+    labelTag: 'settings.localAI.tinyLabel',
+    description: 'settings.localAI.tinyDesc',
+    speedTag: 'settings.localAI.tinySpeed',
+    downloadSize: '~470 MB',
+    downloadSizeBytes: 470 * 1024 * 1024,
+    ramMin: '0.8 GB',
+    capabilities: ['settings.localAI.tinyCap1', 'settings.localAI.tinyCap2', 'settings.localAI.tinyCap3'],
+    downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q2_K.gguf',
+    filename: 'llama-3.2-1b-q2.gguf',
+  },
   essential: {
     id: 'essential',
     label: 'Modelo Esencial',

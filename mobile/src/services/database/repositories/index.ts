@@ -14,7 +14,7 @@ export { CardLogRepository, cardLogRepository, type CardLog } from './CardLogRep
 export { SyncQueueRepository, syncQueueRepository, type SyncQueueItem } from './SyncQueueRepository';
 export { UserRepository, userRepository, type User } from './UserRepository';
 export { assessmentFileRepository, type AssessmentFile } from './AssessmentFileRepository';
-export { CourseRepository, courseRepository } from './CourseRepository';
+export { CourseRepository, courseRepository, type Course } from './CourseRepository';
 export { audioTranscriptRepository, type AudioTranscript } from './AudioTranscriptRepository';
 export { youTubeTranscriptRepository, type YouTubeTranscript } from './YouTubeTranscriptRepository';
 export { AiChatRepository, aiChatRepository, type AiChat } from './AiChatRepository';

@@ -3,6 +3,8 @@ import { Course } from '../../api/types';
 import { BaseRepository } from '../BaseRepository';
 import { syncService } from '../SyncService';
 
+export type { Course } from '../../api/types';
+
 export class CourseRepository extends BaseRepository<Course> {
   constructor() {
     super('courses');

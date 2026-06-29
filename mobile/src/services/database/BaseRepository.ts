@@ -1,4 +1,6 @@
 import { databaseService } from './DatabaseService';
+import { repositoryEventBus } from '../events/RepositoryEventBus';
+import { conflictResolver } from '../sync/ConflictResolver';
 
 export class BaseRepository<T extends { id: string }> {
   constructor(protected tableName: string) {}
@@ -67,36 +69,44 @@ export class BaseRepository<T extends { id: string }> {
     await this.getDb().runAsync(
       `INSERT INTO ${this.tableName} (${cols}) VALUES (${placeholders})`, ...filteredValues
     );
+    this._emit('created', data as T);
     return data as T;
   }
 
   async update(id: string, data: Partial<T>): Promise<void> {
     const validCols = await this.getValidColumns();
     const keys = Object.keys(data).filter(k => k !== 'id' && (validCols.length > 0 ? validCols.includes(k) : true));
-    
+
     const filteredKeys: string[] = [];
     const filteredValues: any[] = [];
     for (const k of keys) {
       const val = (data as any)[k];
-      // Permitir null explícito (ej: course_id = null para desvincular un curso).
-      // Solo descartar undefined, que indica campo no proporcionado.
       if (val !== undefined) {
         filteredKeys.push(k);
-        // Convertir undefined anidado a null para SQLite
         filteredValues.push(val === undefined ? null : val);
       }
     }
-    
+
     if (filteredKeys.length === 0) return;
-    
+
     const setClause = filteredKeys.map(k => `${k} = ?`).join(', ');
     filteredValues.push(id);
     await this.getDb().runAsync(
-      `UPDATE ${this.tableName} SET ${setClause}, updated_at = datetime('now') WHERE id = ?`, ...filteredValues
+      `UPDATE ${this.tableName} SET ${setClause}, updated_at = datetime('now'), version_number = COALESCE(version_number, 0) + 1 WHERE id = ?`,
+      ...filteredValues
     );
+    this._emit('updated', { id, ...data } as T);
   }
 
   async delete(id: string): Promise<void> {
+    await this.getDb().runAsync(
+      `UPDATE ${this.tableName} SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+      id
+    );
+    this._emit('deleted', { id } as T);
+  }
+
+  async hardDelete(id: string): Promise<void> {
     await this.getDb().runAsync(`DELETE FROM ${this.tableName} WHERE id = ?`, id);
   }
 
@@ -105,42 +115,78 @@ export class BaseRepository<T extends { id: string }> {
     return row?.count ?? 0;
   }
 
-  /**
-   * Crea o actualiza un registro local. Usado para respuestas de operaciones
-   * locales (create/update) que necesitan persistir la confirmación del servidor.
-   */
   async upsert(data: T): Promise<void> {
     const existing = await this.getById(data.id);
     if (existing) {
-      const parseDateSafe = (dateStr?: string) => {
-        if (!dateStr) return 0;
-        const formatted = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr) 
-          ? dateStr.replace(' ', 'T') + 'Z' 
-          : dateStr;
-        return new Date(formatted).getTime();
-      };
+      const localVer = (existing as any).version_number || 0;
+      const remoteVer = (data as any).version_number || 0;
 
-      const localTime = parseDateSafe((existing as any).updated_at);
-      const remoteTime = parseDateSafe((data as any).updated_at);
-
-      if (remoteTime === 0 || localTime === 0 || remoteTime >= localTime) {
-        await this.update(data.id, data as any);
+      if (remoteVer === 0 && localVer > 0) {
+        return;
       }
+
+      if (localVer > remoteVer) {
+        return;
+      }
+
+      if (localVer === remoteVer) {
+        const resolution = conflictResolver.resolve(this.tableName, {
+          local: {
+            id: data.id,
+            version_number: localVer,
+            updated_at: (existing as any).updated_at || '',
+            last_modified_by: (existing as any).last_modified_by || 'local',
+            data: existing,
+          },
+          remote: {
+            id: data.id,
+            version_number: remoteVer,
+            updated_at: (data as any).updated_at || '',
+            last_modified_by: (data as any).last_modified_by || 'remote',
+            data,
+          },
+        });
+
+        if (resolution.winner === 'remote' || resolution.winner === 'merged') {
+          await this.update(data.id, { ...resolution.data, version_number: resolution.version_number } as any);
+        }
+        return;
+      }
+
+      await this.update(data.id, { ...data, version_number: remoteVer } as any);
     } else {
       await this.create(data);
     }
   }
 
-  /**
-   * Versión para sync en background desde el cloud: solo crea registros que NO
-   * existen localmente. NUNCA sobreescribe datos locales existentes.
-   * Esto garantiza que el historial local, los cálculos y las ediciones offline
-   * se preserven intactos, como una calculadora.
-   */
   async upsertFromCloud(data: T): Promise<void> {
     const existing = await this.getById(data.id);
     if (!existing) {
       await this.create(data);
+      return;
+    }
+
+    const localVer = (existing as any).version_number || 0;
+    const remoteVer = (data as any).version_number || 0;
+
+    if (remoteVer <= localVer) return;
+
+    await this.update(data.id, data as any);
+  }
+
+  private _emit(eventType: 'created' | 'updated' | 'deleted', data: T): void {
+    try {
+      const priority = eventType === 'updated' ? 'NORMAL' : 'HIGH';
+      repositoryEventBus.emit({
+        entityType: this.tableName,
+        eventType,
+        entityId: data.id,
+        entity: data,
+        timestamp: Date.now(),
+        priority,
+      });
+    } catch (err) {
+      console.warn(`[BaseRepository] Error emitting ${eventType} event for ${this.tableName}:`, err);
     }
   }
 }

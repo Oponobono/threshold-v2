@@ -1525,6 +1525,48 @@ Formato requerido EXACTO (JSON Object):
  * Recibe metadatos del curso/materia + apuntes del usuario y retorna
  * un array de flashcards JSON puro, sin prosa, listo para insertar en FSRS.
  */
+/**
+ * POST /api/ai/chat-proxy
+ * Proxy genérico para llamadas de IA desde el dispositivo.
+ * El móvil envía mensajes y el backend elige el proveedor según disponibilidad de API keys.
+ * El móvil NUNCA necesita la API key de Groq/Gemini.
+ */
+exports.chatProxy = async (req, res) => {
+  const { messages, temperature = 0.7, maxTokens = 1024 } = req.body;
+
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: 'Falta el array de mensajes.' });
+  }
+
+  const provider = getLLMProvider(req);
+  const startTime = Date.now();
+
+  try {
+    let result;
+    if (provider === 'gemini' && secrets.GEMINI_API_KEY) {
+      result = await callGeminiAPI(
+        messages.filter(m => m.role !== 'system'), 
+        messages.find(m => m.role === 'system')?.content || ''
+      );
+    } else {
+      const systemMsg = messages.find(m => m.role === 'system');
+      const userMsgs = messages.filter(m => m.role !== 'system');
+      result = await callGroqAPI(userMsgs, systemMsg?.content || '');
+    }
+
+    const duration = Date.now() - startTime;
+    res.json({
+      response: result.reply.content,
+      provider: result.provider,
+      model: provider === 'gemini' ? 'gemini-3-flash-preview' : 'llama-3.3-70b-versatile',
+      latencyMs: duration,
+    });
+  } catch (err) {
+    console.error('[chatProxy] Error:', err);
+    res.status(500).json({ error: 'Error en proxy de IA', details: err.message });
+  }
+};
+
 exports.generateClassFlashcards = async (req, res) => {
   const { courseName, subjectName, currentMilestone, rawTextFromOCROrNotes } = req.body;
 

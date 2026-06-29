@@ -1,154 +1,194 @@
 # Session Context
 
 ## Goal
-Enable full offline functionality for flashcards (decks, cards, import) and document text extraction; fix calendar/UI positioning behind native navbar; show backup upload/download progress in system notifications; improve Zyren context selector with search, pagination, and category pills. Additionally: build a unified Multi-Platform Course Hub (Platzi, Udemy, etc.) with hierarchical SectionList UI, atomic sync, Momentum tracking and AI-powered class ingestion.
+Demostrar matemáticamente que el sistema de sincronización nunca pierde datos. Ya no se construye infraestructura — se mide, valida y prueba con evidencia obtenida del SyncDebugger, SyncValidator y Sync Test Suite.
 
 ## Constraints & Preferences
 - Spanish-language app (i18next).
-- Offline-first architecture: SQLite + MMKV local storage, cloud sync when online.
-- ForceOfflineMode toggle (useLocalAIStore) must be respected.
-- Native navbar space must not be overlapped by modal content.
-- `React.memo` on list cards must be preserved — always wrap SectionList item handlers in `useCallback`.
+- Offline-first: UI solo lee de SQLite, nunca de API directa.
+- SyncManager es la única autoridad para comunicación de red; ninguna screen o servicio llama fetch() directamente.
+- Los cambios en repositorios deben propagarse a UI vía EventBus, nunca mediante recargas manuales.
+- Toda la IA cloud debe pasar por el backend — no hay API keys en el dispositivo.
+- Entidades se clasifican en 3 categorías:
+  - **Read Only** (users, courses, notifications, analytics) — nunca hacen PUSH.
+  - **Bidireccionales** (subjects, assessments, schedules, flashcards, settings, calendar) — siempre participan en CREATE/UPDATE/DELETE/PUSH/PULL/INITIAL/CONFLICT.
+  - **Assets** (photos, audio, documents) — MetadataSync y AssetSync son pipelines completamente separados.
+- MetadataSync y AssetSync corren como pipelines independientes bajo SyncManager. AssetSync maneja blob/chunk/resume/checksum.
+- Cada registro debe tener `sync_version` por entidad (diseñado ahora, implementado después).
+- Cada registro debe tener checksum SHA256 (canonical JSON) para detectar corrupción silenciosa.
+- `sync_queue` debe evolucionar a Event Store con traceId, version, dependsOn, retry, createdAt.
+- Compactación debe ser una máquina de reducción (SyncQueueReducer) con reglas declarativas, no cascadas de if/else.
+- SyncQueueReducer debe ser una **función pura**: recibe operaciones, devuelve operaciones reducidas + ReductionReport. No escribe en SQLite, no hace HTTP, no modifica sync_queue.
+- Reducción por **estado final**, no por pares: modela el historial completo de la entidad y decide el resultado, no depende del orden de recorrido.
+- Reducer debe soportar agrupación por entidad (todas las ops de un entity_type+entity_id se reducen juntas).
+- Reducer debe generar operación RESTORE para secuencias DELETE+CREATE (mismo ID).
+- Toda sincronización debe tener un traceId único compartido a través de todo el pipeline (SQLite → Queue → HTTP → Controller → Repository → SQLite).
+- Debe existir un RetryPolicy con manejo diferenciado por código HTTP (429→wait/retry, 500→retry, 401→refresh+retry, 404→discard, 409→ConflictResolver).
+- Después de cada sync debe generarse un Consistency Report: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status.
+- Debe existir un SyncValidator que compare conteos, checksums, versiones y missing IDs por entidad.
+- Toda la suite de sync debe ser testeable con escenarios reproducibles (Sync Test Suite).
+- AI architecture (Policy Engine → Orchestrator → Capabilities) congelada; no más refactors de IA.
+
+## Principio Rector
+"Si no puedes observar una sincronización, no puedes confiar en ella."
 
 ## Progress
 ### Done
-- **Decks offline**: `FlashcardNewDeckScreen.tsx` — subject made optional; creation no longer requires `deckSubjectId`.
-- **Import cards persisted**: `FlashcardImportModal.tsx` — after `saveImportedDeck`, each card now saved via `addLocalCard()` into MMKV.
-- **Local decks visible in list**: `useFlashcardsManager.ts` — `loadDecks()` now merges MMKV local decks (`getLocalDecks()`) with SQLite decks via `mergeLocalDecks()`.
-- **Cards read from both stores**: `flashcards.ts` — `getFlashcards`, `getFlashcardsPrioritized`, `getCardsNotSnoozed` now merge SQLite cards + MMKV cards via `mergeCards()` and `getLocalCardsFromMMKV()`.
-- **PDF import hybrid OCR**: `PDFImportModal.tsx` — switched from `extractTextFromPDF` (cloud-first) to `extractTextFromPDFHybrid` (offline-first via `resolveProvider()`). Added user-visible alert on failure.
-- **Scanner OCR for images**: `DocumentScannerModal.tsx` — moved OCR block before PDF/image bifurcation; now both export formats run `extractTextFromImageHybrid` and pass `ocr_text` to `createPhoto()` / `createScannedDocument()`.
-- **Calendar modal bottom safe-area**: `EventCreationModal.tsx` — added `paddingBottom: insets.bottom` to content view and `paddingBottom: Math.max(insets.bottom, 20)` to `SubjectPickerSheet`'s pickerContent, preventing buttons and subject selector from clipping behind the native navbar.
-- **Backup progress notifications**: `notificationService.ts` — added 8 functions for upload/download progress and result. `useBackupLogic.ts` + `scheduledBackupService.ts` integrated. `locales/*/backup.json` — added `backup.partial` key.
-- **Dashboard sheet modals bottom safe-area**: `CreateTaskModal.tsx`, `SubjectSelectorModal.tsx`, `CategorySelectorModal.tsx` — each now imports `useSafeAreaInsets` and applies `paddingBottom: Math.max(insets.bottom, 20)` to `sheetContent`.
-- **Zyren context selector redesigned**: `SubjectAIContextModal.tsx` — search bar, horizontal category pills, "Ver mas" pagination (max 10/page), content hidden until interaction. `AIContextItem.tsx` — added `searchText`. `aiContextMappers.ts` — populate `searchText` from OCR/transcript.
-- **Backup flow resilience**: `backupService.ts` — `POST /backup/mark` failures no longer throw. Files successfully uploaded to Uploadthing always marked `is_backed_up = 1` locally.
-- **YouTube transcripts query fixed**: `backupService.ts` — removed invalid column filter. Migration v2 adds `is_backed_up` + `cloud_url` to `youtube_videos`.
-- **Migration runner fixed**: `DatabaseService.ts` — removed `PRAGMA user_version = 0` hack; incremental migrations now run exactly once. `PRAGMA foreign_keys = ON` active.
-- **Backend mark logging**: `backupController.js` — `console.error` on every `db.run` failure.
-- **PostgreSQL id type fix**: `migrations/fix-id-type.js` — converts PK id columns from INTEGER to TEXT.
-- **Scheduled backup UI clean up**: `settings.tsx` — flat `SettingRow` + `actionRow` pattern.
-- **[HUB] Migration v7**: `migrations.ts` — `courses` table (momentum_score, last_studied_at, platform). Added `course_id`, `external_url`, `total_lessons`, `completed_lessons`, `next_micro_milestone` to `subjects`. `ON DELETE SET NULL` on `course_id`.
-- **[HUB] CourseRepository**: `CourseRepository.ts` — SQLite CRUD. Registered in `repositories/index.ts`.
-- **[HUB] Backend UPSERT for courses**: `coursesController.js` — `INSERT ... ON CONFLICT (id) DO UPDATE SET`. Route registered in `server.js`.
-- **[HUB] Atomic sync ordering**: `SyncService.ts` — items sorted `course -> subject -> *` before processing.
-- **[HUB] useGroupedSubjects hook**: `useGroupedSubjects.ts` — SectionList sections grouped by course, `collapsedCourses` state, `aggregatedMomentumScore` (average of all courses' momentum_score).
-- **[HUB] CourseAccordion**: `CourseAccordion.tsx` — sticky header, animated chevron, platform pill.
-- **[HUB] CourseSubjectCard**: `CourseSubjectCard.tsx` — `React.memo` card with pills, "Continuar" deep-link button, "Marcar clase terminada" bicephalous trigger.
-- **[HUB] subjects.tsx refactor**: Replaced ScrollView+map with `SectionList`. All `renderItem` handlers wrapped in `useCallback` to preserve `React.memo`. `MomentumCard` reads `aggregatedMomentumScore` (was hardcoded 0.85).
-- **[HUB] MomentumService**: `MomentumService.ts` — logarithmic decay after 72h (`0.05 * Math.log1p(hoursOverdue)`), `boostMomentum` (+15%), `updateAllMomentumScores` on app start via `appInit.ts`.
-- **[HUB] Deep Linking fixed**: `linking.ts` — reescrito con estrategia correcta: (1) esquema nativo `vnd.youtube:` para YouTube, (2) `Linking.openURL(https_url)` directo para todas las demás plataformas (Udemy, Coursera, Platzi, etc.) — el SO intercepta Universal Links/App Links y abre la app si está instalada, (3) `WebBrowser` solo si Linking falla por completo. Eliminados esquemas falsos `coursera://`, `udemy://`, `platzi://`. `app.json` actualizado con `LSApplicationQueriesSchemes` (iOS) y `intentFilters` (Android) para YouTube. `CourseAccordion.tsx` y `CourseHeroCard.tsx` ahora pasan `platform` a `openCourseLink`.
-- **[HUB] Zyren Ingestion endpoint**: `aiController.js` — `generateClassFlashcards` uses `llama-3.3-70b-versatile`. Strict JSON contract in system prompt. Double sanitization (Markdown strip + regex fallback). Route: `POST /api/ai/class-flashcards`.
-- **[HUB] ZyrenIngestionModal**: `ZyrenIngestionModal.tsx` — 3-step (Input->Preview->Saving). Saves via `saveImportedDeck` + `addLocalCard` + `recalculateLocalDeckCounters`. `subjectId` passed correctly.
-- **[HUB] Audit**: `useCallback` applied to handlers; `aggregatedMomentumScore` connected to Hero Card; `subjectId` fixed in modal.
-- **Fix subject-course link persistence**: `mergeWithLocal()` cambia `!== undefined` por `!= null` para `course_id`, `external_url`, `next_micro_milestone`. `getSubjectById()` usa `mergeWithLocal()`. Se agregan `updateCourseCounters()` y `repairSubjectCourseLinks()` en `subjects.ts`.
-- **Fix deck subject display**: `localDeckToFlashcardDeck()` resuelve subject metadata desde `subjects[]`. Backend `getGroupDecks` hace `LEFT JOIN subjects`. `LocalDeck` agrega `subject_name/color/icon`.
-- **Fix course loading sync**: `useDataStore` ahora almacena `courses[]` en Zustand, cargándolos síncronamente desde SQLite local. `getCourses()` ya no descarta el resultado. `useGroupedSubjects` recibe `courses` como prop eliminando `useFocusEffect` + `courseRepository.getAll()` asíncrona.
+- **Decks offline**: `FlashcardNewDeckScreen.tsx` — subject made optional.
+- **Import cards persisted**: `FlashcardImportModal.tsx` — calls `addLocalCard()` per card into MMKV.
+- **Local decks visible in list**: `useFlashcardsManager.ts` — merges MMKV + SQLite decks.
+- **Cards read from both stores**: `flashcards.ts` — merges SQLite + MMKV cards at read time.
+- **PDF import hybrid OCR**: `PDFImportModal.tsx` — switched to `extractTextFromPDFHybrid` (offline-first).
+- **Scanner OCR for images**: `DocumentScannerModal.tsx` — OCR runs for both image and PDF export.
+- **Calendar modal bottom safe-area**: `EventCreationModal.tsx` — added `paddingBottom: insets.bottom`.
+- **Backup progress notifications**: `notificationService.ts` — 8 functions for upload/download progress.
+- **Dashboard sheet modals bottom safe-area**: `CreateTaskModal`, `SubjectSelectorModal`, `CategorySelectorModal` — `useSafeAreaInsets` applied.
+- **Zyren context selector redesigned**: `SubjectAIContextModal.tsx` — search, pills, pagination.
+- **Backup flow resilience**: `backupService.ts` — `POST /backup/mark` failures no longer throw.
+- **Migration runner fixed**: incremental migrations, `PRAGMA foreign_keys = ON`.
+- **[HUB] Course Hub**: SectionList, CourseAccordion, CourseSubjectCard, aggregatedMomentumScore, momentum decay.
+- **[HUB] Deep Linking**: `vnd.youtube:` schema, `Linking.openURL(https)` for all others, WebBrowser fallback.
+- **[HUB] Zyren Ingestion**: `generateClassFlashcards` endpoint + 3-step modal.
+- **Sync architecture**: SyncManager, EntitySynchronizer abstraction, BootstrapManager, event-bus repositories, SyncJournal (migration v20), ConflictResolver, CachePolicyManager, DataLoader.
+- **AI Platform**: AIOrchestrator, 5 Capabilities (Chat/Flashcard/OCR/PDF/Transcription), Policy Engine (6 modes), Semantic Cache, Groq/Gemini moved to backend-only, hybridAIService refactored to 223 lines.
+- **Migration v21**: `version_number`, `last_modified_by`, `deleted_at` on 10 syncable tables.
+- **Backend sync_version table**: Created + columns on 6 tables — **pero nunca se incrementa** (hallazgo crítico).
+- **Sync Audit**: Matriz de cobertura completada, 3 sospechas confirmadas (sync_version no incrementa, entidades faltantes en ciclos, compactación parcial).
+- **SyncDebugger**: `SyncDebugger.ts` — traceId por sync, operationId por operación, 15 SyncStage, buffer en memoria (2000) + persistencia batch, stage timing (timeStart/timeEnd), migration v22 (`sync_debug_logs` table). Integrado en SyncManager, SyncService, SyncQueueRepository, backend syncController (X-Trace-Id).
+- **SyncQueueReducer**: módulo `mobile/src/services/sync/reducer/` — OperationReducer (máquina de estados por entidad, pure function, reducción por estado final), DependencyResolver (orden topológico con 28+ entity ranks), ValidationRules (pre-flight + entity existence), ReductionReport (stats: merged/removed/noop/restored), index.ts (reduce() puro: agrupa → reduce → ordena → valida → reporta). Integrado en SyncService.ts reemplazando ordenamiento atómico inline + reemplazando markCompleted por markCompletedBatch.
 
-### In Progress
-- *(none)*
+### In Progress (Sync Verification Suite)
+- 🟡 **Test Harness** — batería de 10+ escenarios automatizados con FaultInjector, ScenarioRunner, y métricas por escenario.
+- 🟢 **Corrección de bugs reales** encontrados por SyncValidator/SyncDebugger.
+
+### Backlog
+- **Consistency Report** — al finalizar cada sync: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status.
+- **Sync Test Suite expansion** — escenarios adicionales (initial sync, delta sync, conflictos, soft-delete, red intermitente).
 
 ### Blocked
 - *(none)*
 
+## Gold Rule (post-architecture-freeze)
+- No new module if an existing one can solve the problem without losing clarity.
+- No abstraction "just in case". Every new layer must justify what problem it solves.
+- The architecture is stable enough to build on for a long time. Optimize, don't restructure.
+- A partir de ahora: toda hora de desarrollo debe aumentar la confianza en el sistema, no su complejidad. Medir, validar, automatizar pruebas, corregir bugs con evidencia.
+
 ## Key Decisions
+### Arquitectura de Sync Audit
+- Sync audit precede a cualquier cambio de código. Arreglar síntomas sin matriz de cobertura completa no es confiable.
+- La participación de entidades debe rastrearse por ciclo (CREATE/UPDATE/DELETE/PUSH/PULL/Initial/Conflict) — las aristas faltantes son la fuente del bug.
+- Toda escritura en backend debe incrementar `sync_version` — si una tabla modifica datos sin avanzar el contador, los clientes nunca lo traen.
+- Los deletes deben usar soft-delete + tabla `sync_deletions`.
+- Analytics debe tratarse como dato derivado (recalculado localmente, no sincronizado bidireccionalmente).
+- Settings debe estar en initial + delta + push siempre — cambian comportamiento global.
+- Assets (photos, audio, documents) deben tener pipeline separado (blob/chunk/resume/checksum).
+- SyncQueueReducer es prioridad sobre SyncValidator y Test Suite porque es el único que modifica comportamiento (los otros solo observan).
+- Reducer debe ser función pura: recibe lista de operaciones, devuelve lista reducida + ReductionReport. No escribe en SQLite, no hace HTTP, no modifica sync_queue, no registra logs por sí mismo.
+- Reducción modela estado final del historial completo (CREATE+UPDATE+UPDATE+DELETE → no-op), no recorre pares secuencialmente.
+- Reducer agrupa por (entity_type, entity_id) antes de reducir — cada grupo se procesa independientemente.
+- Se introduce operación RESTORE para secuencias DELETE+CREATE (mismo ID), traducida por SyncService a UPDATE semántico.
+- La cola original no se modifica; la reducida se genera nueva. Si falla, la original permanece intacta.
+- `sync_queue` debe evolucionar a Event Store con traceId, version, dependsOn, retry, createdAt.
+
+### Decisiones previas (congeladas)
 - **Dual storage merge**: MMKV canonical for deck+cards; merge with SQLite at read time.
-- **Hybrid routing for OCR/PDF extraction**: `extractTextFromImageHybrid` / `extractTextFromPDFHybrid` everywhere.
+- **Hybrid routing for OCR/PDF extraction**: `extractTextFromImageHybrid` / `extractTextFromPDFHybrid`.
 - **Inline safe-area padding for modals**: `useSafeAreaInsets()` with inline `paddingBottom`.
-- **Context selector: pagination over virtualization**: Max 10 items/page with "Ver mas" button.
-- **Context selector: content hidden until interaction**: Reduces cognitive load.
-- **Hub: Data-Driven collapse**: SectionList data array emptied on collapse (not CSS hidden).
-- **Hub: aggregatedMomentumScore**: Arithmetic mean of all courses exposed from `useGroupedSubjects`.
-- **Hub: useCallback for SectionList handlers**: All handlers to `CourseSubjectCard` must be `useCallback` — otherwise `React.memo` is bypassed on every parent re-render.
-- **Hub: Zyren ingestion reuses Groq infra**: No new API key. `generateClassFlashcards` follows same pattern as `generateStudyMaterial` with stricter JSON-only prompt.
-- **Hub: Deep link strategy**: NO usar esquemas custom inventados (`coursera://`, `udemy://`, `platzi://`). Solo `vnd.youtube:` para YouTube. Para todo lo demás: `Linking.openURL(https)` — el SO activa Universal Links/App Links. `WebBrowser` solo como último recurso de emergencia.
+- **Hub: useCallback for SectionList handlers**: preserve `React.memo`.
+- **Hub: Deep link strategy**: `vnd.youtube:` + `Linking.openURL(https)` + WebBrowser fallback.
+- **AI: Policy Engine → Orchestrator → Capabilities**: frozen, no more AI refactors.
 
 ## Next Steps
-- Consider whether `Dashboard.styles.ts` `sheetContent` hardcoded `paddingBottom: 44/52` should be replaced with dynamic inset values.
-- Audit note (INFO): Migration v6 duplicates `assessment_files` table already in v3. No crash (`IF NOT EXISTS`), but dirty log. Consider cleanup migration.
-- Future: After user returns from external class URL, trigger `boostMomentum` automatically.
+1. **Consistency Report** — post-sync: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status.
+2. **Sync Test Suite expansion** — escenarios adicionales: initial sync, delta sync, conflictos, soft-delete, intermitencia de red.
+3. **Optimization** — usando métricas del Test Harness para identificar cuellos de botella.
+4. **Corregir bugs** encontrados por SyncValidator/SyncDebugger:
+   - backend: sync_version nunca se incrementa
+   - backend: deletes son duros, no generan sync_deletions
+   - backend: initialSync cubre solo 6 entidades, deltaSync solo 5 tablas
+   - mobile: entidades faltantes en ciclos de sync
+
+## Hallazgos Críticos del Audit
+- **sync_version nunca se incrementa** en backend — ningún controller llama a `UPDATE sync_version SET version = version + 1` ni `SET sync_version = <next>` en las tablas de entidad. `syncController.js` ejecuta `WHERE sync_version > ?` que siempre devuelve vacío.
+- **initialSync cubre solo 6 entidades** (user, courses, subjects, assessments, schedules, flashcardDecks). Faltan photos, audio, scanned_documents, analytics, settings, calendar, notifications.
+- **deltaSync cubre solo 5 tablas** + sync_deletions. Mismas entidades faltantes.
+- **Backend deletes son duros** (DELETE FROM subjects WHERE id = ?), no generan entradas en sync_deletions.
+- **SyncService.ts ordenamiento incompleto**: ~15 entity types caían en rank 99 (sin orden garantizado) — **resuelto** vía DependencyResolver con 28+ entity ranks.
+- **SyncQueue compactación parcial**: UPDATE dedup y CREATE→DELETE cancel existían, pero [UPDATE, UPDATE, DELETE] sin collapse — **resuelto** vía SyncQueueReducer con reducción por estado final.
 
 ## Relevant Files
-- `mobile/src/components/flashcards/FlashcardNewDeckScreen.tsx`: subject made optional
-- `mobile/src/components/flashcards/FlashcardImportModal.tsx`: now calls `addLocalCard` per card
-- `mobile/src/hooks/useFlashcardsManager.ts`: merges local MMKV decks
-- `mobile/src/services/api/flashcards.ts`: card-read functions merge SQLite + MMKV
-- `mobile/src/components/modals/PDFImportModal.tsx`: switched to `extractTextFromPDFHybrid`
-- `mobile/src/components/modals/DocumentScannerModal.tsx`: OCR runs for both image and PDF export
-- `mobile/src/components/modals/EventCreationModal.tsx`: added bottom safe-area padding
-- `mobile/src/components/dashboard/CreateTaskModal.tsx`: useSafeAreaInsets + inline paddingBottom
-- `mobile/src/components/dashboard/SubjectSelectorModal.tsx`: useSafeAreaInsets + inline paddingBottom
-- `mobile/src/components/dashboard/CategorySelectorModal.tsx`: useSafeAreaInsets + inline paddingBottom
-- `mobile/src/services/hybridAIService.ts`: extractTextFromImageHybrid and extractTextFromPDFHybrid
-- `mobile/src/services/localOCRService.ts`: ML Kit text recognition (offline)
-- `mobile/src/services/localPDFService.ts`: native PDF text extraction (offline)
-- `mobile/src/services/notificationService.ts`: backup upload/download progress notification functions
-- `mobile/src/hooks/useBackupLogic.ts`: backup/download hook with integrated notification calls
-- `mobile/src/services/backup/backupService.ts`: resilient mark flow; youtube_videos query fixed
-- `mobile/src/services/database/DatabaseService.ts`: PRAGMA foreign_keys = ON; incremental migrations
-- `mobile/src/services/database/migrations.ts`: v7 adds courses table + subjects columns
-- `mobile/src/services/database/repositories/CourseRepository.ts`: SQLite CRUD for courses
-- `mobile/src/services/database/repositories/index.ts`: exports CourseRepository
-- `mobile/src/services/database/appInit.ts`: sync handler; MomentumService startup call
-- `mobile/src/services/database/SyncService.ts`: atomic ordering course->subject
-- `mobile/src/services/MomentumService.ts`: logarithmic decay, boostMomentum, updateAllMomentumScores
-- `mobile/src/hooks/useGroupedSubjects.ts`: SectionList sections, collapse state, aggregatedMomentumScore
-- `mobile/src/components/subjects/CourseAccordion.tsx`: sticky header with animated chevron
-- `mobile/src/components/subjects/CourseSubjectCard.tsx`: React.memo card with pills and bicephalous trigger
-- `mobile/src/components/subjects/ZyrenIngestionModal.tsx`: 3-step ingestion modal (Input->Preview->Saving)
-- `mobile/src/utils/linking.ts`: openCourseLink con estrategia en capas: vnd.youtube → Linking.openURL(https) → WebBrowser fallback
-- `mobile/app/(tabs)/subjects.tsx`: SectionList hub with useCallback handlers, reactive MomentumCard
-- `backend/controllers/aiController.js`: generateClassFlashcards endpoint (Groq llama-3.3-70b)
-- `backend/routes/ai.js`: POST /api/ai/class-flashcards registered
-- `backend/controllers/coursesController.js`: UPSERT logic for courses
-- `backend/controllers/backupController.js`: error detail logging to mark endpoint
-- `backend/database/migrations/fix-id-type.js`: converts PK id columns from INTEGER to TEXT
-- `mobile/src/styles/Settings.styles.ts`: removed obsolete scheduledBackup* styles
-- `mobile/src/styles/Dashboard.styles.ts`: sheetContent with hardcoded bottom padding
-- `mobile/src/locales/es/backup.json`: added partial key
-- `mobile/src/locales/en/backup.json`: added partial key
-- `mobile/src/components/subjects/SubjectAIContextModal.tsx`: redesigned context selector
-- `mobile/src/components/ai/AIContextItem.tsx`: added searchText field
-- `mobile/src/utils/aiContextMappers.ts`: populate searchText from OCR/transcript
-- `mobile/src/locales/es/ai.json`: added search, seeMore, ready, noText keys
-- `mobile/src/locales/en/ai.json`: added search, seeMore, ready, noText keys
+### Core Sync
+- `mobile/src/services/sync/SyncManager.ts` — Main orchestrator with traceId, timers, debug logging
+- `mobile/src/services/sync/SyncJournal.ts` — Sync bitacora
+- `mobile/src/services/sync/SyncDebugger.ts` — traceId/operationId logger with stage timing
+- `mobile/src/services/sync/types.ts` — SyncState, SyncPhase, SyncProgress, SyncResult, SyncEvent
+- `mobile/src/services/sync/EntitySynchronizer.ts` — Interface for entity synchronizers
+- `mobile/src/services/sync/synchronizers/SubjectSynchronizer.ts` — Reference implementation
+- `mobile/src/services/sync/ConflictResolver.ts` — 4 strategies
 
-## Strategic Reference: RemNote Benchmarking
+### Validator
+- `mobile/src/services/sync/validator/types.ts` — EntityValidationResult, SyncValidationResult, EntityConfig
+- `mobile/src/services/sync/validator/SyncValidator.ts` — validateAll(), validateEntityType(), formatValidationResult()
 
-Feature priorities adapted from RemNote for mobile-first offline architecture:
+### Test Harness
+- `mobile/src/services/sync/test/types.ts` — SyncScenario, ScenarioResult, ScenarioMetrics, FaultRule, FaultType
+- `mobile/src/services/sync/test/ScenarioRunner.ts` — Runner: register, runAll, runSingle, clear
+- `mobile/src/services/sync/test/FaultInjector.ts` — Interceptor: HTTP 500/429/timeout/404/token-expired, SQLITE_BUSY, PACKET_LOSS. Integrado en fetchWithFallback vía hook.
+- `mobile/src/services/sync/test/ScenarioReport.ts` — formatScenarioReport(): reporte tabular con métricas
+- `mobile/src/services/sync/test/index.ts` — registerDefaultScenarios(), runAllTests()
+- `mobile/src/services/sync/test/scenarios/CRUDScenario.ts` — #1: CREATE+UPDATE+DELETE → Reducer → No-op
+- `mobile/src/services/sync/test/scenarios/QueueReductionScenario.ts` — #2: 10 CREATEs + 20 UPDATEs → 10 ops
+- `mobile/src/services/sync/test/scenarios/DependencyScenario.ts` — #3: Course→Subject→Assessment orden
+- `mobile/src/services/sync/test/scenarios/RestoreScenario.ts` — #4: DELETE+CREATE → RESTORE op
+- `mobile/src/services/sync/test/scenarios/DeterminismScenario.ts` — #5: reduce(reduce(q)) === reduce(q)
+- `mobile/src/services/sync/test/scenarios/FaultToleranceScenario.ts` — #6: HTTP 500/429/timeout sin pérdida
+- `mobile/src/services/sync/test/scenarios/StressScenario.ts` — #7: 10000 ops × 100 entidades → PASS
 
-### P1 — High Impact, Low Effort
+### Reducer
+- `mobile/src/services/sync/reducer/OperationReducer.ts` — State machine per entity (pure function)
+- `mobile/src/services/sync/reducer/DependencyResolver.ts` — Topological ordering (28+ entity ranks)
+- `mobile/src/services/sync/reducer/ValidationRules.ts` — Pre-flight + entity existence validation
+- `mobile/src/services/sync/reducer/ReductionReport.ts` — Stats interface (merged/removed/noop/restored/duration)
+- `mobile/src/services/sync/reducer/index.ts` — Pure reduce() function: group → reduce → sort → validate → report
 
-1. **Direction flag on cards** (`direction: 'forward' | 'backward' | 'bidirectional'`)
-   - Add `direction` column to `flashcards` table in SQLite (default `'forward'`)
-   - Study session engine reads flag and generates inverse render dynamically (no duplicate cards)
-   - Schema: `ALTER TABLE flashcards ADD COLUMN direction TEXT NOT NULL DEFAULT 'forward'`
-   - Migration v8, ~50 lines in `useStudySession.ts`
+### Queue & Database
+- `mobile/src/services/database/SyncService.ts` — Queue processor with reducer integration
+- `mobile/src/services/database/repositories/SyncQueueRepository.ts` — Queue CRUD + markCompletedBatch
+- `mobile/src/services/database/DatabaseService.ts` — Transaction support
+- `mobile/src/services/database/migrations.ts` — v20 (SyncJournal), v21 (version_number/last_modified_by/deleted_at), v22 (sync_debug_logs + trace_id)
+- `mobile/src/services/database/BaseRepository.ts` — ConflictResolver on upsert
+- `mobile/src/services/database/appInit.ts` — Bootstrap and sync handler
 
-2. **Source Context** (source_context TEXT on flashcards)
-   - Add `source_context` column; populated by OCR/import/creation flows
-   - Study screen shows discreet "Context" button → opens bottom sheet with original text
-   - No graph engine needed — just a TEXT field per card
+### Backend
+- `backend/controllers/syncController.js` — initialSync (6 entities) + deltaSync (5 tables)
+- `backend/controllers/subjectsController.js` — NO sync_version increment
+- `backend/controllers/coursesController.js` — NO sync_version increment
+- `backend/controllers/assessmentsController.js` — NO sync_version increment
+- `backend/controllers/schedulesController.js` — NO sync_version increment
+- `backend/controllers/photosController.js` — NO sync_version increment
+- `backend/controllers/audioController.js` — NO sync_version increment
+- `backend/controllers/documentsController.js` — NO sync_version increment
+- `backend/database/migrations/add-sync-version.js` — Creates sync_version table + columns (but never incremented)
+- `backend/db.js` — Database init (no write middleware)
 
-### P2 — High Impact, Moderate Effort
+### Data Layer
+- `mobile/src/services/database/BaseRepository.ts` — Now uses ConflictResolver on upsert
+- `mobile/src/services/database/DatabaseService.ts` — Transaction support
+- `mobile/src/services/database/repositories/CourseRepository.ts` — SQLite CRUD
+- `mobile/src/services/database/appInit.ts` — Bootstrap and sync handler
+- `mobile/src/services/database/migrations.ts` — v20 (SyncJournal), v21 (version_number/last_modified_by/deleted_at)
 
-3. **Exam Scheduler** (temporal SRS compression)
-   - Exam date flag on deck/subject (`exam_date` nullable TIMESTAMP in subjects or flashcard_decks)
-   - Zustand store reads exam date → overrides SRS interval multiplier in `MomentumService.getNextReview`
-   - Algorithm: `compressedInterval = baseInterval * max(0.2, 1 - (daysUntilExam / totalDaysToStudy))`
-   - Integrates with existing `MomentumService.ts`
-
-### P3 — Differentiator, Higher Effort
-
-4. **Touch-native image occlusion**
-   - Canvas overlay on image using `react-native-svg` or `react-native-canvas`
-   - User draws rectangles to hide portions → stores shapes as JSON in `flashcard.source_context` or new `image_occlusion` table
-   - Study mode renders image + occlusions as touch-to-reveal zones
-
-5. **Inline floating toolbar over keyboard**
-   - Custom `InputAccessoryView` (iOS) / `WindowInsets` (Android) with card-type shortcuts
-   - Avoids symbol typing on mobile keyboards
-
-6. **Contextual AI generation from local text**
-   - After OCR/PDF capture, auto-suggest front/back pairs using Groq
-   - Reuses existing `generateClassFlashcards` endpoint with captured text as context
+### Mobile API (enqueue calls)
+- `mobile/src/services/api/subjects.ts` — enqueueCreate/Update/Delete for subject
+- `mobile/src/services/api/courses.ts` — enqueueCreate/Update/Delete for course
+- `mobile/src/services/api/photos.ts` — enqueueCreate/Update/Delete for photo
+- `mobile/src/services/api/audio.ts` — enqueueCreate/Update/Delete for audio + transcript
+- `mobile/src/services/api/documents.ts` — enqueueCreate/Update/Delete for scanned-document
+- `mobile/src/services/api/settings.ts` — enqueueCreate/Update/Delete for grading-period, lms-account, threshold-overrides
+- `mobile/src/services/api/calendar.ts` — enqueueCreate/Update/Delete for calendar-event
+- `mobile/src/services/api/schedules.ts` — enqueueCreate/Update/Delete for schedule
+- `mobile/src/services/api/assessments.ts` — enqueueCreate/Update/Delete for assessment
+- `mobile/src/services/api/flashcards.ts` — enqueueCreate/Update/Delete for flashcard-deck, flashcard, card-snooze
+- `mobile/src/services/api/analytics.ts` — enqueueCreate for card-review
+- `mobile/src/services/api/youtube.ts` — enqueueCreate/Update/Delete for youtube-video, youtube-transcript

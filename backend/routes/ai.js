@@ -326,4 +326,37 @@ router.post('/ai/deck/:deckId/differentiate', aiController.generateDifferentiati
  */
 router.post('/ai/class-flashcards', aiController.generateClassFlashcards);
 
+/**
+ * @swagger
+ * /api/ai/chat-proxy:
+ *   post:
+ *     summary: Proxy genérico de IA (el móvil nunca necesita API keys)
+ *     tags: [AI]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               messages:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     role:
+ *                       type: string
+ *                       enum: [system, user, assistant]
+ *                     content:
+ *                       type: string
+ *               temperature:
+ *                 type: number
+ *               maxTokens:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Respuesta de la IA
+ */
+router.post('/ai/chat-proxy', aiController.chatProxy);
+
 module.exports = router;

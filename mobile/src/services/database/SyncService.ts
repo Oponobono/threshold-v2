@@ -3,6 +3,8 @@ import { databaseService } from './DatabaseService';
 import { mediaSyncService } from './MediaSyncService';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { useConnectivityStore } from '../../store/useConnectivityStore';
+import { syncDebugger } from '../sync/SyncDebugger';
+import { reduce } from '../sync/reducer/index';
 
 type SyncHandler = (operation: {
   entity_type: string;
@@ -24,27 +26,31 @@ export class SyncService {
     this.syncHandler = handler;
   }
 
-  async enqueueCreate(entityType: string, entityId: string | undefined, payload: any): Promise<void> {
+  async enqueueCreate(entityType: string, entityId: string | undefined, payload: any, traceId?: string): Promise<void> {
     await syncQueueRepository.enqueue({
       entity_type: entityType,
       entity_id: entityId,
       operation: 'CREATE',
       payload: payload ? JSON.stringify(payload) : undefined,
+      trace_id: traceId,
     });
+    if (traceId) syncDebugger.log(traceId, null, null, 'QUEUE_ENQUEUE', `CREATE ${entityType}/${entityId}`, undefined, entityType, entityId);
     this.triggerSync();
   }
 
-  async enqueueUpdate(entityType: string, entityId: string, payload: any): Promise<void> {
+  async enqueueUpdate(entityType: string, entityId: string, payload: any, traceId?: string): Promise<void> {
     await syncQueueRepository.enqueue({
       entity_type: entityType,
       entity_id: entityId,
       operation: 'UPDATE',
       payload: payload ? JSON.stringify(payload) : undefined,
+      trace_id: traceId,
     });
+    if (traceId) syncDebugger.log(traceId, null, null, 'QUEUE_ENQUEUE', `UPDATE ${entityType}/${entityId}`, undefined, entityType, entityId);
     this.triggerSync();
   }
 
-  async enqueueDelete(entityType: string, entityId: string): Promise<void> {
+  async enqueueDelete(entityType: string, entityId: string, traceId?: string): Promise<void> {
     const pendingOps = await syncQueueRepository.getPendingOperations(entityType, entityId);
     const isCreatePending = pendingOps.some(op => op.operation === 'CREATE');
 
@@ -57,8 +63,10 @@ export class SyncService {
         entity_type: entityType,
         entity_id: entityId,
         operation: 'DELETE',
+        trace_id: traceId,
       });
     }
+    if (traceId) syncDebugger.log(traceId, null, null, 'QUEUE_ENQUEUE', `DELETE ${entityType}/${entityId}${isCreatePending ? ' (cancelled - no-op)' : ''}`, { isCreatePending }, entityType, entityId);
     this.triggerSync();
   }
 
@@ -71,7 +79,7 @@ export class SyncService {
     this.sync().catch(console.error);
   }
 
-  async sync(options?: { force?: boolean }): Promise<{ success: number; failed: number; pending: number }> {
+  async sync(traceId?: string, options?: { force?: boolean }): Promise<{ success: number; failed: number; pending: number }> {
     if (this.isSyncing) {
       console.log('[SyncService] Sync ya en progreso, ignorando');
       return { success: 0, failed: 0, pending: 0 };
@@ -95,105 +103,118 @@ export class SyncService {
     let success = 0;
     let failed = 0;
 
+    const tid = traceId || 'sync_unknown';
+    syncDebugger.log(tid, null, null, 'QUEUE_READ', 'SyncService.sync() started', { itemsCount: 0 });
+
     try {
       // 🛠️ FASE 1: Binarios (Media Upload)
+      syncDebugger.timeStart(tid, 'media_sync');
       const failedMediaIds = await mediaSyncService.syncPendingMedia();
+      syncDebugger.timeEnd(tid, 'media_sync', 'QUEUE_PROCESS', `Media sync completed: ${failedMediaIds.size} failed`, { failedCount: failedMediaIds.size });
 
       // 🛠️ FASE 2: JSON Payload Sync
+      syncDebugger.timeStart(tid, 'queue_read');
       const items = await syncQueueRepository.getPending(options?.force);
+      syncDebugger.timeEnd(tid, 'queue_read', 'QUEUE_READ', `Read ${items.length} pending operations`, { count: items.length });
       
       if (items.length === 0) {
         console.log('[SyncService] No hay operaciones JSON pendientes');
+        syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', 'No pending JSON operations, skipped');
         return { success: 0, failed: 0, pending: 0 };
       }
 
-      // Orden Atómico: Garantizar que 'course' se procese ANTES que 'subject' para evitar FK Constraint
-      // y que 'audio-recording' se procese ANTES que 'audio-transcript' (FK padre-hijo)
-      items.sort((a, b) => {
-        const order: Record<string, number> = {
-          course: 1,
-          subject: 2,
-          'audio-recording': 3,
-          audio_recording: 3,
-          'flashcard-deck': 4,
-          flashcard: 5,
-          'audio-transcript': 6,
-          audio_transcript: 6,
-          'ai-chat': 7,
-          'user-preference': 8,
-        };
-        const rankA = order[a.entity_type] ?? 99;
-        const rankB = order[b.entity_type] ?? 99;
-        if (rankA !== rankB) return rankA - rankB;
-        // Si tienen el mismo rango, FIFO (menor ID primero)
-        return a.id! - b.id!;
-      });
+      // Reducción de cola: compactar operaciones en estado final por entidad
+      syncDebugger.timeStart(tid, 'queue_reduce');
+      const { operations: reduced, report, errors } = reduce(items);
+      syncDebugger.timeEnd(tid, 'queue_reduce', 'QUEUE_READ', `Reduced ${items.length} → ${reduced.length} ops`, report);
 
-      console.log(`[SyncService] Iniciando Fase 2: sync de ${items.length} operaciones JSON (Orden Atómico aplicado)`);
+      if (errors.length > 0) {
+        syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', `Reduction validation errors: ${errors.length}`, { errors });
+      }
 
-      for (const item of items) {
+      const operations = reduced.length > 0 ? reduced : items.map(i => ({
+        operation: i.operation,
+        entity_type: i.entity_type,
+        entity_id: i.entity_id!,
+        payload: i.payload ? JSON.parse(i.payload) : undefined,
+        originalIds: [i.id!],
+      }));
+
+      console.log(`[SyncService] Iniciando Fase 2: sync de ${operations.length} operaciones (${items.length} → ${reduced.length} reducidas)`);
+
+      for (const op of operations) {
+        const operationId = syncDebugger.nextOperationId(tid);
+        const entityTag = `${op.operation} ${op.entity_type}/${op.entity_id}`;
+
         // Fallo silencioso: si el ID está en la lista de media fallida, saltar
-        if (item.entity_id && failedMediaIds.has(item.entity_id)) {
-          console.log(`[SyncService] Saltando Fase 2 para ${item.entity_type}/${item.entity_id} debido a fallo en Fase 1.`);
+        if (op.entity_id && failedMediaIds.has(op.entity_id)) {
+          console.log(`[SyncService] Saltando Fase 2 para ${entityTag} debido a fallo en Fase 1.`);
+          syncDebugger.log(tid, operationId, null, 'QUEUE_PROCESS', `Skipped ${entityTag} — media failed`, undefined, op.entity_type, op.entity_id);
           continue;
         }
 
         if (!this.syncHandler) {
           console.warn('[SyncService] No sync handler registrado');
+          syncDebugger.log(tid, null, null, 'ERROR', 'No sync handler registered');
           break;
         }
 
         try {
-          await syncQueueRepository.markProcessing(item.id!);
+          syncDebugger.log(tid, operationId, null, 'QUEUE_PROCESS', `Processing ${entityTag}`, undefined, op.entity_type, op.entity_id);
+          syncDebugger.timeStart(tid, `op_handler_${operationId}`);
           
-          // Leer el payload (que puede haber sido actualizado en la BD local durante la Fase 1 si era update, 
-          // pero el payload de la cola es una copia antigua. Lo ideal sería inyectar el cloud_url si aplica.
-          // Para simplificar, asumimos que si es media, el backend acepta el payload con o sin cloud_url, o
-          // mejor leer el estado actual de la tabla en base a la cola).
-          let payload = item.payload ? JSON.parse(item.payload) : undefined;
+          let payload = op.payload;
 
           // Si es una entidad media, inyectamos la URL fresca desde SQLite para evitar sobrescribir con NULL
-          if (item.entity_id && (item.entity_type === 'photo' || item.entity_type === 'audio_recording' || item.entity_type === 'scanned_document')) {
-             const tableName = item.entity_type + 's'; // simplistic mapping
+          if (op.entity_id && (op.entity_type === 'photo' || op.entity_type === 'audio_recording' || op.entity_type === 'scanned_document')) {
+             const tableName = op.entity_type + 's'; // simplistic mapping
              try {
                const db = databaseService.getDb();
-               const freshRecord: any = await db.getFirstAsync(`SELECT cloud_url FROM ${tableName} WHERE id = ?`, [item.entity_id]);
+               const freshRecord: any = await db.getFirstAsync(`SELECT cloud_url FROM ${tableName} WHERE id = ?`, [op.entity_id]);
                if (freshRecord?.cloud_url && payload) {
-                 payload.cloud_url = freshRecord.cloud_url;
+                 payload = { ...payload, cloud_url: freshRecord.cloud_url };
                }
               } catch (_e) { /* ignore */ }
           }
           
-          console.log(`[SyncService] Sincronizando ${item.operation} ${item.entity_type}/${item.entity_id}`);
+          console.log(`[SyncService] Sincronizando ${entityTag}`);
 
+          // RESTORE → CREATE (el backend maneja upsert/existence check)
+          const handlerOp = op.operation === 'RESTORE' ? 'CREATE' : op.operation;
           await this.syncHandler({
-            entity_type: item.entity_type,
-            entity_id: item.entity_id,
-            operation: item.operation,
+            entity_type: op.entity_type,
+            entity_id: op.entity_id,
+            operation: handlerOp,
             payload,
           });
 
-          await syncQueueRepository.markCompleted(item.id!);
+          syncDebugger.timeEnd(tid, `op_handler_${operationId}`, 'QUEUE_PROCESS', `Completed ${entityTag}`, undefined, operationId, op.entity_type, op.entity_id);
+          await syncQueueRepository.markCompletedBatch(op.originalIds);
           success++;
           
-          console.log(`[SyncService] ✅ ${item.entity_type}/${item.entity_id} sincronizado`);
+          console.log(`[SyncService] ✅ ${entityTag} sincronizado`);
         } catch (error: any) {
           if (error.message?.includes('ORPHAN_DROP')) {
-            console.log(`[SyncService] ℹ️ Abortando sync huérfano (padre eliminado): ${item.entity_type}/${item.entity_id}`);
-            // Marcar como completado para borrarlo de la cola
-            await syncQueueRepository.markCompleted(item.id!);
+            console.log(`[SyncService] ℹ️ Abortando sync huérfano (padre eliminado): ${entityTag}`);
+            syncDebugger.log(tid, operationId, null, 'QUEUE_PROCESS', `Orphan dropped: ${entityTag}`, { reason: 'parent_deleted' }, op.entity_type, op.entity_id);
+            await syncQueueRepository.markCompletedBatch(op.originalIds);
             success++;
           } else {
-            console.error(`[SyncService] ❌ Error sincronizando ${item.entity_type} ${item.entity_id}:`, error.message);
-            await syncQueueRepository.markFailed(item.id!, error.message);
+            console.error(`[SyncService] ❌ Error sincronizando ${entityTag}:`, error.message);
+            syncDebugger.logError(tid, operationId, 'QUEUE_PROCESS', `Failed ${entityTag}`, error, op.entity_type, op.entity_id);
+            for (const id of op.originalIds) {
+              await syncQueueRepository.markFailed(id, error.message);
+            }
             failed++;
           }
         }
       }
 
       console.log(`[SyncService] Sync completado: ${success} exitosos, ${failed} fallidos`);
+      syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', `Sync completed: ${success} success, ${failed} failed, ${items.length - success - failed} skipped`, { success, failed, total: items.length });
     } catch (error) {
       console.error('[SyncService] Fatal error durante sync:', error);
+      syncDebugger.logError(tid, null, 'QUEUE_PROCESS', 'Fatal error', error);
       failed++;
     } finally {
       this.isSyncing = false;

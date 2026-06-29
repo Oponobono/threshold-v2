@@ -274,6 +274,11 @@ export const buildApiError = (message: string): Error => new Error(message);
 export const fetchWithFallback = async (path: string, init?: RequestInit): Promise<Response> => {
   const method = init?.method?.toUpperCase() || 'GET';
   
+  // 🧪 FaultInjector hook for test scenarios
+  const { faultInjector } = require('../sync/test/FaultInjector');
+  const faultResponse = faultInjector.intercept(path, init);
+  if (faultResponse) return faultResponse;
+
   // 🛡️ Circuit breaker rápido: si hace <10s TODAS las URLs fallaron,
   //      ni intentamos — fallamos al instante.
   if (lastFullCircuitFailureAt > 0 && Date.now() - lastFullCircuitFailureAt < FULL_CIRCUIT_TTL_MS) {
