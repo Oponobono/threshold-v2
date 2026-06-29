@@ -454,7 +454,6 @@ const migrations: Migration[] = [
     version: 18,
     up: [
       `UPDATE flashcard_decks SET is_backed_up = 0`,
-      `UPDATE flashcards SET is_backed_up = 0`,
     ],
   },
   {
@@ -547,6 +546,12 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_sync_debug_stage ON sync_debug_logs(stage)`,
       `CREATE INDEX IF NOT EXISTS idx_sync_debug_entity ON sync_debug_logs(entity_type, entity_id)`,
       `ALTER TABLE sync_queue ADD COLUMN trace_id TEXT`,
+    ],
+  },
+  {
+    version: 23,
+    up: [
+      `ALTER TABLE flashcards ADD COLUMN is_backed_up INTEGER DEFAULT 0`,
     ],
   },
 ];
