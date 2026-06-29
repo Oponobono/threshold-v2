@@ -127,7 +127,7 @@ exports.deltaSync = (req, res) => {
   });
 
   function respond(syncVersion) {
-    const updatedCount = Object.values(updated).reduce((s: number, arr: any) => s + arr.length, 0);
+    const updatedCount = Object.values(updated).reduce((s, arr) => s + arr.length, 0);
     if (traceId) console.log(`[SyncController][${traceId}] deltaSync completed — ${updatedCount} updated, ${deleted.length} deleted, version=${syncVersion}`);
     res.json({
       syncVersion: syncVersion || 0,
