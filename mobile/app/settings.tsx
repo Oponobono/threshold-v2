@@ -34,33 +34,6 @@ import {
 } from '../src/components/settings';
 
 /**
- * Componente auxiliar para renderizar la cabecera de cada sección de configuración.
- * Muestra un título principal, una descripción y un ícono representativo.
- *
- * @param {string} title - El título de la sección.
- * @param {string} desc - Una breve descripción de lo que contiene la sección.
- * @param {string} icon - Nombre del ícono de Ionicons a mostrar.
- * @param {Function} [onIconPress] - Función opcional al presionar el ícono.
- * @param {string} [iconColor] - Color opcional para sobrescribir el color por defecto del ícono.
- * @param {number} [iconSize] - Tamaño opcional para el ícono.
- */
-const SectionHeader = ({ title, desc, icon, onIconPress, iconColor, iconSize }: { title: string; desc: string; icon: string; onIconPress?: () => void; iconColor?: string; iconSize?: number }) => (
-  <View style={styles.sectionHeader}>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionDesc}>{desc}</Text>
-    </View>
-    {onIconPress ? (
-      <TouchableOpacity onPress={onIconPress} style={{ padding: 4 }}>
-        <Ionicons name={icon as any} size={iconSize || 18} color={iconColor || theme.colors.text.secondary} />
-      </TouchableOpacity>
-    ) : (
-      <Ionicons name={icon as any} size={iconSize || 18} color={iconColor || theme.colors.text.secondary} />
-    )}
-  </View>
-);
-
-/**
  * Componente auxiliar para renderizar una fila de configuración individual.
  * Contiene un título, una descripción opcional y un elemento derecho (ej. Switch, botón).
  *
@@ -89,8 +62,12 @@ const SettingRow = ({ title, desc, right }: { title: string; desc?: string; righ
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
 export default function SettingsScreen() {
-  const [scalesExpanded, setScalesExpanded] = useState(true);
+  const [academicExpanded, setAcademicExpanded] = useState(true);
   const [backupExpanded, setBackupExpanded] = useState(false);
+  const [languageExpanded, setLanguageExpanded] = useState(false);
+  const [notificationsExpanded, setNotificationsExpanded] = useState(true);
+  const [securityExpanded, setSecurityExpanded] = useState(false);
+  const [collaborationExpanded, setCollaborationExpanded] = useState(false);
   const [showWeeklyPicker, setShowWeeklyPicker] = useState(false);
   const [weeklyConfig, setWeeklyConfig] = useState<WeeklyDigestConfig | null>(null);
   const [isZyrenInfoVisible, setIsZyrenInfoVisible] = useState(false);
@@ -202,6 +179,8 @@ export default function SettingsScreen() {
     twoFactorEnabled,
   } = useSettingsLogic();
 
+  const anyNotifActive = notifDeadline || notifWeekly || notifEmail;
+
   const {
     prefs: backupPrefs,
     updatePref: updateBackupPref,
@@ -295,10 +274,40 @@ export default function SettingsScreen() {
         {/* ── ACADEMIC PREFERENCES ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('academic.title')} desc={t('academic.desc')} icon="settings-outline" />
+          <TouchableOpacity
+            onPress={() => setAcademicExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="settings-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={styles.sectionTitle}>{t('academic.title')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('academic.desc')}</Text>
+              {!academicExpanded && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={[styles.settingDesc, { fontWeight: '600' }]}>{t('academic.minGrade')}:</Text>
+                    <Text style={[styles.settingDesc, { color: theme.colors.primary, fontWeight: '700' }]}>{threshold}</Text>
+                  </View>
+                  {(() => {
+                    const active = gradingSystems.find(s => s.id === selectedSystemId);
+                    return active ? (
+                      <View style={styles.activeBadge}>
+                        <Text style={styles.activeBadgeText}>{active.is_custom ? active.name : t(active.name)}</Text>
+                      </View>
+                    ) : null;
+                  })()}
+                </View>
+              )}
+            </View>
+            <Ionicons name={academicExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+          </TouchableOpacity>
 
+          {academicExpanded && (
+            <>
           {/* Terms / Semesters */}
-          <Text style={styles.subSectionTitle}>{t('academic.termsSemesters')}</Text>
+          <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>{t('academic.termsSemesters')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.termsRow}>
             {TERMS.map((term, index) => (
               <TouchableOpacity
@@ -353,25 +362,7 @@ export default function SettingsScreen() {
           </View>
 
           {/* Grading Scales */}
-          <TouchableOpacity
-            onPress={() => setScalesExpanded(prev => !prev)}
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
-              {!scalesExpanded && (() => {
-                const active = gradingSystems.find(s => s.id === selectedSystemId);
-                return active ? (
-                  <View style={[styles.activeBadge, { marginLeft: 8 }]}>
-                    <Text style={styles.activeBadgeText}>{active.is_custom ? active.name : t(active.name)}</Text>
-                  </View>
-                ) : null;
-              })()}
-            </View>
-            <Ionicons name={scalesExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} />
-          </TouchableOpacity>
-          {scalesExpanded && (
-            <>
+          <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
           {isLoadingSystems ? (
             <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 12 }} />
           ) : gradingSystems.map(system => (
@@ -405,12 +396,29 @@ export default function SettingsScreen() {
         {/* ── LANGUAGE ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader
-            title={t('settings.language')}
-            desc={t('settings.languageDesc')}
-            icon="language-outline"
-          />
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
+          <TouchableOpacity
+            onPress={() => setLanguageExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="language-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={styles.sectionTitle}>{t('settings.language')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('settings.languageDesc')}</Text>
+              {!languageExpanded && (
+                <View style={[styles.activeBadge, { alignSelf: 'flex-start', marginTop: 6 }]}>
+                  <Text style={styles.activeBadgeText}>
+                    {appLanguage === 'es' ? t('settings.languageEs') : t('settings.languageEn')}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Ionicons name={languageExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+          </TouchableOpacity>
+
+          {languageExpanded && (
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
             {(['es', 'en'] as const).map((lang) => {
               const isActive = appLanguage === lang;
               return (
@@ -442,6 +450,7 @@ export default function SettingsScreen() {
               );
             })}
           </View>
+          )}
         </View>
 
         {/* ─────────────────────────────────────────── */}
@@ -453,7 +462,26 @@ export default function SettingsScreen() {
         {/* ── NOTIFICATIONS ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('notifications.title')} desc={t('notifications.desc')} icon="notifications-outline" />
+          <TouchableOpacity
+            onPress={() => setNotificationsExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons
+                  name={anyNotifActive ? 'notifications' : 'notifications-off-outline'}
+                  size={18}
+                  color={anyNotifActive ? theme.colors.primary : theme.colors.text.secondary}
+                />
+                <Text style={styles.sectionTitle}>{t('notifications.title')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('notifications.desc')}</Text>
+            </View>
+            <Ionicons name={notificationsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+          </TouchableOpacity>
+
+          {notificationsExpanded && (
+            <>
           <SettingRow
             title={t('notifications.deadlineAlerts')} desc={t('notifications.deadlineAlertsDesc')}
             right={<Switch value={notifDeadline} onValueChange={(v) => { setNotifDeadline(v); AsyncStorage.setItem('notif_deadline', String(v)); if (!v) cancelAllDeadlineNotifications(); alertRef.show({ title: v ? t('settings.notifDeadlineEnabled') : t('settings.notifDeadlineDisabled'), message: v ? t('settings.notifDeadlineEnabledMsg') : t('settings.notifDeadlineDisabledMsg'), type: v ? 'success' : 'info', buttons: [{ text: t('common.ok') }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
@@ -472,6 +500,8 @@ export default function SettingsScreen() {
             title={t('notifications.emailNotif')} desc={t('notifications.emailNotifDesc')}
             right={<Switch value={notifEmail} onValueChange={(v) => { setNotifEmail(v); alertRef.show({ title: v ? t('settings.notifEmailEnabled') : t('settings.notifEmailDisabled'), message: v ? t('settings.notifEmailEnabledMsg') : t('settings.notifEmailDisabledMsg'), type: v ? 'success' : 'info', buttons: [{ text: t('common.ok') }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
           />
+          </>
+          )}
         </View>
 
         {/* ─────────────────────────────────────────── */}
@@ -804,7 +834,31 @@ export default function SettingsScreen() {
         {/* ── SECURITY & ACCOUNT ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('account.securityTitle')} desc={t('account.securityDesc')} icon="shield-outline" />
+          <TouchableOpacity
+            onPress={() => setSecurityExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="shield-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={styles.sectionTitle}>{t('account.securityTitle')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('account.securityDesc')}</Text>
+              {!securityExpanded && (
+                <TouchableOpacity
+                  style={[styles.darkPill, { backgroundColor: theme.colors.text.primary, alignSelf: 'flex-start', marginTop: 8, paddingHorizontal: 20 }]}
+                  onPress={handleSignOut}
+                >
+                  <Ionicons name="log-out-outline" size={14} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.darkPillText}>{t('account.signOutBtn')}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Ionicons name={securityExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+          </TouchableOpacity>
+
+          {securityExpanded && (
+            <>
           <SettingRow
             title={t('account.biometric')} desc={t('account.biometricDesc')}
             right={<Switch value={biometric} onValueChange={handleToggleBiometric} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
@@ -816,8 +870,9 @@ export default function SettingsScreen() {
           <SettingRow
             title={t('account.signOut')} desc={t('account.signOutDesc')}
             right={
-              <TouchableOpacity style={[styles.actionButton, styles.outlinePill]} onPress={handleSignOut}>
-                <Text style={styles.outlinePillText}>{t('account.signOutBtn')}</Text>
+              <TouchableOpacity style={[styles.actionButton, styles.darkPill]} onPress={handleSignOut}>
+                <Ionicons name="log-out-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                <Text style={styles.darkPillText}>{t('account.signOutBtn')}</Text>
               </TouchableOpacity>
             }
           />
@@ -832,59 +887,49 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             }
           />
+            </>
+          )}
         </View>
 
         {/* ─────────────────────────────────────────── */}
         {/* ── INTEGRATIONS ── */}
         {/* ─────────────────────────────────────────── */}
-        <View style={styles.section}>
-          <SectionHeader title={t('integrations.title')} desc={t('integrations.desc')} icon="extension-puzzle-outline" />
-          <SettingRow
-            title={t('integrations.calendarSync')} desc={t('integrations.calendarSyncDesc')}
-            right={<Switch value={calendarSync} onValueChange={setCalendarSync} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
-          />
-          <Text style={styles.subSectionTitle}>{t('integrations.linkedLms')}</Text>
-          {lmsAccounts.length === 0 && (
-            <Text style={[styles.settingDesc, { fontStyle: 'italic', marginBottom: 8 }]}>
-              {t('integrations.noAccounts')}
-            </Text>
-          )}
-          {lmsAccounts.map((lms, i) => (
-            <View key={lms.id || i} style={styles.lmsRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.settingTitle}>{lms.platform}</Text>
-                <Text style={styles.settingDesc}>{t('account.connectedAs', { user: lms.username })}</Text>
+        <View style={[styles.section, { opacity: 0.5 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="extension-puzzle-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.text.secondary }]}>{t('integrations.title')}</Text>
               </View>
-              <TouchableOpacity
-                style={styles.outlinePill}
-                onPress={() => {
-                  const name = lms.platform;
-                  alertRef.show({
-                    title: t('integrations.remove'),
-                    message: t('settings.unlinkConfirm', { name }),
-                    type: 'confirm',
-                    buttons: [
-                      { text: t('common.cancel'), style: 'cancel' },
-                      { text: t('integrations.remove'), style: 'destructive', onPress: () => handleRemoveLms(i) },
-                    ]
-                  });
-                }}
-              >
-                <Text style={styles.outlinePillText}>{t('integrations.remove')}</Text>
-              </TouchableOpacity>
+              <Text style={styles.sectionDesc}>{t('integrations.desc')}</Text>
             </View>
-          ))}
-          <TouchableOpacity style={[styles.darkPill, { alignSelf: 'flex-end', marginTop: 8 }]} onPress={() => setIsAddLmsVisible(true)}>
-            <Text style={styles.darkPillText}>{t('integrations.addLms')}</Text>
-          </TouchableOpacity>
+            <Ionicons name="chevron-down" size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+          </View>
         </View>
 
         {/* ─────────────────────────────────────────── */}
         {/* ── COLLABORATION ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title={t('settings.collaboration')} desc={t('settings.collaborationDesc')} icon="people-outline" />
-          
+          <TouchableOpacity
+            onPress={() => setCollaborationExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="people-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={styles.sectionTitle}>{t('settings.collaboration')}</Text>
+              </View>
+              {!collaborationExpanded ? (
+                <Text style={[styles.sectionDesc, { marginTop: 4 }]}>{t('settings.collaborationDesc')}</Text>
+              ) : null}
+            </View>
+            <Ionicons name={collaborationExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+          </TouchableOpacity>
+          <Text style={[styles.sectionDesc, { marginBottom: 12 }]}>{t('settings.collaborationDesc')}</Text>
+
+          {collaborationExpanded && (
+            <>
           <Text style={styles.subSectionTitle}>{t('settings.joinGroup')}</Text>
           <View style={[styles.settingRow, { alignItems: 'center' }]}>
             <View style={{ flex: 1, marginRight: 12 }}>
@@ -932,43 +977,23 @@ export default function SettingsScreen() {
               ))}
             </>
           )}
+          </>
+          )}
         </View>
 
         {/* ─────────────────────────────────────────── */}
         {/* ── DATA EXPORT & RESET ── */}
         {/* ─────────────────────────────────────────── */}
-        <View style={styles.section}>
-          <SectionHeader title={t('integrations.dataExport')} desc={t('integrations.dataExportDesc')} icon="document-text-outline" />
-          <View style={styles.exportRow}>
-            <TouchableOpacity style={[styles.exportBtn, { flex: 1 }]} onPress={() => setIsExportDataVisible(true)}>
-              <Text style={styles.exportBtnText}>{t('integrations.exportCsv')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.exportBtn, styles.exportBtnOutline, { flex: 1 }]} onPress={() => setIsExportDataVisible(true)}>
-              <Text style={styles.exportBtnOutlineText}>{t('integrations.exportPdf')}</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.subSectionTitle}>{t('settings.resetOptions')}</Text>
-          <View style={styles.settingRow}>
+        <View style={[styles.section, { opacity: 0.5 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.settingTitle}>{t('settings.resetAll')}</Text>
-              <Text style={styles.settingDesc}>{t('settings.resetDesc')}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="document-text-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.text.secondary }]}>{t('integrations.dataExport')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('integrations.dataExportDesc')}</Text>
             </View>
-            <TouchableOpacity
-              style={[styles.darkPill, { backgroundColor: '#FF2D55', marginLeft: 12 }]}
-              onPress={() => alertRef.show({
-                title: t('settings.resetAll'),
-                message: t('settings.resetDesc'),
-                type: 'confirm',
-                buttons: [
-                  { text: t('common.cancel'), style: 'cancel' },
-                  { text: t('settings.reset'), style: 'destructive', onPress: async () => {
-                    alertRef.show({ title: t('common.success'), message: t('settings.dataResetComplete'), type: 'success' });
-                  }},
-                ]
-              })}
-            >
-              <Text style={styles.darkPillText}>{t('settings.reset')}</Text>
-            </TouchableOpacity>
+            <Ionicons name="chevron-down" size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
           </View>
         </View>
 
@@ -976,17 +1001,24 @@ export default function SettingsScreen() {
         {/* ── ABOUT & HELP ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader 
-            title={t('about.helpTitle')} 
-            desc={t('about.helpDesc')} 
-            icon="information-circle-outline" 
-            onIconPress={() => router.push('/about')}
-            iconColor="#C5A059"
-            iconSize={26}
-          />
+          <View style={styles.sectionHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.sectionTitle}>{t('about.helpTitle')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('about.helpDesc')}</Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/about')} style={{ padding: 4 }}>
+              <Ionicons name="information-circle-outline" size={26} color="#C5A059" />
+            </TouchableOpacity>
+          </View>
           <SettingRow
             title={t('about.faq')} desc=""
-            right={<TouchableOpacity onPress={() => setIsFaqVisible(true)}><Text style={styles.openText}>{t('about.open')}</Text></TouchableOpacity>}
+            right={
+              <TouchableOpacity style={styles.darkPill} onPress={() => setIsFaqVisible(true)}>
+                <Text style={styles.darkPillText}>{t('about.open')}</Text>
+              </TouchableOpacity>
+            }
           />
           <SettingRow
             title={t('settings.zyrenAITitle')}
@@ -1000,7 +1032,11 @@ export default function SettingsScreen() {
           />
           <SettingRow
             title={t('about.sendFeedback')} desc=""
-            right={<TouchableOpacity style={styles.darkPill} onPress={() => setIsFeedbackVisible(true)}><Text style={styles.darkPillText}>{t('about.send')}</Text></TouchableOpacity>}
+            right={
+              <TouchableOpacity style={styles.darkPill} onPress={() => setIsFeedbackVisible(true)}>
+                <Text style={styles.darkPillText}>{t('about.send')}</Text>
+              </TouchableOpacity>
+            }
           />
           <View style={[styles.settingRow, { marginTop: 4 }]}>
             <Text style={styles.settingDesc}>{t('about.appVersion')}</Text>

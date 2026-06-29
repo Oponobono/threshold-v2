@@ -174,27 +174,27 @@ export const useSettingsLogic = () => {
         setThreshold(String(userProfile.approval_threshold));
       }
 
-      // Load Grading Systems – defaults siempre disponibles, personalizadas desde API
+      // Grading Systems – defaults instantáneos, personalizadas en background
       const defaultIds = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.id));
-      let allSystems = [...DEFAULT_GRADING_SYSTEMS];
+      const allSystems = [...DEFAULT_GRADING_SYSTEMS];
       const usedCodes = new Set(allSystems.map(s => s.code));
-      let nextId = Math.max(...DEFAULT_GRADING_SYSTEMS.map(s => s.id)) + 1;
-      try {
-        const apiSystems = await fetchGradingSystems();
+      setGradingSystems(allSystems);
+      setIsLoadingSystems(false);
+
+      fetchGradingSystems().then(apiSystems => {
         const customSystems = (apiSystems || []).filter(s => {
           if (!s.is_custom) return false;
           if (usedCodes.has(s.code)) return false;
           return true;
         });
         if (customSystems.length > 0) {
+          const nextId = Math.max(...DEFAULT_GRADING_SYSTEMS.map(s => s.id)) + 1;
           const remapped = customSystems.map(s => defaultIds.has(s.id) ? { ...s, id: nextId++ } : s);
-          allSystems = [...allSystems, ...remapped];
+          setGradingSystems(prev => [...prev, ...remapped]);
         }
-      } catch (err) {
+      }).catch(err => {
         console.warn('[useSettingsLogic] No se pudieron cargar escalas personalizadas:', err);
-      }
-      setGradingSystems(allSystems);
-      setIsLoadingSystems(false);
+      });
 
       let currentSystemId: number | null = null;
       if (userProfile?.active_grading_version_id) {
