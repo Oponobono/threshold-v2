@@ -18,6 +18,8 @@ import {
   GradingPeriodSynchronizer,
   LmsAccountSynchronizer,
   ThresholdOverrideSynchronizer,
+  AssessmentCategorySynchronizer,
+  StudySessionSynchronizer,
   PhotoSynchronizer,
   AudioSynchronizer,
   DocumentSynchronizer,
@@ -69,6 +71,8 @@ class SyncManager {
     this.registerSynchronizer(new GradingPeriodSynchronizer());
     this.registerSynchronizer(new LmsAccountSynchronizer());
     this.registerSynchronizer(new ThresholdOverrideSynchronizer());
+    this.registerSynchronizer(new AssessmentCategorySynchronizer());
+    this.registerSynchronizer(new StudySessionSynchronizer());
     this.registerSynchronizer(new PhotoSynchronizer());
     this.registerSynchronizer(new AudioSynchronizer());
     this.registerSynchronizer(new DocumentSynchronizer());
@@ -222,6 +226,7 @@ class SyncManager {
         this._lastConsistencyReport = r;
         this._emit({ type: 'consistency', consistencyReport: r });
       }).catch(() => {});
+      this.sync().catch(() => {});
       return result;
 
     } catch (err: any) {

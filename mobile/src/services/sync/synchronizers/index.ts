@@ -8,6 +8,8 @@ export { CalendarEventSynchronizer } from './CalendarEventSynchronizer';
 export { GradingPeriodSynchronizer } from './GradingPeriodSynchronizer';
 export { LmsAccountSynchronizer } from './LmsAccountSynchronizer';
 export { ThresholdOverrideSynchronizer } from './ThresholdOverrideSynchronizer';
+export { AssessmentCategorySynchronizer } from './AssessmentCategorySynchronizer';
+export { StudySessionSynchronizer } from './StudySessionSynchronizer';
 export { PhotoSynchronizer } from '../asset/PhotoSynchronizer';
 export { AudioSynchronizer } from '../asset/AudioSynchronizer';
 export { DocumentSynchronizer } from '../asset/DocumentSynchronizer';

@@ -74,6 +74,47 @@ export class SyncService {
     return syncQueueRepository.countPending();
   }
 
+  async enqueueLegacyUnsyncedData(): Promise<number> {
+    const db = databaseService.getDb();
+    let count = 0;
+    const tables = [
+      { name: 'subjects', type: 'subject' },
+      { name: 'courses', type: 'course' },
+      { name: 'assessments', type: 'assessment' },
+      { name: 'assessment_categories', type: 'category' },
+      { name: 'schedules', type: 'schedule' },
+      { name: 'calendar_events', type: 'calendar-event' },
+      { name: 'flashcard_decks', type: 'flashcard-deck' },
+      { name: 'flashcards', type: 'flashcard' },
+      { name: 'grading_periods', type: 'grading-period' },
+      { name: 'lms_accounts', type: 'lms-account' },
+      { name: 'subject_threshold_overrides', type: 'threshold-overrides' },
+      { name: 'study_sessions', type: 'study-session' },
+      { name: 'card_logs', type: 'card-log' }
+    ];
+
+    for (const table of tables) {
+      try {
+        const rows: any[] = await db.getAllAsync(
+          `SELECT * FROM ${table.name} WHERE version_number = 0 OR version_number IS NULL`
+        );
+        for (const row of rows) {
+          if (row.deleted_at) continue;
+          await syncQueueRepository.enqueue({
+            entity_type: table.type,
+            entity_id: row.id,
+            operation: 'CREATE',
+            payload: JSON.stringify(row),
+          });
+          count++;
+        }
+      } catch (e) {
+        console.warn(`[SyncService] Error enqueuing legacy data for ${table.name}:`, e);
+      }
+    }
+    return count;
+  }
+
   private triggerSync() {
     // Optional automatic trigger, can be debounced
     this.sync().catch(console.error);

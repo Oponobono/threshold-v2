@@ -175,10 +175,26 @@ class BootstrapManager {
       if (entity_type === 'scanned_document') path = '/scanned_documents';
       if (entity_type === 'flashcard-deck') path = '/flashcard-decks';
       if (entity_type === 'assessment_files') path = `/assessments/${payload?.assessment_id}/files`;
-      if (entity_type === 'flashcard') path = `/flashcard-decks/${payload?.deck_id}/cards`;
+      if (entity_type === 'flashcard') {
+        if (operation === 'CREATE') {
+          if (payload?.content_json) {
+            path = `/flashcard-decks/${payload?.deck_id}/items`;
+          } else {
+            path = `/flashcard-decks/${payload?.deck_id}/cards`;
+          }
+        } else {
+          path = '/flashcards';
+        }
+      }
+      if (entity_type === 'calendar-event') path = '/calendar/events';
       if (entity_type === 'ai-chat') path = '/ai/chats';
       if (entity_type === 'user-preference') path = '/user-preferences';
       if (entity_type === 'threshold-overrides') path = '/threshold-overrides';
+      if (entity_type === 'category') {
+        if (operation === 'CREATE') path = `/subjects/${payload?.subject_id}/categories`;
+        else path = '/categories';
+      }
+      if (entity_type === 'study-session') path = '/learning/sessions';
 
       if (entity_id && (entity_type === 'photo' || entity_type === 'audio_recording' || entity_type === 'scanned_document' || entity_type === 'assessment_files')) {
         const tableName = entity_type === 'assessment_files'
@@ -200,8 +216,9 @@ class BootstrapManager {
 
       if (entity_type === 'card-review') path = `/flashcards/${entity_id}/review`;
       if (entity_type === 'card-log') path = '/learning/card_logs';
+      if (entity_type === 'card-snooze') path = `/flashcards/${entity_id}/snooze`;
 
-      if (entity_id && operation !== 'CREATE') path += `/${entity_id}`;
+      if (entity_id && operation !== 'CREATE' && entity_type !== 'card-review' && entity_type !== 'card-snooze') path += `/${entity_id}`;
 
       if (operation === 'CREATE' && payload) {
         let parentTable = '';

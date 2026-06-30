@@ -162,8 +162,13 @@ export const useBackupLogic = () => {
       
       // 1. Respaldar Datos (SyncQueue → Backend)
       if (type === 'datos' || type === 'ambos') {
+        const enqueuedCount = await syncService.enqueueLegacyUnsyncedData();
+        if (enqueuedCount > 0) {
+          console.log(`[useBackupLogic] Enqueued ${enqueuedCount} legacy unsynced items.`);
+        }
+        
         const syncResult = await syncService.sync(undefined, { force: true });
-        if (syncResult.success > 0) {
+        if (syncResult.success > 0 || enqueuedCount > 0) {
           dataMessage = `Datos sincronizados (${syncResult.success} subidos).`;
         } else if (syncResult.failed > 0) {
           dataMessage = `${syncResult.failed} operaciones fallaron. Reintenta o revisa conexión.`;
@@ -251,11 +256,18 @@ export const useBackupLogic = () => {
     try {
       let dataMessage = '';
       
-      // 1. Descargar Datos (JSON)
+      // 1. Descargar Datos (JSON desde Supabase via sync initial)
       if (type === 'datos' || type === 'ambos') {
+        setDownloadProgress({ total: 1, done: 0, current: 'Conectando con el servidor...', errors: 0, skipped: 0 });
+        const { syncManager } = await import('../services/sync/SyncManager');
+        const syncResult = await syncManager.requestInitialSync(true);
+        setDownloadProgress({ total: 1, done: 1, current: 'Guardando datos localmente...', errors: syncResult.errors.length, skipped: 0 });
         const { useDataStore } = await import('../store/useDataStore');
         await useDataStore.getState().loadAllData(true);
-        dataMessage = 'Datos de la app descargados.';
+        const entitiesMsg = syncResult.entitiesSynced > 0
+          ? `${syncResult.entitiesSynced} registros descargados.`
+          : 'Datos actualizados.';
+        dataMessage = entitiesMsg;
         
         if (type === 'datos') {
           alertRef.show({ title: t('backup.downloadComplete'), message: dataMessage, type: 'success' });

@@ -19,12 +19,14 @@ exports.initialSync = (req, res) => {
     courses: `SELECT * FROM courses WHERE user_id = ?`,
     subjects: `SELECT * FROM subjects WHERE user_id = ?`,
     assessments: `SELECT * FROM assessments WHERE user_id = ?`,
+    assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ?`,
     schedules: `SELECT * FROM schedules WHERE user_id = ?`,
     flashcardDecks: `SELECT * FROM flashcard_decks WHERE user_id = ?`,
     calendarEvents: `SELECT * FROM calendar_events WHERE user_id = ?`,
     gradingPeriods: `SELECT * FROM grading_periods WHERE user_id = ?`,
     lmsAccounts: `SELECT * FROM lms_accounts WHERE user_id = ?`,
     thresholdOverrides: `SELECT * FROM subject_threshold_overrides WHERE user_id = ?`,
+    study_sessions: `SELECT * FROM study_sessions WHERE user_id = ?`,
     photos: `SELECT * FROM photos WHERE user_id = ?`,
     audioRecordings: `SELECT * FROM audio_recordings WHERE user_id = ?`,
     scannedDocuments: `SELECT * FROM scanned_documents WHERE user_id = ?`,
@@ -53,18 +55,20 @@ exports.initialSync = (req, res) => {
     runQuery(queries.courses),
     runQuery(queries.subjects),
     runQuery(queries.assessments),
+    runQuery(queries.assessment_categories),
     runQuery(queries.schedules),
     runQuery(queries.flashcardDecks),
     runQuery(queries.calendarEvents),
     runQuery(queries.gradingPeriods),
     runQuery(queries.lmsAccounts),
     runQuery(queries.thresholdOverrides),
+    runQuery(queries.study_sessions),
     runQuery(queries.photos),
     runQuery(queries.audioRecordings),
     runQuery(queries.scannedDocuments),
     getCurrentSyncVersion(),
   ])
-    .then(async ([user, courses, subjects, assessments, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, photos, audioRecordings, scannedDocuments, syncVersion]) => {
+    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, scannedDocuments, syncVersion]) => {
       const flashcards = [];
       for (const deck of flashcardDecks) {
         const cards = await new Promise((resolve) => {
@@ -86,12 +90,14 @@ exports.initialSync = (req, res) => {
           courses,
           subjects,
           assessments,
+          assessment_categories: assessmentCategories,
           schedules,
           flashcards,
           calendar_events: calendarEvents,
           grading_periods: gradingPeriods,
           lms_accounts: lmsAccounts,
           subject_threshold_overrides: thresholdOverrides,
+          study_sessions: studySessions,
           photos,
           audio_recordings: audioRecordings,
           scanned_documents: scannedDocuments,
@@ -110,16 +116,33 @@ exports.deltaSync = (req, res) => {
   const traceId = req.headers['x-trace-id'] || null;
   if (traceId) console.log(`[SyncController][${traceId}] deltaSync started — version=${version}`);
 
-  const tables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'photos', 'audio_recordings', 'scanned_documents'];
+  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'photos', 'audio_recordings', 'scanned_documents'];
+  const specialTableQueries = {
+    assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ?`,
+  };
+
+  const allTableKeys = [...regularTables, ...Object.keys(specialTableQueries)];
   const updated = {};
   const deleted = [];
-
   let completed = 0;
-  const total = tables.length + 2;
+  const total = allTableKeys.length + 2;
 
-  tables.forEach((table) => {
+  regularTables.forEach((table) => {
     const query = `SELECT * FROM ${table} WHERE user_id = ? AND sync_version > ?`;
     db.all(query, [userId, version], (err, rows) => {
+      if (err) {
+        console.error(`[SyncController] Error en deltaSync para ${table}:`, err);
+        updated[table] = [];
+      } else {
+        updated[table] = rows || [];
+      }
+      completed++;
+      if (completed === total) respond();
+    });
+  });
+
+  Object.entries(specialTableQueries).forEach(([table, query]) => {
+    db.all(query, [userId], (err, rows) => {
       if (err) {
         console.error(`[SyncController] Error en deltaSync para ${table}:`, err);
         updated[table] = [];

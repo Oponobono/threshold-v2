@@ -699,10 +699,10 @@ exports.getCardsByDeckPrioritized = (req, res) => {
 exports.createCard = (req, res) => {
   const { deckId } = req.params;
   const { id: clientId, front, back } = req.body;
-  if (!front || !back) return res.status(400).json({ error: 'Faltan campos requeridos (front, back).' });
+  if (!front) return res.status(400).json({ error: 'Faltan campos requeridos (front).' });
 
   const safeFront = sanitizeText(front);
-  const safeBack = sanitizeText(back);
+  const safeBack = sanitizeText(back || '');
 
   const contentJson = JSON.stringify({ front: safeFront, back: safeBack });
   
