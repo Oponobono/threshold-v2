@@ -226,6 +226,7 @@ class SyncManager {
 
     } catch (err: any) {
       errors.push(err.message || 'Unknown error');
+      console.error(`[SyncManager] Initial sync failed: ${err.message}`);
       this._setState('ERROR');
       const durationMs = Date.now() - startTime;
       const result: SyncResult = { success: false, phase: 'initial', entitiesSynced, errors, durationMs };

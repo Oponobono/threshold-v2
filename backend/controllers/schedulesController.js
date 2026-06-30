@@ -68,8 +68,9 @@ exports.createSchedule = (req, res) => {
   }
 
   const scheduleId = clientId || uuidv4();
-  const query = `INSERT INTO schedules (id, subject_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?, ?)`;
-  db.run(query, [scheduleId, subject_id, day_of_week, start_time, end_time], function(err) {
+  const userId = req.user.id;
+  const query = `INSERT INTO schedules (id, user_id, subject_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)`;
+  db.run(query, [scheduleId, userId, subject_id, day_of_week, start_time, end_time], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     incrementSyncVersion('schedules', scheduleId, () => {
       res.status(201).json({ id: scheduleId, message: 'Horario agregado' });

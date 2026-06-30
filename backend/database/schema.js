@@ -886,22 +886,28 @@ const tableSchema = {
     sqlite: `
       CREATE TABLE IF NOT EXISTS schedules (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         subject_id TEXT NOT NULL,
         day_of_week INTEGER NOT NULL,
         start_time TEXT NOT NULL,
         end_time TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects(id)
       )
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS schedules (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
         subject_id TEXT NOT NULL REFERENCES subjects(id),
         day_of_week INTEGER NOT NULL,
         start_time TEXT NOT NULL,
         end_time TEXT NOT NULL
       )
-    `
+    `,
+    columns: [
+      { name: 'user_id', type: 'TEXT' },
+    ]
   },
   calendar_events: {
     sqlite: `
