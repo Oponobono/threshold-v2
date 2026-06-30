@@ -14,7 +14,17 @@ import {
   AssessmentSynchronizer,
   ScheduleSynchronizer,
   FlashcardSynchronizer,
+  CalendarEventSynchronizer,
+  GradingPeriodSynchronizer,
+  LmsAccountSynchronizer,
+  ThresholdOverrideSynchronizer,
+  PhotoSynchronizer,
+  AudioSynchronizer,
+  DocumentSynchronizer,
 } from './synchronizers';
+import { assetSyncEngine } from './asset/AssetSyncEngine';
+import { generateConsistencyReport } from './ConsistencyReport';
+import type { ConsistencyReport } from './ConsistencyReport';
 
 const SYNC_DEBOUNCE_MS = 2000;
 
@@ -27,6 +37,7 @@ class SyncManager {
   private _lastSyncVersion: number = 0;
   private _pendingRetryTimeout: ReturnType<typeof setTimeout> | null = null;
   private _synchronizers: Map<string, EntitySynchronizer> = new Map();
+  private _lastConsistencyReport: ConsistencyReport | null = null;
 
   constructor() {
     this._registerDefaults();
@@ -39,10 +50,21 @@ class SyncManager {
     this.registerSynchronizer(new AssessmentSynchronizer());
     this.registerSynchronizer(new ScheduleSynchronizer());
     this.registerSynchronizer(new FlashcardSynchronizer());
+    this.registerSynchronizer(new CalendarEventSynchronizer());
+    this.registerSynchronizer(new GradingPeriodSynchronizer());
+    this.registerSynchronizer(new LmsAccountSynchronizer());
+    this.registerSynchronizer(new ThresholdOverrideSynchronizer());
+    this.registerSynchronizer(new PhotoSynchronizer());
+    this.registerSynchronizer(new AudioSynchronizer());
+    this.registerSynchronizer(new DocumentSynchronizer());
   }
 
   registerSynchronizer(synchronizer: EntitySynchronizer): void {
     this._synchronizers.set(synchronizer.entityType, synchronizer);
+  }
+
+  get lastConsistencyReport(): ConsistencyReport | null {
+    return this._lastConsistencyReport;
   }
 
   get state(): SyncState {
@@ -167,6 +189,10 @@ class SyncManager {
       syncDebugger.endSync(traceId, result);
       await syncJournal.finishEntry({ status: 'success', entities_synced: entitiesSynced, errors });
       this._emit({ type: 'complete', result });
+      generateConsistencyReport({ syncType: 'initial', syncDurationMs: durationMs, syncSuccess: true }).then(r => {
+        this._lastConsistencyReport = r;
+        this._emit({ type: 'consistency', consistencyReport: r });
+      }).catch(() => {});
       return result;
 
     } catch (err: any) {
@@ -177,6 +203,10 @@ class SyncManager {
       syncDebugger.logError(traceId, null, 'SYNC_END', 'Sync failed', err);
       await syncJournal.finishEntry({ status: 'error', entities_synced: entitiesSynced, errors });
       this._emit({ type: 'error', error: err.message, result });
+      generateConsistencyReport({ syncType: 'initial', syncDurationMs: durationMs, syncSuccess: false }).then(r => {
+        this._lastConsistencyReport = r;
+        this._emit({ type: 'consistency', consistencyReport: r });
+      }).catch(() => {});
       return result;
     } finally {
       this._isSyncing = false;
@@ -224,6 +254,10 @@ class SyncManager {
       syncDebugger.endSync(traceId, result);
       await syncJournal.finishEntry({ status: 'success', entities_synced: entitiesSynced, errors });
       this._emit({ type: 'complete', result });
+      generateConsistencyReport({ syncType: 'delta', syncDurationMs: durationMs, syncSuccess: result.success }).then(r => {
+        this._lastConsistencyReport = r;
+        this._emit({ type: 'consistency', consistencyReport: r });
+      }).catch(() => {});
       return result;
 
     } catch (err: any) {
@@ -234,6 +268,10 @@ class SyncManager {
       syncDebugger.logError(traceId, null, 'SYNC_END', 'Sync failed', err);
       await syncJournal.finishEntry({ status: 'error', errors: [err.message] });
       this._emit({ type: 'error', error: err.message, result });
+      generateConsistencyReport({ syncType: 'delta', syncDurationMs: durationMs, syncSuccess: false }).then(r => {
+        this._lastConsistencyReport = r;
+        this._emit({ type: 'consistency', consistencyReport: r });
+      }).catch(() => {});
       return result;
     } finally {
       this._isSyncing = false;
@@ -252,6 +290,10 @@ class SyncManager {
         count += await synchronizer.saveAll(items);
       } else if (Array.isArray(data)) {
         count += await synchronizer.saveAll(data);
+        // Schedule background downloads for assets
+        if (entityType === 'photos' || entityType === 'audio_recordings' || entityType === 'scanned_documents') {
+          assetSyncEngine.schedulePendingDownloads(entityType, data).catch(() => {});
+        }
       }
     }
 

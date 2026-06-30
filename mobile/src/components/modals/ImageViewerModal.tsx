@@ -10,6 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import { theme } from '../../styles/theme';
 import { styles } from '../../styles/ImageViewerModal.styles';
 import { ZoomableImage } from '../ui/ZoomableImage';
+import { assetSyncEngine } from '../../services/sync/asset/AssetSyncEngine';
 
 const { width } = Dimensions.get('window');
 
@@ -68,11 +69,20 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedText, setExtractedText] = useState<string | null>(null);
 
-  // Solo en el primer render visible: ir al initialIndex
+  // Solo en el primer render visible: ir al initialIndex y precargar assets
   useEffect(() => {
     if (isVisible && photos.length > 0) {
       const index = Math.min(initialIndex, photos.length - 1);
       setCurrentIndex(index);
+
+      // Trigger priority download for any photo without a local file
+      for (const photo of photos) {
+        if (!photo.local_uri && photo.cloud_url && photo.id) {
+          assetSyncEngine.requestPriorityDownload(
+            'photo', photo.id, photo.cloud_url, `${photo.id}.jpg`,
+          );
+        }
+      }
       
       setTimeout(() => {
         flatListRef.current?.scrollToIndex({

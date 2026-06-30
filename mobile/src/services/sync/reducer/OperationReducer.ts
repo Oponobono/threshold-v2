@@ -63,7 +63,12 @@ export function reduceEntity(items: SyncQueueItem[]): ReducedOperation | null {
         if (!state.hasCreate) {
           state.lastOp = 'UPDATE';
         }
-        state.latestPayload = getPayload(item);
+        const updatePayload = getPayload(item);
+        if (state.latestPayload && typeof state.latestPayload === 'object' && updatePayload && typeof updatePayload === 'object') {
+          state.latestPayload = { ...state.latestPayload, ...updatePayload };
+        } else {
+          state.latestPayload = updatePayload;
+        }
         state.latestPayloadId = item.id ?? null;
         break;
 

@@ -6,6 +6,7 @@
  * - Marcar ítems como respaldados (guardando su cloud_url)
  */
 const { db } = require('../db');
+const { incrementSyncVersion, incrementSyncCounterOnly } = require('../helpers/syncVersion');
 
 /**
  * GET /api/backup/stats
@@ -358,7 +359,12 @@ exports.markAsBackedUp = (req, res) => {
       [cloud_url, id, userId],
       function (err) {
         if (err) { console.error('[Backup] Error al marcar mazo:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar mazo.' }); }
-        if (this.changes > 0) return res.json({ ok: true });
+        if (this.changes > 0) {
+          return incrementSyncVersion('flashcard_decks', id, (err) => {
+            if (err) return res.status(500).json({ error: 'Error al actualizar sync_version.' });
+            res.json({ ok: true });
+          });
+        }
         // 0 changes: mazo no existe en el backend (creado offline o antes del sync).
         // UPSERT para que cloud-items pueda devolvérselo al dispositivo 2.
         db.run(
@@ -371,7 +377,10 @@ exports.markAsBackedUp = (req, res) => {
               console.error('[Backup] Error al insertar mazo offline:', insertErr.message, insertErr.code, insertErr.stack);
               return res.status(500).json({ error: 'Error al registrar mazo offline.', details: insertErr.message });
             }
-            res.json({ ok: true, inserted: true });
+            return incrementSyncVersion('flashcard_decks', id, (err) => {
+              if (err) return res.status(500).json({ error: 'Error al actualizar sync_version.' });
+              res.json({ ok: true, inserted: true });
+            });
           }
         );
       }
@@ -385,8 +394,16 @@ exports.markAsBackedUp = (req, res) => {
       [cloud_url, id, userId],
       function (err) {
         if (err) { console.error('[Backup] Error al marcar tarjeta:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar tarjeta.' }); }
-        if (this.changes > 0) return res.json({ ok: true });
-        res.json({ ok: true, warning: 'Tarjeta no encontrada en backend.' });
+        if (this.changes > 0) {
+          return incrementSyncVersion('flashcards', id, (err) => {
+            if (err) return res.status(500).json({ error: 'Error al actualizar sync_version.' });
+            res.json({ ok: true });
+          });
+        }
+        return incrementSyncVersion('flashcards', id, (err) => {
+          if (err) return res.status(500).json({ error: 'Error al actualizar sync_version.' });
+          res.json({ ok: true, warning: 'Tarjeta no encontrada en backend.' });
+        });
       }
     );
     return;

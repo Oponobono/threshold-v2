@@ -29,10 +29,38 @@ class DatabaseService {
   private async runMigrations(): Promise<void> {
     const db = this.db!;
     const currentVersion = await this.getUserVersion();
-    // Las migraciones están en un array 0-indexed. La versión 1 está en el índice 0.
     for (let i = currentVersion; i < migrations.length; i++) {
+      const statements = migrations[i].up;
+      const filtered: string[] = [];
+
+      for (const stmt of statements) {
+        const alterMatch = stmt.match(/^ALTER\s+TABLE\s+(\w+)\s+ADD\s+(COLUMN\s+)?(\w+)\s/i);
+        if (alterMatch) {
+          const tableName = alterMatch[1];
+          const columnName = alterMatch[3];
+          try {
+            const tableInfo: any[] = await db.getAllAsync(`PRAGMA table_info(${tableName})`);
+            const exists = tableInfo.some(col => col.name === columnName);
+            if (exists) {
+              console.log(`[Migracion] Saltando: ${stmt} (columna ya existe)`);
+              continue;
+            }
+          } catch {
+            // Si falla PRAGMA table_info, ejecutar el statement original
+          }
+        }
+        filtered.push(stmt);
+      }
+
+      if (filtered.length === 0) {
+        await db.withExclusiveTransactionAsync(async (txn) => {
+          await txn.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
+        });
+        continue;
+      }
+
       await db.withExclusiveTransactionAsync(async (txn) => {
-        for (const stmt of migrations[i].up) {
+        for (const stmt of filtered) {
           await txn.execAsync(stmt);
         }
         await txn.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
@@ -76,7 +104,7 @@ class DatabaseService {
       'subjects', 'assessments', 'assessment_categories', 'schedules',
       'flashcard_decks', 'flashcards', 'card_logs', 'study_sessions',
       'photos', 'audio_recordings', 'youtube_videos', 'scanned_documents',
-      'calendar_events', 'sync_queue',
+      'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'sync_queue',
     ];
     for (const table of tables) {
       try { await db.execAsync(`DELETE FROM ${table}`); } catch {}

@@ -16,7 +16,18 @@ export type SyncStage =
   | 'ENTITY_SAVE'
   | 'ENTITY_DELETE'
   | 'ERROR'
-  | 'CONSISTENCY_CHECK';
+  | 'CONSISTENCY_CHECK'
+  | 'UPLOAD_START'
+  | 'UPLOAD_FINISH'
+  | 'UPLOAD_FAILED'
+  | 'DOWNLOAD_START'
+  | 'DOWNLOAD_FINISH'
+  | 'DOWNLOAD_FAILED'
+  | 'CHECKSUM_OK'
+  | 'CHECKSUM_FAILED'
+  | 'FILE_MISSING'
+  | 'FILE_RESTORED'
+  | 'TEST';
 
 export interface SyncDebugLog {
   id?: number;

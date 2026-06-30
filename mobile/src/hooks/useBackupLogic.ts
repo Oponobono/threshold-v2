@@ -162,7 +162,7 @@ export const useBackupLogic = () => {
       
       // 1. Respaldar Datos (SyncQueue → Backend)
       if (type === 'datos' || type === 'ambos') {
-        const syncResult = await syncService.sync({ force: true });
+        const syncResult = await syncService.sync(undefined, { force: true });
         if (syncResult.success > 0) {
           dataMessage = `Datos sincronizados (${syncResult.success} subidos).`;
         } else if (syncResult.failed > 0) {

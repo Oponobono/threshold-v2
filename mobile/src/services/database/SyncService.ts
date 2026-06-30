@@ -15,12 +15,12 @@ type SyncHandler = (operation: {
 
 type ConflictStrategy = 'last-write-wins' | 'client-wins' | 'server-wins';
 
+const MAX_RETRIES = 5;
+
 export class SyncService {
   private isSyncing = false;
   private syncHandler: SyncHandler | null = null;
   private conflictStrategy: ConflictStrategy = 'last-write-wins';
-  private syncRetries = 0;
-  private maxRetries = 3;
 
   onSync(handler: SyncHandler): void {
     this.syncHandler = handler;
@@ -114,9 +114,18 @@ export class SyncService {
 
       // 🛠️ FASE 2: JSON Payload Sync
       syncDebugger.timeStart(tid, 'queue_read');
-      const items = await syncQueueRepository.getPending(options?.force);
+      let items = await syncQueueRepository.getPending(options?.force);
       syncDebugger.timeEnd(tid, 'queue_read', 'QUEUE_READ', `Read ${items.length} pending operations`, { count: items.length });
-      
+
+      // Descartar operaciones que excedieron el límite de reintentos
+      const staleItems = items.filter(i => i.retries >= MAX_RETRIES);
+      if (staleItems.length > 0) {
+        console.log(`[SyncService] Descartando ${staleItems.length} operaciones con ${MAX_RETRIES}+ reintentos`);
+        syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', `Discarding ${staleItems.length} stale operations (≥${MAX_RETRIES} retries)`, { count: staleItems.length });
+        await syncQueueRepository.markCompletedBatch(staleItems.map(i => i.id!));
+      }
+      items = items.filter(i => i.retries < MAX_RETRIES);
+
       if (items.length === 0) {
         console.log('[SyncService] No hay operaciones JSON pendientes');
         syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', 'No pending JSON operations, skipped');
@@ -203,7 +212,12 @@ export class SyncService {
             console.error(`[SyncService] ❌ Error sincronizando ${entityTag}:`, error.message);
             syncDebugger.logError(tid, operationId, 'QUEUE_PROCESS', `Failed ${entityTag}`, error, op.entity_type, op.entity_id);
             for (const id of op.originalIds) {
-              await syncQueueRepository.markFailed(id, error.message);
+              const retryCount = await syncQueueRepository.markFailed(id, error.message);
+              // Errores 4xx son permanentes (no van a resolverse con reintentos)
+              if (retryCount >= MAX_RETRIES || error.message?.includes('Faltan campos') || error.message?.includes('HTTP 400') || error.message?.includes('HTTP 404')) {
+                console.log(`[SyncService] Descartando operación ${entityTag} permanentemente (${retryCount} retries, error: ${error.message})`);
+                await syncQueueRepository.markCompleted(id);
+              }
             }
             failed++;
           }

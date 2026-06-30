@@ -193,8 +193,6 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
       const localIds = new Set(localDecks.map(ld => String(ld.id)));
       const filteredData = (data || []).filter((d: any) => {
         if (localIds.has(String(d.id))) return false;
-        const isNegativeId = !isNaN(Number(d.id)) && Number(d.id) < 0;
-        if (isNegativeId) return false;
         return true;
       });
       

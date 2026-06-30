@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, recordDeletions } = require('../helpers/syncVersion');
 
 /**
  * Obtener una materia específica por su ID
@@ -338,24 +339,26 @@ exports.createSubject = (req, res) => {
         ],
         function(err) {
           if (err) return res.status(500).json({ error: err.message });
-          res.status(201).json({
-            id: subjectId,
-            user_id,
-            code: normalizedCode,
-            name,
-            credits: credits || null,
-            professor: professor || null,
-            color: color || '#CCCCCC',
-            icon: icon || 'book-outline',
-            target_grade: target_grade || null,
-            course_id: finalCourseId,
-            external_url: external_url || null,
-            total_lessons: total_lessons || 0,
-            completed_lessons: completed_lessons || 0,
-            next_micro_milestone: next_micro_milestone || null,
-            avg_score: 0,
-            completion_percent: 0,
-            message: 'Materia creada',
+          incrementSyncVersion('subjects', subjectId, () => {
+            res.status(201).json({
+              id: subjectId,
+              user_id,
+              code: normalizedCode,
+              name,
+              credits: credits || null,
+              professor: professor || null,
+              color: color || '#CCCCCC',
+              icon: icon || 'book-outline',
+              target_grade: target_grade || null,
+              course_id: finalCourseId,
+              external_url: external_url || null,
+              total_lessons: total_lessons || 0,
+              completed_lessons: completed_lessons || 0,
+              next_micro_milestone: next_micro_milestone || null,
+              avg_score: 0,
+              completion_percent: 0,
+              message: 'Materia creada',
+            });
           });
         }
       );
@@ -372,20 +375,41 @@ exports.deleteSubject = (req, res) => {
   const { subjectId } = req.params;
   const userId = req.user.id;
   
-  // Verificar propiedad antes de borrar en cascada
   db.get('SELECT id FROM subjects WHERE id = ? AND user_id = ?', [subjectId, userId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Materia no encontrada o acceso denegado' });
 
-    const tables = ['assessments', 'schedules', 'photos', 'scanned_documents', 'audio_recordings', 'youtube_videos', 'flashcard_decks'];
+    const tables = [
+      { table: 'assessments', entityType: 'assessments' },
+      { table: 'schedules', entityType: 'schedules' },
+      { table: 'photos', entityType: 'photos' },
+      { table: 'scanned_documents', entityType: 'scanned_documents' },
+      { table: 'audio_recordings', entityType: 'audio_recordings' },
+      { table: 'youtube_videos', entityType: 'youtube_videos' },
+      { table: 'flashcard_decks', entityType: 'flashcard_decks' },
+    ];
     let i = 0;
     const next = () => {
       if (i < tables.length) {
-        db.run(`DELETE FROM ${tables[i]} WHERE subject_id = ?`, [subjectId], () => { i++; next(); });
+        const { table, entityType } = tables[i];
+        db.all(`SELECT id FROM ${table} WHERE subject_id = ?`, [subjectId], (err2, rows) => {
+          if (!err2 && rows && rows.length > 0) {
+            const ids = rows.map(r => r.id);
+            recordDeletions(entityType, ids, userId, () => {
+              db.run(`DELETE FROM ${table} WHERE subject_id = ?`, [subjectId], () => { i++; next(); });
+            });
+          } else {
+            db.run(`DELETE FROM ${table} WHERE subject_id = ?`, [subjectId], () => { i++; next(); });
+          }
+        });
       } else {
-        db.run(`DELETE FROM subjects WHERE id = ? AND user_id = ?`, [subjectId, userId], function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ success: true, message: 'Materia y elementos asociados eliminados correctamente' });
+        recordDeletion('subjects', subjectId, userId, () => {
+          incrementSyncCounterOnly(() => {
+            db.run(`DELETE FROM subjects WHERE id = ? AND user_id = ?`, [subjectId, userId], function(err3) {
+              if (err3) return res.status(500).json({ error: err3.message });
+              res.json({ success: true, message: 'Materia y elementos asociados eliminados correctamente' });
+            });
+          });
         });
       }
     };
@@ -426,7 +450,9 @@ exports.updateSubject = (req, res) => {
       // Devolver la materia completa para que el cliente pueda upsert sin perder course_id u otros campos
       db.get('SELECT * FROM subjects WHERE id = ?', [subjectId], (err2, row) => {
         if (err2 || !row) return res.json({ success: true });
-        res.json(row);
+        incrementSyncVersion('subjects', subjectId, () => {
+          res.json(row);
+        });
       });
     });
   };

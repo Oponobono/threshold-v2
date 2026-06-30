@@ -3,6 +3,7 @@ import { getUserId } from './auth';
 import type { AudioRecording } from './types';
 import { audioRepository, audioTranscriptRepository, syncService } from '../database';
 import { getBackupPreferences } from '../backup/backupService';
+import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
 
 export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
   const userId = await getUserId();
@@ -54,6 +55,9 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
   // 1. Guardar SIEMPRE en SQLite local primero — las grabaciones funcionan sin red
   const recording: any = { id, user_id: String(userId), ...payload };
   await audioRepository.create(recording);
+
+  // Schedule file upload via asset pipeline (background, with retry + progress)
+  assetSyncEngine.scheduleUpload('audio-recording', id, payload.local_uri, 'audio/m4a', `${id}.m4a`);
 
   // 2. Sincronizar SIEMPRE el registro de metadatos al servidor (necesario para que
   //    las transcripciones puedan referenciarlo mediante FK).

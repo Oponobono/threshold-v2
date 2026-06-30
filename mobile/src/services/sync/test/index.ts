@@ -9,6 +9,12 @@ import { StressScenario } from './scenarios/StressScenario';
 import { FaultToleranceScenario } from './scenarios/FaultToleranceScenario';
 import { RestoreScenario } from './scenarios/RestoreScenario';
 import { DeterminismScenario } from './scenarios/DeterminismScenario';
+import { PhotoOfflineScenario } from './scenarios/PhotoOfflineScenario';
+import { AudioOfflineScenario } from './scenarios/AudioOfflineScenario';
+import { DocumentOfflineScenario } from './scenarios/DocumentOfflineScenario';
+import { CorruptedAssetScenario } from './scenarios/CorruptedAssetScenario';
+import { DeletePropagationScenario } from './scenarios/DeletePropagationScenario';
+import { StressKillResumeScenario } from './scenarios/StressKillResumeScenario';
 import type { ScenarioReport as ScenarioReportType, FaultRule } from './types';
 
 export type { ScenarioReportType, FaultRule };
@@ -25,6 +31,13 @@ export function registerDefaultScenarios(runner?: ScenarioRunner): ScenarioRunne
     new DeterminismScenario(),
     new StressScenario(),
     new FaultToleranceScenario(),
+    // Asset test scenarios
+    new PhotoOfflineScenario(),
+    new AudioOfflineScenario(),
+    new DocumentOfflineScenario(),
+    new CorruptedAssetScenario(),
+    new DeletePropagationScenario(),
+    new StressKillResumeScenario(),
   ]);
   return r;
 }

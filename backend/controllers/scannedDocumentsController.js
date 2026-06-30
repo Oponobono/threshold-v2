@@ -3,6 +3,7 @@ const secrets = require('../config/secrets');
 const { db } = require('../db');
 const pdfParse = require('pdf-parse');
 const { deleteFromUploadthing } = require('../utils/uploadthingServer');
+const { incrementSyncVersion, recordDeletion } = require('../helpers/syncVersion');
 
 /**
  * Obtener documentos escaneados por materia
@@ -64,14 +65,16 @@ exports.saveScannedDocument = (req, res) => {
   const values = [docId, user_id, subject_id || null, name || null, local_uri, ocr_text || null];
   db.run(query, values, function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({
-      id: docId,
-      user_id,
-      subject_id,
-      name,
-      local_uri,
-      ocr_text: ocr_text || null,
-      message: 'Documento escaneado registrado en BD'
+    incrementSyncVersion('scanned_documents', docId, () => {
+      res.status(201).json({
+        id: docId,
+        user_id,
+        subject_id,
+        name,
+        local_uri,
+        ocr_text: ocr_text || null,
+        message: 'Documento escaneado registrado en BD'
+      });
     });
   });
 };
@@ -110,7 +113,9 @@ exports.deleteScannedDocument = (req, res) => {
         });
       }
 
-      res.json({ success: true, local_uri: row.local_uri });
+      recordDeletion('scanned_documents', documentId, userId, () => {
+        res.json({ success: true, local_uri: row.local_uri });
+      });
     });
   });
 };
@@ -160,7 +165,9 @@ exports.updateScannedDocument = (req, res) => {
     // Retornar el documento actualizado
     db.get(`SELECT * FROM scanned_documents WHERE id = ?`, [documentId], (getErr, row) => {
       if (getErr) return res.status(500).json({ error: getErr.message });
-      res.json(row);
+      incrementSyncVersion('scanned_documents', documentId, () => {
+        res.json(row);
+      });
     });
   });
 };

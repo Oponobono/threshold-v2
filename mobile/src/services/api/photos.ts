@@ -3,6 +3,7 @@ import { getUserId } from './auth';
 import type { Photo } from './types';
 import { photoRepository, syncService } from '../database';
 import { getBackupPreferences } from '../backup/backupService';
+import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
 
 export const getGalleryItems = async () => {
   const userId = await getUserId();
@@ -60,6 +61,9 @@ export const createPhoto = async (photoData: {
   // 1. Guardar SIEMPRE en SQLite local primero — la galería funciona sin red
   const photo: any = { id, ...photoData };
   await photoRepository.create(photo);
+
+  // Schedule file upload via asset pipeline (background, with retry + progress)
+  assetSyncEngine.scheduleUpload('photo', id, photoData.local_uri, 'image/jpeg', `${id}.jpg`);
 
   // 2. Sincronizar con la nube SOLO si el usuario habilitó auto-upload (background, no bloqueante)
   (async () => {

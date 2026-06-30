@@ -62,7 +62,8 @@ const SettingRow = ({ title, desc, right }: { title: string; desc?: string; righ
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
 export default function SettingsScreen() {
-  const [academicExpanded, setAcademicExpanded] = useState(true);
+  const [academicExpanded, setAcademicExpanded] = useState(false);
+  const [gradeScalesExpanded, setGradeScalesExpanded] = useState(false);
   const [backupExpanded, setBackupExpanded] = useState(false);
   const [languageExpanded, setLanguageExpanded] = useState(false);
   const [notificationsExpanded, setNotificationsExpanded] = useState(true);
@@ -284,22 +285,22 @@ export default function SettingsScreen() {
                 <Text style={styles.sectionTitle}>{t('academic.title')}</Text>
               </View>
               <Text style={styles.sectionDesc}>{t('academic.desc')}</Text>
-              {!academicExpanded && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={[styles.settingDesc, { fontWeight: '600' }]}>{t('academic.minGrade')}:</Text>
-                    <Text style={[styles.settingDesc, { color: theme.colors.primary, fontWeight: '700' }]}>{threshold}</Text>
-                  </View>
-                  {(() => {
-                    const active = gradingSystems.find(s => s.id === selectedSystemId);
-                    return active ? (
+              {!academicExpanded && (() => {
+                const active = gradingSystems.find(s => s.id === selectedSystemId);
+                return (
+                  <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6, marginTop: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={[styles.settingDesc, { fontWeight: '600' }]}>{t('academic.minGrade')}:</Text>
+                      <Text style={[styles.settingDesc, { color: theme.colors.primary, fontWeight: '700' }]}>{threshold}</Text>
+                    </View>
+                    {active && (
                       <View style={styles.activeBadge}>
                         <Text style={styles.activeBadgeText}>{active.is_custom ? active.name : t(active.name)}</Text>
                       </View>
-                    ) : null;
-                  })()}
-                </View>
-              )}
+                    )}
+                  </View>
+                );
+              })()}
             </View>
             <Ionicons name={academicExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
           </TouchableOpacity>
@@ -362,32 +363,52 @@ export default function SettingsScreen() {
           </View>
 
           {/* Grading Scales */}
-          <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
-          {isLoadingSystems ? (
-            <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 12 }} />
-          ) : gradingSystems.map(system => (
-            <View key={system.id} style={styles.scaleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.settingTitle}>{system.is_custom ? system.name : t(system.name)}</Text>
-                <Text style={styles.settingDesc}>{t('settings.approvalFormat', { min: system.min_value, max: system.max_value, passing: system.passing_value })}</Text>
-              </View>
-              {selectedSystemId === system.id ? (
-                <View style={styles.activeBadge}>
-                  <Text style={styles.activeBadgeText}>{t('academic.active')}</Text>
-                </View>
-              ) : (
-                <TouchableOpacity onPress={() => {
-                  setSelectedSystemId(system.id);
-                  setThreshold(String(system.passing_value));
-                }}>
-                  <Text style={styles.selectText}>{t('academic.select')}</Text>
-                </TouchableOpacity>
-              )}
+          <TouchableOpacity
+            onPress={() => setGradeScalesExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 4 }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+              <Text style={styles.subSectionTitle}>{t('academic.gradingScales')}</Text>
+              {!gradeScalesExpanded && (() => {
+                const active = gradingSystems.find(s => s.id === selectedSystemId);
+                return active ? (
+                  <View style={[styles.activeBadge, { marginBottom: 0 }]}>
+                    <Text style={styles.activeBadgeText}>{active.is_custom ? active.name : t(active.name)}</Text>
+                  </View>
+                ) : null;
+              })()}
             </View>
-          ))}
-          <TouchableOpacity style={[styles.darkPill, { alignSelf: 'center', marginTop: 8 }]} onPress={() => setIsAddCustomScaleVisible(true)}>
-            <Text style={styles.darkPillText}>{t('academic.addCustomScale')}</Text>
+            <Ionicons name={gradeScalesExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={theme.colors.text.secondary} />
           </TouchableOpacity>
+          {gradeScalesExpanded && (
+            <>
+              {isLoadingSystems ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 12 }} />
+              ) : gradingSystems.map(system => (
+                <View key={system.id} style={[styles.scaleRow, { flexWrap: 'wrap' }]}>
+                  <View style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                    <Text style={styles.settingTitle}>{system.is_custom ? system.name : t(system.name)}</Text>
+                    <Text style={styles.settingDesc}>{t('settings.approvalFormat', { min: system.min_value, max: system.max_value, passing: system.passing_value })}</Text>
+                  </View>
+                  {selectedSystemId === system.id ? (
+                    <View style={styles.activeBadge}>
+                      <Text style={styles.activeBadgeText}>{t('academic.active')}</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity onPress={() => {
+                      setSelectedSystemId(system.id);
+                      setThreshold(String(system.passing_value));
+                    }}>
+                      <Text style={styles.selectText}>{t('academic.select')}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              <TouchableOpacity style={[styles.darkPill, { alignSelf: 'center', marginTop: 8 }]} onPress={() => setIsAddCustomScaleVisible(true)}>
+                <Text style={styles.darkPillText}>{t('academic.addCustomScale')}</Text>
+              </TouchableOpacity>
+            </>
+          )}
           </>
           )}
         </View>
@@ -926,8 +947,6 @@ export default function SettingsScreen() {
             </View>
             <Ionicons name={collaborationExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
           </TouchableOpacity>
-          <Text style={[styles.sectionDesc, { marginBottom: 12 }]}>{t('settings.collaborationDesc')}</Text>
-
           {collaborationExpanded && (
             <>
           <Text style={styles.subSectionTitle}>{t('settings.joinGroup')}</Text>
@@ -998,6 +1017,29 @@ export default function SettingsScreen() {
         </View>
 
         {/* ─────────────────────────────────────────── */}
+        {/* ── DEVELOPER CONSOLE ── */}
+        {/* ─────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="code-slash" size={18} color="#C5A059" />
+                <Text style={styles.sectionTitle}>Developer</Text>
+              </View>
+              <Text style={styles.sectionDesc}>Sync console, validator, asset pipeline, test harness</Text>
+            </View>
+          </View>
+          <SettingRow
+            title="Developer Console" desc="Sync, validator, assets, test harness, replay"
+            right={
+              <TouchableOpacity style={styles.darkPill} onPress={() => router.push('/developer')}>
+                <Ionicons name="terminal-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+                <Text style={styles.darkPillText}>Open</Text>
+              </TouchableOpacity>
+            }
+          />
+        </View>
+
         {/* ── ABOUT & HELP ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>

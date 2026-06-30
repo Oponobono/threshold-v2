@@ -554,6 +554,87 @@ const migrations: Migration[] = [
       `ALTER TABLE flashcards ADD COLUMN is_backed_up INTEGER DEFAULT 0`,
     ],
   },
+  {
+    version: 24,
+    up: [
+      `CREATE TABLE IF NOT EXISTS grading_periods (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        period_type TEXT NOT NULL DEFAULT 'custom',
+        start_date TEXT,
+        end_date TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now')),
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER NOT NULL DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS lms_accounts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        instance_url TEXT,
+        username TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER NOT NULL DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
+        threshold REAL NOT NULL DEFAULT 70,
+        created_at TEXT DEFAULT (datetime('now')),
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER NOT NULL DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TEXT
+      )`,
+    ],
+  },
+  {
+    version: 25,
+    up: [
+      // ── Photos ──
+      `ALTER TABLE photos ADD COLUMN user_id TEXT`,
+      `ALTER TABLE photos ADD COLUMN filename TEXT`,
+      `ALTER TABLE photos ADD COLUMN mime_type TEXT`,
+      `ALTER TABLE photos ADD COLUMN file_size INTEGER`,
+      `ALTER TABLE photos ADD COLUMN checksum TEXT`,
+      `ALTER TABLE photos ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE photos ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
+      `ALTER TABLE photos ADD COLUMN transfer_type TEXT`,
+      `ALTER TABLE photos ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
+      `ALTER TABLE photos ADD COLUMN last_error TEXT`,
+      `ALTER TABLE photos ADD COLUMN last_verified TEXT`,
+      // ── Audio Recordings ──
+      `ALTER TABLE audio_recordings ADD COLUMN filename TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN mime_type TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN file_size INTEGER`,
+      `ALTER TABLE audio_recordings ADD COLUMN checksum TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE audio_recordings ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
+      `ALTER TABLE audio_recordings ADD COLUMN transfer_type TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
+      `ALTER TABLE audio_recordings ADD COLUMN last_error TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN last_verified TEXT`,
+      // ── Scanned Documents ──
+      `ALTER TABLE scanned_documents ADD COLUMN filename TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN mime_type TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN file_size INTEGER`,
+      `ALTER TABLE scanned_documents ADD COLUMN checksum TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE scanned_documents ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
+      `ALTER TABLE scanned_documents ADD COLUMN transfer_type TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
+      `ALTER TABLE scanned_documents ADD COLUMN last_error TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN last_verified TEXT`,
+    ],
+  },
 ];
 
 export default migrations;

@@ -1,6 +1,7 @@
 const secrets = require('../config/secrets');
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
 const { analyzeCardDensity, fragmentCard } = require('../utils/atomicCardGenerator');
 const { calculateSM2, calculateFSRS } = require('../utils/sm2Algorithm');
 
@@ -235,9 +236,13 @@ exports.createFlashcardDeck = (req, res) => {
         const cardDone = () => {
           if (++inserted === cards.length) {
             if (cardErr) {
-              return res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: cards.length, cardError: cardErr.message });
+              return incrementSyncVersion('flashcard_decks', deckId, () =>
+                res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: cards.length, cardError: cardErr.message })
+              );
             }
-            res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: cards.length });
+            incrementSyncVersion('flashcard_decks', deckId, () =>
+              res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: cards.length })
+            );
           }
         };
         for (const card of cards) {
@@ -258,7 +263,9 @@ exports.createFlashcardDeck = (req, res) => {
           );
         }
       } else {
-        res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 });
+        incrementSyncVersion('flashcard_decks', deckId, () =>
+          res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 })
+        );
       }
     }
   );
@@ -383,7 +390,11 @@ exports.deleteDeck = (req, res) => {
           return res.status(404).json({ error: 'Mazo no encontrado o sin permisos.' });
         }
         console.log(`[DeleteDeck] Mazo ${deckId} eliminado por usuario ${user_id}`);
-        res.json({ success: true, message: 'Mazo y todo su contenido eliminado permanentemente.' });
+        recordDeletion('flashcard_decks', deckId, user_id, () => {
+          incrementSyncCounterOnly(() =>
+            res.json({ success: true, message: 'Mazo y todo su contenido eliminado permanentemente.' })
+          );
+        });
       });
     } else {
       db.run(
@@ -394,7 +405,11 @@ exports.deleteDeck = (req, res) => {
           if (this.changes === 0) {
             return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo o no estÃ¡ compartido contigo.' });
           }
-          res.json({ success: true, message: 'Mazo compartido quitado de tu lista exitosamente.' });
+          recordDeletion('shared_decks', deckId, user_id, () => {
+            incrementSyncCounterOnly(() =>
+              res.json({ success: true, message: 'Mazo compartido quitado de tu lista exitosamente.' })
+            );
+          });
         }
       );
     }
@@ -465,7 +480,7 @@ exports.updateFlashcardDeck = (req, res) => {
           db.get(`SELECT * FROM flashcard_decks WHERE id = ?`, [deckId], (fetchErr, updated) => {
             if (fetchErr) return res.status(500).json({ error: fetchErr.message });
             console.log('[FlashcardsController] Mazo actualizado:', { deckId, title: updated.title, subject_id: updated.subject_id });
-            res.json(updated);
+            incrementSyncVersion('flashcard_decks', deckId, () => res.json(updated));
           });
         }
       );
@@ -703,10 +718,12 @@ exports.createCard = (req, res) => {
     [cardId, deckId, safeFront, safeBack, contentJson, nextReviewDateStr],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json(normalizeCard({
-        id: cardId, deck_id: deckId, front, back,
-        item_type: 'flashcard', content_json: contentJson, status: 'new', hint: null, explanation: null,
-      }));
+      incrementSyncVersion('flashcards', cardId, () =>
+        res.status(201).json(normalizeCard({
+          id: cardId, deck_id: deckId, front, back,
+          item_type: 'flashcard', content_json: contentJson, status: 'new', hint: null, explanation: null,
+        }))
+      );
     }
   );
 };
@@ -753,10 +770,12 @@ exports.createEvaluationItem = (req, res) => {
     [itemId, deckId, front, back, item_type, safeContentStr, safeHint, safeExplanation, nextReviewDateStr],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json(normalizeCard({
-        id: itemId, deck_id: deckId, front, back,
-        item_type, content_json: safeContentStr, hint: safeHint, explanation: safeExplanation, status: 'new',
-      }));
+      incrementSyncVersion('flashcards', itemId, () =>
+        res.status(201).json(normalizeCard({
+          id: itemId, deck_id: deckId, front, back,
+          item_type, content_json: safeContentStr, hint: safeHint, explanation: safeExplanation, status: 'new',
+        }))
+      );
     }
   );
 };
@@ -851,17 +870,19 @@ exports.recordCardReview = (req, res) => {
           );
 
           // ── Retornar resultado con métricas FSRS ────────────────────────
-          res.json({
-            success: true,
-            cardId,
-            quality,
-            nextReviewDate: nextReviewDateStr,
-            newStability: fsrsResult.newStability,
-            newDifficulty: fsrsResult.newDifficulty,
-            newRepetitions: fsrsResult.newRepetitions,
-            retention: fsrsResult.retention,
-            message: `Revisión registrada (FSRS). Próxima revisión en ${fsrsResult.newInterval} días. Retención esperada: ${fsrsResult.retention}%.`,
-          });
+          incrementSyncVersion('flashcards', cardId, () =>
+            res.json({
+              success: true,
+              cardId,
+              quality,
+              nextReviewDate: nextReviewDateStr,
+              newStability: fsrsResult.newStability,
+              newDifficulty: fsrsResult.newDifficulty,
+              newRepetitions: fsrsResult.newRepetitions,
+              retention: fsrsResult.retention,
+              message: `Revisión registrada (FSRS). Próxima revisión en ${fsrsResult.newInterval} días. Retención esperada: ${fsrsResult.retention}%.`,
+            })
+          );
         }
       );
     }
@@ -876,7 +897,7 @@ exports.updateCardStatus = (req, res) => {
   const { status } = req.body;
   db.run(`UPDATE flashcards SET status = ? WHERE id = ?`, [status, cardId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
+    incrementSyncVersion('flashcards', cardId, () => res.json({ success: true }));
   });
 };
 
@@ -885,9 +906,12 @@ exports.updateCardStatus = (req, res) => {
  */
 exports.deleteCard = (req, res) => {
   const { cardId } = req.params;
+  const userId = req.user?.id || req.query?.user_id || '0';
   db.run(`DELETE FROM flashcards WHERE id = ?`, [cardId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
+    recordDeletion('flashcards', cardId, userId, () => {
+      res.json({ success: true });
+    });
   });
 };
 
@@ -911,7 +935,9 @@ exports.deleteDeck = (req, res) => {
           if (errShared) return res.status(500).json({ error: errShared.message });
           db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], function(errDeck) {
             if (errDeck) return res.status(500).json({ error: errDeck.message });
-            res.json({ success: true, message: 'Mazo y todo su contenido eliminado permanentemente.' });
+            recordDeletion('flashcard_decks', deckId, user_id, () => {
+              res.json({ success: true, message: 'Mazo y todo su contenido eliminado permanentemente.' })
+            });
           });
         });
       });
@@ -924,7 +950,9 @@ exports.deleteDeck = (req, res) => {
           if (this.changes === 0) {
             return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo o no está compartido contigo.' });
           }
-          res.json({ success: true, message: 'Mazo compartido quitado de tu lista exitosamente.' });
+          recordDeletion('shared_decks', deckId, user_id, () => {
+            res.json({ success: true, message: 'Mazo compartido quitado de tu lista exitosamente.' })
+          });
         }
       );
     }

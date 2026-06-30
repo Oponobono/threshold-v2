@@ -21,6 +21,13 @@ exports.initialSync = (req, res) => {
     assessments: `SELECT * FROM assessments WHERE user_id = ?`,
     schedules: `SELECT * FROM schedules WHERE user_id = ?`,
     flashcardDecks: `SELECT * FROM flashcard_decks WHERE user_id = ?`,
+    calendarEvents: `SELECT * FROM calendar_events WHERE user_id = ?`,
+    gradingPeriods: `SELECT * FROM grading_periods WHERE user_id = ?`,
+    lmsAccounts: `SELECT * FROM lms_accounts WHERE user_id = ?`,
+    thresholdOverrides: `SELECT * FROM subject_threshold_overrides WHERE user_id = ?`,
+    photos: `SELECT * FROM photos WHERE user_id = ?`,
+    audioRecordings: `SELECT * FROM audio_recordings WHERE user_id = ?`,
+    scannedDocuments: `SELECT * FROM scanned_documents WHERE user_id = ?`,
   };
 
   const runQuery = (sql) => {
@@ -48,9 +55,16 @@ exports.initialSync = (req, res) => {
     runQuery(queries.assessments),
     runQuery(queries.schedules),
     runQuery(queries.flashcardDecks),
+    runQuery(queries.calendarEvents),
+    runQuery(queries.gradingPeriods),
+    runQuery(queries.lmsAccounts),
+    runQuery(queries.thresholdOverrides),
+    runQuery(queries.photos),
+    runQuery(queries.audioRecordings),
+    runQuery(queries.scannedDocuments),
     getCurrentSyncVersion(),
   ])
-    .then(async ([user, courses, subjects, assessments, schedules, flashcardDecks, syncVersion]) => {
+    .then(async ([user, courses, subjects, assessments, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, photos, audioRecordings, scannedDocuments, syncVersion]) => {
       const flashcards = [];
       for (const deck of flashcardDecks) {
         const cards = await new Promise((resolve) => {
@@ -74,6 +88,13 @@ exports.initialSync = (req, res) => {
           assessments,
           schedules,
           flashcards,
+          calendar_events: calendarEvents,
+          grading_periods: gradingPeriods,
+          lms_accounts: lmsAccounts,
+          subject_threshold_overrides: thresholdOverrides,
+          photos,
+          audio_recordings: audioRecordings,
+          scanned_documents: scannedDocuments,
         },
       });
     })
@@ -89,7 +110,7 @@ exports.deltaSync = (req, res) => {
   const traceId = req.headers['x-trace-id'] || null;
   if (traceId) console.log(`[SyncController][${traceId}] deltaSync started — version=${version}`);
 
-  const tables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks'];
+  const tables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'photos', 'audio_recordings', 'scanned_documents'];
   const updated = {};
   const deleted = [];
 

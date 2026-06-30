@@ -63,7 +63,7 @@ export class SyncQueueRepository {
     );
   }
 
-  async getPending(includeFailed = false): Promise<SyncQueueItem[]> {
+  async getPending(includeFailed = true): Promise<SyncQueueItem[]> {
     const db = databaseService.getDb();
     if (includeFailed) {
       return db.getAllAsync(
@@ -98,12 +98,14 @@ export class SyncQueueRepository {
     );
   }
 
-  async markFailed(id: number, error: string): Promise<void> {
+  async markFailed(id: number, error: string): Promise<number> {
     const db = databaseService.getDb();
     await db.runAsync(
       `UPDATE sync_queue SET status = 'failed', retries = retries + 1, error = ?, updated_at = datetime('now') WHERE id = ?`,
       error, id
     );
+    const row: any = await db.getFirstAsync(`SELECT retries FROM sync_queue WHERE id = ?`, id);
+    return row?.retries ?? 0;
   }
 
   async countPending(): Promise<number> {

@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
 
 exports.getCourses = (req, res) => {
   const userId = req.user.id;
@@ -57,7 +58,9 @@ exports.createCourse = (req, res) => {
 
   db.run(query, [courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours || 0, total_classes || 0, completed_classes || 0, status || 'active', global_notes, tags, momentum_score || 1.0, last_studied_at], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours: total_hours || 0, total_classes: total_classes || 0, completed_classes: completed_classes || 0, status: status || 'active', global_notes, tags, momentum_score: momentum_score || 1.0, last_studied_at });
+    incrementSyncVersion('courses', this.lastID, () => {
+      res.status(201).json({ id: courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours: total_hours || 0, total_classes: total_classes || 0, completed_classes: completed_classes || 0, status: status || 'active', global_notes, tags, momentum_score: momentum_score || 1.0, last_studied_at });
+    });
   });
 };
 
@@ -83,7 +86,9 @@ exports.updateCourse = (req, res) => {
 
   db.run(`UPDATE courses SET ${columns} WHERE id = ? AND user_id = ?`, values, function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
+    incrementSyncVersion('courses', courseId, () => {
+      res.json({ success: true });
+    });
   });
 };
 
@@ -93,6 +98,10 @@ exports.deleteCourse = (req, res) => {
   
   db.run('DELETE FROM courses WHERE id = ? AND user_id = ?', [courseId, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
+    recordDeletion('courses', courseId, req.user.id, () => {
+      incrementSyncCounterOnly(() => {
+        res.json({ success: true });
+      });
+    });
   });
 };

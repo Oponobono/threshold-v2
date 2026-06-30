@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
 
 /**
  * Predecir materia actual por horario
@@ -70,7 +71,9 @@ exports.createSchedule = (req, res) => {
   const query = `INSERT INTO schedules (id, subject_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?, ?)`;
   db.run(query, [scheduleId, subject_id, day_of_week, start_time, end_time], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: scheduleId, message: 'Horario agregado' });
+    incrementSyncVersion('schedules', scheduleId, () => {
+      res.status(201).json({ id: scheduleId, message: 'Horario agregado' });
+    });
   });
 };
 
@@ -81,7 +84,11 @@ exports.deleteSchedule = (req, res) => {
   const { id } = req.params;
   db.run(`DELETE FROM schedules WHERE id = ?`, [id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Horario eliminado' });
+    recordDeletion('schedules', id, req.user.id, () => {
+      incrementSyncCounterOnly(() => {
+        res.json({ message: 'Horario eliminado' });
+      });
+    });
   });
 };
 

@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { deleteMultipleFromUploadthing } = require('../utils/uploadthingServer');
+const { incrementSyncVersion, recordDeletion } = require('../helpers/syncVersion');
 
 /**
  * Obtener todas las grabaciones de un usuario
@@ -51,13 +52,15 @@ exports.createAudioRecording = (req, res) => {
       }
       return res.status(500).json({ error: err.message });
     }
-    res.status(201).json({ 
-      id: recordingId, 
-      user_id, 
-      subject_id: subject_id || null, 
-      name: name || null,
-      local_uri, 
-      duration: duration || 0 
+    incrementSyncVersion('audio_recordings', recordingId, () => {
+      res.status(201).json({ 
+        id: recordingId, 
+        user_id, 
+        subject_id: subject_id || null, 
+        name: name || null,
+        local_uri, 
+        duration: duration || 0 
+      });
     });
   });
 };
@@ -169,7 +172,9 @@ exports.deleteAudioRecording = (req, res) => {
           if (urls.length > 0) deleteMultipleFromUploadthing(urls).catch(() => {});
         }
 
-        res.json({ success: true, changes: this.changes });
+        recordDeletion('audio_recordings', id, userId, () => {
+          res.json({ success: true, changes: this.changes });
+        });
       });
     }
   );

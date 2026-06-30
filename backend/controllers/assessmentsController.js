@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const gradingEngine = require('../services/gradingEngine');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
 
 /**
  * Helper: Denormalize a single assessment row
@@ -294,18 +295,18 @@ exports.createAssessment = (req, res) => {
                 
                 try {
                   const fullAssessment = await fetchAndDenormalizeAssessment(newAssessmentId, subject.user_id);
-                  return res.status(201).json(fullAssessment);
+                  incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json(fullAssessment); });
                 } catch (fetchErr) {
-                  return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
+                  incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' }); });
                 }
               });
             } else {
               console.log('[POST] ⚠️  No hay rawValue para insertar en assessment_results');
               try {
                 const fullAssessment = await fetchAndDenormalizeAssessment(newAssessmentId, subject.user_id);
-                return res.status(201).json(fullAssessment);
+                incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json(fullAssessment); });
               } catch (fetchErr) {
-                return res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' });
+                incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' }); });
               }
             }
           });
@@ -504,10 +505,10 @@ exports.updateAssessment = (req, res) => {
               );
             });
             const fullAssessment = await fetchAndDenormalizeAssessment(id, subjectRow.user_id);
-            return res.status(200).json(fullAssessment);
+            incrementSyncVersion('assessments', id, () => { res.status(200).json(fullAssessment); });
           } catch (err) {
             console.warn('[AssessmentsController] Could not denormalize for response, using fallback:', err.message);
-            return res.status(200).json({ message: 'Evaluación actualizada', id });
+            incrementSyncVersion('assessments', id, () => { res.status(200).json({ message: 'Evaluación actualizada', id }); });
           }
         })();
       }
@@ -636,7 +637,7 @@ function handleAssessmentResultsUpdate(assessmentId, score, percentage, grade_va
       // Return the full denormalized assessment so the frontend can update its state immediately
       const fullAssessment = await fetchAndDenormalizeAssessment(assessmentId, subject.user_id);
       console.log('[AssessmentsController] ✅ Retornando assessment completo:', { id: fullAssessment.id, grade_value: fullAssessment.grade_value, normalized_value: fullAssessment.normalized_value });
-      return res.status(200).json(fullAssessment);
+      incrementSyncVersion('assessments', assessmentId, () => { res.status(200).json(fullAssessment); });
     } catch (err) {
       console.error('[AssessmentsController] ❌ Error en actualización de assessment_results:', err.message);
       return res.status(500).json({ error: err.message });
@@ -653,7 +654,9 @@ exports.deleteAssessment = (req, res) => {
   db.run(`DELETE FROM assessments WHERE id = ? AND subject_id IN (SELECT id FROM subjects WHERE user_id = ?)`, [id, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     if (this.changes === 0) return res.status(404).json({ error: 'Evaluación no encontrada o acceso denegado.' });
-    res.json({ message: 'Evaluación eliminada exitosamente' });
+    recordDeletion('assessments', id, req.user.id, () => {
+      incrementSyncCounterOnly(() => { res.json({ message: 'Evaluación eliminada exitosamente' }); });
+    });
   });
 };
 

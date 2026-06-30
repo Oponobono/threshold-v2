@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
+const { incrementSyncVersion, recordDeletion } = require('../helpers/syncVersion');
 
 /**
  * Crear un nuevo evento de calendario
@@ -140,20 +141,22 @@ exports.createCalendarEvent = (req, res) => {
               return res.status(500).json({ error: 'Error al recuperar evento creado' });
             }
 
-            res.status(201).json({
-              id: event.id,
-              title: event.title,
-              eventType: event.event_type,
-              subjectId: event.subject_id,
-              deckId: event.linked_deck_id,
-              startDate: event.start_date,
-              endDate: event.end_date,
-              startTime: event.start_time,
-              endTime: event.end_time,
-              allDay: event.all_day === 1,
-              description: event.description,
-              createStudyPlan: event.create_study_plan === 1,
-              createdAt: event.created_at,
+            incrementSyncVersion('calendar_events', eventId, () => {
+              res.status(201).json({
+                id: event.id,
+                title: event.title,
+                eventType: event.event_type,
+                subjectId: event.subject_id,
+                deckId: event.linked_deck_id,
+                startDate: event.start_date,
+                endDate: event.end_date,
+                startTime: event.start_time,
+                endTime: event.end_time,
+                allDay: event.all_day === 1,
+                description: event.description,
+                createStudyPlan: event.create_study_plan === 1,
+                createdAt: event.created_at,
+              });
             });
           }
         );
@@ -417,21 +420,23 @@ exports.updateCalendarEvent = (req, res) => {
             return res.status(500).json({ error: 'Error al recuperar evento actualizado' });
           }
 
-          res.json({
-            id: event.id,
-            title: event.title,
-            eventType: event.event_type,
-            subjectId: event.subject_id,
-            deckId: event.linked_deck_id,
-            startDate: event.start_date,
-            endDate: event.end_date,
-            startTime: event.start_time,
-            endTime: event.end_time,
-            allDay: event.all_day === 1,
-            description: event.description,
-            createStudyPlan: event.create_study_plan === 1,
-            createdAt: event.created_at,
-            updatedAt: event.updated_at,
+          incrementSyncVersion('calendar_events', eventId, () => {
+            res.json({
+              id: event.id,
+              title: event.title,
+              eventType: event.event_type,
+              subjectId: event.subject_id,
+              deckId: event.linked_deck_id,
+              startDate: event.start_date,
+              endDate: event.end_date,
+              startTime: event.start_time,
+              endTime: event.end_time,
+              allDay: event.all_day === 1,
+              description: event.description,
+              createStudyPlan: event.create_study_plan === 1,
+              createdAt: event.created_at,
+              updatedAt: event.updated_at,
+            });
           });
         }
       );
@@ -473,7 +478,9 @@ exports.deleteCalendarEvent = (req, res) => {
             return res.status(500).json({ error: 'Error al eliminar evento' });
           }
 
-          res.json({ id: eventId, message: 'Evento eliminado exitosamente' });
+          recordDeletion('calendar_events', eventId, userId, () => {
+            res.json({ id: eventId, message: 'Evento eliminado exitosamente' });
+          });
         }
       );
     }

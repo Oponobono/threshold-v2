@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
 
 exports.getGradingPeriods = (req, res) => {
   const userId = req.user.id;
@@ -26,7 +27,9 @@ exports.createGradingPeriod = (req, res) => {
     [periodId, userId, name, period_type || 'custom', start_date || null, end_date || null],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: periodId, name, period_type });
+      incrementSyncVersion('grading_periods', periodId, () => {
+        res.status(201).json({ id: periodId, name, period_type });
+      });
     }
   );
 };
@@ -40,7 +43,11 @@ exports.deleteGradingPeriod = (req, res) => {
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
       if (this.changes === 0) return res.status(404).json({ error: 'Período no encontrado' });
-      res.json({ message: 'Período eliminado' });
+      recordDeletion('grading_periods', id, userId, () => {
+        incrementSyncCounterOnly(() => {
+          res.json({ message: 'Período eliminado' });
+        });
+      });
     }
   );
 };
@@ -81,7 +88,9 @@ exports.saveThresholdOverrides = (req, res) => {
           if (err) console.error('Error saving override:', err.message);
           completed++;
           if (completed === total) {
-            res.json({ message: 'Excepciones guardadas' });
+            incrementSyncVersion('subject_threshold_overrides', userId, () => {
+              res.json({ message: 'Excepciones guardadas' });
+            });
           }
         }
       );
@@ -209,7 +218,9 @@ exports.addLmsAccount = (req, res) => {
     [accountId, userId, platform, instance_url, username],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: accountId, platform, instance_url, username });
+      incrementSyncVersion('lms_accounts', accountId, () => {
+        res.status(201).json({ id: accountId, platform, instance_url, username });
+      });
     }
   );
 };
@@ -223,7 +234,11 @@ exports.removeLmsAccount = (req, res) => {
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
       if (this.changes === 0) return res.status(404).json({ error: 'Cuenta LMS no encontrada' });
-      res.json({ message: 'Cuenta LMS desvinculada' });
+      recordDeletion('lms_accounts', id, userId, () => {
+        incrementSyncCounterOnly(() => {
+          res.json({ message: 'Cuenta LMS desvinculada' });
+        });
+      });
     }
   );
 };

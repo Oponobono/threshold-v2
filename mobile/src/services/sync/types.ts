@@ -32,11 +32,12 @@ export interface SyncResult {
 }
 
 export interface SyncEvent {
-  type: 'state_change' | 'progress' | 'error' | 'complete';
+  type: 'state_change' | 'progress' | 'error' | 'complete' | 'consistency';
   state?: SyncState;
   progress?: SyncProgress;
   result?: SyncResult;
   error?: string;
+  consistencyReport?: any;
 }
 
 export type SyncListener = (event: SyncEvent) => void;

@@ -58,29 +58,43 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
     return [];
   }
 
-  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
-  (async () => {
-    try {
-      const userId = await getUserId();
-      const response = await fetchWithFallback(`/flashcard-decks/with-metrics?user_id=${userId}`);
-      if (response.ok) {
-        const data = await parseJsonSafely(response);
-        if (Array.isArray(data)) {
-          for (const d of data) await flashcardDeckRepository.upsertFromCloud(d);
+  // 2. Sincronizar en foreground para devolver la data fresca
+  try {
+    const userId = await getUserId();
+    const response = await fetchWithFallback(`/flashcard-decks/with-metrics?user_id=${userId}`);
+    if (response.ok) {
+      const data = await parseJsonSafely(response);
+      if (Array.isArray(data)) {
+        for (const d of data) {
+          try {
+            const { databaseService } = await import('../database/DatabaseService');
+            await databaseService.getDb().runAsync(
+              `UPDATE flashcard_decks 
+               SET card_count = ?, review_count = ?, learning_count = ?, new_count = ?
+               WHERE id = ?`,
+              [d.card_count ?? 0, d.review_count ?? 0, d.learning_count ?? 0, d.new_count ?? 0, d.id]
+            );
+          } catch (e) {
+            console.warn('[Flashcards API] Error actualizando métricas:', e);
+          }
+          await flashcardDeckRepository.upsertFromCloud(d);
         }
+        const remoteIds = new Set(data.map(d => String(d.id)));
+        const localOnly = localData.filter(ld => !remoteIds.has(String(ld.id)));
+        return [...data, ...localOnly];
       }
-    } catch {}
-  })();
+    }
+  } catch {}
 
   return localData;
 };
 
-export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string; id?: string; linked_event_id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string }): Promise<any> => {
+export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string; id?: string; linked_event_id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string; card_count?: number }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = (payload as any).id || uuidv4();
   const userId = await getUserId();
 
-  const deck: any = { id, user_id: userId, ...payload, card_count: 0, created_at: new Date().toISOString() };
+  const deck: any = { id, user_id: userId, ...payload, card_count: payload.card_count ?? 0, created_at: new Date().toISOString() };
   await flashcardDeckRepository.create(deck);
 
   try {
@@ -300,6 +314,13 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
   await flashcardRepository.create(card);
 
   try {
+    const { databaseService } = await import('../database/DatabaseService');
+    await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = card_count + 1 WHERE id = ?', [payload.deck_id]);
+  } catch (e) {
+    console.warn('[Flashcards API] Error incrementing card_count:', e);
+  }
+
+  try {
     const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/cards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -323,6 +344,13 @@ export const createEvaluationItem = async (payload: { deck_id: string; item_type
   const item: any = { id, status: 'new', created_at: new Date().toISOString(), ...payload };
 
   await flashcardRepository.create(item);
+
+  try {
+    const { databaseService } = await import('../database/DatabaseService');
+    await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = card_count + 1 WHERE id = ?', [payload.deck_id]);
+  } catch (e) {
+    console.warn('[Flashcards API] Error incrementing card_count:', e);
+  }
 
   try {
     const response = await fetchWithFallback(`/flashcard-decks/${payload.deck_id}/items`, {
@@ -513,6 +541,16 @@ export const autoUnsnoozeExpired = async (): Promise<any> => {
 };
 
 export const deleteFlashcard = async (cardId: string) => {
+  try {
+    const card = await flashcardRepository.getById(cardId);
+    if (card && card.deck_id) {
+      const { databaseService } = await import('../database/DatabaseService');
+      await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = MAX(0, card_count - 1) WHERE id = ?', [card.deck_id]);
+    }
+  } catch (e) {
+    console.warn('[Flashcards API] Error decrementing card_count:', e);
+  }
+
   await flashcardRepository.delete(cardId);
 
   try {

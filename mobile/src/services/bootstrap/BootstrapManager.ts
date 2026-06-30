@@ -169,6 +169,7 @@ class BootstrapManager {
       if (entity_type === 'flashcard') path = `/flashcard-decks/${payload?.deck_id}/cards`;
       if (entity_type === 'ai-chat') path = '/ai/chats';
       if (entity_type === 'user-preference') path = '/user-preferences';
+      if (entity_type === 'threshold-overrides') path = '/threshold-overrides';
 
       if (entity_id && (entity_type === 'photo' || entity_type === 'audio_recording' || entity_type === 'scanned_document' || entity_type === 'assessment_files')) {
         const tableName = entity_type === 'assessment_files'

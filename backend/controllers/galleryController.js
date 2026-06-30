@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { deleteFromUploadthing } = require('../utils/uploadthingServer');
+const { incrementSyncVersion, recordDeletion } = require('../helpers/syncVersion');
 
 /**
  * Obtener todos los ítems de la galería de un usuario
@@ -161,15 +162,17 @@ exports.savePhoto = (req, res) => {
         return res.status(500).json({ error: err.message });
       }
       console.log('[Gallery] Photo saved with ID:', photoId);
-      res.status(201).json({
-        id: photoId,
-        subject_id,
-        local_uri,
-        es_favorita: es_favorita || 0,
-        ocr_text: ocr_text || null,
-        tags: tags,
-        group_id: group_id || null,
-        message: 'Foto registrada en BD'
+      incrementSyncVersion('photos', photoId, () => {
+        res.status(201).json({
+          id: photoId,
+          subject_id,
+          local_uri,
+          es_favorita: es_favorita || 0,
+          ocr_text: ocr_text || null,
+          tags: tags,
+          group_id: group_id || null,
+          message: 'Foto registrada en BD'
+        });
       });
     });
   });
@@ -238,7 +241,9 @@ exports.updatePhoto = (req, res) => {
 
   db.run(query, updateValues, function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true, changes: this.changes });
+    incrementSyncVersion('photos', photoId, () => {
+      res.json({ success: true, changes: this.changes });
+    });
   });
 };
 
@@ -269,7 +274,9 @@ exports.deletePhoto = (req, res) => {
       }
 
       console.log(`[Backend] Foto ${photoId} borrada de la BD con éxito.`);
-      res.json({ success: true, local_uri: row.local_uri });
+      recordDeletion('photos', photoId, userId, () => {
+        res.json({ success: true, local_uri: row.local_uri });
+      });
     });
   });
 };

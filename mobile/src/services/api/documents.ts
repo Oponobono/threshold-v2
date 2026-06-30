@@ -3,6 +3,7 @@ import { getUserId } from './auth';
 import { documentRepository, syncService } from '../database';
 import { extractTextFromPdfLocal } from '../localPDFService';
 import { getBackupPreferences } from '../backup/backupService';
+import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
 
 export interface ScannedDocument {
   id?: string;
@@ -43,6 +44,9 @@ export const createScannedDocument = async (data: { subject_id?: string; name?: 
   // 1. Guardar SIEMPRE en SQLite local primero — los documentos funcionan sin red
   const doc: any = { id, user_id: String(userId), ...data };
   await documentRepository.create(doc);
+
+  // Schedule file upload via asset pipeline (background, with retry + progress)
+  assetSyncEngine.scheduleUpload('scanned-document', id, data.local_uri, 'application/pdf', `${id}.pdf`);
 
   // 2. Sincronizar con la nube SOLO si el usuario habilitó auto-upload (background, no bloqueante)
   (async () => {

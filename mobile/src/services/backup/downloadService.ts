@@ -88,6 +88,7 @@ export interface DownloadResult {
 export const downloadCloudItems = async (
   onProgress?: (progress: DownloadProgress) => void
 ): Promise<DownloadResult> => {
+  console.log(`[DownloadService] downloadCloudItems iniciado`);
   const prefs = await getBackupPreferences();
   const result: DownloadResult = {
     downloaded: 0,
@@ -100,6 +101,16 @@ export const downloadCloudItems = async (
   if (!response.ok) throw new Error('No se pudo obtener los archivos de la nube.');
 
   const data = (await parseJsonSafely(response)) as CloudItemsResponse;
+  console.log(`[DownloadService] cloud-items response:`, JSON.stringify({
+    photos: data.photos?.length ?? 0,
+    audio: data.audio?.length ?? 0,
+    docs: data.docs?.length ?? 0,
+    transcripts: data.transcripts?.length ?? 0,
+    assessmentFiles: data.assessmentFiles?.length ?? 0,
+    flashcardDecks: data.flashcardDecks?.length ?? 0,
+    aiChats: data.aiChats?.length ?? 0,
+  }));
+  console.log(`[DownloadService] prefs:`, JSON.stringify(prefs));
   const tasks: (() => Promise<void>)[] = [];
 
   // ── Fotos ──
@@ -373,22 +384,40 @@ export const downloadCloudItems = async (
 
   // ── Mazos de Flashcards (JSON con deck + tarjetas) ──
   if (data.flashcardDecks && data.flashcardDecks.length > 0) {
+    console.log(`[DownloadService] ${data.flashcardDecks.length} mazo(s) en la nube`);
     for (const item of data.flashcardDecks) {
       tasks.push(async () => {
-        if (!item.cloud_url || item.cloud_url === 'ghost_file') { result.skipped++; return; }
+        if (!item.cloud_url || item.cloud_url === 'ghost_file') {
+          console.log(`[DownloadService] Mazo ${item.id} → skip (sin cloud_url o ghost_file)`);
+          result.skipped++;
+          return;
+        }
         try {
           // Descargar el JSON del mazo desde Uploadthing
+          console.log(`[DownloadService] Mazo ${item.id}: descargando JSON desde Uploadthing...`);
           const res = await fetch(item.cloud_url);
-          if (!res.ok) { result.errors++; return; }
+          if (!res.ok) {
+            console.log(`[DownloadService] Mazo ${item.id}: HTTP ${res.status} al descargar JSON → error`);
+            result.errors++;
+            return;
+          }
           const payload = await res.json() as { deck: any; cards: any[] };
           const { deck, cards = [] } = payload;
-          if (!deck?.id) { result.skipped++; return; }
+          if (!deck?.id) {
+            console.log(`[DownloadService] Item ${item.id}: payload sin deck.id → skip`);
+            result.skipped++;
+            return;
+          }
 
           // Verificar si ya existe localmente
           const existing = await databaseService.getDb().getFirstAsync(
             'SELECT id FROM flashcard_decks WHERE id = ?', [deck.id]
           );
-          if (existing) { result.skipped++; return; }
+          if (existing) {
+            console.log(`[DownloadService] Mazo ${deck.id} ya existe localmente → skip`);
+            result.skipped++;
+            return;
+          }
 
           // UPSERT del mazo con todos sus campos incl. linked_event_id y métricas
           await databaseService.getDb().runAsync(
@@ -460,6 +489,8 @@ export const downloadCloudItems = async (
   const total = tasks.length;
   let done = 0;
 
+  console.log(`[DownloadService] Ejecutando ${total} tarea(s) de descarga...`);
+
   for (const task of tasks) {
     await task();
     done++;
@@ -472,6 +503,7 @@ export const downloadCloudItems = async (
     });
   }
 
+  console.log(`[DownloadService] Finalizado: descargadas=${result.downloaded}, saltadas=${result.skipped}, errores=${result.errors}`);
   return result;
 };
 
@@ -488,7 +520,9 @@ export const getCloudItemsCount = async (): Promise<number> => {
       (data.audio?.length || 0) +
       (data.docs?.length || 0) +
       (data.transcripts?.length || 0) +
-      (data.assessmentFiles?.length || 0)
+      (data.assessmentFiles?.length || 0) +
+      (data.flashcardDecks?.length || 0) +
+      (data.aiChats?.length || 0)
     );
   } catch {
     return 0;

@@ -56,14 +56,22 @@ Demostrar matemáticamente que el sistema de sincronización nunca pierde datos.
 - **Sync Audit**: Matriz de cobertura completada, 3 sospechas confirmadas (sync_version no incrementa, entidades faltantes en ciclos, compactación parcial).
 - **SyncDebugger**: `SyncDebugger.ts` — traceId por sync, operationId por operación, 15 SyncStage, buffer en memoria (2000) + persistencia batch, stage timing (timeStart/timeEnd), migration v22 (`sync_debug_logs` table). Integrado en SyncManager, SyncService, SyncQueueRepository, backend syncController (X-Trace-Id).
 - **SyncQueueReducer**: módulo `mobile/src/services/sync/reducer/` — OperationReducer (máquina de estados por entidad, pure function, reducción por estado final), DependencyResolver (orden topológico con 28+ entity ranks), ValidationRules (pre-flight + entity existence), ReductionReport (stats: merged/removed/noop/restored), index.ts (reduce() puro: agrupa → reduce → ordena → valida → reporta). Integrado en SyncService.ts reemplazando ordenamiento atómico inline + reemplazando markCompleted por markCompletedBatch.
+- **Bug `is_backed_up` corregido**: migration 18 hacía `UPDATE flashcards SET is_backed_up = 0` sin haber agregado la columna. Fix: se eliminó esa línea de migration 18 y se agregó migration 23 con `ALTER TABLE flashcards ADD COLUMN is_backed_up INTEGER DEFAULT 0`. `runMigrations()` ahora verifica `PRAGMA table_info` antes de cada `ALTER TABLE ADD COLUMN` para evitar "duplicate column".
+- **Sync retry limit**: `SyncService.MAX_RETRIES = 5`. `markFailed()` devuelve `Promise<number>`. `getPending()` incluye `failed` por defecto. Errores 4xx descartan permanentemente. Stale ops (retries ≥ 5) se limpian pre-reduce.
+- **Backend SyntaxError fix**: syncController.js línea 130 — eliminado TypeScript `(s: number, arr: any)` que causaba error en Node.js v26.
+- **Download flow logging**: `downloadService.ts` ahora tiene logs en cada etapa: entrada, response de cloud-items, conteo por categoría, prefs, skip de mazo con razón, descarga JSON desde Uploadthing, resultado final.
+- **`getCloudItemsCount` corregido**: ahora suma `flashcardDecks` y `aiChats` además de las 5 categorías originales.
 
-### In Progress (Sync Verification Suite)
-- 🟡 **Test Harness** — batería de 10+ escenarios automatizados con FaultInjector, ScenarioRunner, y métricas por escenario.
-- 🟢 **Corrección de bugs reales** encontrados por SyncValidator/SyncDebugger.
+### In Progress
+- ✅ **Bug 1/3: sync_version** — CORREGIDO: helper `backend/helpers/syncVersion.js` creado. `incrementSyncVersion(table, id, cb)` se llama desde 9 controllers.
+- ✅ **Bug 2/3: Backend deletes duros** — CORREGIDO: helpers `recordDeletion`/`recordDeletions`. Cada DELETE en 8 controllers inserta en `sync_deletions`.
+- ✅ **Bug 3/3: initialSync/deltaSync incompletos** — CORREGIDO: initialSync cubre 10 entidades (antes 6), deltaSync cubre 9 tablas (antes 5). Controladores de calendar, settings, gallery, audio, scannedDocuments parcheados.
+- 🔴 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. Faltan escenarios de test y Consistency Report.
 
-### Backlog
-- **Consistency Report** — al finalizar cada sync: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status.
-- **Sync Test Suite expansion** — escenarios adicionales (initial sync, delta sync, conflictos, soft-delete, red intermitente).
+### Next Up
+- 🟡 **Sync Test Suite expansion** — escenarios de asset: offline create → sync → verify en segundo dispositivo; interrupted download → resume → checksum OK; corrupt file → detect → redownload.
+- 🟡 **Consistency Report** — post-sync: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status. Incluir reporte de AssetValidator.
+- ✅ **Download flow** — diagnosticado: NO es bug de infraestructura. El flujo funciona correctamente. Los 9 mazos se saltan porque ya existen localmente (mismos IDs negativos). El logging agregado ahora hace visible cada skip.
 
 ### Blocked
 - *(none)*
@@ -116,6 +124,7 @@ Demostrar matemáticamente que el sistema de sincronización nunca pierde datos.
 - **Backend deletes son duros** (DELETE FROM subjects WHERE id = ?), no generan entradas en sync_deletions.
 - **SyncService.ts ordenamiento incompleto**: ~15 entity types caían en rank 99 (sin orden garantizado) — **resuelto** vía DependencyResolver con 28+ entity ranks.
 - **SyncQueue compactación parcial**: UPDATE dedup y CREATE→DELETE cancel existían, pero [UPDATE, UPDATE, DELETE] sin collapse — **resuelto** vía SyncQueueReducer con reducción por estado final.
+- **Download flow a mismo dispositivo**: No es bug. Los 9 mazos se saltan porque los IDs negativos locales coinciden. El flujo descarga JSON desde Uploadthing, verifica existencia local, y salta si ya existen. El logging agregado en `downloadService.ts` hace visible cada skip.
 
 ## Relevant Files
 ### Core Sync
@@ -160,17 +169,35 @@ Demostrar matemáticamente que el sistema de sincronización nunca pierde datos.
 - `mobile/src/services/database/BaseRepository.ts` — ConflictResolver on upsert
 - `mobile/src/services/database/appInit.ts` — Bootstrap and sync handler
 
-### Backend
-- `backend/controllers/syncController.js` — initialSync (6 entities) + deltaSync (5 tables)
-- `backend/controllers/subjectsController.js` — NO sync_version increment
-- `backend/controllers/coursesController.js` — NO sync_version increment
-- `backend/controllers/assessmentsController.js` — NO sync_version increment
-- `backend/controllers/schedulesController.js` — NO sync_version increment
-- `backend/controllers/photosController.js` — NO sync_version increment
-- `backend/controllers/audioController.js` — NO sync_version increment
-- `backend/controllers/documentsController.js` — NO sync_version increment
-- `backend/database/migrations/add-sync-version.js` — Creates sync_version table + columns (but never incremented)
-- `backend/db.js` — Database init (no write middleware)
+### Asset Pipeline (Sprint 2)
+- `mobile/src/services/sync/asset/types.ts` — AssetState (7 estados), AssetMetadata, AssetDownloadJob, AssetUploadJob
+- `mobile/src/services/sync/asset/PersistentLocalAssetStore.ts` — File system manager, checksums, LRU eviction (3GB)
+- `mobile/src/services/sync/asset/BaseAssetSynchronizer.ts` — Clase base abstracta para sincronizadores de assets
+- `mobile/src/services/sync/asset/PhotoSynchronizer.ts` — Synchronizer para photos (entityType='photos')
+- `mobile/src/services/sync/asset/AudioSynchronizer.ts` — Synchronizer para audio_recordings
+- `mobile/src/services/sync/asset/DocumentSynchronizer.ts` — Synchronizer para scanned_documents
+- `mobile/src/services/sync/asset/AssetUploadManager.ts` — Cola de subida (2 concurrentes, retry exponencial, FormData)
+- `mobile/src/services/sync/asset/AssetDownloadManager.ts` — Cola de descarga (3 concurrentes, checksums, prioridades, resume)
+- `mobile/src/services/sync/asset/AssetSyncEngine.ts` — Orquestador: schedulePendingDownloads, requestPriorityDownload, scheduleUpload, getLocalPath
+- `mobile/src/services/sync/asset/AssetValidator.ts` — Validación de integridad: checksum post-descarga, detección de archivos corruptos/faltantes
+- `mobile/src/services/database/migrations.ts:v25` — Columnas asset_state, checksum, filename, file_size, etc. en photos/audio/documents
+- `mobile/src/services/api/photos.ts` — scheduleUpload() al crear foto + priority download en ImageViewerModal
+- `mobile/src/services/api/audio.ts` — scheduleUpload() al crear grabación
+- `mobile/src/services/api/documents.ts` — scheduleUpload() al crear documento
+
+### Backend (corregido)
+- `backend/helpers/syncVersion.js` — 4 funciones: incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, recordDeletions
+- `backend/controllers/syncController.js` — initialSync (10 entities) + deltaSync (9 tables)
+- `backend/controllers/subjectsController.js` — incrementSyncVersion + recordDeletion + cascade
+- `backend/controllers/coursesController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/assessmentsController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/schedulesController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/flashcardsController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/calendarEventsController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/settingsController.js` — incrementSyncVersion + recordDeletion (grading_periods, lms_accounts, threshold_overrides)
+- `backend/controllers/galleryController.js` — incrementSyncVersion + recordDeletion (photos)
+- `backend/controllers/audioController.js` — incrementSyncVersion + recordDeletion (audio_recordings)
+- `backend/controllers/scannedDocumentsController.js` — incrementSyncVersion + recordDeletion (scanned_documents)
 
 ### Data Layer
 - `mobile/src/services/database/BaseRepository.ts` — Now uses ConflictResolver on upsert

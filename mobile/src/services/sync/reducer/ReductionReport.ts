@@ -1,6 +1,6 @@
 import type { ReducedOperation } from './OperationReducer';
 
-export interface ReductionReport {
+export type ReductionReport = {
   originalOperations: number;
   reducedOperations: number;
   merged: number;
@@ -8,7 +8,7 @@ export interface ReductionReport {
   noop: number;
   restored: number;
   durationMs: number;
-}
+};
 
 export function createReport(
   originalCount: number,

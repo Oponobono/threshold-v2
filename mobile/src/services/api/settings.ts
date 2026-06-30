@@ -35,23 +35,55 @@ export interface TwoFactorStatus {
   secret?: string;
 }
 
-export const getGradingPeriods = async (): Promise<GradingPeriod[]> => {
+async function _repo() {
+  const [g, l, t] = await Promise.all([
+    import('../database/repositories/GradingPeriodRepository'),
+    import('../database/repositories/LmsAccountRepository'),
+    import('../database/repositories/ThresholdOverrideRepository'),
+  ]);
+  return { gradingPeriodRepo: g.gradingPeriodRepository, lmsAccountRepo: l.lmsAccountRepository, thresholdOverrideRepo: t.thresholdOverrideRepository };
+}
+
+function _cache() {
   const mmkv = require('react-native-mmkv').createMMKV();
-  const cacheKey = 'cache:settings:grading_periods';
-  
+  return { mmkv, set: (key: string, data: any) => mmkv.set(key, JSON.stringify(data)), get: (key: string) => { const v = mmkv.getString(key); return v ? JSON.parse(v) : null; } };
+}
+
+// ── Grading Periods ──────────────────────────────────────────
+
+export const getGradingPeriods = async (): Promise<GradingPeriod[]> => {
+  const repo = (await _repo()).gradingPeriodRepo;
+  const cache = _cache();
+  const local = await repo.getAll();
+  if (local.length > 0) {
+    _refreshGradingPeriods(repo, cache);
+    return local;
+  }
   try {
     const response = await fetchWithFallback('/grading-periods');
     if (!response.ok) throw new Error('Error al obtener períodos');
     const data = await parseJsonSafely(response);
-    const periods = data?.periods || [];
-    mmkv.set(cacheKey, JSON.stringify(periods));
+    const periods: GradingPeriod[] = data?.periods || [];
+    for (const p of periods) await repo.upsert(p);
+    cache.set('cache:settings:grading_periods', periods);
     return periods;
   } catch (error) {
-    const cached = mmkv.getString(cacheKey);
-    if (cached) return JSON.parse(cached);
+    const cached = cache.get('cache:settings:grading_periods');
+    if (cached) return cached as GradingPeriod[];
     throw error;
   }
 };
+
+async function _refreshGradingPeriods(repo: any, cache: { set: (k: string, d: any) => void }) {
+  try {
+    const response = await fetchWithFallback('/grading-periods');
+    if (!response.ok) return;
+    const data = await parseJsonSafely(response);
+    const periods: GradingPeriod[] = data?.periods || [];
+    for (const p of periods) await repo.upsert(p);
+    cache.set('cache:settings:grading_periods', periods);
+  } catch { /* background refresh — best effort */ }
+}
 
 export const createGradingPeriod = async (name: string, period_type: string = 'custom', start_date?: string, end_date?: string): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
@@ -64,9 +96,16 @@ export const createGradingPeriod = async (name: string, period_type: string = 'c
       body: JSON.stringify({ id, name, period_type, start_date: start_date || null, end_date: end_date || null }),
     });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al crear período'); }
-    return await parseJsonSafely(response);
+    const result = await parseJsonSafely(response);
+    const repo = (await _repo()).gradingPeriodRepo;
+    await repo.upsert(result);
+    _cache().set('cache:settings:grading_periods', await repo.getAll());
+    return result;
   } catch {
     await syncService.enqueueCreate('grading-period', id, { name, period_type, start_date, end_date });
+    const repo = (await _repo()).gradingPeriodRepo;
+    await repo.upsert({ id, name, period_type, start_date, end_date } as any);
+    _cache().set('cache:settings:grading_periods', await repo.getAll());
     return { id, name, period_type, _isPending: true };
   }
 };
@@ -75,30 +114,69 @@ export const deleteGradingPeriod = async (id: string): Promise<void> => {
   try {
     const response = await fetchWithFallback(`/grading-periods/${id}`, { method: 'DELETE' });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al eliminar período'); }
+    const repo = (await _repo()).gradingPeriodRepo;
+    await repo.delete(id);
+    _cache().set('cache:settings:grading_periods', await repo.getAll());
   } catch {
     await syncService.enqueueDelete('grading-period', id);
+    const repo = (await _repo()).gradingPeriodRepo;
+    await repo.delete(id);
+    _cache().set('cache:settings:grading_periods', await repo.getAll());
   }
 };
 
+// ── Threshold Overrides ──────────────────────────────────────
+// SQLite keeps synchronized backend data (via initial/delta sync).
+// MMKV is the offline cache for edits not yet pushed.
+// The GET function reads MMKV first (hot path) then refreshes from API.
+
 export const getThresholdOverrides = async (): Promise<ThresholdOverride[]> => {
-  const mmkv = require('react-native-mmkv').createMMKV();
-  const cacheKey = 'cache:settings:threshold_overrides';
-  
+  const cache = _cache();
+  const cached = cache.get('cache:settings:threshold_overrides');
+  if (cached) {
+    _refreshThresholdOverrides();
+    return cached as ThresholdOverride[];
+  }
+  return _fetchThresholdOverrides();
+};
+
+async function _fetchThresholdOverrides(): Promise<ThresholdOverride[]> {
+  const repo = (await _repo()).thresholdOverrideRepo;
+  const cache = _cache();
   try {
     const response = await fetchWithFallback('/threshold-overrides');
     if (!response.ok) throw new Error('Error al obtener excepciones');
     const data = await parseJsonSafely(response);
-    const overrides = data?.overrides || [];
-    mmkv.set(cacheKey, JSON.stringify(overrides));
+    const overrides: ThresholdOverride[] = data?.overrides || [];
+    await repo.replaceAll(overrides);
+    cache.set('cache:settings:threshold_overrides', overrides);
     return overrides;
   } catch (error) {
-    const cached = mmkv.getString(cacheKey);
-    if (cached) return JSON.parse(cached);
+    const local = await repo.getAll();
+    if (local.length > 0) return local;
+    const cached = cache.get('cache:settings:threshold_overrides');
+    if (cached) return cached as ThresholdOverride[];
     throw error;
   }
-};
+}
+
+async function _refreshThresholdOverrides(): Promise<void> {
+  try {
+    const response = await fetchWithFallback('/threshold-overrides');
+    if (!response.ok) return;
+    const data = await parseJsonSafely(response);
+    const overrides: ThresholdOverride[] = data?.overrides || [];
+    const repo = (await _repo()).thresholdOverrideRepo;
+    await repo.replaceAll(overrides);
+    _cache().set('cache:settings:threshold_overrides', overrides);
+  } catch { /* background refresh — best effort */ }
+}
 
 export const saveThresholdOverrides = async (overrides: { subjectId: string; threshold: string }[]): Promise<void> => {
+  const cache = _cache();
+  // Optimistic local update so UI responds immediately
+  const mapped = overrides.map(o => ({ subject_id: o.subjectId, threshold: parseFloat(o.threshold) || 70 } as any));
+  cache.set('cache:settings:threshold_overrides', mapped);
   try {
     const response = await fetchWithFallback('/threshold-overrides', {
       method: 'PUT',
@@ -106,10 +184,18 @@ export const saveThresholdOverrides = async (overrides: { subjectId: string; thr
       body: JSON.stringify({ overrides }),
     });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al guardar excepciones'); }
+    const data = await parseJsonSafely(response);
+    const items: ThresholdOverride[] = data?.overrides || [];
+    const trepo = (await _repo()).thresholdOverrideRepo;
+    await trepo.replaceAll(items);
+    cache.set('cache:settings:threshold_overrides', items);
   } catch {
     await syncService.enqueueUpdate('threshold-overrides', 'all', { overrides });
+    // Keep optimistic data in MMKV, sync will reconcile
   }
 };
+
+// ── Grading System ───────────────────────────────────────────
 
 export const createCustomGradingSystem = async (data: {
   name: string; min_value: number; max_value: number; passing_value: number;
@@ -131,6 +217,8 @@ export const createCustomGradingSystem = async (data: {
     return { id, ...data, _isPending: true };
   }
 };
+
+// ── Two Factor ───────────────────────────────────────────────
 
 export const getTwoFactorStatus = async (): Promise<TwoFactorStatus> => {
   const mmkv = require('react-native-mmkv').createMMKV();
@@ -161,23 +249,41 @@ export const disableTwoFactor = async (): Promise<TwoFactorStatus> => {
   return await parseJsonSafely(response);
 };
 
+// ── LMS Accounts ─────────────────────────────────────────────
+
 export const getLmsAccounts = async (): Promise<LmsAccount[]> => {
-  const mmkv = require('react-native-mmkv').createMMKV();
-  const cacheKey = 'cache:settings:lms_accounts';
-  
+  const repo = (await _repo()).lmsAccountRepo;
+  const cache = _cache();
+  const local = await repo.getAll();
+  if (local.length > 0) {
+    _refreshLmsAccounts(repo, cache);
+    return local;
+  }
   try {
     const response = await fetchWithFallback('/lms-accounts');
     if (!response.ok) throw new Error('Error al obtener cuentas LMS');
     const data = await parseJsonSafely(response);
-    const accounts = data?.accounts || [];
-    mmkv.set(cacheKey, JSON.stringify(accounts));
+    const accounts: LmsAccount[] = data?.accounts || [];
+    for (const a of accounts) await repo.upsert(a);
+    cache.set('cache:settings:lms_accounts', accounts);
     return accounts;
   } catch (error) {
-    const cached = mmkv.getString(cacheKey);
-    if (cached) return JSON.parse(cached);
+    const cached = cache.get('cache:settings:lms_accounts');
+    if (cached) return cached as LmsAccount[];
     throw error;
   }
 };
+
+async function _refreshLmsAccounts(repo: any, cache: { set: (k: string, d: any) => void }) {
+  try {
+    const response = await fetchWithFallback('/lms-accounts');
+    if (!response.ok) return;
+    const data = await parseJsonSafely(response);
+    const accounts: LmsAccount[] = data?.accounts || [];
+    for (const a of accounts) await repo.upsert(a);
+    cache.set('cache:settings:lms_accounts', accounts);
+  } catch { /* background refresh — best effort */ }
+}
 
 export const addLmsAccount = async (platform: string, instance_url: string, username: string): Promise<LmsAccount> => {
   const { uuidv4 } = await import('../../utils/uuid');
@@ -190,9 +296,16 @@ export const addLmsAccount = async (platform: string, instance_url: string, user
       body: JSON.stringify({ id, platform, instance_url, username }),
     });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al vincular LMS'); }
-    return await parseJsonSafely(response);
+    const result = await parseJsonSafely(response);
+    const repo = (await _repo()).lmsAccountRepo;
+    await repo.upsert(result);
+    _cache().set('cache:settings:lms_accounts', await repo.getAll());
+    return result;
   } catch {
     await syncService.enqueueCreate('lms-account', id, { platform, instance_url, username });
+    const repo = (await _repo()).lmsAccountRepo;
+    await repo.upsert({ id, platform, instance_url, username } as any);
+    _cache().set('cache:settings:lms_accounts', await repo.getAll());
     return { id, platform, instance_url, username, _isPending: true } as any;
   }
 };
@@ -201,8 +314,14 @@ export const removeLmsAccount = async (id: string): Promise<void> => {
   try {
     const response = await fetchWithFallback(`/lms-accounts/${id}`, { method: 'DELETE' });
     if (!response.ok) { const e = await parseJsonSafely(response); throw new Error(e?.error || 'Error al desvincular LMS'); }
+    const repo = (await _repo()).lmsAccountRepo;
+    await repo.delete(id);
+    _cache().set('cache:settings:lms_accounts', await repo.getAll());
   } catch {
     await syncService.enqueueDelete('lms-account', id);
+    const repo = (await _repo()).lmsAccountRepo;
+    await repo.delete(id);
+    _cache().set('cache:settings:lms_accounts', await repo.getAll());
   }
 };
 
