@@ -281,10 +281,10 @@ exports.markAsBackedUp = (req, res) => {
         // Insertar con los datos mínimos disponibles.
         const resolvedSubjectId = subject_id || null;
         db.run(
-          `INSERT INTO photos (id, subject_id, local_uri, cloud_url, is_backed_up)
-           VALUES (?, ?, '', ?, 1)
+          `INSERT INTO photos (id, user_id, subject_id, local_uri, cloud_url, is_backed_up)
+           VALUES (?, ?, ?, '', ?, 1)
            ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
-          [id, resolvedSubjectId, cloud_url],
+          [id, userId, resolvedSubjectId, cloud_url],
           function (insertErr) {
             if (insertErr) {
               console.error('[Backup] Error al insertar foto offline:', insertErr.message, insertErr.code, insertErr.stack);

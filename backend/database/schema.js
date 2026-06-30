@@ -223,6 +223,7 @@ const tableSchema = {
     sqlite: `
       CREATE TABLE IF NOT EXISTS photos (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         subject_id TEXT NOT NULL,
         local_uri TEXT NOT NULL,
         es_favorita INTEGER DEFAULT 0,
@@ -231,12 +232,14 @@ const tableSchema = {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
+        FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS photos (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
         subject_id TEXT NOT NULL REFERENCES subjects (id) ON DELETE CASCADE,
         local_uri TEXT NOT NULL,
         es_favorita INTEGER DEFAULT 0,
@@ -248,6 +251,7 @@ const tableSchema = {
       )
     `,
     columns: [
+      { name: 'user_id', type: 'TEXT' },
       { name: 'ocr_text', type: 'TEXT' },
       { name: 'tags', type: 'TEXT' },
       { name: 'cloud_url', type: 'TEXT' },

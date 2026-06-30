@@ -146,8 +146,8 @@ exports.savePhoto = (req, res) => {
 
     const photoId = clientId || uuidv4();
     const query = `
-      INSERT INTO photos (id, subject_id, local_uri, es_favorita, ocr_text, tags, group_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO photos (id, user_id, subject_id, local_uri, es_favorita, ocr_text, tags, group_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Generar tags a partir del OCR si existe
@@ -156,7 +156,7 @@ exports.savePhoto = (req, res) => {
       tags = generateTagsFromOCR(ocr_text);
     }
 
-    db.run(query, [photoId, subject_id, local_uri, es_favorita ? 1 : 0, ocr_text || null, tags, group_id || null], function(err) {
+    db.run(query, [photoId, userId, subject_id, local_uri, es_favorita ? 1 : 0, ocr_text || null, tags, group_id || null], function(err) {
       if (err) {
         console.error('[Gallery] Save error:', err.message);
         return res.status(500).json({ error: err.message });
