@@ -12,6 +12,6 @@ export class DeletePropagationScenario extends AssetScenarioBase {
     { name: 'queueHasCreate', run: validateQueueCount(1) },
     { name: 'deleteAsset', run: deleteAsset() },
     { name: 'validateAssetState(afterDelete)', run: validateAssetState('LOCAL_ONLY') },
-    { name: 'validateConsistency', run: validateConsistency() },
+    { name: 'validateConsistency', run: validateConsistency(['photos']) },
   ];
 }

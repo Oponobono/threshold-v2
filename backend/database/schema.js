@@ -1399,6 +1399,44 @@ const tableSchema = {
       { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' }
     ]
   },
+  sync_version: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS sync_version (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        version INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS sync_version (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        version INTEGER NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+  },
+  sync_deletions: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS sync_deletions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        deleted_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(entity_type, entity_id, user_id)
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS sync_deletions (
+        id SERIAL PRIMARY KEY,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(entity_type, entity_id, user_id)
+      )
+    `,
+  },
 };
 
 module.exports = tableSchema;

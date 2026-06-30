@@ -13,6 +13,9 @@ import type { ConsistencyReport } from '../sync/ConsistencyReport';
 export interface DeveloperConsoleData {
   // Sync State
   syncState: string;
+  syncStatus: string;
+  syncError: string | null;
+  syncDurationMs: number;
   network: string;
   lastSync: string;
   confidence: number;
@@ -78,9 +81,13 @@ class DeveloperService {
     const confidence = this.calculateConfidence({ pending, retries, corrupted, missing });
 
     const consistencyReport = syncManager.lastConsistencyReport;
+    const lastSyncStatus = syncManager.lastSyncStatus;
 
     return {
       syncState: syncManager.state === 'INITIAL_SYNC' || syncManager.state === 'PUSHING' || syncManager.state === 'PULLING' ? 'SYNCING' : syncManager.state,
+      syncStatus: lastSyncStatus.lastSyncStatus ?? 'never',
+      syncError: lastSyncStatus.lastSyncError,
+      syncDurationMs: lastSyncStatus.lastSyncDurationMs,
       network: networkManager.isOnline ? 'ONLINE' : 'OFFLINE',
       lastSync: lastSyncStr,
       confidence,

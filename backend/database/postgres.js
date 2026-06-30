@@ -136,6 +136,26 @@ const initializePostgresDb = async (pool) => {
       );
     }
 
+    // Insertar fila inicial de sync_version si no existe
+    await pool.query(`INSERT INTO sync_version (id, version) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`);
+    console.log('✓ sync_version seeded');
+
+    // Agregar columna sync_version a tablas sincronizables si no existe
+    const syncTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'flashcards', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'photos', 'audio_recordings', 'scanned_documents'];
+    for (const t of syncTables) {
+      try {
+        await pool.query(`ALTER TABLE ${t} ADD COLUMN sync_version INTEGER DEFAULT 0`);
+        console.log(`  ✓ sync_version column added to ${t}`);
+      } catch (e) {
+        if (e.message && e.message.includes('already exists')) {
+          // columna ya existe, ignorar
+        } else {
+          console.warn(`  ⚠ sync_version column skipped for ${t}: ${e.message}`);
+        }
+      }
+    }
+    console.log('✓ sync_version columns verified');
+
     console.log('✅ Base de datos PostgreSQL inicializada correctamente.');
     await seedGradingSystemsPostgres(pool);
   } catch (err) {

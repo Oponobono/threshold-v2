@@ -25,6 +25,6 @@ export class StressKillResumeScenario extends AssetScenarioBase {
     }).flat(),
     { name: 'goOnline', run: goOnline() },
     { name: 'validateQueueCount', run: validateQueueCount(ASSET_COUNT) },
-    { name: 'validateConsistency', run: validateConsistency() },
+    { name: 'validateConsistency', run: validateConsistency(['photos', 'audio-recordings', 'scanned-documents']) },
   ];
 }

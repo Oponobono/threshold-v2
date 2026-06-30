@@ -125,6 +125,9 @@ export const useDataStore = create<DataState>((set, get) => {
       set({ isRefreshing: true });
     }
 
+    console.trace('[DataStore] loadAllData() called');
+    console.log('[DataStore] loadAllData() caller stack captured above');
+
     try {
       await databaseService.open();
 
@@ -291,6 +294,8 @@ export const useDataStore = create<DataState>((set, get) => {
   },
 
   syncPendingOperations: async () => {
+    console.trace('[DataStore] syncPendingOperations() called');
+    console.log('[DataStore] syncPendingOperations() caller stack captured above');
     const result = await syncManager.sync();
     return { success: result.entitiesSynced, failed: result.errors.length, pending: 0 };
   },

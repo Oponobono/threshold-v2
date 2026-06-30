@@ -156,8 +156,10 @@ export default function DeveloperScreen() {
         {sectionHeader('Status')}
         <View style={{ backgroundColor: '#161b22', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#30363d' }}>
           {statusBadge('Sync State', data.syncState, data.syncState === 'READY' ? '#3fb950' : '#d29922')}
+          {statusBadge('Last Sync', data.syncStatus === 'success' ? '✅ Success' : data.syncStatus === 'failed' ? '❌ Failed' : '⏳ Never', data.syncStatus === 'success' ? '#3fb950' : data.syncStatus === 'failed' ? '#f85149' : '#8b949e')}
+          {data.syncError && statusBadge('Error', data.syncError, '#f85149')}
+          {data.syncDurationMs > 0 && statusBadge('Duration', `${data.syncDurationMs}ms`, '#8b949e')}
           {statusBadge('Network', data.network, data.network === 'ONLINE' ? '#3fb950' : '#f85149')}
-          {statusBadge('Last Sync', data.lastSync, '#8b949e')}
         </View>
 
         {/* Queue */}

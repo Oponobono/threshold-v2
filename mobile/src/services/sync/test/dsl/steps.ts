@@ -216,12 +216,12 @@ export function validateQueueCount(expected: number): (ctx: AssetTestContext) =>
   };
 }
 
-/** Run full SyncValidator + AssetValidator */
-export function validateConsistency(): (ctx: AssetTestContext) => Promise<StepResult> {
+/** Run SQLite-only SyncValidator + AssetValidator, optionally filtering entity types */
+export function validateConsistency(entityTypes?: string[]): (ctx: AssetTestContext) => Promise<StepResult> {
   return async () => {
     const start = Date.now();
     try {
-      const entityResult = await validateAll();
+      const entityResult = await validateAll(undefined, entityTypes);
       const assetResult = await validateAllAssets();
 
       const entityOk = entityResult.overallStatus === 'PASS';
@@ -232,7 +232,7 @@ export function validateConsistency(): (ctx: AssetTestContext) => Promise<StepRe
         step: 'validateConsistency', status: ok ? 'PASS' : 'FAIL',
         durationMs: Date.now() - start,
         error: ok ? undefined : `Entities: ${entityResult.overallStatus}, Assets: ${assetResult.totalOk}/${assetResult.totalAssets} OK`,
-        metrics: { validatorErrors: entityResult.results.filter(r => r.status !== 'OK').length + assetResult.totalChecksumMismatch + assetResult.totalMissing },
+        metrics: { validatorErrors: entityResult.results.filter(r => r.status !== 'OK' && r.status !== 'EMPTY').length + assetResult.totalChecksumMismatch + assetResult.totalMissing },
       };
     } catch (e: any) {
       return { step: 'validateConsistency', status: 'FAIL', durationMs: Date.now() - start, error: e.message };

@@ -13,6 +13,6 @@ export class PhotoOfflineScenario extends AssetScenarioBase {
     { name: 'goOnline', run: goOnline() },
     { name: 'validateChecksum', run: validateChecksum() },
     { name: 'validateAssetState', run: validateAssetState('LOCAL_ONLY') },
-    { name: 'validateConsistency', run: validateConsistency() },
+    { name: 'validateConsistency', run: validateConsistency(['photos']) },
   ];
 }

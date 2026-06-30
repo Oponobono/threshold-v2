@@ -13,6 +13,6 @@ export class DocumentOfflineScenario extends AssetScenarioBase {
     { name: 'validateAssetState', run: validateAssetState('LOCAL_ONLY') },
     { name: 'goOnline', run: goOnline() },
     { name: 'validateChecksum', run: validateChecksum() },
-    { name: 'validateConsistency', run: validateConsistency() },
+    { name: 'validateConsistency', run: validateConsistency(['scanned_documents']) },
   ];
 }

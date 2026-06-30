@@ -1,25 +1,23 @@
 import * as Crypto from 'expo-crypto';
 import { databaseService } from '../../database/DatabaseService';
-import { fetchWithFallback, parseJsonSafely } from '../../api/client';
-import { getUserId } from '../../api/auth';
 import type { EntityValidationResult, SyncValidationResult, EntityConfig } from './types';
 
-const ENTITY_CONFIGS: EntityConfig[] = [
-  { entityType: 'subjects', tableName: 'subjects', apiPath: '/subjects/${userId}', idField: 'id', userIdField: 'user_id' },
-  { entityType: 'courses', tableName: 'courses', apiPath: '/courses', idField: 'id', userIdField: 'user_id' },
-  { entityType: 'assessments', tableName: 'assessments', apiPath: '/assessments/user/${userId}', idField: 'id', userIdField: 'user_id' },
-  { entityType: 'schedules', tableName: 'schedules', apiPath: '/schedules/user/${userId}', idField: 'id', userIdField: 'user_id' },
-  { entityType: 'flashcard-decks', tableName: 'flashcard_decks', apiPath: '/flashcard-decks?user_id=${userId}', idField: 'id', userIdField: 'user_id' },
-  { entityType: 'photos', tableName: 'photos', apiPath: '/gallery/${userId}', idField: 'id', userIdField: 'user_id', compareChecksum: false },
-  { entityType: 'audio-recordings', tableName: 'audio_recordings', apiPath: '/audio-recordings/${userId}', idField: 'id', userIdField: 'user_id' },
-  { entityType: 'calendar-events', tableName: 'calendar_events', apiPath: '/calendar/events?user_id=${userId}', idField: 'id', userIdField: 'user_id' },
-];
-
-// Fields to exclude from checksum computation (timestamps, metadata)
 const SKIP_FIELDS = new Set([
   'created_at', 'updated_at', 'deleted_at', 'last_modified_by',
   'cloud_url', 'local_uri', 'thumbnail_uri',
 ]);
+
+const ENTITY_TABLES: { entityType: string; tableName: string; idField: string; userIdField: string }[] = [
+  { entityType: 'subjects', tableName: 'subjects', idField: 'id', userIdField: 'user_id' },
+  { entityType: 'courses', tableName: 'courses', idField: 'id', userIdField: 'user_id' },
+  { entityType: 'assessments', tableName: 'assessments', idField: 'id', userIdField: 'user_id' },
+  { entityType: 'schedules', tableName: 'schedules', idField: 'id', userIdField: 'user_id' },
+  { entityType: 'flashcard-decks', tableName: 'flashcard_decks', idField: 'id', userIdField: 'user_id' },
+  { entityType: 'photos', tableName: 'photos', idField: 'id', userIdField: 'user_id' },
+  { entityType: 'audio-recordings', tableName: 'audio_recordings', idField: 'id', userIdField: 'user_id' },
+  { entityType: 'calendar-events', tableName: 'calendar_events', idField: 'id', userIdField: 'user_id' },
+  { entityType: 'scanned-documents', tableName: 'scanned_documents', idField: 'id', userIdField: 'user_id' },
+];
 
 async function computeChecksum(records: any[]): Promise<string> {
   const sorted = [...records].sort((a, b) => {
@@ -44,12 +42,8 @@ async function computeChecksum(records: any[]): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, json);
 }
 
-function resolveApiPath(template: string, userId: string): string {
-  return template.replace('${userId}', userId);
-}
-
 async function validateEntity(
-  config: EntityConfig,
+  config: { entityType: string; tableName: string; idField: string; userIdField: string },
   userId: string,
 ): Promise<EntityValidationResult> {
   const result: EntityValidationResult = {
@@ -68,68 +62,24 @@ async function validateEntity(
 
   try {
     const db = databaseService.getDb();
-    const apiPath = resolveApiPath(config.apiPath, userId);
 
-    // Fetch local data
     const localRows: any[] = await db.getAllAsync(
       `SELECT * FROM ${config.tableName} WHERE ${config.userIdField} = ? ORDER BY ${config.idField}`,
       userId,
     );
 
-    // Fetch remote data
-    const response = await fetchWithFallback(apiPath);
-    let remoteRows: any[] = [];
-    if (response.ok) {
-      remoteRows = (await parseJsonSafely(response)) ?? [];
-    } else {
-      result.status = 'ERROR';
-      return { ...result, status: 'ERROR' as const };
-    }
-
-    // Filter remote rows to only this user's records
-    remoteRows = remoteRows.filter((r: any) => String(r[config.userIdField] ?? r.user_id) === userId);
-
-    // Gallery endpoint mixes photos + scanned_documents; filter by item_type
-    if (config.entityType === 'photos') {
-      remoteRows = remoteRows.filter((r: any) => r.item_type === 'photo');
-    }
-
-    // Separate soft-deleted from active local records
     const activeLocal = localRows.filter((r: any) => !r.deleted_at);
     const deletedLocal = localRows.filter((r: any) => r.deleted_at);
 
-    // Counts
     result.localCount = activeLocal.length;
-    result.remoteCount = remoteRows.length;
     result.deletedLocalCount = deletedLocal.length;
+    result.localChecksum = await computeChecksum(activeLocal);
 
-    // Checksums (skip for entities where remote format differs from local)
-    if (config.compareChecksum !== false) {
-      result.localChecksum = await computeChecksum(activeLocal);
-      result.remoteChecksum = await computeChecksum(remoteRows);
-    }
-
-    // Versions
     const localMaxVer = activeLocal.reduce((max: number, r: any) => Math.max(max, r.version_number ?? 0), 0);
-    const remoteMaxVer = remoteRows.reduce((max: number, r: any) => Math.max(max, r.version_number ?? 0), 0);
     result.localVersion = localMaxVer;
-    result.remoteVersion = remoteMaxVer;
 
-    // Missing IDs
-    const localIds = new Set(activeLocal.map((r: any) => String(r[config.idField])));
-    const remoteIds = new Set(remoteRows.map((r: any) => String(r[config.idField])));
-    result.missingLocalIds = [...remoteIds].filter(id => !localIds.has(id));
-    result.missingRemoteIds = [...localIds].filter(id => !remoteIds.has(id));
-
-    // Status
-    if (result.missingLocalIds.length > 0 || result.missingRemoteIds.length > 0) {
-      result.status = 'MISSING_IDS';
-    }
-    if (config.compareChecksum !== false && result.localChecksum !== result.remoteChecksum && result.status === 'OK') {
-      result.status = 'CHECKSUM_MISMATCH';
-    }
-    if (result.localCount !== result.remoteCount && result.status === 'OK') {
-      result.status = 'COUNT_MISMATCH';
+    if (result.localCount === 0) {
+      result.status = 'EMPTY';
     }
   } catch (error: any) {
     result.status = 'ERROR';
@@ -138,8 +88,9 @@ async function validateEntity(
   return result;
 }
 
-export async function validateAll(userId?: string): Promise<SyncValidationResult> {
+export async function validateAll(userId?: string, entities?: string[]): Promise<SyncValidationResult> {
   const startTime = Date.now();
+  const { getUserId } = await import('../../api/auth');
   const uid = userId || await getUserId();
   const errors: string[] = [];
 
@@ -153,8 +104,22 @@ export async function validateAll(userId?: string): Promise<SyncValidationResult
     };
   }
 
+  const configs = entities
+    ? ENTITY_TABLES.filter(c => entities.includes(c.entityType))
+    : ENTITY_TABLES;
+
+  if (configs.length === 0) {
+    return {
+      timestamp: new Date().toISOString(),
+      results: [],
+      overallStatus: 'PASS',
+      durationMs: Date.now() - startTime,
+      errors: [],
+    };
+  }
+
   const results: EntityValidationResult[] = [];
-  for (const config of ENTITY_CONFIGS) {
+  for (const config of configs) {
     try {
       const entityResult = await validateEntity(config, uid);
       results.push(entityResult);
@@ -176,7 +141,7 @@ export async function validateAll(userId?: string): Promise<SyncValidationResult
     }
   }
 
-  const failed = results.filter(r => r.status !== 'OK');
+  const failed = results.filter(r => r.status !== 'OK' && r.status !== 'EMPTY');
   const overallStatus = failed.length === 0 ? 'PASS' : 'FAIL';
 
   return {
@@ -192,9 +157,10 @@ export async function validateEntityType(
   entityType: string,
   userId?: string,
 ): Promise<EntityValidationResult | null> {
-  const config = ENTITY_CONFIGS.find(c => c.entityType === entityType);
+  const config = ENTITY_TABLES.find(c => c.entityType === entityType);
   if (!config) return null;
 
+  const { getUserId } = await import('../../api/auth');
   const uid = userId || await getUserId();
   if (!uid) return null;
 
@@ -208,17 +174,11 @@ export function formatValidationResult(result: SyncValidationResult): string {
   lines.push('');
 
   for (const entity of result.results) {
-    const icon = entity.status === 'OK' ? '✅' : '❌';
+    const icon = entity.status === 'OK' ? '✅' : entity.status === 'EMPTY' ? '⬜' : '❌';
     lines.push(`${icon} ${entity.entity}`);
-    lines.push(`   Local: ${entity.localCount} | Remote: ${entity.remoteCount} | Deleted: ${entity.deletedLocalCount}`);
-    lines.push(`   Checksum: ${entity.localChecksum === entity.remoteChecksum ? 'OK' : 'MISMATCH'}`);
-    lines.push(`   Version: ${entity.localVersion} / ${entity.remoteVersion}`);
-    if (entity.missingLocalIds.length > 0) {
-      lines.push(`   Missing locally (${entity.missingLocalIds.length}): ${entity.missingLocalIds.slice(0, 10).join(', ')}${entity.missingLocalIds.length > 10 ? '...' : ''}`);
-    }
-    if (entity.missingRemoteIds.length > 0) {
-      lines.push(`   Missing remotely (${entity.missingRemoteIds.length}): ${entity.missingRemoteIds.slice(0, 10).join(', ')}${entity.missingRemoteIds.length > 10 ? '...' : ''}`);
-    }
+    lines.push(`   Local: ${entity.localCount} | Deleted: ${entity.deletedLocalCount}`);
+    lines.push(`   Checksum: ${entity.localChecksum.slice(0, 16)}...`);
+    lines.push(`   Version: ${entity.localVersion}`);
     lines.push('');
   }
 

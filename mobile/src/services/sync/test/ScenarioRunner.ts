@@ -1,6 +1,8 @@
 import type { SyncScenario, ScenarioResult, ScenarioMetrics, FaultRule, ScenarioReport } from './types';
 import { faultInjector } from './FaultInjector';
 
+const SCENARIO_TIMEOUT_MS = 30000;
+
 export class ScenarioRunner {
   private scenarios: SyncScenario[] = [];
 
@@ -19,29 +21,29 @@ export class ScenarioRunner {
 
     for (const scenario of this.scenarios) {
       let result: ScenarioResult;
+      const scenarioStartTime = Date.now();
 
       try {
-        // Setup
         await scenario.setup();
 
-        // Enable faults if any
         if (faults && faults.length > 0) {
           faultInjector.enable(faults);
         }
 
-        // Execute
-        const traceId = await scenario.execute(faults);
+        const traceId = await Promise.race([
+          scenario.execute(faults),
+          new Promise<string>((_, reject) =>
+            setTimeout(() => reject(new Error(`Scenario "${scenario.name}" timed out after ${SCENARIO_TIMEOUT_MS}ms`)), SCENARIO_TIMEOUT_MS)
+          ),
+        ]);
 
-        // Disable faults for validation
         if (faultInjector.enabled) {
           faultInjector.disable();
         }
 
-        // Validate
         result = await scenario.validate();
         result.traceId = traceId;
 
-        // Cleanup
         await scenario.cleanup();
       } catch (error: any) {
         result = {
@@ -50,7 +52,7 @@ export class ScenarioRunner {
           status: 'ERROR',
           error: error.message,
           metrics: {
-            durationMs: 0,
+            durationMs: Date.now() - scenarioStartTime,
             queueOriginal: 0,
             queueReduced: 0,
             uploaded: 0,
@@ -64,9 +66,7 @@ export class ScenarioRunner {
 
         try { await scenario.cleanup(); } catch { /* ignore cleanup errors */ }
       } finally {
-        if (faultInjector.enabled) {
-          faultInjector.disable();
-        }
+        faultInjector.disable();
       }
 
       results.push(result);

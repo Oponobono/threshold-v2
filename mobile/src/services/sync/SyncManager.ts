@@ -28,6 +28,14 @@ import type { ConsistencyReport } from './ConsistencyReport';
 
 const SYNC_DEBOUNCE_MS = 2000;
 
+interface SyncStatus {
+  lastSyncTime: number | null;
+  lastSyncStatus: 'success' | 'failed' | null;
+  lastSyncError: string | null;
+  lastSyncPhase: SyncPhase | null;
+  lastSyncDurationMs: number;
+}
+
 class SyncManager {
   private _state: SyncState = 'UNAUTHENTICATED';
   private _listeners: Set<SyncListener> = new Set();
@@ -38,6 +46,13 @@ class SyncManager {
   private _pendingRetryTimeout: ReturnType<typeof setTimeout> | null = null;
   private _synchronizers: Map<string, EntitySynchronizer> = new Map();
   private _lastConsistencyReport: ConsistencyReport | null = null;
+  private _lastSyncStatus: SyncStatus = {
+    lastSyncTime: null,
+    lastSyncStatus: null,
+    lastSyncError: null,
+    lastSyncPhase: null,
+    lastSyncDurationMs: 0,
+  };
 
   constructor() {
     this._registerDefaults();
@@ -61,6 +76,10 @@ class SyncManager {
 
   registerSynchronizer(synchronizer: EntitySynchronizer): void {
     this._synchronizers.set(synchronizer.entityType, synchronizer);
+  }
+
+  get lastSyncStatus(): SyncStatus {
+    return { ...this._lastSyncStatus };
   }
 
   get lastConsistencyReport(): ConsistencyReport | null {
@@ -95,7 +114,7 @@ class SyncManager {
     this._emit({ type: 'progress', progress: { phase, current, total, label } });
   }
 
-  start(): void {
+  private _startNetwork(): void {
     if (this._unsubscribeNetwork) return;
 
     this._unsubscribeNetwork = networkManager.subscribe(netState => {
@@ -113,6 +132,10 @@ class SyncManager {
     console.log('[SyncManager] Started');
   }
 
+  start(): void {
+    this._startNetwork();
+  }
+
   stop(): void {
     if (this._unsubscribeNetwork) {
       this._unsubscribeNetwork();
@@ -126,7 +149,10 @@ class SyncManager {
   }
 
   async login(): Promise<boolean> {
+    if (this._state !== 'UNAUTHENTICATED') return true;
     this._setState('LOGIN');
+    this._startNetwork();
+    this._setState('READY');
     return true;
   }
 
@@ -156,9 +182,9 @@ class SyncManager {
     try {
       this._emitProgress('initial', 0, 1, 'Downloading all data...');
       syncDebugger.timeStart(traceId, 'initial_http');
-      syncDebugger.log(traceId, null, null, 'HTTP_REQUEST', 'Fetching initial sync data', { url: '/api/sync/initial' });
+      syncDebugger.log(traceId, null, null, 'HTTP_REQUEST', 'Fetching initial sync data', { url: '/sync/initial' });
 
-      const response = await fetchWithFallback('/api/sync/initial', {
+      const response = await fetchWithFallback('/sync/initial', {
         method: 'GET',
         headers: { 'X-Trace-Id': traceId },
       });
@@ -166,7 +192,9 @@ class SyncManager {
       syncDebugger.timeEnd(traceId, 'initial_http', 'HTTP_RESPONSE', `HTTP ${response.status}`, { status: response.status });
 
       if (!response.ok) {
-        throw new Error(`Sync initial failed: HTTP ${response.status}`);
+        let errorBody = '';
+        try { errorBody = await response.text(); } catch {}
+        throw new Error(`Sync initial failed: HTTP ${response.status} — ${errorBody.slice(0, 200)}`);
       }
 
       const body = await response.json();
@@ -186,6 +214,7 @@ class SyncManager {
 
       const durationMs = Date.now() - startTime;
       const result: SyncResult = { success: true, phase: 'initial', entitiesSynced, errors, durationMs };
+      this._lastSyncStatus = { lastSyncTime: Date.now(), lastSyncStatus: 'success', lastSyncError: null, lastSyncPhase: 'initial', lastSyncDurationMs: durationMs };
       syncDebugger.endSync(traceId, result);
       await syncJournal.finishEntry({ status: 'success', entities_synced: entitiesSynced, errors });
       this._emit({ type: 'complete', result });
@@ -200,6 +229,7 @@ class SyncManager {
       this._setState('ERROR');
       const durationMs = Date.now() - startTime;
       const result: SyncResult = { success: false, phase: 'initial', entitiesSynced, errors, durationMs };
+      this._lastSyncStatus = { lastSyncTime: Date.now(), lastSyncStatus: 'failed', lastSyncError: err.message || 'Unknown error', lastSyncPhase: 'initial', lastSyncDurationMs: durationMs };
       syncDebugger.logError(traceId, null, 'SYNC_END', 'Sync failed', err);
       await syncJournal.finishEntry({ status: 'error', entities_synced: entitiesSynced, errors });
       this._emit({ type: 'error', error: err.message, result });
@@ -207,6 +237,7 @@ class SyncManager {
         this._lastConsistencyReport = r;
         this._emit({ type: 'consistency', consistencyReport: r });
       }).catch(() => {});
+      this._setState('READY');
       return result;
     } finally {
       this._isSyncing = false;
@@ -250,9 +281,11 @@ class SyncManager {
       if (this._state === 'PUSHING' || this._state === 'PULLING') this._setState('READY');
 
       const durationMs = Date.now() - startTime;
-      const result: SyncResult = { success: errors.length === 0, phase: 'push', entitiesSynced, errors, durationMs };
+      const success = errors.length === 0;
+      const result: SyncResult = { success, phase: 'push', entitiesSynced, errors, durationMs };
+      this._lastSyncStatus = { lastSyncTime: Date.now(), lastSyncStatus: success ? 'success' : 'failed', lastSyncError: errors.length > 0 ? errors[0] : null, lastSyncPhase: 'push', lastSyncDurationMs: durationMs };
       syncDebugger.endSync(traceId, result);
-      await syncJournal.finishEntry({ status: 'success', entities_synced: entitiesSynced, errors });
+      await syncJournal.finishEntry({ status: success ? 'success' : 'error', entities_synced: entitiesSynced, errors });
       this._emit({ type: 'complete', result });
       generateConsistencyReport({ syncType: 'delta', syncDurationMs: durationMs, syncSuccess: result.success }).then(r => {
         this._lastConsistencyReport = r;
@@ -265,6 +298,7 @@ class SyncManager {
       this._setState('ERROR');
       const durationMs = Date.now() - startTime;
       const result: SyncResult = { success: false, phase: 'push', entitiesSynced: 0, errors, durationMs };
+      this._lastSyncStatus = { lastSyncTime: Date.now(), lastSyncStatus: 'failed', lastSyncError: err.message || 'Unknown error', lastSyncPhase: 'push', lastSyncDurationMs: durationMs };
       syncDebugger.logError(traceId, null, 'SYNC_END', 'Sync failed', err);
       await syncJournal.finishEntry({ status: 'error', errors: [err.message] });
       this._emit({ type: 'error', error: err.message, result });
@@ -272,6 +306,7 @@ class SyncManager {
         this._lastConsistencyReport = r;
         this._emit({ type: 'consistency', consistencyReport: r });
       }).catch(() => {});
+      this._setState('READY');
       return result;
     } finally {
       this._isSyncing = false;
@@ -304,7 +339,7 @@ class SyncManager {
     const errors: string[] = [];
 
     try {
-      const url = `/api/sync?version=${this._lastSyncVersion}`;
+      const url = `/sync?version=${this._lastSyncVersion}`;
       if (traceId) { syncDebugger.timeStart(traceId, 'delta_http'); syncDebugger.log(traceId, null, null, 'HTTP_REQUEST', 'Fetching delta sync', { url, lastSyncVersion: this._lastSyncVersion }); }
 
       const response = await fetchWithFallback(url, {

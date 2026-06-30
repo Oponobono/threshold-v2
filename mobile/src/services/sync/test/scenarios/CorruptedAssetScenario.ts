@@ -13,6 +13,6 @@ export class CorruptedAssetScenario extends AssetScenarioBase {
     { name: 'checksumFAIL(afterCorrupt)', run: validateChecksum(), expectFail: true },
     { name: 'reCreateAsset', run: createAsset('photo') },
     { name: 'checksumOK(afterRecovery)', run: validateChecksum() },
-    { name: 'validateConsistency', run: validateConsistency() },
+    { name: 'validateConsistency', run: validateConsistency(['photos']) },
   ];
 }

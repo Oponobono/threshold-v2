@@ -125,7 +125,7 @@ class BootstrapManager {
         const { fetchWithFallback } = await import('../api/client');
         const { getUserId } = await import('../api/auth');
 
-        syncManager.start();
+        await syncManager.login();
 
         this._registerSyncHandlers(syncService, databaseService, fetchWithFallback, getUserId);
 
