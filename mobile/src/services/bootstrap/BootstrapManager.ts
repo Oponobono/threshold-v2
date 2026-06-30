@@ -98,6 +98,9 @@ class BootstrapManager {
           });
         });
         networkManager.start();
+
+        const { initializeApiClient } = await import('../api/client');
+        await initializeApiClient();
         console.log('[Bootstrap] Network ready');
       });
 
@@ -107,7 +110,7 @@ class BootstrapManager {
           const profile = await getCurrentUserProfile();
           if (profile) {
             const { userRepository } = await import('../database/repositories/UserRepository');
-            await userRepository.upsert(profile as any);
+            await userRepository.saveProfile(profile);
           }
         } catch {
           console.log('[Bootstrap] Auth: no session yet');
@@ -143,6 +146,12 @@ class BootstrapManager {
       });
 
       await this._runPhase('READY', async () => {
+        try {
+          const { useDataStore } = await import('../../store/useDataStore');
+          await useDataStore.getState().loadAllData();
+        } catch (err) {
+          console.warn('[Bootstrap] Pre-load DataStore failed:', err);
+        }
         console.log('[Bootstrap] App ready');
       });
 

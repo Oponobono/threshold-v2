@@ -19,7 +19,6 @@ import { useCacheCleanup } from '../src/hooks/useCacheCleanup';
 import { DatabaseProvider, useDatabaseReady } from '../src/context/DatabaseContext';
 
 import { hasValidSession } from '../src/services/api/auth/session';
-import { initializeApiClient } from '../src/services/api/client';
 import { requestPermissions } from '../src/services/notificationService';
 import { registerScheduledBackup } from '../src/services/backup/scheduledBackupService';
 import { getScheduledBackupConfig } from '../src/services/backup/backupService';
@@ -84,12 +83,7 @@ function RootNavigator() {
           // Intentar continuar de todas formas (puede usar API fallback)
         }
 
-        // 🔷 1. Inicializar cliente API con detección de backend (local vs Render)
-        console.log('[RootLayout] 🔄 Inicializando cliente API...');
-        await initializeApiClient();
-        console.log('[RootLayout] ✅ Cliente API inicializado');
-        
-        // 🔷 2. Verificar si existe sesión válida al iniciar la app
+        // 🔷 1. Verificar si existe sesión válida al iniciar la app
         const hasSession = await hasValidSession();
         if (hasSession) {
           console.log('[RootLayout] ✅ Sesión válida encontrada, navegando a (tabs)');
@@ -99,12 +93,12 @@ function RootNavigator() {
           setInitialRoute('welcome');
         }
 
-        // 🔷 3. Solicitar permiso de notificaciones al iniciar (no bloquea)
+        // 🔷 2. Solicitar permiso de notificaciones al iniciar (no bloquea)
         requestPermissions().then(granted => {
           console.log(`[RootLayout] 📱 Permiso de notificaciones: ${granted ? 'concedido' : 'denegado'}`);
         });
 
-        // 🔷 4. Registrar backup automático si está habilitado
+        // 🔷 3. Registrar backup automático si está habilitado
         // IMPORTANTE: Esto debe ocurrir DESPUÉS de que BD esté inicializada
         // ya que getScheduledBackupConfig() necesita acceso al almacenamiento seguro
         try {

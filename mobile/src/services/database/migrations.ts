@@ -597,6 +597,30 @@ const migrations: Migration[] = [
     ],
   },
   {
+    version: 26,
+    up: [
+      // Expand users table with full UserProfile fields + sync columns
+      `ALTER TABLE users ADD COLUMN lastname TEXT`,
+      `ALTER TABLE users ADD COLUMN username TEXT`,
+      `ALTER TABLE users ADD COLUMN major TEXT`,
+      `ALTER TABLE users ADD COLUMN university TEXT`,
+      `ALTER TABLE users ADD COLUMN semester TEXT`,
+      `ALTER TABLE users ADD COLUMN study_goal TEXT`,
+      `ALTER TABLE users ADD COLUMN profile_image TEXT`,
+      `ALTER TABLE users ADD COLUMN display_name TEXT`,
+      `ALTER TABLE users ADD COLUMN share_pin TEXT`,
+      `ALTER TABLE users ADD COLUMN approval_threshold REAL`,
+      `ALTER TABLE users ADD COLUMN grading_scale TEXT`,
+      `ALTER TABLE users ADD COLUMN active_grading_version_id TEXT`,
+      `ALTER TABLE users ADD COLUMN last_login TEXT`,
+      `ALTER TABLE users ADD COLUMN reference_language TEXT`,
+      `ALTER TABLE users ADD COLUMN biometric_token TEXT`,
+      `ALTER TABLE users ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE users ADD COLUMN last_modified_by TEXT`,
+      `ALTER TABLE users ADD COLUMN deleted_at TEXT`,
+    ],
+  },
+  {
     version: 25,
     up: [
       // ── Photos ──

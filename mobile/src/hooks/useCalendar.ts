@@ -97,8 +97,12 @@ export function useCalendar(t: any, language: string = 'es-ES') {
     rawClasses.forEach(cls => {
       if (cls.subject_id && classMap.has(cls.subject_id)) {
         const existing = classMap.get(cls.subject_id)!;
-        const newStartTime = existing.start_time < cls.start_time ? existing.start_time : cls.start_time;
-        const newEndTime = existing.end_time > cls.end_time ? existing.end_time : cls.end_time;
+        const est = existing.start_time ?? cls.start_time;
+        const cst = cls.start_time ?? existing.start_time;
+        const eet = existing.end_time ?? cls.end_time;
+        const cet = cls.end_time ?? existing.end_time;
+        const newStartTime = est !== undefined && cst !== undefined && cst < est ? cst : est;
+        const newEndTime = eet !== undefined && cet !== undefined && cet > eet ? cet : eet;
         existing.start_time = newStartTime;
         existing.end_time = newEndTime;
         existing.time = `${newStartTime} - ${newEndTime}`;

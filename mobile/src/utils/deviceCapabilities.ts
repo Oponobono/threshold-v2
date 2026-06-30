@@ -159,28 +159,24 @@ export async function getDeviceCapabilities(): Promise<DeviceCapabilities> {
   let compatibleModels: LocalModelId[];
 
   /**
-   * Clasificación basada en RAM UTILIZABLE (no total)
-   * Esto evita que se descarguen modelos que causarían crashes
-   * por falta de memoria disponible
+   * Clasificación basada en RAM TOTAL del dispositivo (no disponible/utilizable).
+   * La RAM disponible fluctúa según el estado actual del sistema; la RAM total
+   * es la característica estable del hardware. Si al cargar un modelo no hay
+   * suficiente memoria libre, la carga falla gracefulmente.
    */
-  if (usableRamMB <= 1536) {
-    // Muy baja (≤ 1.5GB utilizable)
+  if (totalRamGB <= 2) {
     tier = 'low';
-    compatibleModels = ['essential']; // ~800MB descarga
-  } else if (usableRamMB <= 2560) {
-    // Baja (1.5-2.5GB utilizable)
+    compatibleModels = ['essential'];
+  } else if (totalRamGB <= 4) {
     tier = 'low';
-    compatibleModels = ['essential', 'qwen_1_5b']; // ~1.1GB descarga
-  } else if (usableRamMB <= 4096) {
-    // Media (2.5-4GB utilizable)
+    compatibleModels = ['essential', 'qwen_1_5b'];
+  } else if (totalRamGB <= 6) {
     tier = 'mid';
-    compatibleModels = ['essential', 'qwen_1_5b', 'gemma2_2b']; // ~1.6GB descarga
-  } else if (usableRamMB <= 5632) {
-    // Alta (4-5.5GB utilizable)
+    compatibleModels = ['essential', 'qwen_1_5b', 'gemma2_2b'];
+  } else if (totalRamGB <= 8) {
     tier = 'high';
-    compatibleModels = ['essential', 'qwen_1_5b', 'qwen_3b', 'gemma2_2b']; // ~2.2GB descarga
+    compatibleModels = ['essential', 'qwen_1_5b', 'qwen_3b', 'gemma2_2b'];
   } else {
-    // Muy alta (>5.5GB utilizable)
     tier = 'high';
     compatibleModels = ['essential', 'qwen_1_5b', 'qwen_3b', 'gemma2_2b', 'advanced', 'phi3_5'];
   }

@@ -1,39 +1,27 @@
 # Session Context
 
 ## Goal
-Demostrar matemáticamente que el sistema de sincronización nunca pierde datos. Ya no se construye infraestructura — se mide, valida y prueba con evidencia obtenida del SyncDebugger, SyncValidator y Sync Test Suite.
+Eliminar require cycle, hidratar perfil antes del primer render del Dashboard, unificar inicialización del API Client en BootstrapManager y optimizar backend detector con competitive race + cancelación vía AbortController.
 
 ## Constraints & Preferences
-- Spanish-language app (i18next).
-- Offline-first: UI solo lee de SQLite, nunca de API directa.
-- SyncManager es la única autoridad para comunicación de red; ninguna screen o servicio llama fetch() directamente.
-- Los cambios en repositorios deben propagarse a UI vía EventBus, nunca mediante recargas manuales.
-- Toda la IA cloud debe pasar por el backend — no hay API keys en el dispositivo.
-- Entidades se clasifican en 3 categorías:
-  - **Read Only** (users, courses, notifications, analytics) — nunca hacen PUSH.
-  - **Bidireccionales** (subjects, assessments, schedules, flashcards, settings, calendar) — siempre participan en CREATE/UPDATE/DELETE/PUSH/PULL/INITIAL/CONFLICT.
-  - **Assets** (photos, audio, documents) — MetadataSync y AssetSync son pipelines completamente separados.
-- MetadataSync y AssetSync corren como pipelines independientes bajo SyncManager. AssetSync maneja blob/chunk/resume/checksum.
-- Cada registro debe tener `sync_version` por entidad (diseñado ahora, implementado después).
-- Cada registro debe tener checksum SHA256 (canonical JSON) para detectar corrupción silenciosa.
-- `sync_queue` debe evolucionar a Event Store con traceId, version, dependsOn, retry, createdAt.
-- Compactación debe ser una máquina de reducción (SyncQueueReducer) con reglas declarativas, no cascadas de if/else.
-- SyncQueueReducer debe ser una **función pura**: recibe operaciones, devuelve operaciones reducidas + ReductionReport. No escribe en SQLite, no hace HTTP, no modifica sync_queue.
-- Reducción por **estado final**, no por pares: modela el historial completo de la entidad y decide el resultado, no depende del orden de recorrido.
-- Reducer debe soportar agrupación por entidad (todas las ops de un entity_type+entity_id se reducen juntas).
-- Reducer debe generar operación RESTORE para secuencias DELETE+CREATE (mismo ID).
-- Toda sincronización debe tener un traceId único compartido a través de todo el pipeline (SQLite → Queue → HTTP → Controller → Repository → SQLite).
-- Debe existir un RetryPolicy con manejo diferenciado por código HTTP (429→wait/retry, 500→retry, 401→refresh+retry, 404→discard, 409→ConflictResolver).
-- Después de cada sync debe generarse un Consistency Report: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status.
-- Debe existir un SyncValidator que compare conteos, checksums, versiones y missing IDs por entidad.
-- Toda la suite de sync debe ser testeable con escenarios reproducibles (Sync Test Suite).
-- AI architecture (Policy Engine → Orchestrator → Capabilities) congelada; no más refactors de IA.
+- No comentar código a menos que sea estrictamente necesario.
+- No refactorizar código estable sin ganancia funcional clara.
+- SQLite como única fuente de verdad para datos de negocio; MMKV reservado para JWT, tokens, flags, configuración, metadatos.
+- La capa UI no debe importar directamente de `services/api`; debe hacerlo vía DataStore, Repositories o Queries.
+- Mantener el orden de secciones del template.
 
 ## Principio Rector
 "Si no puedes observar una sincronización, no puedes confiar en ella."
 
 ## Progress
 ### Done
+- **[*NUEVO*] Require Cycle eliminado**: `localFlashcardService.ts` cambió de barrel `./api` a import directo `./api/auth`. Rompe el ciclo `api/index.ts → analytics.ts → localMasteryService.ts → localFlashcardService.ts → api/index.ts`.
+- **[*NUEVO*] Profile = null eliminado**: Bootstrap READY phase ejecuta `loadAllData()` del store antes de emitir `READY`. Dashboard inicializa `profile` desde `storeProfile`.
+- **[*NUEVO*] `initializeApiClient()` unificado en Bootstrap**: NETWORK phase llama y awaitza `initializeApiClient()`. `_layout.tsx` ya no lo importa ni invoca.
+- **[*NUEVO*] Backend Detector awaitzado**: `initializeApiClient()` ya no es fire-and-forget; `detectAvailableBackend()` se awaitza internamente. NETWORK phase bloquea hasta tener backend definitivo.
+- **[*NUEVO*] Competitive race + AbortController**: `findAvailableBackendParallel()` resuelve al primer 200. Render gana en ~307ms vs 2338ms. Los 7 checks perdedores se abortan sin logs.
+- **[*NUEVO*] Platform URL filtering**: `localhost` eliminado como candidato en Android. Ahora solo `10.0.2.2` (emulador) + LAN IP (físico) + Render. Fallback en `setupDefaultApiUrls` también es platform-aware.
+- **[*NUEVO*] Device Tier corrige clasificación**: Usaba RAM disponible (1.4GB → `low`). Ahora usa RAM total (7.3GB → `high`). La disponible fluctúa; la total es estable.
 - **Decks offline**: `FlashcardNewDeckScreen.tsx` — subject made optional.
 - **Import cards persisted**: `FlashcardImportModal.tsx` — calls `addLocalCard()` per card into MMKV.
 - **Local decks visible in list**: `useFlashcardsManager.ts` — merges MMKV + SQLite decks.
@@ -63,9 +51,6 @@ Demostrar matemáticamente que el sistema de sincronización nunca pierde datos.
 - **`getCloudItemsCount` corregido**: ahora suma `flashcardDecks` y `aiChats` además de las 5 categorías originales.
 
 ### In Progress
-- ✅ **Bug 1/3: sync_version** — CORREGIDO: helper `backend/helpers/syncVersion.js` creado. `incrementSyncVersion(table, id, cb)` se llama desde 9 controllers.
-- ✅ **Bug 2/3: Backend deletes duros** — CORREGIDO: helpers `recordDeletion`/`recordDeletions`. Cada DELETE en 8 controllers inserta en `sync_deletions`.
-- ✅ **Bug 3/3: initialSync/deltaSync incompletos** — CORREGIDO: initialSync cubre 10 entidades (antes 6), deltaSync cubre 9 tablas (antes 5). Controladores de calendar, settings, gallery, audio, scannedDocuments parcheados.
 - 🔴 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. Faltan escenarios de test y Consistency Report.
 
 ### Next Up
@@ -109,24 +94,32 @@ Demostrar matemáticamente que el sistema de sincronización nunca pierde datos.
 
 ## Next Steps
 1. **Consistency Report** — post-sync: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status.
-2. **Sync Test Suite expansion** — escenarios adicionales: initial sync, delta sync, conflictos, soft-delete, intermitencia de red.
-3. **Optimization** — usando métricas del Test Harness para identificar cuellos de botella.
-4. **Corregir bugs** encontrados por SyncValidator/SyncDebugger:
-   - backend: sync_version nunca se incrementa
-   - backend: deletes son duros, no generan sync_deletions
-   - backend: initialSync cubre solo 6 entidades, deltaSync solo 5 tablas
-   - mobile: entidades faltantes en ciclos de sync
+2. **Sync Test Suite expansion** — escenarios de asset: offline create → sync → verify; interrupted download → resume; corrupt file → redownload.
+3. **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
+4. **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
+5. **Refactorizar event handlers** (`deleteSubject`, `createStudySession`, `getPredictedSubject`) para que no importen directamente de `services/api`.
 
 ## Hallazgos Críticos del Audit
-- **sync_version nunca se incrementa** en backend — ningún controller llama a `UPDATE sync_version SET version = version + 1` ni `SET sync_version = <next>` en las tablas de entidad. `syncController.js` ejecuta `WHERE sync_version > ?` que siempre devuelve vacío.
-- **initialSync cubre solo 6 entidades** (user, courses, subjects, assessments, schedules, flashcardDecks). Faltan photos, audio, scanned_documents, analytics, settings, calendar, notifications.
-- **deltaSync cubre solo 5 tablas** + sync_deletions. Mismas entidades faltantes.
-- **Backend deletes son duros** (DELETE FROM subjects WHERE id = ?), no generan entradas en sync_deletions.
+- **sync_version nunca se incrementa** en backend — ningún controller llama a `UPDATE sync_version SET version = version + 1` ni `SET sync_version = <next>` en las tablas de entidad. `syncController.js` ejecuta `WHERE sync_version > ?` que siempre devuelve vacío. **CORREGIDO** vía helper `syncVersion.js` + 9 controllers.
+- **initialSync cubre solo 6 entidades** (user, courses, subjects, assessments, schedules, flashcardDecks). Faltan photos, audio, scanned_documents, analytics, settings, calendar, notifications. **CORREGIDO** — ahora 10 entidades.
+- **deltaSync cubre solo 5 tablas** + sync_deletions. Mismas entidades faltantes. **CORREGIDO** — ahora 9 tablas.
+- **Backend deletes son duros** (DELETE FROM subjects WHERE id = ?), no generan entradas en sync_deletions. **CORREGIDO** vía `recordDeletion()` en 8 controllers.
 - **SyncService.ts ordenamiento incompleto**: ~15 entity types caían en rank 99 (sin orden garantizado) — **resuelto** vía DependencyResolver con 28+ entity ranks.
 - **SyncQueue compactación parcial**: UPDATE dedup y CREATE→DELETE cancel existían, pero [UPDATE, UPDATE, DELETE] sin collapse — **resuelto** vía SyncQueueReducer con reducción por estado final.
-- **Download flow a mismo dispositivo**: No es bug. Los 9 mazos se saltan porque los IDs negativos locales coinciden. El flujo descarga JSON desde Uploadthing, verifica existencia local, y salta si ya existen. El logging agregado en `downloadService.ts` hace visible cada skip.
+- **Device Tier RAM disponible vs total**: Usaba RAM disponible (fluctuante) para clasificar. Ahora usa RAM total (estable).
+- **Verificación Dashboard**: renderiza 3 veces en dev (StrictMode 2 mounts + refreshProfile). No hay duplicación de requests de red.
+- **Flujo Bootstrap**: `Database → Storage → Network (338ms) → Auth → Sync → Momentum → Ready`.
 
 ## Relevant Files
+### Session Actual (App Initialization)
+- `mobile/src/services/localFlashcardService.ts` — Require Cycle corregido (import `./api/auth`)
+- `mobile/src/services/api/client.ts` — `initializeApiClient()` awaitza detección; `setupDefaultApiUrls` platform-aware
+- `mobile/src/services/api/backendDetector.ts` — Competitive race + AbortController + platform filtering
+- `mobile/src/services/bootstrap/BootstrapManager.ts` — NETWORK phase llama `initializeApiClient()`; READY phase ejecuta `loadAllData()`
+- `app/_layout.tsx` — Eliminado import y call a `initializeApiClient()`
+- `app/(tabs)/index.tsx` — Dashboard inicializa `profile` desde `storeProfile`
+- `mobile/src/store/useDataStore.ts` — Store con profile/groups/GPA; hidratado por Bootstrap READY
+- `mobile/src/utils/deviceCapabilities.ts` — Tier clasificado por RAM total en vez de disponible
 ### Core Sync
 - `mobile/src/services/sync/SyncManager.ts` — Main orchestrator with traceId, timers, debug logging
 - `mobile/src/services/sync/SyncJournal.ts` — Sync bitacora

@@ -14,6 +14,7 @@ import {
 } from '../services/database';
 import { syncManager } from '../services/sync/SyncManager';
 import { repositoryEventBus } from '../services/events/RepositoryEventBus';
+import type { UserProfile } from '../services/api/types';
 
 export interface PredictionItem {
   cardId: number;
@@ -32,6 +33,17 @@ export interface PredictionResponse {
   cards: PredictionItem[];
 }
 
+export interface GroupMembership {
+  id?: string;
+  user_id?: string;
+  group_pin_id: string;
+  name?: string;
+  role?: string;
+  joined_at?: string;
+  is_public?: boolean;
+  password?: string;
+}
+
 interface DataState {
   courses: Course[];
   subjects: Subject[];
@@ -41,6 +53,9 @@ interface DataState {
   calendarEvents: any[];
   flashcardDecks: any[];
   userStats: any | null;
+  profile: UserProfile | null;
+  userGroups: GroupMembership[];
+  overallGpa: number | null;
 
   isInitialLoading: boolean;
   isRefreshing: boolean;
@@ -54,6 +69,10 @@ interface DataState {
   refreshSubjects: () => Promise<void>;
   refreshAssessments: () => Promise<void>;
   refreshSchedules: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  refreshUserGroups: () => Promise<void>;
+  refreshOverallGpa: () => Promise<void>;
+  syncTodaySchedules: () => Promise<void>;
   refreshPredictions: (userId: string | number) => Promise<void>;
   loadCachedPredictions: () => Promise<void>;
   preloadOfflineCache: () => Promise<void>;
@@ -84,6 +103,9 @@ export const useDataStore = create<DataState>((set, get) => {
   calendarEvents: [],
   flashcardDecks: [],
   userStats: null,
+  profile: null,
+  userGroups: [],
+  overallGpa: null,
 
   isInitialLoading: false,
   isRefreshing: false,
@@ -117,6 +139,26 @@ export const useDataStore = create<DataState>((set, get) => {
 
       const dbSchedules = await scheduleRepository.getAll();
       set({ schedules: dbSchedules || [] });
+
+      const { userRepository } = await import('../services/database/repositories/UserRepository');
+      const currentUser = await userRepository.getCurrentUser();
+      if (currentUser) {
+        set({ profile: currentUser as any });
+      }
+
+      const { storageService } = await import('../services/storageService');
+      const groupsCache = await storageService.getLocal('app:cache:userGroups');
+      if (groupsCache) {
+        try { set({ userGroups: JSON.parse(groupsCache) }); } catch {}
+      }
+
+      const gpaCache = await storageService.getLocal('app:cache:global_gpa');
+      if (gpaCache) {
+        try {
+          const parsed = JSON.parse(gpaCache);
+          set({ overallGpa: parsed.currentAverage ?? null });
+        } catch {}
+      }
 
       set({ hasLoadedOnce: true, isInitialLoading: false });
     } catch (error) {
@@ -160,6 +202,51 @@ export const useDataStore = create<DataState>((set, get) => {
     } catch (error) {
       console.error('[DataStore] refreshSchedules error:', error);
     }
+  },
+
+  refreshProfile: async () => {
+    try {
+      const { getCurrentUserProfile } = await import('../services/api/auth/profile');
+      const fresh = await getCurrentUserProfile();
+      if (fresh) {
+        const { userRepository } = await import('../services/database/repositories/UserRepository');
+        await userRepository.saveProfile(fresh);
+        set({ profile: fresh });
+      }
+    } catch {}
+  },
+
+  refreshUserGroups: async () => {
+    try {
+      const { getUserGroups } = await import('../services/api/learning/groups');
+      const groups = await getUserGroups();
+      if (Array.isArray(groups)) {
+        set({ userGroups: groups });
+        const { storageService } = await import('../services/storageService');
+        await storageService.saveLocal('app:cache:userGroups', JSON.stringify(groups));
+      }
+    } catch {}
+  },
+
+  refreshOverallGpa: async () => {
+    try {
+      const { getLocalGlobalGPA } = await import('../services/localMasteryService');
+      const profile = get().profile;
+      if (profile?.id) {
+        const localGpa = await getLocalGlobalGPA(profile.id);
+        if (localGpa.assessmentCount > 0) {
+          set({ overallGpa: localGpa.currentAverage ?? 0 });
+        }
+      }
+    } catch {}
+  },
+
+  syncTodaySchedules: async () => {
+    try {
+      const { getTodaySchedules } = await import('../services/api/schedules');
+      await getTodaySchedules();
+      get().refreshSchedules();
+    } catch {}
   },
 
   refreshPredictions: async (userId: string | number) => {

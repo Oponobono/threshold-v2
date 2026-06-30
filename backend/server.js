@@ -63,6 +63,24 @@ const upload = multer({
   },
 });
 
+// 🏥 Health Check Endpoint (Completamente público, sin autenticación)
+// Usado por el cliente para detectar si el backend está disponible
+// DEBE estar antes de cualquier middleware costoso (body parsing, logger, rate limiter, auth, etc.)
+// para que el health check sea ultraliviano y responda lo más rápido posible.
+app.get('/health', (_req, res) => {
+  res.sendStatus(200);
+});
+
+// Root route for Render health checks if configured to /
+app.get('/', (_req, res) => {
+  res.status(200).json({ status: 'OK', message: 'API running' });
+});
+
+// Ruta de estado (deprecated - usar /health)
+app.get('/api/status', (_req, res) => {
+  res.status(200).json({ status: 'OK' });
+});
+
 // Middlewares de Seguridad Globales
 app.use(helmet()); // Añade cabeceras HTTP que previenen XSS, Clickjacking, etc.
 app.use(globalLimiter); // Evita DDoS limitando a 100 peticiones por IP cada 15 min.
@@ -79,22 +97,6 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 if (secrets.NODE_ENV !== 'production') {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 }
-
-// 🏥 Health Check Endpoint (Completamente público, sin autenticación)
-// Usado por el cliente para detectar si el backend está disponible
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK' });
-});
-
-// Root route for Render health checks if configured to /
-app.get('/', (req, res) => {
-  res.json({ status: 'OK', message: 'API running' });
-});
-
-// Ruta de estado (deprecated - usar /health)
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'OK' });
-});
 
 // Registrar rutas públicas (Login, Registro)
 app.use('/api', authRoutes);

@@ -13,6 +13,7 @@
  */
 
 import { Platform } from 'react-native';
+import { createMMKV } from 'react-native-mmkv';
 
 export interface BackendConfig {
   url: string;
@@ -21,15 +22,41 @@ export interface BackendConfig {
   timestamp: number;
 }
 
-const HEALTH_CHECK_TIMEOUT = 3000; // Aumentado a 3 segundos (emuladores pueden ser lentos)
-const HEALTH_CHECK_CACHE_DURATION = 30000; // 30 segundos (cachear decisión localmente)
-const HEALTH_CHECK_ENDPOINT = '/health'; // Endpoint público (sin /api, sin autenticación)
+const HEALTH_CHECK_TIMEOUT = 3000;
+const HEALTH_CHECK_CACHE_DURATION = 30000;
+const HEALTH_CHECK_ENDPOINT = '/health';
+const LOCALHOST_TIMEOUT = 1500;
 
-// Timeout para localhost/10.0.2.2 en emuladores (fail fast pero con tiempo suficiente)
-const LOCALHOST_TIMEOUT = 1500; // 1.5s para localhost/10.0.2.2
+/** MMKV key para persistir el último backend exitoso entre sesiones */
+const LAST_BACKEND_KEY = 'last_successful_backend_url';
 
+let lastSuccessfulBackendUrl: string | null = null;
 let cachedBackendConfig: BackendConfig | null = null;
 let lastHealthCheckTime = 0;
+
+/** Guarda la URL del último backend que respondió OK, en MMKV y en memoria */
+function saveSuccessfulBackend(url: string): void {
+  lastSuccessfulBackendUrl = url;
+  try {
+    const mmkv = createMMKV();
+    mmkv.set(LAST_BACKEND_KEY, url);
+  } catch {
+    // Fallback silencioso — si MMKV falla, seguimos con la cache en memoria
+  }
+}
+
+/** Lee la URL del último backend exitoso desde MMKV */
+function loadLastSuccessfulBackend(): string | null {
+  if (lastSuccessfulBackendUrl) return lastSuccessfulBackendUrl;
+  try {
+    const mmkv = createMMKV();
+    const stored = mmkv.getString(LAST_BACKEND_KEY);
+    if (stored) lastSuccessfulBackendUrl = stored;
+    return lastSuccessfulBackendUrl;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Obtiene todas las URLs base candidatas (sin /api ni /health).
@@ -67,9 +94,11 @@ function getCandidateBaseUrls(localIp: string, ports: number[]): string[] {
       }
     }
     
-    // 4. localhost (funciona solo en emuladores, no en dispositivos físicos)
-    for (const port of ports) {
-      candidates.push(`http://localhost:${port}`);
+    // 4. localhost (solo funciona en iOS Simulator, nunca en Android)
+    if (Platform.OS !== 'android') {
+      for (const port of ports) {
+        candidates.push(`http://localhost:${port}`);
+      }
     }
   }
   
@@ -87,28 +116,41 @@ function getCandidateBaseUrls(localIp: string, ports: number[]): string[] {
  * Realiza un health check a una URL específica con timeout.
  * Retorna true si el endpoint responde, false si falla o timeout.
  */
-async function isBackendAvailable(baseUrl: string, timeout: number = HEALTH_CHECK_TIMEOUT): Promise<boolean> {
+async function isBackendAvailable(
+  baseUrl: string,
+  timeout: number = HEALTH_CHECK_TIMEOUT,
+  cancelSignal?: AbortSignal
+): Promise<boolean> {
   try {
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), timeout);
-    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    // Si nos cancelan desde fuera (otra URL ya ganó la race), abortamos también
+    if (cancelSignal) {
+      if (cancelSignal.aborted) return false;
+      cancelSignal.addEventListener('abort', () => {
+        clearTimeout(timeoutId);
+        controller.abort();
+      }, { once: true });
+    }
+
     const response = await fetch(`${baseUrl}${HEALTH_CHECK_ENDPOINT}`, {
       method: 'GET',
-      signal: abortController.signal,
+      signal: controller.signal,
       headers: {
         'Cache-Control': 'no-cache',
         'Content-Type': 'application/json',
       },
     });
-    
+
     clearTimeout(timeoutId);
-    
+    if (cancelSignal?.aborted) return false;
+
     if (response.ok) {
       console.log(`[Health Check] ✅ ${baseUrl} - OK (${response.status})`);
       return true;
     }
 
-    // Render puede no tener /health en la raíz; considerarlo disponible si responde (incluso 404)
     const isRenderUrl = process.env.EXPO_PUBLIC_API_URL &&
       baseUrl === process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/?$/, '');
     if (response.status === 404 && isRenderUrl) {
@@ -119,10 +161,12 @@ async function isBackendAvailable(baseUrl: string, timeout: number = HEALTH_CHEC
     console.warn(`[Health Check] ⚠️ ${baseUrl} - HTTP ${response.status}`);
     return false;
   } catch (error) {
+    // Si la cancelación externa ya ocurrió, salimos en silencio
+    if (cancelSignal?.aborted) return false;
+
     const errorName = error instanceof Error ? error.name : 'Unknown';
     const errorMsg = error instanceof Error ? error.message : String(error);
-    
-    // Distinguir tipos de error
+
     if (errorName === 'AbortError') {
       console.warn(`[Health Check] ⏱️ ${baseUrl} - TIMEOUT (${timeout}ms)`);
     } else if (errorMsg.includes('Network') || errorMsg.includes('Failed to fetch')) {
@@ -130,7 +174,7 @@ async function isBackendAvailable(baseUrl: string, timeout: number = HEALTH_CHEC
     } else {
       console.warn(`[Health Check] ❌ ${baseUrl} - ${errorName}: ${errorMsg}`);
     }
-    
+
     return false;
   }
 }
@@ -147,35 +191,49 @@ async function findAvailableBackendParallel(
 ): Promise<string | null> {
   if (urls.length === 0) return null;
   
-  // Si hay solo una URL, no parallelizar
   if (urls.length === 1) {
     const timeout = getTimeoutForUrl(urls[0], defaultTimeout);
     const available = await isBackendAvailable(urls[0], timeout);
     return available ? urls[0] : null;
   }
   
-  // Hacer health checks en paralelo
-  const checks = urls.map((url) => {
-    const startTime = Date.now();
-    const timeout = getTimeoutForUrl(url, defaultTimeout);
-    return isBackendAvailable(url, timeout)
-      .then((available) => {
-        const elapsed = Date.now() - startTime;
-        console.log(`[Health Check] ⏱️  ${url} took ${elapsed}ms`);
-        return { url, available };
-      })
-      .catch((error) => {
-        const elapsed = Date.now() - startTime;
-        console.error(`[Health Check] ❌ Error en ${url} (${elapsed}ms):`, error);
-        return { url, available: false };
-      });
+  // Competitive race: la primera URL que responda 200 gana.
+  // Las demás se abortan vía AbortController para no desperdiciar recursos.
+  return new Promise<string | null>((resolve) => {
+    const controllers: AbortController[] = [];
+    let settled = false;
+    let pending = urls.length;
+
+    function abortAll(): void {
+      for (const c of controllers) {
+        try { c.abort(); } catch { /* ignore */ }
+      }
+    }
+
+    for (const url of urls) {
+      const controller = new AbortController();
+      controllers.push(controller);
+
+      const startTime = Date.now();
+      const timeout = getTimeoutForUrl(url, defaultTimeout);
+      isBackendAvailable(url, timeout, controller.signal)
+        .then((available) => {
+          if (settled) return; // Descarte silencioso: otro backend ya ganó
+
+          const elapsed = Date.now() - startTime;
+          if (available) {
+            console.log(`[Health Check] ⏱️  ${url} took ${elapsed}ms  ← GANADOR`);
+            settled = true;
+            abortAll();
+            resolve(url);
+          } else {
+            console.log(`[Health Check] ⏱️  ${url} took ${elapsed}ms`);
+            pending--;
+            if (pending === 0) resolve(null);
+          }
+        });
+    }
   });
-  
-  const results = await Promise.all(checks);
-  
-  // Retornar la primera disponible (en orden de prioridad)
-  const available = results.find((r) => r.available);
-  return available?.url || null;
 }
 
 /**
@@ -204,10 +262,46 @@ export async function detectAvailableBackend(
 ): Promise<BackendConfig> {
   const now = Date.now();
   
-  // 1. Si tenemos caché válido, retornarlo
+  // 1. Si tenemos caché en memoria válido, retornarlo
   if (cachedBackendConfig && now - lastHealthCheckTime < HEALTH_CHECK_CACHE_DURATION) {
     console.log(`[Backend Detector] ⚡ Usando caché (${(now - lastHealthCheckTime) / 1000}s atrás):`, cachedBackendConfig.url);
     return cachedBackendConfig;
+  }
+  
+  // 2. Fast path: último backend exitoso persistido en MMKV
+  //    Probamos una sola URL en vez de la race paralela.
+  //    Si responde, listo. Si falla, recién ejecutamos la detección completa.
+  const t0 = performance.now();
+  const lastUrl = loadLastSuccessfulBackend();
+  const mmkvElapsed = performance.now() - t0;
+
+  if (lastUrl) {
+    console.log(`[Backend Detector] ⚡ Intentando último backend exitoso: ${lastUrl} (MMKV: ${mmkvElapsed.toFixed(1)}ms)`);
+    const t1 = performance.now();
+    const fastTimeout = getTimeoutForUrl(lastUrl, HEALTH_CHECK_TIMEOUT);
+    const available = await isBackendAvailable(lastUrl, fastTimeout);
+    const healthElapsed = performance.now() - t1;
+    const totalElapsed = performance.now() - t0;
+
+    if (available) {
+      let source: 'render' | 'local' | 'env' = 'env';
+      const renderBase = process.env.EXPO_PUBLIC_API_URL?.replace(/\/api\/?$/, '');
+      if (lastUrl === renderBase) source = 'render';
+      else if (lastUrl.includes('http://')) source = 'local';
+
+      cachedBackendConfig = {
+        url: lastUrl,
+        source,
+        isAvailable: true,
+        timestamp: now,
+      };
+      lastHealthCheckTime = now;
+      console.log(`[Backend Detector] ✅ Fast path — ${lastUrl} (MMKV: ${mmkvElapsed.toFixed(1)}ms | Health: ${healthElapsed.toFixed(0)}ms | Total: ${totalElapsed.toFixed(0)}ms)`);
+      return cachedBackendConfig;
+    }
+
+    const fastTotal = performance.now() - t0;
+    console.log(`[Backend Detector] ⏩ Fast path falló (${fastTotal.toFixed(0)}ms), ejecutando detección completa`);
   }
   
   const candidates = getCandidateBaseUrls(localIp, ports);
@@ -244,6 +338,8 @@ export async function detectAvailableBackend(
     };
     
     lastHealthCheckTime = now;
+    
+    saveSuccessfulBackend(availableUrl);
     
     const emoji = source === 'local' ? '🖥️ Local' : '☁️ Render';
     console.log(`[Backend Detector] ✅ Backend disponible: ${emoji}`, availableUrl);
@@ -290,7 +386,19 @@ export async function detectAvailableBackend(
 export function resetBackendDetectionCache(): void {
   cachedBackendConfig = null;
   lastHealthCheckTime = 0;
-  console.log(`[Backend Detector] 🔄 Caché de detección resetado.`);
+  lastSuccessfulBackendUrl = null;
+  try {
+    const mmkv = createMMKV();
+    mmkv.delete(LAST_BACKEND_KEY);
+  } catch { /* ignore */ }
+  console.log(`[Backend Detector] 🔄 Caché de detección y MMKV resetados.`);
+}
+
+/**
+ * Retorna la URL del último backend exitoso persistido en MMKV, o null si no existe.
+ */
+export function getLastSuccessfulBackendUrl(): string | null {
+  return loadLastSuccessfulBackend();
 }
 
 /**

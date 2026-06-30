@@ -9,13 +9,13 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
-import { getCurrentUserProfile, getPredictedSubject, getTodaySchedules, createStudySession, deleteSubject, type Subject, type UserProfile, type Assessment } from '../../src/services/api';
-import { getUserGroups } from '../../src/services/api/learning/groups';
-import { getGlobalGPAAnalytics } from '../../src/services/api/analytics';
+import { getPredictedSubject, createStudySession, deleteSubject } from '../../src/services/api';
+import type { UserProfile } from '../../src/services/api/types';
+import type { Subject, Assessment } from '../../src/services/database/repositories';
 import { calculateProjection } from '../../src/utils/projectionEngine';
 import { useDataStore } from '../../src/store/useDataStore';
 import { courseRepository } from '../../src/services/database/repositories';
-import { Course } from '../../src/services/api/types';
+import type { Course } from '../../src/services/api/types';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 import { useCachePreload } from '../../src/hooks/useCachePreload';
 import { downloadProfileImage, getLocalProfileImageUri } from '../../src/services/profileImageCache';
@@ -49,21 +49,44 @@ const SUBJECT_CARD_GAP = 12;
 export default function HybridDashboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
   // ── Usar store global para subjects, assessments, schedules y predicciones ──
-  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions, isSyncing, syncStatusMessage, courses } = useDataStore();
+  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions, isSyncing, syncStatusMessage, courses, profile: storeProfile, userGroups: storeGroups, overallGpa: storeOverallGpa, refreshProfile, refreshUserGroups, refreshOverallGpa, syncTodaySchedules } = useDataStore();
+  const [profile, setProfile] = useState<UserProfile | null>(storeProfile);
+  const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
 
-  // Cargar perfil desde caché al montar para hidratación instantánea
+  // Cargar datos locales al montar para hidratación instantánea
   useEffect(() => {
     (async () => {
-      const { getCurrentUserProfileSync } = await import('../../src/services/api/auth/profile');
-      const cached = await getCurrentUserProfileSync();
-      if (cached) setProfile(cached);
+      const { userRepository } = await import('../../src/services/database/repositories/UserRepository');
+      const currentUser = await userRepository.getCurrentUser();
+      if (currentUser) setProfile(currentUser as any);
+
       const localUri = await getLocalProfileImageUri();
       if (localUri) setLocalProfileImageUri(localUri);
+
+      const { storageService } = await import('../../src/services/storageService');
+      const groupsCache = await storageService.getLocal('app:cache:userGroups');
+      if (groupsCache) {
+        try { setUserGroups(JSON.parse(groupsCache)); } catch {}
+      }
+
+      const gpaCache = await storageService.getLocal('app:cache:global_gpa');
+      if (gpaCache) {
+        try {
+          const parsed = JSON.parse(gpaCache);
+          setOverallGpa(parsed.currentAverage ?? null);
+        } catch {}
+      }
     })();
   }, []);
+  // Sync en background después del primer render (no bloquea)
+  useEffect(() => {
+    refreshProfile();
+    refreshUserGroups();
+    refreshOverallGpa();
+    syncTodaySchedules();
+  }, []);
+
   const { preloadRelatedData } = useCachePreload();
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const [isCourseModalVisible, setIsCourseModalVisible] = useState(false);
@@ -110,8 +133,6 @@ export default function HybridDashboardScreen() {
   const lastFocusRefreshRef = useRef<number>(0);
   const FOCUS_REFRESH_THROTTLE_MS = 5 * 60 * 1000; // 5 min
 
-  // Profile ya fue inicializado síncronamente en el useState vía MMKV
-
   // Snooze State
   const snoozeManager = useDueCardSnooze();
   const [isSnoozeModalVisible, setIsSnoozeModalVisible] = useState(false);
@@ -124,44 +145,29 @@ export default function HybridDashboardScreen() {
 
   const loadData = useCallback(async (skipFullReload = false) => {
     try {
-      // ── Iniciar carga del store global (SQLite instantáneo + Cloud background) ──
       const now = Date.now();
-      let storePromise = Promise.resolve();
       if (!skipFullReload && (now - lastFocusRefreshRef.current > FOCUS_REFRESH_THROTTLE_MS)) {
         lastFocusRefreshRef.current = now;
-        storePromise = loadAllData(true);
+        await loadAllData(true);
       }
 
-      const [userProfile, schedulesToday, groups] = await Promise.all([
-        getCurrentUserProfile(),
-        getTodaySchedules(),
-        getUserGroups(),
-        storePromise
-      ]);
+      const currentSchedules = useDataStore.getState().schedules;
+      const today = new Date().getDay();
+      setTodaySchedules(
+        currentSchedules.filter((s: any) => s.day_of_week === today)
+      );
 
-      setProfile(userProfile);
+      const currentProfile = useDataStore.getState().profile;
+      if (currentProfile) setProfile(currentProfile);
 
-      if (userProfile?.profile_image) {
-        const localUri = await downloadProfileImage(userProfile.profile_image);
-        if (localUri) setLocalProfileImageUri(localUri);
+      const currentGroups = useDataStore.getState().userGroups;
+      if (Array.isArray(currentGroups) && currentGroups.length > 0) {
+        setUserGroups(currentGroups);
       }
 
-      setTodaySchedules(Array.isArray(schedulesToday) ? schedulesToday : []);
+      const currentGpa = useDataStore.getState().overallGpa;
+      if (currentGpa != null) setOverallGpa(currentGpa);
 
-      if (Array.isArray(groups) && groups.length > 0) {
-        setUserGroups(groups);
-      }
-      
-
-      // ── Obtener GPA general ──
-      try {
-        const gpaData = await getGlobalGPAAnalytics();
-        setOverallGpa(gpaData.currentAverage);
-      } catch {
-        // Silently fail — GPA no es crítico
-      }
-      
-      // 🔁 Pre-cargar datos relacionados en background (no bloquea)
       preloadRelatedData().catch(err => console.warn('[Dashboard] Error preloading:', err));
     } catch (err) {
       console.warn('Error loading dashboard data:', err);
@@ -171,19 +177,21 @@ export default function HybridDashboardScreen() {
   // Handle pull-to-refresh: actualizar datos y predicciones
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    lastFocusRefreshRef.current = 0; // Reset throttle to force full reload
+    lastFocusRefreshRef.current = 0;
     try {
       await Promise.all([
         loadData(),
         profile?.id ? refreshPredictions(profile.id) : Promise.resolve(),
-        getGlobalGPAAnalytics().then(d => setOverallGpa(d.currentAverage)).catch(() => {}),
+        refreshOverallGpa(),
+        refreshUserGroups(),
+        refreshProfile(),
       ]);
     } catch (err) {
       console.warn('Error refreshing dashboard:', err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [loadData, profile?.id, refreshPredictions]);
+  }, [loadData, profile?.id, refreshPredictions, refreshOverallGpa, refreshUserGroups, refreshProfile]);
 
   const handleEditSubject = useCallback((subject: Subject) => {
     setEditingSubject(subject);
@@ -1124,7 +1132,11 @@ export default function HybridDashboardScreen() {
         subjects={subjects}
         allSchedules={allSchedules}
         onScheduleUpdated={() => {
-          getTodaySchedules().then(res => setTodaySchedules(Array.isArray(res) ? res : []));
+          useDataStore.getState().refreshSchedules().then(() => {
+            const s = useDataStore.getState().schedules;
+            const today = new Date().getDay();
+            setTodaySchedules(s.filter((sch: any) => sch.day_of_week === today));
+          });
         }}
       />
       

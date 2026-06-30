@@ -1,4 +1,4 @@
-import { getUserId } from './api';
+import { getUserId } from './api/auth';
 import { syncService } from './database';
 
 let _localIdCounter = -Date.now();
