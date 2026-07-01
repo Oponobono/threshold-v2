@@ -35,7 +35,7 @@ import { getUserGroups, getGroupDecks } from '../../services/api/learning/groups
 
 import { GroupPills } from './GroupPills';
 import { LinkExamModal } from './LinkExamModal';
-import { calendarEventRepository } from '../../services/database';
+import { calendarEventRepository, flashcardDeckRepository } from '../../services/database';
 
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
 import { FlashcardNewDeckScreen } from './FlashcardNewDeckScreen';
@@ -159,7 +159,10 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
       for (const evt of allEvents) {
         const linkedDeckId = (evt as any).linked_deck_id;
         if (linkedDeckId) {
-          deckToExamFromEvent.set(linkedDeckId, { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
+          const ids = String(linkedDeckId).split(',').map(id => id.trim());
+          ids.forEach(id => {
+            if (id) deckToExamFromEvent.set(id, { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
+          });
         }
       }
       return decks.map(d => {
@@ -173,7 +176,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           }
         }
         // Prioridad 2: linked_deck_id en el evento (relación vieja)
-        const examFromEvent = deckToExamFromEvent.get(d.id);
+        const examFromEvent = deckToExamFromEvent.get(String(d.id));
         if (examFromEvent) {
           return { ...d, linked_exam_title: examFromEvent.title, linked_exam_date: examFromEvent.start_date } as FlashcardDeck;
         }
@@ -189,13 +192,22 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
       const data = await getFlashcardDecksWithMetrics();
       const { getLocalDecksForCurrentUser } = await import('../../services/localFlashcardService');
       const localDecks = getLocalDecksForCurrentUser(await getUserId());
-      
-      const localIds = new Set(localDecks.map(ld => String(ld.id)));
-      const filteredData = (data || []).filter((d: any) => {
-        if (localIds.has(String(d.id))) return false;
-        return true;
+
+      // Hydrate API data with linked_event_id from local SQLite (API doesn't return it)
+      const sqliteDecks = await flashcardDeckRepository.getAll();
+      const sqliteLinkedEventMap = new Map(
+        sqliteDecks
+          .filter((d: any) => d.linked_event_id)
+          .map((d: any) => [String(d.id), String(d.linked_event_id)])
+      );
+      const hydratedData = (data || []).map((d: any) => {
+        const localLinked = sqliteLinkedEventMap.get(String(d.id));
+        return localLinked && !d.linked_event_id ? { ...d, linked_event_id: localLinked } : d;
       });
-      
+
+      const localIds = new Set(localDecks.map((ld: any) => String(ld.id)));
+      const filteredData = hydratedData.filter((d: any) => !localIds.has(String(d.id)));
+
       const merged = [...filteredData, ...localDecks] as FlashcardDeck[];
       const enriched = await enrichWithExamInfo(merged);
       setDecks(enriched);

@@ -148,7 +148,7 @@ export const FlashcardDeckCard = React.memo(function DeckCard({
           </View>
         )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: hasExam ? 4 : 6 }}>
-          <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+          <Text style={{ fontSize: 12, color: theme.colors.text.primary, fontWeight: '500' }}>
             {Number(deck.card_count ?? 0)} {t('flashcards.cards')}
           </Text>
           {Number(deck.card_count ?? 0) > 0 && (

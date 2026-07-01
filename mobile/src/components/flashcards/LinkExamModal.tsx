@@ -114,9 +114,11 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
 
     calendarEventRepository.getAll()
       .then(async (all) => {
+        const deckId = String(deck?.id ?? '');
         const linkedEventId = (deck as any)?.linked_event_id;
         let linked: any = null;
 
+        // Priority 1: deck has explicit linked_event_id
         if (linkedEventId) {
           const rawId = String(linkedEventId).split(',')[0].trim();
           linked = (all as any[]).find(e => String(e.id) === rawId) ?? null;
@@ -125,7 +127,15 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
           }
         }
 
-        // Mostrar todos los eventos excepto el ya vinculado
+        // Priority 2: find an event whose linked_deck_id CSV contains this deck's id
+        if (!linked && deckId) {
+          linked = (all as any[]).find((e: any) => {
+            const ids = String(e.linked_deck_id ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
+            return ids.includes(deckId);
+          }) ?? null;
+        }
+
+        // Show all events except the already-linked one
         const upcoming = (all as any[])
           .filter((e: any) => ['exam', 'task', 'other'].includes(e.event_type || e.eventType))
           .filter((e: any) => !linked || String(e.id) !== String(linked.id))
@@ -150,14 +160,18 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
     if (!deck || linking) return;
     setLinking(true);
     try {
-      // Guardar el ID del evento en el mazo (un mazo → un examen)
-      await updateFlashcardDeck(String(deck.id), { linked_event_id: String(exam.id) });
-      // Actualizar el evento para indicar que tiene mazos vinculados (para el ícono en agenda)
-      // No sobreescribimos, solo ponemos el deck_id como referencia del primero (indicador)
-      const existingLinked = exam.linked_deck_id;
-      if (!existingLinked) {
-        await updateCalendarEvent(String(exam.id), { deckId: String(deck.id) });
+      const deckIdStr = String(deck.id);
+      // Save event ID on the deck
+      await updateFlashcardDeck(deckIdStr, { linked_event_id: String(exam.id) });
+      // Append this deck's ID to the event's linked_deck_id CSV list (avoid duplicates)
+      const existingIds = String(exam.linked_deck_id ?? '')
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+      if (!existingIds.includes(deckIdStr)) {
+        existingIds.push(deckIdStr);
       }
+      await updateCalendarEvent(String(exam.id), { deckId: existingIds.join(',') });
       onLinked(exam.title);
       onClose();
     } catch (e: any) {

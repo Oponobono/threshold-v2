@@ -138,7 +138,7 @@ export const flashcardsStyles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 11,
-    color: theme.colors.text.secondary,
+    color: theme.colors.text.primary,
     fontWeight: '500',
   },
   statValueSuccess: {

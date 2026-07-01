@@ -21,12 +21,19 @@ export interface FlashcardsManagerResult {
 async function enrichDecksWithExamInfo(decks: FlashcardDeck[]): Promise<FlashcardDeck[]> {
   try {
     const allEvents = await calendarEventRepository.getAll();
-    // Mapa de eventId → metadata del evento
-    const eventMap = new Map<string, { title: string; start_date: string }>();
+    const eventMap = new Map<string, { id: string; title: string; start_date: string }>();
+    const deckToExam = new Map<string, { id: string; title: string; start_date: string }>();
+
     for (const evt of allEvents) {
-      eventMap.set(String(evt.id), { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
+      const entry = { id: String(evt.id), title: evt.title, start_date: evt.start_date || evt.end_date || '' };
+      eventMap.set(String(evt.id), entry);
+      const linkedDeckId = (evt as any).linked_deck_id;
+      if (linkedDeckId) {
+        const ids = String(linkedDeckId).split(',').map((id: string) => id.trim()).filter(Boolean);
+        ids.forEach((id: string) => { deckToExam.set(id, entry); });
+      }
     }
-    // Enriquecer cada mazo usando su propio linked_event_id (un mazo → un examen)
+
     return decks.map(d => {
       const linkedEventId = (d as any).linked_event_id;
       if (linkedEventId) {
@@ -36,12 +43,22 @@ async function enrichDecksWithExamInfo(decks: FlashcardDeck[]): Promise<Flashcar
           return { ...d, linked_exam_title: evt.title, linked_exam_date: evt.start_date };
         }
       }
+
+      // Fallback: event has this deck in linked_deck_id — also backfill linked_event_id silently
+      const examFromEvent = deckToExam.get(String(d.id));
+      if (examFromEvent) {
+        if (!(d as any)._local) {
+          flashcardDeckRepository.update(String(d.id), { linked_event_id: examFromEvent.id } as any).catch(() => {});
+        }
+        return { ...d, linked_event_id: examFromEvent.id, linked_exam_title: examFromEvent.title, linked_exam_date: examFromEvent.start_date };
+      }
       return d;
     });
   } catch {
     return decks;
   }
 }
+
 
 function localDeckToFlashcardDeck(local: LocalDeck, subjects: Subject[] = []): FlashcardDeck {
   const subject = local.subject_id ? subjects.find(s => s.id === local.subject_id) : undefined;
@@ -133,7 +150,18 @@ export const useFlashcardsManager = (subjects: Subject[]): FlashcardsManagerResu
       try {
         const data = await getFlashcardDecksWithMetrics();
         if (generation === loadGenRef.current) {
-          const merged = mergeLocalDecks(Array.isArray(data) ? data : [], currentUserId);
+          // Hydrate API data with linked_event_id from local SQLite (API doesn't return it)
+          const sqliteDecks = await flashcardDeckRepository.getAll();
+          const sqliteLinkedEventMap = new Map(
+            sqliteDecks
+              .filter((d: any) => d.linked_event_id)
+              .map((d: any) => [String(d.id), String(d.linked_event_id)])
+          );
+          const hydratedData = (Array.isArray(data) ? data : []).map((d: any) => {
+            const localLinked = sqliteLinkedEventMap.get(String(d.id));
+            return localLinked && !d.linked_event_id ? { ...d, linked_event_id: localLinked } : d;
+          });
+          const merged = mergeLocalDecks(hydratedData as FlashcardDeck[], currentUserId);
           const enriched = await enrichDecksWithExamInfo(merged);
           if (generation === loadGenRef.current) {
             setDecks(enriched);
