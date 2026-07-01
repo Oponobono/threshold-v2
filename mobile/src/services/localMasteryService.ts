@@ -39,7 +39,7 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
 
   // 1. Obtener subjects
   const subjects = await db.getAllAsync(
-    'SELECT id, name, COALESCE(name, subject_name, \'General\') AS display_name FROM subjects WHERE user_id = ? ORDER BY created_at DESC',
+    'SELECT id, name FROM subjects WHERE user_id = ? ORDER BY created_at DESC',
     userId
   ) as any[];
 
@@ -81,7 +81,7 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
   const stats: Record<string, SubjectAgg> = {};
   for (const s of filteredSubjects) {
     stats[String(s.id)] = {
-      subjectName: s.display_name || s.name || 'General',
+      subjectName: s.name || 'General',
       totalReviews: 0,
       correctReviews: 0,
       totalResponseTime: 0,

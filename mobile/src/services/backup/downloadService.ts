@@ -414,7 +414,6 @@ export const downloadCloudItems = async (
             'SELECT id, linked_event_id FROM flashcard_decks WHERE id = ?', [deck.id]
           );
           if (existing) {
-            // Si el backup tiene un linked_event_id diferente, actualizarlo
             if (deck.linked_event_id && deck.linked_event_id !== existing.linked_event_id) {
               await databaseService.getDb().runAsync(
                 `UPDATE flashcard_decks SET linked_event_id = ?, updated_at = datetime('now') WHERE id = ?`,

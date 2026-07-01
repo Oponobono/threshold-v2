@@ -168,7 +168,8 @@ export const updateFlashcardDeck = async (deckId: string, payload: any): Promise
     return { ...payload, id: deckId, _isPending: true };
   }
 
-  await flashcardDeckRepository.update(deckId, payload);
+  // Flag for backup so changes like linked_event_id are uploaded to cloud
+  await flashcardDeckRepository.update(deckId, { ...payload, is_backed_up: 0 });
 
   try {
     const response = await fetchWithFallback(`/flashcard-decks/${deckId}`, {

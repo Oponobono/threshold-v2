@@ -27,16 +27,16 @@ exports.initialSync = (req, res) => {
     lmsAccounts: `SELECT * FROM lms_accounts WHERE user_id = ?`,
     thresholdOverrides: `SELECT * FROM subject_threshold_overrides WHERE user_id = ?`,
     study_sessions: `SELECT * FROM study_sessions WHERE user_id = ?`,
-    photos: `SELECT * FROM photos WHERE user_id = ?`,
+    photos: `SELECT p.* FROM photos p JOIN subjects s ON p.subject_id = s.id WHERE s.user_id = ?`,
     audioRecordings: `SELECT * FROM audio_recordings WHERE user_id = ?`,
-    audioTranscripts: `SELECT * FROM audio_transcripts WHERE user_id = ?`,
+    audioTranscripts: `SELECT at.* FROM audio_transcripts at JOIN audio_recordings ar ON at.recording_id = ar.id WHERE ar.user_id = ?`,
     scannedDocuments: `SELECT * FROM scanned_documents WHERE user_id = ?`,
   };
 
   const runQuery = (sql) => {
     return new Promise((resolve, reject) => {
       db.all(sql, [userId], (err, rows) => {
-        if (err) return reject(err);
+        if (err) return reject(new Error(`Error in query "${sql}": ${err.message}`));
         resolve(rows || []);
       });
     });
@@ -119,9 +119,11 @@ exports.deltaSync = (req, res) => {
   const traceId = req.headers['x-trace-id'] || null;
   if (traceId) console.log(`[SyncController][${traceId}] deltaSync started — version=${version}`);
 
-  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'flashcards', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'photos', 'audio_recordings', 'audio_transcripts', 'scanned_documents'];
+  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'audio_recordings', 'scanned_documents'];
   const specialTableQueries = {
-    assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ?`,
+    assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ? AND ac.sync_version > ?`,
+    photos: `SELECT p.* FROM photos p JOIN subjects s ON p.subject_id = s.id WHERE s.user_id = ? AND p.sync_version > ?`,
+    audio_transcripts: `SELECT at.* FROM audio_transcripts at JOIN audio_recordings ar ON at.recording_id = ar.id WHERE ar.user_id = ? AND at.sync_version > ?`,
   };
 
   const allTableKeys = [...regularTables, ...Object.keys(specialTableQueries)];
@@ -146,7 +148,7 @@ exports.deltaSync = (req, res) => {
   });
 
   Object.entries(specialTableQueries).forEach(([table, query]) => {
-    db.all(query, [userId], (err, rows) => {
+    db.all(query, [userId, version], (err, rows) => {
       if (err) {
         console.error(`[SyncController] Error en deltaSync para ${table}:`, err);
         updated[table] = [];
