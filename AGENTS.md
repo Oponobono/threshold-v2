@@ -1,7 +1,15 @@
 # Session Context
 
 ## Goal
-Eliminar require cycle, hidratar perfil antes del primer render del Dashboard, unificar inicialización del API Client en BootstrapManager y optimizar backend detector con competitive race + cancelación vía AbortController.
+- **[Protocol v1.0]** Sync engine convergence validated: all sync decisions ordered exclusively by version (`sync_version` for mutations, `deletion_version` for deletions). `deleted_at` is audit/metadata only.
+- **Stress Suite**: reproducible simulation engine with configurable devices (2/3/5/10), 5 perturbation types (kill/resume, simultaneous sync, random latency, packet loss, server restart, partial sync), SyncMetrics tracking (Convergence Score, sync timing P95, queue depth, conflicts, retries, per-op timing), and tiered runner (smoke/regression/nightly).
+- **Asset pipeline**: integrate into the same simulation engine.
+
+## Constraints & Preferences
+- Test framework must simulate two devices (A, B) syncing through a real backend.
+- Each sync cycle: push queue → pull delta → verify convergence.
+- No refactor of stable backend code without clear functional gain — except confirmed bugs found by the test framework itself.
+- `deletion_version` migration follows phased plan (Schema → Dual Write → Delta Sync → Test Validation → Cleanup) to keep the system functional at each step.
 
 ## Constraints & Preferences
 - No comentar código a menos que sea estrictamente necesario.
@@ -15,6 +23,16 @@ Eliminar require cycle, hidratar perfil antes del primer render del Dashboard, u
 
 ## Progress
 ### Done
+- **[*NUEVO*] F12 — Double version bump corregido**: `BaseRepository.update()` ahora honra `version_number` explícito cuando se pasa. Sin él, auto-incrementa `COALESCE(version_number,0)+1` como antes. Elimina el doble salto que ocurría vía `ConflictResolver` + `update()`.
+- **[*NUEVO*] F5 — sync_version guard en todos los UPDATEs del backend**: 4 endpoints (`updateSubject`, `updateCourse`, `updateFlashcardDeck`, `updateCardStatus`) ahora comparan `sync_version` entrante contra el actual. Rechazan con 409 si el cliente está obsoleto. Helper `updateWithVersionGuard()` en `syncVersion.js`.
+- **[*NUEVO*] F4 — version guards en CREATEs restantes**: `createSubject` (migrado de SELECT-then-INSERT a `ON CONFLICT` con guard), `createCourse` y `createFlashcardDeck` ahora incluyen `WHERE sync_version IS NULL OR sync_version <= ?` en su `ON CONFLICT DO UPDATE SET`.
+- **[*NUEVO*] F8 — createSubject idempotente**: Reemplazado el patrón `SELECT → INSERT` race-condition-prone por `INSERT ... ON CONFLICT(id) DO UPDATE SET`. RESTORE de subjects ya no falla con duplicate key.
+- **[*NUEVO*] F1/F11 — GET-before-PUT conflict check eliminado**: El `syncHandler` ya no hace GET silencioso previo al PUT. El servidor rechaza actualizaciones obsoletas con 409 (vía F5). El `SyncService` reintenta automáticamente. Se agregó mapeo `version_number → sync_version` en el payload.
+- **[*NUEVO*] F7 — RESTORE limpia sync_deletions**: `createSubject`, `createCourse`, `createFlashcardDeck` ahora llaman `removeDeletion()` tras upsert exitoso. Previene borrados fantasma en otros clientes tras una secuencia DELETE+CREATE.
+- **[*NUEVO*] F13 — deltaSync total counter miscalculated**: `total = allTableKeys.length + 1` = 16, but there are 17 completion increments (14 regular tables + 1 special table + 1 deletion query + 1 sync version fetch). Caused one query's data to always be silently dropped from every delta sync response (`updated` miss one table, `_syncVersion = 0`). Fixed: `total = allTableKeys.length + 2`. Detected by convergence test scenario 007 returning `entities=1` instead of 2 after offline-then-sync.
+- **Sync Protocol v1.0 document**: `SYNC_PROTOCOL.md` — estructura de eventos (queue → reducer → RESTORE semantics), initial/delta/push flow, conflict resolution (4 estrategias: LWW/CLIENT/SERVER/MERGE), versionado (sync_version/deletion_version/version_number), borrado (soft delete + sync_deletions + cascade), error codes (409/404/400/5xx), garantías (idempotencia, monotonía, convergencia, at-least-once), asset pipeline overview. — estructura de eventos (queue → reducer → RESTORE semantics), initial/delta/push flow, conflict resolution (4 estrategias: LWW/CLIENT/SERVER/MERGE), versionado (sync_version/deletion_version/version_number), borrado (soft delete + sync_deletions + cascade), error codes (409/404/400/5xx), garantías (idempotencia, monotonía, convergencia, at-least-once), asset pipeline overview.
+- **RandomScenario generator**: `StressSuite/RandomScenario.js` — 4 segmentes (normal/heavy_perturbations/offline/normal) con pesos específicos, ConsistencyReport al final, 100×2 PASS (100% convergence, 0 errores, 31 conflictos detectados).
+- **Stress Suite v2**: SimulationEngine expandido con devices configurables (2/3/5/10), 5 tipos de perturbación (simultaneous sync, latencia aleatoria, pérdida de paquetes, reinicio de servidor, sincronización parcial), SyncMetrics con Convergence Score y métricas detalladas (P95, profundidad de cola, reintentos, conflictos, tiempos por operación), y runner por niveles (smoke/regression/nightly/custom/random). Smoke 100×2 PASS, Regression 1000×3 PASS con 1056 conflictos y 0 errores.
 - **[*NUEVO*] Require Cycle eliminado**: `localFlashcardService.ts` cambió de barrel `./api` a import directo `./api/auth`. Rompe el ciclo `api/index.ts → analytics.ts → localMasteryService.ts → localFlashcardService.ts → api/index.ts`.
 - **[*NUEVO*] Profile = null eliminado**: Bootstrap READY phase ejecuta `loadAllData()` del store antes de emitir `READY`. Dashboard inicializa `profile` desde `storeProfile`.
 - **[*NUEVO*] `initializeApiClient()` unificado en Bootstrap**: NETWORK phase llama y awaitza `initializeApiClient()`. `_layout.tsx` ya no lo importa ni invoca.
@@ -51,12 +69,21 @@ Eliminar require cycle, hidratar perfil antes del primer render del Dashboard, u
 - **`getCloudItemsCount` corregido**: ahora suma `flashcardDecks` y `aiChats` además de las 5 categorías originales.
 
 ### In Progress
-- 🔴 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. Faltan escenarios de test y Consistency Report.
+- 🟢 **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md`: estructura de eventos, initial/delta/push flow, conflict resolution, versionado, deletion_version, códigos de error, garantías.
+- 🟢 **Stress Suite — RandomScenario** — 4 segmentes (normal/heavy_perturbations/offline/normal), ConsistencyReport final, tier runner integrado.
+- 🟢 **Consistency Report** — `ConsistencyReport.js` ejecutable post-suite: entidades (15 tablas B vs D0), integridad (FK orphans, duplicate PKs), colas (pending/failed), versiones (backend/device/max_table).
+- 🟢 **deletion_version — Fase 5 (Cleanup)**: Confirmado — **cero decisiones de sync dependen de `deleted_at`**.
+- 🔴 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. Falta integrar en SimulationEngine.
 
 ### Next Up
-- 🟡 **Sync Test Suite expansion** — escenarios de asset: offline create → sync → verify en segundo dispositivo; interrupted download → resume → checksum OK; corrupt file → detect → redownload.
-- 🟡 **Consistency Report** — post-sync: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status. Incluir reporte de AssetValidator.
-- ✅ **Download flow** — diagnosticado: NO es bug de infraestructura. El flujo funciona correctamente. Los 9 mazos se saltan porque ya existen localmente (mismos IDs negativos). El logging agregado ahora hace visible cada skip.
+- 🟢 **Sync Protocol v1.0 document**: `SYNC_PROTOCOL.md` — created and frozen.
+- 🟢 **RandomScenario generator**: 100×2 PASS, 100% convergence, 31 conflicts, 0 errors.
+- 🟢 **deletion_version Fase 5 (Cleanup)**: Confirmed — zero sync decisions depend on `deleted_at`.
+- 🟢 **`sameEntities` skips `sync_version`**: Already done.
+- 🟡 **Scenario expansion** — RESTORE cascade (subject delete cascades to courses → verify course deletions), conflict resolution merge/LWW.
+- ✅ **Download flow** — diagnosticado: NO es bug de infraestructura.
+- ✅ **Convergence Test Suite (10/10)** — Framework completo validando CREATE, UPDATE, DELETE, RESTORE, idempotent double CREATE, offline-then-sync, stale client 409, flashcard deck+cards, initial sync.
+- ✅ **Stress Suite avanzado** — 1000 ops regression PASS, 1056 conflictos detectados, 5 perturbaciones activas, tiered runner (smoke/regression/nightly/custom), métricas detalladas.
 
 ### Blocked
 - *(none)*
@@ -93,11 +120,13 @@ Eliminar require cycle, hidratar perfil antes del primer render del Dashboard, u
 - **AI: Policy Engine → Orchestrator → Capabilities**: frozen, no more AI refactors.
 
 ## Next Steps
-1. **Consistency Report** — post-sync: uploaded/downloaded/conflicts/queueRemaining/backendVersion/sqliteVersion/status.
-2. **Sync Test Suite expansion** — escenarios de asset: offline create → sync → verify; interrupted download → resume; corrupt file → redownload.
-3. **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
-4. **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
-5. **Refactorizar event handlers** (`deleteSubject`, `createStudySession`, `getPredictedSubject`) para que no importen directamente de `services/api`.
+1. ✅ **Stress Suite expansion** — RandomScenario (4 segmentos, Consistency Report) corriendo en tier runner (`node index.js random`).
+2. 🔴 **Assets pipeline** — integrar en SimulationEngine (upload/kill/resume/network-timeout/retry, dos dispositivos mismo hash).
+3. 🟡 **Dashboard de salud del Sync Engine** — Convergence Score, stress/consistency status, pending queue, failed journal, retry rate, avg/P95 sync timing.
+4. ✅ **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen.
+5. 🟡 **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
+6. 🟡 **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
+7. 🟡 **Refactorizar event handlers** (`deleteSubject`, `createStudySession`, `getPredictedSubject`) para que no importen directamente de `services/api`.
 
 ## Hallazgos Críticos del Audit
 - **sync_version nunca se incrementa** en backend — ningún controller llama a `UPDATE sync_version SET version = version + 1` ni `SET sync_version = <next>` en las tablas de entidad. `syncController.js` ejecuta `WHERE sync_version > ?` que siempre devuelve vacío. **CORREGIDO** vía helper `syncVersion.js` + 9 controllers.
@@ -180,9 +209,30 @@ Eliminar require cycle, hidratar perfil antes del primer render del Dashboard, u
 
 ### Backend (corregido)
 - `backend/helpers/syncVersion.js` — 4 funciones: incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, recordDeletions
-- `backend/controllers/syncController.js` — initialSync (10 entities) + deltaSync (9 tables)
+- `backend/controllers/syncController.js` — initialSync (10 entities) + deltaSync (9 tables); **total counter fixed** (allTableKeys.length + 2)
 - `backend/controllers/subjectsController.js` — incrementSyncVersion + recordDeletion + cascade
 - `backend/controllers/coursesController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/assessmentsController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/schedulesController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/flashcardsController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/calendarEventsController.js` — incrementSyncVersion + recordDeletion
+- `backend/controllers/settingsController.js` — incrementSyncVersion + recordDeletion (grading_periods, lms_accounts, threshold_overrides)
+- `backend/controllers/galleryController.js` — incrementSyncVersion + recordDeletion (photos)
+- `backend/controllers/audioController.js` — incrementSyncVersion + recordDeletion (audio_recordings)
+- `backend/controllers/scannedDocumentsController.js` — incrementSyncVersion + recordDeletion (scanned_documents)
+
+### Stress Suite (Fase 2)
+- `backend/tests/stress/SimulationEngine.js` — Expandido: 5 perturbaciones (simultaneous sync, latency, packet loss, server restart, partial sync), devices configurables (2/3/5/10), SyncMetrics integration, NetworkController con latency/packet loss
+- `backend/tests/stress/SyncMetrics.js` — Métricas: Convergence Score, sync timing (avg/P95/min/max), queue depth, retries, conflicts, discarded by version, per-op timing (CREATE/UPDATE/DELETE/RESTORE)
+- `backend/tests/stress/index.js` — Tiered runner: `node tests/stress/index.js smoke` (100×2), `regression` (1000×3), `nightly` (10000×5), `custom <ops> <devices> [seed]`, `random <ops> <devices> [seed]`
+- `backend/tests/stress/RandomScenario.js` — 4 segmentes operativos, pesos por segmento, ConsistencyReport final, verificación por checkpoint
+
+### Convergence Test Framework
+- `backend/tests/convergence/TestEnvironment.js` — Express + SQLite in-memory, JWT, db injection, TABLE_SCHEMAS, **restart()** method for server restart perturbation
+- `backend/tests/convergence/DeviceSimulator.js` — HTTP sync push/pull, own SQLite, dumpAll, sync_version tracking, **metrics hooks**, **latency/packet loss simulation**, **syncPushOnly/syncPullOnly** partial sync
+- `backend/tests/convergence/ConvergenceAssert.js` — `deepEqual` (excludes timestamps/metadata), `sameEntities` (excludes version_number), `noQueue`
+- `backend/tests/convergence/index.js` — Runner: registerDefaultScenarios(), runAllTests(), PASS/FAIL summary
+- `backend/tests/convergence/scenarios/basic.js` — 10 core scenarios covering all sync phases
 - `backend/controllers/assessmentsController.js` — incrementSyncVersion + recordDeletion
 - `backend/controllers/schedulesController.js` — incrementSyncVersion + recordDeletion
 - `backend/controllers/flashcardsController.js` — incrementSyncVersion + recordDeletion
@@ -197,7 +247,7 @@ Eliminar require cycle, hidratar perfil antes del primer render del Dashboard, u
 - `mobile/src/services/database/DatabaseService.ts` — Transaction support
 - `mobile/src/services/database/repositories/CourseRepository.ts` — SQLite CRUD
 - `mobile/src/services/database/appInit.ts` — Bootstrap and sync handler
-- `mobile/src/services/database/migrations.ts` — v20 (SyncJournal), v21 (version_number/last_modified_by/deleted_at)
+- `mobile/src/services/database/migrations.ts` — v20 (SyncJournal), v21 (version_number/last_modified_by/deleted_at), v22 (sync_debug_logs + trace_id)
 
 ### Mobile API (enqueue calls)
 - `mobile/src/services/api/subjects.ts` — enqueueCreate/Update/Delete for subject

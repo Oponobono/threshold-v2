@@ -1,7 +1,7 @@
 const secrets = require('../config/secrets');
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
-const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, recordDeletions, updateWithVersionGuard, removeDeletion, respondStaleVersion } = require('../helpers/syncVersion');
 const { analyzeCardDensity, fragmentCard } = require('../utils/atomicCardGenerator');
 const { calculateSM2, calculateFSRS } = require('../utils/sm2Algorithm');
 
@@ -203,13 +203,11 @@ function sanitizeObject(obj) {
 }
 
 exports.createFlashcardDeck = (req, res) => {
-  const { id: clientId, subject_id, title, description, linked_event_id } = req.body;
+  const { id: clientId, subject_id, title, description, linked_event_id, sync_version: incomingVersion } = req.body;
   const userId = req.user.id;
   
   if (!title) return res.status(400).json({ error: 'Faltan campos requeridos (title).' });
   
-  // SEGURIDAD: Ignorar cualquier user_id enviado desde el cliente
-  // El user_id siempre será el del usuario autenticado
   if (req.body.user_id && String(req.body.user_id) !== String(userId)) {
     console.warn(`[CreateDeck] Intento de asignar user_id diferente: ${req.body.user_id} vs ${userId}`);
   }
@@ -218,14 +216,18 @@ exports.createFlashcardDeck = (req, res) => {
   const safeDescription = sanitizeText(description);
 
   const deckId = clientId || uuidv4();
+  const hasVersion = incomingVersion !== undefined && incomingVersion !== null;
 
-  // UPSERT: si el mazo ya existe (por ej. re-sync tras añadir tarjetas), actualiza en lugar de fallar
+  const params = [deckId, subject_id || null, userId, safeTitle, safeDescription || '', linked_event_id ?? null];
+  const versionGuard = hasVersion ? ' WHERE sync_version IS NULL OR sync_version <= ?' : '';
+
   db.run(
     `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, linked_event_id) VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, title = excluded.title, description = excluded.description, linked_event_id = excluded.linked_event_id`,
-    [deckId, subject_id || null, userId, safeTitle, safeDescription || '', linked_event_id ?? null],
+     ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, title = excluded.title, description = excluded.description, linked_event_id = excluded.linked_event_id${versionGuard}`,
+    hasVersion ? [...params, incomingVersion] : params,
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
+      removeDeletion('flashcard_decks', deckId, userId);
       console.log(`[CreateDeck] Mazo creado/actualizado: ID=${deckId}, user_id=${userId}, title=${safeTitle}`);
 
       // Insertar tarjetas incluidas en el payload (vienen del sync de mazos locales)
@@ -422,9 +424,9 @@ exports.deleteDeck = (req, res) => {
 exports.updateFlashcardDeck = (req, res) => {
   const { deckId } = req.params;
   const userId = req.user.id;
+  const { sync_version: incomingVersion } = req.body;
   let { title, description, subject_id, linked_event_id } = req.body;
 
-  // Validación inicial
   if (title !== undefined && typeof title === 'string') {
     title = title.trim();
     if (!title) {
@@ -436,15 +438,17 @@ exports.updateFlashcardDeck = (req, res) => {
     return res.status(400).json({ error: 'No hay campos para actualizar.' });
   }
 
-  // Verificar que el mazo exista y pertenezca al usuario
-  db.get(`SELECT user_id FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
+  db.get(`SELECT user_id, sync_version FROM flashcard_decks WHERE id = ?`, [deckId], (err, deck) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!deck) return res.status(404).json({ error: 'Mazo no encontrado.' });
     if (String(deck.user_id) !== String(userId)) {
       return res.status(403).json({ error: 'No tienes permiso para editar este mazo.' });
     }
 
-    // Si subject_id se proporciona, validar que exista y pertenezca al usuario
+    if (incomingVersion !== undefined && incomingVersion !== null && deck.sync_version !== null && incomingVersion < deck.sync_version) {
+      return res.status(409).json({ reason: 'STALE_VERSION', current_sync_version: deck.sync_version, entity: deck, error: 'Conflicto: los datos del servidor son más recientes. Re-sincroniza antes de actualizar.' });
+    }
+
     if (subject_id !== undefined && subject_id !== null) {
       db.get(`SELECT id FROM subjects WHERE id = ? AND user_id = ?`, [subject_id, userId], (subjErr, subject) => {
         if (subjErr) return res.status(500).json({ error: subjErr.message });
@@ -465,25 +469,19 @@ exports.updateFlashcardDeck = (req, res) => {
       if (subject_id !== undefined)  { fields.push('subject_id = ?');  values.push(subject_id); }
       if (linked_event_id !== undefined) { fields.push('linked_event_id = ?'); values.push(linked_event_id); }
 
-      values.push(deckId);
-
-      db.run(
-        `UPDATE flashcard_decks SET ${fields.join(', ')} WHERE id = ?`,
-        values,
-        function(updateErr) {
-          if (updateErr) {
-            console.error('[FlashcardsController] Error al actualizar mazo:', updateErr);
-            return res.status(500).json({ error: updateErr.message });
-          }
-          if (this.changes === 0) return res.status(404).json({ error: 'Mazo no encontrado.' });
-
-          db.get(`SELECT * FROM flashcard_decks WHERE id = ?`, [deckId], (fetchErr, updated) => {
-            if (fetchErr) return res.status(500).json({ error: fetchErr.message });
-            console.log('[FlashcardsController] Mazo actualizado:', { deckId, title: updated.title, subject_id: updated.subject_id });
-            incrementSyncVersion('flashcard_decks', deckId, () => res.json(updated));
-          });
+      updateWithVersionGuard('flashcard_decks', deckId, fields.map(f => f.split(' ')[0]), values, incomingVersion, (updateErr, changes) => {
+        if (updateErr) {
+          console.error('[FlashcardsController] Error al actualizar mazo:', updateErr);
+          return res.status(500).json({ error: updateErr.message });
         }
-      );
+        if (changes === 0) return res.status(404).json({ error: 'Mazo no encontrado.' });
+
+        db.get(`SELECT * FROM flashcard_decks WHERE id = ?`, [deckId], (fetchErr, updated) => {
+          if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+          console.log('[FlashcardsController] Mazo actualizado:', { deckId, title: updated.title, subject_id: updated.subject_id });
+          incrementSyncVersion('flashcard_decks', deckId, () => res.json(updated));
+        });
+      });
     }
   });
 };
@@ -698,34 +696,51 @@ exports.getCardsByDeckPrioritized = (req, res) => {
  */
 exports.createCard = (req, res) => {
   const { deckId } = req.params;
-  const { id: clientId, front, back } = req.body;
+  const { id: clientId, front, back, sync_version } = req.body;
   if (!front) return res.status(400).json({ error: 'Faltan campos requeridos (front).' });
 
-  const safeFront = sanitizeText(front);
-  const safeBack = sanitizeText(back || '');
+  db.get(`SELECT id FROM flashcard_decks WHERE id = ?`, [deckId], (deckErr, deck) => {
+    if (deckErr) return res.status(500).json({ error: deckErr.message });
+    if (!deck) return res.status(404).json({ error: 'El mazo no existe.' });
 
-  const contentJson = JSON.stringify({ front: safeFront, back: safeBack });
-  
-  // ── Calcular next_review_date: 7 dÃ­as desde hoy ─────────────────────────
-  const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + 7);
-  const nextReviewDateStr = nextReviewDate.toISOString();
+    const safeFront = sanitizeText(front);
+    const safeBack = sanitizeText(back || '');
 
-  const cardId = clientId || uuidv4();
-  
-  db.run(
-    `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
-    [cardId, deckId, safeFront, safeBack, contentJson, nextReviewDateStr],
-    function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      incrementSyncVersion('flashcards', cardId, () =>
-        res.status(201).json(normalizeCard({
-          id: cardId, deck_id: deckId, front, back,
-          item_type: 'flashcard', content_json: contentJson, status: 'new', hint: null, explanation: null,
-        }))
-      );
-    }
-  );
+    const contentJson = JSON.stringify({ front: safeFront, back: safeBack });
+
+    const nextReviewDate = new Date();
+    nextReviewDate.setDate(nextReviewDate.getDate() + 7);
+    const nextReviewDateStr = nextReviewDate.toISOString();
+
+    const cardId = clientId || uuidv4();
+    const incomingVersion = sync_version ?? 0;
+
+    db.run(
+      `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions, sync_version)
+       VALUES (?, ?, ?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         front = excluded.front, back = excluded.back,
+         content_json = excluded.content_json
+       WHERE ? >= COALESCE(flashcards.sync_version, 0)`,
+      [cardId, deckId, req.user.id, safeFront, safeBack, contentJson, nextReviewDateStr, incomingVersion, incomingVersion],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        incrementSyncVersion('flashcards', cardId, (err2) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          db.get('SELECT sync_version FROM flashcards WHERE id = ?', [cardId], (_err, row) => {
+            const sv = row ? row.sync_version : null;
+            res.status(200).json({
+              ...normalizeCard({
+                id: cardId, deck_id: deckId, front, back,
+                item_type: 'flashcard', content_json: contentJson, status: 'new', hint: null, explanation: null,
+              }),
+              sync_version: sv,
+            });
+          });
+        });
+      }
+    );
+  });
 };
 
 /**
@@ -764,14 +779,20 @@ exports.createEvaluationItem = (req, res) => {
   const nextReviewDateStr = nextReviewDate.toISOString();
 
   const itemId = clientId || uuidv4();
+  const incomingVersion = req.body.sync_version ?? 0;
 
   db.run(
-    `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0)`,
-    [itemId, deckId, front, back, item_type, safeContentStr, safeHint, safeExplanation, nextReviewDateStr],
+    `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions, sync_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       front = excluded.front, back = excluded.back,
+       item_type = excluded.item_type, content_json = excluded.content_json,
+       hint = excluded.hint, explanation = excluded.explanation
+     WHERE ? >= COALESCE(flashcards.sync_version, 0)`,
+    [itemId, deckId, front, back, item_type, safeContentStr, safeHint, safeExplanation, nextReviewDateStr, incomingVersion, incomingVersion],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       incrementSyncVersion('flashcards', itemId, () =>
-        res.status(201).json(normalizeCard({
+        res.status(200).json(normalizeCard({
           id: itemId, deck_id: deckId, front, back,
           item_type, content_json: safeContentStr, hint: safeHint, explanation: safeExplanation, status: 'new',
         }))
@@ -894,9 +915,10 @@ exports.recordCardReview = (req, res) => {
  */
 exports.updateCardStatus = (req, res) => {
   const { cardId } = req.params;
-  const { status } = req.body;
-  db.run(`UPDATE flashcards SET status = ? WHERE id = ?`, [status, cardId], function(err) {
+  const { status, sync_version: incomingVersion } = req.body;
+  updateWithVersionGuard('flashcards', cardId, ['status'], [status], incomingVersion, (err, changes) => {
     if (err) return res.status(500).json({ error: err.message });
+    if (changes === 0) return respondStaleVersion(res, 'flashcards', cardId);
     incrementSyncVersion('flashcards', cardId, () => res.json({ success: true }));
   });
 };
@@ -920,7 +942,7 @@ exports.deleteCard = (req, res) => {
  */
 exports.deleteDeck = (req, res) => {
   const { deckId } = req.params;
-  const { user_id } = req.query;
+  const user_id = req.query.user_id || req.user.id;
 
   if (!user_id) return res.status(400).json({ error: 'Se requiere user_id para verificar permisos de eliminación.' });
 

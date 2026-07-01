@@ -77,9 +77,12 @@ export class BaseRepository<T extends { id: string }> {
     const validCols = await this.getValidColumns();
     const keys = Object.keys(data).filter(k => k !== 'id' && (validCols.length > 0 ? validCols.includes(k) : true));
 
+    const hasExplicitVersion = keys.includes('version_number');
+    const keysForSet = hasExplicitVersion ? keys.filter(k => k !== 'version_number') : keys;
+
     const filteredKeys: string[] = [];
     const filteredValues: any[] = [];
-    for (const k of keys) {
+    for (const k of keysForSet) {
       const val = (data as any)[k];
       if (val !== undefined) {
         filteredKeys.push(k);
@@ -87,13 +90,21 @@ export class BaseRepository<T extends { id: string }> {
       }
     }
 
-    if (filteredKeys.length === 0) return;
+    if (filteredKeys.length === 0 && !hasExplicitVersion) return;
 
-    const setClause = filteredKeys.map(k => `${k} = ?`).join(', ');
-    filteredValues.push(id);
+    const setClause = filteredKeys.length > 0
+      ? filteredKeys.map(k => `${k} = ?`).join(', ') + ', '
+      : '';
+    const versionClause = hasExplicitVersion
+      ? `version_number = ?`
+      : `version_number = COALESCE(version_number, 0) + 1`;
+    const allValues = hasExplicitVersion
+      ? [...filteredValues, (data as any).version_number, id]
+      : [...filteredValues, id];
+
     await this.getDb().runAsync(
-      `UPDATE ${this.tableName} SET ${setClause}, updated_at = datetime('now'), version_number = COALESCE(version_number, 0) + 1 WHERE id = ?`,
-      ...filteredValues
+      `UPDATE ${this.tableName} SET ${setClause}updated_at = datetime('now'), ${versionClause} WHERE id = ?`,
+      ...allValues
     );
     this._emit('updated', { id, ...data } as T);
   }

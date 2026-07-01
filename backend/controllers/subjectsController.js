@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
-const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, recordDeletions } = require('../helpers/syncVersion');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, recordDeletions, updateWithVersionGuard, removeDeletion, respondStaleVersion } = require('../helpers/syncVersion');
 
 /**
  * Obtener una materia específica por su ID
@@ -278,7 +278,8 @@ exports.getSubjectsByUser = (req, res) => {
  * Agregar una nueva materia
  */
 exports.createSubject = (req, res) => {
-  const { id: clientId, user_id, code, name, credits, professor, color, icon, target_grade, course_id, external_url, total_lessons, completed_lessons, next_micro_milestone } = req.body;
+  const { id: clientId, user_id, sync_version: incomingVersion } = req.body;
+  const { code, name, credits, professor, color, icon, target_grade, course_id, external_url, total_lessons, completed_lessons, next_micro_milestone } = req.body;
   const authenticatedUserId = req.user.id;
 
   if (!user_id || !name) {
@@ -299,73 +300,51 @@ exports.createSubject = (req, res) => {
       .join('') ||
     'SB';
 
-  db.get('SELECT * FROM subjects WHERE user_id = ? AND LOWER(name) = LOWER(?)', [user_id, name], (err, existingSubject) => {
-    if (err) return res.status(500).json({ error: err.message });
-    
-    if (existingSubject) {
-      // Return existing subject to prevent duplicates on offline sync retries
-      return res.status(200).json({
-        ...existingSubject,
-        avg_score: 0,
-        completion_percent: 0,
-        message: 'Materia existente recuperada',
+  const subjectId = clientId || uuidv4();
+  const finalCourseId = course_id || null;
+
+  const hasVersion = incomingVersion !== undefined && incomingVersion !== null;
+
+  const query = `
+    INSERT INTO subjects (id, user_id, code, name, credits, professor, color, icon, target_grade, course_id, external_url, total_lessons, completed_lessons, next_micro_milestone)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+        code = excluded.code, name = excluded.name, credits = excluded.credits,
+        professor = excluded.professor, color = excluded.color, icon = excluded.icon,
+        target_grade = excluded.target_grade, course_id = excluded.course_id,
+        external_url = excluded.external_url, total_lessons = excluded.total_lessons,
+        completed_lessons = excluded.completed_lessons,
+        next_micro_milestone = excluded.next_micro_milestone
+        ${hasVersion ? 'WHERE sync_version IS NULL OR sync_version <= ?' : ''}
+  `;
+
+  const params = [
+    subjectId, user_id, normalizedCode, name,
+    credits || null, professor || null, color || '#CCCCCC', icon || 'book-outline',
+    target_grade || null, finalCourseId, external_url || null,
+    total_lessons || 0, completed_lessons || 0, next_micro_milestone || null,
+  ];
+  if (hasVersion) params.push(incomingVersion);
+
+  db.run(query, params, function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      removeDeletion('subjects', subjectId, user_id);
+      incrementSyncVersion('subjects', subjectId, () => {
+        res.status(201).json({
+          id: subjectId, user_id, code: normalizedCode, name,
+          credits: credits || null, professor: professor || null,
+          color: color || '#CCCCCC', icon: icon || 'book-outline',
+          target_grade: target_grade || null, course_id: finalCourseId,
+          external_url: external_url || null,
+          total_lessons: total_lessons || 0,
+          completed_lessons: completed_lessons || 0,
+          next_micro_milestone: next_micro_milestone || null,
+          avg_score: 0, completion_percent: 0,
+          message: 'Materia creada',
+        });
       });
     }
-
-    const subjectId = clientId || uuidv4();
-    const query = `
-      INSERT INTO subjects (id, user_id, code, name, credits, professor, color, icon, target_grade, course_id, external_url, total_lessons, completed_lessons, next_micro_milestone)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const proceedCreate = (finalCourseId) => {
-      db.run(
-        query,
-        [
-          subjectId,
-          user_id,
-          normalizedCode,
-          name,
-          credits || null,
-          professor || null,
-          color || '#CCCCCC',
-          icon || 'book-outline',
-          target_grade || null,
-          finalCourseId,
-          external_url || null,
-          total_lessons || 0,
-          completed_lessons || 0,
-          next_micro_milestone || null,
-        ],
-        function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          incrementSyncVersion('subjects', subjectId, () => {
-            res.status(201).json({
-              id: subjectId,
-              user_id,
-              code: normalizedCode,
-              name,
-              credits: credits || null,
-              professor: professor || null,
-              color: color || '#CCCCCC',
-              icon: icon || 'book-outline',
-              target_grade: target_grade || null,
-              course_id: finalCourseId,
-              external_url: external_url || null,
-              total_lessons: total_lessons || 0,
-              completed_lessons: completed_lessons || 0,
-              next_micro_milestone: next_micro_milestone || null,
-              avg_score: 0,
-              completion_percent: 0,
-              message: 'Materia creada',
-            });
-          });
-        }
-      );
-    };
-
-    proceedCreate(course_id || null);
-});
+  );
 };
 
 /**
@@ -422,12 +401,12 @@ exports.deleteSubject = (req, res) => {
  */
 exports.updateSubject = (req, res) => {
   const { subjectId } = req.params;
+  const { sync_version: incomingVersion } = req.body;
   const fields = req.body;
   
   const allowedFields = ['code', 'name', 'credits', 'professor', 'color', 'icon', 'target_grade', 'course_id', 'external_url', 'total_lessons', 'completed_lessons', 'next_micro_milestone'];
   const fieldsToUpdate = {};
   
-  // Filtrar solo los campos permitidos
   for (const key of Object.keys(fields)) {
     if (allowedFields.includes(key)) {
       fieldsToUpdate[key] = fields[key];
@@ -438,24 +417,15 @@ exports.updateSubject = (req, res) => {
     return res.status(400).json({ error: 'No se proporcionaron campos válidos para actualizar' });
   }
 
-  const proceedUpdate = () => {
-    const columns = Object.keys(fieldsToUpdate).map(key => `${key} = ?`).join(', ');
-    const values = [...Object.values(fieldsToUpdate), subjectId, req.user.id];
+  const columns = Object.keys(fieldsToUpdate);
+  const values = Object.values(fieldsToUpdate);
 
-    const query = `UPDATE subjects SET ${columns} WHERE id = ? AND user_id = ?`;
-
-    db.run(query, values, function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      if (this.changes === 0) return res.status(404).json({ error: 'Materia no encontrada o acceso denegado' });
-      // Devolver la materia completa para que el cliente pueda upsert sin perder course_id u otros campos
-      db.get('SELECT * FROM subjects WHERE id = ?', [subjectId], (err2, row) => {
-        if (err2 || !row) return res.json({ success: true });
-        incrementSyncVersion('subjects', subjectId, () => {
-          res.json(row);
-        });
-      });
+  updateWithVersionGuard('subjects', subjectId, columns, values, incomingVersion, (err, changes) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (changes === 0) return respondStaleVersion(res, 'subjects', subjectId);
+    db.get('SELECT * FROM subjects WHERE id = ?', [subjectId], (err2, row) => {
+      if (err2 || !row) return res.json({ success: true });
+      incrementSyncVersion('subjects', subjectId, () => { res.json(row); });
     });
-  };
-
-  proceedUpdate();
+  });
 };

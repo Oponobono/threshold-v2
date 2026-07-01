@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
-const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, updateWithVersionGuard, removeDeletion, respondStaleVersion } = require('../helpers/syncVersion');
 
 exports.getCourses = (req, res) => {
   const userId = req.user.id;
@@ -22,7 +22,7 @@ exports.getCourseById = (req, res) => {
 
 
 exports.createCourse = (req, res) => {
-  const { id: clientId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours, total_classes, completed_classes, status, global_notes, tags, momentum_score, last_studied_at } = req.body;
+  const { id: clientId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours, total_classes, completed_classes, status, global_notes, tags, momentum_score, last_studied_at, sync_version: incomingVersion } = req.body;
   const authenticatedUserId = req.user.id;
 
   if (!user_id || !name) {
@@ -34,7 +34,8 @@ exports.createCourse = (req, res) => {
   }
 
   const courseId = clientId || uuidv4();
-  
+  const hasVersion = incomingVersion !== undefined && incomingVersion !== null;
+
   const query = `
     INSERT INTO courses (id, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours, total_classes, completed_classes, status, global_notes, tags, momentum_score, last_studied_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -53,12 +54,16 @@ exports.createCourse = (req, res) => {
       tags = EXCLUDED.tags,
       momentum_score = EXCLUDED.momentum_score,
       last_studied_at = EXCLUDED.last_studied_at,
-      updated_at = CURRENT_TIMESTAMP
+      updated_at = CURRENT_TIMESTAMP${hasVersion ? ' WHERE sync_version IS NULL OR sync_version <= ?' : ''}
   `;
 
-  db.run(query, [courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours || 0, total_classes || 0, completed_classes || 0, status || 'active', global_notes, tags, momentum_score || 1.0, last_studied_at], function(err) {
+  const params = [courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours || 0, total_classes || 0, completed_classes || 0, status || 'active', global_notes, tags, momentum_score || 1.0, last_studied_at];
+  if (hasVersion) params.push(incomingVersion);
+
+  db.run(query, params, function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    incrementSyncVersion('courses', this.lastID, () => {
+    removeDeletion('courses', courseId, user_id);
+    incrementSyncVersion('courses', courseId, () => {
       res.status(201).json({ id: courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours: total_hours || 0, total_classes: total_classes || 0, completed_classes: completed_classes || 0, status: status || 'active', global_notes, tags, momentum_score: momentum_score || 1.0, last_studied_at });
     });
   });
@@ -66,6 +71,7 @@ exports.createCourse = (req, res) => {
 
 exports.updateCourse = (req, res) => {
   const { courseId } = req.params;
+  const { sync_version: incomingVersion } = req.body;
   const fields = req.body;
   
   const allowedFields = ['name', 'platform', 'certificate_url', 'main_url', 'deep_link_url', 'instructor', 'total_hours', 'total_classes', 'completed_classes', 'status', 'global_notes', 'tags', 'momentum_score', 'last_studied_at', 'updated_at'];
@@ -81,14 +87,13 @@ exports.updateCourse = (req, res) => {
     return res.status(400).json({ error: 'No se proporcionaron campos válidos para actualizar' });
   }
 
-  const columns = Object.keys(fieldsToUpdate).map(key => `${key} = ?`).join(', ');
-  const values = [...Object.values(fieldsToUpdate), courseId, req.user.id];
+  const columns = Object.keys(fieldsToUpdate);
+  const values = Object.values(fieldsToUpdate);
 
-  db.run(`UPDATE courses SET ${columns} WHERE id = ? AND user_id = ?`, values, function(err) {
+  updateWithVersionGuard('courses', courseId, columns, values, incomingVersion, (err, changes) => {
     if (err) return res.status(500).json({ error: err.message });
-    incrementSyncVersion('courses', courseId, () => {
-      res.json({ success: true });
-    });
+    if (changes === 0) return respondStaleVersion(res, 'courses', courseId);
+    incrementSyncVersion('courses', courseId, () => { res.json({ success: true }); });
   });
 };
 

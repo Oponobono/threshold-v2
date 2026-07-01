@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS sync_deletions (
   entity_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
   deleted_at TEXT DEFAULT (datetime('now')),
+  deletion_version INTEGER,
   UNIQUE(entity_type, entity_id, user_id)
 );
 `;

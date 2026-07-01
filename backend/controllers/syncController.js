@@ -116,7 +116,7 @@ exports.deltaSync = (req, res) => {
   const traceId = req.headers['x-trace-id'] || null;
   if (traceId) console.log(`[SyncController][${traceId}] deltaSync started — version=${version}`);
 
-  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'photos', 'audio_recordings', 'scanned_documents'];
+  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'flashcards', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'photos', 'audio_recordings', 'scanned_documents'];
   const specialTableQueries = {
     assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ?`,
   };
@@ -125,7 +125,9 @@ exports.deltaSync = (req, res) => {
   const updated = {};
   const deleted = [];
   let completed = 0;
+  let _syncVersion = 0;
   const total = allTableKeys.length + 2;
+  let responded = false;
 
   regularTables.forEach((table) => {
     const query = `SELECT * FROM ${table} WHERE user_id = ? AND sync_version > ?`;
@@ -136,8 +138,7 @@ exports.deltaSync = (req, res) => {
       } else {
         updated[table] = rows || [];
       }
-      completed++;
-      if (completed === total) respond();
+      if (++completed >= total && !responded) respond();
     });
   });
 
@@ -149,32 +150,32 @@ exports.deltaSync = (req, res) => {
       } else {
         updated[table] = rows || [];
       }
-      completed++;
-      if (completed === total) respond();
+      if (++completed >= total && !responded) respond();
     });
   });
 
-  const delQuery = `SELECT entity_type, entity_id, deleted_at FROM sync_deletions WHERE user_id = ? AND deleted_at > ?`;
-  db.all(delQuery, [userId, new Date(version > 0 ? version : 0).toISOString()], (err, rows) => {
+  const delQuery = `SELECT entity_type, entity_id, deleted_at, deletion_version FROM sync_deletions WHERE user_id = ? AND COALESCE(deletion_version, 0) > ?`;
+  db.all(delQuery, [userId, version], (err, rows) => {
     if (!err) {
       for (const row of rows || []) {
-        deleted.push({ entityType: row.entity_type, entityId: row.entity_id, deletedAt: row.deleted_at });
+        deleted.push({ entityType: row.entity_type, entityId: row.entity_id, deletedAt: row.deleted_at, deletionVersion: row.deletion_version });
       }
     }
-    completed++;
-    if (completed === total) respond();
+    if (++completed >= total && !responded) respond();
   });
 
   getCurrentSyncVersion().then((syncVersion) => {
-    completed++;
-    if (completed === total) respond(syncVersion);
+    _syncVersion = syncVersion;
+    if (++completed >= total && !responded) respond();
   });
 
-  function respond(syncVersion) {
+  function respond() {
+    if (responded) return;
+    responded = true;
     const updatedCount = Object.values(updated).reduce((s, arr) => s + arr.length, 0);
-    if (traceId) console.log(`[SyncController][${traceId}] deltaSync completed — ${updatedCount} updated, ${deleted.length} deleted, version=${syncVersion}`);
+    if (traceId) console.log(`[SyncController][${traceId}] deltaSync completed — ${updatedCount} updated, ${deleted.length} deleted, version=${_syncVersion}`);
     res.json({
-      syncVersion: syncVersion || 0,
+      syncVersion: _syncVersion,
       traceId,
       updated,
       deleted,

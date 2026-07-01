@@ -262,19 +262,8 @@ class BootstrapManager {
         }
       }
 
-      if (operation === 'UPDATE' && entity_id && payload) {
-        try {
-          const currentRes = await fetchWithFallback(path, { method: 'GET' });
-          if (currentRes.ok) {
-            const currentData = await currentRes.json();
-            const localTime = payload?.updated_at ? new Date(payload.updated_at).getTime() : 0;
-            const remoteTime = currentData?.updated_at ? new Date(currentData.updated_at).getTime() : 0;
-            if (remoteTime > localTime) {
-              console.warn(`[SyncService] Conflict: Server has newer data for ${entity_type}/${entity_id}. Aborting local push.`);
-              return;
-            }
-          }
-        } catch { }
+      if (payload && payload.version_number !== undefined && payload.sync_version === undefined) {
+        payload.sync_version = payload.version_number;
       }
 
       const options: RequestInit = {
