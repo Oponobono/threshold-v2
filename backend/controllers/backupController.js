@@ -355,8 +355,8 @@ exports.markAsBackedUp = (req, res) => {
   if (type === 'flashcard_deck') {
     const { title: deckTitle = 'Mazo Offline', subject_id: deckSubjectId = null, linked_event_id = null } = req.body;
     db.run(
-      `UPDATE flashcard_decks SET cloud_url = ?, is_backed_up = 1 WHERE id = ? AND user_id = ?`,
-      [cloud_url, id, userId],
+      `UPDATE flashcard_decks SET cloud_url = ?, is_backed_up = 1, linked_event_id = COALESCE(?, linked_event_id) WHERE id = ? AND user_id = ?`,
+      [cloud_url, linked_event_id, id, userId],
       function (err) {
         if (err) { console.error('[Backup] Error al marcar mazo:', err.message, err.code, err.stack); return res.status(500).json({ error: 'Error al marcar mazo.' }); }
         if (this.changes > 0) {
@@ -368,9 +368,9 @@ exports.markAsBackedUp = (req, res) => {
         // 0 changes: mazo no existe en el backend (creado offline o antes del sync).
         // UPSERT para que cloud-items pueda devolvérselo al dispositivo 2.
         db.run(
-          `INSERT INTO flashcard_decks (id, user_id, subject_id, title, linked_event_id, cloud_url, is_backed_up)
-           VALUES (?, ?, ?, ?, ?, ?, 1)
-           ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1`,
+           `INSERT INTO flashcard_decks (id, user_id, subject_id, title, linked_event_id, cloud_url, is_backed_up)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+            ON CONFLICT(id) DO UPDATE SET cloud_url = excluded.cloud_url, is_backed_up = 1, linked_event_id = excluded.linked_event_id`,
           [id, userId, deckSubjectId, deckTitle, linked_event_id, cloud_url],
           function (insertErr) {
             if (insertErr) {

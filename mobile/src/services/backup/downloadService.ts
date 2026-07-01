@@ -410,13 +410,37 @@ export const downloadCloudItems = async (
           }
 
           // Verificar si ya existe localmente
-          const existing = await databaseService.getDb().getFirstAsync(
-            'SELECT id FROM flashcard_decks WHERE id = ?', [deck.id]
+          const existing = await databaseService.getDb().getFirstAsync<{ id: string; linked_event_id: string | null }>(
+            'SELECT id, linked_event_id FROM flashcard_decks WHERE id = ?', [deck.id]
           );
           if (existing) {
+            // Si el backup tiene un linked_event_id diferente, actualizarlo
+            if (deck.linked_event_id && deck.linked_event_id !== existing.linked_event_id) {
+              await databaseService.getDb().runAsync(
+                `UPDATE flashcard_decks SET linked_event_id = ?, updated_at = datetime('now') WHERE id = ?`,
+                [deck.linked_event_id, deck.id]
+              );
+              console.log(`[DownloadService] Mazo ${deck.id}: linked_event_id actualizado (${existing.linked_event_id} → ${deck.linked_event_id})`);
+            }
             console.log(`[DownloadService] Mazo ${deck.id} ya existe localmente → skip`);
             result.skipped++;
             return;
+          }
+
+          // Restaurar subject asociado si viene incluido en el payload
+          if (deck.subject_id && payload.subject) {
+            try {
+              const subjectCols = Object.keys(payload.subject).filter(k => payload.subject[k] !== undefined);
+              const subjectVals = subjectCols.map(k => payload.subject[k]);
+              const subjectPhs = subjectCols.map(() => '?').join(', ');
+              await databaseService.getDb().runAsync(
+                `INSERT OR IGNORE INTO subjects (${subjectCols.join(', ')})
+                 VALUES (${subjectPhs})`,
+                ...subjectVals
+              );
+            } catch (subjErr) {
+              console.warn(`[DownloadService] Mazo ${deck.id}: error al restaurar subject:`, subjErr);
+            }
           }
 
           // UPSERT del mazo con todos sus campos incl. linked_event_id y métricas

@@ -1096,7 +1096,13 @@ export const runBackup = async (
     tasks.push(async () => {
       try {
         const deckCards = (pending.flashcards || []).filter(c => c.deck_id === deck.id);
-        const deckPayload = JSON.stringify({ deck, cards: deckCards }, null, 2);
+        let subjectData = null;
+        if (deck.subject_id) {
+          try {
+            subjectData = await db.getFirstAsync('SELECT * FROM subjects WHERE id = ?', [deck.subject_id]);
+          } catch {}
+        }
+        const deckPayload = JSON.stringify({ deck, cards: deckCards, subject: subjectData }, null, 2);
         const tempUri = `${FileSystem.cacheDirectory}flashcard_deck_${deck.id}.json`;
         await FileSystem.writeAsStringAsync(tempUri, deckPayload, { encoding: FileSystem.EncodingType.UTF8 });
         const uploadResult = await uploadFileToUploadthing(tempUri, `flashcard_deck_${deck.id}.json`, 'application/json');

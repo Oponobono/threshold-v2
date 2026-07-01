@@ -203,7 +203,7 @@ function sanitizeObject(obj) {
 }
 
 exports.createFlashcardDeck = (req, res) => {
-  const { id: clientId, subject_id, title, description } = req.body;
+  const { id: clientId, subject_id, title, description, linked_event_id } = req.body;
   const userId = req.user.id;
   
   if (!title) return res.status(400).json({ error: 'Faltan campos requeridos (title).' });
@@ -221,9 +221,9 @@ exports.createFlashcardDeck = (req, res) => {
 
   // UPSERT: si el mazo ya existe (por ej. re-sync tras añadir tarjetas), actualiza en lugar de fallar
   db.run(
-    `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, title = excluded.title, description = excluded.description`,
-    [deckId, subject_id || null, userId, safeTitle, safeDescription || ''],
+    `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, linked_event_id) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, title = excluded.title, description = excluded.description, linked_event_id = excluded.linked_event_id`,
+    [deckId, subject_id || null, userId, safeTitle, safeDescription || '', linked_event_id ?? null],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       console.log(`[CreateDeck] Mazo creado/actualizado: ID=${deckId}, user_id=${userId}, title=${safeTitle}`);

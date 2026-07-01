@@ -70,9 +70,13 @@ export class UserRepository extends BaseRepository<User> {
   }
 
   async saveProfile(profile: UserProfile): Promise<void> {
+    const existing = await this.getCurrentUser();
+    const { storageService } = await import('../../storageService');
+    const token = existing?.token || await storageService.getSecure('jwt_token') || '';
     await this.upsert({
       id: profile.id,
       email: profile.email,
+      token,
       name: profile.name ?? undefined,
       lastname: profile.lastname,
       username: profile.username,
