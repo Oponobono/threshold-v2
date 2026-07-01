@@ -1104,6 +1104,34 @@ const tableSchema = {
       )
     `
   },
+  ai_chats: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS ai_chats (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
+        role VARCHAR(20) NOT NULL,
+        content TEXT NOT NULL,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS ai_chats (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT REFERENCES subjects(id) ON DELETE CASCADE,
+        role VARCHAR(20) NOT NULL,
+        content TEXT NOT NULL,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+  },
   ai_chat_sessions: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS ai_chat_sessions (
