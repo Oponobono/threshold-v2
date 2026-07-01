@@ -401,7 +401,7 @@ export const downloadCloudItems = async (
             result.errors++;
             return;
           }
-          const payload = await res.json() as { deck: any; cards: any[] };
+          const payload = await res.json() as { deck: any; cards: any[]; subject?: any };
           const { deck, cards = [] } = payload;
           if (!deck?.id) {
             console.log(`[DownloadService] Item ${item.id}: payload sin deck.id → skip`);

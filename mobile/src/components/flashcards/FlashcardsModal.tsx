@@ -189,12 +189,25 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
 
   const loadDecks = async () => {
     try {
-      const data = await getFlashcardDecksWithMetrics();
       const { getLocalDecksForCurrentUser } = await import('../../services/localFlashcardService');
-      const localDecks = getLocalDecksForCurrentUser(await getUserId());
+      const userId = await getUserId();
+      const localDecks = getLocalDecksForCurrentUser(userId);
 
-      // Hydrate API data with linked_event_id from local SQLite (API doesn't return it)
+      // Phase 1: Local Cache (Instant)
       const sqliteDecks = await flashcardDeckRepository.getAll();
+      const localIds = new Set(localDecks.map((ld: any) => String(ld.id)));
+      
+      const filteredSqlite = sqliteDecks.filter((d: any) => !localIds.has(String(d.id)));
+      const mergedLocal = [...filteredSqlite, ...localDecks] as FlashcardDeck[];
+      if (mergedLocal.length > 0) {
+        const enrichedLocal = await enrichWithExamInfo(mergedLocal);
+        setDecks(enrichedLocal);
+      }
+
+      // Phase 2: Network Sync (Slow)
+      const data = await getFlashcardDecksWithMetrics();
+      
+      // Hydrate API data with linked_event_id from local SQLite (API doesn't return it)
       const sqliteLinkedEventMap = new Map(
         sqliteDecks
           .filter((d: any) => d.linked_event_id)
@@ -205,9 +218,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
         return localLinked && !d.linked_event_id ? { ...d, linked_event_id: localLinked } : d;
       });
 
-      const localIds = new Set(localDecks.map((ld: any) => String(ld.id)));
       const filteredData = hydratedData.filter((d: any) => !localIds.has(String(d.id)));
-
       const merged = [...filteredData, ...localDecks] as FlashcardDeck[];
       const enriched = await enrichWithExamInfo(merged);
       setDecks(enriched);

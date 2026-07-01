@@ -283,20 +283,27 @@ export function useFlashcards() {
         try {
           const userId = await getUserId();
           setCurrentUserId(userId ? String(userId) : null);
+          
+          // Fire loadDecks immediately to trigger Phase 1 (instant cache load)
+          const loadDecksPromise = loadDecks();
+
           const subs = await getSubjects();
           setSubjects(subs || []);
-          // Load groups
-          const userGroups = await getUserGroups();
-          const valid = (userGroups || []).filter((g: any) => g.group_pin_id);
-          setGroups(valid);
-          if (valid.length > 0 && !activeGroupPin) {
-            setActiveGroupPin(valid[0].group_pin_id);
-          }
+          
+          // Load groups (network call) without blocking
+          getUserGroups().then(userGroups => {
+            const valid = (userGroups || []).filter((g: any) => g.group_pin_id);
+            setGroups(valid);
+            // Only set active group if there's none and valid groups exist
+            setActiveGroupPin(prev => prev || (valid.length > 0 ? valid[0].group_pin_id : null));
+          }).catch(e => console.warn('Error loading groups:', e));
+
+          await loadDecksPromise;
         } catch (e) {
-          console.warn('Error loading subjects:', e);
+          console.warn('Error initializing flashcards:', e);
         }
-        await loadDecks();
       });
+
       return () => {
         task.cancel();
         cancelAllDueDeckNotifications();
