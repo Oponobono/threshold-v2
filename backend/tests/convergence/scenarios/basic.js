@@ -342,6 +342,71 @@ async function scenarioInitialSync(env) {
   return a.report();
 }
 
+async function scenarioAudioTranscriptReplication(env) {
+  const A = await env.createDevice('A');
+  const B = await env.createDevice('B');
+  const { v4: uuidv4 } = require('uuid');
+
+  const subjId = uuidv4();
+  const recId = uuidv4();
+  const transId = uuidv4();
+
+  // Device A: create subject + audio recording
+  await A.op('subject', 'CREATE', subjId, { name: 'Voice Notes', color: '#AA00AA' });
+  await A.op('audio-recording', 'CREATE', recId, {
+    user_id: env.userId,
+    name: 'Lecture Recording',
+    local_uri: '/tmp/test_audio/recording.m4a',
+    duration: 120,
+  });
+  await A.sync();
+
+  // Device A: create transcript linked to recording
+  await A.op('audio-transcript', 'CREATE', transId, {
+    recording_id: recId,
+    transcript_text: 'This is the lecture transcript content.',
+    summary_text: 'Lecture summary here.',
+  });
+  await A.sync();
+
+  // Device B: pull both recording + transcript
+  await B.sync();
+
+  const backend = await env.dumpBackend();
+  const dumpA = await A.dumpAll();
+  const dumpB = await B.dumpAll();
+
+  const assert = require('../ConvergenceAssert');
+  const a = new assert('011 — Audio transcript replication (A→B)');
+  a.equal(!!dumpA.subjects.find(s => s.id === subjId), true, 'A has subject');
+  a.equal(!!dumpA.audio_recordings.find(s => s.id === recId), true, 'A has recording');
+  a.equal(!!dumpA.audio_transcripts.find(s => s.id === transId), true, 'A has transcript');
+  a.equal(!!dumpB.audio_recordings.find(s => s.id === recId), true, 'B has recording');
+  a.equal(!!dumpB.audio_transcripts.find(s => s.id === transId), true, 'B has transcript');
+
+  // FK integrity: transcript points to recording
+  const transA = dumpA.audio_transcripts.find(s => s.id === transId);
+  a.equal(transA?.recording_id, recId, 'transcript.recording_id matches recording.id (A)');
+  const transB = dumpB.audio_transcripts.find(s => s.id === transId);
+  a.equal(transB?.recording_id, recId, 'transcript.recording_id matches recording.id (B)');
+
+  // Content equality
+  a.equal(transA?.transcript_text, 'This is the lecture transcript content.', 'A transcript_text correct');
+  a.equal(transB?.transcript_text, 'This is the lecture transcript content.', 'B transcript_text correct');
+
+  // Backend convergence
+  const transBack = backend.audio_transcripts.find(s => s.id === transId);
+  a.equal(transBack?.transcript_text, 'This is the lecture transcript content.', 'Backend transcript correct');
+  a.deepEqual(
+    transA, transBack, 'transcript A=backend'
+  );
+
+  a.noQueue(dumpA.sync_queue, 'A');
+  a.noQueue(dumpB.sync_queue, 'B');
+  await A.destroy(); await B.destroy();
+  return a.report();
+}
+
 module.exports = {
   scenarioCreate,
   scenarioUpdate,
@@ -353,4 +418,5 @@ module.exports = {
   scenarioStaleClientRejected,
   scenarioFlashcardDeckWithCards,
   scenarioInitialSync,
+  scenarioAudioTranscriptReplication,
 };

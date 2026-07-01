@@ -13,7 +13,8 @@ const TABLES = [
   'assessments', 'assessment_categories', 'schedules',
   'calendar_events', 'grading_periods', 'lms_accounts',
   'subject_threshold_overrides', 'study_sessions',
-  'photos', 'audio_recordings', 'scanned_documents',
+  'photos', 'audio_recordings', 'audio_transcripts', 'scanned_documents',
+  'youtube_videos', 'youtube_transcripts',
 ];
 
 const FK_RULES = [
@@ -30,6 +31,8 @@ const FK_RULES = [
   { child: 'photos', childKey: 'subject_id', parent: 'subjects', parentKey: 'id', nullable: true },
   { child: 'audio_recordings', childKey: 'subject_id', parent: 'subjects', parentKey: 'id', nullable: true },
   { child: 'scanned_documents', childKey: 'subject_id', parent: 'subjects', parentKey: 'id', nullable: true },
+  { child: 'audio_transcripts', childKey: 'recording_id', parent: 'audio_recordings', parentKey: 'id', nullable: false },
+  { child: 'youtube_transcripts', childKey: 'video_id', parent: 'youtube_videos', parentKey: 'id', nullable: false },
 ];
 
 class ConsistencyReport {

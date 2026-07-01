@@ -21,6 +21,28 @@
 ## Principio Rector
 "Si no puedes observar una sincronización, no puedes confiar en ella."
 
+## Definiciones
+
+**Entidad persistente**: Existe en la base de datos. No necesariamente participa en sincronización. Ej: logs, analytics, cache.
+
+**Entidad sincronizable**: Cumple todos los invariantes del protocolo. Es una ciudadana de primera clase del Sync Engine.
+
+## Invariantes del Protocolo (Sync Entity Contract)
+1. Toda entidad sincronizable posee `user_id`.
+2. Toda entidad sincronizable posee `sync_version`.
+3. Toda mutación (CREATE/UPDATE) incrementa `sync_version`.
+4. Toda eliminación genera `deletion_version` en `sync_deletions`.
+5. Toda entidad participa en **Initial Sync**.
+6. Toda entidad participa en **Delta Sync**.
+7. Toda entidad participa en **Push** (endpoint + cola).
+8. Toda entidad participa en **Backup/Restore** (cuando aplique).
+9. Toda entidad aparece en el **Consistency Report**.
+10. Toda entidad está cubierta por la **Stress Suite** o por un **escenario específico** de convergencia.
+
+*Si una tabla rompe cualquiera de estas reglas, no es una entidad sincronizable. Es solo una tabla.*
+
+La incorporación de una nueva entidad sincronizable no se considera completa hasta que todos los invariantes sean verificables mediante pruebas automáticas (Convergence Suite, Stress Suite, Consistency Report).
+
 ## Progress
 ### Done
 - **[*NUEVO*] F12 — Double version bump corregido**: `BaseRepository.update()` ahora honra `version_number` explícito cuando se pasa. Sin él, auto-incrementa `COALESCE(version_number,0)+1` como antes. Elimina el doble salto que ocurría vía `ConflictResolver` + `update()`.
@@ -73,7 +95,7 @@
 - 🟢 **Stress Suite — RandomScenario** — 4 segmentes (normal/heavy_perturbations/offline/normal), ConsistencyReport final, tier runner integrado.
 - 🟢 **Consistency Report** — `ConsistencyReport.js` ejecutable post-suite: entidades (15 tablas B vs D0), integridad (FK orphans, duplicate PKs), colas (pending/failed), versiones (backend/device/max_table).
 - 🟢 **deletion_version — Fase 5 (Cleanup)**: Confirmado — **cero decisiones de sync dependen de `deleted_at`**.
-- 🔴 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. Falta integrar en SimulationEngine.
+- 🟢 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. **audio_transcripts** ya incrementa sync_version correctamente. Convergence Suite + Stress Suite verifican integridad.
 
 ### Next Up
 - 🟢 **Sync Protocol v1.0 document**: `SYNC_PROTOCOL.md` — created and frozen.
@@ -111,6 +133,11 @@
 - La cola original no se modifica; la reducida se genera nueva. Si falla, la original permanece intacta.
 - `sync_queue` debe evolucionar a Event Store con traceId, version, dependsOn, retry, createdAt.
 
+### Regla del Protocolo: Toda entidad sincronizable debe incrementar sync_version
+- El bug `upsertAudioTranscript` demostró que la regla "toda escritura incrementa sync_version" es fácil de olvidar.
+- **Solución propuesta**: Centralizar en un helper único `upsertSyncEntity()` que ejecute INSERT/UPDATE + incrementSyncVersion + devolución de datos. Ningún controller nuevo debe llamar `incrementSyncVersion` manualmente.
+- **Validación automática futura**: Registrar todas las entidades sincronizables en un `EntityRegistry` central (`subjects`, `courses`, `flashcard_decks`, `flashcards`, `assessments`, `schedules`, `calendar_events`, `grading_periods`, `lms_accounts`, `subject_threshold_overrides`, `photos`, `audio_recordings`, `audio_transcripts`, `scanned_documents`, `youtube_videos`, `youtube_transcripts`). Los tests de convergencia/stress verificarán que toda entidad registrada: (1) existe en delta sync query, (2) incrementa sync_version en cada CREATE/UPDATE, (3) aparece en initial sync.
+
 ### Decisiones previas (congeladas)
 - **Dual storage merge**: MMKV canonical for deck+cards; merge with SQLite at read time.
 - **Hybrid routing for OCR/PDF extraction**: `extractTextFromImageHybrid` / `extractTextFromPDFHybrid`.
@@ -121,8 +148,9 @@
 
 ## Next Steps
 1. ✅ **Stress Suite expansion** — RandomScenario (4 segmentos, Consistency Report) corriendo en tier runner (`node index.js random`).
-2. 🔴 **Assets pipeline** — integrar en SimulationEngine (upload/kill/resume/network-timeout/retry, dos dispositivos mismo hash).
-3. 🟡 **Dashboard de salud del Sync Engine** — Convergence Score, stress/consistency status, pending queue, failed journal, retry rate, avg/P95 sync timing.
+2. ✅ **Assets pipeline** — integrado en SimulationEngine + Convergence Suite + Stress Suite. **audio_transcripts** corrigió `incrementSyncVersion` faltante.
+3. 🟡 **EntityRegistry centralizado** — crear registro único de todas las entidades sincronizables para que tests verifiquen automáticamente: toda entidad existe en delta sync, incrementa sync_version, aparece en initial sync y consistency report.
+4. 🟡 **Dashboard de salud del Sync Engine** — Convergence Score, stress/consistency status, pending queue, failed journal, retry rate, avg/P95 sync timing.
 4. ✅ **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen.
 5. 🟡 **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
 6. 🟡 **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
@@ -138,6 +166,7 @@
 - **Device Tier RAM disponible vs total**: Usaba RAM disponible (fluctuante) para clasificar. Ahora usa RAM total (estable).
 - **Verificación Dashboard**: renderiza 3 veces en dev (StrictMode 2 mounts + refreshProfile). No hay duplicación de requests de red.
 - **Flujo Bootstrap**: `Database → Storage → Network (338ms) → Auth → Sync → Momentum → Ready`.
+- **`upsertAudioTranscript` sin incrementSyncVersion**: El endpoint `POST /api/audio-transcripts` hacía INSERT/UPDATE en `audio_transcripts` pero nunca llamaba a `incrementSyncVersion`. Esto significaba que transcripciones de audio se guardaban en backend pero **nunca llegaban a otros dispositivos vía delta sync**. **CORREGIDO** — agregado `incrementSyncVersion('audio_transcripts', id)` en ambos paths (INSERT y UPDATE). Hallazgo de la Convergence Suite vía `audio-transcript` generator + Consistency Report.
 
 ## Relevant Files
 ### Session Actual (App Initialization)
@@ -239,7 +268,7 @@
 - `backend/controllers/calendarEventsController.js` — incrementSyncVersion + recordDeletion
 - `backend/controllers/settingsController.js` — incrementSyncVersion + recordDeletion (grading_periods, lms_accounts, threshold_overrides)
 - `backend/controllers/galleryController.js` — incrementSyncVersion + recordDeletion (photos)
-- `backend/controllers/audioController.js` — incrementSyncVersion + recordDeletion (audio_recordings)
+- `backend/controllers/audioController.js` — incrementSyncVersion + recordDeletion (audio_recordings, audio_transcripts)
 - `backend/controllers/scannedDocumentsController.js` — incrementSyncVersion + recordDeletion (scanned_documents)
 
 ### Data Layer

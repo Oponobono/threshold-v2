@@ -15,6 +15,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearAllMediaProgress } from '../services/media/mediaProgress';
 
 // Prefijos y claves MMKV que son globales al dispositivo (sin userId)
 // y deben borrarse al cambiar de sesión.
@@ -28,9 +29,9 @@ const MMKV_KEYS_TO_DELETE = [
 // Prefijos de claves MMKV que usan IDs dinámicos (deckId, subjectId, etc.)
 // Se detectan enumerando todas las claves con startsWith.
 const MMKV_PREFIXES_TO_DELETE = [
-  'cache:',                // Cubre TODA la caché de MMKV (flashcards, settings, IA, chat_history)
-  'api_cache_/',           // caché HTTP genérico del cliente
-  'app:cache:',            // cachés de predicciones, GPA, etc.
+  'cache:',
+  'api_cache_/',
+  'app:cache:',
 ];
 
 // Claves AsyncStorage a borrar en logout (además de las que ya borra signOut)
@@ -115,9 +116,8 @@ async function clearAsyncStorageUserData(): Promise<void> {
  * de usuario. Debe llamarse ANTES de redirigir a /login.
  */
 export async function clearAllUserData(): Promise<void> {
-  // MMKV es síncrono — ejecutar primero
   clearMMKVUserData();
-  // AsyncStorage es async
+  clearAllMediaProgress();
   await clearAsyncStorageUserData();
   console.log('[SessionClear] ✅ Todos los datos de usuario limpiados del dispositivo');
 }

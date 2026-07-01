@@ -29,6 +29,7 @@ exports.initialSync = (req, res) => {
     study_sessions: `SELECT * FROM study_sessions WHERE user_id = ?`,
     photos: `SELECT * FROM photos WHERE user_id = ?`,
     audioRecordings: `SELECT * FROM audio_recordings WHERE user_id = ?`,
+    audioTranscripts: `SELECT * FROM audio_transcripts WHERE user_id = ?`,
     scannedDocuments: `SELECT * FROM scanned_documents WHERE user_id = ?`,
   };
 
@@ -65,10 +66,11 @@ exports.initialSync = (req, res) => {
     runQuery(queries.study_sessions),
     runQuery(queries.photos),
     runQuery(queries.audioRecordings),
+    runQuery(queries.audioTranscripts),
     runQuery(queries.scannedDocuments),
     getCurrentSyncVersion(),
   ])
-    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, scannedDocuments, syncVersion]) => {
+    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, syncVersion]) => {
       const flashcards = [];
       for (const deck of flashcardDecks) {
         const cards = await new Promise((resolve) => {
@@ -100,6 +102,7 @@ exports.initialSync = (req, res) => {
           study_sessions: studySessions,
           photos,
           audio_recordings: audioRecordings,
+          audio_transcripts: audioTranscripts,
           scanned_documents: scannedDocuments,
         },
       });
@@ -116,7 +119,7 @@ exports.deltaSync = (req, res) => {
   const traceId = req.headers['x-trace-id'] || null;
   if (traceId) console.log(`[SyncController][${traceId}] deltaSync started — version=${version}`);
 
-  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'flashcards', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'photos', 'audio_recordings', 'scanned_documents'];
+  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'flashcards', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'photos', 'audio_recordings', 'audio_transcripts', 'scanned_documents'];
   const specialTableQueries = {
     assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ?`,
   };

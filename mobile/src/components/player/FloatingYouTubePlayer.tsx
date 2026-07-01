@@ -1,42 +1,70 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Linking } from 'react-native';
-import YoutubeIframe from 'react-native-youtube-iframe';
+import YoutubeIframe, { YoutubeIframeRef } from 'react-native-youtube-iframe';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '../../store/usePlayerStore';
+import { MediaPlaybackService } from '../../services/media/MediaPlaybackService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PLAYER_WIDTH = SCREEN_WIDTH * 0.75;
-const PLAYER_HEIGHT = (PLAYER_WIDTH * 9) / 16; // 16:9 aspect ratio
+const PLAYER_HEIGHT = (PLAYER_WIDTH * 9) / 16;
 
 export const FloatingYouTubePlayer = () => {
-  const { videoId, isVisible, isPlaying, setPlaying, closePlayer, onVideoEnd, videoTitle, setVideoTitle } = usePlayerStore();
+  const {
+    provider, mediaId, listId, isVisible, isPlaying,
+    setPlaying, closePlayer, onVideoEnd,
+    mediaTitle, setMediaTitle, courseId,
+  } = usePlayerStore();
+
+  const playerRef = useRef<YoutubeIframeRef>(null);
   const insets = useSafeAreaInsets();
 
-  // Fetch video metadata when videoId changes
-  React.useEffect(() => {
-    if (videoId) {
-      fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.title) {
-            setVideoTitle(data.title);
-          }
-        })
-        .catch(err => console.warn('Failed to fetch youtube metadata', err));
-    }
-  }, [videoId, setVideoTitle]);
+  useEffect(() => {
+    if (provider !== 'youtube' || !mediaId) return;
+    fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${mediaId}&format=json`)
+      .then(res => res.json())
+      .then(data => { if (data?.title) setMediaTitle(data.title); })
+      .catch(() => {});
+  }, [mediaId, provider, setMediaTitle]);
 
-  // Initialize off-screen; useEffect will position correctly once insets are available
   const translateX = useSharedValue(SCREEN_WIDTH - PLAYER_WIDTH - 20);
-  const translateY = useSharedValue(-PLAYER_HEIGHT - 100); // off-screen until positioned
+  const translateY = useSharedValue(-PLAYER_HEIGHT - 100);
 
-  // Set initial position after insets are available (avoids using hook values in shared value init)
   useEffect(() => {
     translateY.value = SCREEN_HEIGHT - PLAYER_HEIGHT - insets.bottom - 100;
   }, [insets.bottom]);
+
+  const captureCurrentVideo = useCallback(async () => {
+    if (!playerRef.current || !courseId || provider !== 'youtube') return;
+    try {
+      const url = await playerRef.current.getVideoUrl();
+      if (!url) return;
+      const match = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+      const currentId = match?.[1];
+      if (currentId) {
+        MediaPlaybackService.onMediaChanged(provider, courseId, currentId, listId);
+      }
+    } catch {}
+  }, [courseId, mediaId, listId, provider]);
+
+  const handleStateChange = useCallback((state: string) => {
+    if (state === 'playing') {
+      setPlaying(true);
+      captureCurrentVideo();
+    }
+    if (state === 'paused') {
+      setPlaying(false);
+      captureCurrentVideo();
+    }
+    if (state === 'ended') {
+      setPlaying(false);
+      captureCurrentVideo();
+      if (onVideoEnd) onVideoEnd();
+    }
+  }, [setPlaying, captureCurrentVideo, onVideoEnd]);
 
   const dragGesture = Gesture.Pan()
     .onChange((event) => {
@@ -46,94 +74,78 @@ export const FloatingYouTubePlayer = () => {
     })
     .onEnd(() => {
       'worklet';
-      // Snap to left or right edge
       const isLeft = translateX.value < (SCREEN_WIDTH - PLAYER_WIDTH) / 2;
-      translateX.value = withSpring(isLeft ? 20 : SCREEN_WIDTH - PLAYER_WIDTH - 20);
-
-      // Keep within vertical bounds
+      translateX.value = withSpring(isLeft ? 16 : SCREEN_WIDTH - PLAYER_WIDTH - 16, { damping: 18, stiffness: 180 });
       const minY = insets.top + 50;
       const maxY = SCREEN_HEIGHT - PLAYER_HEIGHT - insets.bottom - 80;
-
-      if (translateY.value < minY) {
-        translateY.value = withSpring(minY);
-      } else if (translateY.value > maxY) {
-        translateY.value = withSpring(maxY);
-      }
+      if (translateY.value < minY) translateY.value = withSpring(minY, { damping: 18 });
+      else if (translateY.value > maxY) translateY.value = withSpring(maxY, { damping: 18 });
     });
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-    ],
+    transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
   }));
 
-  const openExternally = async () => {
-    if (!videoId) return;
-    closePlayer(); // Cerramos el reproductor interno
-    
-    const nativeUrl = `vnd.youtube:${videoId}`;
-    const webUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    
-    try {
-      const canOpen = await Linking.canOpenURL(nativeUrl);
-      if (canOpen) {
-        await Linking.openURL(nativeUrl);
-      } else {
-        await Linking.openURL(webUrl);
-      }
-    } catch {
-      await Linking.openURL(webUrl);
-    }
-  };
+  const handleClose = useCallback(async () => {
+    await captureCurrentVideo();
+    closePlayer();
+  }, [captureCurrentVideo, closePlayer]);
 
-  if (!isVisible || !videoId) return null;
+  const openExternally = useCallback(async () => {
+    await captureCurrentVideo();
+    closePlayer();
+    if (provider) {
+      MediaPlaybackService.openExternally(provider, mediaId, listId);
+    }
+  }, [provider, mediaId, listId, captureCurrentVideo, closePlayer]);
+
+  if (!isVisible || provider !== 'youtube' || (!mediaId && !listId)) return null;
 
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
-      {/* Drag handle: only the bar area is draggable */}
+      <View style={styles.accentBar} />
+
       <GestureDetector gesture={dragGesture}>
-        <View style={styles.dragHandle}>
-          <Ionicons name="move" size={16} color="#ffffff80" />
-          <Text style={styles.dragTitle} numberOfLines={1}>
-            {videoTitle || 'YouTube'}
-          </Text>
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.badge}>
+              <Ionicons name="logo-youtube" size={11} color="#FF0000" />
+              <Text style={styles.badgeText}>YouTube</Text>
+            </View>
+            <Text style={styles.title} numberOfLines={1}>
+              {mediaTitle || (isPlaying ? 'Reproduciendo…' : 'En pausa')}
+            </Text>
+          </View>
+          <View style={styles.actions}>
+            <TouchableOpacity
+              onPress={openExternally}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={styles.iconBtn}
+            >
+              <Ionicons name="arrow-redo-outline" size={16} color="#A8A8AC" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={styles.iconBtn}
+            >
+              <Ionicons name="close" size={18} color="#A8A8AC" />
+            </TouchableOpacity>
+          </View>
         </View>
       </GestureDetector>
 
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          onPress={openExternally}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={styles.actionButton}
-        >
-          <Ionicons name="open-outline" size={18} color="#fff" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          onPress={closePlayer}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={styles.actionButton}
-        >
-          <Ionicons name="close-circle" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.playerWrapper}>
         <YoutubeIframe
+          ref={playerRef}
           height={PLAYER_HEIGHT}
           width={PLAYER_WIDTH}
           play={isPlaying}
-          videoId={videoId}
-          onChangeState={(state: string) => {
-            if (state === 'ended') {
-              setPlaying(false);
-              if (onVideoEnd) onVideoEnd();
-            }
-            if (state === 'playing') setPlaying(true);
-            if (state === 'paused') setPlaying(false);
-          }}
-          webViewStyle={{ opacity: 0.99 }} // prevents android WebView blank-screen bug
+          videoId={mediaId || undefined}
+          playList={!mediaId && listId ? listId : undefined}
+          initialPlayerParams={listId ? { list: listId, listType: 'playlist' } : undefined}
+          onChangeState={handleStateChange}
+          webViewStyle={{ opacity: 0.99 }}
         />
       </View>
     </Animated.View>
@@ -146,43 +158,68 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     width: PLAYER_WIDTH,
-    backgroundColor: '#000',
-    borderRadius: 12,
+    backgroundColor: '#141416',
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 10,
+    elevation: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
     zIndex: 99999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
   },
-  dragHandle: {
-    height: 32,
-    backgroundColor: '#1a1a1a',
+  accentBar: {
+    height: 2,
+    backgroundColor: '#C5A059',
+    width: '100%',
+  },
+  header: {
+    height: 46,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingHorizontal: 12,
+    backgroundColor: '#1C1C1F',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  dragTitle: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+  headerContent: {
     flex: 1,
-    marginLeft: 8,
-    marginRight: 60, // Space for absolute buttons
+    gap: 2,
+    overflow: 'hidden',
   },
-  actionsContainer: {
-    position: 'absolute',
-    top: 4,
-    right: 8,
-    zIndex: 100000, // above drag handle and video
+  badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 4,
   },
-  actionButton: {
-    // optional styling for hit slop space
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    color: '#FF0000',
+    textTransform: 'uppercase',
+  },
+  title: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#F5F5F0',
+    letterSpacing: 0.1,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 8,
+  },
+  iconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   playerWrapper: {
     width: PLAYER_WIDTH,

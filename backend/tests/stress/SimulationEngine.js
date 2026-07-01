@@ -31,6 +31,13 @@ function generateDeviceNames(count) {
   return Array.from({ length: count }, (_, i) => String.fromCharCode(65 + i));
 }
 
+const UPDATE_GENERATORS = {
+  'photo': (rng) => ({
+    ocr_text: pick(rng, ['Extracted text from whiteboard', 'Notes from lecture', 'Diagram explanation', 'Formula derivation', 'Lab results summary', 'Book excerpt', 'Handwritten notes']),
+    es_favorita: pick(rng, [0, 1]),
+  }),
+};
+
 const ENTITY_GENERATORS = {
   subject: {
     generate: (rng) => ({
@@ -81,9 +88,9 @@ const ENTITY_GENERATORS = {
     }),
   },
   photo: {
-    generate: (rng) => ({
+    generate: (rng, subjectId) => ({
       name: pick(rng, ['Screenshot', 'Whiteboard', 'Diagram', 'Notes Page', 'Graph', 'Chart', 'Formula Sheet', 'Mind Map']),
-      subject_id: '00000000-0000-0000-0000-000000000000',
+      subject_id: subjectId || '00000000-0000-0000-0000-000000000000',
       local_uri: `/tmp/test_photos/${rng().toString(36).slice(2, 8)}.jpg`,
     }),
   },
@@ -91,6 +98,20 @@ const ENTITY_GENERATORS = {
     generate: (rng) => ({
       name: pick(rng, ['Lecture', 'Discussion', 'Explanation', 'Review', 'Q&A Session', 'Summary', 'Tutorial']),
       local_uri: `/tmp/test_audio/${rng().toString(36).slice(2, 8)}.m4a`,
+    }),
+  },
+  'audio-transcript': {
+    generate: (rng, recordingId) => ({
+      recording_id: recordingId,
+      transcript_text: pick(rng, [
+        'En esta lección aprendimos sobre los fundamentos de la termodinámica...',
+        'La derivada de una función representa la tasa de cambio instantánea...',
+        'La fotosíntesis convierte la energía luminosa en energía química...',
+        'La Segunda Guerra Mundial comenzó en 1939 con la invasión de Polonia...',
+        'La entropía es una medida del desorden en un sistema termodinámico...',
+        'El teorema de Pitágoras establece que a² + b² = c²...',
+        'La estructura de datos de lista enlazada permite inserción y eliminación eficientes...',
+      ]),
     }),
   },
   'scanned-document': {
@@ -102,7 +123,7 @@ const ENTITY_GENERATORS = {
   },
 };
 
-const ENTITY_TYPES = Object.keys(ENTITY_GENERATORS);
+const ENTITY_TYPES = Object.keys(ENTITY_GENERATORS).filter(t => t !== 'audio-transcript'); // audio-transcript is created only via dependency, no independent UPDATE/DELETE
 
 const DEFAULT_WEIGHTS = {
   'create-subject': 10,
@@ -111,6 +132,7 @@ const DEFAULT_WEIGHTS = {
   'create-flashcard': 7,
   'create-photo': 5,
   'create-audio-recording': 4,
+  'create-audio-transcript': 3,
   'create-scanned-document': 4,
   'update': 16,
   'delete': 10,
@@ -133,6 +155,7 @@ const LIGHT_WEIGHTS = {
   'create-flashcard': 8,
   'create-photo': 4,
   'create-audio-recording': 3,
+  'create-audio-transcript': 2,
   'create-scanned-document': 3,
   'update': 18,
   'delete': 14,
@@ -235,8 +258,13 @@ class RandomOperationGenerator {
         return { device, operation: 'delete', entityType, id, data: null, meta: {} };
       }
 
-      const gen = ENTITY_GENERATORS[entityType];
-      const data = gen.generate(this.rng);
+      let data;
+      if (UPDATE_GENERATORS[entityType]) {
+        data = UPDATE_GENERATORS[entityType](this.rng);
+      } else {
+        const gen = ENTITY_GENERATORS[entityType];
+        data = gen.generate(this.rng);
+      }
       return { device, operation: 'update', entityType, id, data, meta: {} };
     }
 
@@ -264,6 +292,7 @@ class RandomOperationGenerator {
       'create-flashcard': 'flashcard',
       'create-photo': 'photo',
       'create-audio-recording': 'audio-recording',
+      'create-audio-transcript': 'audio-transcript',
       'create-scanned-document': 'scanned-document',
     };
     const entityType = OP_ENTITY[operation];
@@ -278,6 +307,16 @@ class RandomOperationGenerator {
       if (!deckIds || deckIds.size === 0) return this.next(deviceNames);
       const deckId = pick(this.rng, [...deckIds]);
       data = gen.generate(this.rng, deckId);
+    } else if (entityType === 'photo') {
+      const subjectIds = this._knownIds.get('subject');
+      if (!subjectIds || subjectIds.size === 0) return this.next(deviceNames);
+      const subjectId = pick(this.rng, [...subjectIds]);
+      data = gen.generate(this.rng, subjectId);
+    } else if (entityType === 'audio-transcript') {
+      const recordingIds = this._knownIds.get('audio-recording');
+      if (!recordingIds || recordingIds.size === 0) return this.next(deviceNames);
+      const recordingId = pick(this.rng, [...recordingIds]);
+      data = gen.generate(this.rng, recordingId);
     }
 
     return { device, operation: 'create', entityType, id, data, meta: {} };

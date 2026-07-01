@@ -1,36 +1,43 @@
 import { create } from 'zustand';
 
 interface PlayerState {
-  videoId: string | null;
+  provider: 'youtube' | 'vimeo' | 'other' | null;
+  mediaId: string | null;
+  listId: string | null;
   subjectId: string | null;
   courseId: string | null;
-  videoTitle: string | null;       // populated via YouTube oEmbed after load
+  mediaTitle: string | null;
   isVisible: boolean;
   isPlaying: boolean;
-  /** Called automatically when the video reaches 'ended' state */
   onVideoEnd?: () => void;
-  playVideo: (params: {
-    videoId: string;
+  playMedia: (params: {
+    provider: 'youtube' | 'vimeo' | 'other';
+    mediaId?: string | null;
+    listId?: string | null;
     subjectId?: string | null;
     courseId?: string | null;
     onVideoEnd?: () => void;
   }) => void;
+  setCurrentMediaId: (mediaId: string) => void;
   closePlayer: () => void;
   setPlaying: (isPlaying: boolean) => void;
-  setVideoTitle: (title: string) => void;
+  setMediaTitle: (title: string) => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set) => ({
-  videoId: null,
+  provider: null,
+  mediaId: null,
+  listId: null,
   subjectId: null,
   courseId: null,
-  videoTitle: null,
+  mediaTitle: null,
   isVisible: false,
   isPlaying: false,
   onVideoEnd: undefined,
-  playVideo: ({ videoId, subjectId = null, courseId = null, onVideoEnd }) =>
-    set({ videoId, subjectId, courseId, onVideoEnd, isVisible: true, isPlaying: true, videoTitle: null }),
-  closePlayer: () => set({ isVisible: false, videoId: null, subjectId: null, courseId: null, videoTitle: null, onVideoEnd: undefined, isPlaying: false }),
+  playMedia: ({ provider, mediaId = null, listId = null, subjectId = null, courseId = null, onVideoEnd }) =>
+    set({ provider, mediaId, listId, subjectId, courseId, onVideoEnd, isVisible: true, isPlaying: true, mediaTitle: null }),
+  setCurrentMediaId: (mediaId) => set({ mediaId, mediaTitle: null }),
+  closePlayer: () => set({ isVisible: false, provider: null, mediaId: null, listId: null, subjectId: null, courseId: null, mediaTitle: null, onVideoEnd: undefined, isPlaying: false }),
   setPlaying: (isPlaying) => set({ isPlaying }),
-  setVideoTitle: (title) => set({ videoTitle: title }),
+  setMediaTitle: (title) => set({ mediaTitle: title }),
 }));

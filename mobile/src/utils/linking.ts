@@ -1,6 +1,6 @@
 import { Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { usePlayerStore } from '../store/usePlayerStore';
+import { MediaPlaybackService } from '../services/media/MediaPlaybackService';
 
 /**
  * Esquemas nativos VERIFICADOS que sí existen en las apps.
@@ -86,29 +86,27 @@ const tryNativeOpen = async (url: string): Promise<boolean> => {
 export const openCourseLink = async (url: string, platform?: string, options?: { subjectId?: string | null, courseId?: string | null, onVideoEnd?: () => void }): Promise<void> => {
   if (!url) return;
 
-  // Normalizar nombre de plataforma (por campo o por dominio de la URL)
+  // Normalizar nombre de plataforma (case-insensitive → title-case canónico)
+  const normalizePlatform = (p?: string | null): string | null => {
+    if (!p) return null;
+    const lower = p.toLowerCase();
+    if (lower === 'youtube') return 'YouTube';
+    // Capitalizar primera letra para el resto
+    return p.charAt(0).toUpperCase() + p.slice(1);
+  };
+
   const resolvedPlatform =
-    platform ||
+    normalizePlatform(platform) ||
     DOMAIN_TO_PLATFORM[extractDomain(url)] ||
     null;
 
-  // Paso 1: YouTube in-app player (PiP)
-  if (resolvedPlatform === 'YouTube') {
-    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    if (match && match[1]) {
-      const videoId = match[1];
-      usePlayerStore.getState().playVideo({
-        videoId,
-        subjectId: options?.subjectId,
-        courseId: options?.courseId,
-        onVideoEnd: options?.onVideoEnd
-      });
-      console.log(`[Linking] Abriendo YouTube in-app player para videoId: ${videoId}`);
-      return;
-    }
+  // Paso 1: Intentar manejar como Media Playback In-App (YouTube, etc)
+  const isHandledByMediaService = await MediaPlaybackService.handleUrl(url, options);
+  if (isHandledByMediaService) {
+    return;
   }
 
-  // Paso 2: esquema nativo custom (solo para plataformas confirmadas)
+  // Paso 2: esquema nativo custom (solo para plataformas confirmadas).
   if (resolvedPlatform) {
     const resolver = NATIVE_SCHEME_RESOLVERS[resolvedPlatform];
     if (resolver) {
@@ -119,7 +117,6 @@ export const openCourseLink = async (url: string, platform?: string, options?: {
           console.log(`[Linking] Abierto con esquema nativo: ${nativeUrl}`);
           return;
         }
-        // Si el esquema nativo falla (app no instalada), continúa al paso 3
         console.log(`[Linking] Esquema nativo no disponible, usando URL web: ${url}`);
       }
     }

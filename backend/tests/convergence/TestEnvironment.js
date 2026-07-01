@@ -160,6 +160,7 @@ class TestEnvironment {
     app.post('/api/audio-recordings', authMw, audioController.createAudioRecording);
     app.put('/api/audio-recordings/:id', authMw, audioController.updateAudioRecording);
     app.delete('/api/audio-recordings/:id', authMw, audioController.deleteAudioRecording);
+    app.post('/api/audio-transcripts', authMw, audioController.upsertAudioTranscript);
 
     // Scanned document routes
     app.post('/api/scanned_documents', authMw, scannedDocumentsController.saveScannedDocument);
@@ -259,6 +260,7 @@ class TestEnvironment {
     app.post('/api/audio-recordings', authMw, audioController.createAudioRecording);
     app.put('/api/audio-recordings/:id', authMw, audioController.updateAudioRecording);
     app.delete('/api/audio-recordings/:id', authMw, audioController.deleteAudioRecording);
+    app.post('/api/audio-transcripts', authMw, audioController.upsertAudioTranscript);
     app.post('/api/scanned_documents', authMw, scannedDocumentsController.saveScannedDocument);
     app.put('/api/scanned_documents/:documentId', authMw, scannedDocumentsController.updateScannedDocument);
     app.delete('/api/scanned_documents/:documentId', authMw, scannedDocumentsController.deleteScannedDocument);
@@ -291,7 +293,11 @@ class TestEnvironment {
   async dumpBackend() {
     const tables = [
       'subjects', 'courses', 'flashcard_decks', 'flashcards',
-      'assessments', 'schedules', 'sync_deletions', 'sync_version',
+      'assessments', 'schedules', 'calendar_events',
+      'grading_periods', 'lms_accounts', 'subject_threshold_overrides',
+      'photos', 'audio_recordings', 'audio_transcripts', 'scanned_documents',
+      'youtube_videos', 'youtube_transcripts',
+      'sync_deletions', 'sync_version',
     ];
     const result = {};
     for (const t of tables) {
@@ -399,9 +405,12 @@ const TABLE_SCHEMAS = {
     UNIQUE(deck_id, shared_to_user_id)
   )`,
   photos: `CREATE TABLE IF NOT EXISTS photos (
-    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, local_uri TEXT,
-    created_at TEXT, cloud_url TEXT, is_backed_up INTEGER DEFAULT 0,
-    updated_at TEXT, sync_version INTEGER DEFAULT 0, deleted_at TEXT,
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT,
+    name TEXT, local_uri TEXT,
+    es_favorita INTEGER DEFAULT 0, ocr_text TEXT, tags TEXT, group_id TEXT,
+    cloud_url TEXT, is_backed_up INTEGER DEFAULT 0,
+    created_at TEXT, updated_at TEXT,
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT,
     version_number INTEGER DEFAULT 0
   )`,
   audio_recordings: `CREATE TABLE IF NOT EXISTS audio_recordings (
@@ -410,11 +419,51 @@ const TABLE_SCHEMAS = {
     is_backed_up INTEGER DEFAULT 0, updated_at TEXT,
     sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
   )`,
+  audio_transcripts: `CREATE TABLE IF NOT EXISTS audio_transcripts (
+    id TEXT PRIMARY KEY,
+    recording_id TEXT NOT NULL,
+    user_id TEXT,
+    transcript_uri TEXT,
+    transcript_text TEXT,
+    summary_uri TEXT,
+    summary_text TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    cloud_url TEXT,
+    is_backed_up INTEGER DEFAULT 0,
+    sync_version INTEGER DEFAULT 0,
+    deleted_at TEXT,
+    version_number INTEGER DEFAULT 0,
+    FOREIGN KEY (recording_id) REFERENCES audio_recordings(id) ON DELETE CASCADE
+  )`,
   scanned_documents: `CREATE TABLE IF NOT EXISTS scanned_documents (
     id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, name TEXT,
-    file_path TEXT, cloud_url TEXT, is_backed_up INTEGER DEFAULT 0,
+    file_path TEXT, local_uri TEXT, ocr_text TEXT,
+    cloud_url TEXT, is_backed_up INTEGER DEFAULT 0,
     created_at TEXT, updated_at TEXT,
     sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  youtube_videos: `CREATE TABLE IF NOT EXISTS youtube_videos (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    subject_id TEXT,
+    youtube_url TEXT NOT NULL,
+    video_id TEXT NOT NULL,
+    title TEXT,
+    thumbnail_url TEXT,
+    duration INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  youtube_transcripts: `CREATE TABLE IF NOT EXISTS youtube_transcripts (
+    id TEXT PRIMARY KEY,
+    video_id TEXT NOT NULL UNIQUE,
+    transcript_uri TEXT,
+    transcript_text TEXT,
+    summary_uri TEXT,
+    summary_text TEXT,
+    cloud_url TEXT,
+    is_backed_up INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (video_id) REFERENCES youtube_videos(id) ON DELETE CASCADE
   )`,
 };
 

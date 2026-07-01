@@ -429,6 +429,7 @@ const tableSchema = {
       CREATE TABLE IF NOT EXISTS audio_transcripts (
         id TEXT PRIMARY KEY,
         recording_id TEXT NOT NULL,
+        user_id TEXT,
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
@@ -436,6 +437,9 @@ const tableSchema = {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
+        sync_version INTEGER DEFAULT 0,
+        deleted_at TEXT,
+        version_number INTEGER DEFAULT 0,
         FOREIGN KEY (recording_id) REFERENCES audio_recordings(id) ON DELETE CASCADE
       )
     `,
@@ -443,13 +447,17 @@ const tableSchema = {
       CREATE TABLE IF NOT EXISTS audio_transcripts (
         id TEXT PRIMARY KEY,
         recording_id TEXT NOT NULL REFERENCES audio_recordings(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id),
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
         summary_text TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         cloud_url TEXT,
-        is_backed_up INTEGER DEFAULT 0
+        is_backed_up INTEGER DEFAULT 0,
+        sync_version INTEGER DEFAULT 0,
+        deleted_at TIMESTAMP,
+        version_number INTEGER DEFAULT 0
       )
     `,
     columns: [
@@ -457,6 +465,9 @@ const tableSchema = {
       { name: 'summary_text', type: 'TEXT' },
       { name: 'cloud_url', type: 'TEXT' },
       { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'deleted_at', type: 'TEXT' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 0' },
     ]
   },
   youtube_videos: {

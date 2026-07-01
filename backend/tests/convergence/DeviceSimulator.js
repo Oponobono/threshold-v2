@@ -8,7 +8,8 @@ const SYNCABLE_TABLES = [
   'assessments', 'assessment_categories', 'schedules',
   'calendar_events', 'grading_periods', 'lms_accounts',
   'subject_threshold_overrides', 'study_sessions',
-  'photos', 'audio_recordings', 'scanned_documents',
+  'photos', 'audio_recordings', 'audio_transcripts', 'scanned_documents',
+  'youtube_videos', 'youtube_transcripts',
 ];
 
 const TABLE_DEFS = {
@@ -65,6 +66,7 @@ const TABLE_DEFS = {
   photos: `CREATE TABLE IF NOT EXISTS photos (
     id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, name TEXT,
     local_uri TEXT, tags TEXT, es_favorita INTEGER DEFAULT 0,
+    ocr_text TEXT, group_id TEXT,
     cloud_url TEXT, is_backed_up INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
@@ -79,6 +81,45 @@ const TABLE_DEFS = {
     updated_at TEXT DEFAULT (datetime('now')),
     sync_version INTEGER DEFAULT 0, deleted_at TEXT,
     version_number INTEGER DEFAULT 0
+  )`,
+  youtube_videos: `CREATE TABLE IF NOT EXISTS youtube_videos (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    subject_id TEXT,
+    youtube_url TEXT NOT NULL,
+    video_id TEXT NOT NULL,
+    title TEXT,
+    thumbnail_url TEXT,
+    duration INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  youtube_transcripts: `CREATE TABLE IF NOT EXISTS youtube_transcripts (
+    id TEXT PRIMARY KEY,
+    video_id TEXT NOT NULL UNIQUE,
+    transcript_uri TEXT,
+    transcript_text TEXT,
+    summary_uri TEXT,
+    summary_text TEXT,
+    cloud_url TEXT,
+    is_backed_up INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (video_id) REFERENCES youtube_videos(id) ON DELETE CASCADE
+  )`,
+  audio_transcripts: `CREATE TABLE IF NOT EXISTS audio_transcripts (
+    id TEXT PRIMARY KEY,
+    recording_id TEXT NOT NULL,
+    user_id TEXT,
+    transcript_uri TEXT,
+    transcript_text TEXT,
+    summary_uri TEXT,
+    summary_text TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    cloud_url TEXT,
+    is_backed_up INTEGER DEFAULT 0,
+    sync_version INTEGER DEFAULT 0,
+    deleted_at TEXT,
+    version_number INTEGER DEFAULT 0,
+    FOREIGN KEY (recording_id) REFERENCES audio_recordings(id) ON DELETE CASCADE
   )`,
   scanned_documents: `CREATE TABLE IF NOT EXISTS scanned_documents (
     id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, name TEXT,
@@ -113,6 +154,7 @@ const ENTITY_MAP = {
   'calendar-event': { table: 'calendar_events', path: '/calendar/events' },
   photo: { table: 'photos', path: '/photos' },
   'audio-recording': { table: 'audio_recordings', path: '/audio-recordings' },
+  'audio-transcript': { table: 'audio_transcripts', path: '/audio-transcripts' },
   'scanned-document': { table: 'scanned_documents', path: '/scanned_documents' },
 };
 
@@ -405,7 +447,9 @@ class DeviceSimulator {
             lms_accounts: 'lms_accounts',
             subject_threshold_overrides: 'subject_threshold_overrides',
             study_sessions: 'study_sessions', photos: 'photos',
-            audio_recordings: 'audio_recordings', scanned_documents: 'scanned_documents',
+            audio_recordings: 'audio_recordings', audio_transcripts: 'audio_transcripts',
+            scanned_documents: 'scanned_documents',
+            youtube_videos: 'youtube_videos', youtube_transcripts: 'youtube_transcripts',
           }[key];
           if (table && Array.isArray(entities)) {
             for (const e of entities) if (e && e.id) await this._upsertLocal(table, e);
@@ -425,7 +469,9 @@ class DeviceSimulator {
             lms_accounts: 'lms_accounts',
             subject_threshold_overrides: 'subject_threshold_overrides',
             study_sessions: 'study_sessions', photos: 'photos',
-            audio_recordings: 'audio_recordings', scanned_documents: 'scanned_documents',
+            audio_recordings: 'audio_recordings', audio_transcripts: 'audio_transcripts',
+            scanned_documents: 'scanned_documents',
+            youtube_videos: 'youtube_videos', youtube_transcripts: 'youtube_transcripts',
           }[d.entityType];
           if (t) await this._run(`DELETE FROM ${t} WHERE id = ?`, [d.entityId]);
         }

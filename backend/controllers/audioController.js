@@ -185,15 +185,20 @@ exports.deleteAudioRecording = (req, res) => {
  */
 exports.upsertAudioTranscript = (req, res) => {
   // Acepta transcript_text (texto inline) además de las URIs de archivo
-  const { id: clientId, recording_id, transcript_uri, transcript_text, summary_uri, summary_text } = req.body;
+  const { id: clientId, recording_id, user_id, transcript_uri, transcript_text, summary_uri, summary_text } = req.body;
   
   if (!recording_id) {
     return res.status(400).json({ error: 'Falta recording_id' });
   }
 
+  const authenticatedUserId = req.user.id;
+  if (user_id !== undefined && user_id !== null && String(user_id) !== String(authenticatedUserId)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   // Verify the recording exists on the server before inserting the transcript.
   // If not, return 409 Conflict so the client knows to defer and retry.
-  db.get(`SELECT id FROM audio_recordings WHERE id = ?`, [recording_id], (checkErr, recordingRow) => {
+  db.get(`SELECT id, user_id FROM audio_recordings WHERE id = ?`, [recording_id], (checkErr, recordingRow) => {
     if (checkErr) return res.status(500).json({ error: checkErr.message });
     if (!recordingRow) {
       return res.status(409).json({ 
@@ -201,6 +206,8 @@ exports.upsertAudioTranscript = (req, res) => {
         code: 'PARENT_NOT_SYNCED'
       });
     }
+
+  const ownerUserId = authenticatedUserId;
 
   db.get(`SELECT id FROM audio_transcripts WHERE recording_id = ?`, [recording_id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -236,17 +243,21 @@ exports.upsertAudioTranscript = (req, res) => {
       
       db.run(updateQuery, updateValues, function(updateErr) {
         if (updateErr) return res.status(500).json({ error: updateErr.message });
-        res.json({ success: true, id: row.id, action: 'updated' });
+        incrementSyncVersion('audio_transcripts', row.id, () => {
+          res.json({ success: true, id: row.id, action: 'updated' });
+        });
       });
     } else {
       const transcriptId = clientId || uuidv4();
       const insertQuery = `
-        INSERT INTO audio_transcripts (id, recording_id, transcript_uri, transcript_text, summary_uri, summary_text)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO audio_transcripts (id, recording_id, user_id, transcript_uri, transcript_text, summary_uri, summary_text)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
-      db.run(insertQuery, [transcriptId, recording_id, transcript_uri, transcript_text || null, summary_uri, summary_text || null], function(insertErr) {
+      db.run(insertQuery, [transcriptId, recording_id, ownerUserId, transcript_uri, transcript_text || null, summary_uri, summary_text || null], function(insertErr) {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
-        res.status(201).json({ success: true, id: transcriptId, action: 'created' });
+        incrementSyncVersion('audio_transcripts', transcriptId, () => {
+          res.status(201).json({ success: true, id: transcriptId, action: 'created' });
+        });
       });
     }
   });
