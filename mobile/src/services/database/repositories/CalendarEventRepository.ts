@@ -26,7 +26,8 @@ export class CalendarEventRepository extends BaseRepository<CalendarEvent> {
     const rows = await db.getAllAsync(`
       SELECT ce.*, s.name as subject_name 
       FROM calendar_events ce
-      LEFT JOIN subjects s ON ce.subject_id = s.id
+      LEFT JOIN subjects s ON ce.subject_id = s.id AND s.deleted_at IS NULL
+      WHERE ce.deleted_at IS NULL
     `);
     return (rows as any[]).map(row => this.mapRow(row));
   }
@@ -36,8 +37,8 @@ export class CalendarEventRepository extends BaseRepository<CalendarEvent> {
     const rows = await db.getAllAsync(`
       SELECT ce.*, s.name as subject_name 
       FROM calendar_events ce
-      LEFT JOIN subjects s ON ce.subject_id = s.id
-      WHERE ce.user_id = ?
+      LEFT JOIN subjects s ON ce.subject_id = s.id AND s.deleted_at IS NULL
+      WHERE ce.user_id = ? AND ce.deleted_at IS NULL
     `, userId);
     return (rows as any[]).map(row => this.mapRow(row));
   }

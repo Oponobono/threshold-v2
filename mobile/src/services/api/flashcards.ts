@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { FlashcardDeck, Flashcard, CardDirection } from './types';
 import { flashcardDeckRepository, flashcardRepository, syncService } from '../database';
+import { requireActiveSubject, requireActiveFlashcardDeck } from '../domain/invariants';
 
 export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
   // 1. Leer localmente primero
@@ -94,6 +95,10 @@ export const createFlashcardDeck = async (payload: { subject_id?: string; title:
   const id = (payload as any).id || uuidv4();
   const userId = await getUserId();
 
+  if (payload.subject_id) {
+    await requireActiveSubject(payload.subject_id);
+  }
+
   const deck: any = { id, user_id: userId, ...payload, card_count: payload.card_count ?? 0, created_at: new Date().toISOString() };
   await flashcardDeckRepository.create(deck);
 
@@ -145,7 +150,7 @@ const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
   if (!merged.subject_name && merged.subject_id) {
     try {
       const { databaseService } = await import('../database/DatabaseService');
-      const subject: any = await databaseService.getDb().getFirstAsync('SELECT name, color, icon FROM subjects WHERE id = ?', [merged.subject_id]);
+      const subject: any = await databaseService.getDb().getFirstAsync('SELECT name, color, icon FROM subjects WHERE id = ? AND deleted_at IS NULL', [merged.subject_id]);
       if (subject) {
         merged.subject_name = subject.name;
         merged.subject_color = subject.color;
@@ -160,15 +165,12 @@ const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
 };
 
 export const updateFlashcardDeck = async (deckId: string, payload: any): Promise<any> => {
-  const isLocalId = !isNaN(Number(deckId)) && Number(deckId) < 0;
-
-  if (isLocalId) {
+  // Try updating local MMKV deck if it exists there (silent no-op if not local)
+  try {
     const { updateLocalDeck } = await import('../localFlashcardService');
-    updateLocalDeck(Number(deckId), payload);
-    return { ...payload, id: deckId, _isPending: true };
-  }
+    updateLocalDeck(deckId, payload);
+  } catch {}
 
-  // Flag for backup so changes like linked_event_id are uploaded to cloud
   await flashcardDeckRepository.update(deckId, { ...payload, is_backed_up: 0 });
 
   try {
@@ -310,6 +312,9 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
 export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; direction?: CardDirection; id?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_at?: string; fsrs_stability?: number; fsrs_difficulty?: number }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
+
+  await requireActiveFlashcardDeck(payload.deck_id);
+
   const card: any = { id, ...payload, status: 'new', created_at: new Date().toISOString() };
 
   await flashcardRepository.create(card);
@@ -342,6 +347,9 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
 export const createEvaluationItem = async (payload: { deck_id: string; item_type: 'flashcard' | 'multiple_choice' | 'boolean'; content_json: any; direction?: CardDirection; hint?: string; explanation?: string; id?: string }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
+
+  await requireActiveFlashcardDeck(payload.deck_id);
+
   const item: any = { id, status: 'new', created_at: new Date().toISOString(), ...payload };
 
   await flashcardRepository.create(item);
@@ -439,13 +447,11 @@ export const removeDeckFromGroup = async (deckId: string, groupPinId: string): P
 export const deleteFlashcardDeck = async (deckId: string) => {
   await flashcardDeckRepository.delete(deckId);
 
-  // OFFLINE-FIRST: mazos locales (ID negativo) solo existen en MMKV, no tienen backend
-  const isLocalId = !isNaN(Number(deckId)) && Number(deckId) < 0;
-  if (isLocalId) {
+  // Try deleting from local MMKV if it's a local-only deck
+  try {
     const { deleteLocalDeck } = await import('../localFlashcardService');
     deleteLocalDeck(deckId);
-    return { success: true }; // termina aquí, no llamar al backend
-  }
+  } catch {}
 
   try {
     const userId = await getUserId();

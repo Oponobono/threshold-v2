@@ -281,13 +281,13 @@ async function getLocalBackupStats(): Promise<BackupStats> {
     const db = databaseService.getDb();
 
     const [photoRow, audioRow, docRow, audioTransRow, ytTransRow, assessFileRow, deckRow, aiChatRow] = await Promise.all([
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_transcripts`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM youtube_transcripts`) as Promise<{ total: number; backed: number } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM assessment_files WHERE local_uri IS NOT NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM flashcard_decks`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_transcripts WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM youtube_transcripts WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM assessment_files WHERE deleted_at IS NULL AND local_uri IS NOT NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM flashcard_decks WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
       db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM ai_chats`) as Promise<{ total: number; backed: number | null } | undefined>,
     ]);
 
@@ -354,7 +354,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Fotos no respaldadas
     if (prefs.includePhotos) {
       const photos = await db.getAllAsync(
-        `SELECT id, local_uri, subject_id FROM photos WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri, subject_id FROM photos WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
       result.photos = photos.map((p: any) => ({ id: String(p.id), uri: p.local_uri, subject_id: p.subject_id ? String(p.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.photos.length} foto(s) pendientes`);
@@ -363,7 +363,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Grabaciones de audio no respaldadas
     if (prefs.includeAudio) {
       const audio = await db.getAllAsync(
-        `SELECT id, local_uri, name, subject_id FROM audio_recordings WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri, name, subject_id FROM audio_recordings WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
       result.audio = audio.map((a: any) => ({ id: String(a.id), local_uri: a.local_uri, name: String(a.name), subject_id: a.subject_id ? String(a.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.audio.length} grabación(es) pendiente(s)`);
@@ -372,7 +372,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Documentos no respaldados
     if (prefs.includeDocs) {
       const docs = await db.getAllAsync(
-        `SELECT id, local_uri, subject_id FROM scanned_documents WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri, subject_id FROM scanned_documents WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
       result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri, name: undefined, subject_id: d.subject_id ? String(d.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.docs.length} documento(s) pendiente(s)`);
@@ -381,13 +381,13 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Transcripciones no respaldadas (desde tablas dedicadas)
     if (prefs.includeTranscripts) {
       const audioTranscripts = await db.getAllAsync(
-        `SELECT id, recording_id, transcript_text FROM audio_transcripts WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
+        `SELECT id, recording_id, transcript_text FROM audio_transcripts WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
       );
       result.transcripts.push(...audioTranscripts.map((t: any) => ({ id: String(t.id), type: 'audio' as const, text: t.transcript_text, recording_id: String(t.recording_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${audioTranscripts.length} transcripción(es) de audio pendiente(s)`);
 
       const ytTranscripts = await db.getAllAsync(
-        `SELECT id, video_id, transcript_text FROM youtube_transcripts WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
+        `SELECT id, video_id, transcript_text FROM youtube_transcripts WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
       );
       result.transcripts.push(...ytTranscripts.map((t: any) => ({ id: String(t.id), type: 'youtube' as const, text: t.transcript_text, video_id: String(t.video_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${ytTranscripts.length} transcripción(es) de YouTube pendiente(s)`);
@@ -395,7 +395,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     // Soportes de evaluaciones no respaldados
     if (prefs.includeAssessmentFiles) {
       const assessFiles = await db.getAllAsync(
-        `SELECT id, local_uri, file_name, file_type, assessment_id FROM assessment_files WHERE (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
+        `SELECT id, local_uri, file_name, file_type, assessment_id FROM assessment_files WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
       );
       result.assessmentFiles = assessFiles.map((f: any) => ({ id: String(f.id), local_uri: f.local_uri, file_name: f.file_name, file_type: f.file_type, assessment_id: String(f.assessment_id) }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.assessmentFiles.length} soporte(s) de evaluación pendiente(s)`);
@@ -436,7 +436,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
       `SELECT id, user_id, subject_id, title, description, linked_event_id,
               avg_ease_factor, total_reviews, last_reviewed_at
        FROM flashcard_decks
-       WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
+       WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
     );
     result.flashcardDecks = unbackedDecks.map((d: any) => ({
       id: String(d.id),
@@ -459,7 +459,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
                 ease_factor, interval_days, repetitions, next_review_at,
                 fsrs_stability, fsrs_difficulty, source_context
          FROM flashcards
-         WHERE deck_id IN (${deckIds})`
+         WHERE deck_id IN (${deckIds}) AND deleted_at IS NULL`
       );
       result.flashcards = unbackedCards.map((c: any) => ({
         id: String(c.id),
@@ -635,7 +635,7 @@ export const runBackup = async (
         const localOnlyPhotos: any[] = await db.getAllAsync(
           `SELECT id, subject_id, local_uri, es_favorita, ocr_text, group_id
            FROM photos
-           WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0a: ${localOnlyPhotos.length} foto(s) sin registro en backend.`);
         for (const photo of localOnlyPhotos) {
@@ -660,7 +660,7 @@ export const runBackup = async (
         const localOnlyAudio: any[] = await db.getAllAsync(
           `SELECT id, user_id, subject_id, name, local_uri, duration
            FROM audio_recordings
-           WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0b: ${localOnlyAudio.length} grabación(es) sin registro en backend.`);
         for (const rec of localOnlyAudio) {
@@ -685,7 +685,7 @@ export const runBackup = async (
         const localOnlyDocs: any[] = await db.getAllAsync(
           `SELECT id, user_id, subject_id, local_uri, ocr_text
            FROM scanned_documents
-           WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0c: ${localOnlyDocs.length} documento(s) sin registro en backend.`);
         for (const doc of localOnlyDocs) {
@@ -708,7 +708,7 @@ export const runBackup = async (
       try {
         const localOnlyFiles: any[] = await db.getAllAsync(
           `SELECT id, assessment_id, file_name, file_type, local_uri, file_size FROM assessment_files
-           WHERE (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0d: ${localOnlyFiles.length} soporte(s) de evaluación sin registro en backend.`);
         for (const f of localOnlyFiles) {
@@ -1099,7 +1099,7 @@ export const runBackup = async (
         let subjectData = null;
         if (deck.subject_id) {
           try {
-            subjectData = await db.getFirstAsync('SELECT * FROM subjects WHERE id = ?', [deck.subject_id]);
+            subjectData = await db.getFirstAsync('SELECT * FROM subjects WHERE id = ? AND deleted_at IS NULL', [deck.subject_id]);
           } catch {}
         }
         const deckPayload = JSON.stringify({ deck, cards: deckCards, subject: subjectData }, null, 2);

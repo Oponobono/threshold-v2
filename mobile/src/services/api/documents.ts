@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { documentRepository, syncService } from '../database';
+import { requireActiveSubject, requireActiveDocument } from '../domain/invariants';
 import { extractTextFromPdfLocal } from '../localPDFService';
 import { getBackupPreferences } from '../backup/backupService';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
@@ -40,6 +41,10 @@ export const createScannedDocument = async (data: { subject_id?: string; name?: 
   const id = data.id || uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');
+
+  if (data.subject_id) {
+    await requireActiveSubject(data.subject_id);
+  }
 
   // 1. Guardar SIEMPRE en SQLite local primero — los documentos funcionan sin red
   const doc: any = { id, user_id: String(userId), ...data };
@@ -98,6 +103,8 @@ export const deleteScannedDocument = async (documentId: string) => {
 };
 
 export const updateScannedDocument = async (documentId: string, data: Partial<ScannedDocument>): Promise<any> => {
+  await requireActiveDocument(documentId);
+
   // 1. Actualizar localmente de forma inmediata
   await documentRepository.update(documentId, data as any);
 

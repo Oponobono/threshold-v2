@@ -91,12 +91,13 @@ export const recordCardReview = async (
   subjectId?: string | number | null,
 ): Promise<CardReviewResponse> => {
   try {
-    // Local cards (negative IDs) - save pending review to MMKV instead of API
-    const numericId = Number(cardId);
-    if (!isNaN(numericId) && numericId < 0) {
+    // Check if card is local-only (exists in MMKV but not SQLite) by trying the repository first
+    const { flashcardRepository } = await import('../database/repositories/FlashcardRepository');
+    const sqliteCard = await flashcardRepository.getById(cardId);
+    if (!sqliteCard) {
       const { queuePendingReview } = await import('../localFlashcardService');
       await queuePendingReview({
-        cardId: numericId,
+        cardId,
         grade: result === 'correct' ? 4 : 1,
         status: result === 'correct' ? 'review' : 'learning',
         stability: 0,
@@ -404,7 +405,7 @@ export const getSemesterSummary = async (): Promise<SemesterSummary> => {
     
     try {
       const { getLocalSemesterSummary } = await import('../localMasteryService');
-      const localData = await getLocalSemesterSummary(Number(userId));
+      const localData = await getLocalSemesterSummary(String(userId));
       console.log('[Analytics] ✅ Loaded semester summary from local calculation (offline mode)');
       return localData as SemesterSummary;
     } catch (localErr) {

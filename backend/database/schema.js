@@ -818,7 +818,7 @@ const tableSchema = {
   lms_accounts: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS lms_accounts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         platform TEXT NOT NULL,
         instance_url TEXT NOT NULL,
@@ -829,7 +829,7 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS lms_accounts (
-        id SERIAL PRIMARY KEY,
+        id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         platform TEXT NOT NULL,
         instance_url TEXT NOT NULL,
@@ -1284,7 +1284,7 @@ const tableSchema = {
   grading_periods: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS grading_periods (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         period_type TEXT NOT NULL,
@@ -1297,7 +1297,7 @@ const tableSchema = {
     `,
     postgres: `
       CREATE TABLE IF NOT EXISTS grading_periods (
-        id SERIAL PRIMARY KEY,
+        id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         period_type TEXT NOT NULL,

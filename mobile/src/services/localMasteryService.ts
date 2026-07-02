@@ -37,9 +37,9 @@ function getMasteryColor(percentage: number): string {
 export async function getLocalMasteryData(userId: string, subjectId: string | 'all'): Promise<MasteryRadarData> {
   const db = databaseService.getDb();
 
-  // 1. Obtener subjects
+  // 1. Obtener subjects (solo activos)
   const subjects = await db.getAllAsync(
-    'SELECT id, name FROM subjects WHERE user_id = ? ORDER BY created_at DESC',
+    'SELECT id, name FROM subjects WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC',
     userId
   ) as any[];
 
@@ -57,10 +57,10 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
     };
   }
 
-  // 2. Obtener decks de SQLite + MMKV, mapear deck_id → subject_id
+  // 2. Obtener decks de SQLite + MMKV, mapear deck_id → subject_id (solo activos)
   const deckQuery = subjectId === 'all'
-    ? 'SELECT id, subject_id FROM flashcard_decks WHERE user_id = ?'
-    : 'SELECT id, subject_id FROM flashcard_decks WHERE user_id = ? AND subject_id = ?';
+    ? 'SELECT id, subject_id FROM flashcard_decks WHERE user_id = ? AND deleted_at IS NULL'
+    : 'SELECT id, subject_id FROM flashcard_decks WHERE user_id = ? AND subject_id = ? AND deleted_at IS NULL';
   const deckParams: any[] = subjectId === 'all' ? [userId] : [userId, subjectId];
   const sqliteDecks = await db.getAllAsync(deckQuery, ...deckParams) as any[];
 
@@ -95,7 +95,7 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
   if (deckIds.length > 0) {
     const placeholders = deckIds.map(() => '?').join(',');
     const cards = await db.getAllAsync(
-      `SELECT id, deck_id FROM flashcards WHERE deck_id IN (${placeholders})`,
+      `SELECT id, deck_id FROM flashcards WHERE deck_id IN (${placeholders}) AND deleted_at IS NULL`,
       ...deckIds
     ) as any[];
 
@@ -208,6 +208,8 @@ export async function getLocalGlobalGPA(userId: string): Promise<GlobalGPAAnalyt
        FROM assessments a
        JOIN subjects s ON a.subject_id = s.id
        WHERE s.user_id = ?
+       AND a.deleted_at IS NULL
+       AND s.deleted_at IS NULL
        AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR a.normalized_value IS NOT NULL)
        ORDER BY a.date ASC`,
       userId
@@ -277,12 +279,14 @@ export async function getLocalPredictions(userId: string): Promise<PredictionRes
     const rows = await db.getAllAsync(
       `SELECT
          fc.id, fc.front, fc.deck_id, fc.status, fc.next_review_date,
-         COALESCE((SELECT name FROM subjects WHERE id = fd.subject_id), '') as subject_name,
+         COALESCE((SELECT name FROM subjects WHERE id = fd.subject_id AND deleted_at IS NULL), '') as subject_name,
          fd.title as deck_title,
          fd.subject_id
        FROM flashcards fc
        JOIN flashcard_decks fd ON fc.deck_id = fd.id
        WHERE fd.user_id = ?
+       AND fc.deleted_at IS NULL
+       AND fd.deleted_at IS NULL
        AND fc.status IN ('new', 'learning')
        AND fc.next_review_date IS NOT NULL
        AND fc.next_review_date <= ?`,
@@ -388,14 +392,14 @@ export async function getLocalDeckStats(deckId: number, userId: number): Promise
   const deckRow = await db.getFirstAsync(
     `SELECT d.*, s.name as subject_name 
      FROM flashcard_decks d 
-     LEFT JOIN subjects s ON d.subject_id = s.id 
-     WHERE d.id = ? AND d.user_id = ?`,
+     LEFT JOIN subjects s ON d.subject_id = s.id AND s.deleted_at IS NULL
+     WHERE d.id = ? AND d.user_id = ? AND d.deleted_at IS NULL`,
     deckId, userId
   ) as any;
   
   if (!deckRow) throw new Error('Mazo no encontrado localmente');
   
-  const cards = await db.getAllAsync(`SELECT * FROM flashcards WHERE deck_id = ?`, deckId) as any[];
+  const cards = await db.getAllAsync(`SELECT * FROM flashcards WHERE deck_id = ? AND deleted_at IS NULL`, deckId) as any[];
   const cardIds = cards.map(c => c.id);
   
   let totalReviews = 0;
@@ -517,11 +521,11 @@ export async function getLocalProgressTrends(userId: number, days: number = 30):
   };
 }
 
-export async function getLocalSemesterSummary(userId: number): Promise<any> {
+export async function getLocalSemesterSummary(userId: string): Promise<any> {
   const db = databaseService.getDb();
   
-  const subjects = await db.getAllAsync(`SELECT * FROM subjects WHERE user_id = ?`, userId) as any[];
-  const gpaData = await getLocalGlobalGPA(String(userId));
+  const subjects = await db.getAllAsync(`SELECT * FROM subjects WHERE user_id = ? AND deleted_at IS NULL`, userId) as any[];
+  const gpaData = await getLocalGlobalGPA(userId);
   
   const criticalSubjects: any[] = [];
   let approvedCount = 0;
@@ -529,7 +533,7 @@ export async function getLocalSemesterSummary(userId: number): Promise<any> {
   
   for (const sub of subjects) {
     const subGpa = sub.avg_score || sub.gpa_equivalent || 0;
-    const target = sub.target_grade || 3.0; // Assume 3.0 passing if not set
+    const target = sub.target_grade || 3.0;
     
     if (subGpa >= target) approvedCount++;
     else if (subGpa > 0) atRiskCount++;
@@ -547,7 +551,7 @@ export async function getLocalSemesterSummary(userId: number): Promise<any> {
     }
   }
   
-  criticalSubjects.sort((a, b) => a.delta - b.delta); // most negative first
+  criticalSubjects.sort((a, b) => a.delta - b.delta);
   
   // Recent activity
   const recentLogs = await db.getAllAsync(
@@ -555,6 +559,8 @@ export async function getLocalSemesterSummary(userId: number): Promise<any> {
      FROM assessments a
      JOIN subjects s ON a.subject_id = s.id
      WHERE s.user_id = ?
+     AND a.deleted_at IS NULL
+     AND s.deleted_at IS NULL
      ORDER BY a.created_at DESC LIMIT 5`,
     userId
   ) as any[];

@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { scheduleRepository, syncService } from '../database';
+import { requireActiveSubject } from '../domain/invariants';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -51,6 +52,8 @@ export const createSchedule = async (payload: { subject_id: string; day_of_week:
   const { uuidv4 } = await import('../../utils/uuid');
   const userId = await getUserIdNumber();
   const id = (payload as any).id || uuidv4();
+
+  await requireActiveSubject(payload.subject_id);
 
   const schedule: any = { id, user_id: userId, ...payload };
   await scheduleRepository.create(schedule);

@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { AudioRecording } from './types';
 import { audioRepository, audioTranscriptRepository, syncService } from '../database';
+import { requireActiveSubject, requireActiveAudio } from '../domain/invariants';
 import { getBackupPreferences } from '../backup/backupService';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
 
@@ -52,6 +53,10 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');
 
+  if (payload.subject_id) {
+    await requireActiveSubject(payload.subject_id);
+  }
+
   // 1. Guardar SIEMPRE en SQLite local primero — las grabaciones funcionan sin red
   const recording: any = { id, user_id: String(userId), ...payload };
   await audioRepository.create(recording);
@@ -67,7 +72,7 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
       const response = await fetchWithFallback('/audio-recordings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, id, user_id: Number(userId) }),
+        body: JSON.stringify({ ...payload, id, user_id: String(userId) }),
       });
       const data = await parseJsonSafely(response);
       if (response.ok && data) {
@@ -141,6 +146,8 @@ export const deleteAudioRecording = async (id: string) => {
 };
 
 export const upsertAudioTranscript = async (payload: { recording_id: string; transcript_uri?: string; transcript_text?: string; summary_uri?: string; summary_text?: string }) => {
+  await requireActiveAudio(payload.recording_id);
+
   // Offline-First: Guardar localmente (inline + tabla dedicada)
   if (payload.transcript_text || payload.summary_text) {
     try {

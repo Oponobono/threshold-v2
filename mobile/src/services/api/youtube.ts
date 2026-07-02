@@ -53,7 +53,7 @@ export const createYouTubeVideo = async (payload: { subject_id?: string | null; 
     const response = await fetchWithFallback('/youtube-videos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, id, user_id: Number(userId) }),
+      body: JSON.stringify({ ...payload, id, user_id: String(userId) }),
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {

@@ -41,7 +41,7 @@ export class AssessmentRepository extends BaseRepository<Assessment> {
    * devuelve null (ej. por type mismatch en JOIN con assessment_results).
    */
   async upsert(data: Assessment): Promise<void> {
-    const existing = await this.getById(data.id);
+    const existing = await this.getByIdIncludingDeleted(data.id);
     if (existing) {
       // Preservar grade_value, normalized_value, score existentes si el servidor los devuelve null
       const merged = { ...data } as any;

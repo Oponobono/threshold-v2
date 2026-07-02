@@ -51,7 +51,7 @@ export const createCalendarEvent = async (event: CalendarEventData): Promise<Cal
     const response = await fetchWithFallback('/calendar/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...event, id, user_id: Number(userId) }),
+      body: JSON.stringify({ ...event, id, user_id: String(userId) }),
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {

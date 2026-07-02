@@ -387,7 +387,7 @@ const TABLE_SCHEMAS = {
     sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT
   )`,
   subject_threshold_overrides: `CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, subject_id TEXT,
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT,
     threshold REAL DEFAULT 70, created_at TEXT, updated_at TEXT,
     sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT
   )`,

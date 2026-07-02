@@ -20,21 +20,52 @@ export class BaseRepository<T extends { id: string }> {
     return result as T;
   }
 
+  protected buildActiveWhereClause(extraWhere?: string): string {
+    return extraWhere
+      ? `deleted_at IS NULL AND ${extraWhere}`
+      : 'deleted_at IS NULL';
+  }
+
   async getAll(): Promise<T[]> {
-    const rows = await this.getDb().getAllAsync(`SELECT * FROM ${this.tableName} ORDER BY created_at DESC`);
+    const rows = await this.getDb().getAllAsync(
+      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause()} ORDER BY created_at DESC`
+    );
     return (rows as any[]).map(row => this.mapRow(row));
   }
 
   async getById(id: string): Promise<T | null> {
-    const row = await this.getDb().getFirstAsync(`SELECT * FROM ${this.tableName} WHERE id = ?`, id);
+    const row = await this.getDb().getFirstAsync(
+      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause('id = ?')}`, id
+    );
     return row ? this.mapRow(row) : null;
   }
 
   async getByField(field: string, value: any): Promise<T[]> {
     const rows = await this.getDb().getAllAsync(
-      `SELECT * FROM ${this.tableName} WHERE ${field} = ? ORDER BY created_at DESC`, value
+      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause(`${field} = ?`)} ORDER BY created_at DESC`, value
     );
     return (rows as any[]).map(row => this.mapRow(row));
+  }
+
+  async getByIdIncludingDeleted(id: string): Promise<T | null> {
+    const row = await this.getDb().getFirstAsync(
+      `SELECT * FROM ${this.tableName} WHERE id = ?`, id
+    );
+    return row ? this.mapRow(row) : null;
+  }
+
+  async requireActive(id: string, userId?: string): Promise<T> {
+    const entity = await this.getByIdIncludingDeleted(id);
+    if (!entity) {
+      throw new Error(`${this.tableName} '${id}' does not exist`);
+    }
+    if ((entity as any).deleted_at) {
+      throw new Error(`${this.tableName} '${id}' has been deleted`);
+    }
+    if (userId !== undefined && (entity as any).user_id !== undefined && String((entity as any).user_id) !== String(userId)) {
+      throw new Error(`${this.tableName} '${id}' does not belong to user`);
+    }
+    return entity;
   }
 
   private validColumns: string[] | null = null;
@@ -122,12 +153,14 @@ export class BaseRepository<T extends { id: string }> {
   }
 
   async count(): Promise<number> {
-    const row: any = await this.getDb().getFirstAsync(`SELECT COUNT(*) as count FROM ${this.tableName}`);
+    const row: any = await this.getDb().getFirstAsync(
+      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE ${this.buildActiveWhereClause()}`
+    );
     return row?.count ?? 0;
   }
 
   async upsert(data: T): Promise<void> {
-    const existing = await this.getById(data.id);
+    const existing = await this.getByIdIncludingDeleted(data.id);
     if (existing) {
       const localVer = (existing as any).version_number || 0;
       const remoteVer = (data as any).version_number || 0;
@@ -171,7 +204,7 @@ export class BaseRepository<T extends { id: string }> {
   }
 
   async upsertFromCloud(data: T): Promise<void> {
-    const existing = await this.getById(data.id);
+    const existing = await this.getByIdIncludingDeleted(data.id);
     if (!existing) {
       await this.create(data);
       return;

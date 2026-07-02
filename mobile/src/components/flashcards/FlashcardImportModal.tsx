@@ -41,7 +41,7 @@ interface DeckJSON {
 }
 
 interface ImportedDeck {
-  id: number;
+  id: string;
   title: string;
   description?: string;
   cardCount: number;
@@ -364,8 +364,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
 
       // OFFLINE-FIRST: Preparar mazo para sincronizar cuando vuelva online
       try {
-        const userId = Number(await import('../../services/api').then(m => m.getUserId())) || 0;
-        if (userId > 0) {
+        const userId = await import('../../services/api').then(m => m.getUserId());
+        if (userId) {
           await prepareDeckForSync(deck.id, userId);
           console.log('[FlashcardImportModal] Mazo importado preparado para sincronizar');
         }

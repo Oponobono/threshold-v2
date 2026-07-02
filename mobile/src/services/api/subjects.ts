@@ -14,7 +14,6 @@ let lastSyncTimestamp = 0;
 let syncInProgress = false;
 let fetchInProgress = false;
 const SYNC_THROTTLE_MS = 30000;
-const pendingDelete = new Set<string>();
 
 // Seguimiento separado para getSubjectById — no debe compartir lastSyncTimestamp
 // con getSubjects para evitar que una función interrumpa el throttle de la otra.
@@ -25,8 +24,6 @@ const lastSubjectSyncTimestamps = new Map<string, number>();
 const SUBJECT_BY_ID_THROTTLE_MS = 30000;
 
 export const getSubjectById = async (subjectId: string): Promise<Subject | null> => {
-  if (pendingDelete.has(subjectId)) return null;
-
   // 1. Leer localmente primero
   const localData = await subjectRepository.getById(subjectId);
 
@@ -47,7 +44,7 @@ export const getSubjectById = async (subjectId: string): Promise<Subject | null>
         const response = await fetchWithFallback(`/subject/${subjectId}`);
         if (response.ok) {
           const data = await parseJsonSafely(response);
-          if (data && !pendingDelete.has(subjectId)) {
+          if (data) {
             await subjectRepository.upsertFromCloud(data);
           }
         }
@@ -58,9 +55,6 @@ export const getSubjectById = async (subjectId: string): Promise<Subject | null>
 
   return localData;
 };
-
-const filterDeleted = (subjects: Subject[]): Subject[] =>
-  subjects.filter(s => !pendingDelete.has(s.id));
 
 /**
  * Fusiona datos del servidor con el registro local preservando campos
@@ -111,11 +105,9 @@ export const getSubjects = async (): Promise<Subject[]> => {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
           for (const s of data) {
-            if (!pendingDelete.has(s.id)) {
-              await subjectRepository.upsertFromCloud(s);
-            }
+            await subjectRepository.upsertFromCloud(s);
           }
-          return filterDeleted(data);
+          return data;
         }
       }
     } catch {}
@@ -136,9 +128,7 @@ export const getSubjects = async (): Promise<Subject[]> => {
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             for (const s of data) {
-              if (!pendingDelete.has(s.id)) {
-                await subjectRepository.upsertFromCloud(s);
-              }
+              await subjectRepository.upsertFromCloud(s);
             }
           }
         }
@@ -147,7 +137,7 @@ export const getSubjects = async (): Promise<Subject[]> => {
     })();
   }
 
-  return filterDeleted(localData);
+  return localData;
 };
 
 export const createSubject = async (payload: {
@@ -263,7 +253,6 @@ export const updateSubject = async (subjectId: string, payload: Partial<Subject>
 };
 
 export const deleteSubject = async (subjectId: string) => {
-  pendingDelete.add(subjectId);
   await subjectRepository.delete(subjectId);
 
   // Invalidar toda caché relacionada con subjects para evitar que una lectura
@@ -282,11 +271,9 @@ export const deleteSubject = async (subjectId: string) => {
 
   try {
     const response = await fetchWithFallback(`/subjects/${subjectId}`, { method: 'DELETE' });
-    pendingDelete.delete(subjectId);
     return await parseJsonSafely(response);
   } catch {
     await syncService.enqueueDelete('subject', subjectId);
-    pendingDelete.delete(subjectId);
     return { success: true, _isPending: true };
   }
 };

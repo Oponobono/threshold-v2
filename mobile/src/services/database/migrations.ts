@@ -584,7 +584,7 @@ const migrations: Migration[] = [
         deleted_at TEXT
       )`,
       `CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         subject_id TEXT,
         threshold REAL NOT NULL DEFAULT 70,
@@ -659,6 +659,27 @@ const migrations: Migration[] = [
       `ALTER TABLE scanned_documents ADD COLUMN last_verified TEXT`,
     ],
   },
+  {
+    version: 27,
+    up: [
+      // Fix: subject_threshold_overrides PK type: INTEGER AUTOINCREMENT → TEXT
+      // SQLite doesn't enforce types, so existing INTEGER values work as TEXT.
+      // But the schema must match for consistency with backend + future PostgreSQL.
+      `ALTER TABLE subject_threshold_overrides RENAME TO subject_threshold_overrides_old`,
+      `CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
+        threshold REAL NOT NULL DEFAULT 70,
+        created_at TEXT DEFAULT (datetime('now')),
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER NOT NULL DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TEXT
+      )`,
+      `INSERT INTO subject_threshold_overrides SELECT * FROM subject_threshold_overrides_old`,
+      `DROP TABLE subject_threshold_overrides_old`,
+    ],
+  },
 ];
-
 export default migrations;

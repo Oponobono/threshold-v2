@@ -213,7 +213,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
     }
 
     // Persistir
-    const isLocalCard = typeof item.id === 'number' && item.id < 0;
+    const isLocalCard = (item as any)._local === true;
 
     try {
       const textToCount = item.front || (item as any).question || '';
@@ -241,8 +241,8 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
     if (activeDeck?.id) {
       if (isLocalCard) {
         const { updateLocalCard, recalculateLocalDeckCounters } = await import('../../services/localFlashcardService');
-        await updateLocalCard(Number(activeDeck.id), item.id, {}, newStatus);
-        await recalculateLocalDeckCounters(Number(activeDeck.id));
+        await updateLocalCard(activeDeck.id, String(item.id), {}, newStatus);
+        await recalculateLocalDeckCounters(activeDeck.id);
       } else {
         // Cloud: persistir status en SQLite + backend
         try {
@@ -257,7 +257,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
               COUNT(CASE WHEN status = 'review' THEN 1 END) as review_count,
               COUNT(CASE WHEN status = 'learning' THEN 1 END) as learning_count,
               COUNT(CASE WHEN status = 'new' THEN 1 END) as new_count
-            FROM flashcards WHERE deck_id = ?`,
+            FROM flashcards WHERE deck_id = ? AND deleted_at IS NULL`,
             String(activeDeck.id)
           );
           if (row) {

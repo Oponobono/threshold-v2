@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { Assessment } from './types';
 import { assessmentRepository, syncService } from '../database';
+import { requireActiveSubject } from '../domain/invariants';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -68,6 +69,10 @@ export const getAllAssessments = async (): Promise<Assessment[]> => {
 export const createAssessment = async (payload: Assessment): Promise<Assessment> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
+
+  if (payload.subject_id) {
+    await requireActiveSubject(payload.subject_id);
+  }
 
   const assessment: Assessment = {
     ...payload,

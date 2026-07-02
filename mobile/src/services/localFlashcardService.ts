@@ -1,12 +1,6 @@
 import { getUserId } from './api/auth';
 import { syncService } from './database';
-
-let _localIdCounter = -Date.now();
-
-function nextLocalId(): number {
-  _localIdCounter -= 1;
-  return _localIdCounter;
-}
+import { uuidv4 } from '../utils/uuid';
 
 export type LocalCardDirection = 'forward' | 'backward' | 'bidirectional';
 
@@ -19,7 +13,7 @@ export interface LocalCard {
 }
 
 export interface LocalDeck {
-  id: number;
+  id: string;
   title: string;
   description: string;
   subject_id: string | null;
@@ -96,7 +90,7 @@ export async function saveImportedDeck(
 ): Promise<LocalDeck> {
   const uid = await getUserId();
   const deck: LocalDeck = {
-    id: nextLocalId(),
+    id: uuidv4(),
     title: title.trim(),
     description: description?.trim() || '',
     subject_id,
@@ -119,7 +113,7 @@ export async function saveImportedDeck(
 }
 
 export function updateLocalDeckSubject(
-  deckId: number,
+  deckId: string,
   subjectId: string | null,
   subjectName?: string | null,
   subjectColor?: string | null,
@@ -143,7 +137,7 @@ export function deleteLocalDeck(deckId: string): void {
   saveLocalDecksSync(decks);
 }
 
-export function recalculateLocalDeckCounters(deckId: number): void {
+export function recalculateLocalDeckCounters(deckId: string): void {
   try {
     const mmkv = require('react-native-mmkv').createMMKV();
     const cardsKey = `cache:flashcards_by_deck:${deckId}`;
@@ -183,7 +177,7 @@ export function recalculateLocalDeckCounters(deckId: number): void {
 /**
  * OFFLINE-FIRST: Exporta un mazo local a JSON sin exponer user_id (seguridad)
  */
-export async function exportDeckToJSON(deckId: number): Promise<any> {
+export async function exportDeckToJSON(deckId: string): Promise<any> {
   try {
     const allDecks = getLocalDecks();
     const deck = allDecks.find(d => d.id === deckId);
@@ -238,7 +232,7 @@ export async function exportDeckToJSON(deckId: number): Promise<any> {
 /**
  * OFFLINE-FIRST: Prepara sincronización de mazos importados
  */
-export async function prepareDeckForSync(deckId: number, userId: string | number): Promise<void> {
+export async function prepareDeckForSync(deckId: string, userId: string | number): Promise<void> {
   try {
     const decks = getLocalDecks();
     const idx = decks.findIndex(d => d.id === deckId);
@@ -291,14 +285,14 @@ export async function prepareDeckForSync(deckId: number, userId: string | number
 export function getPendingDecksForSync(): LocalDeck[] {
   try {
     const localDecks = getLocalDecks();
-    return localDecks.filter(d => d._local === true && d.id < 0);
+    return localDecks.filter(d => d._local === true);
   } catch (error) {
     console.error('[LocalFlashcard] Error getting pending decks:', error);
     return [];
   }
 }
 
-export function updateLocalDeck(deckId: number, updates: Partial<LocalDeck>): void {
+export function updateLocalDeck(deckId: string, updates: Partial<LocalDeck>): void {
   try {
     const decks = getLocalDecks();
     const idx = decks.findIndex(d => d.id === deckId);
@@ -315,7 +309,7 @@ export function updateLocalDeck(deckId: number, updates: Partial<LocalDeck>): vo
   }
 }
 
-export function addLocalCard(deckId: number, card: Omit<LocalCard, 'id'>): void {
+export function addLocalCard(deckId: string, card: Omit<LocalCard, 'id'>): void {
   try {
     const mmkv = require('react-native-mmkv').createMMKV();
     const cardsKey = `cache:flashcards_by_deck:${deckId}`;
@@ -330,7 +324,7 @@ export function addLocalCard(deckId: number, card: Omit<LocalCard, 'id'>): void 
     } catch {}
 
     const newCard = {
-      id: nextLocalId(),
+      id: uuidv4(),
       deck_id: deckId,
       item_type: card.type || 'flashcard',
       content: card.data,
@@ -353,7 +347,7 @@ export function addLocalCard(deckId: number, card: Omit<LocalCard, 'id'>): void 
   }
 }
 
-export function deleteLocalCard(deckId: number, cardId: number): void {
+export function deleteLocalCard(deckId: string, cardId: string): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mmkv = require('react-native-mmkv').createMMKV();
@@ -377,8 +371,8 @@ export function deleteLocalCard(deckId: number, cardId: number): void {
 }
 
 export function updateLocalCard(
-  deckId: number,
-  cardId: number,
+  deckId: string,
+  cardId: string,
   updates: Partial<LocalCard>,
   status?: string,
   fsrs_stability?: number,
@@ -427,7 +421,7 @@ export function updateLocalCard(
   }
 }
 
-export function queuePendingReview(review: { cardId: number; grade: number; status: string; stability: number; difficulty: number }): void {
+export function queuePendingReview(review: { cardId: string; grade: number; status: string; stability: number; difficulty: number }): void {
   const key = 'local_pending_reviews';
   const mmkv = require('react-native-mmkv').createMMKV();
   const existing = mmkv.getString(key);
@@ -436,7 +430,7 @@ export function queuePendingReview(review: { cardId: number; grade: number; stat
   mmkv.set(key, JSON.stringify(reviews));
 }
 
-export function getPendingReviews(): Array<{ cardId: number; grade: number; status: string; stability: number; difficulty: number }> {
+export function getPendingReviews(): Array<{ cardId: string; grade: number; status: string; stability: number; difficulty: number }> {
   const key = 'local_pending_reviews';
   const mmkv = require('react-native-mmkv').createMMKV();
   const existing = mmkv.getString(key);

@@ -48,6 +48,8 @@ export class ExamSchedulerService {
           `SELECT ce.start_date FROM flashcard_decks fd
            JOIN calendar_events ce ON ce.id = fd.linked_event_id
            WHERE fd.id = ?
+             AND fd.deleted_at IS NULL
+             AND ce.deleted_at IS NULL
              AND ce.start_date >= ?
            ORDER BY ce.start_date ASC
            LIMIT 1`,
@@ -62,6 +64,7 @@ export class ExamSchedulerService {
           rows = await db.getAllAsync(
             `SELECT start_date FROM calendar_events
              WHERE event_type IN ('exam', 'task') AND subject_id = ?
+               AND deleted_at IS NULL
                AND start_date >= ?
              ORDER BY start_date ASC
              LIMIT 1`,

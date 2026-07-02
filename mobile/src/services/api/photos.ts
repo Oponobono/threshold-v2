@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { Photo } from './types';
 import { photoRepository, syncService } from '../database';
+import { requireActiveSubject, requireActivePhoto } from '../domain/invariants';
 import { getBackupPreferences } from '../backup/backupService';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
 
@@ -57,6 +58,8 @@ export const createPhoto = async (photoData: {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = photoData.id || uuidv4();
   const userId = await getUserId();
+
+  await requireActiveSubject(photoData.subject_id);
 
   // 1. Guardar SIEMPRE en SQLite local primero — la galería funciona sin red
   const photo: any = { id, ...photoData };
@@ -136,6 +139,8 @@ export const deletePhoto = async (photoId: string) => {
 };
 
 export const updatePhoto = async (photoId: string, data: { ocr_text?: string; tags?: string; es_favorita?: boolean }) => {
+  await requireActivePhoto(photoId);
+
   // 1. Actualizar localmente de forma inmediata (optimistic update garantizado)
   await photoRepository.update(photoId, data as any);
 
