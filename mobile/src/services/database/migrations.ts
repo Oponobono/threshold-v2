@@ -681,5 +681,25 @@ const migrations: Migration[] = [
       `DROP TABLE subject_threshold_overrides_old`,
     ],
   },
+  {
+    version: 28,
+    up: [
+      // Add missing sync columns to assessment_categories, audio_transcripts, youtube_transcripts
+      `ALTER TABLE assessment_categories ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE assessment_categories ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE assessment_categories ADD COLUMN last_modified_by TEXT`,
+      `ALTER TABLE assessment_categories ADD COLUMN deleted_at TEXT`,
+      `ALTER TABLE audio_transcripts ADD COLUMN user_id TEXT`,
+      `ALTER TABLE audio_transcripts ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE audio_transcripts ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE audio_transcripts ADD COLUMN last_modified_by TEXT`,
+      `ALTER TABLE audio_transcripts ADD COLUMN deleted_at TEXT`,
+      `ALTER TABLE youtube_transcripts ADD COLUMN user_id TEXT`,
+      `ALTER TABLE youtube_transcripts ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE youtube_transcripts ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE youtube_transcripts ADD COLUMN last_modified_by TEXT`,
+      `ALTER TABLE youtube_transcripts ADD COLUMN deleted_at TEXT`,
+    ],
+  },
 ];
 export default migrations;

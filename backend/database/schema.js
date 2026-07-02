@@ -505,6 +505,7 @@ const tableSchema = {
       CREATE TABLE IF NOT EXISTS youtube_transcripts (
         id TEXT PRIMARY KEY,
         video_id TEXT NOT NULL UNIQUE,
+        user_id TEXT,
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
@@ -512,6 +513,9 @@ const tableSchema = {
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        deleted_at TEXT,
         FOREIGN KEY (video_id) REFERENCES youtube_videos(id) ON DELETE CASCADE
       )
     `,
@@ -519,20 +523,27 @@ const tableSchema = {
       CREATE TABLE IF NOT EXISTS youtube_transcripts (
         id TEXT PRIMARY KEY,
         video_id TEXT NOT NULL UNIQUE REFERENCES youtube_videos(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id),
         transcript_uri TEXT,
         transcript_text TEXT,
         summary_uri TEXT,
         summary_text TEXT,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        deleted_at TIMESTAMP
       )
     `,
     columns: [
       { name: 'transcript_text', type: 'TEXT' },
       { name: 'summary_text', type: 'TEXT' },
       { name: 'cloud_url', type: 'TEXT' },
-      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
+      { name: 'user_id', type: 'TEXT' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 0' },
+      { name: 'deleted_at', type: 'TEXT' },
     ]
   },
   flashcard_decks: {
@@ -1317,6 +1328,9 @@ const tableSchema = {
         weight REAL,
         drop_lowest INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        deleted_at TEXT,
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
       )
     `,
@@ -1327,9 +1341,17 @@ const tableSchema = {
         name TEXT NOT NULL,
         weight REAL,
         drop_lowest INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        deleted_at TIMESTAMP
       )
-    `
+    `,
+    columns: [
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 0' },
+      { name: 'deleted_at', type: 'TEXT' },
+    ]
   },
   assessment_results: {
     sqlite: `

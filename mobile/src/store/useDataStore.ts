@@ -166,6 +166,7 @@ export const useDataStore = create<DataState>((set, get) => {
       set({ hasLoadedOnce: true, isInitialLoading: false });
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
+      set({ hasLoadedOnce: true });
     } finally {
       set({ isInitialLoading: false, isRefreshing: false, isSyncing: false, syncStatusMessage: '' });
     }

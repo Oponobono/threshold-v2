@@ -31,6 +31,7 @@ exports.initialSync = (req, res) => {
     audioRecordings: `SELECT * FROM audio_recordings WHERE user_id = ?`,
     audioTranscripts: `SELECT at.* FROM audio_transcripts at JOIN audio_recordings ar ON at.recording_id = ar.id WHERE ar.user_id = ?`,
     scannedDocuments: `SELECT * FROM scanned_documents WHERE user_id = ?`,
+    youtubeTranscripts: `SELECT yt.* FROM youtube_transcripts yt JOIN youtube_videos yv ON yt.video_id = yv.id WHERE yv.user_id = ?`,
   };
 
   const runQuery = (sql) => {
@@ -68,9 +69,10 @@ exports.initialSync = (req, res) => {
     runQuery(queries.audioRecordings),
     runQuery(queries.audioTranscripts),
     runQuery(queries.scannedDocuments),
+    runQuery(queries.youtubeTranscripts),
     getCurrentSyncVersion(),
   ])
-    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, syncVersion]) => {
+    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, youtubeTranscripts, syncVersion]) => {
       const flashcards = [];
       for (const deck of flashcardDecks) {
         const cards = await new Promise((resolve) => {
@@ -104,6 +106,7 @@ exports.initialSync = (req, res) => {
           audio_recordings: audioRecordings,
           audio_transcripts: audioTranscripts,
           scanned_documents: scannedDocuments,
+          youtube_transcripts: youtubeTranscripts,
         },
       });
     })
@@ -124,6 +127,7 @@ exports.deltaSync = (req, res) => {
     assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ? AND ac.sync_version > ?`,
     photos: `SELECT p.* FROM photos p JOIN subjects s ON p.subject_id = s.id WHERE s.user_id = ? AND p.sync_version > ?`,
     audio_transcripts: `SELECT at.* FROM audio_transcripts at JOIN audio_recordings ar ON at.recording_id = ar.id WHERE ar.user_id = ? AND at.sync_version > ?`,
+    youtube_transcripts: `SELECT yt.* FROM youtube_transcripts yt JOIN youtube_videos yv ON yt.video_id = yv.id WHERE yv.user_id = ? AND yt.sync_version > ?`,
   };
 
   const allTableKeys = [...regularTables, ...Object.keys(specialTableQueries)];

@@ -3,6 +3,7 @@ import { BaseRepository } from '../BaseRepository';
 export interface AudioTranscript {
   id: string;
   recording_id: string;
+  user_id?: string;
   transcript_uri?: string;
   transcript_text?: string;
   summary_uri?: string;
@@ -10,6 +11,10 @@ export interface AudioTranscript {
   created_at?: string;
   cloud_url?: string;
   is_backed_up?: number | boolean;
+  sync_version?: number;
+  version_number?: number;
+  last_modified_by?: string;
+  deleted_at?: string;
 }
 
 class AudioTranscriptRepository extends BaseRepository<AudioTranscript> {

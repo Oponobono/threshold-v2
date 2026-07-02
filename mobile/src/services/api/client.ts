@@ -160,13 +160,14 @@ export async function initializeApiClient(): Promise<void> {
       console.log(`[API Client] 🔍 Detectando backend... (activo por ahora: ${activeBaseUrl})`);
       const detectedBackend = await detectAvailableBackend(localIp, API_PORTS);
 
-      if (detectedBackend.isAvailable) {
+      if (detectedBackend.isAvailable || detectedBackend.status === 'connecting') {
         const apiUrl = detectedBackend.url.endsWith('/api')
           ? detectedBackend.url
           : `${detectedBackend.url}/api`;
 
         if (apiUrl !== activeBaseUrl) {
-          console.log(`[API Client] 🔄 Usando backend detectado: ${apiUrl}`);
+          const statusLabel = detectedBackend.isAvailable ? 'disponible' : 'conectando...';
+          console.log(`[API Client] 🔄 Usando backend ${statusLabel}: ${apiUrl}`);
 
           const newUrls: string[] = [apiUrl];
           for (const port of API_PORTS) {

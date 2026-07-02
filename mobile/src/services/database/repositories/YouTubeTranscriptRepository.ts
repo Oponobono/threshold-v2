@@ -3,6 +3,7 @@ import { BaseRepository } from '../BaseRepository';
 export interface YouTubeTranscript {
   id: string;
   video_id: string;
+  user_id?: string;
   transcript_uri?: string;
   transcript_text?: string;
   summary_uri?: string;
@@ -10,6 +11,10 @@ export interface YouTubeTranscript {
   cloud_url?: string;
   is_backed_up?: number | boolean;
   created_at?: string;
+  sync_version?: number;
+  version_number?: number;
+  last_modified_by?: string;
+  deleted_at?: string;
 }
 
 class YouTubeTranscriptRepository extends BaseRepository<YouTubeTranscript> {

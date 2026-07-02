@@ -360,7 +360,8 @@ const TABLE_SCHEMAS = {
   )`,
   assessment_categories: `CREATE TABLE IF NOT EXISTS assessment_categories (
     id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, name TEXT,
-    weight REAL, created_at TEXT, updated_at TEXT
+    weight REAL, created_at TEXT, updated_at TEXT,
+    sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT
   )`,
   schedules: `CREATE TABLE IF NOT EXISTS schedules (
     id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, title TEXT,
@@ -456,6 +457,7 @@ const TABLE_SCHEMAS = {
   youtube_transcripts: `CREATE TABLE IF NOT EXISTS youtube_transcripts (
     id TEXT PRIMARY KEY,
     video_id TEXT NOT NULL UNIQUE,
+    user_id TEXT,
     transcript_uri TEXT,
     transcript_text TEXT,
     summary_uri TEXT,
@@ -463,6 +465,7 @@ const TABLE_SCHEMAS = {
     cloud_url TEXT,
     is_backed_up INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT,
     FOREIGN KEY (video_id) REFERENCES youtube_videos(id) ON DELETE CASCADE
   )`,
 };

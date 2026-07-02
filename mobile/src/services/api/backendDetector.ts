@@ -15,14 +15,18 @@
 import { Platform } from 'react-native';
 import { createMMKV } from 'react-native-mmkv';
 
+export type BackendStatus = 'unknown' | 'connecting' | 'online' | 'offline';
+
 export interface BackendConfig {
   url: string;
   source: 'render' | 'local' | 'env';
   isAvailable: boolean;
   timestamp: number;
+  status: BackendStatus;
 }
 
 const HEALTH_CHECK_TIMEOUT = 3000;
+const RENDER_HEALTH_CHECK_TIMEOUT = 12000;
 const HEALTH_CHECK_CACHE_DURATION = 30000;
 const HEALTH_CHECK_ENDPOINT = '/health';
 const LOCALHOST_TIMEOUT = 1500;
@@ -245,6 +249,10 @@ function getTimeoutForUrl(url: string, defaultTimeout: number): number {
   if (url.includes('localhost') || url.includes('10.0.2.2')) {
     return LOCALHOST_TIMEOUT;
   }
+  const renderBase = process.env.EXPO_PUBLIC_API_URL?.replace(/\/api\/?$/, '');
+  if (renderBase && url === renderBase) {
+    return RENDER_HEALTH_CHECK_TIMEOUT;
+  }
   return defaultTimeout;
 }
 
@@ -294,6 +302,7 @@ export async function detectAvailableBackend(
         source,
         isAvailable: true,
         timestamp: now,
+        status: 'online',
       };
       lastHealthCheckTime = now;
       console.log(`[Backend Detector] ✅ Fast path — ${lastUrl} (MMKV: ${mmkvElapsed.toFixed(1)}ms | Health: ${healthElapsed.toFixed(0)}ms | Total: ${totalElapsed.toFixed(0)}ms)`);
@@ -335,6 +344,7 @@ export async function detectAvailableBackend(
       source,
       isAvailable: true,
       timestamp: now,
+      status: 'online',
     };
     
     lastHealthCheckTime = now;
@@ -347,8 +357,50 @@ export async function detectAvailableBackend(
     return cachedBackendConfig;
   }
   
-  // 3. Si nada está disponible, usar la primera candidata como fallback
-  // (probablemente Render, que debería estar siempre disponible en producción)
+  // 3. Si ningún health check respondió:
+  //    - Si Render es candidato, darle más tiempo (cold start puede tardar 8-15s)
+  //    - Si no, fallback inmediato
+  if (renderBase && candidates.includes(renderBase)) {
+    cachedBackendConfig = {
+      url: renderBase,
+      source: 'render',
+      isAvailable: false,
+      timestamp: now,
+      status: 'connecting',
+    };
+    lastHealthCheckTime = now;
+    console.log(`[Backend Detector] ⏳ Render no respondió en ${elapsed}ms (cold start?), lanzando verificación extendida (${RENDER_HEALTH_CHECK_TIMEOUT}ms)...`);
+    
+    // Background: verificar Render con timeout largo
+    isBackendAvailable(renderBase, RENDER_HEALTH_CHECK_TIMEOUT).then((renderOk) => {
+      if (renderOk) {
+        cachedBackendConfig = {
+          url: renderBase,
+          source: 'render',
+          isAvailable: true,
+          timestamp: Date.now(),
+          status: 'online',
+        };
+        lastHealthCheckTime = Date.now();
+        saveSuccessfulBackend(renderBase);
+        console.log(`[Backend Detector] ☁️ Render ahora responde (background) ✅`);
+      } else {
+        cachedBackendConfig = {
+          url: renderBase,
+          source: 'render',
+          isAvailable: false,
+          timestamp: Date.now(),
+          status: 'offline',
+        };
+        lastHealthCheckTime = Date.now();
+        console.warn(`[Backend Detector] ☁️ Render sigue sin responder tras ${RENDER_HEALTH_CHECK_TIMEOUT}ms ❌`);
+      }
+    });
+    
+    return cachedBackendConfig;
+  }
+  
+  // Fallback sin Render: usar primera candidata
   const fallbackUrl = candidates[0] || 'http://localhost:3000';
   
   cachedBackendConfig = {
@@ -356,14 +408,14 @@ export async function detectAvailableBackend(
     source: fallbackUrl === renderBase ? 'render' : 'local',
     isAvailable: false,
     timestamp: now,
+    status: 'offline',
   };
   
   lastHealthCheckTime = now;
   
   console.warn(
-    `[Backend Detector] ⚠️ No hay backend disponible. Usando fallback:`,
-    fallbackUrl,
-    '(puede no estar disponible)'
+    `[Backend Detector] ⚠️ Backends locales no disponibles. Usando fallback:`,
+    fallbackUrl
   );
   
   // 🔧 DEBUG: Información adicional
@@ -413,16 +465,25 @@ export function getCachedBackendConfig(): BackendConfig | null {
  * Retorna una descripción amigable del estado del backend.
  */
 export function getBackendStatusMessage(config: BackendConfig): string {
-  const statusEmoji = config.isAvailable ? '✅' : '⚠️';
+  const statusLabels: Record<BackendStatus, string> = {
+    unknown: '⚪',
+    connecting: '⏳',
+    online: '✅',
+    offline: '⚠️',
+  };
+  const statusEmoji = statusLabels[config.status] || '⚪';
   const sourceLabel = {
     local: '🖥️ Servidor Local',
     render: '☁️ Render Remoto',
     env: '🔧 Configurado',
   }[config.source];
   
-  const availabilityMsg = config.isAvailable
-    ? 'disponible'
-    : 'no verificado (puede estar desconectado)';
+  const statusMsg: Record<BackendStatus, string> = {
+    unknown: 'no verificado',
+    connecting: 'conectando...',
+    online: 'disponible',
+    offline: 'no disponible',
+  };
   
-  return `${statusEmoji} ${sourceLabel} - ${availabilityMsg}`;
+  return `${statusEmoji} ${sourceLabel} - ${statusMsg[config.status] || 'desconocido'}`;
 }
