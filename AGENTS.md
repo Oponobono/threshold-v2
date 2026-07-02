@@ -89,6 +89,15 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - **Backend SyntaxError fix**: syncController.js línea 130 — eliminado TypeScript `(s: number, arr: any)` que causaba error en Node.js v26.
 - **Download flow logging**: `downloadService.ts` ahora tiene logs en cada etapa: entrada, response de cloud-items, conteo por categoría, prefs, skip de mazo con razón, descarga JSON desde Uploadthing, resultado final.
 - **`getCloudItemsCount` corregido**: ahora suma `flashcardDecks` y `aiChats` además de las 5 categorías originales.
+- **FEATURE_MATRIX.md**: Documento funcional expandido a 5 matrices: Lifecycle (26+ entidades, 4 capas cada una), State Machine (5 entidades con estados documentados), Relationship (FK + cascade + 3 riesgos), Capability (IA por entidad), Offline (CRUD + IA + assets). Detecta 20+ brechas funcionales. El documento ahora gobierna el desarrollo: toda entidad nueva debe completar su fila antes de implementarse.
+- **USER_JOURNEYS.md**: 12 recorridos completos del usuario (120 pasos totales). 61% de completitud funcional detectada. El journey "Administrar materia" es el más incompleto (53%). El journey "Backup/Restore" es el más completo (80%).
+- **MUTATION_MATRIX.md**: 30+ acciones mapeadas con sus entidades afectadas. Detecta 9 mutaciones faltantes, incluyendo la más crítica: eliminar Subject no hace cascade en Courses, Assessments, Schedules, ni StudySessions.
+- **OWNERSHIP_MATRIX.md**: Árbol de propiedad completo con 25 relaciones. Identifica 5 riesgos de orphan data por CASCADE faltante en relaciones Subject→hijos.
+- **Desvincular examen de mazo**: Brecha funcional corregida — la UI ahora permite desvincular un examen de un mazo. Tres puntos de entrada:
+  1. Botón "Quitar vínculo" + icono X en `LinkExamModal.tsx` junto al examen vinculado actualmente.
+  2. Swipe action con icono link rojo en `flashcards.tsx` cuando el mazo tiene `linked_event_id`.
+  3. `handleUnlink` en `LinkExamModal.tsx` limpia `linked_event_id` del mazo y remueve el deck del CSV `linked_deck_id` del evento.
+  Backend ya soportaba `PUT /flashcard-decks/:deckId` con `{ linked_event_id: null }` — solo faltaba UI.
 
 ### In Progress
 - 🟢 **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md`: estructura de eventos, initial/delta/push flow, conflict resolution, versionado, deletion_version, códigos de error, garantías.
@@ -96,16 +105,22 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - 🟢 **Consistency Report** — `ConsistencyReport.js` ejecutable post-suite: entidades (15 tablas B vs D0), integridad (FK orphans, duplicate PKs), colas (pending/failed), versiones (backend/device/max_table).
 - 🟢 **deletion_version — Fase 5 (Cleanup)**: Confirmado — **cero decisiones de sync dependen de `deleted_at`**.
 - 🟢 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. **audio_transcripts** ya incrementa sync_version correctamente. Convergence Suite + Stress Suite verifican integridad.
+- 🟢 **Product Audit Phase**: 4 documentos de auditoría de producto creados (FEATURE_MATRIX, USER_JOURNEYS, MUTATION_MATRIX, OWNERSHIP_MATRIX). El tipo de auditoría cambió de "¿el sync funciona?" a "¿la aplicación permite completar el ciclo de vida?".
 
-### Next Up
-- 🟢 **Sync Protocol v1.0 document**: `SYNC_PROTOCOL.md` — created and frozen.
-- 🟢 **RandomScenario generator**: 100×2 PASS, 100% convergence, 31 conflicts, 0 errors.
-- 🟢 **deletion_version Fase 5 (Cleanup)**: Confirmed — zero sync decisions depend on `deleted_at`.
-- 🟢 **`sameEntities` skips `sync_version`**: Already done.
-- 🟡 **Scenario expansion** — RESTORE cascade (subject delete cascades to courses → verify course deletions), conflict resolution merge/LWW.
-- ✅ **Download flow** — diagnosticado: NO es bug de infraestructura.
-- ✅ **Convergence Test Suite (10/10)** — Framework completo validando CREATE, UPDATE, DELETE, RESTORE, idempotent double CREATE, offline-then-sync, stale client 409, flashcard deck+cards, initial sync.
-- ✅ **Stress Suite avanzado** — 1000 ops regression PASS, 1056 conflictos detectados, 5 perturbaciones activas, tiered runner (smoke/regression/nightly/custom), métricas detalladas.
+### Next Steps
+1. ✅ **Stress Suite expansion** — RandomScenario (4 segmentos, Consistency Report) corriendo en tier runner (`node index.js random`).
+2. ✅ **Assets pipeline** — integrado en SimulationEngine + Convergence Suite + Stress Suite. **audio_transcripts** corrigió `incrementSyncVersion` faltante.
+3. 🟡 **Cerrar brechas funcionales de FEATURE_MATRIX.md** — Priorizar brechas donde backend ya soporta la operación pero falta UI. Las 5 matrices son la fuente de verdad del ciclo de vida de cada entidad. Orden:
+    1. Priority High (UI faltante, backend listo): duplicar mazo, re-transcribir, compartir contenido
+    2. Priority Medium (relaciones): CASCADE faltante en assessments/schedules/study_sessions
+    3. Priority Low (calidad de vida): archivar, resetear estadísticas
+4. 🟡 **Cerrar brechas de USER_JOURNEYS.md** — Los 12 journeys son la guía de priorización. El journey "Administrar materia" (53%) y "Mazo compartido" (44%) son los más incompletos. Cada journey debe auditarse antes de cerrar un sprint.
+4. 🟡 **EntityRegistry centralizado** — crear registro único de todas las entidades sincronizables para que tests verifiquen automáticamente: toda entidad existe en delta sync, incrementa sync_version, aparece en initial sync y consistency report.
+5. 🟡 **Dashboard de salud del Sync Engine** — Convergence Score, stress/consistency status, pending queue, failed journal, retry rate, avg/P95 sync timing.
+4. ✅ **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen.
+5. 🟡 **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
+6. 🟡 **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
+7. 🟡 **Refactorizar event handlers** (`deleteSubject`, `createStudySession`, `getPredictedSubject`) para que no importen directamente de `services/api`.
 
 ### Blocked
 - *(none)*
@@ -133,6 +148,48 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - La cola original no se modifica; la reducida se genera nueva. Si falla, la original permanece intacta.
 - `sync_queue` debe evolucionar a Event Store con traceId, version, dependsOn, retry, createdAt.
 
+### Threshold: De código a dominio
+- El proyecto cruzó el umbral de estar organizado alrededor del código a estarlo alrededor del dominio.
+- Ahora el conjunto de documentos (SYNC_PROTOCOL, FEATURE_MATRIX, USER_JOURNEYS, MUTATION_MATRIX, OWNERSHIP_MATRIX, AGENTS) constituye la especificación funcional del producto, no documentación técnica.
+- **Regla de gobierno a partir de ahora**: No implementar una funcionalidad nueva mientras exista un ciclo de vida incompleto en una funcionalidad existente. Antes de agregar X, verificar:
+  - ¿El usuario puede crearlo, editarlo, moverlo, vincularlo/desvincularlo, eliminarlo, restaurarlo (si aplica)?
+  - ¿Funciona offline? ¿Sincroniza? ¿Tiene pruebas?
+  - ¿Aparece en las matrices?
+- **Proceso madurado**: El ciclo pasó de `Bug → Fix → Siguiente bug` a `Observación → Auditoría → Modelo → Implementación → Tests → Documentación → Regla de gobierno`.
+- **Nueva definición de "Done"**: Una funcionalidad está terminada solo cuando completa:
+  1. Modelo actualizado (matrices)
+  2. Implementación (código)
+  3. Convergence Suite (sync)
+  4. Stress Suite (resistencia)
+  5. Pruebas en dispositivos (campo)
+  6. Documentación (matrices actualizadas)
+  7. FEATURE_MATRIX.md = ✅ y USER_JOURNEYS.md = ✅ para esa entidad
+- **Métricas de seguimiento del proyecto**:
+  - **Estabilidad del motor**: Convergence Suite + Stress Suite + tests en dispositivos (¿todo verde?)
+  - **Completitud funcional**: % de operaciones completas en FEATURE_MATRIX.md
+  - **Completitud de recorridos**: % de pasos completados en USER_JOURNEYS.md
+- **Documentos futuros** (cuando el dominio lo requiera):
+  - `DOMAIN_MODEL.md`: Qué representa cada entidad (no cómo sincroniza ni cómo se almacena — solo su significado en el dominio).
+  - `DECISION_LOG.md` (o ADRs): Registro de decisiones arquitectónicas con contexto, alternativas, y estado (Accepted/Deprecated/Superseded).
+
+### Metodología: Operación Campo
+- **Fase 1 — Usar como usuario real**: 1-2 semanas usando la app como herramienta principal de estudio. No probar botones — cumplir objetivos reales ("mañana tengo un parcial").
+- **Fase 2 — No arreglar inmediatamente**: Documentar cada hallazgo sin abrir el editor. Cada hallazgo incluye: número, journey, paso, problema, impacto y documento afectado.
+- **Fase 3 — Agrupar**: No implementar uno por uno. Agrupar hallazgos por tema (relaciones, compartir, restaurar) y resolver en sprints temáticos.
+- **Fase 4 — Matrices como backlog**: FEATURE_MATRIX y USER_JOURNEYS son el backlog vivo. No inventar tareas — las celdas en rojo YA son las tareas.
+
+### Priorización de Hallazgos: Impacto × Frecuencia
+
+| Impacto | Peso | Frecuencia | Peso |
+|---------|------|-----------|------|
+| No puedo terminar el flujo | 5 | Todos los días | 5 |
+| Puedo terminar con dificultad | 4 | Varias veces/semana | 4 |
+| Existe workaround | 3 | Semanal | 3 |
+| Es incómodo | 2 | Mensual | 2 |
+| Detalle visual | 1 | Muy raro | 1 |
+
+**Score = Impacto × Frecuencia**. El backlog se ordena por score descendente.
+
 ### Regla del Protocolo: Toda entidad sincronizable debe incrementar sync_version
 - El bug `upsertAudioTranscript` demostró que la regla "toda escritura incrementa sync_version" es fácil de olvidar.
 - **Solución propuesta**: Centralizar en un helper único `upsertSyncEntity()` que ejecute INSERT/UPDATE + incrementSyncVersion + devolución de datos. Ningún controller nuevo debe llamar `incrementSyncVersion` manualmente.
@@ -149,12 +206,17 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 ## Next Steps
 1. ✅ **Stress Suite expansion** — RandomScenario (4 segmentos, Consistency Report) corriendo en tier runner (`node index.js random`).
 2. ✅ **Assets pipeline** — integrado en SimulationEngine + Convergence Suite + Stress Suite. **audio_transcripts** corrigió `incrementSyncVersion` faltante.
-3. 🟡 **EntityRegistry centralizado** — crear registro único de todas las entidades sincronizables para que tests verifiquen automáticamente: toda entidad existe en delta sync, incrementa sync_version, aparece en initial sync y consistency report.
-4. 🟡 **Dashboard de salud del Sync Engine** — Convergence Score, stress/consistency status, pending queue, failed journal, retry rate, avg/P95 sync timing.
-4. ✅ **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen.
-5. 🟡 **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
-6. 🟡 **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
-7. 🟡 **Refactorizar event handlers** (`deleteSubject`, `createStudySession`, `getPredictedSubject`) para que no importen directamente de `services/api`.
+3. 🟡 **Cerrar brechas funcionales de FEATURE_MATRIX.md** — Priorizar brechas donde backend ya soporta la operación pero falta UI. Las 5 matrices son la fuente de verdad del ciclo de vida de cada entidad. Orden:
+    1. Priority High (UI faltante, backend listo): duplicar mazo, re-transcribir, compartir contenido
+    2. Priority Medium (relaciones): CASCADE faltante en assessments/schedules/study_sessions
+    3. Priority Low (calidad de vida): archivar, resetear estadísticas
+4. 🟡 **Cerrar brechas de USER_JOURNEYS.md** — Los 12 journeys son la guía de priorización. El journey "Administrar materia" (53%) y "Mazo compartido" (44%) son los más incompletos. Cada journey debe auditarse antes de cerrar un sprint.
+5. 🟡 **EntityRegistry centralizado** — crear registro único de todas las entidades sincronizables para que tests verifiquen automáticamente: toda entidad existe en delta sync, incrementa sync_version, aparece en initial sync y consistency report.
+6. 🟡 **Dashboard de salud del Sync Engine** — Convergence Score, stress/consistency status, pending queue, failed journal, retry rate, avg/P95 sync timing.
+7. ✅ **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen.
+8. 🟡 **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
+9. 🟡 **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
+10. 🟡 **Refactorizar event handlers** (`deleteSubject`, `createStudySession`, `getPredictedSubject`) para que no importen directamente de `services/api`.
 
 ## Hallazgos Críticos del Audit
 - **sync_version nunca se incrementa** en backend — ningún controller llama a `UPDATE sync_version SET version = version + 1` ni `SET sync_version = <next>` en las tablas de entidad. `syncController.js` ejecuta `WHERE sync_version > ?` que siempre devuelve vacío. **CORREGIDO** vía helper `syncVersion.js` + 9 controllers.

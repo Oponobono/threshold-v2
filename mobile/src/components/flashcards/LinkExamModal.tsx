@@ -81,11 +81,12 @@ interface Props {
   deck: FlashcardDeck | null;
   onClose: () => void;
   onLinked: (examTitle: string) => void;
+  onUnlinked?: () => void;
 }
 
 type Step = 'pick' | 'create';
 
-export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinked }) => {
+export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinked, onUnlinked }) => {
   const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>('pick');
@@ -210,6 +211,32 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
     }
   };
 
+  // ── Unlink current exam ──────────────────────────────────────────────────
+  const handleUnlink = async () => {
+    if (!deck || !currentLinkedExam || linking) return;
+    setLinking(true);
+    try {
+      const deckIdStr = String(deck.id);
+      await updateFlashcardDeck(deckIdStr, { linked_event_id: null });
+      const eventId = String(currentLinkedExam.id);
+      const existingIds = String(currentLinkedExam.linked_deck_id ?? '')
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter(Boolean)
+        .filter((id: string) => id !== deckIdStr);
+      if (existingIds.length !== String(currentLinkedExam.linked_deck_id ?? '').split(',').map((s: string) => s.trim()).filter(Boolean).length) {
+        await updateCalendarEvent(eventId, { deckId: existingIds.join(',') || '' }).catch(() => {});
+      }
+      setCurrentLinkedExam(null);
+      onUnlinked?.();
+      onClose();
+    } catch (e: any) {
+      console.warn('[LinkExamModal] Error unlinking exam:', e.message);
+    } finally {
+      setLinking(false);
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────
   if (!visible) return null;
 
@@ -263,7 +290,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
                       {currentLinkedExam && (
                         <>
                           <Text style={styles.sectionLabel}>Vinculado actualmente</Text>
-                          <View style={[styles.examRow, { backgroundColor: theme.colors.primary + '10', marginBottom: 16 }]}>
+                          <View style={[styles.examRow, { backgroundColor: theme.colors.primary + '10' }]}>
                             <View style={[styles.urgencyDot, { backgroundColor: theme.colors.primary }]} />
                             <View style={{ flex: 1 }}>
                               <Text style={[styles.examTitle, { color: theme.colors.primary }]} numberOfLines={1}>{currentLinkedExam.title}</Text>
@@ -276,8 +303,46 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
                                 {urgencyLabel(daysBetween((currentLinkedExam as any).start_date ?? (currentLinkedExam as any).startDate))}
                               </Text>
                             </View>
-                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} style={{ marginLeft: 8 }} />
+                            <TouchableOpacity
+                              onPress={() => {
+                                Alert.alert(
+                                  'Desvincular examen',
+                                  `¿Quitar el vínculo con "${currentLinkedExam.title}"?`,
+                                  [
+                                    { text: 'Cancelar', style: 'cancel' },
+                                    { text: 'Desvincular', style: 'destructive', onPress: handleUnlink },
+                                  ],
+                                );
+                              }}
+                              disabled={linking}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              style={{ marginLeft: 8, padding: 2 }}
+                            >
+                              {linking ? (
+                                <ActivityIndicator size="small" color={theme.colors.danger} />
+                              ) : (
+                                <Ionicons name="close-circle" size={20} color={theme.colors.danger} />
+                              )}
+                            </TouchableOpacity>
                           </View>
+                          <TouchableOpacity
+                            onPress={() => {
+                              Alert.alert(
+                                'Desvincular examen',
+                                `¿Quitar el vínculo con "${currentLinkedExam.title}"?`,
+                                [
+                                  { text: 'Cancelar', style: 'cancel' },
+                                  { text: 'Desvincular', style: 'destructive', onPress: handleUnlink },
+                                ],
+                              );
+                            }}
+                            disabled={linking}
+                            style={{ alignSelf: 'flex-start', marginBottom: 16, paddingVertical: 4 }}
+                          >
+                            <Text style={{ fontSize: 12, color: theme.colors.danger, fontWeight: '600' }}>
+                              {linking ? 'Desvinculando...' : 'Quitar vínculo'}
+                            </Text>
+                          </TouchableOpacity>
                         </>
                       )}
                       

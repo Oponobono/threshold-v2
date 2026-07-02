@@ -43,6 +43,7 @@ export function useFlashcards() {
   // Exam mode state
   const [linkExamTarget, setLinkExamTarget] = useState<FlashcardDeck | null>(null);
 
+
   const handleRemoveFromGroup = useCallback(async (deck: FlashcardDeck, groupPin: string) => {
     showAlert({
       title: t('modals.removeFromGroup'),
@@ -217,15 +218,26 @@ export function useFlashcards() {
 
   const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
     const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
-    const pillWidth = isOwner ? 202 : 152;
+    const hasLinkedExam = !!(deck as any).linked_event_id;
+    const extraUnlink = hasLinkedExam ? 50 : 0;
+    const pillWidth = (isOwner ? 202 : 152) + extraUnlink;
     return {
       pillWidth,
       onAddPress: () => { close(); setActiveDeck(deck); setShowNewCardModal(true); },
       onSharePress: isOwner ? () => { close(); setShareDeckTarget(deck); setSharePin(''); } : undefined,
       onExamLinkPress: () => { close(); setLinkExamTarget(deck); },
+      onUnlinkPress: hasLinkedExam ? () => {
+        close();
+        updateFlashcardDeck(String(deck.id), { linked_event_id: null }).then(() => {
+          loadDecks({ skipCache: true });
+          showAlert({ title: 'Vínculo eliminado', message: `El mazo "${deck.title}" ya no está vinculado a ningún examen.`, type: 'info' });
+        }).catch((e: any) => {
+          showAlert({ title: 'Error', message: e.message || 'No se pudo desvincular el examen', type: 'error' });
+        });
+      } : undefined,
       onDeletePress: () => { close(); handleDeleteDeck(deck); },
     };
-  }, [handleDeleteDeck, currentUserId]);
+  }, [handleDeleteDeck, currentUserId, loadDecks, showAlert]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);

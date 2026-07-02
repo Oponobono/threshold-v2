@@ -150,7 +150,7 @@ export default function FlashcardsScreen() {
                   const isShared = deck.user_id != null && String(deck.user_id) !== String(currentUserId) && !(deck as any)._local;
                   const duedeckIds = getDuedeckIds();
                   const isDue = duedeckIds.has(deck.id);
-                  const { pillWidth, onAddPress, onSharePress, onExamLinkPress, onDeletePress } = renderSwipeActions(deck, () => {});
+                  const { pillWidth, onAddPress, onSharePress, onExamLinkPress, onDeletePress, onUnlinkPress } = renderSwipeActions(deck, () => {});
                   return (
                     <SwipeableCard
                       onOpen={(closeFn) => {
@@ -189,6 +189,18 @@ export default function FlashcardsScreen() {
                                 activeOpacity={0.6}
                               >
                                 <Ionicons name="calendar-outline" size={17} color={theme.colors.text.secondary} />
+                              </TouchableOpacity>
+                            </>
+                          )}
+                          {onUnlinkPress && (
+                            <>
+                              <View style={flashcardStyles.swipeActionDivider} />
+                              <TouchableOpacity
+                                style={flashcardStyles.swipeActionBtn}
+                                onPress={() => { close(); onUnlinkPress(); }}
+                                activeOpacity={0.6}
+                              >
+                                <Ionicons name="link-outline" size={17} color={theme.colors.danger} />
                               </TouchableOpacity>
                             </>
                           )}
@@ -383,6 +395,15 @@ export default function FlashcardsScreen() {
             title: '¡Modo Examen activo!',
             message: `El mazo "${linkExamTarget?.title}" ya está vinculado a "${examTitle}". Los intervalos se comprimirán automáticamente.`,
             type: 'success',
+          });
+          setLinkExamTarget(null);
+          await loadDecks({ skipCache: true });
+        }}
+        onUnlinked={async () => {
+          showAlert({
+            title: 'Vínculo eliminado',
+            message: `El mazo "${linkExamTarget?.title}" ya no está vinculado a ningún examen.`,
+            type: 'info',
           });
           setLinkExamTarget(null);
           await loadDecks({ skipCache: true });
