@@ -144,7 +144,7 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
     }
 
     for (const review of pendingReviews) {
-      const sid = cardToSubject[review.cardId] ?? null;
+      const sid = cardToSubject[Number(review.cardId)] ?? null;
       if (!sid || !stats[sid]) continue;
 
       stats[sid].totalReviews++;
@@ -336,9 +336,10 @@ export async function getLocalPredictions(userId: string): Promise<PredictionRes
   const pendingReviews = getPendingReviews();
   const pendingMap: Record<number, number> = {};
   for (const r of pendingReviews) {
-    if (!pendingMap[r.cardId]) pendingMap[r.cardId] = 0;
-    pendingMap[r.cardId]++;
-    if (r.grade < 3) pendingMap[r.cardId] = -999; // mark as incorrect
+    const cardIdNum = Number(r.cardId);
+    if (!pendingMap[cardIdNum]) pendingMap[cardIdNum] = 0;
+    pendingMap[cardIdNum]++;
+    if (r.grade < 3) pendingMap[cardIdNum] = -999; // mark as incorrect
   }
 
   // 5. Obtener failure_rate desde SQLite en batch
