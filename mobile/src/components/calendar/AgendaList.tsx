@@ -14,21 +14,12 @@ const LinkedDeckIndicator = ({ eventId }: { eventId: string }) => {
   React.useEffect(() => {
     if (!eventId) return;
     let isMounted = true;
-    Promise.all([
-      import('../../services/database').then(m => m.flashcardDeckRepository.getByLinkedEvent(eventId)),
-      import('../../services/localFlashcardService').then(m => m.getLocalDecks()),
-    ]).then(([sqliteDecks, localDecks]) => {
-      if (!isMounted) return;
-      const fromSqlite = (sqliteDecks || []).map((d: any) => ({ id: String(d.id) }));
-      const fromLocal = (localDecks || [])
-        .filter((ld: any) => String(ld.linked_event_id) === String(eventId))
-        .map((ld: any) => ({ id: String(ld.id) }));
-      const merged = [...fromSqlite];
-      for (const ld of fromLocal) {
-        if (!merged.find(d => d.id === ld.id)) merged.push(ld);
-      }
-      setDeckCount(merged.length);
-    }).catch(() => {});
+    import('../../services/database').then(m => m.flashcardDeckRepository.getByLinkedEvent(eventId))
+      .then(sqliteDecks => {
+        if (!isMounted) return;
+        const mapped = (sqliteDecks || []).map((d: any) => ({ id: String(d.id) }));
+        setDeckCount(mapped.length);
+      }).catch(() => {});
     return () => { isMounted = false; };
   }, [eventId]);
 

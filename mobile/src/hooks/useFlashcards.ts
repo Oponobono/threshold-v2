@@ -14,8 +14,8 @@ import {
   cancelAllDueDeckNotifications,
 } from '../services/notificationService';
 import { getUserGroups, getGroupDecks } from '../services/api/learning/groups';
-import { exportDeckToJSON, getLocalDecks } from '../services/localFlashcardService';
-
+import { databaseService } from '../services/database/DatabaseService';
+import { useFlashcardsStore } from '../store/useFlashcardsStore';
 export function useFlashcards() {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
@@ -109,6 +109,8 @@ export function useFlashcards() {
     loadDecks,
   } = useFlashcardsManager(subjects);
 
+  const { initialize: initializeStore, refresh: refreshStore } = useFlashcardsStore();
+
   const handleOpenMenu = useCallback(() => {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
@@ -191,17 +193,22 @@ export function useFlashcards() {
         console.warn('[useFlashcards] Export backend falló, intentando localmente:', onlineErr);
       }
 
-      // OFFLINE-FIRST: Exportar desde cache local si está offline
-      const localDecks = getLocalDecks();
-      const isLocal = localDecks.some(d => String(d.id) === deck.id);
-      if (isLocal) {
-        const localDeck = localDecks.find(d => String(d.id) === deck.id);
+      // OFFLINE-FIRST: Exportar desde cache local (SQLite) si está offline
+      const db = databaseService.getDb();
+      const localDeck: any = await db.getFirstAsync('SELECT * FROM flashcard_decks WHERE id = ?', [deck.id]);
+      if (localDeck) {
+        const cards: any[] = await db.getAllAsync('SELECT * FROM flashcards WHERE deck_id = ? AND deleted_at IS NULL', [deck.id]);
         
-        if (localDeck) {
-          const deckJSON = await exportDeckToJSON(localDeck.id);
-          console.log('[useFlashcards] Mazo exportado localmente (offline)');
-          return deckJSON;
-        }
+        const deckJSON = {
+          title: localDeck.title,
+          description: localDeck.description || '',
+          cards: cards.map(c => ({
+            type: 'flashcard',
+            data: { front: c.front || '', back: c.back || '' }
+          }))
+        };
+        console.log('[useFlashcards] Mazo exportado localmente (offline)');
+        return deckJSON;
       }
 
       throw new Error('No se pudo exportar el mazo');
@@ -218,26 +225,15 @@ export function useFlashcards() {
 
   const renderSwipeActions = useCallback((deck: FlashcardDeck, close: () => void) => {
     const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
-    const hasLinkedExam = !!(deck as any).linked_event_id;
-    const extraUnlink = hasLinkedExam ? 50 : 0;
-    const pillWidth = (isOwner ? 202 : 152) + extraUnlink;
+    const pillWidth = isOwner ? 202 : 152;
     return {
       pillWidth,
       onAddPress: () => { close(); setActiveDeck(deck); setShowNewCardModal(true); },
       onSharePress: isOwner ? () => { close(); setShareDeckTarget(deck); setSharePin(''); } : undefined,
       onExamLinkPress: () => { close(); setLinkExamTarget(deck); },
-      onUnlinkPress: hasLinkedExam ? () => {
-        close();
-        updateFlashcardDeck(String(deck.id), { linked_event_id: null }).then(() => {
-          loadDecks({ skipCache: true });
-          showAlert({ title: 'Vínculo eliminado', message: `El mazo "${deck.title}" ya no está vinculado a ningún examen.`, type: 'info' });
-        }).catch((e: any) => {
-          showAlert({ title: 'Error', message: e.message || 'No se pudo desvincular el examen', type: 'error' });
-        });
-      } : undefined,
       onDeletePress: () => { close(); handleDeleteDeck(deck); },
     };
-  }, [handleDeleteDeck, currentUserId, loadDecks, showAlert]);
+  }, [handleDeleteDeck, currentUserId, showAlert]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -295,22 +291,19 @@ export function useFlashcards() {
         try {
           const userId = await getUserId();
           setCurrentUserId(userId ? String(userId) : null);
-          
-          // Fire loadDecks immediately to trigger Phase 1 (instant cache load)
-          const loadDecksPromise = loadDecks();
+
+          await initializeStore();
 
           const subs = await getSubjects();
           setSubjects(subs || []);
-          
-          // Load groups (network call) without blocking
+
           getUserGroups().then(userGroups => {
             const valid = (userGroups || []).filter((g: any) => g.group_pin_id);
             setGroups(valid);
-            // Only set active group if there's none and valid groups exist
             setActiveGroupPin(prev => prev || (valid.length > 0 ? valid[0].group_pin_id : null));
           }).catch(e => console.warn('Error loading groups:', e));
 
-          await loadDecksPromise;
+          refreshStore();
         } catch (e) {
           console.warn('Error initializing flashcards:', e);
         }

@@ -98,6 +98,7 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
   2. Swipe action con icono link rojo en `flashcards.tsx` cuando el mazo tiene `linked_event_id`.
   3. `handleUnlink` en `LinkExamModal.tsx` limpia `linked_event_id` del mazo y remueve el deck del CSV `linked_deck_id` del evento.
   Backend ya soportaba `PUT /flashcard-decks/:deckId` con `{ linked_event_id: null }` — solo faltaba UI.
+- **[*NUEVO*] SubjectDomainService.deleteSubject()**: Nuevo servicio `mobile/src/services/domain/SubjectDomainService.ts` que implementa cascade local transaccional al eliminar Subject. Cubre 11 entidades hijas (assessments, assessment_categories, schedules, study_sessions, threshold_overrides, photos, audio_recordings, scanned_documents, youtube_videos, flashcard_decks → flashcards, calendar_events). Compacta sync_journal (elimina operaciones pendientes de todas las entidades afectadas). Soft-delete atómico dentro de `withExclusiveTransactionAsync`. Emite eventos batch post-transacción. `subjects.ts` delega en el servicio. Sprint 1 completado. 11 tests de integración cubren cascade, journal compaction, atomicidad, idempotencia y eventos.
 
 ### In Progress
 - 🟢 **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md`: estructura de eventos, initial/delta/push flow, conflict resolution, versionado, deletion_version, códigos de error, garantías.
@@ -106,6 +107,7 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - 🟢 **deletion_version — Fase 5 (Cleanup)**: Confirmado — **cero decisiones de sync dependen de `deleted_at`**.
 - 🟢 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. **audio_transcripts** ya incrementa sync_version correctamente. Convergence Suite + Stress Suite verifican integridad.
 - 🟢 **Product Audit Phase**: 4 documentos de auditoría de producto creados (FEATURE_MATRIX, USER_JOURNEYS, MUTATION_MATRIX, OWNERSHIP_MATRIX). El tipo de auditoría cambió de "¿el sync funciona?" a "¿la aplicación permite completar el ciclo de vida?".
+- 🟢 **Sprint 1 (Cascade local Subject)**: `SubjectDomainService.deleteSubject()` implementado — cascade transaccional + journal compaction + eventos batch. `subjects.ts` delega en el servicio.
 
 ### Next Steps
 1. ✅ **Stress Suite expansion** — RandomScenario (4 segmentos, Consistency Report) corriendo en tier runner (`node index.js random`).
@@ -216,9 +218,11 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 7. ✅ **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen.
 8. 🟡 **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
 9. 🟡 **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
-10. 🟡 **Refactorizar event handlers** (`deleteSubject`, `createStudySession`, `getPredictedSubject`) para que no importen directamente de `services/api`.
+10. 🟡 **Sprint 2 (Restore Validator)**: Convertir `downloadService.ts` en importador con dos fases — Parse Backup → Validate Graph (FKs, duplicados, sync_version inválido, padres soft-deleted, referencias circulares) → Integrity Report → Import → Summary.
+11. ✅ **Sprint 1 (Cascade local Subject)**: `SubjectDomainService.deleteSubject()` implementado — cascade transaccional + journal compaction + eventos batch + 11 tests de integración. `subjects.ts` delega en el servicio.
 
 ## Hallazgos Críticos del Audit
+- **FOREIGN KEY constraint failed en restore de backup**: `downloadService.ts` falla al restaurar flashcard_decks cuyos `subject_id` ya no existe localmente. Causa raíz: `deleteSubject()` en móvil hace soft-delete SIN cascade local. El backend sí cascadea, pero entre el soft-delete local y la sincronización, un backup captura decks huérfanos. **CORREGIDO** vía `SubjectDomainService.deleteSubject()` con cascade transaccional + journal compaction. Sprint 2 pendiente: IntegrityReport en restore para prevenir inserciones huérfanas.
 - **sync_version nunca se incrementa** en backend — ningún controller llama a `UPDATE sync_version SET version = version + 1` ni `SET sync_version = <next>` en las tablas de entidad. `syncController.js` ejecuta `WHERE sync_version > ?` que siempre devuelve vacío. **CORREGIDO** vía helper `syncVersion.js` + 9 controllers.
 - **initialSync cubre solo 6 entidades** (user, courses, subjects, assessments, schedules, flashcardDecks). Faltan photos, audio, scanned_documents, analytics, settings, calendar, notifications. **CORREGIDO** — ahora 10 entidades.
 - **deltaSync cubre solo 5 tablas** + sync_deletions. Mismas entidades faltantes. **CORREGIDO** — ahora 9 tablas.
@@ -333,6 +337,10 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - `backend/controllers/audioController.js` — incrementSyncVersion + recordDeletion (audio_recordings, audio_transcripts)
 - `backend/controllers/scannedDocumentsController.js` — incrementSyncVersion + recordDeletion (scanned_documents)
 
+### Domain Layer
+- `mobile/src/services/domain/SubjectDomainService.ts` — `deleteSubject()` transaccional: cascade 11 entidades hijas + journal compaction + eventos batch
+- `mobile/src/services/domain/invariants.ts` — Invariant checks (requireActiveSubject, etc.)
+
 ### Data Layer
 - `mobile/src/services/database/BaseRepository.ts` — Now uses ConflictResolver on upsert
 - `mobile/src/services/database/DatabaseService.ts` — Transaction support
@@ -341,7 +349,7 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - `mobile/src/services/database/migrations.ts` — v20 (SyncJournal), v21 (version_number/last_modified_by/deleted_at), v22 (sync_debug_logs + trace_id)
 
 ### Mobile API (enqueue calls)
-- `mobile/src/services/api/subjects.ts` — enqueueCreate/Update/Delete for subject
+- `mobile/src/services/api/subjects.ts` — enqueueCreate/Update/Delete for subject; delega en SubjectDomainService para DELETE con cascade
 - `mobile/src/services/api/courses.ts` — enqueueCreate/Update/Delete for course
 - `mobile/src/services/api/photos.ts` — enqueueCreate/Update/Delete for photo
 - `mobile/src/services/api/audio.ts` — enqueueCreate/Update/Delete for audio + transcript

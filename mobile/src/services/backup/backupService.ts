@@ -726,15 +726,6 @@ export const runBackup = async (
     }
     } // Cierre de if (!isOffline)
 
-    // ── Fase 0e: Sincronizar mazos locales (MMKV) al backend ──
-    if (!isOffline) {
-      try {
-        await syncLocalFlashcardsToBackend();
-        console.log('[BackupService] Fase 0e: Sincronización de mazos locales completada.');
-      } catch (e) {
-        console.warn('[BackupService] Fase 0e: Error sincronizando mazos locales:', e);
-      }
-    }
 
   // ──────────────────────────────────────────────────────────────────
   // FASE 1: Obtener ítems pendientes desde SQLite local y subirlos
@@ -1155,78 +1146,4 @@ export const runBackup = async (
   return { success: errors === 0, uploaded, errors };
 };
 
-// ─── Sync local flashcards to backend ─────────────────────────────────────────
 
-export const syncLocalFlashcardsToBackend = async (): Promise<void> => {
-  try {
-    const { createMMKV } = await import('react-native-mmkv');
-    const storage = createMMKV();
-    const { getLocalDecks, deleteLocalDeck } = await import('../localFlashcardService');
-    const { createFlashcardDeck } = await import('../api/flashcards');
-
-    const localDecks = getLocalDecks().filter((d: any) => d._local);
-    if (localDecks.length === 0) {
-      console.log('[BackupService] No hay mazos locales para sincronizar.');
-      return;
-    }
-
-    console.log(`[BackupService] Sincronizando ${localDecks.length} mazo(s) local(es) al backend...`);
-
-    for (const deck of localDecks) {
-      try {
-        const createdDeck = await createFlashcardDeck({
-          id: String(deck.id),
-          title: deck.title,
-          description: deck.description,
-          subject_id: deck.subject_id ? String(deck.subject_id) : undefined,
-          linked_event_id: (deck as any).linked_event_id ?? undefined,
-          avg_ease_factor: (deck as any).avg_ease_factor ?? undefined,
-          total_reviews: (deck as any).total_reviews ?? undefined,
-          last_reviewed_at: (deck as any).last_reviewed_at ?? undefined,
-          card_count: deck.card_count ?? 0,
-        });
-        console.log(`[BackupService] Mazo ${deck.id} sincronizado. Nuevo ID remoto: ${createdDeck?.id}`);
-
-        // Leer cards locales desde MMKV
-        const cardsKey = `cache:flashcards_by_deck:${deck.id}`;
-        const raw = storage.getString(cardsKey);
-        let cards: any[] = [];
-        if (raw) {
-          const entry = JSON.parse(raw);
-          cards = entry.data || entry || [];
-        }
-
-        const { createFlashcard } = await import('../api/flashcards');
-        for (const card of cards) {
-          try {
-            await createFlashcard({
-              deck_id: String(createdDeck?.id || deck.id),
-              front: card.front || card.content?.front || '',
-              back: card.back || card.content?.back || '',
-              id: String(card.id),
-              ease_factor: card.ease_factor ?? card.ease ?? undefined,
-              interval_days: card.interval_days ?? card.interval ?? undefined,
-              repetitions: card.repetitions ?? card.reps ?? undefined,
-              next_review_at: card.next_review_at ?? undefined,
-              fsrs_stability: card.fsrs_stability ?? undefined,
-              fsrs_difficulty: card.fsrs_difficulty ?? undefined,
-            });
-          } catch (cardErr) {
-            console.warn(`[BackupService] Error sincronizando card ${card.id}:`, cardErr);
-          }
-        }
-
-        // Eliminar copia local tras sincronización exitosa
-        deleteLocalDeck(String(deck.id));
-        storage.remove(cardsKey);
-        console.log(`[BackupService] Mazo local ${deck.id} eliminado.`);
-      } catch (deckErr) {
-        console.warn(`[BackupService] Error sincronizando mazo ${deck.id}:`, deckErr);
-      }
-    }
-
-    console.log('[BackupService] Sincronización de mazos locales completada.');
-  } catch (err) {
-    console.error('[BackupService] Error en syncLocalFlashcardsToBackend:', err);
-  }
-};

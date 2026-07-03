@@ -1,5 +1,5 @@
 import { databaseService } from './database/DatabaseService';
-import { getLocalDecksForCurrentUser, getPendingReviews } from './localFlashcardService';
+import { getPendingReviews } from './localFlashcardService';
 import type { MasteryRadarData, MasteryRadarItem, GlobalGPAAnalytics, PredictionResponse, PredictionItem } from './api/analytics';
 
 interface SubjectAgg {
@@ -64,17 +64,10 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
   const deckParams: any[] = subjectId === 'all' ? [userId] : [userId, subjectId];
   const sqliteDecks = await db.getAllAsync(deckQuery, ...deckParams) as any[];
 
-  const localDecks = getLocalDecksForCurrentUser(userId);
   const deckToSubject: Record<string, string | null> = {};
 
   for (const d of sqliteDecks) {
     deckToSubject[d.id] = d.subject_id ?? null;
-  }
-  for (const d of localDecks) {
-    const sid = d.subject_id !== null ? String(d.subject_id) : null;
-    if (subjectId === 'all' || sid === subjectId) {
-      deckToSubject[String(d.id)] = sid;
-    }
   }
 
   // 3. Inicializar stats por subject
@@ -127,7 +120,7 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
     const mmkv = require('react-native-mmkv').createMMKV();
     const cardToSubject: Record<number, string | null> = {};
 
-    for (const localDeck of localDecks) {
+    for (const localDeck of sqliteDecks) {
       const sid = localDeck.subject_id !== null ? String(localDeck.subject_id) : null;
       if (subjectId !== 'all' && sid !== subjectId) continue;
 
@@ -295,11 +288,11 @@ export async function getLocalPredictions(userId: string): Promise<PredictionRes
     sqliteDue.push(...(rows || []));
   } catch { /* ignore */ }
 
-  // 2. Local cards (MMKV)
-  const localDecks = getLocalDecksForCurrentUser(userId);
+  // 2. Local cards (MMKV) using SQLite decks
+  const sqliteDecks = await db.getAllAsync('SELECT id, title, subject_id FROM flashcard_decks WHERE user_id = ? AND deleted_at IS NULL', userId) as any[];
   const localDue: any[] = [];
   const mmkv = require('react-native-mmkv').createMMKV();
-  for (const deck of localDecks) {
+  for (const deck of sqliteDecks) {
     try {
       const raw = mmkv.getString(`cache:flashcards_by_deck:${deck.id}`);
       if (!raw) continue;

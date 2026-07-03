@@ -28,6 +28,7 @@ import { MenuModal } from '../src/components/flashcards/MenuModal';
 import { useFlashcards } from '../src/hooks/useFlashcards';
 import { useTranslation } from 'react-i18next';
 import { useCustomAlert } from '../src/components/ui/CustomAlert';
+import { useFlashcardsStore } from '../src/store/useFlashcardsStore';
 
 export default function FlashcardsScreen() {
   const { t } = useTranslation();
@@ -54,6 +55,8 @@ export default function FlashcardsScreen() {
     groupDecks, loadingGroups,
     isGroupAdmin, handleRemoveFromGroup,
   } = useFlashcards();
+
+  const { refresh: refreshDecks } = useFlashcardsStore();
 
   if (isLoading && filteredDecks.length === 0 && activeTab === 'mazos') {
     return <PremiumLoading text="CARGANDO" />;
@@ -150,7 +153,7 @@ export default function FlashcardsScreen() {
                   const isShared = deck.user_id != null && String(deck.user_id) !== String(currentUserId) && !(deck as any)._local;
                   const duedeckIds = getDuedeckIds();
                   const isDue = duedeckIds.has(deck.id);
-                  const { pillWidth, onAddPress, onSharePress, onExamLinkPress, onDeletePress, onUnlinkPress } = renderSwipeActions(deck, () => {});
+                  const { pillWidth, onAddPress, onSharePress, onExamLinkPress, onDeletePress } = renderSwipeActions(deck, () => {});
                   return (
                     <SwipeableCard
                       onOpen={(closeFn) => {
@@ -189,18 +192,6 @@ export default function FlashcardsScreen() {
                                 activeOpacity={0.6}
                               >
                                 <Ionicons name="calendar-outline" size={17} color={theme.colors.text.secondary} />
-                              </TouchableOpacity>
-                            </>
-                          )}
-                          {onUnlinkPress && (
-                            <>
-                              <View style={flashcardStyles.swipeActionDivider} />
-                              <TouchableOpacity
-                                style={flashcardStyles.swipeActionBtn}
-                                onPress={() => { close(); onUnlinkPress(); }}
-                                activeOpacity={0.6}
-                              >
-                                <Ionicons name="link-outline" size={17} color={theme.colors.danger} />
                               </TouchableOpacity>
                             </>
                           )}
@@ -331,21 +322,21 @@ export default function FlashcardsScreen() {
         visible={showNewDeckModal}
         subjects={subjects}
         onClose={() => setShowNewDeckModal(false)}
-        onDeckCreated={() => { setShowNewDeckModal(false); loadDecks({ skipCache: true }); }}
+        onDeckCreated={() => { setShowNewDeckModal(false); refreshDecks(); }}
       />
 
       <FlashcardImportModal
         isVisible={showImportModal}
         onClose={() => setShowImportModal(false)}
         subjects={subjects}
-        onImportSuccess={() => loadDecks({ skipCache: true })}
+        onImportSuccess={() => refreshDecks()}
       />
 
       <NewCardModal
         visible={showNewCardModal}
         deck={activeDeck}
         onClose={() => setShowNewCardModal(false)}
-        onCardCreated={() => { setShowNewCardModal(false); loadDecks({ skipCache: true }); }}
+        onCardCreated={() => { setShowNewCardModal(false); refreshDecks(); }}
       />
 
       <EditDeckModal
@@ -353,7 +344,7 @@ export default function FlashcardsScreen() {
         deck={editingDeck}
         subjects={subjects}
         onClose={() => setShowEditDeckModal(false)}
-        onSaved={() => loadDecks({ skipCache: true })}
+        onSaved={() => refreshDecks()}
       />
 
       <MenuModal
@@ -378,7 +369,7 @@ export default function FlashcardsScreen() {
                 setShowStudyModal(false);
                 setActiveDeck(null);
                 setStudyDeckCards([]);
-                loadDecks({ skipCache: true });
+                refreshDecks();
               }}
             />
           )}
@@ -397,7 +388,7 @@ export default function FlashcardsScreen() {
             type: 'success',
           });
           setLinkExamTarget(null);
-          await loadDecks({ skipCache: true });
+          refreshDecks();
         }}
         onUnlinked={async () => {
           showAlert({
@@ -406,7 +397,7 @@ export default function FlashcardsScreen() {
             type: 'info',
           });
           setLinkExamTarget(null);
-          await loadDecks({ skipCache: true });
+          refreshDecks();
         }}
       />
 

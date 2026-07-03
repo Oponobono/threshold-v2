@@ -165,31 +165,10 @@ const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
 };
 
 export const updateFlashcardDeck = async (deckId: string, payload: any): Promise<any> => {
-  // Try updating local MMKV deck if it exists there (silent no-op if not local)
-  try {
-    const { updateLocalDeck } = await import('../localFlashcardService');
-    updateLocalDeck(deckId, payload);
-  } catch {}
-
   await flashcardDeckRepository.update(deckId, { ...payload, is_backed_up: 0 });
 
-  try {
-    const response = await fetchWithFallback(`/flashcard-decks/${deckId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await parseJsonSafely(response);
-    if (response.ok && data) {
-      const merged = await mergeDeckWithLocal(data);
-      await flashcardDeckRepository.update(data.id, merged);
-      return data;
-    }
-    throw new Error(data?.error || 'Error al actualizar el mazo');
-  } catch {
-    await syncService.enqueueUpdate('flashcard-deck', deckId, payload);
-    return { ...payload, _isPending: true };
-  }
+  syncService.enqueueUpdate('flashcard-deck', deckId, payload).catch(() => {});
+  return { ...payload, id: deckId, _isPending: true };
 };
 
 function getLocalCardsFromMMKV(deckId: string): any[] {

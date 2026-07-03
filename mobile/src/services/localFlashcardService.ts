@@ -292,23 +292,6 @@ export function getPendingDecksForSync(): LocalDeck[] {
   }
 }
 
-export function updateLocalDeck(deckId: string, updates: Partial<LocalDeck>): void {
-  try {
-    const decks = getLocalDecks();
-    const idx = decks.findIndex(d => d.id === deckId);
-
-    if (idx === -1) {
-      throw new Error(`Mazo ${deckId} no encontrado`);
-    }
-
-    decks[idx] = { ...decks[idx], ...updates };
-    saveLocalDecksSync(decks);
-  } catch (error) {
-    console.error('[LocalFlashcard] Error updating deck:', error);
-    throw error;
-  }
-}
-
 export function addLocalCard(deckId: string, card: Omit<LocalCard, 'id'>): void {
   try {
     const mmkv = require('react-native-mmkv').createMMKV();

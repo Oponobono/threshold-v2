@@ -18,10 +18,11 @@ import {
   authenticateWithBiometrics, 
   revokeBiometricToken 
 } from '../services/biometricService';
-import { getBackupPreferences, BACKUP_PREFS } from '../services/backup/backupService';
+import { BACKUP_PREFS } from '../services/backup/backupService';
 import { downloadCloudItems } from '../services/backup/downloadService';
 import { storageService } from '../services/storageService';
 import { preloadAllUserData, PreloadProgress } from '../services/dataPreloader';
+import { syncManager } from '../services/sync/SyncManager';
 
 /**
  * Hook personalizado que maneja toda la lógica de autenticación de la pantalla de Login.
@@ -84,39 +85,51 @@ export const useLoginAuth = () => {
   };
 
   /**
-   * Dispara la descarga automática en background si el usuario la tiene habilitada.
-   * Se llama en cada login exitoso sin bloquear la navegación.
+   * Secuencia post-login:
+   * 1. Initial Sync → popula SQLite (usuario, materias, flashcards, etc.)
+   * 2. preloadAllUserData → calienta caché MMKV con llamadas API
+   * 3. downloadCloudItems → descarga assets binarios/JSON del cloud
+   * El FK constraint de flashcard_decks.user_id se satisface porque el paso 1
+   * ya insertó el usuario en SQLite antes de que el paso 3 intente insertar mazos.
    */
   const navigateAfterSync = () => {
     setIsSyncLoading(true);
     setSyncProgress({ phase: 'profile', label: 'Sincronizando datos...', current: 0, total: 1 });
-    preloadAllUserData(setSyncProgress)
-      .then((result) => {
-        if (!result.success) {
-          console.warn('[Preloader] Precarga fallida:', result.error);
-        }
-      })
-      .catch((err) => {
-        console.warn('[Preloader] Error inesperado:', err);
-      })
+
+    const run = async () => {
+      setSyncProgress({ phase: 'profile', label: 'Sincronizando con el servidor...', current: 0, total: 3 });
+      try {
+        await syncManager.login();
+        await syncManager.requestInitialSync(true);
+        console.log('[Login] Initial Sync completado — SQLite poblado');
+      } catch (err) {
+        console.warn('[Login] Initial Sync fallido (continuando):', err);
+      }
+
+      setSyncProgress({ phase: 'subjects', label: 'Cargando datos del perfil...', current: 1, total: 3 });
+      try {
+        await preloadAllUserData(setSyncProgress);
+      } catch (err) {
+        console.warn('[Login] preloadAllUserData fallido (continuando):', err);
+      }
+
+      setSyncProgress({ phase: 'done', label: 'Descargando archivos del cloud...', current: 2, total: 3 });
+      try {
+        const result = await downloadCloudItems();
+        console.log(`[Login] Cloud download: ${result.downloaded} descargados, ${result.skipped} saltados, ${result.errors} errores`);
+        await storageService.saveSecure(BACKUP_PREFS.LAST_DOWNLOAD, new Date().toISOString());
+      } catch (err) {
+        console.warn('[Login] Descarga cloud fallida (no bloquea):', err);
+      }
+    };
+
+    run()
+      .catch((err) => console.warn('[Login] navigateAfterSync error inesperado:', err))
       .finally(() => {
         setIsSyncLoading(false);
         setSyncProgress(null);
-        triggerAutoDownloadIfEnabled();
         router.replace('/(tabs)');
       });
-  };
-
-  const triggerAutoDownloadIfEnabled = () => {
-    getBackupPreferences().then((prefs) => {
-      if (prefs.autoDownload) {
-        downloadCloudItems().then(() => {
-          storageService.saveSecure(BACKUP_PREFS.LAST_DOWNLOAD, new Date().toISOString());
-        }).catch((err) => {
-          console.warn('[Backup] Auto-descarga fallida en login:', err);
-        });
-      }
-    }).catch(() => {});
   };
 
   const handleLogin = async () => {
@@ -149,15 +162,9 @@ export const useLoginAuth = () => {
                 try {
                   await reactivateAccount(loginData.user.id.toString());
                   const sessionToken = `dummy-token-${Date.now()}`;
-                  if (Platform.OS === 'web') {
-                    localStorage.setItem('app_session_token', sessionToken);
-                    localStorage.setItem('app_user_email', email);
-                    localStorage.setItem('app_user_id', loginData.user.id.toString());
-                  } else {
-                    await setItemAsync('app_session_token', sessionToken);
-                    await setItemAsync('app_user_email', email);
-                    await setItemAsync('app_user_id', loginData.user.id.toString());
-                  }
+                  await storageService.saveSecure('jwt_token', sessionToken);
+                  await storageService.saveSecure('app_user_email', email);
+                  await storageService.saveSecure('app_user_id', loginData.user.id.toString());
                   alertRef.show({ title: t('common.success'), message: t('login.accountRecovered'), type: 'success' });
                   navigateAfterSync();
                 } catch (error: any) {

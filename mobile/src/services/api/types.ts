@@ -127,6 +127,7 @@ export interface FlashcardDeck {
   subject_icon?: string;
   owner_username?: string;
   owner_name?: string;
+  linked_event_id?: string;
   linked_exam_title?: string;
   linked_exam_date?: string;
   avg_ease_factor?: number;

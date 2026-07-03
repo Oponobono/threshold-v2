@@ -17,7 +17,9 @@ import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { type Subject } from '../../services/api';
-import { saveImportedDeck, updateLocalDeckSubject, prepareDeckForSync, addLocalCard } from '../../services/localFlashcardService';
+import { addLocalCard } from '../../services/localFlashcardService';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface FlashcardImportModalProps {
   isVisible: boolean;
@@ -345,40 +347,77 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         }
       }
 
-      const importSubjectId = deckData.subject_id ? String(deckData.subject_id) : null;
+      const deckId = uuidv4();
+      const userId = await import('../../services/api').then(m => m.getUserId());
+      const importSubjectId = deckData.subject_id ? String(deckData.subject_id) : undefined;
       const importSubject = importSubjectId ? subjects.find(s => s.id === importSubjectId) : undefined;
-      const deck = await saveImportedDeck(
-        sanitizeText(deckData.title),
-        sanitizeText(deckData.description),
-        cards,
-        importSubjectId,
-        importSubject?.name,
-        importSubject?.color,
-        importSubject?.icon,
-      );
+
+      const newDeck = {
+        id: deckId,
+        title: sanitizeText(deckData.title),
+        description: sanitizeText(deckData.description),
+        subject_id: importSubjectId,
+        subject_name: importSubject?.name,
+        subject_color: importSubject?.color,
+        subject_icon: importSubject?.icon,
+        card_count: cards.length,
+        user_id: String(userId || 0),
+        created_at: new Date().toISOString(),
+        review_count: 0,
+        learning_count: 0,
+        new_count: cards.length,
+      };
+
+      const { flashcardDeckRepository } = await import('../../services/database');
+      await flashcardDeckRepository.create(newDeck);
 
       // OFFLINE-FIRST: Persistir cada tarjeta individualmente en MMKV
       for (const card of cards) {
-        addLocalCard(deck.id, card);
+        addLocalCard(deckId, card as any);
       }
 
       // OFFLINE-FIRST: Preparar mazo para sincronizar cuando vuelva online
       try {
-        const userId = await import('../../services/api').then(m => m.getUserId());
         if (userId) {
-          await prepareDeckForSync(deck.id, userId);
+          const { syncService } = await import('../../services/database/SyncService');
+          const cardsKey = `cache:flashcards_by_deck:${deckId}`;
+          let mmkvCards: any[] = [];
+          try {
+            const raw = require('react-native-mmkv').createMMKV().getString(cardsKey);
+            if (raw) {
+              const entry = JSON.parse(raw);
+              mmkvCards = entry.data || entry || [];
+            }
+          } catch {}
+
+          const deckPayload = {
+            id: deckId,
+            title: newDeck.title,
+            description: newDeck.description,
+            subject_id: newDeck.subject_id,
+            cards: mmkvCards.map(c => ({
+              id: c.id,
+              front: c.front || c.content?.front || '',
+              back: c.back || c.content?.back || '',
+              item_type: c.item_type || 'flashcard',
+              content_json: c.content || c.data,
+              hint: c.hint,
+              explanation: c.explanation,
+            })),
+          };
+
+          await syncService.enqueueCreate('flashcard-deck', String(deckId), deckPayload);
           console.log('[FlashcardImportModal] Mazo importado preparado para sincronizar');
         }
       } catch (syncErr) {
-        // Si hay error preparando sync, no importa - el mazo se sincronizará manualmente
         console.warn('[FlashcardImportModal] Error preparando sync:', syncErr);
       }
 
       setImportedDeck({
-        id: deck.id,
-        title: deck.title,
-        description: deck.description,
-        cardCount: deck.card_count,
+        id: deckId,
+        title: newDeck.title,
+        description: newDeck.description,
+        cardCount: newDeck.card_count,
       });
 
       setIsProcessing(false);
@@ -421,13 +460,17 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       // Si se seleccionó materia, actualizarla
       if (selectedSubjectId) {
         const sub = subjects.find(s => s.id === String(selectedSubjectId));
-        updateLocalDeckSubject(
-          importedDeck.id,
-          String(selectedSubjectId),
-          sub?.name,
-          sub?.color,
-          sub?.icon,
-        );
+        const { flashcardDeckRepository } = await import('../../services/database');
+        const { syncService } = await import('../../services/database/SyncService');
+        await flashcardDeckRepository.update(importedDeck.id, {
+          subject_id: String(selectedSubjectId),
+          subject_name: sub?.name,
+          subject_color: sub?.color,
+          subject_icon: sub?.icon,
+        });
+        await syncService.enqueueUpdate('flashcard-deck', importedDeck.id, {
+          subject_id: String(selectedSubjectId),
+        });
       }
       
       showAlert({

@@ -701,5 +701,17 @@ const migrations: Migration[] = [
       `ALTER TABLE youtube_transcripts ADD COLUMN deleted_at TEXT`,
     ],
   },
+  {
+    version: 29,
+    up: [
+      // assessment_files — creada en v3, nunca recibió columnas de sync
+      `ALTER TABLE assessment_files ADD COLUMN deleted_at TEXT`,
+      `ALTER TABLE assessment_files ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE assessment_files ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE assessment_files ADD COLUMN last_modified_by TEXT`,
+      // ai_chats — creada en v16, nunca recibió deleted_at
+      `ALTER TABLE ai_chats ADD COLUMN deleted_at TEXT`,
+    ],
+  },
 ];
 export default migrations;

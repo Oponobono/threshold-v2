@@ -114,23 +114,11 @@ const LinkedDecksSection = ({ eventId }: { eventId: string }) => {
 
   React.useEffect(() => {
     if (!eventId) return;
-    Promise.all([
-      import('../../services/database').then(m => m.flashcardDeckRepository.getByLinkedEvent(eventId)),
-      import('../../services/localFlashcardService').then(m => m.getLocalDecks()),
-    ]).then(([sqliteDecks, localDecks]) => {
-      // Mazos de SQLite vinculados a este evento
-      const fromSqlite = (sqliteDecks || []).map((d: any) => ({ id: String(d.id), title: d.title }));
-      // Mazos locales MMKV vinculados a este evento
-      const fromLocal = (localDecks || [])
-        .filter((ld: any) => String(ld.linked_event_id) === String(eventId))
-        .map((ld: any) => ({ id: String(ld.id), title: ld.title }));
-      // Merge sin duplicados
-      const merged = [...fromSqlite];
-      for (const ld of fromLocal) {
-        if (!merged.find(d => d.id === ld.id)) merged.push(ld);
-      }
-      setDecks(merged);
-    }).catch(() => setDecks([]));
+    import('../../services/database').then(m => m.flashcardDeckRepository.getByLinkedEvent(eventId))
+      .then(sqliteDecks => {
+        const mapped = (sqliteDecks || []).map((d: any) => ({ id: String(d.id), title: d.title }));
+        setDecks(mapped);
+      }).catch(() => setDecks([]));
   }, [eventId]);
 
   if (decks === null) {

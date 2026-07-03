@@ -1,7 +1,6 @@
-import { Platform } from 'react-native';
-import { setItemAsync } from 'expo-secure-store';
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { getUserId } from './session';
+import { storageService } from '../../storageService';
 
 /**
  * Registra el token biométrico del dispositivo en el backend para un usuario autenticado.
@@ -39,15 +38,10 @@ export const biometricLogin = async (biometricToken: string) => {
   }
 
   // Guardar sesión igual que en loginUser
-  if (Platform.OS === 'web') {
-    localStorage.setItem('app_session_token', `biometric-token-${Date.now()}`);
-    localStorage.setItem('app_user_email', data.user.email);
-    localStorage.setItem('app_user_id', data.user.id.toString());
-  } else {
-    await setItemAsync('app_session_token', `biometric-token-${Date.now()}`);
-    await setItemAsync('app_user_email', data.user.email);
-    await setItemAsync('app_user_id', data.user.id.toString());
-  }
+  const token = data.token || `dummy-token-${Date.now()}`;
+  await storageService.saveSecure('jwt_token', token);
+  await storageService.saveSecure('app_user_email', data.user.email);
+  await storageService.saveSecure('app_user_id', data.user.id.toString());
 
   return data;
 };

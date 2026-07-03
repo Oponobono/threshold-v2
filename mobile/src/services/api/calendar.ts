@@ -130,19 +130,8 @@ export const updateCalendarEvent = async (eventId: string, updates: Partial<Cale
 
   await calendarEventRepository.update(eventId, data);
 
-  try {
-    const response = await fetchWithFallback(`/calendar/events/${eventId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    });
-    const responseData = await parseJsonSafely(response);
-    if (response.ok) return responseData;
-    throw new Error('Error del servidor');
-  } catch {
-    await syncService.enqueueUpdate('calendar-event', eventId, updates);
-    return { ...updates, _isPending: true };
-  }
+  syncService.enqueueUpdate('calendar-event', eventId, updates).catch(() => {});
+  return { ...data, _isPending: true };
 };
 
 export const deleteCalendarEvent = async (eventId: string): Promise<void> => {

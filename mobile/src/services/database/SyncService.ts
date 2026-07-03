@@ -116,8 +116,9 @@ export class SyncService {
   }
 
   private triggerSync() {
-    // Optional automatic trigger, can be debounced
-    this.sync().catch(console.error);
+    // Intencional: no lanzar sync() aquí.
+    // SyncManager es el único responsable de ejecutar HTTP sync (polling + NetworkManager wake).
+    // Esta función existe solo como punto de extensión futuro.
   }
 
   async sync(traceId?: string, options?: { force?: boolean }): Promise<{ success: number; failed: number; pending: number }> {

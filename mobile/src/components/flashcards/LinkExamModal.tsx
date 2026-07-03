@@ -31,6 +31,7 @@ import {
 } from '../../services/api/calendar';
 import { calendarEventRepository, flashcardDeckRepository } from '../../services/database';
 import { updateFlashcardDeck } from '../../services/api/flashcards';
+import { alertRef } from '../ui/CustomAlert';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -93,7 +94,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
   const [exams, setExams] = useState<CalendarEvent[]>([]);
   const [currentLinkedExam, setCurrentLinkedExam] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [linking, setLinking] = useState(false);
+  const [linkingExamId, setLinkingExamId] = useState<string | null>(null);
 
   // Create-exam form
   const [examTitle, setExamTitle] = useState('');
@@ -158,8 +159,8 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
 
   // ── Link existing event → store linked_event_id on the DECK (many decks → one event) ──
   const handleLinkExisting = async (exam: any) => {
-    if (!deck || linking) return;
-    setLinking(true);
+    if (!deck || linkingExamId) return;
+    setLinkingExamId(String(exam.id));
     try {
       const deckIdStr = String(deck.id);
       // Save event ID on the deck
@@ -178,7 +179,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
     } catch (e: any) {
       console.warn('[LinkExamModal] Error linking exam:', e.message);
     } finally {
-      setLinking(false);
+      setLinkingExamId(null);
     }
   };
 
@@ -213,8 +214,8 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
 
   // ── Unlink current exam ──────────────────────────────────────────────────
   const handleUnlink = async () => {
-    if (!deck || !currentLinkedExam || linking) return;
-    setLinking(true);
+    if (!deck || !currentLinkedExam || linkingExamId) return;
+    setLinkingExamId(String(currentLinkedExam.id));
     try {
       const deckIdStr = String(deck.id);
       await updateFlashcardDeck(deckIdStr, { linked_event_id: null });
@@ -233,7 +234,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
     } catch (e: any) {
       console.warn('[LinkExamModal] Error unlinking exam:', e.message);
     } finally {
-      setLinking(false);
+      setLinkingExamId(null);
     }
   };
 
@@ -305,44 +306,27 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
                             </View>
                             <TouchableOpacity
                               onPress={() => {
-                                Alert.alert(
-                                  'Desvincular examen',
-                                  `¿Quitar el vínculo con "${currentLinkedExam.title}"?`,
-                                  [
+                                alertRef.show({
+                                  title: 'Desvincular examen',
+                                  message: `¿Quitar el vínculo con "${currentLinkedExam.title}"?`,
+                                  type: 'warning',
+                                  buttons: [
                                     { text: 'Cancelar', style: 'cancel' },
                                     { text: 'Desvincular', style: 'destructive', onPress: handleUnlink },
                                   ],
-                                );
+                                });
                               }}
-                              disabled={linking}
+                              disabled={linkingExamId !== null}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                               style={{ marginLeft: 8, padding: 2 }}
                             >
-                              {linking ? (
+                              {linkingExamId === String(currentLinkedExam.id) ? (
                                 <ActivityIndicator size="small" color={theme.colors.danger} />
                               ) : (
-                                <Ionicons name="close-circle" size={20} color={theme.colors.danger} />
+                                <Ionicons name="unlink" size={20} color={theme.colors.danger} />
                               )}
                             </TouchableOpacity>
                           </View>
-                          <TouchableOpacity
-                            onPress={() => {
-                              Alert.alert(
-                                'Desvincular examen',
-                                `¿Quitar el vínculo con "${currentLinkedExam.title}"?`,
-                                [
-                                  { text: 'Cancelar', style: 'cancel' },
-                                  { text: 'Desvincular', style: 'destructive', onPress: handleUnlink },
-                                ],
-                              );
-                            }}
-                            disabled={linking}
-                            style={{ alignSelf: 'flex-start', marginBottom: 16, paddingVertical: 4 }}
-                          >
-                            <Text style={{ fontSize: 12, color: theme.colors.danger, fontWeight: '600' }}>
-                              {linking ? 'Desvinculando...' : 'Quitar vínculo'}
-                            </Text>
-                          </TouchableOpacity>
                         </>
                       )}
                       
@@ -361,7 +345,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
                                 <TouchableOpacity
                                   style={styles.examRow}
                                   onPress={() => handleLinkExisting(item)}
-                                  disabled={linking}
+                                  disabled={linkingExamId !== null}
                                   activeOpacity={0.7}
                                 >
                                   <View style={[styles.urgencyDot, { backgroundColor: color }]} />
@@ -374,7 +358,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
                                   <View style={[styles.daysBadge, { borderColor: color }]}>
                                     <Text style={[styles.daysText, { color }]}>{urgencyLabel(days)}</Text>
                                   </View>
-                                  {linking ? (
+                                  {linkingExamId === String(item.id) ? (
                                     <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginLeft: 8 }} />
                                   ) : (
                                     <Ionicons name="link-outline" size={18} color={theme.colors.primary} style={{ marginLeft: 8 }} />

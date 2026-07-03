@@ -9,7 +9,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { fetchWithFallback } from '../../services/api/client';
-import { saveImportedDeck, addLocalCard, recalculateLocalDeckCounters } from '../../services/localFlashcardService';
+import { addLocalCard, recalculateLocalDeckCounters } from '../../services/localFlashcardService';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 import { extractTextFromImageHybrid, generateClassFlashcardsHybrid } from '../../services/hybridAIService';
 import type { CardDirection } from '../../services/api/types';
 
@@ -209,28 +211,73 @@ export function ZyrenIngestionModal({
     }
     setStep('saving');
     try {
-      const deck = await saveImportedDeck(
-        `${generatedTopic} — ${subjectName} (${new Date().toLocaleDateString('es')})`,
-        `Mazo generado por Zyren desde apuntes de clase`,
-        toSave.map(card => ({
-          type: 'flashcard' as const,
-          data: { front: card.front, back: card.back },
-        })),
-        subjectId || null,
-        subjectName,
-        subjectColor || null,
-        subjectIcon || null,
-      );
+      const deckId = uuidv4();
+      const userId = await import('../../services/api').then(m => m.getUserId());
+      
+      const newDeck = {
+        id: deckId,
+        title: `${generatedTopic} — ${subjectName} (${new Date().toLocaleDateString('es')})`,
+        description: `Mazo generado por Zyren desde apuntes de clase`,
+        subject_id: subjectId || undefined,
+        subject_name: subjectName,
+        subject_color: subjectColor,
+        subject_icon: subjectIcon,
+        card_count: toSave.length,
+        user_id: String(userId || 0),
+        created_at: new Date().toISOString(),
+        review_count: 0,
+        learning_count: 0,
+        new_count: toSave.length,
+      };
+
+      const { flashcardDeckRepository } = await import('../../services/database');
+      await flashcardDeckRepository.create(newDeck);
 
       for (const card of toSave) {
-        addLocalCard(deck.id, {
+        addLocalCard(deckId, {
           type: 'flashcard',
           data: { front: card.front, back: card.back },
           direction,
         });
       }
 
-      recalculateLocalDeckCounters(deck.id);
+      recalculateLocalDeckCounters(deckId);
+
+      try {
+        if (userId) {
+          const { syncService } = await import('../../services/database/SyncService');
+          const cardsKey = `cache:flashcards_by_deck:${deckId}`;
+          let mmkvCards: any[] = [];
+          try {
+            const raw = require('react-native-mmkv').createMMKV().getString(cardsKey);
+            if (raw) {
+              const entry = JSON.parse(raw);
+              mmkvCards = entry.data || entry || [];
+            }
+          } catch {}
+
+          const deckPayload = {
+            id: deckId,
+            title: newDeck.title,
+            description: newDeck.description,
+            subject_id: newDeck.subject_id,
+            cards: mmkvCards.map(c => ({
+              id: c.id,
+              front: c.front || c.content?.front || '',
+              back: c.back || c.content?.back || '',
+              item_type: c.item_type || 'flashcard',
+              content_json: c.content || c.data,
+              hint: c.hint,
+              explanation: c.explanation,
+            })),
+          };
+
+          await syncService.enqueueCreate('flashcard-deck', String(deckId), deckPayload);
+          console.log('[ZyrenIngestionModal] Mazo importado preparado para sincronizar');
+        }
+      } catch (syncErr) {
+        console.warn('[ZyrenIngestionModal] Error preparando sync:', syncErr);
+      }
 
       Alert.alert(
         '¡Mazo creado! 🎉',

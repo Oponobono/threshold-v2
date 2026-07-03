@@ -3,6 +3,7 @@ import { getUserId } from './auth';
 import type { Subject } from './types';
 import { subjectRepository, syncService } from '../database';
 import { storageService } from '../storageService';
+import { deleteSubject as domainDeleteSubject } from '../domain/SubjectDomainService';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -253,20 +254,16 @@ export const updateSubject = async (subjectId: string, payload: Partial<Subject>
 };
 
 export const deleteSubject = async (subjectId: string) => {
-  await subjectRepository.delete(subjectId);
-
-  // Invalidar toda caché relacionada con subjects para evitar que una lectura
-  // posterior (loadAllData, getSubjectById) en modo offline restaure la materia
-  // desde la caché obsoleta.
   const userId = await getUserIdNumber();
+
+  await domainDeleteSubject(subjectId, userId);
+
   await Promise.all([
     storageService.removeLocal(`api_cache_/subjects/${userId}`).catch(() => {}),
     storageService.removeLocal(`api_cache_/subject/${subjectId}`).catch(() => {}),
     storageService.removeLocal(`api_cache_/subjects/user/${userId}`).catch(() => {}),
     storageService.removeLocal(`api_cache_/subjects/${userId}?`).catch(() => {}),
   ]);
-  // Resetear timestamp de sync para que el próximo getSubjects/getSubjectById
-  // no haga background sync con caché obsoleta.
   lastSyncTimestamp = Date.now();
 
   try {

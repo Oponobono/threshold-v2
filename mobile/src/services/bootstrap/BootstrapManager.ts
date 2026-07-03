@@ -82,6 +82,8 @@ class BootstrapManager {
       });
 
       await this._runPhase('STORAGE', async () => {
+        const { migrateFlashcardsFromMMKV } = await import('../migration/migrateFlashcardsFromMMKV');
+        await migrateFlashcardsFromMMKV();
         console.log('[Bootstrap] Storage ready');
       });
 

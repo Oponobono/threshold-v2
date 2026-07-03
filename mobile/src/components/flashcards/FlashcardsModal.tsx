@@ -23,7 +23,6 @@ import {
   type Subject,
   type FlashcardDeck,
   type Flashcard,
-  getFlashcardDecksWithMetrics,
   getFlashcardsPrioritized,
   getUserId,
   shareDeck,
@@ -35,11 +34,11 @@ import { getUserGroups, getGroupDecks } from '../../services/api/learning/groups
 
 import { GroupPills } from './GroupPills';
 import { LinkExamModal } from './LinkExamModal';
-import { calendarEventRepository, flashcardDeckRepository } from '../../services/database';
 
 import { FlashcardStudyScreen } from './FlashcardStudyScreen';
 import { FlashcardNewDeckScreen } from './FlashcardNewDeckScreen';
 import { FlashcardNewCardScreen } from './FlashcardNewCardScreen';
+import { useFlashcardsStore } from '../../store/useFlashcardsStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,7 +67,8 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const router = useRouter();
   const { getDuedeckIds } = useDataStore();
   const [screen, setScreen] = useState<Screen>('hub');
-  const [decks, setDecks] = useState<FlashcardDeck[]>([]);
+
+  const { decks, status, initialize, refresh } = useFlashcardsStore();
 
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -145,91 +145,11 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
     }
   };
 
-  // ── Data loading ──────────────────────────────────────────────────────────
-
-  async function enrichWithExamInfo(decks: FlashcardDeck[]): Promise<FlashcardDeck[]> {
-    try {
-      const allEvents = await calendarEventRepository.getAll();
-      const eventMap = new Map<string, { title: string; start_date: string }>();
-      for (const evt of allEvents) {
-        eventMap.set(String(evt.id), { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
-      }
-      // Mapa de deckId → evento vía linked_deck_id (relación vieja, evento → mazo)
-      const deckToExamFromEvent = new Map<string, { title: string; start_date: string }>();
-      for (const evt of allEvents) {
-        const linkedDeckId = (evt as any).linked_deck_id;
-        if (linkedDeckId) {
-          const ids = String(linkedDeckId).split(',').map(id => id.trim());
-          ids.forEach(id => {
-            if (id) deckToExamFromEvent.set(id, { title: evt.title, start_date: evt.start_date || evt.end_date || '' });
-          });
-        }
-      }
-      return decks.map(d => {
-        // Prioridad 1: linked_event_id en el mazo (relación nueva, mazo → evento)
-        const linkedEventId = (d as any).linked_event_id;
-        if (linkedEventId) {
-          const rawId = String(linkedEventId).split(',')[0].trim();
-          const evt = eventMap.get(rawId);
-          if (evt) {
-            return { ...d, linked_exam_title: evt.title, linked_exam_date: evt.start_date } as FlashcardDeck;
-          }
-        }
-        // Prioridad 2: linked_deck_id en el evento (relación vieja)
-        const examFromEvent = deckToExamFromEvent.get(String(d.id));
-        if (examFromEvent) {
-          return { ...d, linked_exam_title: examFromEvent.title, linked_exam_date: examFromEvent.start_date } as FlashcardDeck;
-        }
-        return d;
-      });
-    } catch {
-      return decks;
-    }
-  }
-
-  const loadDecks = async () => {
-    try {
-      const { getLocalDecksForCurrentUser } = await import('../../services/localFlashcardService');
-      const userId = await getUserId();
-      const localDecks = getLocalDecksForCurrentUser(userId);
-
-      // Phase 1: Local Cache (Instant)
-      const sqliteDecks = await flashcardDeckRepository.getAll();
-      const localIds = new Set(localDecks.map((ld: any) => String(ld.id)));
-      
-      const filteredSqlite = sqliteDecks.filter((d: any) => !localIds.has(String(d.id)));
-      const mergedLocal = [...filteredSqlite, ...localDecks] as FlashcardDeck[];
-      if (mergedLocal.length > 0) {
-        const enrichedLocal = await enrichWithExamInfo(mergedLocal);
-        setDecks(enrichedLocal);
-      }
-
-      // Phase 2: Network Sync (Slow)
-      const data = await getFlashcardDecksWithMetrics();
-      
-      // Hydrate API data with linked_event_id from local SQLite (API doesn't return it)
-      const sqliteLinkedEventMap = new Map(
-        sqliteDecks
-          .filter((d: any) => d.linked_event_id)
-          .map((d: any) => [String(d.id), String(d.linked_event_id)])
-      );
-      const hydratedData = (data || []).map((d: any) => {
-        const localLinked = sqliteLinkedEventMap.get(String(d.id));
-        return localLinked && !d.linked_event_id ? { ...d, linked_event_id: localLinked } : d;
-      });
-
-      const filteredData = hydratedData.filter((d: any) => !localIds.has(String(d.id)));
-      const merged = [...filteredData, ...localDecks] as FlashcardDeck[];
-      const enriched = await enrichWithExamInfo(merged);
-      setDecks(enriched);
-    } catch (e) {
-      console.warn('Error loading decks:', e);
-    }
-  };
+  // ── Data loading via FlashcardsStore ──────────────────────────────────────
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadDecks();
+    await refresh();
     setRefreshing(false);
   };
 
@@ -237,15 +157,14 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
     if (isVisible) {
       setActiveTab('mazos');
       setScreen('hub');
-      loadDecks();
       getUserId().then(id => setCurrentUserId(id || null));
-      // Load groups
       getUserGroups().then(g => {
         const valid = (g || []).filter((gr: any) => gr.group_pin_id);
         setGroups(valid);
-        if (valid.length > 0) {
-          setActiveGroupPin(valid[0].group_pin_id);
-        }
+        if (valid.length > 0) setActiveGroupPin(valid[0].group_pin_id);
+      });
+      initialize().then(() => {
+        refresh();
       });
     }
   }, [isVisible]);
@@ -289,11 +208,12 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   };
 
   const goBackToHub = () => {
-    loadDecks();
+    refresh();
     setScreen('hub');
   };
 
   const handleDeleteDeck = (deck: FlashcardDeck) => {
+    const { remove } = useFlashcardsStore.getState();
     const isOwner = String(deck.user_id) === String(currentUserId) || !!(deck as any)._local;
     showAlert({
       title: isOwner ? t('modals.deleteDeck') : t('flashcards.removeShared'),
@@ -308,9 +228,10 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
           style: 'destructive',
           onPress: async () => {
             try {
+              remove(deck.id);
               await deleteFlashcardDeck(deck.id);
-              await loadDecks();
             } catch (e: any) {
+              refresh();
               showAlert({ title: t('common.error'), message: e.message || t('common.error'), type: 'error' });
             }
           },
@@ -708,6 +629,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
         visible={!!linkExamTarget}
         deck={linkExamTarget}
         onClose={() => setLinkExamTarget(null)}
+        onUnlinked={refresh}
         onLinked={async (examTitle) => {
           showAlert({
             title: '¡Modo Examen activo!',
@@ -715,7 +637,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
             type: 'success',
           });
           setLinkExamTarget(null);
-          await loadDecks();
+          await refresh();
         }}
       />
 
