@@ -802,113 +802,69 @@ exports.createEvaluationItem = (req, res) => {
 };
 
 /**
- * Registrar una revisión de tarjeta con SM-2 Algorithm
- * Body: { userId, result: 'correct'|'incorrect', responseTimeMs: number }
+ * PUT /flashcards/:cardId/review
+ * Persistencia pura — el cliente ya calculó FSRS. El servidor solo almacena.
+ * Body: { userId, fsrs_stability, fsrs_difficulty, fsrs_repetitions, next_review_date, status, result, response_time_ms }
  */
 exports.recordCardReview = (req, res) => {
   const { cardId } = req.params;
-  const { userId, result, responseTimeMs } = req.body;
+  const {
+    userId, result, responseTimeMs,
+    fsrs_stability, fsrs_difficulty, fsrs_repetitions,
+    next_review_date, status,
+  } = req.body;
 
-  if (!userId || !result || typeof responseTimeMs !== 'number') {
-    return res.status(400).json({ error: 'Se requieren: userId, result (correct|incorrect), responseTimeMs' });
+  if (!userId || !result) {
+    return res.status(400).json({ error: 'Se requieren: userId, result' });
   }
 
-  if (!['correct', 'incorrect'].includes(result)) {
-    return res.status(400).json({ error: 'result debe ser "correct" o "incorrect"' });
-  }
+  db.get(`SELECT id, last_review_timestamp FROM flashcards WHERE id = ?`, [cardId], (err, card) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!card) return res.status(404).json({ error: 'Tarjeta no encontrada' });
 
-  // Obtener FSRS actual de la tarjeta
-  db.get(
-    `SELECT fc.id, fc.deck_id, fc.fsrs_stability, fc.fsrs_difficulty, fc.fsrs_repetitions, fd.subject_id 
-     FROM flashcards fc
-     LEFT JOIN flashcard_decks fd ON fc.deck_id = fd.id
-     WHERE fc.id = ?`,
-    [cardId],
-    (err, card) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (!card) return res.status(404).json({ error: 'Tarjeta no encontrada' });
-
-      // ── Mapear resultado a calidad FSRS (0-5) ────────────────────────────
-      // result === 'correct' se mapea a quality (3-5 según tiempo)
-      // result === 'incorrect' se mapea a quality < 3
-      let quality = 1;
-      if (result === 'correct') {
-        if (responseTimeMs < 3000) quality = 5;        // Perfecto
-        else if (responseTimeMs < 8000) quality = 4;   // Bueno
-        else quality = 3;                              // Aceptable
-      } else {
-        quality = 1;                                   // Malo/Olvidado
+    // Idempotency check: if the incoming review is older or identical to the one already stored, skip it
+    if (req.body.last_review_timestamp && card.last_review_timestamp) {
+      const incomingTime = new Date(req.body.last_review_timestamp).getTime();
+      const existingTime = new Date(card.last_review_timestamp).getTime();
+      if (incomingTime <= existingTime) {
+        return res.json({ success: true, cardId, message: 'Revisión ya persistida (idempotente).', noop: true });
       }
+    }
 
-      // ── Calcular nuevo intervalo con FSRS ────────────────────────────────
-      const fsrsResult = calculateFSRS({
-        quality,
-        stability: card.fsrs_stability || 1,
-        difficulty: card.fsrs_difficulty || 0.5,
-        repetitions: card.fsrs_repetitions || 0,
-        interval: 1,  // Simplificado: se calcula dentro de calculateFSRS
-      });
+    const fields = [];
+    const values = [];
+    if (fsrs_stability != null)   { fields.push('fsrs_stability = ?');   values.push(fsrs_stability); }
+    if (fsrs_difficulty != null)  { fields.push('fsrs_difficulty = ?');  values.push(fsrs_difficulty); }
+    if (fsrs_repetitions != null) { fields.push('fsrs_repetitions = ?'); values.push(fsrs_repetitions); }
+    if (next_review_date != null) { fields.push('next_review_date = ?'); values.push(next_review_date); }
+    if (status != null)           { fields.push('status = ?');           values.push(status); }
+    const reviewTimestamp = req.body.last_review_timestamp || new Date().toISOString();
+    fields.push('last_review_timestamp = ?');
+    values.push(reviewTimestamp);
+    values.push(cardId);
 
-      const nextReviewDateStr = fsrsResult.nextReviewDate.toISOString();
+    db.run(
+      `UPDATE flashcards SET ${fields.join(', ')} WHERE id = ?`,
+      values,
+      (updateErr) => {
+        if (updateErr) return res.status(500).json({ error: updateErr.message });
 
-      // ── Actualizar flashcard con nuevos valores FSRS ────────────────────
-      db.run(
-        `UPDATE flashcards 
-         SET fsrs_stability = ?, fsrs_difficulty = ?, fsrs_repetitions = ?, 
-             next_review_date = ?, status = 'review', last_review_timestamp = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [fsrsResult.newStability, fsrsResult.newDifficulty, fsrsResult.newRepetitions, nextReviewDateStr, cardId],
-        (updateErr) => {
-          if (updateErr) return res.status(500).json({ error: updateErr.message });
-
-          // ── Registrar en card_logs para análisis ───────────────────────
+        if (userId && result) {
           db.run(
-            `INSERT INTO card_logs (card_id, user_id, result, response_time_ms, difficulty_deduced)
-             VALUES (?, ?, ?, ?, ?)`,
-            [cardId, userId, result, responseTimeMs, quality >= 4 ? 'easy' : quality === 3 ? 'moderate' : 'difficult'],
-            (logErr) => {
-              if (logErr) console.warn('[CardLogs] Error registrando revisión:', logErr);
-            }
-          );
-
-          // ── Actualizar learning_analytics ──────────────────────────────
-          const isCorrect = result === 'correct' ? 1 : 0;
-          db.run(
-            `UPDATE learning_analytics 
-             SET total_reviews = total_reviews + 1,
-                 correct_reviews = correct_reviews + ?,
-                 incorrect_reviews = incorrect_reviews + ?,
-                 mastery_percentage = CASE 
-                   WHEN total_reviews + 1 > 0 THEN ROUND((correct_reviews + ?) * 100.0 / (total_reviews + 1), 1)
-                   ELSE 0
-                 END,
-                 last_updated = CURRENT_TIMESTAMP
-             WHERE user_id = ? AND subject_id = ?`,
-            [isCorrect, 1 - isCorrect, isCorrect, userId, card.subject_id || null],
-            (analyticsErr) => {
-              if (analyticsErr) console.warn('[Analytics] Error actualizando estadísticas:', analyticsErr);
-            }
-          );
-
-          // ── Retornar resultado con métricas FSRS ────────────────────────
-          incrementSyncVersion('flashcards', cardId, () =>
-            res.json({
-              success: true,
-              cardId,
-              quality,
-              nextReviewDate: nextReviewDateStr,
-              newStability: fsrsResult.newStability,
-              newDifficulty: fsrsResult.newDifficulty,
-              newRepetitions: fsrsResult.newRepetitions,
-              retention: fsrsResult.retention,
-              message: `Revisión registrada (FSRS). Próxima revisión en ${fsrsResult.newInterval} días. Retención esperada: ${fsrsResult.retention}%.`,
-            })
+            `INSERT INTO card_logs (card_id, user_id, result, response_time_ms) VALUES (?, ?, ?, ?)`,
+            [cardId, userId, result, responseTimeMs || 0],
+            (logErr) => { if (logErr) console.warn('[CardLogs] Error registrando revisión:', logErr); }
           );
         }
-      );
-    }
-  );
+
+        incrementSyncVersion('flashcards', cardId, () =>
+          res.json({ success: true, cardId, message: 'Revisión persistida.' })
+        );
+      }
+    );
+  });
 };
+
 
 /**
  * Actualizar el estado de una tarjeta

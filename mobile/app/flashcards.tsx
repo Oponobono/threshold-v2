@@ -322,21 +322,21 @@ export default function FlashcardsScreen() {
         visible={showNewDeckModal}
         subjects={subjects}
         onClose={() => setShowNewDeckModal(false)}
-        onDeckCreated={() => { setShowNewDeckModal(false); refreshDecks(); }}
+        onDeckCreated={() => setShowNewDeckModal(false)}
       />
 
       <FlashcardImportModal
         isVisible={showImportModal}
         onClose={() => setShowImportModal(false)}
         subjects={subjects}
-        onImportSuccess={() => refreshDecks()}
+        onImportSuccess={() => {}}
       />
 
       <NewCardModal
         visible={showNewCardModal}
         deck={activeDeck}
         onClose={() => setShowNewCardModal(false)}
-        onCardCreated={() => { setShowNewCardModal(false); refreshDecks(); }}
+        onCardCreated={() => setShowNewCardModal(false)}
       />
 
       <EditDeckModal
@@ -344,7 +344,7 @@ export default function FlashcardsScreen() {
         deck={editingDeck}
         subjects={subjects}
         onClose={() => setShowEditDeckModal(false)}
-        onSaved={() => refreshDecks()}
+        onSaved={() => {}}
       />
 
       <MenuModal
@@ -369,7 +369,6 @@ export default function FlashcardsScreen() {
                 setShowStudyModal(false);
                 setActiveDeck(null);
                 setStudyDeckCards([]);
-                refreshDecks();
               }}
             />
           )}
@@ -388,7 +387,6 @@ export default function FlashcardsScreen() {
             type: 'success',
           });
           setLinkExamTarget(null);
-          refreshDecks();
         }}
         onUnlinked={async () => {
           showAlert({
@@ -397,7 +395,6 @@ export default function FlashcardsScreen() {
             type: 'info',
           });
           setLinkExamTarget(null);
-          refreshDecks();
         }}
       />
 

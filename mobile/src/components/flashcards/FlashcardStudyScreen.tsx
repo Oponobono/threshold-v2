@@ -16,9 +16,9 @@ import {
   StrategyFactory,
   adaptFlashcardsToEvaluationItems,
 } from '../../utils/evaluationStrategies';
-import { updateFlashcardStatus, deleteFlashcard, snoozeCard, createCardLog } from '../../services/api';
+import { updateFlashcardStatus, deleteFlashcard, snoozeCard } from '../../services/api';
 import { analyzeDeckConfusionsHybrid as analyzeDeckConfusions, generateDifferentiationCardHybrid as generateDifferentiationCard } from '../../services/hybridAIService';
-import { recordCardReview } from '../../services/api/analytics';
+import { FlashcardDomainService } from '../../domain/fsrs/FlashcardDomainService';
 import { ExamSchedulerService } from '../../services/ExamSchedulerService';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { QuestionRendererFactory } from '../evaluation/QuestionRendererFactory';
@@ -198,72 +198,28 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
       total:     prev.total     + 1,
     }));
 
-    // ── Enviar revisión al backend discretamente (FSRS) ──────────────────
+    // ── Local-First Domain Execution ──────────────────────────────────────────
     if (currentUserId && item.id) {
       try {
-        console.log('[FlashcardReview] Enviando revisión:', {
-          cardId: item.id,
-          userId: currentUserId,
-          result: result.passed ? 'correct' : 'incorrect',
-          responseTimeMs: responseTime,
-        });
-        const reviewResult = await recordCardReview(
-          String(item.id),
-          String(currentUserId),
-          result.passed ? 'correct' : 'incorrect',
-          responseTime,
-          activeDeck?.subject_id,
+        await FlashcardDomainService.recordReview(
+          item as any,
+          result.passed,
+          responseTime
         );
-        console.log('[FlashcardReview] FSRS metrics:', {
-          quality: reviewResult.quality,
-          retention: reviewResult.retention,
-          nextReview: reviewResult.nextReviewDate,
-        });
+        // The DomainService handles FSRS math, SQLite updates, and enqueueing Sync.
       } catch (error) {
-        console.warn('[FlashcardReview] Error sending review:', error);
-        // No interrumpir la sesión si hay error
+        console.warn('[FlashcardReview] Error in Domain Service:', error);
       }
-    } else {
-      console.log('[FlashcardReview] Omitiendo revisión - currentUserId:', currentUserId, 'item.id:', item.id);
     }
 
-    // Persistir
+    // Actualizar estado y contadores según tipo de tarjeta (UI/UX logic)
     const isLocalCard = (item as any)._local === true;
-
-    try {
-      const textToCount = item.front || (item as any).question || '';
-      const wordCount = textToCount.trim() ? textToCount.trim().split(/\s+/).length : 20;
-
-      const logResponse = await createCardLog({ 
-        card_id: item.id, 
-        result: result.passed ? 'correct' : 'incorrect', 
-        response_time_ms: responseTime,
-        question_word_count: wordCount 
-      }).catch(() => ({ queued: true, card_id: item.id }));
-
-      if (logResponse?.feedback) {
-        setLearningFeedback({
-          emoji: logResponse.feedback.emoji,
-          message: logResponse.feedback.message,
-          color: logResponse.microInteraction?.color || theme.colors.primary,
-        });
-
-        setTimeout(() => setLearningFeedback(null), 2000);
-      }
-    } catch {}
-
-    // Actualizar estado y contadores según tipo de tarjeta
     if (activeDeck?.id) {
       if (isLocalCard) {
         const { updateLocalCard, recalculateLocalDeckCounters } = await import('../../services/localFlashcardService');
         await updateLocalCard(activeDeck.id, String(item.id), {}, newStatus);
         await recalculateLocalDeckCounters(activeDeck.id);
       } else {
-        // Cloud: persistir status en SQLite + backend
-        try {
-          await updateFlashcardStatus(item.id, newStatus);
-        } catch {}
-
         try {
           const { databaseService } = await import('../../services/database/DatabaseService');
           const db = databaseService.getDb();

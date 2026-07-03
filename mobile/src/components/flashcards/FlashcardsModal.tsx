@@ -68,7 +68,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   const { getDuedeckIds } = useDataStore();
   const [screen, setScreen] = useState<Screen>('hub');
 
-  const { decks, status, initialize, refresh } = useFlashcardsStore();
+  const { decks, status, initialize, refresh, subscribeToEvents } = useFlashcardsStore();
 
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -163,9 +163,9 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
         setGroups(valid);
         if (valid.length > 0) setActiveGroupPin(valid[0].group_pin_id);
       });
-      initialize().then(() => {
-        refresh();
-      });
+      initialize();
+      const unsubscribe = subscribeToEvents();
+      return () => unsubscribe();
     }
   }, [isVisible]);
 
@@ -208,7 +208,6 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
   };
 
   const goBackToHub = () => {
-    refresh();
     setScreen('hub');
   };
 
@@ -231,7 +230,6 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
               remove(deck.id);
               await deleteFlashcardDeck(deck.id);
             } catch (e: any) {
-              refresh();
               showAlert({ title: t('common.error'), message: e.message || t('common.error'), type: 'error' });
             }
           },
@@ -629,7 +627,7 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
         visible={!!linkExamTarget}
         deck={linkExamTarget}
         onClose={() => setLinkExamTarget(null)}
-        onUnlinked={refresh}
+        onUnlinked={() => {}}
         onLinked={async (examTitle) => {
           showAlert({
             title: '¡Modo Examen activo!',
@@ -637,7 +635,6 @@ export const FlashcardsModal: React.FC<Props> = ({ isVisible, onClose, subjects 
             type: 'success',
           });
           setLinkExamTarget(null);
-          await refresh();
         }}
       />
 

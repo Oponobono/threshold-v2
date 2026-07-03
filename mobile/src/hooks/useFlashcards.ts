@@ -109,7 +109,7 @@ export function useFlashcards() {
     loadDecks,
   } = useFlashcardsManager(subjects);
 
-  const { initialize: initializeStore, refresh: refreshStore } = useFlashcardsStore();
+  const { initialize: initializeStore, subscribeToEvents } = useFlashcardsStore();
 
   const handleOpenMenu = useCallback(() => {
     if (Platform.OS === 'ios') {
@@ -163,7 +163,6 @@ export function useFlashcards() {
           onPress: async () => {
             try {
               await deleteFlashcardDeck(deck.id);
-              await loadDecks({ skipCache: true });
               const userId = await getUserId();
               if (userId) {
                 await refreshPredictions(userId);
@@ -285,6 +284,11 @@ export function useFlashcards() {
     scheduleDueNotifications();
   }, [filteredDecks]);
 
+  useEffect(() => {
+    const unsub = subscribeToEvents();
+    return () => unsub();
+  }, [subscribeToEvents]);
+
   useFocusEffect(
     useCallback(() => {
       const task = InteractionManager.runAfterInteractions(async () => {
@@ -302,8 +306,6 @@ export function useFlashcards() {
             setGroups(valid);
             setActiveGroupPin(prev => prev || (valid.length > 0 ? valid[0].group_pin_id : null));
           }).catch(e => console.warn('Error loading groups:', e));
-
-          refreshStore();
         } catch (e) {
           console.warn('Error initializing flashcards:', e);
         }

@@ -472,14 +472,14 @@ export const downloadCloudItems = async (
               await databaseService.getDb().runAsync(
                 `INSERT INTO flashcards
                    (id, deck_id, front, back, status, direction,
-                    ease_factor, interval_days, repetitions, next_review_at,
+                    ease_factor, interval_days, repetitions, next_review_date,
                     fsrs_stability, fsrs_difficulty, source_context, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT(id) DO UPDATE SET
                    front = excluded.front, back = excluded.back,
                    status = excluded.status, direction = excluded.direction,
                    ease_factor = excluded.ease_factor, interval_days = excluded.interval_days,
-                   repetitions = excluded.repetitions, next_review_at = excluded.next_review_at,
+                   repetitions = excluded.repetitions, next_review_date = excluded.next_review_date,
                    fsrs_stability = excluded.fsrs_stability, fsrs_difficulty = excluded.fsrs_difficulty,
                    source_context = excluded.source_context`,
                 [
@@ -487,7 +487,7 @@ export const downloadCloudItems = async (
                   card.front ?? '', card.back ?? null,
                   card.status ?? 'new', card.direction ?? 'forward',
                   card.ease_factor ?? null, card.interval_days ?? null,
-                  card.repetitions ?? 0, card.next_review_at ?? null,
+                  card.repetitions ?? 0, card.next_review_date ?? null,
                   card.fsrs_stability ?? null, card.fsrs_difficulty ?? null,
                   card.source_context ?? null,
                   card.created_at || new Date().toISOString(),

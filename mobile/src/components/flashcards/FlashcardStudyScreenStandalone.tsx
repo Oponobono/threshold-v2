@@ -16,13 +16,14 @@ import {
   StrategyFactory,
   adaptFlashcardsToEvaluationItems,
 } from '../../utils/evaluationStrategies';
-import { updateFlashcardStatus, deleteFlashcard, snoozeCard, createCardLog } from '../../services/api';
+import { updateFlashcardStatus, deleteFlashcard, snoozeCard } from '../../services/api';
 import { analyzeDeckConfusionsHybrid as analyzeDeckConfusions, generateDifferentiationCardHybrid as generateDifferentiationCard } from '../../services/hybridAIService';
-import { recordCardReview } from '../../services/api/analytics';
+import { FlashcardDomainService } from '../../domain/fsrs/FlashcardDomainService';
 import { ExamSchedulerService } from '../../services/ExamSchedulerService';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { QuestionRendererFactory } from '../evaluation/QuestionRendererFactory';
 import { ExplanationOverlay } from '../evaluation/ExplanationOverlay';
+import { ContextBottomSheet } from '../evaluation/ContextBottomSheet';
 import { SnoozeModal } from '../modals/SnoozeModal';
 import { useDueCardSnooze, SnoozeOption } from '../../hooks/useDueCardSnooze';
 
@@ -77,8 +78,9 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
   const [selectedIndex, setSelectedIndex]     = useState<number | null>(null);
   const [selectedBoolean, setSelectedBoolean] = useState<boolean | null>(null);
 
-  // Overlay de explicación
+  // Overlay de explicación y contexto
   const [overlayVisible, setOverlayVisible]   = useState(false);
+  const [contextVisible, setContextVisible]   = useState(false);
   const [isProcessing, setIsProcessing]       = useState(false); // Previene race conditions
 
   // Learning Engineering Feedback
@@ -91,6 +93,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
     setSelectedIndex(null);
     setSelectedBoolean(null);
     setOverlayVisible(false);
+    setContextVisible(false);
     setIsProcessing(false);
   }, []);
 
@@ -143,7 +146,15 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
 
   const handleReveal = useCallback(() => setIsRevealed(true), []);
 
-  const handleShowExplanation = useCallback(() => setOverlayVisible(true), []);
+  const handleShowExplanation = useCallback(() => {
+    setContextVisible(false);
+    setOverlayVisible(true);
+  }, []);
+
+  const handleShowContext = useCallback(() => {
+    setOverlayVisible(false);
+    setContextVisible(true);
+  }, []);
 
   /** Cierra el overlay y ejecuta la función de avance */
   const handleOverlayDismiss = useCallback(() => {
@@ -183,72 +194,23 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       total:     prev.total     + 1,
     }));
 
-    // ── Enviar revisión al backend discretamente (FSRS) ──────────────────
+    // ── Local-First Domain Execution ──────────────────────────────────────
     if (currentUserId && item.id) {
       try {
-        console.log('[FlashcardReview] Enviando revisión:', {
-          cardId: item.id,
-          userId: currentUserId,
-          result: result.passed ? 'correct' : 'incorrect',
-          responseTimeMs: responseTime,
-        });
-        const reviewResult = await recordCardReview(
-          String(item.id),
-          String(currentUserId),
-          result.passed ? 'correct' : 'incorrect',
-          responseTime,
-          activeDeck?.subject_id,
-        );
-        console.log('[FlashcardReview] FSRS metrics:', {
-          quality: reviewResult.quality,
-          retention: reviewResult.retention,
-          nextReview: reviewResult.nextReviewDate,
-        });
+        await FlashcardDomainService.recordReview(item as any, result.passed, responseTime);
       } catch (error) {
-        console.warn('[FlashcardReview] Error sending review:', error);
-        // No interrumpir la sesión si hay error
+        console.warn('[FlashcardReview] Error in Domain Service:', error);
       }
-    } else {
-      console.log('[FlashcardReview] Omitiendo revisión - currentUserId:', currentUserId, 'item.id:', item.id);
     }
 
-    // Persistir
     const isLocalCard = (item as any)._local === true;
 
-    try {
-      const textToCount = item.front || (item as any).question || '';
-      const wordCount = textToCount.trim() ? textToCount.trim().split(/\s+/).length : 20;
-
-      const logResponse = await createCardLog({ 
-        card_id: item.id, 
-        result: result.passed ? 'correct' : 'incorrect', 
-        response_time_ms: responseTime,
-        question_word_count: wordCount 
-      }).catch(() => ({ queued: true, card_id: item.id }));
-
-      if (logResponse?.feedback) {
-        setLearningFeedback({
-          emoji: logResponse.feedback.emoji,
-          message: logResponse.feedback.message,
-          color: logResponse.microInteraction?.color || theme.colors.primary,
-        });
-
-        setTimeout(() => setLearningFeedback(null), 2000);
-      }
-    } catch {}
-
-    // Actualizar estado y contadores según tipo de tarjeta
     if (activeDeck?.id) {
       if (isLocalCard) {
         const { updateLocalCard, recalculateLocalDeckCounters } = await import('../../services/localFlashcardService');
         await updateLocalCard(activeDeck.id, String(item.id), {}, newStatus);
         await recalculateLocalDeckCounters(activeDeck.id);
       } else {
-        // Cloud: persistir status en SQLite + backend
-        try {
-          await updateFlashcardStatus(item.id, newStatus);
-        } catch {}
-
         try {
           const { databaseService } = await import('../../services/database/DatabaseService');
           const db = databaseService.getDb();
@@ -270,12 +232,9 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
       }
     }
 
-    // Refresh predictions after reviewing
     try {
       const { useDataStore } = await import('../../store/useDataStore');
-      if (currentUserId) {
-        useDataStore.getState().refreshPredictions(currentUserId);
-      }
+      if (currentUserId) useDataStore.getState().refreshPredictions(currentUserId);
     } catch {}
 
     setIsProcessing(false);
@@ -547,6 +506,7 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
           onAnswer={handleAnswer}
           onReveal={handleReveal}
           onShowExplanation={handleShowExplanation}
+          onShowContext={handleShowContext}
           isAnswered={isAnswered}
           selectedRating={selectedRating}
           selectedIndex={selectedIndex}
@@ -560,6 +520,13 @@ export const FlashcardStudyScreenStandalone: React.FC<Props> = ({
         visible={overlayVisible}
         explanation={item.explanation ?? null}
         onDismiss={handleOverlayDismiss}
+      />
+
+      {/* ── Bottom Sheet de Contexto ── */}
+      <ContextBottomSheet
+        visible={contextVisible}
+        contextJson={item.source_context ?? null}
+        onDismiss={() => setContextVisible(false)}
       />
 
       {/* ── Modal de Snooze ── */}

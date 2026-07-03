@@ -95,10 +95,11 @@ function calculateSM2(params) {
  * Más moderno que SM-2, considera múltiples factores
  */
 function calculateFSRS(params) {
-  const { quality = 3, stability = 1, difficulty = 0.5, interval = 1, repetitions = 0, daysSinceReview = 0 } = params;
+  const { quality = 3, stability = 1, difficulty = 0.5, repetitions = 0, daysSinceReview = 0 } = params;
 
-  // Factor de retención basado en días desde el último repaso
-  const retention = Math.exp(-interval / 36); // Modelo exponencial
+  // Factor de retención basado en días desde el último repaso y estabilidad
+  const safeStability = Math.max(0.1, stability);
+  const retention = Math.exp(-daysSinceReview / (9 * safeStability)); // Modelo FSRS real
 
   let newDifficulty = Math.max(0.1, Math.min(10, difficulty + 0.1 - quality * 0.02));
   let newStability;
@@ -118,11 +119,12 @@ function calculateFSRS(params) {
     newRepetitions += 1;
   }
 
-  // Nuevo intervalo en días
-  const newInterval = Math.round(newStability * 9 * (1 - retention));
+  // Nuevo intervalo en días basado en target retention FSRS
+  const TARGET_RETENTION = 0.90;
+  const newInterval = Math.max(1, Math.round(-9 * newStability * Math.log(TARGET_RETENTION)));
 
   const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + Math.max(1, newInterval));
+  nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
 
   return {
     newStability: Math.round(newStability * 100) / 100,

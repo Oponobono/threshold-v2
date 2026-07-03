@@ -55,11 +55,9 @@ exports.getCardLogs = (req, res) => {
   );
 };
 
-const cardResultProcessor = require('../utils/cardResultProcessor');
-
 exports.createCardLog = async (req, res) => {
   try {
-    const { id: clientId, card_id, user_id, subject_id, result, response_time_ms, question_word_count } = req.body;
+    const { id: clientId, card_id, user_id, subject_id, result, response_time_ms, question_word_count, difficulty_deduced } = req.body;
     
     if (!card_id || !user_id) {
       return res.status(400).json({ error: 'Faltan campos requeridos (card_id, user_id).' });
@@ -77,37 +75,10 @@ exports.createCardLog = async (req, res) => {
     }
 
     const isCorrect = result === 'correct' || result === true;
-    const processingResult = await cardResultProcessor.processCardResult({
-      cardId: card_id,
-      userId: user_id,
-      subjectId: subject_id || currentCard.deck_id,
-      isCorrect,
-      responseTimeMs: response_time_ms || 0,
-      questionWordCount: question_word_count || currentCard.word_count || 20,
-      currentCard,
-    });
-
-    await new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE flashcards SET 
-         sm2_ease_factor = ?, sm2_interval = ?, sm2_repetitions = ?,
-         next_review_date = ?
-         WHERE id = ?`,
-        [
-          processingResult.cardUpdate.sm2_ease_factor,
-          processingResult.cardUpdate.sm2_interval,
-          processingResult.cardUpdate.sm2_repetitions,
-          processingResult.cardUpdate.next_review_date,
-          card_id,
-        ],
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
-
     const logId = clientId || uuidv4();
+    const wordCount = question_word_count || currentCard.word_count || 20;
+    const diffDeduced = difficulty_deduced || (isCorrect ? 'good' : 'forgotten');
+
     await new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO card_logs 
@@ -116,13 +87,13 @@ exports.createCardLog = async (req, res) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           logId,
-          processingResult.logEntry.card_id,
-          processingResult.logEntry.user_id,
-          processingResult.logEntry.result,
-          processingResult.logEntry.response_time_ms,
-          processingResult.logEntry.difficulty_deduced,
-          processingResult.logEntry.normalized_time_ms,
-          processingResult.logEntry.text_length_words,
+          card_id,
+          user_id,
+          isCorrect ? 'correct' : 'incorrect',
+          response_time_ms || 0,
+          diffDeduced,
+          response_time_ms || 0,
+          wordCount,
         ],
         function(err) {
           if (err) reject(err);
@@ -131,32 +102,15 @@ exports.createCardLog = async (req, res) => {
       );
     });
 
-    try {
-      await cardResultProcessor.updateAnalyticsAfterResult(
-        db,
-        user_id,
-        subject_id || currentCard.deck_id,
-        card_id
-      );
-    } catch (analyticsError) {
-      console.error('[learningController] Error updating analytics:', analyticsError);
-    }
-
     res.status(201).json({
       success: true,
       logId: logId,
-      message: 'Log de tarjeta guardado y procesado.',
-      feedback: processingResult.feedback,
-      microInteraction: processingResult.microInteraction,
-      metrics: processingResult.metrics,
-      analytics: {
-        masteryPercentage: processingResult.metrics.quality,
-      },
+      message: 'Log de tarjeta persistido exitosamente (Local-First Sync).',
     });
 
   } catch (error) {
     console.error('[learningController.createCardLog] Error:', error);
-    res.status(500).json({ error: 'Failed to process card result' });
+    res.status(500).json({ error: 'Failed to process card log' });
   }
 };
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { flashcardDeckRepository, calendarEventRepository, subjectRepository, flashcardRepository } from '../services/database';
 import { getFlashcardDecksWithMetrics, type FlashcardDeck } from '../services/api';
+import { repositoryEventBus } from '../services/events/RepositoryEventBus';
 
 export enum FlashcardsStoreState {
   NOT_INITIALIZED = 'NOT_INITIALIZED',
@@ -16,20 +17,28 @@ interface FlashcardsStore {
   refresh: () => Promise<void>;
   upsert: (deck: FlashcardDeck) => void;
   remove: (deckId: string) => void;
+  subscribeToEvents: () => () => void;
 }
 
 async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<FlashcardDeck[]> {
   try {
+    if (decks.length === 0) return decks;
+    
     const allEvents = await calendarEventRepository.getAll();
     const allSubjects = await subjectRepository.getAll();
-    const allFlashcards = await flashcardRepository.getAll();
+    
+    const deckIds = decks.map(d => String(d.id));
+    const placeholders = deckIds.map(() => '?').join(',');
+    const { databaseService } = await import('../services/database/DatabaseService');
+    const db = databaseService.getDb();
+    const relevantFlashcards = await db.getAllAsync(`SELECT deck_id, status, next_review_date FROM flashcards WHERE deck_id IN (${placeholders})`, deckIds);
     
     const eventMap = new Map<string, { id: string; title: string; start_date: string }>();
     const deckToExam = new Map<string, { id: string; title: string; start_date: string }>();
     const subjectMap = new Map(allSubjects.map(s => [String(s.id), s]));
-    const deckCardsMap = new Map<string, typeof allFlashcards>();
+    const deckCardsMap = new Map<string, any[]>();
 
-    for (const card of allFlashcards) {
+    for (const card of relevantFlashcards as any[]) {
       const did = String(card.deck_id);
       if (!deckCardsMap.has(did)) deckCardsMap.set(did, []);
       deckCardsMap.get(did)!.push(card);
@@ -48,7 +57,6 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
     return decks.map(d => {
       let enrichedDeck = { ...d };
 
-      // Attach subject metadata
       if (d.subject_id) {
         const subject = subjectMap.get(String(d.subject_id));
         if (subject) {
@@ -58,7 +66,6 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
         }
       }
 
-      // Attach local metrics
       const localCards = deckCardsMap.get(String(d.id)) || [];
       if (d.card_count == null) enrichedDeck.card_count = localCards.length;
       if (d.new_count == null) enrichedDeck.new_count = localCards.filter(c => !c.status || c.status === 'new').length;
@@ -68,7 +75,7 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
       if (d.review_count == null) {
         enrichedDeck.review_count = localCards.filter(c => 
           (c.status === 'review' || c.status === 'graduated') && 
-          c.next_review_at && new Date(c.next_review_at) <= now
+          c.next_review_date && new Date(c.next_review_date) <= now
         ).length;
       }
 
@@ -104,10 +111,8 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
 
   initialize: async () => {
     if (get().status !== FlashcardsStoreState.NOT_INITIALIZED) return;
-
     set({ status: FlashcardsStoreState.INITIALIZING });
     const t0 = Date.now();
-
     try {
       const sqliteDecks = await flashcardDeckRepository.getAll();
       const enriched = await enrichWithLocalMetrics(sqliteDecks as unknown as FlashcardDeck[]);
@@ -121,7 +126,6 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
 
   refresh: async () => {
     if (refreshInProgress) return refreshInProgress;
-
     refreshInProgress = (async () => {
       try {
         const sqliteDecks = await flashcardDeckRepository.getAll();
@@ -133,7 +137,6 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
         refreshInProgress = null;
       }
     })();
-
     return refreshInProgress;
   },
 
@@ -151,5 +154,66 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
 
   remove: (deckId: string) => {
     set((state) => ({ decks: state.decks.filter(d => d.id !== deckId) }));
+  },
+
+  subscribeToEvents: () => {
+    // When a deck is mutated
+    const unsubDeck = repositoryEventBus.onBatch('flashcard_decks', async (event) => {
+      if (get().status !== FlashcardsStoreState.READY) return;
+      try {
+        const affectedDeckIds = [...new Set(event.entities.map(e => String(e.id)))];
+        if (affectedDeckIds.length === 0) return;
+        
+        // Fetch only affected decks
+        const placeholders = affectedDeckIds.map(() => '?').join(',');
+        const { databaseService } = await import('../services/database/DatabaseService');
+        const db = databaseService.getDb();
+        const rows = await db.getAllAsync(`SELECT * FROM flashcard_decks WHERE id IN (${placeholders})`, affectedDeckIds);
+        
+        if (rows.length > 0) {
+          const enriched = await enrichWithLocalMetrics(rows as unknown as FlashcardDeck[]);
+          const { upsert } = get();
+          enriched.forEach(d => upsert(d));
+        }
+      } catch (e) {
+        console.warn('[FlashcardsStore] Incremental deck update failed', e);
+      }
+    });
+
+    // When a flashcard is mutated
+    const unsubFlashcard = repositoryEventBus.onBatch('flashcards', async (event) => {
+      if (get().status !== FlashcardsStoreState.READY) return;
+      try {
+        // We need to find which decks were affected by these cards
+        const cardIds = [...new Set(event.entities.map(e => String(e.id)))];
+        if (cardIds.length === 0) return;
+        
+        const placeholders = cardIds.map(() => '?').join(',');
+        const { databaseService } = await import('../services/database/DatabaseService');
+        const db = databaseService.getDb();
+        
+        // Get unique deck_ids for these cards
+        const rows = await db.getAllAsync(`SELECT DISTINCT deck_id FROM flashcards WHERE id IN (${placeholders})`, cardIds);
+        const affectedDeckIds = rows.map((r: any) => String(r.deck_id));
+        
+        if (affectedDeckIds.length > 0) {
+          const deckPlaceholders = affectedDeckIds.map(() => '?').join(',');
+          const deckRows = await db.getAllAsync(`SELECT * FROM flashcard_decks WHERE id IN (${deckPlaceholders})`, affectedDeckIds);
+          
+          if (deckRows.length > 0) {
+            const enriched = await enrichWithLocalMetrics(deckRows as unknown as FlashcardDeck[]);
+            const { upsert } = get();
+            enriched.forEach(d => upsert(d));
+          }
+        }
+      } catch (e) {
+        console.warn('[FlashcardsStore] Incremental flashcard update failed', e);
+      }
+    });
+
+    return () => {
+      unsubFlashcard();
+      unsubDeck();
+    };
   },
 }));

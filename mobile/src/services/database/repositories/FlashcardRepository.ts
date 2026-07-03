@@ -11,7 +11,7 @@ export interface Flashcard {
   ease_factor?: number;
   interval_days?: number;
   repetitions?: number;
-  next_review_at?: string;
+  next_review_date?: string;
   fsrs_stability?: number;
   fsrs_difficulty?: number;
   source_context?: string;

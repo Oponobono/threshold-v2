@@ -18,8 +18,11 @@ export interface PredictionItem {
 
 export interface PredictionResponse {
   dueCount: number;
+  dueCardsCount?: number;
   deckCount?: number;
+  dueDeckCount?: number;
   cards: PredictionItem[];
+  dueDeckIds?: string[];
 }
 
 export interface CardReviewResponse {

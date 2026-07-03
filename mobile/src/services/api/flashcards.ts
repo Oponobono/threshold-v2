@@ -288,7 +288,7 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
   }
 };
 
-export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; direction?: CardDirection; id?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_at?: string; fsrs_stability?: number; fsrs_difficulty?: number }): Promise<any> => {
+export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; direction?: CardDirection; id?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_date?: string; fsrs_stability?: number; fsrs_difficulty?: number }): Promise<any> => {
   const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
 

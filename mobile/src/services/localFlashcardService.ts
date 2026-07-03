@@ -358,10 +358,6 @@ export function updateLocalCard(
   cardId: string,
   updates: Partial<LocalCard>,
   status?: string,
-  fsrs_stability?: number,
-  fsrs_difficulty?: number,
-  fsrs_repetitions?: number,
-  next_review_date?: string,
 ): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -382,19 +378,12 @@ export function updateLocalCard(
       throw new Error(`Tarjeta ${cardId} no encontrada`);
     }
 
-    const fsrsUpdates: Record<string, any> = {};
-    if (status !== undefined) fsrsUpdates.status = status;
-    if (fsrs_stability !== undefined) fsrsUpdates.fsrs_stability = fsrs_stability;
-    if (fsrs_difficulty !== undefined) fsrsUpdates.fsrs_difficulty = fsrs_difficulty;
-    if (fsrs_repetitions !== undefined) fsrsUpdates.fsrs_repetitions = fsrs_repetitions;
-    if (next_review_date !== undefined) fsrsUpdates.next_review_date = next_review_date;
-
     cards[idx] = {
       ...cards[idx],
       ...(updates.data && { content: updates.data, ...(updates.data?.front && { front: updates.data.front }), ...(updates.data?.back && { back: updates.data.back }) }),
       ...(updates.hint !== undefined && { hint: updates.hint }),
       ...(updates.explanation !== undefined && { explanation: updates.explanation }),
-      ...fsrsUpdates,
+      ...(status !== undefined && { status }),
     };
 
     mmkv.set(cardsKey, JSON.stringify({ data: cards, timestamp: Date.now() }));

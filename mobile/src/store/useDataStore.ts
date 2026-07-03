@@ -29,8 +29,11 @@ export interface PredictionItem {
 
 export interface PredictionResponse {
   dueCount: number;
+  dueCardsCount?: number;
   deckCount?: number;
+  dueDeckCount?: number;
   cards: PredictionItem[];
+  dueDeckIds?: string[];
 }
 
 export interface GroupMembership {
@@ -286,6 +289,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   getDuedeckIds: () => {
     const state = get();
+    if (state.predictions?.dueDeckIds) return new Set(state.predictions.dueDeckIds);
     if (!state.predictions?.cards) return new Set();
     return new Set(
       state.predictions.cards

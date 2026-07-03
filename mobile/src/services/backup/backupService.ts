@@ -335,7 +335,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   aiChats: { id: string; user_id: string; subject_id?: string; role: string; content: string }[];
   userPreferences: { key: string; value: string }[];
   flashcardDecks: { id: string; user_id: string; subject_id?: string; title: string; description?: string; linked_event_id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string }[];
-  flashcards: { id: string; deck_id: string; front: string; back?: string; status?: string; direction?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_at?: string; fsrs_stability?: number; fsrs_difficulty?: number; source_context?: string }[];
+  flashcards: { id: string; deck_id: string; front: string; back?: string; status?: string; direction?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_date?: string; fsrs_stability?: number; fsrs_difficulty?: number; source_context?: string }[];
 }> {
   const db = databaseService.getDb();
   const result = {
@@ -347,7 +347,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     aiChats: [] as { id: string; user_id: string; subject_id?: string; role: string; content: string }[],
     userPreferences: [] as { key: string; value: string }[],
     flashcardDecks: [] as { id: string; user_id: string; subject_id?: string; title: string; description?: string; linked_event_id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string }[],
-    flashcards: [] as { id: string; deck_id: string; front: string; back?: string; status?: string; direction?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_at?: string; fsrs_stability?: number; fsrs_difficulty?: number; source_context?: string }[],
+    flashcards: [] as { id: string; deck_id: string; front: string; back?: string; status?: string; direction?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_date?: string; fsrs_stability?: number; fsrs_difficulty?: number; source_context?: string }[],
   };
 
   try {
@@ -456,7 +456,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
       const deckIds = result.flashcardDecks.map(d => `'${d.id}'`).join(',');
       const unbackedCards: any[] = await db.getAllAsync(
         `SELECT id, deck_id, front, back, status, direction,
-                ease_factor, interval_days, repetitions, next_review_at,
+                ease_factor, interval_days, repetitions, next_review_date,
                 fsrs_stability, fsrs_difficulty, source_context
          FROM flashcards
          WHERE deck_id IN (${deckIds}) AND deleted_at IS NULL`
@@ -471,7 +471,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
         ease_factor: c.ease_factor ?? undefined,
         interval_days: c.interval_days ?? undefined,
         repetitions: c.repetitions ?? undefined,
-        next_review_at: c.next_review_at ? String(c.next_review_at) : undefined,
+        next_review_date: c.next_review_date ? String(c.next_review_date) : undefined,
         fsrs_stability: c.fsrs_stability ?? undefined,
         fsrs_difficulty: c.fsrs_difficulty ?? undefined,
         source_context: c.source_context ? String(c.source_context) : undefined,
