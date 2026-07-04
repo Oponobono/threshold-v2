@@ -5,22 +5,34 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Threshold API Documentation',
+      title: 'Threshold API',
       version: '1.0.0',
-      description: 'Documentación oficial de la API del backend de Threshold para gestionar usuarios, flashcards, materias y recordatorios.',
+      description: 'API del backend de Threshold — aplicación offline-first para estudiantes universitarios. Gestión académica, flashcards con SM-2/FSRS, asistente IA (Zyren), y sincronización entre dispositivos.\n\n📘 Documentación completa del proyecto: ejecutar \`cd docs && npm run start\` para ver el sitio Docusaurus local.',
+    },
+    externalDocs: {
+      description: 'Documentación completa de Threshold (Docusaurus)',
+      url: 'http://localhost:3001',
     },
     servers: [
       {
         url: 'http://localhost:3000',
-        description: 'Servidor Local',
+        description: 'Servidor local (desarrollo)',
       },
       {
-        url: 'https://tu-servidor-produccion.com', // Replace with production URL if any
-        description: 'Servidor de Producción',
-      }
+        url: 'https://threshold.onrender.com',
+        description: 'Producción (Render)',
+      },
     ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
   },
-  // Documentamos todos los endpoints en la carpeta de rutas
   apis: ['./routes/*.js'],
 };
 
