@@ -9,7 +9,6 @@ const migrations: Migration[] = [
   {
     version: 1,
     up: [
-      // TABLA DE USUARIOS - Centraliza datos de autenticación
       `CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL UNIQUE,
@@ -321,19 +320,19 @@ const migrations: Migration[] = [
       `ALTER TABLE subjects ADD COLUMN external_url TEXT`,
       `ALTER TABLE subjects ADD COLUMN total_lessons INTEGER DEFAULT 0`,
       `ALTER TABLE subjects ADD COLUMN completed_lessons INTEGER DEFAULT 0`,
-      `ALTER TABLE subjects ADD COLUMN next_micro_milestone TEXT`
+      `ALTER TABLE subjects ADD COLUMN next_micro_milestone TEXT`,
     ],
   },
   {
     version: 8,
     up: [
-      `ALTER TABLE flashcards ADD COLUMN direction TEXT NOT NULL DEFAULT 'forward'`
+      `ALTER TABLE flashcards ADD COLUMN direction TEXT NOT NULL DEFAULT 'forward'`,
     ],
   },
   {
     version: 9,
     up: [
-      `ALTER TABLE flashcards ADD COLUMN source_context TEXT`
+      `ALTER TABLE flashcards ADD COLUMN source_context TEXT`,
     ],
   },
   {
@@ -371,7 +370,7 @@ const migrations: Migration[] = [
   {
     version: 14,
     up: [
-      `UPDATE flashcard_decks SET linked_event_id = (SELECT id FROM calendar_events WHERE linked_deck_id = flashcard_decks.id LIMIT 1) WHERE EXISTS (SELECT 1 FROM calendar_events WHERE linked_deck_id = flashcard_decks.id)`
+      `UPDATE flashcard_decks SET linked_event_id = (SELECT id FROM calendar_events WHERE linked_deck_id = flashcard_decks.id LIMIT 1) WHERE EXISTS (SELECT 1 FROM calendar_events WHERE linked_deck_id = flashcard_decks.id)`,
     ],
   },
   {
@@ -597,9 +596,44 @@ const migrations: Migration[] = [
     ],
   },
   {
+    version: 25,
+    up: [
+      `ALTER TABLE photos ADD COLUMN user_id TEXT`,
+      `ALTER TABLE photos ADD COLUMN filename TEXT`,
+      `ALTER TABLE photos ADD COLUMN mime_type TEXT`,
+      `ALTER TABLE photos ADD COLUMN file_size INTEGER`,
+      `ALTER TABLE photos ADD COLUMN checksum TEXT`,
+      `ALTER TABLE photos ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE photos ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
+      `ALTER TABLE photos ADD COLUMN transfer_type TEXT`,
+      `ALTER TABLE photos ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
+      `ALTER TABLE photos ADD COLUMN last_error TEXT`,
+      `ALTER TABLE photos ADD COLUMN last_verified TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN filename TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN mime_type TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN file_size INTEGER`,
+      `ALTER TABLE audio_recordings ADD COLUMN checksum TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE audio_recordings ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
+      `ALTER TABLE audio_recordings ADD COLUMN transfer_type TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
+      `ALTER TABLE audio_recordings ADD COLUMN last_error TEXT`,
+      `ALTER TABLE audio_recordings ADD COLUMN last_verified TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN filename TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN mime_type TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN file_size INTEGER`,
+      `ALTER TABLE scanned_documents ADD COLUMN checksum TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE scanned_documents ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
+      `ALTER TABLE scanned_documents ADD COLUMN transfer_type TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
+      `ALTER TABLE scanned_documents ADD COLUMN last_error TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN last_verified TEXT`,
+    ],
+  },
+  {
     version: 26,
     up: [
-      // Expand users table with full UserProfile fields + sync columns
       `ALTER TABLE users ADD COLUMN lastname TEXT`,
       `ALTER TABLE users ADD COLUMN username TEXT`,
       `ALTER TABLE users ADD COLUMN major TEXT`,
@@ -621,50 +655,8 @@ const migrations: Migration[] = [
     ],
   },
   {
-    version: 25,
-    up: [
-      // ── Photos ──
-      `ALTER TABLE photos ADD COLUMN user_id TEXT`,
-      `ALTER TABLE photos ADD COLUMN filename TEXT`,
-      `ALTER TABLE photos ADD COLUMN mime_type TEXT`,
-      `ALTER TABLE photos ADD COLUMN file_size INTEGER`,
-      `ALTER TABLE photos ADD COLUMN checksum TEXT`,
-      `ALTER TABLE photos ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE photos ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
-      `ALTER TABLE photos ADD COLUMN transfer_type TEXT`,
-      `ALTER TABLE photos ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
-      `ALTER TABLE photos ADD COLUMN last_error TEXT`,
-      `ALTER TABLE photos ADD COLUMN last_verified TEXT`,
-      // ── Audio Recordings ──
-      `ALTER TABLE audio_recordings ADD COLUMN filename TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN mime_type TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN file_size INTEGER`,
-      `ALTER TABLE audio_recordings ADD COLUMN checksum TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE audio_recordings ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
-      `ALTER TABLE audio_recordings ADD COLUMN transfer_type TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
-      `ALTER TABLE audio_recordings ADD COLUMN last_error TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN last_verified TEXT`,
-      // ── Scanned Documents ──
-      `ALTER TABLE scanned_documents ADD COLUMN filename TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN mime_type TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN file_size INTEGER`,
-      `ALTER TABLE scanned_documents ADD COLUMN checksum TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE scanned_documents ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
-      `ALTER TABLE scanned_documents ADD COLUMN transfer_type TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
-      `ALTER TABLE scanned_documents ADD COLUMN last_error TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN last_verified TEXT`,
-    ],
-  },
-  {
     version: 27,
     up: [
-      // Fix: subject_threshold_overrides PK type: INTEGER AUTOINCREMENT → TEXT
-      // SQLite doesn't enforce types, so existing INTEGER values work as TEXT.
-      // But the schema must match for consistency with backend + future PostgreSQL.
       `ALTER TABLE subject_threshold_overrides RENAME TO subject_threshold_overrides_old`,
       `CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
         id TEXT PRIMARY KEY,
@@ -684,7 +676,6 @@ const migrations: Migration[] = [
   {
     version: 28,
     up: [
-      // Add missing sync columns to assessment_categories, audio_transcripts, youtube_transcripts
       `ALTER TABLE assessment_categories ADD COLUMN sync_version INTEGER DEFAULT 0`,
       `ALTER TABLE assessment_categories ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
       `ALTER TABLE assessment_categories ADD COLUMN last_modified_by TEXT`,
@@ -704,214 +695,11 @@ const migrations: Migration[] = [
   {
     version: 29,
     up: [
-      // assessment_files — creada en v3, nunca recibió columnas de sync
-      `ALTER TABLE photos ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE photos ADD COLUMN deleted_at TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
-      `ALTER TABLE audio_recordings ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN deleted_at TEXT`,
-      `ALTER TABLE youtube_videos ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
-      `ALTER TABLE youtube_videos ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE youtube_videos ADD COLUMN deleted_at TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
-      `ALTER TABLE scanned_documents ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN deleted_at TEXT`,
-      `ALTER TABLE calendar_events ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
-      `ALTER TABLE calendar_events ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE calendar_events ADD COLUMN deleted_at TEXT`,
-    ],
-  },
-  {
-    version: 22,
-    up: [
-      `CREATE TABLE IF NOT EXISTS sync_debug_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trace_id TEXT NOT NULL,
-        operation_id TEXT,
-        parent_trace_id TEXT,
-        stage TEXT NOT NULL,
-        entity_type TEXT,
-        entity_id TEXT,
-        message TEXT NOT NULL,
-        data TEXT,
-        duration_ms INTEGER,
-        created_at TEXT NOT NULL
-      )`,
-      `CREATE INDEX IF NOT EXISTS idx_sync_debug_trace ON sync_debug_logs(trace_id)`,
-      `CREATE INDEX IF NOT EXISTS idx_sync_debug_stage ON sync_debug_logs(stage)`,
-      `CREATE INDEX IF NOT EXISTS idx_sync_debug_entity ON sync_debug_logs(entity_type, entity_id)`,
-      `ALTER TABLE sync_queue ADD COLUMN trace_id TEXT`,
-    ],
-  },
-  {
-    version: 23,
-    up: [
-      `ALTER TABLE flashcards ADD COLUMN is_backed_up INTEGER DEFAULT 0`,
-    ],
-  },
-  {
-    version: 24,
-    up: [
-      `CREATE TABLE IF NOT EXISTS grading_periods (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        period_type TEXT NOT NULL DEFAULT 'custom',
-        start_date TEXT,
-        end_date TEXT,
-        is_active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now')),
-        sync_version INTEGER DEFAULT 0,
-        version_number INTEGER NOT NULL DEFAULT 0,
-        last_modified_by TEXT,
-        deleted_at TEXT
-      )`,
-      `CREATE TABLE IF NOT EXISTS lms_accounts (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        platform TEXT NOT NULL,
-        instance_url TEXT,
-        username TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        sync_version INTEGER DEFAULT 0,
-        version_number INTEGER NOT NULL DEFAULT 0,
-        last_modified_by TEXT,
-        deleted_at TEXT
-      )`,
-      `CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        subject_id TEXT,
-        threshold REAL NOT NULL DEFAULT 70,
-        created_at TEXT DEFAULT (datetime('now')),
-        sync_version INTEGER DEFAULT 0,
-        version_number INTEGER NOT NULL DEFAULT 0,
-        last_modified_by TEXT,
-        deleted_at TEXT
-      )`,
-    ],
-  },
-  {
-    version: 26,
-    up: [
-      // Expand users table with full UserProfile fields + sync columns
-      `ALTER TABLE users ADD COLUMN lastname TEXT`,
-      `ALTER TABLE users ADD COLUMN username TEXT`,
-      `ALTER TABLE users ADD COLUMN major TEXT`,
-      `ALTER TABLE users ADD COLUMN university TEXT`,
-      `ALTER TABLE users ADD COLUMN semester TEXT`,
-      `ALTER TABLE users ADD COLUMN study_goal TEXT`,
-      `ALTER TABLE users ADD COLUMN profile_image TEXT`,
-      `ALTER TABLE users ADD COLUMN display_name TEXT`,
-      `ALTER TABLE users ADD COLUMN share_pin TEXT`,
-      `ALTER TABLE users ADD COLUMN approval_threshold REAL`,
-      `ALTER TABLE users ADD COLUMN grading_scale TEXT`,
-      `ALTER TABLE users ADD COLUMN active_grading_version_id TEXT`,
-      `ALTER TABLE users ADD COLUMN last_login TEXT`,
-      `ALTER TABLE users ADD COLUMN reference_language TEXT`,
-      `ALTER TABLE users ADD COLUMN biometric_token TEXT`,
-      `ALTER TABLE users ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
-      `ALTER TABLE users ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE users ADD COLUMN deleted_at TEXT`,
-    ],
-  },
-  {
-    version: 25,
-    up: [
-      // ── Photos ──
-      `ALTER TABLE photos ADD COLUMN user_id TEXT`,
-      `ALTER TABLE photos ADD COLUMN filename TEXT`,
-      `ALTER TABLE photos ADD COLUMN mime_type TEXT`,
-      `ALTER TABLE photos ADD COLUMN file_size INTEGER`,
-      `ALTER TABLE photos ADD COLUMN checksum TEXT`,
-      `ALTER TABLE photos ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE photos ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
-      `ALTER TABLE photos ADD COLUMN transfer_type TEXT`,
-      `ALTER TABLE photos ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
-      `ALTER TABLE photos ADD COLUMN last_error TEXT`,
-      `ALTER TABLE photos ADD COLUMN last_verified TEXT`,
-      // ── Audio Recordings ──
-      `ALTER TABLE audio_recordings ADD COLUMN filename TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN mime_type TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN file_size INTEGER`,
-      `ALTER TABLE audio_recordings ADD COLUMN checksum TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE audio_recordings ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
-      `ALTER TABLE audio_recordings ADD COLUMN transfer_type TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
-      `ALTER TABLE audio_recordings ADD COLUMN last_error TEXT`,
-      `ALTER TABLE audio_recordings ADD COLUMN last_verified TEXT`,
-      // ── Scanned Documents ──
-      `ALTER TABLE scanned_documents ADD COLUMN filename TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN mime_type TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN file_size INTEGER`,
-      `ALTER TABLE scanned_documents ADD COLUMN checksum TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE scanned_documents ADD COLUMN asset_state TEXT DEFAULT 'LOCAL_ONLY'`,
-      `ALTER TABLE scanned_documents ADD COLUMN transfer_type TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN transfer_progress INTEGER DEFAULT 0`,
-      `ALTER TABLE scanned_documents ADD COLUMN last_error TEXT`,
-      `ALTER TABLE scanned_documents ADD COLUMN last_verified TEXT`,
-    ],
-  },
-  {
-    version: 27,
-    up: [
-      // Fix: subject_threshold_overrides PK type: INTEGER AUTOINCREMENT → TEXT
-      // SQLite doesn't enforce types, so existing INTEGER values work as TEXT.
-      // But the schema must match for consistency with backend + future PostgreSQL.
-      `ALTER TABLE subject_threshold_overrides RENAME TO subject_threshold_overrides_old`,
-      `CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        subject_id TEXT,
-        threshold REAL NOT NULL DEFAULT 70,
-        created_at TEXT DEFAULT (datetime('now')),
-        sync_version INTEGER DEFAULT 0,
-        version_number INTEGER NOT NULL DEFAULT 0,
-        last_modified_by TEXT,
-        deleted_at TEXT
-      )`,
-      `INSERT INTO subject_threshold_overrides SELECT * FROM subject_threshold_overrides_old`,
-      `DROP TABLE subject_threshold_overrides_old`,
-    ],
-  },
-  {
-    version: 28,
-    up: [
-      // Add missing sync columns to assessment_categories, audio_transcripts, youtube_transcripts
-      `ALTER TABLE assessment_categories ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE assessment_categories ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
-      `ALTER TABLE assessment_categories ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE assessment_categories ADD COLUMN deleted_at TEXT`,
-      `ALTER TABLE audio_transcripts ADD COLUMN user_id TEXT`,
-      `ALTER TABLE audio_transcripts ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE audio_transcripts ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
-      `ALTER TABLE audio_transcripts ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE audio_transcripts ADD COLUMN deleted_at TEXT`,
-      `ALTER TABLE youtube_transcripts ADD COLUMN user_id TEXT`,
-      `ALTER TABLE youtube_transcripts ADD COLUMN sync_version INTEGER DEFAULT 0`,
-      `ALTER TABLE youtube_transcripts ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
-      `ALTER TABLE youtube_transcripts ADD COLUMN last_modified_by TEXT`,
-      `ALTER TABLE youtube_transcripts ADD COLUMN deleted_at TEXT`,
-    ],
-  },
-  {
-    version: 29,
-    up: [
-      // assessment_files — creada en v3, nunca recibió columnas de sync
       `ALTER TABLE assessment_files ADD COLUMN deleted_at TEXT`,
       `ALTER TABLE assessment_files ADD COLUMN sync_version INTEGER DEFAULT 0`,
       `ALTER TABLE assessment_files ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
       `ALTER TABLE assessment_files ADD COLUMN last_modified_by TEXT`,
-      // ai_chats — creada en v16, nunca recibió deleted_at
       `ALTER TABLE ai_chats ADD COLUMN deleted_at TEXT`,
-    ],
-  },
-  {
-    version: 30,
-    up: [
-      `ALTER TABLE flashcards ADD COLUMN next_review_date TEXT`,
     ],
   },
 ];
