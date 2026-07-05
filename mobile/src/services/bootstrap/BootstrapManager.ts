@@ -71,23 +71,28 @@ class BootstrapManager {
   private _error?: string;
 
   async start(): Promise<void> {
-    if (this._started) return;
+    if (this._started) { console.log('[BOOT] start() already called, skipping'); return; }
     this._started = true;
+    console.log('[BOOT 06] BootstrapManager.start() begins');
 
     try {
       await this._runPhase('DATABASE', async () => {
+        console.log('[BOOT 07] PHASE DATABASE: importing DatabaseService...');
         const { databaseService } = await import('../database/DatabaseService');
+        console.log('[BOOT 07a] DatabaseService imported, calling open()...');
         await databaseService.open();
-        console.log('[Bootstrap] Database ready');
+        console.log('[BOOT 08] Database ready');
       });
 
       await this._runPhase('STORAGE', async () => {
+        console.log('[BOOT 09] PHASE STORAGE: migrating MMKV...');
         const { migrateFlashcardsFromMMKV } = await import('../migration/migrateFlashcardsFromMMKV');
         await migrateFlashcardsFromMMKV();
-        console.log('[Bootstrap] Storage ready');
+        console.log('[BOOT 09z] Storage ready');
       });
 
       await this._runPhase('NETWORK', async () => {
+        console.log('[BOOT 10] PHASE NETWORK: initializing...');
         const { networkManager } = await import('../network/NetworkManager');
         const { useConnectivityStore } = await import('../../store/useConnectivityStore');
         networkManager.subscribe((state) => {
@@ -101,64 +106,100 @@ class BootstrapManager {
         });
         networkManager.start();
 
+        // Fire-and-forget: no bloqueamos el bootstrap esperando el backend
         const { initializeApiClient } = await import('../api/client');
-        await initializeApiClient();
-        console.log('[Bootstrap] Network ready');
+        initializeApiClient().then(() => {
+          console.log('[BOOT 10z] Network initialized (async)');
+        }).catch((err: any) => {
+          console.warn('[BOOT 10z] Network init failed (non-blocking):', err?.message);
+        });
+        console.log('[BOOT 10a] Network init dispatched (non-blocking)');
       });
 
       await this._runPhase('AUTH', async () => {
+        console.log('[BOOT 11] PHASE AUTH...');
+
+        // Caso 1: Cargar perfil desde SQLite (local, rápido, sin red)
+        const { userRepository } = await import('../database/repositories/UserRepository');
+        let localProfileExists = false;
         try {
-          const { getCurrentUserProfile } = await import('../api/auth');
-          const profile = await getCurrentUserProfile();
-          if (profile) {
-            const { userRepository } = await import('../database/repositories/UserRepository');
-            await userRepository.saveProfile(profile);
-          }
+          localProfileExists = !!(await userRepository.getCurrentUser());
+          console.log(localProfileExists
+            ? '[BOOT 11a] Profile loaded from local DB'
+            : '[BOOT 11b] No local profile (first install)');
         } catch {
-          console.log('[Bootstrap] Auth: no session yet');
+          // Sin perfil local — esperable en primer inicio
         }
-        console.log('[Bootstrap] Auth ready');
+
+        // Caso 2: Refrescar/cargar perfil remoto en background (fire-and-forget)
+        const { getCurrentUserProfile } = await import('../api/auth');
+        getCurrentUserProfile().then(async (profile) => {
+          if (profile) {
+            await userRepository.saveProfile(profile);
+            console.log(localProfileExists
+              ? '[BOOT 11z] Profile refreshed from remote'
+              : '[BOOT 11z] Profile fetched from remote (first time)');
+          }
+        }).catch((err: any) => {
+          // Timeout/network: si teníamos perfil local lo conservamos;
+          // si es primer inicio, la app arranca sin perfil y muestra Login
+          if (localProfileExists) {
+            console.log('[BOOT 11b] Remote fetch failed (keeping local profile):', err?.message);
+          }
+        });
+
+        console.log('[BOOT 11z] Auth ready');
       });
 
       await this._runPhase('SYNC', async () => {
+        console.log('[BOOT 12] PHASE SYNC: login...');
         const { syncManager } = await import('../sync/SyncManager');
         const { syncService } = await import('../database/SyncService');
         const { databaseService } = await import('../database/DatabaseService');
         const { fetchWithFallback } = await import('../api/client');
         const { getUserId } = await import('../api/auth');
 
-        await syncManager.login();
+        // Fire-and-forget: login y sync se ejecutan en background
+        syncManager.login().then(() => {
+          console.log('[BOOT 12a] Sync login completed (async)');
+        }).catch((err: any) => {
+          console.warn('[BOOT 12a] Sync login failed (non-blocking):', err?.message);
+        });
 
         this._registerSyncHandlers(syncService, databaseService, fetchWithFallback, getUserId);
 
-        const pendingCount = await syncService.getPendingCount();
-        if (pendingCount > 0) {
-          console.log(`[Bootstrap] ${pendingCount} pending operations, syncing...`);
-          syncService.sync().catch(err =>
-            console.warn('[Bootstrap] Sync on init failed:', err)
-          );
-        }
+        syncService.getPendingCount().then(pendingCount => {
+          if (pendingCount > 0) {
+            console.log(`[BOOT 12d] ${pendingCount} pending operations, syncing...`);
+            syncService.sync().catch(err =>
+              console.warn('[BOOT 12e] Sync on init failed:', err)
+            );
+          }
+        }).catch(() => {});
 
         const { MomentumService } = await import('../MomentumService');
         MomentumService.updateAllMomentumScores().catch(err =>
-          console.warn('[Bootstrap] Momentum recalculation error:', err)
+          console.warn('[BOOT 12g] Momentum recalculation error:', err)
         );
 
-        console.log('[Bootstrap] Sync ready');
+        console.log('[BOOT 12z] Sync dispatched (non-blocking)');
       });
 
       await this._runPhase('READY', async () => {
+        console.log('[BOOT 13] PHASE READY: loading DataStore...');
         try {
           const { useDataStore } = await import('../../store/useDataStore');
           await useDataStore.getState().loadAllData();
         } catch (err) {
-          console.warn('[Bootstrap] Pre-load DataStore failed:', err);
+          console.warn('[BOOT 13a] Pre-load DataStore failed:', err);
         }
-        console.log('[Bootstrap] App ready');
+        console.log('[BOOT 14] App ready');
       });
 
+      console.log('[BOOT 15] BootstrapManager.start() completed successfully');
     } catch (err: any) {
-      console.error(`[Bootstrap] Failed at phase ${this._currentPhase}:`, err);
+      console.error(`[BOOT 15!] BootstrapManager failed at phase ${this._currentPhase}:`, err);
+      throw err;
     }
   }
 

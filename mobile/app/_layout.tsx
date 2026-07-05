@@ -1,3 +1,4 @@
+import 'react-native-reanimated';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -5,8 +6,6 @@ import { useEffect, useState, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import { View, Text } from 'react-native';
-
-import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -23,10 +22,17 @@ import { requestPermissions } from '../src/services/notificationService';
 import { registerScheduledBackup } from '../src/services/backup/scheduledBackupService';
 import { getScheduledBackupConfig } from '../src/services/backup/backupService';
 import { FloatingYouTubePlayer } from '../src/components/player/FloatingYouTubePlayer';
+import { ErrorBoundary } from '../src/components/ui/ErrorBoundary';
+
+// [BOOT 00] — Module-level code: se ejecuta DURANTE la evaluación del bundle JS
+// Si la app se queda en blanco sin llegar al splash, el problema está en módulo previo
+console.log('[BOOT 00d] _layout.tsx module evaluating. All static imports resolved.');
 
 // Mantener el Splash Screen visible hasta que decidamos ocultarlo
-SplashScreen.preventAutoHideAsync().catch(() => {
-  /* ignore error */
+SplashScreen.preventAutoHideAsync().then(() => {
+  console.log('[BOOT 00e] SplashScreen.preventAutoHideAsync succeeded');
+}).catch((err: any) => {
+  console.warn('[BOOT 00e!] SplashScreen.preventAutoHideAsync failed:', err?.message || err);
 });
 
 /**
@@ -47,10 +53,13 @@ export let unstable_settings = {
  * para no interferir con la navegación dentro de los tabs.
  */
 export default function RootLayout() {
+  console.log('[BOOT 01b] RootLayout mounted');
   return (
-    <DatabaseProvider>
-      <RootNavigator />
-    </DatabaseProvider>
+    <ErrorBoundary>
+      <DatabaseProvider>
+        <RootNavigator />
+      </DatabaseProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -58,6 +67,7 @@ export default function RootLayout() {
  * Componente interno que usa DatabaseProvider para garantizar BD inicializada
  */
 function RootNavigator() {
+  console.log('[BOOT 01] RootNavigator mounted — React está renderizando');
   const colorScheme = useColorScheme();
   const [appIsReady, setAppIsReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<string>('welcome');
@@ -197,10 +207,10 @@ function RootNavigator() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0E0E18' }}>
       <SafeAreaProvider>
         <CustomAlertProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <ThemeProvider value={colorScheme !== 'light' ? DarkTheme : DefaultTheme}>
             <Stack initialRouteName={initialRoute}>
               <Stack.Screen 
                 name="welcome" 

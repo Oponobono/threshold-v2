@@ -18,6 +18,34 @@
 - La capa UI no debe importar directamente de `services/api`; debe hacerlo vía DataStore, Repositories o Queries.
 - Mantener el orden de secciones del template.
 
+### Invariantes del Bootstrap (Local-First)
+1. **Ningún `await` sobre red en el bootstrap.** Todo `await` en `BootstrapManager.start()` debe ser sobre SQLite o MMKV (recursos locales). NETWORK, AUTH y SYNC phases deben ser fire-and-forget. Solo DATABASE y STORAGE bloquean.
+2. **La red actualiza el estado local; nunca habilita el arranque.** El flujo es: `Servidor → Sincronización → SQLite → Repositorios → UI`. Nunca: `Servidor → UI`.
+3. **Ningún repositorio lee directamente del backend.** Todo Repository lee de SQLite. Si necesita datos remotos, los escribe primero en SQLite, luego notifica. Patrón: `SQLite → Repository → UI`; nunca `HTTP → Repository`.
+4. **La UI nunca depende del resultado de un refresh remoto.** Perfil local → UI → refresh remoto → SQLite → UI se actualiza reactivamente. Si el refresh falla, la UI ya tiene datos locales.
+
+### Logcat Commands Reference
+```powershell
+# Capturar logs de la app por paquete
+adb logcat -d | Select-String "com.oponobono.threshold" > crash.log
+
+# Filtrar por boots
+Select-String -Path "crash.log" -Pattern "BOOT"
+
+# Filtrar por módulos nativos
+Select-String -Path "crash.log" -Pattern "llama|whisper|reanimated|skia|nitro|sqlite"
+
+# Filtrar por fallos fatales
+Select-String -Path "crash.log" -Pattern "FATAL|SIGSEGV|SIGABRT|dlopen"
+
+# Captura limpia en vivo (borra buffer + filtra por tag)
+adb logcat -c; adb logcat -s "ReactNativeJS" > crash2.log
+
+# Captura del buffer completo post-ejecución
+adb logcat -d > "$env:TEMP\crash3.log"
+Move-Item "$env:TEMP\crash3.log" "C:\Users\cris7\OneDrive\Desktop\crash3.log"
+```
+
 ## Principio Rector
 "Si no puedes observar una sincronización, no puedes confiar en ella."
 
@@ -127,13 +155,23 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 ### Blocked
 - *(none)*
 
+## Key Decisions
+### Bootstrap desacoplado de red (Jul 2026)
+- **Problema aparente**: Pantalla blanca al iniciar APK Release. Sospecha inicial: migraciones o módulos nativos (llama.rn, whisper.rn, skia, reanimated, sqlite).
+- **Problema real 1 (funcional)**: AUTH phase (`getCurrentUserProfile()` HTTP) bloqueaba el bootstrap hasta 10.6s, causando timeout de 15s. En PID 19113: AUTH tardó 10.6s de 10.8s totales. En PID 20095 (reintento con cache warm): 0.4s de 0.5s totales. SDK 54, Hermes, New Architecture — módulos nativos cargaban correctamente (NitroMmkv, expo-sqlite, reanimated todos `ok`).
+- **Problema real 2 (visual)**: `useColorScheme()` retornaba `undefined` antes de resolver a `'dark'`, causando que `colorScheme === 'dark'` fuese `false` y se usara `DefaultTheme` (background blanco) en `ThemeProvider` de React Navigation durante un frame fugaz. El splash nativo (#0E0E18) y el windowBackground de Android (#0E0E18) ya coincidían — no era un desajuste de color.
+- **Evolución del diagnóstico**: Pantalla blanca → ¿Migraciones? → ¿DatabaseProvider? → ¿ErrorBoundary? → Instrumentación BOOT → AUTH tarda 10s → Bootstrap depende de red → Rediseño Local-First → Flash blanco restante → Theme inicial de React Navigation → Problema resuelto.
+- **Solución**: NETWORK, AUTH y SYNC pasan a ser fases fire-and-forget. Solo DATABASE (SQLite) y STORAGE (MMKV) son bloqueantes. La UI arranca con perfil local y se actualiza reactivamente cuando el refresh remoto completa. `ThemeProvider` cambió de `colorScheme === 'dark'` a `colorScheme !== 'light'` para que `undefined` (antes de resolver) use DarkTheme en vez de DefaultTheme.
+- **Resultado**: Bootstrap determinista de ~1.4s en APK Release. Cero `await` sobre red en el camino crítico. Separación clara entre inicialización local y sincronización remota.
+- **Instrumentación permanente**: [BOOT 00–15] se mantienen como boot tracing del proyecto.
+- **Pruebas pendientes**: 6 escenarios de estrés de arranque (instalación limpia con/sin red, backend lento/caído, 20 reinicios forzados, reinicio de teléfono).
+
 ## Gold Rule (post-architecture-freeze)
 - No new module if an existing one can solve the problem without losing clarity.
 - No abstraction "just in case". Every new layer must justify what problem it solves.
 - The architecture is stable enough to build on for a long time. Optimize, don't restructure.
 - A partir de ahora: toda hora de desarrollo debe aumentar la confianza en el sistema, no su complejidad. Medir, validar, automatizar pruebas, corregir bugs con evidencia.
 
-## Key Decisions
 ### Arquitectura de Sync Audit
 - Sync audit precede a cualquier cambio de código. Arreglar síntomas sin matriz de cobertura completa no es confiable.
 - La participación de entidades debe rastrearse por ciclo (CREATE/UPDATE/DELETE/PUSH/PULL/Initial/Conflict) — las aristas faltantes son la fuente del bug.

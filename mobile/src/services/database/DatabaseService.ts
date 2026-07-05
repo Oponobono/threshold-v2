@@ -5,12 +5,17 @@ class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
 
   async open(): Promise<SQLite.SQLiteDatabase> {
-    if (this.db) return this.db;
+    if (this.db) { console.log('[BOOT 04] DB already open, returning cached'); return this.db; }
+    console.log('[BOOT 03] Calling SQLite.openDatabaseAsync...');
     this.db = await SQLite.openDatabaseAsync('threshold.db');
+    console.log('[BOOT 04] SQLite DB handle acquired');
     await this.db.execAsync('PRAGMA journal_mode = WAL');
+    console.log('[BOOT 04a] PRAGMA journal_mode = WAL done');
     await this.db.execAsync('PRAGMA foreign_keys = ON');
-    
+    console.log('[BOOT 04b] PRAGMA foreign_keys = ON done');
+    console.log('[BOOT 05] Running migrations...');
     await this.runMigrations();
+    console.log('[BOOT 05z] Migrations complete');
     return this.db;
   }
 
@@ -29,7 +34,9 @@ class DatabaseService {
   private async runMigrations(): Promise<void> {
     const db = this.db!;
     const currentVersion = await this.getUserVersion();
+    console.log(`[BOOT 05a] Current DB version: ${currentVersion}, target: ${migrations.length}`);
     for (let i = currentVersion; i < migrations.length; i++) {
+      console.log(`[BOOT 05b] Running migration ${migrations[i].version} (${migrations[i].up.length} statements)`);
       const statements = migrations[i].up;
       const filtered: string[] = [];
 
@@ -53,9 +60,8 @@ class DatabaseService {
       }
 
       if (filtered.length === 0) {
-        await db.withExclusiveTransactionAsync(async (txn) => {
-          await txn.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
-        });
+        // PRAGMA user_version es NO transaccional — se ejecuta fuera de transacción
+        await db.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
         continue;
       }
 
@@ -63,8 +69,12 @@ class DatabaseService {
         for (const stmt of filtered) {
           await txn.execAsync(stmt);
         }
-        await txn.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
       });
+
+      // Actualizar user_version DESPUÉS de que la transacción haya commiteado
+      // PRAGMA user_version es inmediato (no-transaccional), no puede ir dentro de la transacción
+      // porque si la transacción se revierte, user_version quedaría desincronizado
+      await db.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
     }
   }
 
