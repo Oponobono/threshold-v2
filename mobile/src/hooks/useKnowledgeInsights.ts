@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { KnowledgeProjection } from '../domain/knowledge/KnowledgeProjection';
+import { SnapshotBuildReason } from '../domain/knowledge/SnapshotTelemetryTypes';
 import type { KnowledgeSnapshot } from '../domain/knowledge/types';
 
 interface UseKnowledgeInsights {
@@ -23,7 +24,7 @@ export function useKnowledgeInsights(userId: string | null | undefined): UseKnow
       if (!projectionRef.current) {
         projectionRef.current = new KnowledgeProjection();
       }
-      const result = await projectionRef.current.buildSnapshot(userId);
+      const result = await projectionRef.current.buildSnapshot(userId, SnapshotBuildReason.MANUAL_REFRESH);
       setSnapshot(result);
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));

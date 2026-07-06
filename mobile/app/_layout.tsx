@@ -67,11 +67,14 @@ export default function RootLayout() {
  * Componente interno que usa DatabaseProvider para garantizar BD inicializada
  */
 function RootNavigator() {
-  console.log('[BOOT 01] RootNavigator mounted — React está renderizando');
   const colorScheme = useColorScheme();
   const [appIsReady, setAppIsReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<string>('welcome');
   const { isReady: isDatabaseReady, error: databaseError } = useDatabaseReady();
+
+  useEffect(() => {
+    console.log('[BOOT 01] RootNavigator mounted — React está renderizando');
+  }, []);
 
   // Activar sincronización automática cuando recupere internet
   useAutoSync();

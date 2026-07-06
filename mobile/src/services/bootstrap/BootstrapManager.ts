@@ -162,22 +162,22 @@ class BootstrapManager {
         const { getUserId } = await import('../api/auth');
 
         // Fire-and-forget: login y sync se ejecutan en background
+        // SyncManager es el único punto de entrada para sync
+        this._registerSyncHandlers(syncService, databaseService, fetchWithFallback, getUserId);
+
         syncManager.login().then(() => {
           console.log('[BOOT 12a] Sync login completed (async)');
+          syncService.getPendingCount().then(pendingCount => {
+            if (pendingCount > 0) {
+              console.log(`[BOOT 12d] ${pendingCount} pending operations, syncing...`);
+              syncManager.sync().catch(err =>
+                console.warn('[BOOT 12e] Sync on init failed:', err)
+              );
+            }
+          }).catch(() => {});
         }).catch((err: any) => {
           console.warn('[BOOT 12a] Sync login failed (non-blocking):', err?.message);
         });
-
-        this._registerSyncHandlers(syncService, databaseService, fetchWithFallback, getUserId);
-
-        syncService.getPendingCount().then(pendingCount => {
-          if (pendingCount > 0) {
-            console.log(`[BOOT 12d] ${pendingCount} pending operations, syncing...`);
-            syncService.sync().catch(err =>
-              console.warn('[BOOT 12e] Sync on init failed:', err)
-            );
-          }
-        }).catch(() => {});
 
         const { MomentumService } = await import('../MomentumService');
         MomentumService.updateAllMomentumScores().catch(err =>

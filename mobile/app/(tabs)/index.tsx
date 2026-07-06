@@ -292,10 +292,9 @@ export default function HybridDashboardScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      // On first focus, triggers full reload (throttled to 5 min).
-      // Subsequent focuses skip the full subject/assessment/schedule cloud refresh
-      // to avoid the cloud call storm on every tab switch.
-      loadData(false);
+      // Skip full reload on focus — useProgressiveDataLoading in tab layout
+      // handles data loading. Only update derived state (schedules, profile).
+      loadData(true);
     }, [loadData])
   );
 

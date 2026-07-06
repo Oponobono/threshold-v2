@@ -190,7 +190,6 @@ export async function cancelBackupDownloadNotification(): Promise<void> {
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: true,

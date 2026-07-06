@@ -19,8 +19,8 @@ export const useProgressiveDataLoading = () => {
 
   const loadDataProgressive = useCallback(async () => {
     if (hasLoadedOnce) {
-      console.log('[ProgressiveDataLoading] Datos ya cargados, actualizando...');
-      await loadAllData(true);
+      // Bootstrap ya cargó los datos. El sync engine actualiza el store reactivamente.
+      // No necesitamos re-leer SQLite completo aquí.
       return;
     }
 

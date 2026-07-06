@@ -113,12 +113,21 @@ export const useDataStore = create<DataState>((set, get) => {
   isInitialLoading: false,
   isRefreshing: false,
   hasLoadedOnce: false,
+  lastLoadTimestamp: 0,
   isSyncing: false,
   syncStatusMessage: '',
   syncState: 'UNAUTHENTICATED',
 
   loadAllData: async (forceRefresh = false) => {
     const state = get();
+
+    // Si ya se cargó hace menos de 1s, omitir incluso con forceRefresh.
+    // Esto evita la duplicación Bootstrap → ProgressiveDataLoading.
+    if (state.hasLoadedOnce && forceRefresh && Date.now() - state.lastLoadTimestamp < 1000) {
+      console.log('[DataStore] loadAllData(true) skipped — loaded recently');
+      return;
+    }
+
     if (state.isInitialLoading && !forceRefresh) return;
     if (state.hasLoadedOnce && !forceRefresh) return;
 
@@ -166,10 +175,10 @@ export const useDataStore = create<DataState>((set, get) => {
         } catch {}
       }
 
-      set({ hasLoadedOnce: true, isInitialLoading: false });
+      set({ hasLoadedOnce: true, lastLoadTimestamp: Date.now(), isInitialLoading: false });
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
-      set({ hasLoadedOnce: true });
+      set({ hasLoadedOnce: true, lastLoadTimestamp: Date.now() });
     } finally {
       set({ isInitialLoading: false, isRefreshing: false, isSyncing: false, syncStatusMessage: '' });
     }
