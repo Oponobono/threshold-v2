@@ -9,7 +9,7 @@ interface DatabaseContextType {
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
 
-const BOOTSTRAP_TIMEOUT_MS = 10000;
+const BOOTSTRAP_TIMEOUT_MS = 30000;
 
 const styles = StyleSheet.create({
   container: {

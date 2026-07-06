@@ -95,9 +95,8 @@ db.runAsync = jest.fn(async (sql: string, ...params: any[]) => {
   return {};
 });
 
-db.execAsync = jest.fn(async () => {});
+db.execAsync = jest.fn(async (sql: string) => {});
 db.closeAsync = jest.fn(async () => {});
-db.withExclusiveTransactionAsync = jest.fn(async (cb: any) => cb(db));
 
 jest.mock('../../database/DatabaseService', () => {
   class MockDatabaseService {
@@ -133,17 +132,21 @@ function seedJournal(entityType: string, entityId: string) {
 function seedFullSubject() {
   seedRow('subjects', { id: 'subject_1', user_id: 'u1' });
   seedRow('assessments', { id: 'assess_1' });
+  seedRow('assessment_files', { id: 'af_1', assessment_id: 'assess_1', subject_id: null });
   seedRow('assessment_categories', { id: 'cat_1' });
   seedRow('schedules', { id: 'sched_1' });
   seedRow('study_sessions', { id: 'ss_1' });
   seedRow('threshold_overrides', { id: 'to_1' });
   seedRow('photos', { id: 'photo_1' });
   seedRow('audio_recordings', { id: 'audio_1' });
+  seedRow('audio_transcripts', { id: 'at_1', recording_id: 'audio_1', subject_id: null });
   seedRow('scanned_documents', { id: 'doc_1' });
   seedRow('youtube_videos', { id: 'yt_1' });
+  seedRow('youtube_transcripts', { id: 'ytt_1', video_id: 'yt_1', subject_id: null });
   seedRow('flashcard_decks', { id: 'deck_1' });
   seedRow('flashcards', { id: 'card_1', deck_id: 'deck_1' });
   seedRow('calendar_events', { id: 'cal_1' });
+  seedRow('ai_chats', { id: 'ai_1' });
 }
 
 const emitMock = () => repositoryEventBus.emit as jest.Mock;
@@ -156,13 +159,14 @@ beforeEach(() => {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('SubjectDomainService.deleteSubject', () => {
-  test('soft-deletes all 11 child entity types', async () => {
+  test('soft-deletes all 12 direct child entity types', async () => {
     seedFullSubject();
     await deleteSubject('subject_1', 'u1');
 
     for (const table of ['assessments','assessment_categories','schedules',
       'study_sessions','threshold_overrides','photos','audio_recordings',
       'scanned_documents','youtube_videos','flashcard_decks','calendar_events',
+      'ai_chats',
     ]) {
       const rows = Array.from(ensure(table).values());
       expect(rows).toHaveLength(1);
@@ -179,6 +183,22 @@ describe('SubjectDomainService.deleteSubject', () => {
     expect(cards[0].deleted_at).not.toBeNull();
   });
 
+  test('cascade soft-deletes assessment_files, audio_transcripts, youtube_transcripts', async () => {
+    seedFullSubject();
+    await deleteSubject('subject_1', 'u1');
+
+    const tables = [
+      { name: 'assessment_files', idField: 'assessment_id' },
+      { name: 'audio_transcripts', idField: 'recording_id' },
+      { name: 'youtube_transcripts', idField: 'video_id' },
+    ];
+    for (const { name } of tables) {
+      const rows = Array.from(ensure(name).values());
+      expect(rows).toHaveLength(1);
+      expect(rows[0].deleted_at).not.toBeNull();
+    }
+  });
+
   test('soft-deletes the subject itself', async () => {
     seedFullSubject();
     await deleteSubject('subject_1', 'u1');
@@ -192,9 +212,12 @@ describe('SubjectDomainService.deleteSubject', () => {
     seedFullSubject();
     seedJournal('subject', 'subject_1');
     seedJournal('assessment', 'assess_1');
+    seedJournal('assessment_files', 'af_1');
     seedJournal('flashcard-deck', 'deck_1');
     seedJournal('flashcard', 'card_1');
     seedJournal('photo', 'photo_1');
+    seedJournal('audio-transcript', 'at_1');
+    seedJournal('youtube-transcript', 'ytt_1');
 
     await deleteSubject('subject_1', 'u1');
 

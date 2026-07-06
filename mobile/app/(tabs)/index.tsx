@@ -29,6 +29,8 @@ import { DocumentScannerModal } from '../../src/components/modals/DocumentScanne
 import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal';
 import { FlashcardsModal } from '../../src/components/flashcards/FlashcardsModal';
 import { SubjectTile, MetricCard, ActionCircle } from '../../src/components/dashboard/DashboardWidgets';
+import { KnowledgeHealthCard } from '../../src/components/dashboard/KnowledgeHealthCard';
+import { useKnowledgeInsights } from '../../src/hooks/useKnowledgeInsights';
 import { GroupPerformanceLeaderboard } from '../../src/components/dashboard/GroupPerformanceLeaderboard';
 import { CourseHeroCard, AllSubjectsHeroCard, HERO_CARD_WIDTH } from '../../src/components/dashboard/CourseHeroCard';
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
@@ -308,6 +310,9 @@ export default function HybridDashboardScreen() {
 
   // ── Polling de predicciones cada 15 minutos ───────────────────────────────
   usePredictionPolling(profile?.id, true);
+
+  // ── KnowledgeSnapshot (carga al montar, refresh manual) ───────────────────
+  const { snapshot: knowledgeSnapshot, loading: knowledgeLoading } = useKnowledgeInsights(profile?.id);
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
@@ -837,6 +842,12 @@ export default function HybridDashboardScreen() {
               </TouchableOpacity>
             ) : null}
           </View>
+
+          {knowledgeSnapshot && !knowledgeLoading ? (
+            <View style={{ marginTop: 24 }}>
+              <KnowledgeHealthCard snapshot={knowledgeSnapshot} />
+            </View>
+          ) : null}
 
           {predictions && predictions.dueCount > 0 && !snoozeManager.isCardSnoozed('due_cards_alert') ? (
             <View style={{ marginTop: 24 }}>

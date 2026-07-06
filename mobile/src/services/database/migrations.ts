@@ -702,5 +702,27 @@ const migrations: Migration[] = [
       `ALTER TABLE ai_chats ADD COLUMN deleted_at TEXT`,
     ],
   },
+  {
+    version: 30,
+    up: [
+      `ALTER TABLE flashcards ADD COLUMN last_review_timestamp TEXT`,
+      `ALTER TABLE flashcards ADD COLUMN fsrs_repetitions INTEGER DEFAULT 0`,
+      `UPDATE flashcards SET fsrs_stability = 1.0 WHERE fsrs_stability IS NULL`,
+      `UPDATE flashcards SET fsrs_difficulty = 0.5 WHERE fsrs_difficulty IS NULL`,
+      `UPDATE flashcards SET fsrs_repetitions = 0 WHERE fsrs_repetitions IS NULL`,
+      `UPDATE flashcards SET status = 'new' WHERE status IS NULL`,
+    ],
+  },
+  {
+    version: 31,
+    up: [
+      // No-op intencional. Migration 30 ya ejecuta estos UPDATEs.
+      // Se mantiene el número 31 para no renumerar el historial de migraciones.
+      // Instalaciones existentes con user_version=31 — NO ejecutarán nada nuevo.
+      // Instalaciones con user_version=30 — ejecutarán migration 30 (que ya
+      // contiene los mismos UPDATEs) y luego saltarán esta.
+      // Próximas migraciones: version 32+.
+    ],
+  },
 ];
 export default migrations;

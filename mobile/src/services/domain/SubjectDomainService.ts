@@ -10,15 +10,34 @@ interface ChildEntity {
 }
 
 const SUBJECT_CHILDREN: ChildEntity[] = [
-  { table: 'assessments', entityType: 'assessment', eventType: 'assessments' },
+  {
+    table: 'assessments',
+    entityType: 'assessment',
+    eventType: 'assessments',
+    cascade: [
+      { table: 'assessment_files', entityType: 'assessment_files', fkField: 'assessment_id' },
+    ],
+  },
   { table: 'assessment_categories', entityType: 'category' },
   { table: 'schedules', entityType: 'schedule', eventType: 'schedules' },
   { table: 'study_sessions', entityType: 'study-session' },
   { table: 'threshold_overrides', entityType: 'threshold-overrides' },
   { table: 'photos', entityType: 'photo' },
-  { table: 'audio_recordings', entityType: 'audio_recording' },
+  {
+    table: 'audio_recordings',
+    entityType: 'audio_recording',
+    cascade: [
+      { table: 'audio_transcripts', entityType: 'audio-transcript', fkField: 'recording_id' },
+    ],
+  },
   { table: 'scanned_documents', entityType: 'scanned_document' },
-  { table: 'youtube_videos', entityType: 'youtube-video' },
+  {
+    table: 'youtube_videos',
+    entityType: 'youtube-video',
+    cascade: [
+      { table: 'youtube_transcripts', entityType: 'youtube-transcript', fkField: 'video_id' },
+    ],
+  },
   {
     table: 'flashcard_decks',
     entityType: 'flashcard-deck',
@@ -27,6 +46,7 @@ const SUBJECT_CHILDREN: ChildEntity[] = [
     ],
   },
   { table: 'calendar_events', entityType: 'calendar-event' },
+  { table: 'ai_chats', entityType: 'ai-chat' },
 ];
 
 async function softDeleteTable(
@@ -88,10 +108,11 @@ export async function deleteSubject(
 
   const affected: { entityType: string; eventType?: string; ids: string[] }[] = [];
 
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await db.execAsync('BEGIN IMMEDIATE');
+  try {
     for (const child of SUBJECT_CHILDREN) {
       const fkField = child.idField || 'subject_id';
-      const childIds = await softDeleteTable(txn, child.table, fkField, subjectId);
+      const childIds = await softDeleteTable(db, child.table, fkField, subjectId);
 
       if (childIds.length > 0) {
         affected.push({ entityType: child.entityType, eventType: child.eventType, ids: childIds });
@@ -101,7 +122,7 @@ export async function deleteSubject(
             const gIds: string[] = [];
             for (const cId of childIds) {
               const ids = await softDeleteTable(
-                txn,
+                db,
                 grandchild.table,
                 grandchild.fkField,
                 cId,
@@ -116,20 +137,25 @@ export async function deleteSubject(
       }
     }
 
-    await compactJournalForEntities(txn, affected);
+    await compactJournalForEntities(db, affected);
 
-    await txn.runAsync(
+    await db.runAsync(
       `DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?`,
       'subject',
       subjectId,
     );
 
-    await txn.runAsync(
+    await db.runAsync(
       `UPDATE subjects SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND user_id = ?`,
       subjectId,
       userId,
     );
-  });
+
+    await db.execAsync('COMMIT');
+  } catch (e) {
+    await db.execAsync('ROLLBACK');
+    throw e;
+  }
 
   for (const group of affected) {
     enqueueBulkDeletedEvent(group.eventType || group.entityType, group.ids);

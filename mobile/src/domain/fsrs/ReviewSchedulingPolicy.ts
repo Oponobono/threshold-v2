@@ -50,7 +50,7 @@ export class AcceleratedReviewPolicy implements ReviewSchedulingPolicy {
 // Change this value to instantly switch modes without touching FSRS.
 export type SchedulingMode = 'production' | 'development' | 'accelerated';
 
-export const SCHEDULING_MODE: SchedulingMode = 'development';
+export const SCHEDULING_MODE: SchedulingMode = 'production';
 
 export function getActiveReviewPolicy(): ReviewSchedulingPolicy {
   if (SCHEDULING_MODE === 'production') {

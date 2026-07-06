@@ -156,36 +156,40 @@ export async function initializeApiClient(): Promise<void> {
         return;
       }
 
-      // Sin backend conocido: bloqueamos hasta tener uno
-      console.log(`[API Client] 🔍 Detectando backend... (activo por ahora: ${activeBaseUrl})`);
-      const detectedBackend = await detectAvailableBackend(localIp, API_PORTS);
+      // Sin backend conocido: NO bloqueamos bootstrap.
+      // setupDefaultApiUrls() ya configuró activeBaseUrl con la primera candidata.
+      // La detección corre en background; si encuentra un backend, fetchWithFallback
+      // lo usará automáticamente.
+      console.log(`[API Client] 🔍 Sin backend conocido, arrancando con ${activeBaseUrl} (detección en background)...`);
 
-      if (detectedBackend.isAvailable || detectedBackend.status === 'connecting') {
-        const apiUrl = detectedBackend.url.endsWith('/api')
-          ? detectedBackend.url
-          : `${detectedBackend.url}/api`;
+      detectAvailableBackend(localIp, API_PORTS).then((detectedBackend) => {
+        if (detectedBackend.isAvailable || detectedBackend.status === 'connecting') {
+          const apiUrl = detectedBackend.url.endsWith('/api')
+            ? detectedBackend.url
+            : `${detectedBackend.url}/api`;
 
-        if (apiUrl !== activeBaseUrl) {
-          const statusLabel = detectedBackend.isAvailable ? 'disponible' : 'conectando...';
-          console.log(`[API Client] 🔄 Usando backend ${statusLabel}: ${apiUrl}`);
+          if (apiUrl !== activeBaseUrl) {
+            const statusLabel = detectedBackend.isAvailable ? 'disponible' : 'conectando...';
+            console.log(`[API Client] 🔄 Actualizando (background): ${statusLabel} ${apiUrl}`);
 
-          const newUrls: string[] = [apiUrl];
-          for (const port of API_PORTS) {
-            const fallbackUrl = `http://${localIp}:${port}/api`;
-            if (!newUrls.includes(fallbackUrl) && fallbackUrl !== apiUrl) {
-              newUrls.push(fallbackUrl);
+            const newUrls: string[] = [apiUrl];
+            for (const port of API_PORTS) {
+              const fallbackUrl = `http://${localIp}:${port}/api`;
+              if (!newUrls.includes(fallbackUrl) && fallbackUrl !== apiUrl) {
+                newUrls.push(fallbackUrl);
+              }
             }
-          }
-          if (process.env.EXPO_PUBLIC_API_URL && !newUrls.includes(process.env.EXPO_PUBLIC_API_URL)) {
-            newUrls.push(process.env.EXPO_PUBLIC_API_URL);
-          }
+            if (process.env.EXPO_PUBLIC_API_URL && !newUrls.includes(process.env.EXPO_PUBLIC_API_URL)) {
+              newUrls.push(process.env.EXPO_PUBLIC_API_URL);
+            }
 
-          API_BASE_URLS = newUrls;
-          activeBaseUrl = newUrls[0];
+            API_BASE_URLS = newUrls;
+            activeBaseUrl = newUrls[0];
+          }
+        } else {
+          console.log(`[API Client] ℹ️  Detección en background: no se encontró backend disponible`);
         }
-      } else {
-        console.log(`[API Client] ℹ️  No se detectó backend disponible, usando configuración por defecto`);
-      }
+      }).catch(() => {});
 
       isApiClientInitialized = true;
     } catch (error) {

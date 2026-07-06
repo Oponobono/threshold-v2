@@ -4,25 +4,29 @@
 - **[Protocol v1.0]** Sync engine convergence validated: all sync decisions ordered exclusively by version (`sync_version` for mutations, `deletion_version` for deletions). `deleted_at` is audit/metadata only.
 - **Stress Suite**: reproducible simulation engine with configurable devices (2/3/5/10), 5 perturbation types (kill/resume, simultaneous sync, random latency, packet loss, server restart, partial sync), SyncMetrics tracking (Convergence Score, sync timing P95, queue depth, conflicts, retries, per-op timing), and tiered runner (smoke/regression/nightly).
 - **Asset pipeline**: integrate into the same simulation engine.
+- **[Knowledge Domain — Sprints 1–3 ✅]** FSRS consolidado como única fuente de verdad. `KnowledgeProjection` → `KnowledgeSnapshot` (Value Object inmutable). Primer consumidor (KnowledgeHealthCard) validado en Dashboard. FSRS, SQLite y retrievability encapsulados detrás de `KnowledgeProvider`. Dominio congelado — próximos sprints validan valor, no amplían.
+
+## Architecture Invariants
+Estas reglas no son tareas ni roadmap. Son invariantes arquitectónicos. Cualquier propuesta que las rompa debe justificar por qué el invariante ya no aplica.
+
+1. **Bootstrap nunca espera red.** Solo SQLite y MMKV bloquean el arranque. NETWORK, AUTH y SYNC son fire-and-forget.
+2. **SQLite es la fuente de verdad local.** MMKV es solo para JWT, tokens, flags, configuración y metadatos.
+3. **Los consumidores nunca conocen el motor subyacente.** Dashboard, IA, Calendario y Notificaciones solo conocen contratos (KnowledgeProvider, Repository). No importan FSRS, SQLite, retrievability ni API HTTP.
+4. **FSRS es la única fuente de verdad del conocimiento.** Toda métrica cognitiva (retrievability, dificultad, estabilidad) nace de FSRS. Prohibido proxies estadísticos (failure_rate, success_rate).
+5. **KnowledgeSnapshot es un Value Object inmutable.** Nadie lo muta parcialmente. Cada buildSnapshot() genera una nueva instancia. Object.freeze() en runtime.
+6. **El dominio solo crece cuando un consumidor real lo justifica.** No se agregan propiedades al Snapshot por anticipación ("podría necesitarse"). El flujo es: consumidor real → necesidad demostrada → ampliación → tests → documentación.
+7. **La red actualiza el estado local; nunca habilita el arranque.** El flujo es: Servidor → Sincronización → SQLite → Repository → UI. Nunca: Servidor → UI.
+8. **La UI nunca depende del resultado de un refresh remoto.** Perfil local → UI → refresh remoto → SQLite → UI se actualiza reactivamente. Si el refresh falla, la UI ya tiene datos locales.
 
 ## Constraints & Preferences
 - Test framework must simulate two devices (A, B) syncing through a real backend.
 - Each sync cycle: push queue → pull delta → verify convergence.
 - No refactor of stable backend code without clear functional gain — except confirmed bugs found by the test framework itself.
 - `deletion_version` migration follows phased plan (Schema → Dual Write → Delta Sync → Test Validation → Cleanup) to keep the system functional at each step.
-
-## Constraints & Preferences
 - No comentar código a menos que sea estrictamente necesario.
 - No refactorizar código estable sin ganancia funcional clara.
-- SQLite como única fuente de verdad para datos de negocio; MMKV reservado para JWT, tokens, flags, configuración, metadatos.
 - La capa UI no debe importar directamente de `services/api`; debe hacerlo vía DataStore, Repositories o Queries.
 - Mantener el orden de secciones del template.
-
-### Invariantes del Bootstrap (Local-First)
-1. **Ningún `await` sobre red en el bootstrap.** Todo `await` en `BootstrapManager.start()` debe ser sobre SQLite o MMKV (recursos locales). NETWORK, AUTH y SYNC phases deben ser fire-and-forget. Solo DATABASE y STORAGE bloquean.
-2. **La red actualiza el estado local; nunca habilita el arranque.** El flujo es: `Servidor → Sincronización → SQLite → Repositorios → UI`. Nunca: `Servidor → UI`.
-3. **Ningún repositorio lee directamente del backend.** Todo Repository lee de SQLite. Si necesita datos remotos, los escribe primero en SQLite, luego notifica. Patrón: `SQLite → Repository → UI`; nunca `HTTP → Repository`.
-4. **La UI nunca depende del resultado de un refresh remoto.** Perfil local → UI → refresh remoto → SQLite → UI se actualiza reactivamente. Si el refresh falla, la UI ya tiene datos locales.
 
 ### Logcat Commands Reference
 ```powershell
@@ -68,6 +72,18 @@ Move-Item "$env:TEMP\crash3.log" "C:\Users\cris7\OneDrive\Desktop\crash3.log"
 10. Toda entidad está cubierta por la **Stress Suite** o por un **escenario específico** de convergencia.
 
 *Si una tabla rompe cualquiera de estas reglas, no es una entidad sincronizable. Es solo una tabla.*
+
+## Políticas de Tablas No Sincronizables
+
+### card_logs — Auditoría histórica (NO sincronizable)
+`card_logs` es una tabla de auditoría histórica de repasos. Sus registros:
+- Nunca participan en sincronización lógica ni restauración del agregado Subject.
+- No poseen `deleted_at`, `sync_version`, ni las columnas del protocolo de sincronización.
+- Se conservan indefinidamente incluso cuando el `card_id` o `flashcard` padre es soft-deleted.
+- Son la fuente de verdad para analytics, métricas FSRS y estadísticas históricas.
+- Quedan excluidos intencionalmente del CASCADE de Subject→hijos.
+
+**Regla**: cualquier entidad sin `sync_version` ni `deleted_at` no forma parte del agregado Subject y no debe ser cascada por `deleteSubject()`.
 
 La incorporación de una nueva entidad sincronizable no se considera completa hasta que todos los invariantes sean verificables mediante pruebas automáticas (Convergence Suite, Stress Suite, Consistency Report).
 
@@ -126,31 +142,122 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
   2. Swipe action con icono link rojo en `flashcards.tsx` cuando el mazo tiene `linked_event_id`.
   3. `handleUnlink` en `LinkExamModal.tsx` limpia `linked_event_id` del mazo y remueve el deck del CSV `linked_deck_id` del evento.
   Backend ya soportaba `PUT /flashcard-decks/:deckId` con `{ linked_event_id: null }` — solo faltaba UI.
-- **[*NUEVO*] SubjectDomainService.deleteSubject()**: Nuevo servicio `mobile/src/services/domain/SubjectDomainService.ts` que implementa cascade local transaccional al eliminar Subject. Cubre 11 entidades hijas (assessments, assessment_categories, schedules, study_sessions, threshold_overrides, photos, audio_recordings, scanned_documents, youtube_videos, flashcard_decks → flashcards, calendar_events). Compacta sync_journal (elimina operaciones pendientes de todas las entidades afectadas). Soft-delete atómico dentro de `withExclusiveTransactionAsync`. Emite eventos batch post-transacción. `subjects.ts` delega en el servicio. Sprint 1 completado. 11 tests de integración cubren cascade, journal compaction, atomicidad, idempotencia y eventos.
+- **Sprint 1 — K0 (Cimentación FSRS)**: Consolidar FSRS como única fuente de verdad del conocimiento.
+  - `integrity.ts` — detección de datos FSRS corruptos.
+  - Migration v30 — `last_review_timestamp` + valores por defecto para parámetros FSRS.
+  - Activación del modo Production en FSRS.
+  - Refactor de `ReviewScheduler`: eliminación completa de `failure_rate`; adopción de retrievability como métrica única.
+  - `getKnowledgeAggregation()` — una única consulta SQL; agregación en memoria preparada para KnowledgeSnapshot.
+- **Sprint 2 — K1 (KnowledgeSnapshot)**: Crear una proyección inmutable del dominio desacoplada de FSRS y SQLite.
+  - `KnowledgeSnapshot`, `LearningHealth`, `SubjectKnowledge` en `types.ts`.
+  - `KnowledgeSnapshotBuilder` — builder puro, snapshot completamente inmutable (`Object.freeze`).
+  - `KnowledgeProjection` — orquestador DB → Query → Builder → Snapshot.
+  - `KnowledgeProvider` — contrato estable para consumidores.
+  - 19 pruebas automatizadas: determinismo, confidence, memoryLevel, edge cases, inmutabilidad.
+- **Sprint 3 — Primer consumidor (KnowledgeHealthCard)**: Validar que un consumidor real puede utilizar el Snapshot sin conocer el dominio.
+  - `useKnowledgeInsights` — hook React con estados loading/error/data + refresh manual.
+  - `KnowledgeHealthCard` — componente UI que consume solo `snapshot.health` + `snapshot.metadata`.
+  - Integración en Dashboard como capa cognitiva (`Estado de Aprendizaje`) junto a la capa operativa existente (`Repasos urgentes`).
+  - Documentado en `docs/architecture/Sprint3-KnowledgeHealthCard.md`.
+- **[Sesión Jul 2026] Bootstrap + Migraciones estabilizados**:
+  - Migration v30 corregida (`fsrs_repetitions` antes de UPDATE).
+  - Migration v31 convertida a no-op (historial congelado).
+  - `withExclusiveTransactionAsync` eliminado de `SubjectDomainService` → `BEGIN IMMEDIATE`/`COMMIT` manual.
+  - WAL mode verificado: no era el culpable — la BD existente estaba corrupta.
+  - `PRAGMA wal_checkpointer(TRUNCATE)` en error handler solo si error "locked".
+  - `initializeApiClient()` nunca bloquea bootstrap (ni en fresh install).
+  - Backend detection pasó de ~12s a ~0.44s con MMKV cache + background health check.
+- **[*NUEVO*] CASCADE Subject→hijos auditado y completado**: 15 tablas auditadas con subject_id directo o relación anidada. Se agregaron 4 entidades faltantes (ai_chats, assessment_files, audio_transcripts, youtube_transcripts). Cascade profundo validado: Subject→Assessment→Files, Subject→Audio→Transcripts, Subject→YouTube→Transcripts. Se excluyó card_logs intencionalmente (datos históricos de review). Tests: 12/12 PASS.
+- **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen: estructura de eventos, initial/delta/push flow, conflict resolution, versionado, deletion_version, códigos de error, garantías.
+- **Stress Suite** — RandomScenario (4 segmentos), ConsistencyReport, tier runner integrado (smoke/regression/nightly/custom/random).
+- **Consistency Report** — `ConsistencyReport.js` ejecutable post-suite: entidades (15 tablas B vs D0), integridad (FK orphans, duplicate PKs), colas, versiones.
+- **deletion_version — Fase 5 (Cleanup)** — Confirmado: cero decisiones de sync dependen de `deleted_at`.
+- **Sprint 2 (Assets) — Pipeline completo** — AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator. Integrado en SyncManager.
+- **Product Audit Phase** — 4 documentos de auditoría (FEATURE_MATRIX, USER_JOURNEYS, MUTATION_MATRIX, OWNERSHIP_MATRIX).
+- **[Knowledge Domain — Sprints 1-3]** — FSRS consolidado, KnowledgeSnapshot inmutable + 19 tests, KnowledgeHealthCard en Dashboard.
 
 ### In Progress
-- 🟢 **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md`: estructura de eventos, initial/delta/push flow, conflict resolution, versionado, deletion_version, códigos de error, garantías.
-- 🟢 **Stress Suite — RandomScenario** — 4 segmentes (normal/heavy_perturbations/offline/normal), ConsistencyReport final, tier runner integrado.
-- 🟢 **Consistency Report** — `ConsistencyReport.js` ejecutable post-suite: entidades (15 tablas B vs D0), integridad (FK orphans, duplicate PKs), colas (pending/failed), versiones (backend/device/max_table).
-- 🟢 **deletion_version — Fase 5 (Cleanup)**: Confirmado — **cero decisiones de sync dependen de `deleted_at`**.
-- 🟢 **Sprint 2 (Assets) — Pipeline completo**: Infraestructura creada (AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator). Integrado en SyncManager. Upload wiring en api/photos/audio/documents. Priority download en ImageViewerModal. **audio_transcripts** ya incrementa sync_version correctamente. Convergence Suite + Stress Suite verifican integridad.
-- 🟢 **Product Audit Phase**: 4 documentos de auditoría de producto creados (FEATURE_MATRIX, USER_JOURNEYS, MUTATION_MATRIX, OWNERSHIP_MATRIX). El tipo de auditoría cambió de "¿el sync funciona?" a "¿la aplicación permite completar el ciclo de vida?".
-- 🟢 **Sprint 1 (Cascade local Subject)**: `SubjectDomainService.deleteSubject()` implementado — cascade transaccional + journal compaction + eventos batch. `subjects.ts` delega en el servicio.
+*(Ver Fase Actual → Sprint 2)*
 
-### Next Steps
-1. ✅ **Stress Suite expansion** — RandomScenario (4 segmentos, Consistency Report) corriendo en tier runner (`node index.js random`).
-2. ✅ **Assets pipeline** — integrado en SimulationEngine + Convergence Suite + Stress Suite. **audio_transcripts** corrigió `incrementSyncVersion` faltante.
-3. 🟡 **Cerrar brechas funcionales de FEATURE_MATRIX.md** — Priorizar brechas donde backend ya soporta la operación pero falta UI. Las 5 matrices son la fuente de verdad del ciclo de vida de cada entidad. Orden:
-    1. Priority High (UI faltante, backend listo): duplicar mazo, re-transcribir, compartir contenido
-    2. Priority Medium (relaciones): CASCADE faltante en assessments/schedules/study_sessions
-    3. Priority Low (calidad de vida): archivar, resetear estadísticas
-4. 🟡 **Cerrar brechas de USER_JOURNEYS.md** — Los 12 journeys son la guía de priorización. El journey "Administrar materia" (53%) y "Mazo compartido" (44%) son los más incompletos. Cada journey debe auditarse antes de cerrar un sprint.
-4. 🟡 **EntityRegistry centralizado** — crear registro único de todas las entidades sincronizables para que tests verifiquen automáticamente: toda entidad existe en delta sync, incrementa sync_version, aparece en initial sync y consistency report.
-5. 🟡 **Dashboard de salud del Sync Engine** — Convergence Score, stress/consistency status, pending queue, failed journal, retry rate, avg/P95 sync timing.
-4. ✅ **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen.
-5. 🟡 **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
-6. 🟡 **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
-7. 🟡 **Refactorizar event handlers** (`deleteSubject`, `createStudySession`, `getPredictedSubject`) para que no importen directamente de `services/api`.
+## Fase Actual: Consolidación del Núcleo
+
+Progreso estructurado en sprints dentro de la fase actual. Cada sprint tiene alcance cerrado y criterios de salida definidos.
+
+### Sprint 1 — CASCADE de Subject (Integridad del Agregado) ✅
+*Cerrado. 12/12 tests PASS.*
+
+Objetivo: garantizar que eliminar un Subject no deje huérfanos en ninguna tabla dependiente.
+
+| Invariante | Estado |
+|---|---|
+| assessments → assessment_files | ✅ Cascade verificado |
+| audio_recordings → audio_transcripts | ✅ Cascade verificado |
+| youtube_videos → youtube_transcripts | ✅ Cascade verificado |
+| flashcard_decks → flashcards | ✅ Cascade verificado |
+| ai_chats (subject_id directo) | ✅ Agregado |
+| FKs sin orphan data post-delete | ✅ Verificado |
+| sync_queue compactada por entidad afectada | ✅ Verificado |
+| event bus notifica borrado por tipo | ✅ Verificado |
+| card_logs excluido (política documentada) | ✅ Intencional |
+
+### Sprint 2 — Observabilidad y Performance Budgets 🟡 **EN CURSO**
+*Activo. Próximo a iniciar.*
+
+No se toca lógica de dominio. Solo instrumentación.
+
+Objetivo: que cualquier degradación futura sea detectable sin necesidad de debugging manual.
+
+#### Instrumentación planificada
+
+| Métrica | Dónde |
+|---|---|
+| `KnowledgeSnapshot.build()` — duration, subjectCount, deckCount, flashcardCount, memoryUsed | `KnowledgeProjection.ts` |
+| Cache hit/miss rate | `useKnowledgeInsights.ts` |
+| Razón de reconstrucción (builds totales / builds necesarias) | `KnowledgeProjection.ts` |
+| Tiempo de notificación a consumidores | `repositoryEventBus` |
+| Bootstrap total | `BootstrapManager.ts` |
+| `deleteSubject()` timing | `SubjectDomainService.ts` |
+
+#### Performance budgets (referencia inicial)
+
+| Métrica | Objetivo |
+|---|---|
+| Bootstrap completo | < 1 s |
+| KnowledgeSnapshot.build() | < 100 ms |
+| Carga inicial del DataStore | < 1.5 s |
+| Eliminación completa de Subject | < 300 ms |
+| Health check conocido | < 500 ms |
+
+**Regla del sprint**: medir, no optimizar. Si una métrica excede el presupuesto, se documenta pero no se corrige hasta tener datos de al menos 7 días de uso real.
+
+### Sprint 3 — Feature Matrix (Cierre de Brechas Funcionales) 🟡 *Pendiente*
+*Depende de Sprint 2.*
+
+Recién aquí se vuelve a agregar funcionalidad. Prioridad por brecha donde backend ya soporta la operación pero falta UI.
+
+| Feature | Impacto | Backend |
+|---|---|---|
+| Duplicar mazo | Alto | ✅ Listo |
+| Re-transcribir audio | Alto | ✅ Listo |
+| Compartir contenido | Alto | ✅ Listo |
+| Archivar materia | Bajo | Parcial |
+| Resetear estadísticas | Bajo | Parcial |
+
+### Batería de Regresión (permanente, paralela a los sprints)
+
+Pruebas que se ejecutan en pocos minutos y aseguran que no se reintroduzcan bugs críticos:
+
+- Instalación limpia → bootstrap OK
+- Migración 0→31 completa
+- Abrir/cerrar BD 100 veces sin `database is locked`
+- Crear Subject con todas las entidades hijas
+- Eliminar Subject con cascade (assert 0 orphans)
+- Sincronización inicial (2 dispositivos, converge)
+- Login → logout → login
+- Restaurar backup (con y sin datos locales)
+- Stress Suite smoke (100×2)
+
+**Estado**: pendiente de implementar como script autónomo (`scripts/regression.ps1` o `npm run test:regression`).
 
 ### Blocked
 - *(none)*
@@ -235,6 +342,25 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - **Solución propuesta**: Centralizar en un helper único `upsertSyncEntity()` que ejecute INSERT/UPDATE + incrementSyncVersion + devolución de datos. Ningún controller nuevo debe llamar `incrementSyncVersion` manualmente.
 - **Validación automática futura**: Registrar todas las entidades sincronizables en un `EntityRegistry` central (`subjects`, `courses`, `flashcard_decks`, `flashcards`, `assessments`, `schedules`, `calendar_events`, `grading_periods`, `lms_accounts`, `subject_threshold_overrides`, `photos`, `audio_recordings`, `audio_transcripts`, `scanned_documents`, `youtube_videos`, `youtube_transcripts`). Los tests de convergencia/stress verificarán que toda entidad registrada: (1) existe en delta sync query, (2) incrementa sync_version en cada CREATE/UPDATE, (3) aparece en initial sync.
 
+### Knowledge Domain Architecture (Jul 2026)
+- **FSRS es la única fuente de verdad para el estado cognitivo**. ReviewScheduler, Dashboard, IA y cualquier consumidor usan retrievability real de FSRS, no proxies estadísticos (failure_rate, success_rate).
+- **KnowledgeSnapshot es un Value Object inmutable**. Nadie lo muta. Cada `buildSnapshot()` genera una nueva instancia. `Object.freeze()` garantiza la inmutabilidad en runtime.
+- **Separación estricta**: `KnowledgeProjection` (orquestación) → `KnowledgeSnapshotBuilder` (dominio puro, testeable sin DB) → `KnowledgeSnapshot` (contrato). El Builder puede dividirse en calculadoras especializadas si crece.
+- **KnowledgeProvider es el único contrato que conocen los consumidores**. Dashboard, IA, Calendario, Notificaciones no importan FSRS, SQLite, retrievability ni `getKnowledgeAggregation()`.
+- **Regla de gobierno del Snapshot**: Ningún consumidor puede solicitar nuevas propiedades al `KnowledgeSnapshot` sin demostrar primero un caso de uso concreto. No se agregan métricas por anticipación.
+- **Próximo sprint (Sprint 2 de la fase actual)**: Observabilidad del Snapshot. Instrumentar timing de `buildSnapshot()`, subjects/decks/cards participantes, razón de invalidez/reconstrucción, hit rate de caché. El dominio permanece congelado — no se agregan propiedades sin un consumidor real que lo justifique.
+- **Dashboard con capas definidas**:
+  ```
+  Dashboard
+  ├── Capa cognitiva: KnowledgeHealthCard ("¿cómo está mi conocimiento?")
+  ├── Capa operativa: Repasos urgentes ("¿qué debo hacer hoy?")
+  ├── Próximos repasos
+  ├── Actividad reciente
+  └── Acciones rápidas
+  ```
+- **Arquitectura en capas**: SQLite → `getKnowledgeAggregation()` (infraestructura) → `KnowledgeSnapshotBuilder` (dominio) → `KnowledgeSnapshot` (Value Object) → `KnowledgeProvider` (contrato) → UI.
+- **Principio rector**: El objetivo de los próximos sprints deja de ser construir más dominio y pasa a ser demostrar que el dominio existente genera valor para el usuario. El dominio permanece congelado hasta que un consumidor real justifique una ampliación.
+
 ### Decisiones previas (congeladas)
 - **Dual storage merge**: MMKV canonical for deck+cards; merge with SQLite at read time.
 - **Hybrid routing for OCR/PDF extraction**: `extractTextFromImageHybrid` / `extractTextFromPDFHybrid`.
@@ -243,21 +369,16 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - **Hub: Deep link strategy**: `vnd.youtube:` + `Linking.openURL(https)` + WebBrowser fallback.
 - **AI: Policy Engine → Orchestrator → Capabilities**: frozen, no more AI refactors.
 
-## Next Steps
-1. ✅ **Stress Suite expansion** — RandomScenario (4 segmentos, Consistency Report) corriendo en tier runner (`node index.js random`).
-2. ✅ **Assets pipeline** — integrado en SimulationEngine + Convergence Suite + Stress Suite. **audio_transcripts** corrigió `incrementSyncVersion` faltante.
-3. 🟡 **Cerrar brechas funcionales de FEATURE_MATRIX.md** — Priorizar brechas donde backend ya soporta la operación pero falta UI. Las 5 matrices son la fuente de verdad del ciclo de vida de cada entidad. Orden:
-    1. Priority High (UI faltante, backend listo): duplicar mazo, re-transcribir, compartir contenido
-    2. Priority Medium (relaciones): CASCADE faltante en assessments/schedules/study_sessions
-    3. Priority Low (calidad de vida): archivar, resetear estadísticas
-4. 🟡 **Cerrar brechas de USER_JOURNEYS.md** — Los 12 journeys son la guía de priorización. El journey "Administrar materia" (53%) y "Mazo compartido" (44%) son los más incompletos. Cada journey debe auditarse antes de cerrar un sprint.
-5. 🟡 **EntityRegistry centralizado** — crear registro único de todas las entidades sincronizables para que tests verifiquen automáticamente: toda entidad existe en delta sync, incrementa sync_version, aparece en initial sync y consistency report.
-6. 🟡 **Dashboard de salud del Sync Engine** — Convergence Score, stress/consistency status, pending queue, failed journal, retry rate, avg/P95 sync timing.
-7. ✅ **Sync Protocol v1.0 document** — `SYNC_PROTOCOL.md` frozen.
-8. 🟡 **Migrar `expo-av` → `expo-audio`/`expo-video` y `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
-9. 🟡 **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo/caché local desde SQLite.
-10. 🟡 **Sprint 2 (Restore Validator)**: Convertir `downloadService.ts` en importador con dos fases — Parse Backup → Validate Graph (FKs, duplicados, sync_version inválido, padres soft-deleted, referencias circulares) → Integrity Report → Import → Summary.
-11. ✅ **Sprint 1 (Cascade local Subject)**: `SubjectDomainService.deleteSubject()` implementado — cascade transaccional + journal compaction + eventos batch + 11 tests de integración. `subjects.ts` delega en el servicio.
+## Backlog Técnico (fuera de sprints)
+
+Items que no dependen de la fase actual. Se atienden cuando hay ventana.
+
+- **EntityRegistry centralizado**: registro único de entidades sincronizables para verificación automática (delta sync, sync_version, initial sync, consistency report).
+- **Dashboard de salud del Sync Engine**: Convergence Score, stress/consistency status, colas, reintentos, timing P95.
+- **Migrar `expo-av` → `expo-audio`/`expo-video`** antes de SDK 54.
+- **Migrar `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
+- **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo local.
+- **Restore Validator**: `downloadService.ts` como importador en 2 fases (Parse → Validate → Integrity Report → Import).
 
 ## Hallazgos Críticos del Audit
 - **FOREIGN KEY constraint failed en restore de backup**: `downloadService.ts` falla al restaurar flashcard_decks cuyos `subject_id` ya no existe localmente. Causa raíz: `deleteSubject()` en móvil hace soft-delete SIN cascade local. El backend sí cascadea, pero entre el soft-delete local y la sincronización, un backup captura decks huérfanos. **CORREGIDO** vía `SubjectDomainService.deleteSubject()` con cascade transaccional + journal compaction. Sprint 2 pendiente: IntegrityReport en restore para prevenir inserciones huérfanas.
@@ -376,8 +497,26 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - `backend/controllers/scannedDocumentsController.js` — incrementSyncVersion + recordDeletion (scanned_documents)
 
 ### Domain Layer
-- `mobile/src/services/domain/SubjectDomainService.ts` — `deleteSubject()` transaccional: cascade 11 entidades hijas + journal compaction + eventos batch
+- `mobile/src/services/domain/SubjectDomainService.ts` — `deleteSubject()` transaccional: cascade 12 entidades hijas + 4 nietos + journal compaction + eventos batch
 - `mobile/src/services/domain/invariants.ts` — Invariant checks (requireActiveSubject, etc.)
+
+### Knowledge Domain (Sprint 3 — FSRS como Sistema Nervioso)
+- `mobile/src/domain/fsrs/types.ts` — ReviewQuality, ReviewInput, ReviewDecision
+- `mobile/src/domain/fsrs/calculateFSRS.ts` — Algoritmo FSRS-4.5 puro
+- `mobile/src/domain/fsrs/FlashcardDomainService.ts` — Orquestación de review: FSRS → policy → SQLite → sync
+- `mobile/src/domain/fsrs/ReviewSchedulingPolicy.ts` — Modo `production` activado (intervalos FSRS reales)
+- `mobile/src/domain/fsrs/calculateElapsedDays.ts` — Cálculo puro de días transcurridos
+- `mobile/src/domain/fsrs/integrity.ts` — Detección de datos FSRS corruptos
+- `mobile/src/domain/learning/ReviewScheduler.ts` — Agenda de estudio con retrievability real (sin failure_rate legacy)
+- `mobile/src/domain/knowledge/retrievability.ts` — Helper puro calculateRetrievability()
+- `mobile/src/domain/knowledge/query.ts` — getKnowledgeAggregation(): 1 query SQL para todo el Snapshot
+- `mobile/src/domain/knowledge/types.ts` — KnowledgeSnapshot, LearningHealth, SubjectKnowledge, SnapshotMetadata
+- `mobile/src/domain/knowledge/KnowledgeSnapshotBuilder.ts` — Builder puro: aggregation → health + subjects + metadata → frozen snapshot
+- `mobile/src/domain/knowledge/KnowledgeProjection.ts` — Orquestador DB → Builder (implementa KnowledgeProvider)
+- `mobile/src/domain/knowledge/KnowledgeProvider.ts` — Interfaz contrato (único punto de entrada para consumidores)
+- `mobile/src/hooks/useKnowledgeInsights.ts` — Hook React: snapshot + loading + error + refresh()
+- `mobile/src/components/dashboard/KnowledgeHealthCard.tsx` — Primer consumidor UI: health.score, memoryLevel, forgettingRisk, knowledgeAtRisk, metadata
+- `mobile/src/domain/knowledge/__tests__/KnowledgeSnapshotBuilder.test.ts` — 19 tests (determinismo, confidence, memoryLevel, edge cases)
 
 ### Data Layer
 - `mobile/src/services/database/BaseRepository.ts` — Now uses ConflictResolver on upsert

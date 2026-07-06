@@ -3,20 +3,38 @@ import migrations from './migrations';
 
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
+  private openingPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
   async open(): Promise<SQLite.SQLiteDatabase> {
     if (this.db) { console.log('[BOOT 04] DB already open, returning cached'); return this.db; }
-    console.log('[BOOT 03] Calling SQLite.openDatabaseAsync...');
-    this.db = await SQLite.openDatabaseAsync('threshold.db');
-    console.log('[BOOT 04] SQLite DB handle acquired');
-    await this.db.execAsync('PRAGMA journal_mode = WAL');
-    console.log('[BOOT 04a] PRAGMA journal_mode = WAL done');
-    await this.db.execAsync('PRAGMA foreign_keys = ON');
-    console.log('[BOOT 04b] PRAGMA foreign_keys = ON done');
-    console.log('[BOOT 05] Running migrations...');
-    await this.runMigrations();
-    console.log('[BOOT 05z] Migrations complete');
-    return this.db;
+    if (this.openingPromise) { console.log('[BOOT 03a] open() already in progress, awaiting...'); return this.openingPromise; }
+
+    this.openingPromise = (async () => {
+      let db: SQLite.SQLiteDatabase | null = null;
+      try {
+        console.log('[BOOT 03] Calling SQLite.openDatabaseAsync...');
+        db = await SQLite.openDatabaseAsync('threshold.db');
+        console.log('[BOOT 04] SQLite DB handle acquired');
+        await db.execAsync('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+        console.log('[BOOT 04a] PRAGMAs done (busy_timeout, journal_mode=WAL, foreign_keys=ON)');
+        console.log('[BOOT 05] Running migrations...');
+        await this.runMigrationsCore(db);
+        console.log('[BOOT 05z] Migrations complete');
+        this.db = db;
+        this.openingPromise = null;
+        return this.db;
+      } catch (e) {
+        this.openingPromise = null;
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('locked') && db) {
+          try { await db.execAsync('PRAGMA wal_checkpoint(TRUNCATE);'); } catch {}
+        }
+        try { await db?.closeAsync(); } catch {}
+        throw e;
+      }
+    })();
+
+    return this.openingPromise;
   }
 
   async close(): Promise<void> {
@@ -31,9 +49,8 @@ class DatabaseService {
     return this.db;
   }
 
-  private async runMigrations(): Promise<void> {
-    const db = this.db!;
-    const currentVersion = await this.getUserVersion();
+  private async runMigrationsCore(db: SQLite.SQLiteDatabase): Promise<void> {
+    const currentVersion = await this.getUserVersionCore(db);
     console.log(`[BOOT 05a] Current DB version: ${currentVersion}, target: ${migrations.length}`);
     for (let i = currentVersion; i < migrations.length; i++) {
       console.log(`[BOOT 05b] Running migration ${migrations[i].version} (${migrations[i].up.length} statements)`);
@@ -60,26 +77,38 @@ class DatabaseService {
       }
 
       if (filtered.length === 0) {
-        // PRAGMA user_version es NO transaccional — se ejecuta fuera de transacción
+        console.log(`[Migracion] No hay statements para migration ${migrations[i].version}, solo actualizando user_version`);
         await db.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
         continue;
       }
 
-      await db.withExclusiveTransactionAsync(async (txn) => {
-        for (const stmt of filtered) {
-          await txn.execAsync(stmt);
+      console.log(`[Migracion] Ejecutando ${filtered.length} statements uno por uno (auto-commit, sin BEGIN/COMMIT)`);
+      let allOk = true;
+      for (const stmt of filtered) {
+        try {
+          console.log(`[Migracion] > ${stmt.substring(0, 120)}`);
+          await db.execAsync(stmt);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          // Ignorar "duplicate column" en ALTER TABLE (columna ya existe)
+          if (msg.includes('duplicate column')) {
+            console.log(`[Migracion] Saltando (columna ya existe): ${stmt.substring(0, 80)}`);
+            continue;
+          }
+          console.log(`[Migracion] ERROR en statement: ${msg}`);
+          allOk = false;
+          throw e;
         }
-      });
-
-      // Actualizar user_version DESPUÉS de que la transacción haya commiteado
-      // PRAGMA user_version es inmediato (no-transaccional), no puede ir dentro de la transacción
-      // porque si la transacción se revierte, user_version quedaría desincronizado
-      await db.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
+      }
+      if (allOk) {
+        await db.execAsync(`PRAGMA user_version = ${migrations[i].version}`);
+        console.log(`[Migracion] Migration ${migrations[i].version} completada, user_version actualizado`);
+      }
     }
   }
 
-  private async getUserVersion(): Promise<number> {
-    const row: any = await this.db!.getFirstAsync('PRAGMA user_version');
+  private async getUserVersionCore(db: SQLite.SQLiteDatabase): Promise<number> {
+    const row: any = await db.getFirstAsync('PRAGMA user_version');
     return row?.user_version ?? 0;
   }
 

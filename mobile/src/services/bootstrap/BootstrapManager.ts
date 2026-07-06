@@ -72,7 +72,9 @@ class BootstrapManager {
 
   async start(): Promise<void> {
     if (this._started) { console.log('[BOOT] start() already called, skipping'); return; }
-    this._started = true;
+    if (this._status === 'running') { console.log('[BOOT] start() already running, skipping'); return; }
+    this._status = 'running';
+    this._emit();
     console.log('[BOOT 06] BootstrapManager.start() begins');
 
     try {
@@ -189,15 +191,23 @@ class BootstrapManager {
         console.log('[BOOT 13] PHASE READY: loading DataStore...');
         try {
           const { useDataStore } = await import('../../store/useDataStore');
+          const t0 = performance.now();
           await useDataStore.getState().loadAllData();
+          console.log(`[BOOT 13b] loadAllData: ${(performance.now() - t0).toFixed(1)} ms`);
         } catch (err) {
           console.warn('[BOOT 13a] Pre-load DataStore failed:', err);
         }
         console.log('[BOOT 14] App ready');
       });
 
+      this._started = true;
+      this._status = 'done';
+      this._emit();
       console.log('[BOOT 15] BootstrapManager.start() completed successfully');
     } catch (err: any) {
+      this._status = 'error';
+      this._error = err.message || 'Bootstrap failed';
+      this._emit();
       console.error(`[BOOT 15!] BootstrapManager failed at phase ${this._currentPhase}:`, err);
       throw err;
     }
