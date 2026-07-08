@@ -106,7 +106,6 @@ export class KnowledgeSnapshotBuilder {
       totalDecks: aggregation.totalDecks,
       totalSubjects: aggregation.totalSubjects,
       daysSinceLastReview: aggregation.daysSinceLastReview,
-      confidence: computeConfidence(totalCards),
     };
 
     const snapshot: KnowledgeSnapshot = Object.freeze({

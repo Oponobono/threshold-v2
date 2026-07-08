@@ -5,6 +5,7 @@ import { requireActiveSubject, requireActiveDocument } from '../domain/invariant
 import { extractTextFromPdfLocal } from '../localPDFService';
 import { getBackupPreferences } from '../backup/backupService';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
+import { uuidv4 } from '../../utils/uuid';
 
 export interface ScannedDocument {
   id?: string;
@@ -37,7 +38,6 @@ export const getScannedDocumentsBySubject = async (subjectId: string): Promise<S
 };
 
 export const createScannedDocument = async (data: { subject_id?: string; name?: string; local_uri: string; ocr_text?: string; id?: string }): Promise<ScannedDocument> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = data.id || uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');

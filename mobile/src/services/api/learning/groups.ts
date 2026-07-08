@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { getUserId } from '../auth';
 import { syncService } from '../../database';
+import { uuidv4 } from '../../../utils/uuid';
 
 export interface GroupMembership {
   id?: string;
@@ -117,7 +118,6 @@ export const createGroup = async (params: CreateGroupParams): Promise<any> => {
     if (!response.ok) throw new Error(responseData?.error || 'Error al crear el grupo');
     return responseData;
   } catch (error: any) {
-    const { uuidv4 } = await import('../../../utils/uuid');
     const id = uuidv4();
     await syncService.enqueueCreate('group', id, { creator_user_id: userId, ...params });
     throw new Error(error.message || 'Error de red al intentar crear el grupo');

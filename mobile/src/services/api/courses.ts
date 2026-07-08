@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { Course } from './types';
 import { courseRepository, syncService } from '../database';
+import { uuidv4 } from '../../utils/uuid';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -78,7 +79,6 @@ export const createCourse = async (payload: {
   global_notes?: string;
 }): Promise<Course> => {
   const userId = await getUserIdNumber();
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = uuidv4();
 
   const course: Course = {

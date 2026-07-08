@@ -1,10 +1,10 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
+import { courseRepository } from '../../database/repositories/CourseRepository';
 
 export class CourseSynchronizer implements EntitySynchronizer {
   readonly entityType = 'courses';
 
   async saveAll(items: any[]): Promise<number> {
-    const { courseRepository } = await import('../../database/repositories/CourseRepository');
     let count = 0;
     for (const item of items) {
       await courseRepository.upsert(item);
@@ -14,7 +14,6 @@ export class CourseSynchronizer implements EntitySynchronizer {
   }
 
   async deleteItem(id: string): Promise<void> {
-    const { courseRepository } = await import('../../database/repositories/CourseRepository');
     await courseRepository.delete(id);
   }
 }

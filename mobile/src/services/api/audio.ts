@@ -5,6 +5,7 @@ import { audioRepository, audioTranscriptRepository, syncService } from '../data
 import { requireActiveSubject, requireActiveAudio } from '../domain/invariants';
 import { getBackupPreferences } from '../backup/backupService';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
+import { uuidv4 } from '../../utils/uuid';
 
 export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
   const userId = await getUserId();
@@ -48,8 +49,7 @@ export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
 };
 
 export const createAudioRecording = async (payload: { subject_id?: string | null; name?: string; local_uri: string; duration?: number; id?: string }): Promise<any> => {
-  const { uuidv4 } = await import('../../utils/uuid');
-  const id = payload.id || uuidv4();
+    const id = payload.id || uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');
 
@@ -177,7 +177,6 @@ export const upsertAudioTranscript = async (payload: { recording_id: string; tra
 
   // Siempre enqueue un sync en lugar de intentar POST inline, para evitar 403
   // cuando la grabación padre aún no existe en el servidor (creada offline).
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = uuidv4();
   await syncService.enqueueCreate('audio-transcript', id, payload);
   return { id, ...payload, _isPending: true };

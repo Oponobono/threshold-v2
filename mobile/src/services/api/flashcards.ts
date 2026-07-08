@@ -3,6 +3,9 @@ import { getUserId } from './auth';
 import type { FlashcardDeck, Flashcard, CardDirection } from './types';
 import { flashcardDeckRepository, flashcardRepository, syncService } from '../database';
 import { requireActiveSubject, requireActiveFlashcardDeck } from '../domain/invariants';
+import { uuidv4 } from '../../utils/uuid';
+import { databaseService } from '../database/DatabaseService';
+import { deleteLocalDeck } from '../localFlashcardService';
 
 export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
   // 1. Leer localmente primero
@@ -68,7 +71,6 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
       if (Array.isArray(data)) {
         for (const d of data) {
           try {
-            const { databaseService } = await import('../database/DatabaseService');
             await databaseService.getDb().runAsync(
               `UPDATE flashcard_decks 
                SET card_count = ?, review_count = ?, learning_count = ?, new_count = ?
@@ -91,7 +93,6 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
 };
 
 export const createFlashcardDeck = async (payload: { subject_id?: string; title: string; description?: string; id?: string; linked_event_id?: string; avg_ease_factor?: number; total_reviews?: number; last_reviewed_at?: string; card_count?: number }): Promise<any> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = (payload as any).id || uuidv4();
   const userId = await getUserId();
 
@@ -149,7 +150,6 @@ const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
   // Si tenemos subject_id pero nos faltan los metadatos visuales, hidratar desde SQLite local
   if (!merged.subject_name && merged.subject_id) {
     try {
-      const { databaseService } = await import('../database/DatabaseService');
       const subject: any = await databaseService.getDb().getFirstAsync('SELECT name, color, icon FROM subjects WHERE id = ? AND deleted_at IS NULL', [merged.subject_id]);
       if (subject) {
         merged.subject_name = subject.name;
@@ -289,7 +289,6 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
 };
 
 export const createFlashcard = async (payload: { deck_id: string; front: string; back: string; direction?: CardDirection; id?: string; ease_factor?: number; interval_days?: number; repetitions?: number; next_review_date?: string; fsrs_stability?: number; fsrs_difficulty?: number }): Promise<any> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
 
   await requireActiveFlashcardDeck(payload.deck_id);
@@ -299,7 +298,6 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
   await flashcardRepository.create(card);
 
   try {
-    const { databaseService } = await import('../database/DatabaseService');
     await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = card_count + 1 WHERE id = ?', [payload.deck_id]);
   } catch (e) {
     console.warn('[Flashcards API] Error incrementing card_count:', e);
@@ -324,7 +322,6 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
 };
 
 export const createEvaluationItem = async (payload: { deck_id: string; item_type: 'flashcard' | 'multiple_choice' | 'boolean'; content_json: any; direction?: CardDirection; hint?: string; explanation?: string; id?: string }): Promise<any> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
 
   await requireActiveFlashcardDeck(payload.deck_id);
@@ -334,7 +331,6 @@ export const createEvaluationItem = async (payload: { deck_id: string; item_type
   await flashcardRepository.create(item);
 
   try {
-    const { databaseService } = await import('../database/DatabaseService');
     await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = card_count + 1 WHERE id = ?', [payload.deck_id]);
   } catch (e) {
     console.warn('[Flashcards API] Error incrementing card_count:', e);
@@ -428,7 +424,6 @@ export const deleteFlashcardDeck = async (deckId: string) => {
 
   // Try deleting from local MMKV if it's a local-only deck
   try {
-    const { deleteLocalDeck } = await import('../localFlashcardService');
     deleteLocalDeck(deckId);
   } catch {}
 
@@ -530,7 +525,6 @@ export const deleteFlashcard = async (cardId: string) => {
   try {
     const card = await flashcardRepository.getById(cardId);
     if (card && card.deck_id) {
-      const { databaseService } = await import('../database/DatabaseService');
       await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = MAX(0, card_count - 1) WHERE id = ?', [card.deck_id]);
     }
   } catch (e) {

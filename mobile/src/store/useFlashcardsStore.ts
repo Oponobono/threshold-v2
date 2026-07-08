@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { flashcardDeckRepository, calendarEventRepository, subjectRepository, flashcardRepository } from '../services/database';
 import { getFlashcardDecksWithMetrics, type FlashcardDeck } from '../services/api';
 import { repositoryEventBus } from '../services/events/RepositoryEventBus';
+import { databaseService } from '../services/database/DatabaseService';
 
 export enum FlashcardsStoreState {
   NOT_INITIALIZED = 'NOT_INITIALIZED',
@@ -29,7 +30,6 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
     
     const deckIds = decks.map(d => String(d.id));
     const placeholders = deckIds.map(() => '?').join(',');
-    const { databaseService } = await import('../services/database/DatabaseService');
     const db = databaseService.getDb();
     const relevantFlashcards = await db.getAllAsync(`SELECT deck_id, status, next_review_date FROM flashcards WHERE deck_id IN (${placeholders})`, deckIds);
     
@@ -166,7 +166,6 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
         
         // Fetch only affected decks
         const placeholders = affectedDeckIds.map(() => '?').join(',');
-        const { databaseService } = await import('../services/database/DatabaseService');
         const db = databaseService.getDb();
         const rows = await db.getAllAsync(`SELECT * FROM flashcard_decks WHERE id IN (${placeholders})`, affectedDeckIds);
         
@@ -189,7 +188,6 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
         if (cardIds.length === 0) return;
         
         const placeholders = cardIds.map(() => '?').join(',');
-        const { databaseService } = await import('../services/database/DatabaseService');
         const db = databaseService.getDb();
         
         // Get unique deck_ids for these cards

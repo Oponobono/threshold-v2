@@ -7,6 +7,7 @@ import { SyncState, SyncPhase, SyncProgress, SyncResult, SyncEvent, SyncListener
 import { EntitySynchronizer } from './EntitySynchronizer';
 import { syncJournal } from './SyncJournal';
 import { syncDebugger, generateTraceId } from './SyncDebugger';
+import { getLocalPredictions } from '../localMasteryService';
 import {
   UserSynchronizer,
   CourseSynchronizer,
@@ -321,23 +322,31 @@ class SyncManager {
 
   private async _saveAllEntities(payload: Record<string, any>): Promise<number> {
     let count = 0;
+    const _t = Date.now();
 
     for (const [entityType, data] of Object.entries(payload)) {
       const synchronizer = this._synchronizers.get(entityType);
       if (!synchronizer) continue;
 
+      const _tE = Date.now();
       if (entityType === 'user') {
         const items = Array.isArray(data) ? data : (data ? [data] : []);
         count += await synchronizer.saveAll(items);
       } else if (Array.isArray(data)) {
         count += await synchronizer.saveAll(data);
-        // Schedule background downloads for assets
         if (entityType === 'photos' || entityType === 'audio_recordings' || entityType === 'scanned_documents') {
           assetSyncEngine.schedulePendingDownloads(entityType, data).catch(() => {});
         }
       }
+      const elapsed = Date.now() - _tE;
+      const items = Array.isArray(data) ? data.length : 1;
+      if (elapsed > 10) {
+        console.log(`[DeltaSync] Save ${entityType}: ${elapsed}ms (${items} items, ${items > 0 ? (elapsed/items).toFixed(1) : 0}ms/item)`);
+      }
     }
 
+    const total = Date.now() - _t;
+    console.log(`[DeltaSync] _saveAllEntities total: ${total}ms, ${count} entities saved`);
     return count;
   }
 
@@ -370,9 +379,14 @@ class SyncManager {
 
       if (body.updated) {
         if (traceId) { syncDebugger.timeStart(traceId, 'delta_repo'); syncDebugger.log(traceId, null, null, 'REPOSITORY_WRITE', 'Saving delta updates to SQLite', { entityCount: Object.keys(body.updated).length }); }
+        const _txStart = Date.now();
         await databaseService.runInTransaction(async () => {
+          const _wStart = Date.now();
           await this._saveAllEntities(body.updated as Record<string, any>);
+          console.log(`[DeltaSync] Inside transaction (write phase): ${Date.now() - _wStart}ms`);
         });
+        const _txEnd = Date.now() - _txStart;
+        console.log(`[DeltaSync] Transaction (BEGIN→COMMIT): ${_txEnd}ms`);
         if (traceId) syncDebugger.timeEnd(traceId, 'delta_repo', 'REPOSITORY_WRITE', 'Delta updates saved');
       }
 
@@ -404,7 +418,6 @@ class SyncManager {
     if (result.success) {
       try {
         await syncJournal.startEntry('delta', 'analytics');
-        const { getLocalPredictions } = await import('../localMasteryService');
         await getLocalPredictions('').catch(() => null);
         await syncJournal.finishEntry({ status: 'success' });
       } catch (err: any) {

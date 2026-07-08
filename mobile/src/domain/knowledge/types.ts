@@ -3,6 +3,7 @@ export type MemoryState = 'stable' | 'unstable' | 'decaying' | 'fragile';
 export type ForgettingRisk = 'low' | 'medium' | 'high';
 export type Momentum = 'improving' | 'stable' | 'declining';
 export type SnapshotAge = 'fresh' | 'recent' | 'stale' | 'expired';
+export type KnowledgeMaturity = 'inicio' | 'consolidacion' | 'consolidado';
 
 export interface LearningHealth {
   readonly overallKnowledge: number;
@@ -33,7 +34,6 @@ export interface SnapshotMetadata {
   readonly totalDecks: number;
   readonly totalSubjects: number;
   readonly daysSinceLastReview: number;
-  readonly confidence: number;
 }
 
 export interface KnowledgeSnapshot {

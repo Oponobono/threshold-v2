@@ -5,6 +5,7 @@ import { photoRepository, syncService } from '../database';
 import { requireActiveSubject, requireActivePhoto } from '../domain/invariants';
 import { getBackupPreferences } from '../backup/backupService';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
+import { uuidv4 } from '../../utils/uuid';
 
 export const getGalleryItems = async () => {
   const userId = await getUserId();
@@ -55,7 +56,6 @@ export const createPhoto = async (photoData: {
   ocr_text?: string | null;
   group_id?: string | null;
 }) => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = photoData.id || uuidv4();
   const userId = await getUserId();
 

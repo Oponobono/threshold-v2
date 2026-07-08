@@ -26,30 +26,38 @@ export class BaseRepository<T extends { id: string }> {
       : 'deleted_at IS NULL';
   }
 
-  async getAll(): Promise<T[]> {
-    const rows = await this.getDb().getAllAsync(
-      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause()} ORDER BY created_at DESC`
+  async getAll(label?: string): Promise<T[]> {
+    const rows = await databaseService.getAllTracked(
+      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause()} ORDER BY created_at DESC`,
+      undefined,
+      label || `BaseRepo.${this.tableName}.getAll`
     );
     return (rows as any[]).map(row => this.mapRow(row));
   }
 
-  async getById(id: string): Promise<T | null> {
-    const row = await this.getDb().getFirstAsync(
-      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause('id = ?')}`, id
+  async getById(id: string, label?: string): Promise<T | null> {
+    const row = await databaseService.getFirstTracked(
+      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause('id = ?')}`,
+      [id],
+      label || `BaseRepo.${this.tableName}.getById`
     );
     return row ? this.mapRow(row) : null;
   }
 
-  async getByField(field: string, value: any): Promise<T[]> {
-    const rows = await this.getDb().getAllAsync(
-      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause(`${field} = ?`)} ORDER BY created_at DESC`, value
+  async getByField(field: string, value: any, label?: string): Promise<T[]> {
+    const rows = await databaseService.getAllTracked(
+      `SELECT * FROM ${this.tableName} WHERE ${this.buildActiveWhereClause(`${field} = ?`)} ORDER BY created_at DESC`,
+      [value],
+      label || `BaseRepo.${this.tableName}.getByField`
     );
     return (rows as any[]).map(row => this.mapRow(row));
   }
 
-  async getByIdIncludingDeleted(id: string): Promise<T | null> {
-    const row = await this.getDb().getFirstAsync(
-      `SELECT * FROM ${this.tableName} WHERE id = ?`, id
+  async getByIdIncludingDeleted(id: string, label?: string): Promise<T | null> {
+    const row = await databaseService.getFirstTracked(
+      `SELECT * FROM ${this.tableName} WHERE id = ?`,
+      [id],
+      label || `BaseRepo.${this.tableName}.getByIdIncludingDeleted`
     );
     return row ? this.mapRow(row) : null;
   }
@@ -73,7 +81,7 @@ export class BaseRepository<T extends { id: string }> {
   private async getValidColumns(): Promise<string[]> {
     if (this.validColumns) return this.validColumns;
     try {
-      const rows = await this.getDb().getAllAsync(`PRAGMA table_info(${this.tableName})`);
+      const rows = await databaseService.getAllTracked(`PRAGMA table_info(${this.tableName})`, undefined, `BaseRepo.${this.tableName}.schema`);
       this.validColumns = (rows as any[]).map(r => r.name);
     } catch (e) {
       console.warn(`[BaseRepository] Error obteniendo schema para ${this.tableName}:`, e);
@@ -152,9 +160,11 @@ export class BaseRepository<T extends { id: string }> {
     await this.getDb().runAsync(`DELETE FROM ${this.tableName} WHERE id = ?`, id);
   }
 
-  async count(): Promise<number> {
-    const row: any = await this.getDb().getFirstAsync(
-      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE ${this.buildActiveWhereClause()}`
+  async count(label?: string): Promise<number> {
+    const row: any = await databaseService.getFirstTracked(
+      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE ${this.buildActiveWhereClause()}`,
+      undefined,
+      label || `BaseRepo.${this.tableName}.count`
     );
     return row?.count ?? 0;
   }

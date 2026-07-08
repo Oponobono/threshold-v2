@@ -1,10 +1,10 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
+import { thresholdOverrideRepository } from '../../database/repositories/ThresholdOverrideRepository';
 
 export class ThresholdOverrideSynchronizer implements EntitySynchronizer {
   readonly entityType = 'subject_threshold_overrides';
 
   async saveAll(items: any[]): Promise<number> {
-    const { thresholdOverrideRepository } = await import('../../database/repositories/ThresholdOverrideRepository');
     let count = 0;
     for (const item of items) {
       await thresholdOverrideRepository.upsert(item);
@@ -14,7 +14,6 @@ export class ThresholdOverrideSynchronizer implements EntitySynchronizer {
   }
 
   async deleteItem(id: string): Promise<void> {
-    const { thresholdOverrideRepository } = await import('../../database/repositories/ThresholdOverrideRepository');
     await thresholdOverrideRepository.delete(id);
   }
 }

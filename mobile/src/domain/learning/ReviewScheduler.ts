@@ -16,12 +16,11 @@ export class ReviewScheduler {
    * Sin failure_rate, sin card_logs, sin pending reviews.
    */
   static async getStudySchedule(userId: string): Promise<PredictionResponse> {
-    const db = databaseService.getDb();
     const now = new Date();
 
     const allDue: any[] = [];
     try {
-      const rows = await db.getAllAsync(
+      const rows = await databaseService.getAllTracked(
         `SELECT
            fc.id, fc.front, fc.deck_id, fc.status,
            fc.next_review_date, fc.last_review_timestamp,
@@ -75,7 +74,7 @@ export class ReviewScheduler {
       dueCardsCount: allDue.length,
       deckCount: dueDeckCount,
       dueDeckCount: dueDeckCount,
-      cards: cards.slice(0, 20),
+      cards: cards,
       dueDeckIds: Array.from(uniqueDeckIds),
     };
   }

@@ -14,6 +14,14 @@ import {
 } from '../services/database';
 import { syncManager } from '../services/sync/SyncManager';
 import { repositoryEventBus } from '../services/events/RepositoryEventBus';
+import { userRepository } from '../services/database/repositories/UserRepository';
+import { storageService } from '../services/storageService';
+import { getCurrentUserProfile } from '../services/api/auth/profile';
+import { getUserGroups } from '../services/api/learning/groups';
+import { getLocalGlobalGPA, getLocalPredictions } from '../services/localMasteryService';
+import { getTodaySchedules } from '../services/api/schedules';
+import { flashcardDeckRepository } from '../services/database/repositories/FlashcardDeckRepository';
+import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
 import type { UserProfile } from '../services/api/types';
 
 export interface PredictionItem {
@@ -155,13 +163,11 @@ export const useDataStore = create<DataState>((set, get) => {
       const dbSchedules = await scheduleRepository.getAll();
       set({ schedules: dbSchedules || [] });
 
-      const { userRepository } = await import('../services/database/repositories/UserRepository');
       const currentUser = await userRepository.getCurrentUser();
       if (currentUser) {
         set({ profile: currentUser as any });
       }
 
-      const { storageService } = await import('../services/storageService');
       const groupsCache = await storageService.getLocal('app:cache:userGroups');
       if (groupsCache) {
         try { set({ userGroups: JSON.parse(groupsCache) }); } catch {}
@@ -222,10 +228,8 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshProfile: async () => {
     try {
-      const { getCurrentUserProfile } = await import('../services/api/auth/profile');
       const fresh = await getCurrentUserProfile();
       if (fresh) {
-        const { userRepository } = await import('../services/database/repositories/UserRepository');
         await userRepository.saveProfile(fresh);
         set({ profile: fresh });
       }
@@ -234,19 +238,17 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshUserGroups: async () => {
     try {
-      const { getUserGroups } = await import('../services/api/learning/groups');
       const groups = await getUserGroups();
       if (Array.isArray(groups)) {
         set({ userGroups: groups });
-        const { storageService } = await import('../services/storageService');
         await storageService.saveLocal('app:cache:userGroups', JSON.stringify(groups));
       }
     } catch {}
   },
 
   refreshOverallGpa: async () => {
+    const _t0 = performance.now();
     try {
-      const { getLocalGlobalGPA } = await import('../services/localMasteryService');
       const profile = get().profile;
       if (profile?.id) {
         const localGpa = await getLocalGlobalGPA(profile.id);
@@ -254,12 +256,16 @@ export const useDataStore = create<DataState>((set, get) => {
           set({ overallGpa: localGpa.currentAverage ?? 0 });
         }
       }
-    } catch {}
+    } catch {} finally {
+      const _t = performance.now() - _t0;
+      if (_t > 100) {
+        console.log(`[GpaChain] refreshOverallGpa TOTAL: ${_t.toFixed(0)}ms`);
+      }
+    }
   },
 
   syncTodaySchedules: async () => {
     try {
-      const { getTodaySchedules } = await import('../services/api/schedules');
       await getTodaySchedules();
       get().refreshSchedules();
     } catch {}
@@ -267,7 +273,6 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshPredictions: async (userId: string | number) => {
     try {
-      const { getLocalPredictions } = await import('../services/localMasteryService');
       const data = await getLocalPredictions(String(userId));
       set({ predictions: data || { dueCount: 0, cards: [] } });
     } catch (error) {
@@ -282,8 +287,6 @@ export const useDataStore = create<DataState>((set, get) => {
 
   preloadOfflineCache: async () => {
     try {
-      const { flashcardDeckRepository } = await import('../services/database/repositories/FlashcardDeckRepository');
-      const { flashcardRepository } = await import('../services/database/repositories/FlashcardRepository');
       const decks = await flashcardDeckRepository.getAll();
       if (Array.isArray(decks) && decks.length > 0) set({ flashcardDecks: decks });
       if (Array.isArray(decks) && decks.length > 0) {

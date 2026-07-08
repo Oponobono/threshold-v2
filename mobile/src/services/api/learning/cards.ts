@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from '../client';
 import { getUserId } from '../auth';
 import { cardLogRepository, syncService } from '../../database';
 import type { CardLog } from '../types';
+import { uuidv4 } from '../../../utils/uuid';
 
 export type { CardLog };
 
@@ -35,7 +36,6 @@ export const createCardLog = async (logData: Omit<CardLog, 'id' | 'timestamp' | 
     return;
   }
 
-  const { uuidv4 } = await import('../../../utils/uuid');
   const id = uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');

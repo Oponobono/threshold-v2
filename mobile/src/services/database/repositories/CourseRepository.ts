@@ -2,6 +2,7 @@ import { databaseService } from '../DatabaseService';
 import { Course } from '../../api/types';
 import { BaseRepository } from '../BaseRepository';
 import { syncService } from '../SyncService';
+import { MomentumService } from '../../MomentumService';
 
 export type { Course } from '../../api/types';
 
@@ -11,9 +12,11 @@ export class CourseRepository extends BaseRepository<Course> {
   }
 
   async getAll(): Promise<Course[]> {
-    const db = databaseService.getDb();
-    if (!db) return [];
-    return db.getAllAsync<Course>('SELECT * FROM courses WHERE deleted_at IS NULL ORDER BY last_studied_at DESC');
+    return databaseService.getAllTracked<Course>(
+      'SELECT * FROM courses WHERE deleted_at IS NULL ORDER BY last_studied_at DESC',
+      undefined,
+      'CourseRepo.getAll'
+    );
   }
 
   async getById(id: string): Promise<Course | null> {
@@ -44,7 +47,6 @@ export class CourseRepository extends BaseRepository<Course> {
     );
     await syncService.enqueueUpdate('course', courseId, { completed_classes: nextCompleted, status: newStatus });
     if (newStatus === 'completed' && course.status !== 'completed') {
-      const { MomentumService } = await import('../../MomentumService');
       MomentumService.boostMomentum(courseId).catch(console.warn);
     }
   }

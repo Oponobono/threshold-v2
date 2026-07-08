@@ -1,11 +1,11 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
+import { userRepository } from '../../database/repositories/UserRepository';
+import { storageService } from '../../storageService';
 
 export class UserSynchronizer implements EntitySynchronizer {
   readonly entityType = 'user';
 
   async saveAll(items: any[]): Promise<number> {
-    const { userRepository } = await import('../../database/repositories/UserRepository');
-    const { storageService } = await import('../../storageService');
     const jwtToken = await storageService.getSecure('jwt_token') || '';
     let count = 0;
     for (const item of items) {
@@ -16,7 +16,6 @@ export class UserSynchronizer implements EntitySynchronizer {
   }
 
   async deleteItem(id: string): Promise<void> {
-    const { userRepository } = await import('../../database/repositories/UserRepository');
     await userRepository.delete(id);
   }
 }

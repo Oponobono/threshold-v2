@@ -2,6 +2,8 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { DEFAULT_GRADING_SYSTEMS } from './gradingDefaults';
 import { syncService } from '../database';
 import { storageService } from '../storageService';
+import { uuidv4 } from '../../utils/uuid';
+import { databaseService } from '../database/DatabaseService';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -311,8 +313,6 @@ export const updateAssessmentResult = async (
   // Siempre registrar el cambio localmente para el audit trail offline
   const saveLocalHistory = async (oldValue?: number) => {
     try {
-      const { uuidv4 } = await import('../../utils/uuid');
-      const { databaseService } = await import('../database/DatabaseService');
       const db = databaseService.getDb();
       await db.runAsync(
         `INSERT INTO grade_history (id, assessment_result_id, old_raw_value, new_raw_value, changed_at, reason)
@@ -352,7 +352,6 @@ export const fetchResultHistory = async (
   // 1. Leer historial local de SQLite
   let localHistory: GradeHistoryEntry[] = [];
   try {
-    const { databaseService } = await import('../database/DatabaseService');
     const db = databaseService.getDb();
     const rows = await db.getAllAsync(
       `SELECT id, assessment_result_id, old_raw_value, new_raw_value, changed_by, changed_at, reason
@@ -384,9 +383,7 @@ export const fetchResultHistory = async (
       if (apiHistory.length === 0) return;
 
       // Persistir entradas nuevas de la API que no existen localmente
-      const { databaseService } = await import('../database/DatabaseService');
       const db = databaseService.getDb();
-      const { uuidv4 } = await import('../../utils/uuid');
       for (const entry of apiHistory) {
         try {
           await db.runAsync(

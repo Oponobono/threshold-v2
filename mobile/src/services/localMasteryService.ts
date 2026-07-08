@@ -193,20 +193,18 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
 }
 
 export async function getLocalGlobalGPA(userId: string): Promise<GlobalGPAAnalytics> {
-  const db = databaseService.getDb();
-
+  const _t0 = performance.now();
   try {
-    const assessments = await db.getAllAsync(
-      `SELECT a.subject_id, a.grade_value, a.score, a.out_of, a.percentage, a.weight, a.normalized_value
+    const sql = `SELECT a.subject_id, a.grade_value, a.score, a.out_of, a.percentage, a.weight, a.normalized_value
        FROM assessments a
        JOIN subjects s ON a.subject_id = s.id
        WHERE s.user_id = ?
        AND a.deleted_at IS NULL
        AND s.deleted_at IS NULL
        AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR a.normalized_value IS NOT NULL)
-       ORDER BY a.date ASC`,
-      userId
-    ) as any[];
+       ORDER BY a.date ASC`;
+
+    const assessments = await databaseService.getAllTracked(sql, userId) as any[];
 
     if (!assessments || assessments.length === 0) {
       return { currentAverage: 0, projectedGrade: 0, delta: 0, evaluatedWeight: 0, remainingWeight: 100, assessmentCount: 0, subjectCount: 0 };
@@ -258,6 +256,11 @@ export async function getLocalGlobalGPA(userId: string): Promise<GlobalGPAAnalyt
   } catch (err) {
     console.warn('[LocalGPA] Error calculating GPA locally:', err);
     return { currentAverage: 0, projectedGrade: 0, delta: 0, evaluatedWeight: 0, remainingWeight: 100, assessmentCount: 0, subjectCount: 0 };
+  } finally {
+    const _totalTime = performance.now() - _t0;
+    if (_totalTime > 100) {
+      console.log(`[LocalGPATiming] TOTAL: ${_totalTime.toFixed(0)}ms`);
+    }
   }
 }
 

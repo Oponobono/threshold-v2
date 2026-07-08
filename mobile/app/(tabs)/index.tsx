@@ -30,6 +30,7 @@ import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal
 import { FlashcardsModal } from '../../src/components/flashcards/FlashcardsModal';
 import { SubjectTile, MetricCard, ActionCircle } from '../../src/components/dashboard/DashboardWidgets';
 import { KnowledgeHealthCard } from '../../src/components/dashboard/KnowledgeHealthCard';
+import { DailyReviewCard } from '../../src/components/dashboard/DailyReviewCard';
 import { useKnowledgeInsights } from '../../src/hooks/useKnowledgeInsights';
 import { GroupPerformanceLeaderboard } from '../../src/components/dashboard/GroupPerformanceLeaderboard';
 import { CourseHeroCard, AllSubjectsHeroCard, HERO_CARD_WIDTH } from '../../src/components/dashboard/CourseHeroCard';
@@ -47,6 +48,7 @@ const SUBJECT_LOOP_THRESHOLD = 4;
 const SUBJECT_LOOP_MULTIPLIER = 16;
 const SUBJECT_CARD_WIDTH = 160;
 const SUBJECT_CARD_GAP = 12;
+
 
 export default function HybridDashboardScreen() {
   const { t } = useTranslation();
@@ -170,7 +172,9 @@ export default function HybridDashboardScreen() {
       const currentGpa = useDataStore.getState().overallGpa;
       if (currentGpa != null) setOverallGpa(currentGpa);
 
-      preloadRelatedData().catch(err => console.warn('[Dashboard] Error preloading:', err));
+      setTimeout(() => {
+        preloadRelatedData().catch(err => console.warn('[Dashboard] Error preloading:', err));
+      }, 3000);
     } catch (err) {
       console.warn('Error loading dashboard data:', err);
     }
@@ -536,6 +540,14 @@ export default function HybridDashboardScreen() {
     return todaySchedules.find((s: any) => s.end_time >= currentTime) || null;
   }, [todaySchedules]);
 
+  const subjectNamesMap = useMemo<Record<number, string>>(() => {
+    const map: Record<number, string> = {};
+    for (const s of subjects) {
+      map[Number(s.id)] = s.name;
+    }
+    return map;
+  }, [subjects]);
+
   return (
     <>
       <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
@@ -848,45 +860,11 @@ export default function HybridDashboardScreen() {
             </View>
           ) : null}
 
-          {predictions && predictions.dueCount > 0 && !snoozeManager.isCardSnoozed('due_cards_alert') ? (
-            <View style={{ marginTop: 24 }}>
-              <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
-                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t('dashboard.urgentReviews')}</Text>
-                <View style={globalStyles.rowBetweenCenter}>
-                  <TouchableOpacity
-                    style={[styles.snoozeBtn, { marginRight: 10 }]}
-                    onPress={() => setIsSnoozeModalVisible(true)}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialCommunityIcons name="pause-circle" size={18} color={theme.colors.warning} />
-                  </TouchableOpacity>
-                  <View style={[styles.allChip, { backgroundColor: theme.colors.dangerTransparent, borderWidth: 1, borderColor: theme.colors.danger + '20', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                    <Text style={[styles.allChipText, { color: theme.colors.danger, fontWeight: '800' }]}>{predictions.dueCount}</Text>
-                    <Text style={[styles.allChipText, { color: theme.colors.danger, fontWeight: '500', fontSize: 10 }]}>{t('dashboard.decks')}</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={[styles.nextClassCard, { gap: 12 }]}>
-                <View style={[styles.nextClassBadge, { backgroundColor: theme.colors.dangerTransparent, flexShrink: 0 }]}>
-                  <MaterialCommunityIcons name="brain" size={24} color={theme.colors.danger} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.nextClassTitle} numberOfLines={1}>{t('dashboard.attentionRequired')}</Text>
-                  <Text style={styles.nextClassRoom} numberOfLines={1}>
-                    {predictions.dueCount === 1
-                      ? t('dashboard.deckToReview')
-                      : t('dashboard.decksToReview', { count: predictions.dueCount })}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.openBtn, { borderColor: theme.colors.danger + '30', flexShrink: 0 }]}
-                  onPress={() => setIsFlashcardsVisible(true)}
-                >
-                  <Text style={[styles.openBtnText, { color: theme.colors.danger }]}>{t('dashboard.reviewBtn')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : null}
+          <DailyReviewCard
+            cards={predictions?.cards ?? []}
+            subjectNames={subjectNamesMap}
+            onStart={() => setIsFlashcardsVisible(true)}
+          />
         </View>
 
         {/* 4. ORIGINAL METRICS (2x2) */}

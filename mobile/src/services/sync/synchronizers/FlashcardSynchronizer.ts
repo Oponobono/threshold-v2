@@ -1,11 +1,11 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
+import { flashcardDeckRepository } from '../../database/repositories/FlashcardDeckRepository';
+import { flashcardRepository } from '../../database/repositories/FlashcardRepository';
 
 export class FlashcardSynchronizer implements EntitySynchronizer {
   readonly entityType = 'flashcards';
 
   async saveAll(items: any[]): Promise<number> {
-    const { flashcardDeckRepository } = await import('../../database/repositories/FlashcardDeckRepository');
-    const { flashcardRepository } = await import('../../database/repositories/FlashcardRepository');
     let count = 0;
     for (const item of items) {
       if (item.deck) {
@@ -23,7 +23,6 @@ export class FlashcardSynchronizer implements EntitySynchronizer {
   }
 
   async deleteItem(id: string): Promise<void> {
-    const { flashcardRepository } = await import('../../database/repositories/FlashcardRepository');
     await flashcardRepository.delete(id);
   }
 }

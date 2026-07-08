@@ -89,7 +89,6 @@ describe('KnowledgeSnapshotBuilder — Confidence', () => {
     agg.totalCards = 10;
     const snapshot = new KnowledgeSnapshotBuilder(agg).build();
     expect(snapshot.health.confidence).toBe(0.3);
-    expect(snapshot.metadata.confidence).toBe(0.3);
   });
 
   test('confidence = 0.6 for < 100 cards', () => {
@@ -218,7 +217,7 @@ describe('KnowledgeSnapshotBuilder — Determinism', () => {
     expect(a.health.memoryLevel).toBe(b.health.memoryLevel);
     expect(a.subjects[0].retrievability).toBe(b.subjects[0].retrievability);
     expect(a.subjects[1].memoryState).toBe(b.subjects[1].memoryState);
-    expect(a.metadata.confidence).toBe(b.metadata.confidence);
+    expect(a.health.confidence).toBe(b.health.confidence);
   });
 });
 

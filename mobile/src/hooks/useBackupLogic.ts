@@ -5,6 +5,8 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { syncManager } from '../services/sync/SyncManager';
+import { useDataStore } from '../store/useDataStore';
 import {
   getBackupPreferences,
   saveBackupPreferences,
@@ -259,10 +261,8 @@ export const useBackupLogic = () => {
       // 1. Descargar Datos (JSON desde Supabase via sync initial)
       if (type === 'datos' || type === 'ambos') {
         setDownloadProgress({ total: 1, done: 0, current: 'Conectando con el servidor...', errors: 0, skipped: 0 });
-        const { syncManager } = await import('../services/sync/SyncManager');
         const syncResult = await syncManager.requestInitialSync(true);
         setDownloadProgress({ total: 1, done: 1, current: 'Guardando datos localmente...', errors: syncResult.errors.length, skipped: 0 });
-        const { useDataStore } = await import('../store/useDataStore');
         await useDataStore.getState().loadAllData(true);
         const entitiesMsg = syncResult.entitiesSynced > 0
           ? `${syncResult.entitiesSynced} registros descargados.`

@@ -1,0 +1,30 @@
+{
+  "state": {
+    "excellent": "Excellent",
+    "good": "Good",
+    "recovering": "Regular",
+    "critical": "Weak"
+  },
+  "maturity": {
+    "starting": "Good starting point",
+    "consolidating": "Consolidating knowledge",
+    "consolidated": "Consolidated knowledge",
+    "maintenance": "Needs review to maintain consolidation",
+    "recovering": "Recovering consolidated knowledge"
+  },
+  "risk": {
+    "stable": "Your knowledge is stable.",
+    "warning": "If you don't study today, approximately {{atRisk}}% of your consolidated knowledge will begin to deteriorate."
+  },
+  "labels": {
+    "title": "Learning Status",
+    "generalState": "General state of your learning",
+    "atRiskToday": "At risk today",
+    "confidence": "Confidence",
+    "consolidated": "Consolidated",
+    "todayPriority": "Today's priority",
+    "mostSolid": "Most solid",
+    "evaluatedOn": "Evaluated on {{cards}} cards · {{subjects}} subjects",
+    "pending": "pending"
+  }
+}

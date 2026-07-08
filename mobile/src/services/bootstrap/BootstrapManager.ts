@@ -15,6 +15,22 @@ export interface BootstrapState {
   timestamp: number;
 }
 
+import { databaseService } from '../database/DatabaseService';
+import { migrateFlashcardsFromMMKV } from '../migration/migrateFlashcardsFromMMKV';
+import { networkManager } from '../network/NetworkManager';
+import { useConnectivityStore } from '../../store/useConnectivityStore';
+import { initializeApiClient, fetchWithFallback } from '../api/client';
+import { userRepository } from '../database/repositories/UserRepository';
+import { getCurrentUserProfile, getUserId } from '../api/auth';
+import { KnowledgeProjection } from '../../domain/knowledge/KnowledgeProjection';
+import { SnapshotBuildReason } from '../../domain/knowledge/SnapshotTelemetryTypes';
+import { syncManager } from '../sync/SyncManager';
+// Note: syncService is dynamically imported in _registerSyncHandlers to avoid
+// circular dependency: BootstrapManager → useDataStore → barrel → CourseRepository → SyncService
+import { MomentumService } from '../MomentumService';
+import { useDataStore } from '../../store/useDataStore';
+import { flashcardDeckRepository } from '../database/repositories/FlashcardDeckRepository';
+
 type BootstrapListener = (state: BootstrapState) => void;
 
 class BootstrapManager {
@@ -79,24 +95,19 @@ class BootstrapManager {
 
     try {
       await this._runPhase('DATABASE', async () => {
-        console.log('[BOOT 07] PHASE DATABASE: importing DatabaseService...');
-        const { databaseService } = await import('../database/DatabaseService');
-        console.log('[BOOT 07a] DatabaseService imported, calling open()...');
+        console.log('[BOOT 07] PHASE DATABASE: opening...');
         await databaseService.open();
         console.log('[BOOT 08] Database ready');
       });
 
       await this._runPhase('STORAGE', async () => {
         console.log('[BOOT 09] PHASE STORAGE: migrating MMKV...');
-        const { migrateFlashcardsFromMMKV } = await import('../migration/migrateFlashcardsFromMMKV');
         await migrateFlashcardsFromMMKV();
         console.log('[BOOT 09z] Storage ready');
       });
 
       await this._runPhase('NETWORK', async () => {
         console.log('[BOOT 10] PHASE NETWORK: initializing...');
-        const { networkManager } = await import('../network/NetworkManager');
-        const { useConnectivityStore } = await import('../../store/useConnectivityStore');
         networkManager.subscribe((state) => {
           useConnectivityStore.getState().setNetworkState({
             isOnline: state.isOnline,
@@ -109,7 +120,6 @@ class BootstrapManager {
         networkManager.start();
 
         // Fire-and-forget: no bloqueamos el bootstrap esperando el backend
-        const { initializeApiClient } = await import('../api/client');
         initializeApiClient().then(() => {
           console.log('[BOOT 10z] Network initialized (async)');
         }).catch((err: any) => {
@@ -122,7 +132,6 @@ class BootstrapManager {
         console.log('[BOOT 11] PHASE AUTH...');
 
         // Caso 1: Cargar perfil desde SQLite (local, rápido, sin red)
-        const { userRepository } = await import('../database/repositories/UserRepository');
         let localProfileExists = false;
         try {
           localProfileExists = !!(await userRepository.getCurrentUser());
@@ -134,7 +143,6 @@ class BootstrapManager {
         }
 
         // Caso 2: Refrescar/cargar perfil remoto en background (fire-and-forget)
-        const { getCurrentUserProfile } = await import('../api/auth');
         getCurrentUserProfile().then(async (profile) => {
           if (profile) {
             await userRepository.saveProfile(profile);
@@ -155,16 +163,14 @@ class BootstrapManager {
 
       await this._runPhase('SYNC', async () => {
         console.log('[BOOT 12] PHASE SYNC: login...');
-        const { syncManager } = await import('../sync/SyncManager');
+
+        // Dynamic import to break circular dependency:
+        // BootstrapManager → useDataStore → barrel → CourseRepository → SyncService
         const { syncService } = await import('../database/SyncService');
-        const { databaseService } = await import('../database/DatabaseService');
-        const { fetchWithFallback } = await import('../api/client');
-        const { getUserId } = await import('../api/auth');
+        this._registerSyncHandlers(syncService);
 
         // Fire-and-forget: login y sync se ejecutan en background
         // SyncManager es el único punto de entrada para sync
-        this._registerSyncHandlers(syncService, databaseService, fetchWithFallback, getUserId);
-
         syncManager.login().then(() => {
           console.log('[BOOT 12a] Sync login completed (async)');
           syncService.getPendingCount().then(pendingCount => {
@@ -179,18 +185,12 @@ class BootstrapManager {
           console.warn('[BOOT 12a] Sync login failed (non-blocking):', err?.message);
         });
 
-        const { MomentumService } = await import('../MomentumService');
-        MomentumService.updateAllMomentumScores().catch(err =>
-          console.warn('[BOOT 12g] Momentum recalculation error:', err)
-        );
-
         console.log('[BOOT 12z] Sync dispatched (non-blocking)');
       });
 
       await this._runPhase('READY', async () => {
         console.log('[BOOT 13] PHASE READY: loading DataStore...');
         try {
-          const { useDataStore } = await import('../../store/useDataStore');
           const t0 = performance.now();
           await useDataStore.getState().loadAllData();
           console.log(`[BOOT 13b] loadAllData: ${(performance.now() - t0).toFixed(1)} ms`);
@@ -200,10 +200,20 @@ class BootstrapManager {
         console.log('[BOOT 14] App ready');
       });
 
+      // Fire-and-forget: MomentumService no debe competir con queries del bootstrap
+      MomentumService.updateAllMomentumScores().catch(err =>
+        console.warn('[BOOT 14a] Momentum recalculation error:', err)
+      );
+
       this._started = true;
       this._status = 'done';
       this._emit();
       console.log('[BOOT 15] BootstrapManager.start() completed successfully');
+
+      // Start idle benchmark after system settles (dev only)
+      if (__DEV__) {
+        setTimeout(() => this._runIdleBenchmark(), 8000);
+      }
     } catch (err: any) {
       this._status = 'error';
       this._error = err.message || 'Bootstrap failed';
@@ -213,12 +223,47 @@ class BootstrapManager {
     }
   }
 
-  private _registerSyncHandlers(
-    syncService: any,
-    databaseService: any,
-    fetchWithFallback: any,
-    getUserId: any,
-  ): void {
+  private async _runIdleBenchmark(): Promise<void> {
+    try {
+      const userId = await getUserId();
+      if (!userId) {
+        console.log('[IdleBenchmark] No user ID, skipping');
+        return;
+      }
+
+      const projection = new KnowledgeProjection();
+      const results: number[] = [];
+
+      for (let i = 1; i <= 3; i++) {
+        if (i > 1) await new Promise(r => setTimeout(r, 1000));
+        const t0 = performance.now();
+        await projection.buildSnapshot(userId, 'MANUAL_REFRESH' as SnapshotBuildReason);
+        const ms = performance.now() - t0;
+        results.push(ms);
+        console.log(`[IdleBenchmark] Snapshot #${i}: ${ms.toFixed(1)} ms`);
+      }
+
+      const avg = results.reduce((a, b) => a + b, 0) / results.length;
+      const min = Math.min(...results);
+      const max = Math.max(...results);
+      console.log('[IdleBenchmark] ╔═══════════════════════════════════════╗');
+      console.log('[IdleBenchmark] ║  Isolated Snapshot Benchmark         ║');
+      console.log('[IdleBenchmark] ╚═══════════════════════════════════════╝');
+      console.log(`[IdleBenchmark]   Snapshots: ${results.length}`);
+      console.log(`[IdleBenchmark]   #1: ${results[0].toFixed(1)} ms`);
+      console.log(`[IdleBenchmark]   #2: ${results[1].toFixed(1)} ms`);
+      console.log(`[IdleBenchmark]   #3: ${results[2].toFixed(1)} ms`);
+      console.log(`[IdleBenchmark]   ─────────────────────────────`);
+      console.log(`[IdleBenchmark]   Average: ${avg.toFixed(1)} ms`);
+      console.log(`[IdleBenchmark]   Min:     ${min.toFixed(1)} ms`);
+      console.log(`[IdleBenchmark]   Max:     ${max.toFixed(1)} ms`);
+      console.log(`[IdleBenchmark]   Range:   ${(max - min).toFixed(1)} ms`);
+    } catch (err) {
+      console.warn('[IdleBenchmark] Error:', err);
+    }
+  }
+
+  private _registerSyncHandlers(syncService: any): void {
     syncService.onSync(async ({ entity_type, entity_id, operation, payload }: any) => {
       let path = `/${entity_type}s`;
       if (entity_type === 'course') path = '/courses';
@@ -337,8 +382,7 @@ class BootstrapManager {
         try {
           const body = await response.json().catch(() => null);
           if (body?.id) {
-            const { flashcardDeckRepository } = await import('../database/repositories/FlashcardDeckRepository');
-            await flashcardDeckRepository.upsert({
+              await flashcardDeckRepository.upsert({
               id: body.id,
               user_id: body.user_id || payload?.user_id || '',
               title: body.title || payload?.title || '',

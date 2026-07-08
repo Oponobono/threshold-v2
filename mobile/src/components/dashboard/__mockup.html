@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Dashboard Cards — Estado Actual</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #0E0E18;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+  }
+  .container {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ===== Card base ===== */
+  .card {
+    background: #161622;
+    border-radius: 16px;
+    padding: 18px;
+    border: 1px solid #2A2A3A;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  /* ===== Estado de Aprendizaje ===== */
+  .knowledge-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .knowledge-header svg { flex-shrink: 0; }
+  .knowledge-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: -0.3px;
+  }
+  .score-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .score-value {
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: #30D158;
+  }
+  .score-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #30D158;
+  }
+  .bar-track {
+    height: 8px;
+    background: #2A2A3A;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: #30D158;
+    width: 84%;
+  }
+  .confidence-text {
+    font-size: 11px;
+    color: #8E8E9A;
+    font-weight: 500;
+  }
+  .divider {
+    height: 1px;
+    background: #2A2A3A;
+    margin: 12px 0;
+  }
+  .risk-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .risk-row svg { flex-shrink: 0; margin-top: 1px; }
+  .risk-text-col { flex: 1; }
+  .risk-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #34C759;
+    margin-bottom: 2px;
+  }
+  .risk-detail {
+    font-size: 11px;
+    color: #8E8E9A;
+    line-height: 17px;
+  }
+  .meta-row {
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+  }
+  .meta-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+  .meta-label {
+    font-size: 11px;
+    color: #8E8E9A;
+    margin-top: 2px;
+  }
+
+  /* ===== Repasos urgentes ===== */
+  .urgent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .urgent-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: -0.3px;
+  }
+  .urgent-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .snooze-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #161622;
+    border: 1px solid #2A2A3A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+  }
+  .chip {
+    background: rgba(255,45,85,0.08);
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,45,85,0.12);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .chip-count {
+    color: #FF2D55;
+    font-weight: 800;
+    font-size: 12px;
+  }
+  .chip-label {
+    color: #FF2D55;
+    font-weight: 500;
+    font-size: 10px;
+  }
+  .urgent-card {
+    display: flex;
+    align-items: center;
+    background: #161622;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid #2A2A3A;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .urgent-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: rgba(255,45,85,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .urgent-body { flex: 1; }
+  .urgent-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #FFFFFF;
+  }
+  .urgent-card-subtext {
+    font-size: 13px;
+    color: #8E8E9A;
+    margin-top: 3px;
+  }
+  .review-btn {
+    background: #1C1C2E;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,45,85,0.2);
+    flex-shrink: 0;
+  }
+  .review-btn-text {
+    color: #FF2D55;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  /* ===== Labels ===== */
+  .layer-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #5E5E6E;
+    margin-bottom: 8px;
+  }
+  .layer-cognitive { color: #30D158; }
+  .layer-operational { color: #FF9500; }
+
+  /* ===== Layout sections ===== */
+  .section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (prefers-color-scheme: light) {
+    body { background: #F2F2F7; }
+    .card, .urgent-card, .snooze-btn { background: #FFFFFF; border-color: #E0E0E5; }
+    .knowledge-title, .urgent-title, .score-value, .meta-value, .urgent-card-title { color: #1C1C1E; }
+    .bar-track { background: #E8E8ED; }
+    .divider { background: #E0E0E5; }
+    .confidence-text, .risk-detail, .meta-label, .urgent-card-subtext { color: #8E8E93; }
+    .review-btn { background: #F2F2F7; }
+    .chip { background: rgba(255,45,85,0.08); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- CAPA COGNITIVA -->
+  <div class="section">
+    <div class="layer-label layer-cognitive">🧠 Capa cognitiva — Estado</div>
+    <div class="card">
+      <div class="knowledge-header">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E5CE6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4a4 4 0 0 1 4 4c0 2-1 3-4 4-3-1-4-2-4-4a4 4 0 0 1 4-4z"/>
+          <path d="M12 12v8"/>
+          <path d="M8 16h8"/>
+        </svg>
+        <span class="knowledge-title">Estado de Aprendizaje</span>
+      </div>
+
+      <div class="score-row">
+        <span class="score-value">84%</span>
+        <span class="score-label">Excelente memoria</span>
+      </div>
+
+      <div class="bar-track">
+        <div class="bar-fill" style="width:84%"></div>
+      </div>
+
+      <div class="confidence-text">Confianza: 96%</div>
+
+      <div class="divider"></div>
+
+      <div class="risk-row">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+        <div class="risk-text-col">
+          <div class="risk-label">Riesgo de olvido: Bajo</div>
+          <div class="risk-detail">18% del conocimiento consolidado<br>entrará en zona de olvido si hoy no estudias.</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="meta-row">
+        <div>
+          <div class="meta-value">1,248</div>
+          <div class="meta-label">Tarjetas</div>
+        </div>
+        <div>
+          <div class="meta-value">6</div>
+          <div class="meta-label">Materias</div>
+        </div>
+        <div>
+          <div class="meta-value">segundos</div>
+          <div class="meta-label">Actualizado</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAPA OPERATIVA -->
+  <div class="section">
+    <div class="layer-label layer-operational">⚡ Capa operativa — Acción</div>
+    <div>
+      <div class="urgent-header">
+        <span class="urgent-title">Repasos urgentes</span>
+        <div class="urgent-header-right">
+          <div class="snooze-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="chip">
+            <span class="chip-count">5</span>
+            <span class="chip-label">decks</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="urgent-card">
+        <div class="urgent-badge">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF2D55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 4a4 4 0 0 1 4 4c0 2-1 3-4 4-3-1-4-2-4-4a4 4 0 0 1 4-4z"/>
+            <path d="M12 12v8"/>
+            <path d="M8 16h8"/>
+          </svg>
+        </div>
+        <div class="urgent-body">
+          <div class="urgent-card-title">¡Atención!</div>
+          <div class="urgent-card-subtext">5 decks para repasar</div>
+        </div>
+        <div class="review-btn">
+          <span class="review-btn-text">Repasar</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,7 +1,11 @@
 import { fetchWithFallback, parseJsonSafely, activeBaseUrl } from './client';
 import { storageService } from '../storageService';
 import { syncService } from '../database';
-import { getLocalGlobalGPA } from '../localMasteryService';
+import { getLocalGlobalGPA, getLocalPredictions, getLocalDeckStats, getLocalProgressTrends, getLocalMasteryData, getLocalSemesterSummary } from '../localMasteryService';
+import { flashcardRepository } from '../database/repositories/FlashcardRepository';
+import { queuePendingReview } from '../localFlashcardService';
+import { ExamSchedulerService } from '../ExamSchedulerService';
+import { getUserId } from './auth';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -44,7 +48,6 @@ export interface CardReviewResponse {
 export const getPredictions = async (userId: string | number): Promise<PredictionResponse> => {
   // 1. Calcular localmente (SQLite + MMKV)
   try {
-    const { getLocalPredictions } = await import('../localMasteryService');
     const localData = await getLocalPredictions(String(userId));
     if (localData.cards.length > 0) {
       return localData;
@@ -95,10 +98,8 @@ export const recordCardReview = async (
 ): Promise<CardReviewResponse> => {
   try {
     // Check if card is local-only (exists in MMKV but not SQLite) by trying the repository first
-    const { flashcardRepository } = await import('../database/repositories/FlashcardRepository');
     const sqliteCard = await flashcardRepository.getById(cardId);
     if (!sqliteCard) {
-      const { queuePendingReview } = await import('../localFlashcardService');
       await queuePendingReview({
         cardId,
         grade: result === 'correct' ? 4 : 1,
@@ -153,7 +154,6 @@ export const recordCardReview = async (
 async function getCompressedInterval(subjectId: string | number | null | undefined, baseMs: number): Promise<number> {
   if (subjectId == null) return baseMs;
   try {
-    const { ExamSchedulerService } = await import('../ExamSchedulerService');
     return ExamSchedulerService.compressInterval(null, baseMs, subjectId);
   } catch {
     return baseMs;
@@ -310,7 +310,6 @@ export const getUserStats = async (userId: number): Promise<UserStats> => {
  */
 export const getDeckStats = async (deckId: number, userId: number): Promise<DeckStats> => {
   try {
-    const { getLocalDeckStats } = await import('../localMasteryService');
     const localData = await getLocalDeckStats(deckId, userId);
     if (localData && localData.total_cards > 0) {
       return localData as DeckStats;
@@ -335,7 +334,6 @@ export const getDeckStats = async (deckId: number, userId: number): Promise<Deck
  */
 export const getProgressTrends = async (userId: number, days?: number): Promise<ProgressTrends> => {
   try {
-    const { getLocalProgressTrends } = await import('../localMasteryService');
     const localData = await getLocalProgressTrends(userId, days || 30);
     if (localData && localData.daily_mastery.length > 0) {
       return localData as ProgressTrends;
@@ -388,7 +386,6 @@ export interface SemesterSummary {
  * GET /api/analytics/semester-summary/:userId
  */
 export const getSemesterSummary = async (): Promise<SemesterSummary> => {
-  const { getUserId } = await import('./auth');
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');
 
@@ -407,7 +404,6 @@ export const getSemesterSummary = async (): Promise<SemesterSummary> => {
     console.warn('[Analytics] Network error, falling back to cached semester summary:', error);
     
     try {
-      const { getLocalSemesterSummary } = await import('../localMasteryService');
       const localData = await getLocalSemesterSummary(String(userId));
       console.log('[Analytics] ✅ Loaded semester summary from local calculation (offline mode)');
       return localData as SemesterSummary;
@@ -446,7 +442,6 @@ export const getMasteryAnalytics = async (userId: string, subjectId: string | 'a
 
   // 1. Calcular localmente (SQLite card_logs + MMKV pending reviews)
   try {
-    const { getLocalMasteryData } = await import('../localMasteryService');
     const localData = await getLocalMasteryData(userId, subjectId);
     if (localData.radar.length > 0) {
       await storageService.saveLocal(CACHE_KEY, JSON.stringify(localData));
@@ -493,7 +488,6 @@ export const getMasteryAnalytics = async (userId: string, subjectId: string | 'a
  * Offline-first: calcula localmente desde SQLite assessments, API como fallback
  */
 export const getGlobalGPAAnalytics = async (): Promise<GlobalGPAAnalytics> => {
-  const { getUserId } = await import('./auth');
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');
 

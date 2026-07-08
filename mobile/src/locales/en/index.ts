@@ -27,6 +27,7 @@ import integrations from './integrations.json';
 import assessments from './assessments.json';
 import categories from './categories.json';
 import tasks from './tasks.json';
+import knowledge from './knowledge.json';
 
 const en = {
   about,
@@ -58,6 +59,7 @@ const en = {
   assessments,
   categories,
   tasks,
+  knowledge,
 };
 
 export default en;

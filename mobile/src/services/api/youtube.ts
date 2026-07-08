@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { YouTubeVideo } from './types';
 import { youTubeRepository, youTubeTranscriptRepository, syncService } from '../database';
+import { uuidv4 } from '../../utils/uuid';
 
 export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
   const userId = await getUserId();
@@ -41,7 +42,6 @@ export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
 };
 
 export const createYouTubeVideo = async (payload: { subject_id?: string | null; youtube_url: string; video_id?: string; title?: string; thumbnail_url?: string; duration?: number; id?: string }): Promise<any> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');
@@ -138,7 +138,6 @@ export const upsertYouTubeTranscript = async (payload: { video_id: string; trans
     if (!response.ok) throw new Error(data?.error || 'Error del servidor');
     return data;
   } catch {
-    const { uuidv4 } = await import('../../utils/uuid');
     const id = uuidv4();
     await syncService.enqueueCreate('youtube-transcript', id, payload);
     return { id, ...payload, _isPending: true };

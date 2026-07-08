@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from '../client';
 import { getUserId } from '../auth';
 import { studySessionRepository, syncService } from '../../database';
 import type { StudySession } from '../types';
+import { uuidv4 } from '../../../utils/uuid';
 
 export type { StudySession };
 
@@ -29,7 +30,6 @@ export const getStudySessions = async (): Promise<StudySession[]> => {
 };
 
 export const createStudySession = async (sessionData: Omit<StudySession, 'id' | 'start_timestamp' | 'user_id'>): Promise<any> => {
-  const { uuidv4 } = await import('../../../utils/uuid');
   const id = uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');

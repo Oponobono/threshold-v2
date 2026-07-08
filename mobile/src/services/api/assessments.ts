@@ -3,6 +3,8 @@ import { getUserId } from './auth';
 import { Assessment } from './types';
 import { assessmentRepository, syncService } from '../database';
 import { requireActiveSubject } from '../domain/invariants';
+import { uuidv4 } from '../../utils/uuid';
+import { calculateProjection } from '../../utils/projectionEngine';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -67,7 +69,6 @@ export const getAllAssessments = async (): Promise<Assessment[]> => {
 };
 
 export const createAssessment = async (payload: Assessment): Promise<Assessment> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
 
   if (payload.subject_id) {
@@ -147,7 +148,6 @@ export const getProjectionAnalytics = async (subjectId: string) => {
       const localAssessments = await assessmentRepository.getBySubject(subjectId) as Assessment[];
       if (!localAssessments || localAssessments.length === 0) return null;
 
-      const { calculateProjection } = await import('../../utils/projectionEngine');
       const result = calculateProjection(localAssessments, null, null);
 
       const gradedCount = localAssessments.filter(

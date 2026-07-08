@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { calendarEventRepository, syncService } from '../database';
+import { uuidv4 } from '../../utils/uuid';
 
 export interface CalendarEventData {
   title: string;
@@ -39,7 +40,6 @@ const normalizeEventForLocal = (e: any, fallbackUserId?: string): any => ({
 });
 
 export const createCalendarEvent = async (event: CalendarEventData): Promise<CalendarEvent> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('No hay sesión activa.');

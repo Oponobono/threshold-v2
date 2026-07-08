@@ -35,7 +35,7 @@ export class KnowledgeProjection implements KnowledgeProvider {
     ctx.phaseTiming.repositoryReadMs = Date.now() - readStart;
 
     const aggStart = Date.now();
-    const aggregation = await getKnowledgeAggregation(db, userId);
+    const aggregation = await getKnowledgeAggregation(userId);
     ctx.phaseTiming.aggregationMs = Date.now() - aggStart;
 
     const buildStart = Date.now();
@@ -54,4 +54,12 @@ export class KnowledgeProjection implements KnowledgeProvider {
 
     return snapshot;
   }
+}
+
+// Dev-only: global trigger for post-sync measurement from console
+if (__DEV__) {
+  (globalThis as any).__triggerKnowledgeSnapshot = async (userId: string) => {
+    const projection = new KnowledgeProjection();
+    return projection.buildSnapshot(userId, SnapshotBuildReason.MANUAL_REFRESH);
+  };
 }

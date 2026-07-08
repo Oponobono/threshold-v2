@@ -1,5 +1,7 @@
 import { databaseService } from './database/DatabaseService';
-import { courseRepository } from './database/repositories/CourseRepository';
+// Dynamic import for courseRepository to avoid circular dependency:
+// CourseRepository → MomentumService → CourseRepository
+const getCourseRepository = () => import('./database/repositories/CourseRepository').then(m => m.courseRepository);
 
 export class MomentumService {
   /**
@@ -35,21 +37,22 @@ export class MomentumService {
    */
   static async updateAllMomentumScores(): Promise<void> {
     try {
-      const db = databaseService.getDb();
-      if (!db) return;
-
-      const courses = await courseRepository.getAll();
+      const courses = await databaseService.getAllTracked<any>(
+        `SELECT * FROM courses WHERE deleted_at IS NULL`,
+        undefined,
+        'MomentumService.getAll'
+      );
       if (!courses || courses.length === 0) return;
 
       for (const course of courses) {
         const currentScore = course.momentum_score ?? 1.0;
         const newScore = this.calculateNewMomentum(currentScore, course.last_studied_at || null);
 
-        // Si el score cambió significativamente, hacemos el UPDATE
         if (Math.abs(currentScore - newScore) > 0.01) {
-          await db.runAsync(
+          await databaseService.runTracked(
             `UPDATE courses SET momentum_score = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-            [newScore, course.id]
+            [newScore, course.id],
+            'MomentumService.update'
           );
         }
       }
@@ -68,7 +71,8 @@ export class MomentumService {
       const db = databaseService.getDb();
       if (!db) return;
 
-      const course = await courseRepository.getById(courseId);
+      const courseRepo = await getCourseRepository();
+      const course = await courseRepo.getById(courseId);
       if (!course) return;
 
       // El boost suma un 15% al momentum actual, con un tope de 1.0 (100%)

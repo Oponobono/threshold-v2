@@ -4,6 +4,7 @@ import { getActiveReviewPolicy } from './ReviewSchedulingPolicy';
 import { ReviewInput, ReviewQuality } from './types';
 import { flashcardRepository, syncService, cardLogRepository } from '../../services/database';
 import { getUserId } from '../../services/api/auth/session';
+import { uuidv4 } from '../../utils/uuid';
 
 export interface CardForReview {
   id: string;
@@ -82,7 +83,6 @@ export class FlashcardDomainService {
     await flashcardRepository.update(String(card.id), updatedFields as any);
     await syncService.enqueueUpdate('flashcard', String(card.id), updatedFields);
 
-    const { uuidv4 } = await import('../../utils/uuid');
     const logId = uuidv4();
     const wordCount = (card.front || '').trim().split(/\s+/).filter(Boolean).length || 20;
 

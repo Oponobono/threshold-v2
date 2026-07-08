@@ -2,6 +2,7 @@ import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import { scheduleRepository, syncService } from '../database';
 import { requireActiveSubject } from '../domain/invariants';
+import { uuidv4 } from '../../utils/uuid';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -49,7 +50,6 @@ export const getTodaySchedules = async (): Promise<any[]> => {
 };
 
 export const createSchedule = async (payload: { subject_id: string; day_of_week: number; start_time: string; end_time: string }) => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const userId = await getUserIdNumber();
   const id = (payload as any).id || uuidv4();
 

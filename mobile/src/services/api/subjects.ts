@@ -4,6 +4,8 @@ import type { Subject } from './types';
 import { subjectRepository, syncService } from '../database';
 import { storageService } from '../storageService';
 import { deleteSubject as domainDeleteSubject } from '../domain/SubjectDomainService';
+import { uuidv4 } from '../../utils/uuid';
+import { courseRepository } from '../database/repositories/CourseRepository';
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -152,7 +154,6 @@ export const createSubject = async (payload: {
   course_id?: string | null;
 }): Promise<Subject> => {
   const userId = await getUserIdNumber();
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = payload.id || uuidv4();
 
   const subject: Subject = {
@@ -196,7 +197,6 @@ export const createSubject = async (payload: {
 export const updateCourseCounters = async (courseId: string | null | undefined): Promise<void> => {
   if (!courseId) return;
   try {
-    const { courseRepository } = await import('../database/repositories/CourseRepository');
     const linked = await subjectRepository.getByField('course_id', courseId);
     const total = linked.reduce((sum, s) => sum + ((s as any).total_lessons ?? 0), 0);
     const completed = linked.reduce((sum, s) => sum + ((s as any).completed_lessons ?? 0), 0);
@@ -286,7 +286,6 @@ export const deleteSubject = async (subjectId: string) => {
  */
 export const repairSubjectCourseLinks = async (): Promise<void> => {
   try {
-    const { courseRepository } = await import('../database/repositories/CourseRepository');
     const subjects = await subjectRepository.getAll();
     const courses = await courseRepository.getAll();
     const courseIds = new Set(courses.map(c => c.id));

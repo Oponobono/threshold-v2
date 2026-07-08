@@ -1,0 +1,30 @@
+{
+  "state": {
+    "excellent": "Excelente",
+    "good": "Bueno",
+    "recovering": "Regular",
+    "critical": "Débil"
+  },
+  "maturity": {
+    "starting": "Buen punto de partida",
+    "consolidating": "Conocimiento en consolidación",
+    "consolidated": "Conocimiento consolidado",
+    "maintenance": "Necesita repaso para mantener la consolidación",
+    "recovering": "Recuperando conocimiento consolidado"
+  },
+  "risk": {
+    "stable": "Tu conocimiento está estable.",
+    "warning": "Si hoy no estudias, aproximadamente el {{atRisk}}% del conocimiento consolidado comenzará a deteriorarse."
+  },
+  "labels": {
+    "title": "Estado de Aprendizaje",
+    "generalState": "Estado general de tu aprendizaje",
+    "atRiskToday": "En riesgo hoy",
+    "confidence": "Confianza",
+    "consolidated": "Consolidado",
+    "todayPriority": "Prioridad de hoy",
+    "mostSolid": "Más sólida",
+    "evaluatedOn": "Evaluado sobre {{cards}} tarjetas · {{subjects}} materias",
+    "pending": "pendientes"
+  }
+}

@@ -1,14 +1,14 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
+import { BaseRepository } from '../../database/BaseRepository';
 
 export class DocumentSynchronizer implements EntitySynchronizer {
   readonly entityType = 'scanned_documents';
+  private repo = new BaseRepository('scanned_documents');
 
   async saveAll(items: any[]): Promise<number> {
-    const { BaseRepository } = await import('../../database/BaseRepository');
-    const repo = new BaseRepository('scanned_documents');
     let count = 0;
     for (const item of items) {
-      await repo.upsert({
+      await this.repo.upsert({
         ...item,
         asset_state: item.asset_state || 'NOT_DOWNLOADED',
       });
@@ -18,8 +18,6 @@ export class DocumentSynchronizer implements EntitySynchronizer {
   }
 
   async deleteItem(id: string): Promise<void> {
-    const { BaseRepository } = await import('../../database/BaseRepository');
-    const repo = new BaseRepository('scanned_documents');
-    await repo.upsert({ id, deleted_at: new Date().toISOString() } as any);
+    await this.repo.upsert({ id, deleted_at: new Date().toISOString() } as any);
   }
 }

@@ -1,5 +1,6 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { syncService } from '../database';
+import { uuidv4 } from '../../utils/uuid';
 
 export interface GradingPeriod {
   id: string;
@@ -86,7 +87,6 @@ async function _refreshGradingPeriods(repo: any, cache: { set: (k: string, d: an
 }
 
 export const createGradingPeriod = async (name: string, period_type: string = 'custom', start_date?: string, end_date?: string): Promise<any> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = uuidv4();
 
   try {
@@ -201,7 +201,6 @@ export const createCustomGradingSystem = async (data: {
   name: string; min_value: number; max_value: number; passing_value: number;
   precision?: number; type?: string; mode?: string; direction?: string;
 }): Promise<any> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = uuidv4();
 
   try {
@@ -286,7 +285,6 @@ async function _refreshLmsAccounts(repo: any, cache: { set: (k: string, d: any) 
 }
 
 export const addLmsAccount = async (platform: string, instance_url: string, username: string): Promise<LmsAccount> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = uuidv4();
 
   try {
@@ -338,7 +336,6 @@ export const exportDataPdf = async (): Promise<Blob> => {
 };
 
 export const sendFeedback = async (message: string): Promise<void> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = uuidv4();
 
   try {

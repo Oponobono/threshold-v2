@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { assessmentCategoryRepository, syncService } from '../database';
 import type { AssessmentCategory } from './types';
+import { uuidv4 } from '../../utils/uuid';
 
 export type { AssessmentCategory };
 
@@ -25,7 +26,6 @@ export const getCategoriesBySubject = async (subjectId: string): Promise<Assessm
 };
 
 export const createCategory = async (subjectId: string, data: Partial<AssessmentCategory>): Promise<AssessmentCategory> => {
-  const { uuidv4 } = await import('../../utils/uuid');
   const id = uuidv4();
   const category: any = { id, subject_id: subjectId, ...data };
   await assessmentCategoryRepository.create(category);
