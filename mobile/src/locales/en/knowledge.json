@@ -5,22 +5,28 @@
     "recovering": "Regular",
     "critical": "Weak"
   },
-  "maturity": {
-    "starting": "Good starting point",
-    "consolidating": "Consolidating knowledge",
-    "consolidated": "Consolidated knowledge",
-    "maintenance": "Needs review to maintain consolidation",
-    "recovering": "Recovering consolidated knowledge"
+  "description": {
+    "excellent": "Your memory is in excellent shape",
+    "good": "Good level, keep reinforcing periodically",
+    "medium": "Frequent reinforcement needed to consolidate",
+    "low": "Reviews are urgent — forgetting is advancing"
   },
   "risk": {
+    "excellent": "Your knowledge is in excellent shape. Keep it up!",
     "stable": "Your knowledge is stable.",
-    "warning": "If you don't study today, approximately {{atRisk}}% of your consolidated knowledge will begin to deteriorate."
+    "warning": "If you don't study today, approximately {{atRisk}}% of your knowledge will begin to deteriorate.",
+    "critical": "Low recovery level. Studying today is key to not losing what you've learned."
+  },
+  "lastReview": {
+    "today": "You reviewed today",
+    "yesterday": "Last review: yesterday",
+    "daysAgo": "Last review: {{days}} days ago",
+    "never": "No reviews recorded yet"
   },
   "labels": {
     "title": "Learning Status",
-    "generalState": "General state of your learning",
     "atRiskToday": "At risk today",
-    "confidence": "Confidence",
+    "confidence": "Coverage",
     "consolidated": "Consolidated",
     "todayPriority": "Today's priority",
     "mostSolid": "Most solid",

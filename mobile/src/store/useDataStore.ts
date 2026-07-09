@@ -283,7 +283,14 @@ export const useDataStore = create<DataState>((set, get) => {
   },
 
   loadCachedPredictions: async () => {
-    set({ predictions: { dueCount: 0, cards: [] } });
+    const userId = get().profile?.id;
+    if (!userId) return;
+    try {
+      const data = await getLocalPredictions(String(userId));
+      set({ predictions: data || { dueCount: 0, cards: [] } });
+    } catch (error) {
+      console.warn('[DataStore] Error in loadCachedPredictions:', error);
+    }
   },
 
   preloadOfflineCache: async () => {

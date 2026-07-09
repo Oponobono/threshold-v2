@@ -5,22 +5,28 @@
     "recovering": "Regular",
     "critical": "Débil"
   },
-  "maturity": {
-    "starting": "Buen punto de partida",
-    "consolidating": "Conocimiento en consolidación",
-    "consolidated": "Conocimiento consolidado",
-    "maintenance": "Necesita repaso para mantener la consolidación",
-    "recovering": "Recuperando conocimiento consolidado"
+  "description": {
+    "excellent": "Tu memoria está en excelente estado",
+    "good": "Buen nivel, sigue reforzando periódicamente",
+    "medium": "Refuerzo frecuente necesario para consolidar",
+    "low": "Los repasos son urgentes — el olvido avanza"
   },
   "risk": {
+    "excellent": "Tu conocimiento está en excelente estado. ¡Mantén el ritmo!",
     "stable": "Tu conocimiento está estable.",
-    "warning": "Si hoy no estudias, aproximadamente el {{atRisk}}% del conocimiento consolidado comenzará a deteriorarse."
+    "warning": "Si hoy no estudias, aproximadamente el {{atRisk}}% del conocimiento comenzará a deteriorarse.",
+    "critical": "Nivel de recuperación bajo. Estudiar hoy es clave para no perder lo aprendido."
+  },
+  "lastReview": {
+    "today": "Repasaste hoy",
+    "yesterday": "Último repaso: ayer",
+    "daysAgo": "Último repaso: hace {{days}} días",
+    "never": "Sin repasos registrados aún"
   },
   "labels": {
     "title": "Estado de Aprendizaje",
-    "generalState": "Estado general de tu aprendizaje",
     "atRiskToday": "En riesgo hoy",
-    "confidence": "Confianza",
+    "confidence": "Cobertura",
     "consolidated": "Consolidado",
     "todayPriority": "Prioridad de hoy",
     "mostSolid": "Más sólida",

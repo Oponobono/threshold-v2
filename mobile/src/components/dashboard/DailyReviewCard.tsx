@@ -11,7 +11,7 @@ interface DailyReviewSubject {
   subjectId: number;
   name: string;
   count: number;
-  estimatedMinutes: number;
+  highUrgencyCount: number;
 }
 
 interface Props {
@@ -29,18 +29,20 @@ if (
 
 export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
   const subjects = useMemo<DailyReviewSubject[]>(() => {
-    const map: Record<number, number> = {};
+    const map: Record<number, { count: number; highUrgencyCount: number }> = {};
     for (const c of cards) {
-      map[c.subjectId] = (map[c.subjectId] ?? 0) + 1;
+      if (!map[c.subjectId]) map[c.subjectId] = { count: 0, highUrgencyCount: 0 };
+      map[c.subjectId].count++;
+      if (c.urgency === 'HIGH') map[c.subjectId].highUrgencyCount++;
     }
     return Object.entries(map)
-      .map(([id, count]) => ({
+      .map(([id, { count, highUrgencyCount }]) => ({
         subjectId: Number(id),
         name: subjectNames[Number(id)] ?? 'Materia',
         count,
-        estimatedMinutes: Math.max(1, Math.round(count * MINUTES_PER_CARD)),
+        highUrgencyCount,
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.highUrgencyCount - a.highUrgencyCount || b.count - a.count);
   }, [cards, subjectNames]);
 
   React.useEffect(() => {
@@ -48,8 +50,8 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
   }, [cards.length, subjects.length, subjects[0]?.name]);
 
   const totalCards = cards.length;
-  const subjectCount = subjects.length;
   const estimatedMinutes = Math.max(1, Math.round(totalCards * MINUTES_PER_CARD));
+  const totalHighUrgency = cards.filter(c => c.urgency === 'HIGH').length;
 
   const topSubject = subjects[0] ?? null;
   const otherSubjects = subjects.slice(1, 1 + MAX_OTHER_SUBJECTS);
@@ -78,39 +80,48 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
 
   return (
     <View style={styles.card}>
-      {/* Header */}
+      {/* Header — título + scope badge */}
       <View style={styles.header} accessible={true} accessibilityRole="header">
-        <MaterialCommunityIcons name="book-open-variant" size={18} color={theme.colors.primary} importantForAccessibility="no" />
-        <Text style={styles.title}>Sesión de hoy</Text>
+        <View style={styles.headerLeft}>
+          <MaterialCommunityIcons name="book-open-variant" size={18} color={theme.colors.primary} importantForAccessibility="no" />
+          <Text style={styles.title}>Sesión de hoy</Text>
+        </View>
+        <View style={styles.headerBadge}>
+          <Text style={styles.headerBadgeText}>{totalCards} tarjetas · ≈{estimatedMinutes} min</Text>
+        </View>
       </View>
 
-      {/* Stats row */}
-      <View style={styles.statsRow}>
-        <Text style={styles.statText}>
-          <Text style={styles.statNumber}>{totalCards}</Text> {totalCards === 1 ? 'tarjeta' : 'tarjetas'}
-        </Text>
-        <Text style={styles.statSeparator}>•</Text>
-        <Text style={styles.statText}>
-          {subjectCount === 1 && topSubject ? topSubject.name : <><Text style={styles.statNumber}>{subjectCount}</Text> materias</>}
-        </Text>
-        <Text style={styles.statSeparator}>•</Text>
-        <Text style={styles.statText}>
-          <Text style={styles.statNumber}>≈{estimatedMinutes}</Text> min
-        </Text>
-      </View>
+      {/* Urgency alert — solo si hay tarjetas de alta urgencia */}
+      {totalHighUrgency > 0 && (
+        <View style={styles.urgencyBanner}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={13} color={theme.colors.danger} importantForAccessibility="no" />
+          <Text style={styles.urgencyBannerText}>
+            {totalHighUrgency} {totalHighUrgency === 1 ? 'tarjeta en riesgo alto de olvido' : 'tarjetas en riesgo alto de olvido'}
+          </Text>
+        </View>
+      )}
 
-      {/* "Empieza por" / "Foco en" */}
+      {/* Top subject — prioridad + señal de urgencia */}
       {topSubject && (
-        <View style={styles.topSubjectCard} accessible={true} accessibilityLabel={`${subjectCount === 1 ? 'Foco en' : 'Empieza por'} ${topSubject.name}, ${topSubject.count} ${topSubject.count === 1 ? 'tarjeta' : 'tarjetas'}, unos ${topSubject.estimatedMinutes} minutos`}>
+        <View
+          style={styles.topSubjectCard}
+          accessible={true}
+          accessibilityLabel={`${subjects.length === 1 ? 'Foco en' : 'Empieza por'} ${topSubject.name}, ${topSubject.count} ${topSubject.count === 1 ? 'tarjeta' : 'tarjetas'}`}
+        >
           <View style={styles.topSubjectHeader}>
             <MaterialCommunityIcons name="target" size={13} color={theme.colors.primary} importantForAccessibility="no" />
-            <Text style={styles.topSubjectLabel}>{subjectCount === 1 ? 'Foco en' : 'Empieza por'}</Text>
+            <Text style={styles.topSubjectLabel}>{subjects.length === 1 ? 'Foco en' : 'Empieza por'}</Text>
           </View>
           <View style={styles.topSubjectBody}>
             <Text style={styles.topSubjectName} numberOfLines={1}>{topSubject.name}</Text>
             <View style={styles.topSubjectMeta}>
               <Text style={styles.topSubjectPill}>{topSubject.count} {topSubject.count === 1 ? 'tarjeta' : 'tarjetas'}</Text>
-              <Text style={styles.topSubjectTime}>≈{topSubject.estimatedMinutes} min</Text>
+              {topSubject.highUrgencyCount > 0 && (
+                <View style={styles.urgencyPill}>
+                  <View style={styles.urgencyDot} />
+                  <Text style={styles.urgencyPillText}>{topSubject.highUrgencyCount} urgente{topSubject.highUrgencyCount > 1 ? 's' : ''}</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -124,9 +135,15 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
           )}
           {otherSubjects.map(s => (
             <View key={s.subjectId} style={styles.subjectRow}>
-              <View style={styles.subjectDot} />
+              <View style={[
+                styles.subjectDot,
+                s.highUrgencyCount > 0 && styles.subjectDotUrgent,
+              ]} />
               <Text style={styles.subjectName} numberOfLines={1}>{s.name}</Text>
               <Text style={styles.subjectCount}>{s.count} {s.count === 1 ? 'tarjeta' : 'tarjetas'}</Text>
+              {s.highUrgencyCount > 0 && (
+                <Text style={styles.subjectUrgencyHint}>{s.highUrgencyCount} urgente{s.highUrgencyCount > 1 ? 's' : ''}</Text>
+              )}
             </View>
           ))}
           {remainingCount > 0 && (
@@ -140,9 +157,9 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
       {/* Footer + CTA */}
       <View style={styles.footer}>
         <Text style={styles.footerHint} numberOfLines={2}>{footerText}</Text>
-        <TouchableOpacity 
-          style={styles.startBtn} 
-          onPress={onStart} 
+        <TouchableOpacity
+          style={styles.startBtn}
+          onPress={onStart}
           activeOpacity={0.8}
           accessible={true}
           accessibilityRole="button"
@@ -172,8 +189,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
-    marginBottom: 14,
   },
   title: {
     fontSize: theme.typography.sizes.lg,
@@ -181,35 +203,39 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     letterSpacing: -0.3,
   },
+  headerBadge: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  headerBadgeText: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '600',
+    color: theme.colors.text.secondary,
+  },
   emptyText: {
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.text.secondary,
     lineHeight: 20,
     marginTop: 4,
   },
-  statsRow: {
+  urgencyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: 12,
-    marginBottom: 16,
-    gap: 12,
+    gap: 6,
+    backgroundColor: theme.colors.dangerTransparent,
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 12,
   },
-  statText: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
-    fontWeight: '500',
-  },
-  statNumber: {
-    fontSize: theme.typography.sizes.md,
-    color: theme.colors.text.primary,
-    fontWeight: '700',
-  },
-  statSeparator: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.border,
+  urgencyBannerText: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '600',
+    color: theme.colors.danger,
   },
   topSubjectCard: {
     backgroundColor: theme.colors.primary + '0D',
@@ -254,10 +280,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.primary,
   },
-  topSubjectTime: {
+  urgencyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.dangerTransparent,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  urgencyDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: theme.colors.danger,
+  },
+  urgencyPillText: {
     fontSize: theme.typography.sizes.xs,
-    fontWeight: '500',
-    color: theme.colors.text.secondary,
+    fontWeight: '700',
+    color: theme.colors.danger,
   },
   otherSection: {
     gap: 8,
@@ -283,6 +324,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.border,
     flexShrink: 0,
   },
+  subjectDotUrgent: {
+    backgroundColor: theme.colors.danger,
+  },
   subjectName: {
     flex: 1,
     fontSize: theme.typography.sizes.sm,
@@ -293,6 +337,11 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.sm,
     fontWeight: '600',
     color: theme.colors.text.secondary,
+  },
+  subjectUrgencyHint: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '600',
+    color: theme.colors.danger,
   },
   moreSubjects: {
     fontSize: theme.typography.sizes.xs,

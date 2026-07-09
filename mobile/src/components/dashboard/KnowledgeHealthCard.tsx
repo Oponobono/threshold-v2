@@ -7,7 +7,7 @@ import { globalStyles } from '../../styles/globalStyles';
 import { RingGauge } from './RingGauge';
 import { computeMaturity } from '../../domain/knowledge/stage';
 import type { KnowledgeSnapshot, SubjectKnowledge } from '../../domain/knowledge/types';
-import { getMemoryLevelLabel, getKnowledgeDescription, getRiskLabel } from '../../presentation/knowledge/labels';
+import { getMemoryLevelLabel, getKnowledgeDescription, getRiskLabel, getLastReviewLabel } from '../../presentation/knowledge/labels';
 
 function scoreColor(score: number): string {
   if (score >= 90) return '#34C759';
@@ -59,8 +59,8 @@ export function KnowledgeHealthCard({ snapshot }: Props) {
     return Math.round((mastered / total) * 100);
   }, [subjects]);
 
-  const maturity = useMemo(() => computeMaturity(consolidado), [consolidado]);
-  const descripcion = useMemo(() => getKnowledgeDescription(maturity, health.score, t), [maturity, health.score, t]);
+  const descripcion = useMemo(() => getKnowledgeDescription(health.score, t), [health.score, t]);
+  const lastReviewLabel = useMemo(() => getLastReviewLabel(metadata.daysSinceLastReview, t), [metadata.daysSinceLastReview, t]);
   const showSubjects = prioridad && masSolida && prioridad.subjectId !== masSolida.subjectId;
 
   return (
@@ -82,7 +82,7 @@ export function KnowledgeHealthCard({ snapshot }: Props) {
             {getMemoryLevelLabel(health.memoryLevel, t)}
           </Text>
           <Text style={styles.estadoDesc}>{descripcion}</Text>
-          <Text style={styles.estadoLabel}>{t('knowledge.labels.generalState')}</Text>
+          <Text style={styles.estadoMeta}>{lastReviewLabel}</Text>
         </View>
       </View>
 
@@ -154,10 +154,9 @@ export function KnowledgeHealthCard({ snapshot }: Props) {
         {t('knowledge.labels.evaluatedOn', { cards: formatNumber(metadata.totalCards), subjects: metadata.totalSubjects })}
       </Text>
 
-      {/* ── Block 3: Interpretación ── */}
       <View style={styles.divider} />
       <Text style={styles.footerText}>
-        {getRiskLabel(health.knowledgeAtRisk, t)}
+        {getRiskLabel(health.knowledgeAtRisk, health.score, t)}
       </Text>
     </View>
   );
@@ -203,7 +202,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: theme.colors.text.secondary,
   },
-  estadoLabel: {
+  estadoMeta: {
     fontSize: theme.typography.sizes.xs,
     fontWeight: '400',
     color: theme.colors.text.secondary,
