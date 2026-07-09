@@ -9,7 +9,7 @@ const secrets = require('../config/secrets');
 // Esto también funciona si se usa el pooler de Supabase (pooler.supabase.com).
 dns.setDefaultResultOrder('ipv4first');
 
-const isProduction = secrets.NODE_ENV === 'production' || !!secrets.DATABASE_URL;
+const isProduction = !!secrets.DATABASE_URL;
 
 let db;
 let pool;

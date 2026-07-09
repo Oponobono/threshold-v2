@@ -8,9 +8,8 @@ require('dotenv').config();
 const getSecret = (key, defaultValue = null, required = false) => {
     const value = process.env[key] || defaultValue;
     if (required && !value) {
-        console.error(`[🔥 CRÍTICO] Falta la variable de entorno obligatoria: ${key}`);
-        console.error(`Por favor, añádela a tu archivo .env y reinicia el servidor.`);
-        process.exit(1); 
+        console.warn(`[⚠️ ADVERTENCIA] Falta la variable de entorno: ${key}. Algunas funciones pueden fallar.`);
+        // No salimos (process.exit) para que Render pueda hacer binding al puerto y terminar el deploy.
     }
     return value;
 };
