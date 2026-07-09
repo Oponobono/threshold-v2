@@ -1,111 +1,46 @@
-# Dashboard UX Specification v1.0
+# Dashboard UX Specification v1.1
 
 ## 1. Propósito
+El Dashboard es la primera implementación concreta del **Product Interaction Model**. Su misión es reducir la incertidumbre del estudiante transformando su estado académico en un **Foco de Hoy** accionable en menos de 5 segundos.
 
-El Dashboard es el punto de entrada diario de la aplicación. Su misión es **transformar el estado académico del estudiante en un plan de acción claro en menos de diez segundos**.
+No es un "dashboard" en el sentido clásico (un tablero de indicadores pasivos). Es un **Daily Briefing** (un orquestador de la jornada de estudio) que guía una conversación activa con el usuario.
 
-El Dashboard no es un tablero de métricas estático; es un *Briefing Diario* proactivo que elimina la fricción de empezar a estudiar. 
+## 2. Arquitectura de las 3 Capas
+El diseño se aleja de la apilación de componentes para adoptar un modelo psicológico de *Progressive Disclosure*, dividido en tres grandes actos conversacionales:
 
-**El Dashboard como orquestador:** No genera información propia. Orquesta información proveniente de distintos dominios (aprendizaje, calendario, materias, evaluaciones y herramientas) para presentar una visión unificada del día sin albergar lógica de negocio pesada.
+### Capa 1: Orientación ("¿Cómo estoy?")
+Responde a la necesidad humana de ubicarse antes de actuar.
+- **Elementos:** Cabecera (Saludo, Avatar) y Diagnóstico Cognitivo (`KnowledgeHealthCard`).
+- **Regla:** Solo información diagnóstica. Cero acciones.
 
-## 2. Principios de Diseño
+### Capa 2: Foco de Hoy ("¿Qué requiere mi atención?")
+Unifica acciones, advertencias y eventos bajo una misma narrativa táctica. Reemplaza la idea de "Plan del día" para incluir la urgencia.
+- **Elementos:** `DailyReviewCard` (Acción), Próxima Clase (Evento), Próximo Examen (Advertencia).
+- **Regla de Oro:** **Siempre debe existir un único CTA dominante**. Si hay examen inminente, el botón es "Preparar". Si no, es "Empezar repaso". Las opciones no compiten.
+- **Organismo Vivo:** Esta capa muta a lo largo del día. Si la clase de las 10:00 ya pasó, desaparece, dando lugar a la siguiente prioridad (ej. repasar a las 11:30).
 
-- **Prioridad sobre completitud:** No mostrar toda la información. Mostrar primero la información que ayuda a decidir.
-- **Diagnóstico antes que acción:** El usuario debe entender su situación (salud de su aprendizaje) antes de decidir qué hacer.
-- **Una acción principal:** El Dashboard nunca debe competir consigo mismo. En cualquier momento debe existir una acción claramente dominante.
-- **Prioridad de la información:** En caso de conflicto de espacio, la jerarquía innegociable es:
-  1. Estado cognitivo
-  2. Acción inmediata
-  3. Urgencias del día
-  4. Motivación y progreso
-  5. Exploración y herramientas
-- **El Dashboard evoluciona:** Un usuario nuevo y uno con cientos de sesiones no necesitan exactamente la misma información.
-- **No reemplaza las pantallas especializadas:** Su objetivo es orientar. No sustituir el calendario, la gestión de materias ni las estadísticas profundas.
+### Capa 3: Ecosistema ("¿Qué más existe?")
+Una vez superadas las fases tácticas, se presenta el contenido estratégico y de navegación.
+- **Elementos:** Carrusel de Cursos y Materias, Herramientas de Estudio (Temporizador, Scanner, Audio), Leaderboard, Feedback semanal.
+- **Regla:** Todo este contenido reside *debajo* del *Above the Fold*. Nunca debe empujar hacia abajo a las Capas 1 y 2.
 
-## 3. Principios de Interacción
+## 3. "Above the Fold"
+La regla innegociable de la primera pantalla visible sin scroll:
+Solo pueden existir la **Capa 1 (Orientación)** y la **Capa 2 (Foco de Hoy)**. Si el usuario necesita desplazarse para ver el botón de "Empezar Repaso" o descubrir que tiene examen, la pantalla ha fallado.
 
-- Un card debe tener una acción principal claramente identificable.
-- Las acciones secundarias nunca deben competir visualmente con la principal.
-- Toda información presentada debe conducir a una pantalla especializada cuando el usuario desee profundizar.
-- El Dashboard debe minimizar la cantidad de decisiones necesarias para comenzar a estudiar.
+## 4. Abstracción del Algoritmo
 
-## 4. Rendimiento Percibido (Offline-First)
+> **El usuario estudia sesiones; el algoritmo administra tarjetas.**
 
-El Dashboard debe transmitir inmediatez absoluta:
-- Renderizar inmediatamente desde SQLite.
-- Evitar indicadores de carga innecesarios o bloqueantes.
-- Permitir que el usuario tome decisiones y actúe antes de finalizar sincronizaciones secundarias.
-- Actualizar información de forma progresiva sin bloquear la interacción.
+Threshold separa estrictamente el estado del motor FSRS (New, Learning, Review) de la experiencia de usuario. El Dashboard no expone el inventario del algoritmo ("tienes 115 tarjetas pendientes"); propone un plan de trabajo ("Sesión de hoy: Foco en Biología, ≈69 min").
 
-## 5. Flujo Cognitivo
+Esta separación permite que el motor se vuelva infinitamente sofisticado mientras la conversación con el estudiante se mantiene simple, accionable y enfocada en resultados ("Reducirá el riesgo de olvido") en lugar de mecánicas.
 
-La arquitectura de la pantalla sigue estrictamente el modelo mental del usuario al abrir la aplicación:
+## 5. El Dashboard como Entrenador (Coach)
+A diferencia de los gestores de tareas (que ponen la acción primero: *"Haz esto"*), Threshold pone el estado primero (*"Estás así, por tanto, haz esto"*). El orden `Estado → Acción` le otorga propósito al esfuerzo y consolida la identidad de Threshold como un copiloto académico.
 
-1. **Comprender:** *¿Cuál es mi contexto?*
-2. **Decidir:** *De todo lo posible, ¿qué importa más hoy?*
-3. **Actuar:** *Resolvamos la prioridad.*
-4. **Reflexionar:** *¿Cómo me fue hoy/esta semana?*
-5. **Explorar:** *¿Qué más hay en mi entorno académico?*
-
-## 6. Arquitectura Funcional
-
-El Dashboard se construye respondiendo a preguntas de usuario, no apilando componentes. La implementación visual puede cambiar con el tiempo, pero las preguntas fundamentales permanecen.
-
-| Pregunta del Usuario | Objetivo del Producto | Implementación Actual |
-| :--- | :--- | :--- |
-| **¿Cómo estoy?** | Diagnóstico cognitivo rápido | `KnowledgeHealthCard` |
-| **¿Qué debería hacer ahora?** | Acción inmediata con menor fricción | `DailyReviewCard` |
-| **¿Qué requiere atención hoy?** | Eventos próximos (Calendario/Exámenes) | `NextClassCard` + `NextAssignmentCard` |
-| **¿Cómo voy progresando?** | Motivación y feedback | *WeeklyProgressCard (Pendiente)* |
-| **¿Qué quiero explorar?** | Navegación y gestión | Carruseles, `StudyTimerCard`, UI de herramientas |
-
-## 7. "Above the Fold"
-
-La regla de oro del área visible inmediata (sin hacer scroll) se rige por **objetivos, no por componentes**. 
-
-Al abrir la app, el usuario **debe poder responder inmediatamente**:
-1. *¿Cómo está mi aprendizaje?*
-2. *¿Cuál es mi siguiente acción?*
-3. *¿Existe alguna urgencia inminente para hoy?*
-
-Si para responder alguna de estas tres preguntas el usuario necesita desplazarse hacia abajo, **el Dashboard no está cumpliendo su misión**. Ningún otro elemento exploratorio (como carruseles de materias, creación de contenido, o herramientas) puede empujar estas respuestas fuera del *Above the Fold*.
-
-## 8. Progresión del Usuario
-
-El Dashboard no es un póster fijo. Su composición se adapta a la etapa de madurez del estudiante en el ecosistema de la app:
-
-- **Descubrimiento (Onboarding):** Enseñar el flujo de estudio. Foco extremo en crear/importar la primera tarjeta y hacer el primer repaso. Mucho aire, pocas distracciones exploratorias.
-- **Construcción del hábito:** Reducir fricción para estudiar diariamente. Foco operativo. El *Above the fold* gobierna la experiencia.
-- **Consolidación:** Mostrar progreso y mantener la motivación. El feedback del esfuerzo semanal/mensual comienza a tomar relevancia en el *middle fold*.
-- **Dominio:** Facilitar decisiones avanzadas y análisis. El usuario ya confía en el sistema; se habilita información tendencial y distribución avanzada de esfuerzo.
-
-## 9. Lo que el Dashboard NO es
-
-Para evitar la acumulación técnica y visual (el *feature creep*), establecemos explícitamente qué roles no debe asumir el Dashboard:
-
-- No es una pantalla de configuración.
-- No es un catálogo exhaustivo de funciones de la app.
-- No es un panel de administración para gestionar grandes volúmenes de datos.
-- No es una lista completa de actividades o tareas.
-- No intenta reemplazar las vistas especializadas (p. ej., no se estudia todo un temario desde el dashboard, se navega hacia él).
-
-## 10. Principios de Evolución
-
-Todo cambio futuro al `index.tsx` o a la experiencia del Dashboard debe ser auditado contra estas reglas:
-
-1. **Intención antes que píxeles:** Agregar un nuevo card requiere definir primero qué pregunta fundamental responde.
-2. **Ortogonalidad:** Ningún card debe duplicar información o intención de otro.
-3. **Respeto a la jerarquía:** Ningún card secundario puede desplazar fuera del *above the fold* una pregunta más importante.
-4. **Escalabilidad limpia:** Las acciones principales deben permanecer visibles e inmutables sin importar el crecimiento del resto del Dashboard.
-5. **Adaptabilidad:** El Dashboard debe poder simplificarse automáticamente cuando los datos requeridos por un card complejo aún no existan para usuarios nuevos.
-
-## 11. Definition of Success
-
-Un Dashboard exitoso permite que un usuario habitual:
-
-- Comprenda su estado académico en **menos de 10 segundos**.
-- Identifique su siguiente acción **sin explorar otras pantallas**.
-- Pueda comenzar una sesión de estudio con un **único toque**.
-- No necesite desplazarse (scroll) para responder las **tres preguntas principales** del día.
-
-Toda modificación futura al Dashboard deberá preservar o mejorar de forma medible estos objetivos.
+## 6. Principios de Evolución
+Cualquier cambio futuro a la interfaz principal debe someterse a este filtro:
+1. **Intención antes que píxeles:** ¿Qué pregunta del usuario responde este nuevo componente?
+2. **Ubicación Semántica:** ¿Pertenece a la Orientación, al Foco o al Ecosistema?
+3. **Respeto a la Atención:** ¿Compromete la lectura de la única Acción Dominante del Foco de Hoy? Si lo hace, debe ser rediseñado o relegado.

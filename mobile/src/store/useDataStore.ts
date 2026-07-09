@@ -71,6 +71,7 @@ interface DataState {
   isInitialLoading: boolean;
   isRefreshing: boolean;
   hasLoadedOnce: boolean;
+  lastLoadTimestamp: number;
   isSyncing: boolean;
   syncStatusMessage: string;
   syncState: string;

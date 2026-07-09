@@ -36,7 +36,7 @@ export class ReviewScheduler {
          AND IFNULL(fc.status, '') NOT IN ('mastered', 'archived')
          AND fc.next_review_date IS NOT NULL
          AND fc.next_review_date <= ?`,
-        userId, now.toISOString()
+        [userId, now.toISOString()]
       ) as any[];
       allDue.push(...(rows || []));
     } catch (error) {

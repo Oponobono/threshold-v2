@@ -47,13 +47,13 @@ export const dashboardStyles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   section: {
-    marginBottom: 28,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: theme.typography.sizes.lg,
     fontWeight: '700',
     color: theme.colors.text.primary,
-    marginBottom: 16,
+    marginBottom: 24,
     letterSpacing: -0.3,
   },
   subjectsRow: {
@@ -64,7 +64,7 @@ export const dashboardStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 24,
   },
   subjectsAddBtn: {
     width: 30,

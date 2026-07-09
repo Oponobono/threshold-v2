@@ -81,7 +81,7 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
       {/* Header */}
       <View style={styles.header} accessible={true} accessibilityRole="header">
         <MaterialCommunityIcons name="book-open-variant" size={18} color={theme.colors.primary} importantForAccessibility="no" />
-        <Text style={styles.title}>Repasos de hoy</Text>
+        <Text style={styles.title}>Sesión de hoy</Text>
       </View>
 
       {/* Stats row */}
@@ -91,7 +91,7 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
         </Text>
         <Text style={styles.statSeparator}>•</Text>
         <Text style={styles.statText}>
-          <Text style={styles.statNumber}>{subjectCount}</Text> {subjectCount === 1 ? 'materia' : 'materias'}
+          {subjectCount === 1 && topSubject ? topSubject.name : <><Text style={styles.statNumber}>{subjectCount}</Text> materias</>}
         </Text>
         <Text style={styles.statSeparator}>•</Text>
         <Text style={styles.statText}>
@@ -99,12 +99,12 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
         </Text>
       </View>
 
-      {/* "Empieza por" */}
+      {/* "Empieza por" / "Foco en" */}
       {topSubject && (
-        <View style={styles.topSubjectCard} accessible={true} accessibilityLabel={`Empieza por ${topSubject.name}, ${topSubject.count} ${topSubject.count === 1 ? 'tarjeta' : 'tarjetas'}, unos ${topSubject.estimatedMinutes} minutos`}>
+        <View style={styles.topSubjectCard} accessible={true} accessibilityLabel={`${subjectCount === 1 ? 'Foco en' : 'Empieza por'} ${topSubject.name}, ${topSubject.count} ${topSubject.count === 1 ? 'tarjeta' : 'tarjetas'}, unos ${topSubject.estimatedMinutes} minutos`}>
           <View style={styles.topSubjectHeader}>
             <MaterialCommunityIcons name="target" size={13} color={theme.colors.primary} importantForAccessibility="no" />
-            <Text style={styles.topSubjectLabel}>Empieza por</Text>
+            <Text style={styles.topSubjectLabel}>{subjectCount === 1 ? 'Foco en' : 'Empieza por'}</Text>
           </View>
           <View style={styles.topSubjectBody}>
             <Text style={styles.topSubjectName} numberOfLines={1}>{topSubject.name}</Text>
@@ -163,7 +163,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 18,
-    marginTop: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,

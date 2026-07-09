@@ -204,7 +204,7 @@ export async function getLocalGlobalGPA(userId: string): Promise<GlobalGPAAnalyt
        AND (a.grade_value IS NOT NULL OR a.score IS NOT NULL OR a.normalized_value IS NOT NULL)
        ORDER BY a.date ASC`;
 
-    const assessments = await databaseService.getAllTracked(sql, userId) as any[];
+    const assessments = await databaseService.getAllTracked(sql, [userId]) as any[];
 
     if (!assessments || assessments.length === 0) {
       return { currentAverage: 0, projectedGrade: 0, delta: 0, evaluatedWeight: 0, remainingWeight: 100, assessmentCount: 0, subjectCount: 0 };

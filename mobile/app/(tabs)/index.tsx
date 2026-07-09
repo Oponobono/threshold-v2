@@ -604,6 +604,111 @@ export default function HybridDashboardScreen() {
           </View>
         ) : null}
 
+
+        {/* ====================================================== */}
+        {/* ORIENTATION & TODAY FOCUS                              */}
+        {/* ====================================================== */}
+        <View style={styles.section}>
+          {/* --- ORIENTATION --- */}
+          {knowledgeSnapshot && !knowledgeLoading ? (
+            <View style={{ marginBottom: 24 }}>
+              <KnowledgeHealthCard snapshot={knowledgeSnapshot} />
+            </View>
+          ) : null}
+
+          {/* --- TODAY FOCUS --- */}
+          <DailyReviewCard
+            cards={predictions?.cards ?? []}
+            subjectNames={subjectNamesMap}
+            onStart={() => setIsFlashcardsVisible(true)}
+          />
+
+          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('dashboard.upNext', { defaultValue: 'Lo siguiente' })}</Text>
+          <View style={styles.grid}>
+            {/* NEXT CLASS */}
+            {(() => {
+              let nextClassSubtext = t('dashboard.enjoyDay');
+              if (nextClass) {
+                const now = new Date();
+                const [startH, startM] = nextClass.start_time.split(':').map(Number);
+                const classStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM, 0);
+                const diffMins = Math.floor((classStart.getTime() - now.getTime()) / 60000);
+                
+                if (diffMins > 0) {
+                  const h = Math.floor(diffMins / 60);
+                  const m = diffMins % 60;
+                  if (h > 0) {
+                    nextClassSubtext = m > 0 ? `En ${h}h ${m}m` : `En ${h}h`;
+                  } else {
+                    nextClassSubtext = `En ${m} min`;
+                  }
+                } else {
+                  nextClassSubtext = `En curso`;
+                }
+              }
+
+              return (
+                <MetricCard 
+                  title={t('dashboard.nextClass')}
+                  value={nextClass ? nextClass.name : (todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'))}
+                  subtext={nextClassSubtext}
+                  icon="time-outline"
+                  color={nextClass ? theme.colors.primary : "#5856D6"}
+                  showMood={false}
+                  onPress={() => {
+                    if (nextClass?.subject_id) {
+                      router.push(`/subjects/${nextClass.subject_id}`);
+                    } else {
+                      setSelectedMetric({
+                        title: t('dashboard.nextClass'),
+                        value: todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'),
+                        subtext: t('dashboard.enjoyDay'),
+                        icon: "time-outline",
+                        color: "#5856D6"
+                      });
+                    }
+                  }}
+                />
+              );
+            })()}
+
+            {/* NEXT ASSIGNMENT */}
+            {(() => {
+              const mood = nextAssessment?.date ? (() => {
+                const [d, m, y] = nextAssessment.date.split('-').map(Number);
+                const dueDate = new Date(y, m - 1, d);
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays <= 1) return { color: '#FF3B30', show: true };
+                if (diffDays <= 3) return { color: '#FF9500', show: true };
+                return { color: '#34C759', show: true };
+              })() : { color: '#5856D6', show: false };
+
+              return (
+                <MetricCard 
+                  title={t('dashboard.nextAssignment')} 
+                  value={nextAssessment ? nextAssessment.name : t('dashboard.nothingPending')} 
+                  subtext={nextAssessment ? nextAssessment.date : t('dashboard.takeABreak')} 
+                  icon="document-text-outline" 
+                  color={mood.color}
+                  showMood={mood.show}
+                  onPress={() => setSelectedMetric({
+                    title: t('dashboard.nextAssignment'),
+                    value: nextAssessment ? nextAssessment.name : "Nada pendiente",
+                    subtext: nextAssessment ? nextAssessment.date : t('dashboard.takeABreak'),
+                    icon: "document-text-outline",
+                    color: mood.color
+                  })}
+                />
+              );
+            })()}
+          </View>
+        </View>
+
+        {/* ====================================================== */}
+        {/* ECOSYSTEM                                              */}
+        {/* ====================================================== */}
         {/* 2. COURSE HERO + YOUR SUBJECTS */}
         <View style={styles.section}>
           {/* Section header */}
@@ -812,107 +917,7 @@ export default function HybridDashboardScreen() {
             )}
           </View>
         </View>
-
-        {/* 3. QUICK ADD & NEXT CLASS */}
-        <View style={styles.section}>
-
-
-          <Text style={styles.sectionTitle}>{t('dashboard.nextClass')}</Text>
-          <View style={styles.nextClassCard}>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-              <View style={styles.nextClassBadge}>
-                <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
-                {nextClass ? (
-                  <>
-                    <Text style={styles.nextClassTitle} numberOfLines={1}>{nextClass.name}</Text>
-                    <Text style={styles.nextClassRoom} numberOfLines={1}>
-                      {nextClass.start_time} - {nextClass.end_time}
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.nextClassTitle} numberOfLines={1}>{todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses')}</Text>
-                    <Text style={styles.nextClassRoom} numberOfLines={1}>{t('dashboard.enjoyDay')}</Text>
-                  </>
-                )}
-              </View>
-            </View>
-            {nextClass ? (
-              <TouchableOpacity
-                style={styles.openBtn}
-                onPress={() => {
-                  const nextSubjectId = nextClass?.subject_id;
-                  if (nextSubjectId) {
-                    router.push(`/subjects/${nextSubjectId}`);
-                  }
-                }}
-              >
-                <Text style={styles.openBtnText}>{t('dashboard.openBtn')}</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {knowledgeSnapshot && !knowledgeLoading ? (
-            <View style={{ marginTop: 24 }}>
-              <KnowledgeHealthCard snapshot={knowledgeSnapshot} />
-            </View>
-          ) : null}
-
-          <DailyReviewCard
-            cards={predictions?.cards ?? []}
-            subjectNames={subjectNamesMap}
-            onStart={() => setIsFlashcardsVisible(true)}
-          />
-        </View>
-
-        {/* 4. ORIGINAL METRICS (2x2) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('dashboard.overview')}</Text>
-          <View style={styles.grid}>
-            <MetricCard 
-              title={t('dashboard.todaysSchedule')} 
-              value={todaySchedules.length.toString()} 
-              subtext={t('dashboard.classes')} 
-              icon="calendar-outline" 
-              color="#FF9500" 
-              onPress={() => setIsScheduleModalVisible(true)}
-            />
-            {(() => {
-              const mood = nextAssessment?.date ? (() => {
-                const [d, m, y] = nextAssessment.date.split('-').map(Number);
-                const dueDate = new Date(y, m - 1, d);
-                const today = new Date();
-                today.setHours(0,0,0,0);
-                const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDays <= 1) return { color: '#FF3B30', show: true };
-                if (diffDays <= 3) return { color: '#FF9500', show: true };
-                return { color: '#34C759', show: true };
-              })() : { color: '#5856D6', show: false };
-
-              return (
-                <MetricCard 
-                  title={t('dashboard.nextAssignment')} 
-                  value={nextAssessment ? nextAssessment.name : t('dashboard.nothingPending')} 
-                  subtext={nextAssessment ? nextAssessment.date : t('dashboard.takeABreak')} 
-                  icon="document-text-outline" 
-                  color={mood.color}
-                  showMood={mood.show}
-                  onPress={() => setSelectedMetric({
-                    title: t('dashboard.nextAssignment'),
-                    value: nextAssessment ? nextAssessment.name : "Nada pendiente",
-                    subtext: nextAssessment ? nextAssessment.date : t('dashboard.takeABreak'),
-                    icon: "document-text-outline",
-                    color: mood.color
-                  })}
-                />
-              );
-            })()}
-          </View>
-        </View>
-
-        {/* 5. STUDY TOOLS (Fixed Row) */}
+        {/* 5. STUDY TOOLS */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('dashboard.studyTools')}</Text>
           <View style={globalStyles.mb16}>
@@ -932,12 +937,6 @@ export default function HybridDashboardScreen() {
             />
           </View>
           <View style={styles.actionsGrid}>
-            <ActionCircle
-              title={t('dashboard.flashcards')}
-              icon="cards-outline"
-              color="#AF52DE"
-              onPress={() => setIsFlashcardsVisible(true)}
-            />
             <ActionCircle 
               title={t('dashboard.audioRecorder')} 
               icon="microphone-outline" 
