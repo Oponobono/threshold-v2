@@ -937,6 +937,12 @@ export default function HybridDashboardScreen() {
             />
           </View>
           <View style={styles.actionsGrid}>
+            <ActionCircle
+              title={t('dashboard.flashcards', { defaultValue: 'Mazos' })}
+              icon="cards-outline"
+              color="#AF52DE"
+              onPress={() => setIsFlashcardsVisible(true)}
+            />
             <ActionCircle 
               title={t('dashboard.audioRecorder')} 
               icon="microphone-outline" 

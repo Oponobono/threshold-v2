@@ -218,3 +218,7 @@
 ---
 
 *Generado: 2026-07-02. Toda acción nueva debe documentar sus mutaciones antes de implementarse.*
+
+
+---
+**Tags:** #product

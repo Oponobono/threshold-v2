@@ -187,3 +187,7 @@ User (root)
 ---
 
 *Generado: 2026-07-02. Toda relación de ownership debe definirse explícitamente, no por omisión.*
+
+
+---
+**Tags:** #product

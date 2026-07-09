@@ -44,3 +44,7 @@ Cualquier cambio futuro a la interfaz principal debe someterse a este filtro:
 1. **Intención antes que píxeles:** ¿Qué pregunta del usuario responde este nuevo componente?
 2. **Ubicación Semántica:** ¿Pertenece a la Orientación, al Foco o al Ecosistema?
 3. **Respeto a la Atención:** ¿Compromete la lectura de la única Acción Dominante del Foco de Hoy? Si lo hace, debe ser rediseñado o relegado.
+
+
+---
+**Tags:** #dashboard

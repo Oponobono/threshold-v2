@@ -73,3 +73,7 @@ El producto no presenta pantallas estáticas, sino adaptativas. El contexto de l
 *   **Usuario Habitual:** Confía en el motor. Después de meses de uso, su cerebro ignorará el diagnóstico temporalmente y buscará el CTA de "Comenzar Repaso" de inmediato.
 
 El diseño debe mantener la secuencia lógica (Diagnóstico → Acción) pero usar el **peso visual y el diseño UI** para que los CTA de acción (el "Comenzar") no queden bloqueados ni subordinados al diagnóstico en el caso de los usuarios recurrentes. El sistema es consciente del tiempo y del esfuerzo del estudiante.
+
+
+---
+**Tags:** #product

@@ -73,3 +73,7 @@ El sistema está diseñado para escalar sin romper componentes existentes. Si de
 3. **Crea el Player:** Crea un archivo `FloatingVimeoPlayer.tsx` (basado en el de YouTube).
 4. **Agrega al Layout:** Renderiza `<FloatingVimeoPlayer />` en el Root Layout de la aplicación.
 5. **Listo:** La misma persistencia (`mediaProgress`) y el mismo store (`usePlayerStore`) funcionarán mágicamente para Vimeo.
+
+
+---
+**Tags:** #architecture

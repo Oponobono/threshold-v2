@@ -271,7 +271,7 @@ export const StudyTimerCard: React.FC<StudyTimerCardProps> = ({ onOpenConfig, on
                 onPress={handleTimerComplete}
               >
                 <Ionicons name="stop" size={18} color={theme.colors.text.error} />
-              </TouchableOpacity>
+            </TouchableOpacity>
             </View>
           ) : (
             <Text style={localStyles.startText}>{t('dashboard.startBtn')}</Text>

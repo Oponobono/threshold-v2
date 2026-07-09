@@ -1,0 +1,607 @@
+// ============================================================================
+// THRESHOLD - Database Diagram (DBML)
+// Formato DBML v2.2 compatible con dbdiagram.io, DbVisualizer, etc.
+// ============================================================================
+// Cómo usar:
+//   1. Ve a https://dbdiagram.io/d
+//   2. Crea un nuevo diagrama
+//   3. Pega todo este contenido
+//   4. El diagrama ER se generará automáticamente
+// ============================================================================
+
+// ============================================================================
+// 1. MÓDULO DE USUARIOS Y ACCESO
+// ============================================================================
+
+Table users {
+  id SERIAL [pk]
+  email TEXT [unique, not null]
+  password_hash TEXT [not null]
+  name TEXT
+  lastname TEXT
+  username TEXT [unique]
+  major TEXT
+  university TEXT
+  semester TEXT
+  study_goal TEXT
+  reference_language TEXT
+  biometric_token TEXT
+  status VARCHAR(20) [default: 'active']
+  deletion_date TIMESTAMP
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  last_login TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  share_pin VARCHAR(8) [unique]
+  display_name TEXT
+  profile_image TEXT
+  active_grading_version_id INTEGER
+  approval_threshold REAL [default: 50.0]
+}
+
+Table deleted_users {
+  id SERIAL [pk]
+  original_user_id INTEGER
+  email TEXT
+  name TEXT
+  lastname TEXT
+  deleted_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table app_visitors {
+  device_id TEXT [pk]
+  first_seen_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  last_visit_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  visit_count INTEGER [default: 1]
+}
+
+Table two_factor_auth {
+  id SERIAL [pk]
+  user_id INTEGER [unique, not null]
+  enabled INTEGER [default: 0]
+  secret TEXT
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  updated_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table lms_accounts {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  platform TEXT [not null]
+  instance_url TEXT [not null]
+  username TEXT [not null]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table feedback_messages {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  message TEXT [not null]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// 2. MÓDULO ACADÉMICO
+// ============================================================================
+
+Table subjects {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  code TEXT [not null, default: '']
+  name TEXT [not null]
+  credits INTEGER
+  professor TEXT
+  color TEXT [default: '#CCCCCC']
+  icon TEXT [default: 'book-outline']
+  target_grade REAL
+  folder_path TEXT
+}
+
+Table schedules {
+  id SERIAL [pk]
+  subject_id INTEGER [not null]
+  day_of_week INTEGER [not null]
+  start_time TEXT [not null]
+  end_time TEXT [not null]
+}
+
+Table calendar_events {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER
+  title TEXT [not null]
+  event_type TEXT [not null]
+  description TEXT
+  start_date TEXT [not null]
+  end_date TEXT [not null]
+  start_time TEXT
+  end_time TEXT
+  all_day INTEGER [default: 0]
+  create_study_plan INTEGER [default: 0]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  updated_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table study_sessions {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER
+  session_type VARCHAR(20) [not null]
+  config_value INTEGER
+  duration_seconds INTEGER [not null]
+  performance_rating INTEGER
+  start_timestamp TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// 3. MÓDULO DE CALIFICACIONES (Grading Engine)
+// ============================================================================
+
+Table grading_systems {
+  id SERIAL [pk]
+  code TEXT [unique, not null]
+  name TEXT [not null]
+  type TEXT [not null]
+  mode TEXT [not null]
+  direction TEXT [not null]
+  country_code TEXT
+  is_system_seeded INTEGER [default: 0]
+  is_custom INTEGER [default: 0]
+  created_by_user_id INTEGER
+  based_on_system_id INTEGER
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table grading_versions {
+  id SERIAL [pk]
+  grading_system_id INTEGER [not null]
+  owner_type TEXT [not null]
+  owner_id TEXT
+  min_value REAL
+  max_value REAL
+  passing_value REAL
+  precision INTEGER [default: 2]
+  valid_from TIMESTAMP
+  valid_to TIMESTAMP
+  is_active INTEGER [default: 1]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  archived_at TIMESTAMP
+}
+
+Table grading_scales {
+  id SERIAL [pk]
+  grading_version_id INTEGER [not null]
+  min_score REAL [not null]
+  max_score REAL [not null]
+  label TEXT [not null]
+  gpa_equivalent REAL
+  color TEXT
+  sort_order INTEGER [default: 0]
+  is_passing INTEGER [default: 1]
+  display_color TEXT
+  display_short_label TEXT
+  display_priority INTEGER [default: 0]
+}
+
+Table grading_periods {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  name TEXT [not null]
+  period_type TEXT [not null]
+  start_date TIMESTAMP
+  end_date TIMESTAMP
+  is_active INTEGER [default: 1]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table assessments {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER [not null]
+  name TEXT [not null]
+  type TEXT
+  date TEXT
+  weight TEXT
+  out_of INTEGER
+  is_completed INTEGER [default: 0]
+  grade_value REAL
+  score REAL
+  normalized_value REAL
+  percentage REAL
+  period_id INTEGER
+  category_id INTEGER
+}
+
+Table assessment_categories {
+  id SERIAL [pk]
+  subject_id INTEGER [not null]
+  name TEXT [not null]
+  weight REAL
+  drop_lowest INTEGER [default: 0]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table assessment_results {
+  id SERIAL [pk]
+  assessment_id INTEGER [not null]
+  user_id INTEGER [not null]
+  raw_value REAL
+  normalized_value DECIMAL(6,5)
+  grading_version_id INTEGER [not null]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  updated_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table grade_history {
+  id SERIAL [pk]
+  assessment_result_id INTEGER [not null]
+  old_raw_value REAL
+  new_raw_value REAL
+  changed_by INTEGER
+  changed_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  reason TEXT
+}
+
+Table subject_grade_snapshots {
+  id SERIAL [pk]
+  subject_id INTEGER [not null]
+  user_id INTEGER [not null]
+  final_raw_value REAL
+  final_normalized_value DECIMAL(6,5)
+  grading_version_id INTEGER [not null]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table subject_threshold_overrides {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER [not null]
+  threshold REAL [not null]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// 4. MÓDULO DE ARCHIVOS Y MULTIMEDIA
+// ============================================================================
+
+Table photos {
+  id SERIAL [pk]
+  subject_id INTEGER [not null]
+  local_uri TEXT [not null]
+  es_favorita INTEGER [default: 0]
+  ocr_text TEXT
+  tags TEXT
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  cloud_url TEXT
+  is_backed_up INTEGER [default: 0]
+  group_id TEXT
+}
+
+Table gallery_items {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  uri TEXT [not null]
+  subject TEXT
+  date TEXT
+  time TEXT
+  ocr_text TEXT
+  is_starred INTEGER [default: 0]
+  cloud_url TEXT
+  is_backed_up INTEGER [default: 0]
+}
+
+Table scanned_documents {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER
+  name TEXT
+  local_uri TEXT [not null]
+  ocr_text TEXT
+  extracted_at TIMESTAMP
+  cloud_url TEXT
+  is_backed_up INTEGER [default: 0]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table audio_recordings {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER
+  name TEXT
+  local_uri TEXT [not null]
+  duration INTEGER
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  cloud_url TEXT
+  is_backed_up INTEGER [default: 0]
+}
+
+Table audio_transcripts {
+  id SERIAL [pk]
+  recording_id INTEGER [not null]
+  transcript_uri TEXT
+  transcript_text TEXT
+  summary_uri TEXT
+  summary_text TEXT
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  cloud_url TEXT
+  is_backed_up INTEGER [default: 0]
+}
+
+Table youtube_videos {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER
+  youtube_url TEXT [not null]
+  video_id TEXT [not null]
+  title TEXT
+  thumbnail_url TEXT
+  duration INTEGER
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table youtube_transcripts {
+  id SERIAL [pk]
+  video_id INTEGER [unique, not null]
+  transcript_uri TEXT
+  transcript_text TEXT
+  summary_uri TEXT
+  summary_text TEXT
+  cloud_url TEXT
+  is_backed_up INTEGER [default: 0]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// 5. MÓDULO DE FLASHCARDS Y APRENDIZAJE
+// ============================================================================
+
+Table flashcard_decks {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER
+  title TEXT [not null]
+  description TEXT
+  is_public INTEGER [default: 0]
+  total_reviews INTEGER [default: 0]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table flashcards {
+  id SERIAL [pk]
+  deck_id INTEGER [not null]
+  front TEXT [not null, default: '']
+  back TEXT [not null, default: '']
+  item_type TEXT [not null, default: 'flashcard']
+  content_json TEXT
+  hint TEXT
+  explanation TEXT
+  status TEXT [default: 'new']
+  view_count INTEGER [default: 0]
+  success_count INTEGER [default: 0]
+  failure_count INTEGER [default: 0]
+  last_review_timestamp TIMESTAMP
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  sm2_ease_factor REAL [default: 2.5]
+  sm2_interval INTEGER [default: 1]
+  sm2_repetitions INTEGER [default: 0]
+  next_review_date TIMESTAMP
+  fsrs_stability REAL [default: 1]
+  fsrs_difficulty REAL [default: 0.5]
+  fsrs_repetitions INTEGER [default: 0]
+  word_count INTEGER [default: 0]
+  is_atomic INTEGER [default: 1]
+  parent_card_id INTEGER
+  atomic_index INTEGER
+}
+
+Table card_logs {
+  id SERIAL [pk]
+  card_id INTEGER [not null]
+  user_id INTEGER [not null]
+  result VARCHAR(20)
+  response_time_ms INTEGER
+  difficulty_deduced VARCHAR(20)
+  normalized_time_ms INTEGER
+  text_length_words INTEGER
+  timestamp TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table card_snoozes {
+  id SERIAL [pk]
+  card_id INTEGER [unique, not null]
+  user_id INTEGER [not null]
+  snoozed_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+  resume_at TIMESTAMP [not null]
+  snooze_duration_minutes INTEGER [not null]
+  reason TEXT
+}
+
+Table review_predictions {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  card_id INTEGER [not null]
+  predicted_next_review TIMESTAMP
+  prediction_confidence REAL
+  notification_sent INTEGER [default: 0]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// 6. MÓDULO DE ANALÍTICA
+// ============================================================================
+
+Table learning_analytics {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER
+  total_cards INTEGER [default: 0]
+  total_reviews INTEGER [default: 0]
+  correct_reviews INTEGER [default: 0]
+  incorrect_reviews INTEGER [default: 0]
+  avg_response_time_ms REAL [default: 0]
+  mastery_percentage REAL [default: 0]
+  last_updated TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table card_difficulty_analytics {
+  id SERIAL [pk]
+  card_id INTEGER [unique, not null]
+  total_attempts INTEGER [default: 0]
+  failure_rate REAL [default: 0]
+  avg_response_time_ms REAL [default: 0]
+  problem_flag INTEGER [default: 0]
+  last_analyzed TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// 7. MÓDULO SOCIAL / GRUPOS / COMPARTIR
+// ============================================================================
+
+Table groups {
+  id SERIAL [pk]
+  group_pin_id TEXT [unique, not null]
+  name TEXT [not null]
+  creator_user_id INTEGER [not null]
+  is_public BOOLEAN [default: true]
+  password TEXT
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table group_memberships {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  group_pin_id TEXT [not null]
+  role VARCHAR(20) [default: 'member']
+  joined_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table shared_decks {
+  id SERIAL [pk]
+  deck_id INTEGER [not null]
+  shared_by_user_id INTEGER [not null]
+  shared_to_user_id INTEGER [not null]
+  shared_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table shared_group_decks {
+  id SERIAL [pk]
+  deck_id INTEGER [not null]
+  shared_by_user_id INTEGER [not null]
+  group_pin_id TEXT [not null]
+  shared_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// 8. MÓDULO AI CHAT
+// ============================================================================
+
+Table ai_chat_sessions {
+  id SERIAL [pk]
+  user_id INTEGER [not null]
+  subject_id INTEGER
+  title TEXT
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+Table ai_chat_messages {
+  id SERIAL [pk]
+  session_id INTEGER [not null]
+  role VARCHAR(20) [not null]
+  content TEXT [not null]
+  created_at TIMESTAMP [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// RELACIONES (Foreign Keys)
+// ============================================================================
+
+// Usuarios -> Todo
+Ref: users.id < subjects.user_id
+Ref: users.id < assessments.user_id
+Ref: users.id < assessment_results.user_id
+Ref: users.id < gallery_items.user_id
+Ref: users.id < scanned_documents.user_id
+Ref: users.id < audio_recordings.user_id
+Ref: users.id < youtube_videos.user_id
+Ref: users.id < flashcard_decks.user_id
+Ref: users.id < two_factor_auth.user_id
+Ref: users.id < lms_accounts.user_id
+Ref: users.id < feedback_messages.user_id
+Ref: users.id < card_logs.user_id
+Ref: users.id < card_snoozes.user_id
+Ref: users.id < review_predictions.user_id
+Ref: users.id < learning_analytics.user_id
+Ref: users.id < grading_periods.user_id
+Ref: users.id < subject_threshold_overrides.user_id
+Ref: users.id < study_sessions.user_id
+Ref: users.id < calendar_events.user_id
+Ref: users.id < group_memberships.user_id
+Ref: users.id < groups.creator_user_id
+Ref: users.id < ai_chat_sessions.user_id
+Ref: users.id < shared_decks.shared_by_user_id
+Ref: users.id < shared_decks.shared_to_user_id
+Ref: users.id < shared_group_decks.shared_by_user_id
+
+// Materias -> Hijos
+Ref: subjects.id > photos.subject_id
+Ref: subjects.id > schedules.subject_id
+Ref: subjects.id > assessments.subject_id
+Ref: subjects.id > assessment_categories.subject_id
+Ref: subjects.id > scanned_documents.subject_id
+Ref: subjects.id > audio_recordings.subject_id
+Ref: subjects.id > youtube_videos.subject_id
+Ref: subjects.id > flashcard_decks.subject_id
+Ref: subjects.id > study_sessions.subject_id
+Ref: subjects.id > calendar_events.subject_id
+Ref: subjects.id > learning_analytics.subject_id
+Ref: subjects.id > subject_threshold_overrides.subject_id
+Ref: subjects.id > subject_grade_snapshots.subject_id
+Ref: subjects.id > ai_chat_sessions.subject_id
+
+// Calificaciones
+Ref: assessments.id > assessment_results.assessment_id
+Ref: assessment_results.id > grade_history.assessment_result_id
+Ref: assessments.subject_id > assessment_categories.subject_id
+Ref: grading_systems.id > grading_versions.grading_system_id
+Ref: grading_versions.id > grading_scales.grading_version_id
+Ref: grading_versions.id > assessment_results.grading_version_id
+Ref: grading_versions.id > subject_grade_snapshots.grading_version_id
+
+// Multimedia
+Ref: audio_recordings.id > audio_transcripts.recording_id
+Ref: youtube_videos.id > youtube_transcripts.video_id
+
+// Flashcards
+Ref: flashcard_decks.id > flashcards.deck_id
+Ref: flashcards.id > card_logs.card_id
+Ref: flashcards.id > card_snoozes.card_id
+Ref: flashcards.id > card_difficulty_analytics.card_id
+Ref: flashcards.id > review_predictions.card_id
+Ref: flashcards.parent_card_id - flashcards.id
+
+// Social / Compartir
+Ref: flashcard_decks.id > shared_decks.deck_id
+Ref: flashcard_decks.id > shared_group_decks.deck_id
+
+// Chat
+Ref: ai_chat_sessions.id > ai_chat_messages.session_id
+
+// Grading Systems (auto-referencia)
+Ref: grading_systems.id > grading_systems.based_on_system_id
+
+// ============================================================================
+// ÍNDICES RECOMENDADOS
+// ============================================================================
+
+// Performance: Assessments por materia
+// CREATE INDEX idx_assessments_subject ON assessments(subject_id);
+
+// Performance: Photos por materia
+// CREATE INDEX idx_photos_subject ON photos(subject_id);
+
+// Performance: Resultados por assessment
+// CREATE INDEX idx_assessment_results_assessment ON assessment_results(assessment_id);
+
+// Performance: Flashcards por deck
+// CREATE INDEX idx_flashcards_deck ON flashcards(deck_id);
+
+// Performance: Calendar por usuario
+// CREATE INDEX idx_calendar_user ON calendar_events(user_id);

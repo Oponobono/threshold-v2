@@ -493,3 +493,7 @@ Antes de escribir código, completa:
 ---
 
 *Generado: 2026-07-02. Documento vivo — actualizar con cada cambio de modelo de negocio.*
+
+
+---
+**Tags:** #product

@@ -191,3 +191,7 @@ No mezclarlas.
 ## Principio arquitectónico
 
 > El dominio evoluciona únicamente cuando un consumidor demuestra necesitar nueva información.
+
+
+---
+**Tags:** #architecture

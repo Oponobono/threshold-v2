@@ -118,3 +118,7 @@ El problema que hay que resolver ahora es de **orquestación del arranque**: ide
 2. **schedules.getAll** (466ms) — ¿depende del anterior? ¿duplican trabajo?
 3. **CachePreload** — cuatro `getAll()` casi simultáneos; ¿pueden ser lazy?
 4. **PredictionPolling / ReviewScheduler** — ¿pueden esperar a que la UI sea estable?
+
+
+---
+**Tags:** #architecture

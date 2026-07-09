@@ -89,3 +89,7 @@ Estas son reglas estrictas de la arquitectura que **no pueden romperse nunca**:
 - **NO** utilizar `MMKV` u otro caché temporal para sobreescribir lógica de negocio; SQLite es la única fuente de verdad.
 - **NO** colocar lógicas de recalculo de memoria espaciada en controladores de red (`Express / Node.js`).
 - **NO** forzar la carga de datos con banderas como `skipCache: true` para simular reactividad.
+
+
+---
+**Tags:** #architecture

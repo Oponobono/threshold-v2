@@ -333,3 +333,7 @@
 ---
 
 *Generado: 2026-07-02. Cada journey debe auditarse antes de cerrar un sprint.*
+
+
+---
+**Tags:** #product

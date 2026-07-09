@@ -47,3 +47,7 @@ Todo card del Dashboard debe diseñar explícitamente para los siguientes estado
 2. **Métricas:** 32 tarjetas • 5 materias • ≈19 min
 3. **Desglose:** 🎯 Empieza por: Matemáticas (12 tarjetas). Otras materias: Historia, Inglés...
 4. **Acción:** Hint: "Esta sesión reducirá el riesgo de olvido en Matemáticas." CTA: [Comenzar →]
+
+
+---
+**Tags:** #architecture

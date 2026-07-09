@@ -571,3 +571,7 @@ El cache reemplaza snapshots enteros, nunca muta parcialmente.
 | K2 | Dashboard consume `KnowledgeProvider`. Muestra Estado de Aprendizaje (score, momentum, riesgo, balance, loss projection, tiempo estimado, confianza). Recomendaciones. Web de materias. |
 | K3 | Detalle de materia con salud, memory map, velocity, loss projection. Todo desde el mismo Snapshot. |
 | K4 | IA, notificaciones, calendario y notas consumen `KnowledgeProvider`. No hay cálculos duplicados. Knowledge Authority Matrix respetada. |
+
+
+---
+**Tags:** #logs

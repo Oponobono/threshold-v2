@@ -108,3 +108,7 @@ Y terminar con:
 - [ ] **Consistency Report** ejecutado (documentar diferencias)
 - [ ] **Findings** registrados en la tabla
 - [ ] **Backup** ejecutado si hubo cambios importantes
+
+
+---
+**Tags:** #logs

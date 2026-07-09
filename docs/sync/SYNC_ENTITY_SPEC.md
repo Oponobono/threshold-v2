@@ -267,3 +267,7 @@ Una SyncEntity se considera **oficialmente integrada** cuando:
 | **Convergence Score** | % de entidades que coinciden entre backend y todos los dispositivos |
 | **Asset Pipeline** | Pipeline paralelo para subir/bajar archivos binarios |
 | **LWW** | Last Writer Wins — estrategia de conflicto por defecto |
+
+
+---
+**Tags:** #sync

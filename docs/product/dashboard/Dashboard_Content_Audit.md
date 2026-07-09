@@ -288,3 +288,7 @@ Este principio protege contra dos enemigos distintos: el feature creep (ya cubie
 
 *Este principio se elevará a criterio formal en v1.1 una vez que el producto tenga suficientes usuarios para producir métricas de uso propias.*
 
+
+
+---
+**Tags:** #dashboard

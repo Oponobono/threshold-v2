@@ -52,3 +52,7 @@ Antes de implementar telemetría compleja, durante las próximas 2 semanas, el e
 - *¿Hice scroll involuntario buscando algo?*
 
 **Nota de Diseño:** No se admitirán nuevos bloques (cards) hasta que esta matriz de validación tenga al menos 14 días de datos respaldando su comportamiento actual.
+
+
+---
+**Tags:** #dashboard

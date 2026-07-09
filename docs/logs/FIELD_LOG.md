@@ -38,3 +38,7 @@ No se busca un bug concreto. Se busca responder:
 - **Alta** — funcionalidad degradada, workaround posible
 - **Media** — cosmético, edge case
 - **Baja** — sugerencia, mejora
+
+
+---
+**Tags:** #logs
