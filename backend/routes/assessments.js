@@ -253,19 +253,34 @@ router.get('/assessments/:assessmentId/files', assessmentFilesController.getAsse
 
 /**
  * @swagger
- * /api/assessments/{assessmentId}/files/{fileId}:
+ * /api/assessment-files/{fileId}:
+ *   put:
+ *     summary: Actualizar un archivo de una evaluación (Sync)
+ *     tags: [Assessment Files]
+ *     parameters:
+ *       - name: fileId
+ *         in: path
+ *         required: true
+ *         type: string
+ *     responses:
+ *       200:
+ *         description: Archivo actualizado
+ *       403:
+ *         description: Acceso denegado
+ */
+router.put('/assessment-files/:fileId', assessmentFilesController.updateAssessmentFile);
+
+/**
+ * @swagger
+ * /api/assessment-files/{fileId}:
  *   delete:
  *     summary: Eliminar un archivo de una evaluación
  *     tags: [Assessment Files]
  *     parameters:
- *       - name: assessmentId
- *         in: path
- *         required: true
- *         type: integer
  *       - name: fileId
  *         in: path
  *         required: true
- *         type: integer
+ *         type: string
  *     responses:
  *       200:
  *         description: Archivo eliminado exitosamente
@@ -274,6 +289,6 @@ router.get('/assessments/:assessmentId/files', assessmentFilesController.getAsse
  *       403:
  *         description: Acceso denegado
  */
-router.delete('/assessments/:assessmentId/files/:fileId', assessmentFilesController.deleteAssessmentFile);
+router.delete('/assessment-files/:fileId', assessmentFilesController.deleteAssessmentFile);
 
 module.exports = router;

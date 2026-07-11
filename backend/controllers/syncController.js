@@ -31,7 +31,10 @@ exports.initialSync = (req, res) => {
     audioRecordings: `SELECT * FROM audio_recordings WHERE user_id = ?`,
     audioTranscripts: `SELECT at.* FROM audio_transcripts at JOIN audio_recordings ar ON at.recording_id = ar.id WHERE ar.user_id = ?`,
     scannedDocuments: `SELECT * FROM scanned_documents WHERE user_id = ?`,
+    youtubeVideos: `SELECT * FROM youtube_videos WHERE user_id = ?`,
     youtubeTranscripts: `SELECT yt.* FROM youtube_transcripts yt JOIN youtube_videos yv ON yt.video_id = yv.id WHERE yv.user_id = ?`,
+    aiChats: `SELECT * FROM ai_chats WHERE user_id = ?`,
+    assessmentFiles: `SELECT af.* FROM assessment_files af JOIN assessments a ON af.assessment_id = a.id JOIN subjects s ON a.subject_id = s.id WHERE s.user_id = ?`,
   };
 
   const runQuery = (sql) => {
@@ -69,10 +72,13 @@ exports.initialSync = (req, res) => {
     runQuery(queries.audioRecordings),
     runQuery(queries.audioTranscripts),
     runQuery(queries.scannedDocuments),
+    runQuery(queries.youtubeVideos),
     runQuery(queries.youtubeTranscripts),
+    runQuery(queries.aiChats),
+    runQuery(queries.assessmentFiles),
     getCurrentSyncVersion(),
   ])
-    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, youtubeTranscripts, syncVersion]) => {
+    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, youtubeVideos, youtubeTranscripts, aiChats, assessmentFiles, syncVersion]) => {
       const flashcards = [];
       for (const deck of flashcardDecks) {
         const cards = await new Promise((resolve) => {
@@ -106,7 +112,10 @@ exports.initialSync = (req, res) => {
           audio_recordings: audioRecordings,
           audio_transcripts: audioTranscripts,
           scanned_documents: scannedDocuments,
+          youtube_videos: youtubeVideos,
           youtube_transcripts: youtubeTranscripts,
+          ai_chats: aiChats,
+          assessment_files: assessmentFiles,
         },
       });
     })
@@ -122,9 +131,10 @@ exports.deltaSync = (req, res) => {
   const traceId = req.headers['x-trace-id'] || null;
   if (traceId) console.log(`[SyncController][${traceId}] deltaSync started — version=${version}`);
 
-  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'audio_recordings', 'scanned_documents'];
+  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'audio_recordings', 'scanned_documents', 'youtube_videos', 'ai_chats'];
   const specialTableQueries = {
     assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ? AND ac.sync_version > ?`,
+    assessment_files: `SELECT af.* FROM assessment_files af JOIN assessments a ON af.assessment_id = a.id JOIN subjects s ON a.subject_id = s.id WHERE s.user_id = ? AND af.sync_version > ?`,
     photos: `SELECT p.* FROM photos p JOIN subjects s ON p.subject_id = s.id WHERE s.user_id = ? AND p.sync_version > ?`,
     audio_transcripts: `SELECT at.* FROM audio_transcripts at JOIN audio_recordings ar ON at.recording_id = ar.id WHERE ar.user_id = ? AND at.sync_version > ?`,
     youtube_transcripts: `SELECT yt.* FROM youtube_transcripts yt JOIN youtube_videos yv ON yt.video_id = yv.id WHERE yv.user_id = ? AND yt.sync_version > ?`,

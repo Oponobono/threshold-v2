@@ -90,7 +90,10 @@ export class SyncService {
       { name: 'lms_accounts', type: 'lms-account' },
       { name: 'subject_threshold_overrides', type: 'threshold-overrides' },
       { name: 'study_sessions', type: 'study-session' },
-      { name: 'card_logs', type: 'card-log' }
+      { name: 'card_logs', type: 'card-log' },
+      { name: 'youtube_videos', type: 'youtube-video' },
+      { name: 'ai_chats', type: 'ai-chat' },
+      { name: 'assessment_files', type: 'assessment-file' }
     ];
 
     for (const table of tables) {

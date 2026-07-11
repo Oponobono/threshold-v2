@@ -9,6 +9,11 @@ export interface AiChat {
   cloud_url?: string;
   is_backed_up?: number;
   created_at?: string;
+  updated_at?: string;
+  sync_version?: number;
+  version_number?: number;
+  last_modified_by?: string;
+  deleted_at?: string;
 }
 
 export class AiChatRepository extends BaseRepository<AiChat> {

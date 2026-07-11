@@ -724,5 +724,21 @@ const migrations: Migration[] = [
       // Próximas migraciones: version 32+.
     ],
   },
+  {
+    version: 32,
+    up: [
+      `ALTER TABLE youtube_videos ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE ai_chats ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE ai_chats ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`,
+      `ALTER TABLE ai_chats ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE ai_chats ADD COLUMN last_modified_by TEXT`,
+      `ALTER TABLE user_preferences ADD COLUMN user_id TEXT`,
+      `ALTER TABLE user_preferences ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE user_preferences ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE user_preferences ADD COLUMN last_modified_by TEXT`,
+      `ALTER TABLE user_preferences ADD COLUMN deleted_at TEXT`,
+      `ALTER TABLE assessment_files ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`,
+    ],
+  },
 ];
 export default migrations;

@@ -1,4 +1,4 @@
-# Sync Entity Specification v1.0
+# Sync Entity Specification v1.1
 
 > **Propósito**: Definir formalmente qué significa ser una entidad sincronizable en el Sync Engine de Threshold.
 > Este documento describe el **contrato**, no la implementación. Debe sobrevivir a cambios de base de datos,
@@ -6,17 +6,37 @@
 >
 > Documento relacionado: [`SYNC_PROTOCOL.md`](./SYNC_PROTOCOL.md) — describe el protocolo de sincronización
 > (eventos, flujos, endpoints, conflicto, borrado).
+>
+> **v1.1 — Sprint de Normalización**: Formaliza la Taxonomía de Tablas, los dos Patrones Oficiales de Entidad
+> (Standard y Asset), el Asset Locality Invariant, y actualiza el registro a 21 entidades.
 
 ---
 
-## 1. Definiciones
+## 1. Taxonomía de Tablas
+
+No toda tabla merece sincronizarse. La primera decisión al incorporar una tabla es clasificarla.
+Esta clasificación **no es reversible sin justificación explícita**.
+
+| Categoría | Descripción | Ejemplos |
+|-----------|-------------|----------|
+| **Entidad Sincronizable** | Cumple los 10 invariantes. Participa en Initial Sync, Delta Sync y Push. | `subjects`, `flashcards`, `ai_chats`, `assessment_files` |
+| **Entidad Local** | Existe solo en el dispositivo. No tiene identidad global. | Cachés de UI, flags de sesión |
+| **Infraestructura** | Soporte del protocolo. No representa datos del dominio. | `sync_queue`, `sync_journal`, `sync_debug_logs` |
+| **Legacy / Pendiente de rediseño** | Tabla sin dueño claro, modelo incorrecto, o sin consumidores activos. Excluida del protocolo hasta rediseño formal. | `user_preferences` |
+
+> **Regla**: Si una tabla no puede clasificarse con certeza en la primera fila, no debe entrar al protocolo.
+> La ambigüedad en la clasificación es una señal de diseño incompleto, no un caso especial a resolver con código.
+
+---
+
+## 2. Definiciones
 
 ### Entidad persistente
 Existe en la base de datos. No necesariamente participa en sincronización.
 Ejemplos: logs de auditoría, cachés de analytics, configuraciones efímeras.
 
 ### Entidad sincronizable (SyncEntity)
-Cumple **todos** los invariantes del protocolo (sección 2). Es una ciudadana de primera clase del Sync Engine.
+Cumple **todos** los invariantes del protocolo (sección 3). Es una ciudadana de primera clase del Sync Engine.
 Su estado debe converger en todos los dispositivos que pertenecen al mismo usuario tras cada ciclo de sync.
 
 ### Dependencia
@@ -30,7 +50,7 @@ Asset Pipeline. El metadata (JSON) sigue el protocolo estándar; el blob sigue u
 
 ---
 
-## 2. Invariantes del Protocolo (Sync Entity Contract)
+## 3. Invariantes del Protocolo (Sync Entity Contract)
 
 Estas 10 reglas no son negociables. Si una tabla no cumple una, **no es una entidad sincronizable**.
 
@@ -54,7 +74,70 @@ sean verificables mediante pruebas automáticas (Convergence Suite, Stress Suite
 
 ---
 
-## 3. Ciclo de Vida
+## 4. Los Dos Patrones Oficiales de Entidad
+
+Toda SyncEntity se implementa siguiendo **exactamente uno** de estos dos patrones.
+
+### Patrón A — Standard Entity Pattern
+
+Toda la información de la entidad viaja por el protocolo de sincronización.
+No existen campos específicos del dispositivo ni artefactos binarios.
+
+**Aplica a:** `subjects`, `courses`, `assessments`, `flashcard_decks`, `flashcards`, `calendar_events`,
+`schedules`, `study_sessions`, `grading_periods`, `lms_accounts`, `subject_threshold_overrides`,
+`ai_chats`, `youtube_videos`, `audio_transcripts`, `youtube_transcripts`.
+
+```
+Cliente → sync_queue → PUT /api/{entity}/:id → incrementSyncVersion() → Delta Sync → todos los dispositivos
+```
+
+### Patrón B — Asset Entity Pattern
+
+La entidad se divide en **dos responsabilidades arquitectónicas distintas**:
+
+| Responsabilidad | Propietario | Qué viaja |
+|----------------|------------|----------|
+| **Metadata** | Sync Protocol | `id`, `user_id`, `file_name`, `file_type`, `file_size`, identificador remoto del blob | 
+| **Binario (Blob)** | Asset Pipeline | El archivo físico (PDF, JPG, MP3) |
+
+**Aplica a:** `photos`, `audio_recordings`, `scanned_documents`, `assessment_files`.
+
+```
+Metadata:  Cliente → sync_queue → PUT /api/{entity}/:id → Delta Sync (JSON only)
+Binario:   Cliente → Upload Queue → Uploadthing/Storage Provider → cloud_url
+```
+
+#### Identificador remoto del blob
+
+El campo que apunta al blob en el proveedor de almacenamiento se llama `cloud_url` en el esquema actual,
+pero el patrón es agnóstico al proveedor. Si en el futuro se migra a otro servicio o se usa una
+`storage_key` en lugar de una URL pública, el patrón sigue siendo válido. Lo que importa es que:
+
+- El campo identifica el recurso **de forma global e independiente del dispositivo**.
+- El campo viaja por el Sync Protocol (es parte del metadata).
+- El campo lo actualiza el Asset Pipeline cuando el upload confirma el almacenamiento remoto.
+
+#### Asset Locality Invariant
+
+> **Ningún dato específico del dispositivo puede sincronizarse.**
+
+Ejemplos de datos que **nunca** deben viajar por el protocolo:
+
+- `local_uri` (ruta absoluta del sistema de archivos del dispositivo)
+- Rutas absolutas del SO (`/storage/emulated/...`, `/var/mobile/...`)
+- Identificadores de caché o permisos locales
+- Flags de estado de UI efímera
+
+**Invariante en backend**: Los endpoints de Asset Entities no deben aceptar, almacenar ni devolver
+`local_uri` en ninguna circunstancia. Esta restricción se aplica en el controlador, no en el cliente.
+
+**Invariante en cliente**: El sincronizador (`*Synchronizer.ts`) debe extraer y descartar `local_uri`
+del payload entrante antes de cualquier operación de `upsert`. El Asset Engine (post-descarga) es el
+único sistema autorizado para escribir `local_uri` en la base de datos local.
+
+---
+
+## 5. Ciclo de Vida
 
 ```
   ┌──────────┐
@@ -96,7 +179,7 @@ sean verificables mediante pruebas automáticas (Convergence Suite, Stress Suite
 
 ---
 
-## 4. Checklist de Incorporación
+## 6. Checklist de Incorporación
 
 Al agregar una nueva SyncEntity, verificar cada punto en orden:
 
@@ -149,7 +232,7 @@ Al agregar una nueva SyncEntity, verificar cada punto en orden:
 
 ---
 
-## 5. Perfiles de Entidad
+## 7. Perfiles de Entidad
 
 No todas las SyncEntities son iguales. Se clasifican según su nivel de autonomía:
 
@@ -174,7 +257,7 @@ Ejemplos: `assessment-category` (JOIN con `subject` para filtrar por `user_id`).
 
 ---
 
-## 6. Casos Límite
+## 8. Casos Límite
 
 ### 6.1 CREATE antes de que el padre exista en backend
 
@@ -211,7 +294,7 @@ El `AssetValidator` detecta checksum mismatch post-descarga. La entidad se marca
 
 ---
 
-## 7. Criterios de Certificación
+## 9. Criterios de Certificación
 
 Una SyncEntity se considera **oficialmente integrada** cuando:
 
@@ -227,32 +310,47 @@ Una SyncEntity se considera **oficialmente integrada** cuando:
 
 ---
 
-## 8. Registro de Entidades (18)
+## 10. Registro de Entidades (21)
 
-| Entidad | Tabla | Nivel | Asset | Escenario dedicado |
-|---------|-------|-------|-------|--------------------|
-| subject | `subjects` | A | No | 001–008, 010 |
-| course | `courses` | A | No | 007 |
-| flashcard-deck | `flashcard_decks` | A | No | 009 |
-| flashcard | `flashcards` | B (deck) | No | 009 |
-| assessment | `assessments` | A | No | — (Stress Suite) |
-| assessment-category | `assessment_categories` | D (subject) | No | — (Stress Suite) |
-| schedule | `schedules` | A | No | — (Stress Suite) |
-| calendar-event | `calendar_events` | A | No | — (Stress Suite) |
-| grading-period | `grading_periods` | A | No | — (Stress Suite) |
-| lms-account | `lms_accounts` | A | No | — (Stress Suite) |
-| threshold-override | `subject_threshold_overrides` | A | No | — (Stress Suite) |
-| study-session | `study_sessions` | A | No | — (Stress Suite) |
-| photo | `photos` | A | Sí | — (Stress Suite) |
-| audio-recording | `audio_recordings` | A | Sí | — (Stress Suite) |
-| audio-transcript | `audio_transcripts` | B (recording) | No | 011 |
-| scanned-document | `scanned_documents` | A | Sí | — (Stress Suite) |
-| youtube-video | `youtube_videos` | A | No | — (Stress Suite) |
-| youtube-transcript | `youtube_transcripts` | B (video) | No | — (Stress Suite) |
+> Actualizado en el **Sprint de Normalización Sync v1.0** (Julio 2026).
+> Las entidades marcadas con 🆕 fueron integradas en este sprint.
+
+| Entidad | Tabla | Patrón | Nivel | Asset | Escenario dedicado |
+|---------|-------|--------|-------|-------|--------------------|
+| subject | `subjects` | Standard | A | No | 001–008, 010 |
+| course | `courses` | Standard | A | No | 007 |
+| flashcard-deck | `flashcard_decks` | Standard | A | No | 009 |
+| flashcard | `flashcards` | Standard | B (deck) | No | 009 |
+| assessment | `assessments` | Standard | A | No | — (Stress Suite) |
+| assessment-category | `assessment_categories` | Standard | D (subject) | No | — (Stress Suite) |
+| schedule | `schedules` | Standard | A | No | — (Stress Suite) |
+| calendar-event | `calendar_events` | Standard | A | No | — (Stress Suite) |
+| grading-period | `grading_periods` | Standard | A | No | — (Stress Suite) |
+| lms-account | `lms_accounts` | Standard | A | No | — (Stress Suite) |
+| threshold-override | `subject_threshold_overrides` | Standard | A | No | — (Stress Suite) |
+| study-session | `study_sessions` | Standard | A | No | — (Stress Suite) |
+| photo | `photos` | Asset | A | Sí | — (Stress Suite) |
+| audio-recording | `audio_recordings` | Asset | A | Sí | — (Stress Suite) |
+| audio-transcript | `audio_transcripts` | Standard | B (recording) | No | 011 |
+| scanned-document | `scanned_documents` | Asset | A | Sí | — (Stress Suite) |
+| youtube-video | `youtube_videos` | Standard | A | No | — (Stress Suite) 🆕 |
+| youtube-transcript | `youtube_transcripts` | Standard | B (video) | No | — (Stress Suite) |
+| ai-chat | `ai_chats` | Standard | A | No | — (Stress Suite) 🆕 |
+| assessment-file | `assessment_files` | Asset | B (assessment) | Sí | — (Stress Suite) 🆕 |
+
+### Tabla de Entidades No Sincronizables
+
+| Tabla | Categoría | Razón de exclusión |
+|-------|-----------|--------------------|
+| `card_logs` | Infraestructura / Auditoría | Datos históricos de review. No tienen identidad global. Excluidos intencionalmente del cascade. |
+| `user_preferences` | Legacy / Pendiente de rediseño | PK incorrecta (`key` sin `user_id`). Sin consumidores activos. Requiere rediseño completo antes de sincronizar. |
+| `sync_queue` | Infraestructura | Cola local del protocolo. No es un dato del dominio. |
+| `sync_journal` | Infraestructura | Registro de ciclos de sync. No es un dato del dominio. |
+| `sync_debug_logs` | Infraestructura | Trazabilidad interna. No cruza dispositivos. |
 
 ---
 
-## 9. Glosario
+## 11. Glosario
 
 | Término | Definición |
 |---------|------------|
@@ -266,8 +364,10 @@ Una SyncEntity se considera **oficialmente integrada** cuando:
 | **Consistency Report** | Verificación post-suite: compara backend vs dispositivos |
 | **Convergence Score** | % de entidades que coinciden entre backend y todos los dispositivos |
 | **Asset Pipeline** | Pipeline paralelo para subir/bajar archivos binarios |
+| **Standard Entity Pattern** | Patrón de entidad donde toda la información viaja por el protocolo |
+| **Asset Entity Pattern** | Patrón de entidad donde los metadatos van por el protocolo y el blob por el Asset Pipeline |
+| **Asset Locality Invariant** | Regla que prohíbe sincronizar datos específicos del dispositivo (como `local_uri`) |
 | **LWW** | Last Writer Wins — estrategia de conflicto por defecto |
-
 
 ---
 **Tags:** #sync

@@ -24,6 +24,9 @@ import {
   PhotoSynchronizer,
   AudioSynchronizer,
   DocumentSynchronizer,
+  YouTubeSynchronizer,
+  AiChatSynchronizer,
+  AssessmentFileSynchronizer,
 } from './synchronizers';
 import { assetSyncEngine } from './asset/AssetSyncEngine';
 import { generateConsistencyReport } from './ConsistencyReport';
@@ -77,6 +80,9 @@ class SyncManager {
     this.registerSynchronizer(new PhotoSynchronizer());
     this.registerSynchronizer(new AudioSynchronizer());
     this.registerSynchronizer(new DocumentSynchronizer());
+    this.registerSynchronizer(new YouTubeSynchronizer());
+    this.registerSynchronizer(new AiChatSynchronizer());
+    this.registerSynchronizer(new AssessmentFileSynchronizer());
   }
 
   registerSynchronizer(synchronizer: EntitySynchronizer): void {

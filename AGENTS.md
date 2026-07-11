@@ -87,6 +87,27 @@ Move-Item "$env:TEMP\crash3.log" "C:\Users\cris7\OneDrive\Desktop\crash3.log"
 
 La incorporación de una nueva entidad sincronizable no se considera completa hasta que todos los invariantes sean verificables mediante pruebas automáticas (Convergence Suite, Stress Suite, Consistency Report).
 
+## Taxonomía de Tablas (oficial desde Sprint de Normalización Jul 2026)
+
+No toda tabla merece sincronizarse. Cada tabla pertenece exactamente a una de estas categorías:
+
+| Categoría | Descripción | Ejemplos |
+|-----------|-------------|----------|
+| **Entidad Sincronizable** | Cumple los 10 invariantes. Participa en Initial Sync, Delta Sync y Push. | `subjects`, `flashcards`, `ai_chats`, `assessment_files` |
+| **Entidad Local** | Existe solo en el dispositivo. No tiene identidad global. | Cachés de UI, flags de sesión |
+| **Infraestructura** | Soporte del protocolo. No representa datos del dominio. | `sync_queue`, `sync_journal`, `sync_debug_logs` |
+| **Legacy / Pendiente de rediseño** | Tabla sin dueño claro, modelo incorrecto, o sin consumidores activos. Excluida del protocolo hasta rediseño formal. | `user_preferences` |
+
+> **Regla**: La primera decisión al incorporar una tabla es clasificarla. Si no puede clasificarse con certeza como Entidad Sincronizable, no debe entrar al protocolo. La ambigüedad es una señal de diseño incompleto.
+
+## Dos Patrones Oficiales de Entidad Sincronizable
+
+**Standard Entity Pattern**: toda la información viaja por el Sync Protocol. Aplica a `subjects`, `courses`, `assessments`, `ai_chats`, `youtube_videos`, etc.
+
+**Asset Entity Pattern**: la entidad se divide en (1) Metadata → Sync Protocol y (2) Binario (blob) → Asset Pipeline. El identificador remoto del blob (`cloud_url` o equivalente) sí viaja por el protocolo; la ruta local (`local_uri`) nunca.
+
+**Asset Locality Invariant**: ningún dato específico del dispositivo puede sincronizarse (`local_uri`, rutas absolutas, cachés locales, permisos del SO). Véase `SYNC_ENTITY_SPEC.md` sección 4.
+
 ## Progress
 ### Done
 - **[*NUEVO*] F12 — Double version bump corregido**: `BaseRepository.update()` ahora honra `version_number` explícito cuando se pasa. Sin él, auto-incrementa `COALESCE(version_number,0)+1` como antes. Elimina el doble salto que ocurría vía `ConflictResolver` + `update()`.
@@ -181,6 +202,15 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - **Sprint 7 — Performance Observability**: `PerformanceObserver` (interface domain), `MetricsCollector` (ring buffer + summarize: avg/p50/p95/max), `NullObserver`. Instrumentados 6 stages del pipeline: `snapshot_builder.build`, `entity.build`, `collect_sequences`, `interruption.resolve`, `templates.enrich`, `reconciler.sync`. Integrados en `EngineTraceEntry.stages`. Zero cambios de comportamiento con default NullObserver.
 - **[*FIX*] Deep link disconnect**: `_layout.tsx` ahora lee `data.deeplink` del Reminder Engine primero, con fallback a legacy `data.type`. `NavigationContract.ts` creado con `parseDeeplink()` y `getTargetRoute()` — contrato documentado entre el dominio y la app. 15 tests nuevos. El handler legacy ignoraba los deep links del Engine (threshold://assessments/{id}, etc.).
 - **Reminder System — Engineering Complete (Stable)**: 24 suites, 290 tests, 0 failures. Core, integración, validación, observabilidad, bug de integración corregido. El subsistema se declara estable. El trabajo restante (UX, permisos, validación en dispositivos) pertenece a producto, no a ingeniería del subsistema.
+- **[*NUEVO*] Sprint de Normalización Sync v1.0 — CERRADO (Jul 2026)**:
+  - **Auditoría de cobertura**: 4 entidades identificadas como incompletas (youtube_videos, ai_chats, user_preferences, assessment_files).
+  - **`youtube_videos`** integrada al protocolo: Migration V32, `YouTubeSynchronizer`, Initial + Delta Sync, enqueueLegacyUnsyncedData.
+  - **`ai_chats`** integrada al protocolo: `aiChatsController.js`, rutas dedicadas, `AiChatSynchronizer`, Initial + Delta Sync, enqueueLegacyUnsyncedData. Patrón append-only, orden por `created_at`.
+  - **`user_preferences`** reclasificada como **Legacy / Pendiente de rediseño**: PK incorrecta (`key` sin `user_id`), tabla sin consumidores activos. Excluida del protocolo. No integrar hasta rediseño formal del modelo K/V.
+  - **`assessment_files`** integrada al protocolo (**Asset Entity Pattern**): `assessmentFilesController.js` con version guards, `AssessmentFileSynchronizer` con omisión explícita de `local_uri`, Initial + Delta Sync con JOIN correcto (assessment_files → assessments → subjects → user_id).
+  - **Taxonomía de Tablas formalizada**: 4 categorías oficiales (Sincronizable, Local, Infraestructura, Legacy/Rediseño). Gobernada en `SYNC_ENTITY_SPEC.md`.
+  - **Asset Locality Invariant documentado**: ningún dato específico del dispositivo puede sincronizarse. Aplica a backend (controller) y cliente (synchronizer). Invariante válido independientemente del proveedor de almacenamiento.
+  - **`SYNC_ENTITY_SPEC.md` actualizado a v1.1**: Taxonomía, dos patrones oficiales (Standard / Asset), Asset Locality Invariant, glosario ampliado, registro actualizado a 21 entidades + tabla de entidades no sincronizables.
 
 ### In Progress
 *(Ver Fase Actual → Pendiente)*
@@ -486,6 +516,8 @@ Items que no dependen de la fase actual. Se atienden cuando hay ventana.
 - `backend/controllers/galleryController.js` — incrementSyncVersion + recordDeletion (photos)
 - `backend/controllers/audioController.js` — incrementSyncVersion + recordDeletion (audio_recordings)
 - `backend/controllers/scannedDocumentsController.js` — incrementSyncVersion + recordDeletion (scanned_documents)
+- `backend/controllers/aiChatsController.js` — incrementSyncVersion + recordDeletion (ai_chats) 🆕
+- `backend/controllers/assessmentFilesController.js` — CRUD con version guards, omite local_uri, `AssessmentFileSynchronizer` 🆕
 
 ### Stress Suite (Fase 2)
 - `backend/tests/stress/SimulationEngine.js` — Expandido: 5 perturbaciones (simultaneous sync, latency, packet loss, server restart, partial sync), devices configurables (2/3/5/10), SyncMetrics integration, NetworkController con latency/packet loss

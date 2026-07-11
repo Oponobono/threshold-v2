@@ -13,3 +13,6 @@ export { StudySessionSynchronizer } from './StudySessionSynchronizer';
 export { PhotoSynchronizer } from '../asset/PhotoSynchronizer';
 export { AudioSynchronizer } from '../asset/AudioSynchronizer';
 export { DocumentSynchronizer } from '../asset/DocumentSynchronizer';
+export { YouTubeSynchronizer } from './YouTubeSynchronizer';
+export { AiChatSynchronizer } from './AiChatSynchronizer';
+export { AssessmentFileSynchronizer } from './AssessmentFileSynchronizer';
