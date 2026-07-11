@@ -175,9 +175,15 @@ La incorporación de una nueva entidad sincronizable no se considera completa ha
 - **Sprint 2 (Assets) — Pipeline completo** — AssetSyncEngine, colas upload/download, PersistentLocalAssetStore, 3 synchronizers, AssetValidator. Integrado en SyncManager.
 - **Product Audit Phase** — 4 documentos de auditoría (FEATURE_MATRIX, USER_JOURNEYS, MUTATION_MATRIX, OWNERSHIP_MATRIX).
 - **[Knowledge Domain — Sprints 1-3]** — FSRS consolidado, KnowledgeSnapshot inmutable + 19 tests, KnowledgeHealthCard en Dashboard.
+- **[*NUEVO*] Sprint 6 (Reminder System) completo**: 23 suites, 275 tests, 0 failures. Propiedades fundamentales demostradas (Event Storm, Session Isolation, Delta Convergence, Resync). Dominio puro sin dependencias de infraestructura.
+- **[*NUEVO*] Sprint 6.3 — Frontera dominio/infraestructura blindada**: `createDefault()` y `loadDefaultRepos()` extraídos de `ReminderCoordinator` a `ReminderSystemFactory.ts` (composition root). `createDefaultRepos()` extraído de `ReminderSnapshotBuilder`. 3 bugs latentes corregidos en la fábrica: `registry.register()` pasaba constructores en vez de instancias, `InterruptionPolicy` sin `Clock`, `TemplateResolver` sin `I18nService`. Todos los archivos de dominio ahora son puros — 0 imports de infraestructura en runtime.
+- **[*NUEVO*] Reminder Regression Suite**: `ReminderRegression.test.ts` — 10 tests que cubren los 8 escenarios críticos (Event Storm, Session Isolation, Delta Convergence, Resync, Logout/Login, Double initialize, Double destroy, Event Repetition). Comando: `npx jest --testPathPattern "ReminderRegression"`.
+- **Sprint 7 — Performance Observability**: `PerformanceObserver` (interface domain), `MetricsCollector` (ring buffer + summarize: avg/p50/p95/max), `NullObserver`. Instrumentados 6 stages del pipeline: `snapshot_builder.build`, `entity.build`, `collect_sequences`, `interruption.resolve`, `templates.enrich`, `reconciler.sync`. Integrados en `EngineTraceEntry.stages`. Zero cambios de comportamiento con default NullObserver.
+- **[*FIX*] Deep link disconnect**: `_layout.tsx` ahora lee `data.deeplink` del Reminder Engine primero, con fallback a legacy `data.type`. `NavigationContract.ts` creado con `parseDeeplink()` y `getTargetRoute()` — contrato documentado entre el dominio y la app. 15 tests nuevos. El handler legacy ignoraba los deep links del Engine (threshold://assessments/{id}, etc.).
+- **Reminder System — Engineering Complete (Stable)**: 24 suites, 290 tests, 0 failures. Core, integración, validación, observabilidad, bug de integración corregido. El subsistema se declara estable. El trabajo restante (UX, permisos, validación en dispositivos) pertenece a producto, no a ingeniería del subsistema.
 
 ### In Progress
-*(Ver Fase Actual → Sprint 2)*
+*(Ver Fase Actual → Pendiente)*
 
 ## Fase Actual: Consolidación del Núcleo
 
@@ -200,8 +206,8 @@ Objetivo: garantizar que eliminar un Subject no deje huérfanos en ninguna tabla
 | event bus notifica borrado por tipo | ✅ Verificado |
 | card_logs excluido (política documentada) | ✅ Intencional |
 
-### Sprint 2 — Observabilidad y Performance Budgets 🟡 **EN CURSO**
-*Activo. Próximo a iniciar.*
+### Sprint 2 — Observabilidad y Performance Budgets 🟡 *Pendiente*
+*Planificado. No iniciado.*
 
 No se toca lógica de dominio. Solo instrumentación.
 
@@ -245,19 +251,25 @@ Recién aquí se vuelve a agregar funcionalidad. Prioridad por brecha donde back
 
 ### Batería de Regresión (permanente, paralela a los sprints)
 
-Pruebas que se ejecutan en pocos minutos y aseguran que no se reintroduzcan bugs críticos:
+Pruebas que se ejecutan en < 15s y aseguran que no se reintroduzcan bugs críticos:
 
-- Instalación limpia → bootstrap OK
-- Migración 0→31 completa
-- Abrir/cerrar BD 100 veces sin `database is locked`
-- Crear Subject con todas las entidades hijas
-- Eliminar Subject con cascade (assert 0 orphans)
-- Sincronización inicial (2 dispositivos, converge)
-- Login → logout → login
-- Restaurar backup (con y sin datos locales)
-- Stress Suite smoke (100×2)
+- **[Reminder System]** `npm run test:regression` (10 tests, 8 escenarios)
+  → CI gate: `.github/workflows/reminder-regression.yml`
+- *Pendiente:* Instalación limpia → bootstrap OK
+- *Pendiente:* Migración 0→31 completa
+- *Pendiente:* Abrir/cerrar BD 100 veces sin `database is locked`
+- *Pendiente:* Crear Subject con todas las entidades hijas
+- *Pendiente:* Eliminar Subject con cascade (assert 0 orphans)
+- *Pendiente:* Sincronización inicial (2 dispositivos, converge)
+- *Pendiente:* Login → logout → login
+- *Pendiente:* Restaurar backup (con y sin datos locales)
+- *Pendiente:* Stress Suite smoke (100×2)
 
-**Estado**: pendiente de implementar como script autónomo (`scripts/regression.ps1` o `npm run test:regression`).
+**Comandos**:
+- `npm test` — Jest completo
+- `npm run test:regression` — Solo Regression Suite (10 tests, ~15s)
+- `npm run test:ci` — Suite completa del Reminder System (290 tests)
+- **Gate CI**: se activa en PRs contra `mobile/src/services/reminders/**`. Ejecuta regression suite primero (fallo rápido), luego full suite.
 
 ### Blocked
 - *(none)*
@@ -348,7 +360,7 @@ Pruebas que se ejecutan en pocos minutos y aseguran que no se reintroduzcan bugs
 - **Separación estricta**: `KnowledgeProjection` (orquestación) → `KnowledgeSnapshotBuilder` (dominio puro, testeable sin DB) → `KnowledgeSnapshot` (contrato). El Builder puede dividirse en calculadoras especializadas si crece.
 - **KnowledgeProvider es el único contrato que conocen los consumidores**. Dashboard, IA, Calendario, Notificaciones no importan FSRS, SQLite, retrievability ni `getKnowledgeAggregation()`.
 - **Regla de gobierno del Snapshot**: Ningún consumidor puede solicitar nuevas propiedades al `KnowledgeSnapshot` sin demostrar primero un caso de uso concreto. No se agregan métricas por anticipación.
-- **Próximo sprint (Sprint 2 de la fase actual)**: Observabilidad del Snapshot. Instrumentar timing de `buildSnapshot()`, subjects/decks/cards participantes, razón de invalidez/reconstrucción, hit rate de caché. El dominio permanece congelado — no se agregan propiedades sin un consumidor real que lo justifique.
+- **Observabilidad del Snapshot (Sprint 7)**: Instrumentar timing de `buildSnapshot()`, subjects/decks/cards participantes, razón de invalidez/reconstrucción, hit rate de caché. El dominio permanece congelado — no se agregan propiedades sin un consumidor real que lo justifique.
 - **Dashboard con capas definidas**:
   ```
   Dashboard

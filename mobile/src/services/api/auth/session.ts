@@ -105,6 +105,14 @@ export const hasValidSession = async (): Promise<boolean> => {
  */
 export const signOut = async (): Promise<void> => {
   try {
+    // Detener Reminder Coordinator antes de limpiar datos
+    try {
+      const { resetReminderCoordinator } = require('../../reminders/reminderCoordinatorInstance');
+      resetReminderCoordinator();
+    } catch {
+      // Reminder modules no disponibles (test o entorno sin reminders)
+    }
+
     await storageService.removeSecure('jwt_token');
     await storageService.removeSecure('app_user_email');
     await storageService.removeSecure('app_user_id');

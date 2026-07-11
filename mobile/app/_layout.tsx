@@ -20,6 +20,7 @@ import { DatabaseProvider, useDatabaseReady } from '../src/context/DatabaseConte
 import { hasValidSession } from '../src/services/api/auth/session';
 import { requestPermissions } from '../src/services/notificationService';
 import { registerScheduledBackup } from '../src/services/backup/scheduledBackupService';
+import { parseDeeplink, getTargetRoute } from '../src/services/reminders/NavigationContract';
 import { getScheduledBackupConfig } from '../src/services/backup/backupService';
 import { FloatingYouTubePlayer } from '../src/components/player/FloatingYouTubePlayer';
 import { ErrorBoundary } from '../src/components/ui/ErrorBoundary';
@@ -153,6 +154,19 @@ function RootNavigator() {
   useEffect(() => {
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       const data = response.notification.request.content.data as Record<string, any>;
+
+      // 1. Intentar deeplink del ReminderEngine (threshold://...)
+      const rawDeeplink = data?.deeplink as string | undefined;
+      if (rawDeeplink) {
+        const parsed = parseDeeplink(rawDeeplink);
+        if (parsed) {
+          const route = getTargetRoute(parsed.entityType);
+          router.push({ pathname: route, params: { entityId: parsed.entityId, entityType: parsed.entityType } });
+          return;
+        }
+      }
+
+      // 2. Fallback: legacy data.type (notificationService.ts)
       const type = data?.type as string | undefined;
       if (type === 'deadline') {
         router.push('/calendar');

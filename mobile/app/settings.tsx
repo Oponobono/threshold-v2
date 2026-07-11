@@ -8,18 +8,16 @@ import { theme } from '../src/styles/theme';
 import { settingsStyles as styles } from '../src/styles/Settings.styles';
 import { alertRef } from '../src/components/ui/CustomAlert';
 import * as Clipboard from 'expo-clipboard';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettingsLogic } from '../src/hooks/useSettingsLogic';
 import { useBackupLogic } from '../src/hooks/useBackupLogic';
+import { useReminderSettings } from '../src/hooks/useReminderSettings';
+import type { ReminderProfileName } from '../src/hooks/useReminderSettings';
 import { EditProfileModal } from '../src/components/modals/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/modals/DeleteAccountModal';
-import { WeeklySummaryPicker } from '../src/components/settings/WeeklySummaryPicker';
 import { LocalAIEngineSection } from '../src/components/settings/LocalAIEngineSection';
 import { OfflineIndicator } from '../src/components/ui/OfflineIndicator';
-import type { WeeklyDigestConfig } from '../src/services/notificationService';
-import { cancelAllDeadlineNotifications, cancelWeeklyDigest, scheduleWeeklyDigest } from '../src/services/notificationService';
 import {
   AddTermModal,
   ManageOverridesModal,
@@ -31,6 +29,8 @@ import {
   SendFeedbackModal,
   CreateGroupModal,
   ZyrenInfoModal,
+  ActiveRemindersModal,
+  PersonalizeRemindersModal,
 } from '../src/components/settings';
 
 /**
@@ -59,19 +59,17 @@ const SettingRow = ({ title, desc, right }: { title: string; desc?: string; righ
  * general de la cuenta. Toda la lógica de estado y peticiones a la API
  * se ha extraído al hook `useSettingsLogic`.
  */
-const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
-
 export default function SettingsScreen() {
   const [academicExpanded, setAcademicExpanded] = useState(false);
   const [gradeScalesExpanded, setGradeScalesExpanded] = useState(false);
   const [backupExpanded, setBackupExpanded] = useState(false);
   const [languageExpanded, setLanguageExpanded] = useState(false);
-  const [notificationsExpanded, setNotificationsExpanded] = useState(true);
+  const [remindersExpanded, setRemindersExpanded] = useState(true);
   const [securityExpanded, setSecurityExpanded] = useState(false);
   const [collaborationExpanded, setCollaborationExpanded] = useState(false);
-  const [showWeeklyPicker, setShowWeeklyPicker] = useState(false);
-  const [weeklyConfig, setWeeklyConfig] = useState<WeeklyDigestConfig | null>(null);
   const [isZyrenInfoVisible, setIsZyrenInfoVisible] = useState(false);
+  const [isActiveRemindersVisible, setIsActiveRemindersVisible] = useState(false);
+  const [isPersonalizeRemindersVisible, setIsPersonalizeRemindersVisible] = useState(false);
   const {
     t,
     router,
@@ -85,12 +83,6 @@ export default function SettingsScreen() {
     selectedSystemId,
     setSelectedSystemId,
     isLoadingSystems,
-    notifDeadline,
-    setNotifDeadline,
-    notifWeekly,
-    setNotifWeekly,
-    notifEmail,
-    setNotifEmail,
     biometric,
     calendarSync,
     setCalendarSync,
@@ -180,7 +172,7 @@ export default function SettingsScreen() {
     twoFactorEnabled,
   } = useSettingsLogic();
 
-  const anyNotifActive = notifDeadline || notifWeekly || notifEmail;
+  const reminderCtx = useReminderSettings();
 
   const {
     prefs: backupPrefs,
@@ -480,49 +472,81 @@ export default function SettingsScreen() {
         <LocalAIEngineSection />
 
         {/* ─────────────────────────────────────────── */}
-        {/* ── NOTIFICATIONS ── */}
+        {/* ── RECORDATORIOS ── */}
         {/* ─────────────────────────────────────────── */}
         <View style={styles.section}>
           <TouchableOpacity
-            onPress={() => setNotificationsExpanded(prev => !prev)}
+            onPress={() => setRemindersExpanded(prev => !prev)}
             style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
           >
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons
-                  name={anyNotifActive ? 'notifications' : 'notifications-off-outline'}
-                  size={18}
-                  color={anyNotifActive ? theme.colors.primary : theme.colors.text.secondary}
-                />
+                <Ionicons name="notifications" size={18} color={theme.colors.primary} />
                 <Text style={styles.sectionTitle}>{t('notifications.title')}</Text>
               </View>
               <Text style={styles.sectionDesc}>{t('notifications.desc')}</Text>
             </View>
-            <Ionicons name={notificationsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+            <Ionicons name={remindersExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
           </TouchableOpacity>
 
-          {notificationsExpanded && (
+          {remindersExpanded && (
             <>
-          <SettingRow
-            title={t('notifications.deadlineAlerts')} desc={t('notifications.deadlineAlertsDesc')}
-            right={<Switch value={notifDeadline} onValueChange={(v) => { setNotifDeadline(v); AsyncStorage.setItem('notif_deadline', String(v)); if (!v) cancelAllDeadlineNotifications(); alertRef.show({ title: v ? t('settings.notifDeadlineEnabled') : t('settings.notifDeadlineDisabled'), message: v ? t('settings.notifDeadlineEnabledMsg') : t('settings.notifDeadlineDisabledMsg'), type: v ? 'success' : 'info', buttons: [{ text: t('common.ok') }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
-          />
+              {!reminderCtx.health.permissionGranted && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF950015', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+                  <Ionicons name="warning" size={16} color="#FF9500" style={{ marginRight: 8 }} />
+                  <Text style={{ flex: 1, fontSize: 12, color: '#FF9500' }}>
+                    {t('reminders.healthNoPermission', 'Permisos de sistema desactivados')}
+                  </Text>
+                </View>
+              )}
+
+              <SettingRow
+                title={t('reminders.globalProfile', 'Perfil de recordatorios')}
+                desc={reminderCtx.getProfileLabelName(reminderCtx.globalProfile)}
+                right={
+                  <TouchableOpacity style={[styles.outlinePill, { minWidth: 90, justifyContent: 'center' }]} onPress={() => setIsPersonalizeRemindersVisible(true)}>
+                    <Text style={[styles.outlinePillText, { textAlign: 'center' }]}>{t('common.manage', 'Gestionar')}</Text>
+                  </TouchableOpacity>
+                }
+              />
+
+              <SettingRow
+                title={t('reminders.activeReminders', 'Recordatorios activos')}
+                desc={t('reminders.activeCount', { count: reminderCtx.health.scheduledCount })}
+                right={
+                  <TouchableOpacity style={[styles.outlinePill, { minWidth: 90, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' }]} onPress={() => setIsActiveRemindersVisible(true)}>
+                    <Ionicons name="eye-outline" size={14} color={theme.colors.text.secondary} style={{ marginRight: 4 }} />
+                    <Text style={[styles.outlinePillText, { textAlign: 'center' }]} numberOfLines={1}>{t('common.view', 'Ver')}</Text>
+                  </TouchableOpacity>
+                }
+              />
+            </>
+          )}
+        </View>
+
+        {/* ─────────────────────────────────────────── */}
+        {/* ── PRODUCTIVIDAD ── */}
+        {/* ─────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="timer-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={styles.sectionTitle}>{t('productivity.title', 'Productividad')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('productivity.desc', 'Resumen semanal y hábitos')}</Text>
+            </View>
+            <Ionicons name="chevron-down" size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+          </View>
           <SettingRow
             title={t('notifications.weeklyDigest')}
-            desc={weeklyConfig
-              ? t('notifications.weeklyDigestDescFmt', {
-                  day: t(`notifications.day.${DAYS[weeklyConfig.dayOfWeek]}`),
-                  time: `${weeklyConfig.hour.toString().padStart(2, '0')}:${weeklyConfig.minute.toString().padStart(2, '0')}`,
-                })
-              : t('notifications.weeklyDigestDesc')}
-            right={<Switch value={notifWeekly} onValueChange={(v) => { if (v) setShowWeeklyPicker(true); else { setNotifWeekly(false); AsyncStorage.setItem('notif_weekly', 'false'); cancelWeeklyDigest(); alertRef.show({ title: t('settings.notifWeeklyDisabled'), message: t('settings.notifWeeklyDisabledMsg'), type: 'info', buttons: [{ text: t('common.ok') }] }); } }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
+            desc={t('productivity.weeklyDigestComingSoon', 'Disponible próximamente')}
+            right={
+              <View style={[styles.activeBadge, { opacity: 0.5 }]}>
+                <Text style={[styles.activeBadgeText, { fontSize: 10 }]}>{t('common.comingSoon', 'Próximamente')}</Text>
+              </View>
+            }
           />
-          <SettingRow
-            title={t('notifications.emailNotif')} desc={t('notifications.emailNotifDesc')}
-            right={<Switch value={notifEmail} onValueChange={(v) => { setNotifEmail(v); alertRef.show({ title: v ? t('settings.notifEmailEnabled') : t('settings.notifEmailDisabled'), message: v ? t('settings.notifEmailEnabledMsg') : t('settings.notifEmailDisabledMsg'), type: v ? 'success' : 'info', buttons: [{ text: t('common.ok') }] }); }} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} thumbColor={theme.colors.white} />}
-          />
-          </>
-          )}
         </View>
 
         {/* ─────────────────────────────────────────── */}
@@ -1197,19 +1221,6 @@ export default function SettingsScreen() {
         onSubmit={handleSendFeedback}
       />
 
-      <WeeklySummaryPicker
-        visible={showWeeklyPicker}
-        initialConfig={weeklyConfig ?? undefined}
-        onSave={(config) => {
-          setWeeklyConfig(config);
-          setNotifWeekly(true);
-          AsyncStorage.setItem('notif_weekly', 'true');
-          AsyncStorage.setItem('weekly_config', JSON.stringify(config));
-          scheduleWeeklyDigest(config);
-        }}
-        onClose={() => setShowWeeklyPicker(false)}
-      />
-
       <CreateGroupModal
         visible={isCreateGroupVisible}
         isCreating={isCreatingGroup}
@@ -1220,6 +1231,17 @@ export default function SettingsScreen() {
       <ZyrenInfoModal
         visible={isZyrenInfoVisible}
         onClose={() => setIsZyrenInfoVisible(false)}
+      />
+
+      <ActiveRemindersModal
+        visible={isActiveRemindersVisible}
+        onClose={() => setIsActiveRemindersVisible(false)}
+      />
+
+      <PersonalizeRemindersModal
+        visible={isPersonalizeRemindersVisible}
+        onClose={() => setIsPersonalizeRemindersVisible(false)}
+        reminderCtx={reminderCtx}
       />
 
     </SafeAreaView>

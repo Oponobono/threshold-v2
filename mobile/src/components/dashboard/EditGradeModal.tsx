@@ -159,6 +159,12 @@ export const EditGradeModal = ({ visible, onClose, assessment, subjects, onAsses
       console.log('[EditGradeModal] 🔄 Refrescando store...', { refreshSubjects: !!refreshSubjects, refreshAssessments: !!refreshAssessments });
       await Promise.all([refreshSubjects(), refreshAssessments()]);
       console.log('[EditGradeModal] ✅ Store refrescado exitosamente');
+
+      try {
+        const { getReminderCoordinator } = require('../../services/reminders/reminderCoordinatorInstance');
+        getReminderCoordinator().handleActionCompleted('assessment', assessment.id);
+      } catch {}
+
       handleClose();
     } catch (error: any) {
       console.error('[EditGradeModal] ❌ Error al guardar:', { message: error?.message, error });

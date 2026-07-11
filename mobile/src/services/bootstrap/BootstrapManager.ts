@@ -200,6 +200,28 @@ class BootstrapManager {
         console.log('[BOOT 14] App ready');
       });
 
+      // Fire-and-forget: Reminder Coordinator + EventBus + Sync subscription
+      (async () => {
+        try {
+          const { getReminderCoordinator } = await import('../reminders/reminderCoordinatorInstance');
+          await getReminderCoordinator().initialize();
+          getReminderCoordinator().subscribeToEventBus();
+
+          // Re-sync reminders after each sync cycle
+          syncManager.subscribe((event) => {
+            if (event.type === 'complete' && event.result?.success) {
+              getReminderCoordinator().resync().catch((err: unknown) =>
+                console.warn('[BOOT 14r] Reminder resync after sync failed:', err)
+              );
+            }
+          });
+
+          console.log('[BOOT 14r] Reminder Coordinator + EventBus + Sync initialized');
+        } catch (err) {
+          console.warn('[BOOT 14r] Reminder init failed (non-blocking):', err);
+        }
+      })();
+
       // Fire-and-forget: MomentumService no debe competir con queries del bootstrap
       MomentumService.updateAllMomentumScores().catch(err =>
         console.warn('[BOOT 14a] Momentum recalculation error:', err)

@@ -360,7 +360,13 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
           setConfusionSuggestions(result.suggestions ?? []);
         }
       })
-      .finally(() => setIsAnalyzingConfusions(false));
+      .finally(() => {
+        setIsAnalyzingConfusions(false);
+        try {
+          const { getReminderCoordinator } = require('../../services/reminders/reminderCoordinatorInstance');
+          getReminderCoordinator().handleActionCompleted('flashcard_deck', activeDeck.id);
+        } catch {}
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionDone]);
 

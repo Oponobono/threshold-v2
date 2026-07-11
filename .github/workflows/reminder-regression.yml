@@ -1,0 +1,48 @@
+name: Reminder System — Regression Gate
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/src/services/reminders/**'
+      - 'mobile/src/services/events/RepositoryEventBus.ts'
+      - 'mobile/package.json'
+      - 'mobile/jest.config.js'
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/src/services/reminders/**'
+      - 'mobile/src/services/events/RepositoryEventBus.ts'
+      - 'mobile/package.json'
+      - 'mobile/jest.config.js'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  regression-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regression Suite (fast gate)
+        run: npx jest --testPathPattern "ReminderRegression" --no-cache
+        env:
+          CI: true
+
+      - name: Full Reminder Test Suite (275 tests)
+        run: npx jest --testPathPattern "services/reminders/__tests__" --no-cache
+        env:
+          CI: true

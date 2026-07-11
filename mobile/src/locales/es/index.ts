@@ -28,6 +28,8 @@ import assessments from './assessments.json';
 import categories from './categories.json';
 import tasks from './tasks.json';
 import knowledge from './knowledge.json';
+import reminders from './reminders.json';
+import productivity from './productivity.json';
 
 const es = {
   about,
@@ -60,6 +62,8 @@ const es = {
   categories,
   tasks,
   knowledge,
+  reminders,
+  productivity,
 };
 
 export default es;

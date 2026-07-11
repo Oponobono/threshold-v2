@@ -9,6 +9,8 @@
     "web": "cross-env NODE_OPTIONS=--max-old-space-size=8192 expo start --web",
     "lint": "expo lint",
     "test": "jest --passWithNoTests",
+    "test:regression": "jest --testPathPattern \"ReminderRegression\"",
+    "test:ci": "jest --testPathPattern \"services/reminders/__tests__\"",
     "postinstall": "node -e \"try{const s='node_modules/@react-native/debugger-frontend/dist/third-party/front_end/core/i18n/locales';const f=require('fs');const d=f.readdirSync(s);if(!d.includes('es-419.json')){f.copyFileSync(s+'/en-US.json',s+'/es-419.json');console.log('postinstall: created es-419.json fallback for debugger')}}catch(e){}\""
   },
   "dependencies": {

@@ -57,6 +57,11 @@ export const CompleteTaskModal = ({ visible, onClose, task }: CompleteTaskModalP
         type: 'success' 
       });
       
+      try {
+        const { getReminderCoordinator } = require('../../services/reminders/reminderCoordinatorInstance');
+        getReminderCoordinator().handleActionCompleted('assessment', task.id);
+      } catch {}
+
       await Promise.all([refreshSubjects(), refreshAssessments()]);
       handleClose();
     } catch (error: any) {

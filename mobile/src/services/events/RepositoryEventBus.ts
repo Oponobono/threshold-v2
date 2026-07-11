@@ -117,6 +117,13 @@ export class RepositoryEventBus {
     this._listeners.get(entityType)?.delete(handler);
   }
 
+  listenerCount(entityType?: string): number {
+    if (entityType) {
+      return this._listeners.get(entityType)?.size ?? 0;
+    }
+    return this._wildcardListeners.size;
+  }
+
   removeAll(): void {
     this._listeners.clear();
     this._batchListeners.clear();
