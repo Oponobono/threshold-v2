@@ -524,6 +524,11 @@ export const downloadCloudItems = async (
       errors: result.errors,
       skipped: result.skipped,
     });
+    // Ceder el JS Event Loop entre cada tarea para que React Native pueda:
+    // 1. Repintar la UI con el progreso actualizado.
+    // 2. Ejecutar el GC y liberar la memoria del archivo recién descargado.
+    // 3. Responder a los heartbeats del SO (evita ANR / cierre de sesión).
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   console.log(`[DownloadService] Finalizado: descargadas=${result.downloaded}, saltadas=${result.skipped}, errores=${result.errors}`);

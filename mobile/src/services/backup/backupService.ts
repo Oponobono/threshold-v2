@@ -1143,14 +1143,15 @@ export const runBackup = async (
     });
   }
 
-  // Ejecutar todas las tareas secuencialmente con progreso
+  // Ejecutar todas las tareas en lotes con pausas para no bloquear el UI ni el Event Loop
   const total = tasks.length;
   let done = 0;
-
   for (const task of tasks) {
     await task();
     done++;
     onProgress?.({ total, done, current: `${done}/${total}`, errors });
+    // Ceder el JS Event Loop entre cada tarea para evitar ANR / OOM
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   // Guardar fecha del último backup
