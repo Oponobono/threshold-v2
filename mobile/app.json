@@ -66,6 +66,7 @@
           }
         }
       ],
+      "expo-notifications",
       "expo-sqlite",
       "expo-secure-store",
       "@react-native-community/datetimepicker",

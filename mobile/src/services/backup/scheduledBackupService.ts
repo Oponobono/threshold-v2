@@ -20,6 +20,8 @@ import {
   updateBackupUploadNotification,
   cancelBackupUploadNotification,
 } from '../notificationService';
+import { databaseService } from '../database/DatabaseService';
+import { initializeApiClient } from '../api/client';
 
 export const BACKUP_TASK_NAME = 'threshold-scheduled-backup';
 
@@ -28,6 +30,10 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
   try {
     const now = new Date();
     console.log(`[ScheduledBackup] 🕐 Task ejecutado por el sistema a las ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
+
+    // Inicializar dependencias críticas (en background no se ejecuta BootstrapManager ni React)
+    await databaseService.open();
+    await initializeApiClient();
 
     const config = await getScheduledBackupConfig();
     if (!config.enabled) {
