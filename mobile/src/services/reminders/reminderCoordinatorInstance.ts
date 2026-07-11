@@ -9,8 +9,8 @@ export function getReminderCoordinator(): ReminderCoordinator {
     _instance = createDefaultReminderCoordinator(undefined, {
       i18n: {
         translate(key: string, params?: Record<string, any>): string {
-          // Aseguramos que busque en el namespace 'reminders'
-          const i18nKey = `reminders:${key}`;
+          // Aseguramos que busque bajo la clave 'reminders' en el namespace por defecto
+          const i18nKey = `reminders.${key}`;
           const translated = i18n.t(i18nKey, params);
           return translated !== i18nKey ? translated : (params?.default ?? key);
         }

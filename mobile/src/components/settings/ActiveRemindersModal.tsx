@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { getAllScheduledNotificationsAsync } from 'expo-notifications';
@@ -12,10 +12,13 @@ interface Props {
   onClose: () => void;
 }
 
+const GOLD = '#C5A059';
+
 export const ActiveRemindersModal: React.FC<Props> = ({ visible, onClose }) => {
   const { t } = useTranslation();
   const [scheduled, setScheduled] = useState<NotificationRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [infoVisible, setInfoVisible] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -70,11 +73,123 @@ export const ActiveRemindersModal: React.FC<Props> = ({ visible, onClose }) => {
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: 0 }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('reminders.activeReminders', 'Recordatorios activos')}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
-            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { flex: 1 }]}>{t('reminders.activeReminders', 'Recordatorios activos')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <TouchableOpacity
+                onPress={() => setInfoVisible(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="information-circle" size={22} color={GOLD} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+              </TouchableOpacity>
+            </View>
           </View>
+
+          {/* ── Info tooltip modal ── */}
+          <Modal
+            transparent
+            visible={infoVisible}
+            animationType="fade"
+            onRequestClose={() => setInfoVisible(false)}
+          >
+            <Pressable
+              style={{
+                flex: 1,
+                backgroundColor: 'rgba(0,0,0,0.45)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingHorizontal: 32,
+              }}
+              onPress={() => setInfoVisible(false)}
+            >
+              <Pressable
+                style={{
+                  backgroundColor: theme.colors.white,
+                  borderRadius: 16,
+                  padding: 24,
+                  width: '100%',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.18,
+                  shadowRadius: 16,
+                  elevation: 12,
+                }}
+                onPress={() => {}}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                  <View style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: `${GOLD}18`,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 10,
+                  }}>
+                    <Ionicons name="notifications-outline" size={18} color={GOLD} />
+                  </View>
+                  <Text style={{
+                    fontSize: 16,
+                    fontWeight: '700',
+                    color: theme.colors.text.primary,
+                    flex: 1,
+                  }}>
+                    {t('reminders.infoTitle', '¿Cómo funcionan los recordatorios?')}
+                  </Text>
+                </View>
+
+                <Text style={{
+                  fontSize: 13,
+                  color: theme.colors.text.secondary,
+                  lineHeight: 20,
+                  marginBottom: 10,
+                }}>
+                  {t(
+                    'reminders.infoBody1',
+                    'Los recordatorios se crean automáticamente. Tú no necesitas configurarlos aquí de forma manual.',
+                  )}
+                </Text>
+                <Text style={{
+                  fontSize: 13,
+                  color: theme.colors.text.secondary,
+                  lineHeight: 20,
+                  marginBottom: 10,
+                }}>
+                  {t(
+                    'reminders.infoBody2',
+                    'Cuando agregas una evaluación, un evento en el calendario o un horario de clase, el motor de Threshold programa los avisos automáticamente según el perfil que hayas configurado (Mínimo, Estándar, Persistente).',
+                  )}
+                </Text>
+                <Text style={{
+                  fontSize: 13,
+                  color: theme.colors.text.secondary,
+                  lineHeight: 20,
+                }}>
+                  {t(
+                    'reminders.infoBody3',
+                    'Esta pantalla es solo una ventana de observabilidad para que puedas ver cuándo y cuántos avisos tiene el sistema programados para ti.',
+                  )}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => setInfoVisible(false)}
+                  style={{
+                    marginTop: 20,
+                    backgroundColor: GOLD,
+                    borderRadius: 10,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                    {t('common.understood', 'Entendido')}
+                  </Text>
+                </TouchableOpacity>
+              </Pressable>
+            </Pressable>
+          </Modal>
           
           {loading ? (
             <View style={{ padding: 40, alignItems: 'center' }}>

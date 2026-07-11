@@ -167,6 +167,7 @@ export function useReminderSettings() {
     customizeCategory,
     resetCategoryToGlobal,
     setCustomOffsets,
+    setCategoryEnabled,
     getCategoryProfile,
     getCategoryLabel,
     getProfileLabelName,

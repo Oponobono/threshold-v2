@@ -62,5 +62,9 @@
     "submit_work": "The deadline for {{entity}} is approaching.",
     "digest": "Here is your weekly digest for {{entity}}.",
     "follow_up": "Don't forget to follow up on {{entity}}."
-  }
+  },
+  "infoTitle": "How do reminders work?",
+  "infoBody1": "Reminders are created automatically. You don't need to configure them here manually.",
+  "infoBody2": "When you add an assessment, a calendar event, or a class schedule, Threshold's engine automatically schedules alerts based on the profile you've configured (Minimal, Standard, Persistent).",
+  "infoBody3": "This screen is just an observability window so you can see how many alerts the system has scheduled for you and when."
 }

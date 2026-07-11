@@ -62,5 +62,9 @@
     "submit_work": "Se acerca la fecha límite para entregar {{entity}}.",
     "digest": "Aquí tienes tu resumen semanal de {{entity}}.",
     "follow_up": "No olvides hacer seguimiento a {{entity}}."
-  }
+  },
+  "infoTitle": "¿Cómo funcionan los recordatorios?",
+  "infoBody1": "Los recordatorios se crean automáticamente. Tú no necesitas configurarlos aquí de forma manual.",
+  "infoBody2": "Cuando agregas una evaluación, un evento en el calendario o un horario de clase, el motor de Threshold programa los avisos automáticamente según el perfil que hayas configurado (Mínimo, Estándar, Persistente).",
+  "infoBody3": "Esta pantalla es solo una ventana de observabilidad para que puedas ver cuándo y cuántos avisos tiene el sistema programados para ti."
 }
