@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
@@ -55,16 +55,24 @@ export const ZyrenInfoModal: React.FC<Props> = ({ visible, onClose }) => {
   const { t } = useTranslation();
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { maxHeight: '85%' }]}>
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
+        </TouchableWithoutFeedback>
+        
+        <View style={[styles.bottomSheetModalContent, { maxHeight: '85%', width: '100%', maxWidth: 600 }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Zyren</Text>
-            <TouchableOpacity onPress={onClose}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="sparkles" size={20} color={theme.colors.primary} />
+              <Text style={styles.modalTitle}>Zyren</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons name="close" size={24} color={theme.colors.text.primary} />
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+
+          <ScrollView style={[styles.modalBody, { marginTop: 10 }]} showsVerticalScrollIndicator={false}>
             <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.primary, marginBottom: 12, lineHeight: 22 }}>
               {t('settings.zyren.cognitiveCore')}
             </Text>
@@ -107,11 +115,6 @@ export const ZyrenInfoModal: React.FC<Props> = ({ visible, onClose }) => {
               {t('settings.zyren.final')}
             </Text>
           </ScrollView>
-          <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.modalBtnPrimary} onPress={onClose}>
-              <Text style={styles.modalBtnPrimaryText}>{t('common.close')}</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </Modal>

@@ -64,7 +64,7 @@ export default function SettingsScreen() {
   const [gradeScalesExpanded, setGradeScalesExpanded] = useState(false);
   const [backupExpanded, setBackupExpanded] = useState(false);
   const [languageExpanded, setLanguageExpanded] = useState(false);
-  const [remindersExpanded, setRemindersExpanded] = useState(true);
+  const [remindersExpanded, setRemindersExpanded] = useState(false);
   const [securityExpanded, setSecurityExpanded] = useState(false);
   const [collaborationExpanded, setCollaborationExpanded] = useState(false);
   const [isZyrenInfoVisible, setIsZyrenInfoVisible] = useState(false);
@@ -490,7 +490,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           {remindersExpanded && (
-            <>
+            <View style={{ marginTop: 16 }}>
               {!reminderCtx.health.permissionGranted && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF950015', padding: 12, borderRadius: 8, marginBottom: 12 }}>
                   <Ionicons name="warning" size={16} color="#FF9500" style={{ marginRight: 8 }} />
@@ -520,34 +520,11 @@ export default function SettingsScreen() {
                   </TouchableOpacity>
                 }
               />
-            </>
+            </View>
           )}
         </View>
 
-        {/* ─────────────────────────────────────────── */}
-        {/* ── PRODUCTIVIDAD ── */}
-        {/* ─────────────────────────────────────────── */}
-        <View style={styles.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="timer-outline" size={18} color={theme.colors.text.secondary} />
-                <Text style={styles.sectionTitle}>{t('productivity.title', 'Productividad')}</Text>
-              </View>
-              <Text style={styles.sectionDesc}>{t('productivity.desc', 'Resumen semanal y hábitos')}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
-          </View>
-          <SettingRow
-            title={t('notifications.weeklyDigest')}
-            desc={t('productivity.weeklyDigestComingSoon', 'Disponible próximamente')}
-            right={
-              <View style={[styles.activeBadge, { opacity: 0.5 }]}>
-                <Text style={[styles.activeBadgeText, { fontSize: 10 }]}>{t('common.comingSoon', 'Próximamente')}</Text>
-              </View>
-            }
-          />
-        </View>
+
 
         {/* ─────────────────────────────────────────── */}
         {/* ── BACKUP & SYNC ── */}
@@ -936,21 +913,6 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        {/* ─────────────────────────────────────────── */}
-        {/* ── INTEGRATIONS ── */}
-        {/* ─────────────────────────────────────────── */}
-        <View style={[styles.section, { opacity: 0.5 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="extension-puzzle-outline" size={18} color={theme.colors.text.secondary} />
-                <Text style={[styles.sectionTitle, { color: theme.colors.text.secondary }]}>{t('integrations.title')}</Text>
-              </View>
-              <Text style={styles.sectionDesc}>{t('integrations.desc')}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
-          </View>
-        </View>
 
         {/* ─────────────────────────────────────────── */}
         {/* ── COLLABORATION ── */}
@@ -1024,21 +986,6 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        {/* ─────────────────────────────────────────── */}
-        {/* ── DATA EXPORT & RESET ── */}
-        {/* ─────────────────────────────────────────── */}
-        <View style={[styles.section, { opacity: 0.5 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="document-text-outline" size={18} color={theme.colors.text.secondary} />
-                <Text style={[styles.sectionTitle, { color: theme.colors.text.secondary }]}>{t('integrations.dataExport')}</Text>
-              </View>
-              <Text style={styles.sectionDesc}>{t('integrations.dataExportDesc')}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
-          </View>
-        </View>
 
         {/* ─────────────────────────────────────────── */}
         {/* ── DEVELOPER CONSOLE ── */}
@@ -1081,7 +1028,7 @@ export default function SettingsScreen() {
           <SettingRow
             title={t('about.faq')} desc=""
             right={
-              <TouchableOpacity style={styles.darkPill} onPress={() => setIsFaqVisible(true)}>
+              <TouchableOpacity style={[styles.darkPill, { minWidth: 95 }]} onPress={() => setIsFaqVisible(true)}>
                 <Text style={styles.darkPillText}>{t('about.open')}</Text>
               </TouchableOpacity>
             }
@@ -1090,7 +1037,7 @@ export default function SettingsScreen() {
             title={t('settings.zyrenAITitle')}
             desc={t('settings.zyrenAIDesc')}
             right={
-              <TouchableOpacity style={styles.darkPill} onPress={() => setIsZyrenInfoVisible(true)}>
+              <TouchableOpacity style={[styles.darkPill, { minWidth: 95 }]} onPress={() => setIsZyrenInfoVisible(true)}>
                 <Ionicons name="sparkles" size={14} color="#fff" style={{ marginRight: 4 }} />
                 <Text style={styles.darkPillText}>{t('common.info')}</Text>
               </TouchableOpacity>
@@ -1099,7 +1046,7 @@ export default function SettingsScreen() {
           <SettingRow
             title={t('about.sendFeedback')} desc=""
             right={
-              <TouchableOpacity style={styles.darkPill} onPress={() => setIsFeedbackVisible(true)}>
+              <TouchableOpacity style={[styles.darkPill, { minWidth: 95 }]} onPress={() => setIsFeedbackVisible(true)}>
                 <Text style={styles.darkPillText}>{t('about.send')}</Text>
               </TouchableOpacity>
             }
@@ -1107,6 +1054,51 @@ export default function SettingsScreen() {
           <View style={[styles.settingRow, { marginTop: 4 }]}>
             <Text style={styles.settingDesc}>{t('about.appVersion')}</Text>
             <Text style={styles.versionText}>{t('about.version')}</Text>
+          </View>
+        </View>
+
+      <View style={[styles.section, { opacity: 0.5 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="timer-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.text.secondary }]}>{t('productivity.title', 'Productividad')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('productivity.desc', 'Resumen semanal y hábitos')}</Text>
+            </View>
+            <View style={[styles.activeBadge, { backgroundColor: theme.colors.border }]}>
+              <Text style={[styles.activeBadgeText, { fontSize: 10, color: theme.colors.text.secondary }]}>{t('common.comingSoon', 'Próximamente')}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.section, { opacity: 0.5 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="extension-puzzle-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.text.secondary }]}>{t('integrations.title')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('integrations.desc')}</Text>
+            </View>
+            <View style={[styles.activeBadge, { backgroundColor: theme.colors.border }]}>
+              <Text style={[styles.activeBadgeText, { fontSize: 10, color: theme.colors.text.secondary }]}>{t('common.comingSoon', 'Próximamente')}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.section, { opacity: 0.5 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="document-text-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.text.secondary }]}>{t('integrations.dataExport')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>{t('integrations.dataExportDesc')}</Text>
+            </View>
+            <View style={[styles.activeBadge, { backgroundColor: theme.colors.border }]}>
+              <Text style={[styles.activeBadgeText, { fontSize: 10, color: theme.colors.text.secondary }]}>{t('common.comingSoon', 'Próximamente')}</Text>
+            </View>
           </View>
         </View>
 

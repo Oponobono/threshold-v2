@@ -245,6 +245,21 @@ export const settingsStyles = StyleSheet.create({
     padding: theme.spacing.xl,
     ...globalStyles.shadow,
   },
+  bottomSheetModalOverlay: {
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end', 
+    alignItems: 'center',
+  },
+  bottomSheetModalContent: {
+    backgroundColor: theme.colors.background,
+    width: '100%', maxWidth: 600,
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
+    padding: 24,
+    paddingBottom: 40,
+    ...globalStyles.shadow,
+  },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: theme.spacing.lg,

@@ -70,8 +70,8 @@ export const ActiveRemindersModal: React.FC<Props> = ({ visible, onClose }) => {
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: 0 }]}>
+      <View style={styles.bottomSheetModalOverlay}>
+        <View style={[styles.bottomSheetModalContent, { maxHeight: '90%', paddingBottom: 0, paddingHorizontal: 20 }]}>
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { flex: 1 }]}>{t('reminders.activeReminders', 'Recordatorios activos')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -100,7 +100,7 @@ export const ActiveRemindersModal: React.FC<Props> = ({ visible, onClose }) => {
                 backgroundColor: 'rgba(0,0,0,0.45)',
                 justifyContent: 'center',
                 alignItems: 'center',
-                paddingHorizontal: 32,
+                paddingHorizontal: 20,
               }}
               onPress={() => setInfoVisible(false)}
             >

@@ -100,6 +100,18 @@ export class FlashcardDomainService {
     await cardLogRepository.create(logData as any);
     await syncService.enqueueCreate('card-log', logId, logData);
 
+    if (card.deck_id) {
+      try {
+        const { databaseService } = await import('../../services/database/DatabaseService');
+        await databaseService.getDb().runAsync(
+          `UPDATE flashcard_decks SET last_reviewed_at = datetime('now') WHERE id = ?`,
+          [String(card.deck_id)]
+        );
+      } catch (e) {
+        console.warn('[FlashcardDomainService] Error updating deck last_reviewed_at:', e);
+      }
+    }
+
     console.log(`[ReviewCompleted]
 Card: ${String(card.id).substring(0, 8)}...
 Quality: ${quality}

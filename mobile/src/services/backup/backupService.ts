@@ -176,8 +176,9 @@ export const getBackupPreferences = async (): Promise<BackupPreferences> => {
   ]);
 
   return {
-    enabled: enabled === 'true',
-    autoUpload: autoUpload === 'true',
+    // Opt-out: enabled/autoUpload default to true if never explicitly set to 'false'
+    enabled: enabled !== 'false',
+    autoUpload: autoUpload !== 'false',
     autoDownload: autoDownload !== 'false',
     includePhotos: photos !== 'false',
     includeAudio: audio !== 'false',
@@ -222,8 +223,9 @@ export const getScheduledBackupConfig = async (): Promise<ScheduledBackupConfig>
     ]);
     
     const config: ScheduledBackupConfig = {
-      enabled: enabled === 'true',
-      hour: hour !== null ? parseInt(hour, 10) : 2,
+      // Opt-out: scheduled backup enabled by default at 5:00am
+      enabled: enabled !== 'false',
+      hour: hour !== null ? parseInt(hour, 10) : 5,
       minute: minute !== null ? parseInt(minute, 10) : 0,
       type: (type as ScheduledBackupType) || 'ambos',
     };
@@ -232,10 +234,9 @@ export const getScheduledBackupConfig = async (): Promise<ScheduledBackupConfig>
     return config;
   } catch (err) {
     console.error('[BackupService] Error leyendo config de backup programado:', err);
-    // Retornar default pero con enabled=false para ser seguro
     return {
-      enabled: false,
-      hour: 2,
+      enabled: true,
+      hour: 5,
       minute: 0,
       type: 'ambos',
     };
@@ -602,21 +603,33 @@ export const runBackup = async (
   if (overridePrefs) {
     prefs = { ...prefs, ...overridePrefs };
   }
-  if (!prefs.enabled) return { success: false, uploaded: 0, errors: 0 };
+  if (!prefs.enabled) {
+    console.warn('[BackupService] Backup deshabilitado manualmente — saliendo sin subir.');
+    return { success: false, uploaded: 0, errors: 0 };
+  }
 
   let uploaded = 0;
   let errors = 0;
 
-  // Detectar si estamos en modo offline con probe de conectividad
+  // Detectar si estamos en modo offline.
+  // La probe tiene timeout de 3s para no asumir offline en cold starts de Render.
   const { useLocalAIStore } = await import('../../store/useLocalAIStore');
   let isOffline = !useConnectivityStore.getState().isOnline || useLocalAIStore.getState().forceOfflineMode;
   if (!isOffline) {
     try {
-      const probe = await fetchWithFallback('/health', { method: 'HEAD' });
-      isOffline = !probe;
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('probe timeout')), 3000)
+      );
+      const probe = await Promise.race([
+        fetchWithFallback('/health', { method: 'HEAD' }),
+        timeoutPromise,
+      ]);
+      isOffline = !probe || !(probe as Response).ok;
     } catch {
-      isOffline = true;
-      console.warn('[BackupService] Probe de conectividad falló — asumiendo offline.');
+      // Probe tardó o falló — continuar en modo online de todas formas.
+      // El upload fallará si no hay red y el error se reportará por ítem.
+      isOffline = false;
+      console.warn('[BackupService] Probe de conectividad tardó/falló — asumiendo online y continuando.');
     }
   }
   console.log(`[BackupService] Iniciando backup. Modo offline: ${isOffline}`);

@@ -86,8 +86,8 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, r
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: 0 }]}>
+      <View style={styles.bottomSheetModalOverlay}>
+        <View style={[styles.bottomSheetModalContent, { maxHeight: '90%', paddingBottom: 0, paddingHorizontal: 20 }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{t('reminders.globalProfile', 'Perfil de recordatorios')}</Text>
             <TouchableOpacity onPress={onClose}>
