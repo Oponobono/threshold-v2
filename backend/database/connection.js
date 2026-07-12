@@ -26,7 +26,10 @@ if (isProduction) {
 
   const convertQuery = (sql) => {
     let index = 1;
-    let pgSql = sql.replace(/\?/g, () => `$${index++}`);
+    // Replace SQLite datetime('now') with PostgreSQL NOW()
+    let pgSql = sql.replace(/datetime\s*\(\s*['"]now['"]\s*\)/gi, 'NOW()');
+    // Replace ? placeholders with $1, $2, ...
+    pgSql = pgSql.replace(/\?/g, () => `$${index++}`);
     if (pgSql.trim().toUpperCase().startsWith('INSERT') && !pgSql.toUpperCase().includes('RETURNING')) {
       pgSql += ' RETURNING id';
     }
