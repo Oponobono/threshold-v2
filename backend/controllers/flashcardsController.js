@@ -716,13 +716,13 @@ exports.createCard = (req, res) => {
     const incomingVersion = sync_version ?? 0;
 
     db.run(
-      `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions, sync_version)
-       VALUES (?, ?, ?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0, ?)
+      `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions, sync_version)
+       VALUES (?, ?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0, ?)
        ON CONFLICT(id) DO UPDATE SET
          front = excluded.front, back = excluded.back,
          content_json = excluded.content_json
        WHERE ? >= COALESCE(flashcards.sync_version, 0)`,
-      [cardId, deckId, req.user.id, safeFront, safeBack, contentJson, nextReviewDateStr, incomingVersion, incomingVersion],
+      [cardId, deckId, safeFront, safeBack, contentJson, nextReviewDateStr, incomingVersion, incomingVersion],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
         incrementSyncVersion('flashcards', cardId, (err2) => {

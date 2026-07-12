@@ -28,24 +28,35 @@ exports.createCalendarEvent = (req, res) => {
   const {
     id: clientId,
     title,
-    eventType,
-    subjectId,
-    deckId,
-    startDate,
-    endDate,
-    startTime,
-    endTime,
-    allDay,
+    eventType, event_type,
+    subjectId, subject_id,
+    deckId, linked_deck_id,
+    startDate, start_date,
+    endDate, end_date,
+    startTime, start_time,
+    endTime, end_time,
+    allDay, all_day,
     description,
-    createStudyPlan,
+    createStudyPlan, create_study_plan,
   } = req.body;
+
+  // Normalize: accept both camelCase (from UI) and snake_case (from sync queue raw rows)
+  const resolvedEventType = eventType || event_type;
+  const resolvedSubjectId = subjectId || subject_id;
+  const resolvedDeckId = deckId || linked_deck_id;
+  const resolvedStartDate = startDate || start_date;
+  const resolvedEndDate = endDate || end_date;
+  const resolvedStartTime = startTime || start_time;
+  const resolvedEndTime = endTime || end_time;
+  const resolvedAllDay = allDay !== undefined ? allDay : all_day;
+  const resolvedCreateStudyPlan = createStudyPlan !== undefined ? createStudyPlan : create_study_plan;
 
   // Validación básica
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'El título del evento es requerido' });
   }
 
-  if (!eventType || !['exam', 'task', 'class', 'other'].includes(eventType)) {
+  if (!resolvedEventType || !['exam', 'task', 'class', 'other'].includes(resolvedEventType)) {
     return res.status(400).json({ error: 'Tipo de evento inválido' });
   }
 
@@ -55,12 +66,12 @@ exports.createCalendarEvent = (req, res) => {
 
   // Para eventos académicos (task, class) la materia es obligatoria.
   // 'exam' se permite sin materia para soportar mazos sin subject_id (<- subject optional en FlashcardNewDeckScreen).
-  if (eventType !== 'other' && eventType !== 'exam' && !subjectId) {
+  if (resolvedEventType !== 'other' && resolvedEventType !== 'exam' && !resolvedSubjectId) {
     return res.status(400).json({ error: 'Se requiere una materia para este tipo de evento' });
   }
 
   // Si subjectId existe, verificar que pertenezca al usuario
-  const checkSubjectQuery = subjectId
+  const checkSubjectQuery = resolvedSubjectId
     ? `SELECT id FROM subjects WHERE id = ? AND user_id = ?`
     : null;
 
@@ -85,8 +96,8 @@ exports.createCalendarEvent = (req, res) => {
   `;
 
   // Si hay subjectId, primero verificar que pertenezca al usuario
-  if (subjectId) {
-    db.get(checkSubjectQuery, [subjectId, userId], (err, row) => {
+  if (resolvedSubjectId) {
+    db.get(checkSubjectQuery, [resolvedSubjectId, userId], (err, row) => {
       if (err) {
         return res.status(500).json({ error: 'Error al verificar materia' });
       }
@@ -110,17 +121,17 @@ exports.createCalendarEvent = (req, res) => {
       [
         eventId,
         userId,
-        subjectId || null,
-        deckId || null,
+        resolvedSubjectId || null,
+        resolvedDeckId || null,
         title.trim(),
-        eventType,
+        resolvedEventType,
         description || null,
-        startDate, // DD-MM-YYYY
-        endDate,   // DD-MM-YYYY
-        startTime || null, // HH:MM o null
-        endTime || null,   // HH:MM o null
-        allDay ? 1 : 0,
-        createStudyPlan ? 1 : 0,
+        resolvedStartDate,
+        resolvedEndDate,
+        resolvedStartTime || null,
+        resolvedEndTime || null,
+        resolvedAllDay ? 1 : 0,
+        resolvedCreateStudyPlan ? 1 : 0,
       ],
       function (err) {
         if (err) {

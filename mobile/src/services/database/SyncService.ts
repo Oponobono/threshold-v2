@@ -159,7 +159,7 @@ export class SyncService {
 
       // 🛠️ FASE 2: JSON Payload Sync
       syncDebugger.timeStart(tid, 'queue_read');
-      let items = await syncQueueRepository.getPending(options?.force);
+      let items = await syncQueueRepository.getPending(true);
       syncDebugger.timeEnd(tid, 'queue_read', 'QUEUE_READ', `Read ${items.length} pending operations`, { count: items.length });
 
       // Descartar operaciones que excedieron el límite de reintentos
