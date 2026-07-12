@@ -219,7 +219,7 @@ exports.createFlashcardDeck = (req, res) => {
   const hasVersion = incomingVersion !== undefined && incomingVersion !== null;
 
   const params = [deckId, subject_id || null, userId, safeTitle, safeDescription || '', linked_event_id ?? null];
-  const versionGuard = hasVersion ? ' WHERE sync_version IS NULL OR sync_version <= ?' : '';
+  const versionGuard = hasVersion ? ' WHERE flashcard_decks.sync_version IS NULL OR flashcard_decks.sync_version <= ?' : '';
 
   db.run(
     `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, linked_event_id) VALUES (?, ?, ?, ?, ?, ?)

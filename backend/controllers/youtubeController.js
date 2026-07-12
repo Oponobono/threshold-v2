@@ -69,7 +69,7 @@ exports.createYoutubeVideo = (req, res) => {
       duration = excluded.duration,
       version_number = COALESCE(excluded.version_number, youtube_videos.version_number + 1),
       updated_at = datetime('now')
-      ${hasVersion ? 'WHERE sync_version IS NULL OR sync_version <= ?' : ''}
+      ${hasVersion ? 'WHERE youtube_videos.sync_version IS NULL OR youtube_videos.sync_version <= ?' : ''}
   `;
   
   const params = [ytVideoId, user_id, subject_id || null, youtube_url, video_id, title || null, thumbnail_url || null, duration || null, version_number || 0];

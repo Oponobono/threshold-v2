@@ -50,7 +50,7 @@ exports.uploadAssessmentFile = (req, res) => {
         is_backed_up = CASE WHEN excluded.cloud_url IS NOT NULL THEN 1 ELSE assessment_files.is_backed_up END,
         version_number = COALESCE(excluded.version_number, assessment_files.version_number + 1),
         updated_at = datetime('now')
-        ${hasVersion ? 'WHERE sync_version IS NULL OR sync_version <= ?' : ''}
+        ${hasVersion ? 'WHERE assessment_files.sync_version IS NULL OR assessment_files.sync_version <= ?' : ''}
     `;
     
     const isBackedUp = cloud_url ? 1 : 0;

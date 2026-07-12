@@ -54,7 +54,7 @@ exports.createCourse = (req, res) => {
       tags = EXCLUDED.tags,
       momentum_score = EXCLUDED.momentum_score,
       last_studied_at = EXCLUDED.last_studied_at,
-      updated_at = CURRENT_TIMESTAMP${hasVersion ? ' WHERE sync_version IS NULL OR sync_version <= ?' : ''}
+      updated_at = CURRENT_TIMESTAMP${hasVersion ? ' WHERE courses.sync_version IS NULL OR courses.sync_version <= ?' : ''}
   `;
 
   const params = [courseId, user_id, name, platform, certificate_url, main_url, deep_link_url, instructor, total_hours || 0, total_classes || 0, completed_classes || 0, status || 'active', global_notes, tags, momentum_score || 1.0, last_studied_at];

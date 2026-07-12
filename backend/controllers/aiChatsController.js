@@ -43,7 +43,7 @@ exports.createAiChat = (req, res) => {
       cloud_url = excluded.cloud_url,
       version_number = COALESCE(excluded.version_number, ai_chats.version_number + 1),
       updated_at = datetime('now')
-      ${hasVersion ? 'WHERE sync_version IS NULL OR sync_version <= ?' : ''}
+      ${hasVersion ? 'WHERE ai_chats.sync_version IS NULL OR ai_chats.sync_version <= ?' : ''}
   `;
   
   const params = [chatId, user_id, subject_id || null, role, content, cloud_url || null, version_number || 0];

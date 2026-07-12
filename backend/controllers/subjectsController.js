@@ -315,7 +315,7 @@ exports.createSubject = (req, res) => {
         external_url = excluded.external_url, total_lessons = excluded.total_lessons,
         completed_lessons = excluded.completed_lessons,
         next_micro_milestone = excluded.next_micro_milestone
-        ${hasVersion ? 'WHERE sync_version IS NULL OR sync_version <= ?' : ''}
+        ${hasVersion ? 'WHERE subjects.sync_version IS NULL OR subjects.sync_version <= ?' : ''}
   `;
 
   const params = [
