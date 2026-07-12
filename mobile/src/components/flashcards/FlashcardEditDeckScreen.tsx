@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Platform, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { flashcardsStyles as s } from '../../styles/FlashcardsModal.styles';
+import { styles } from '../../styles/FlashcardEditDeckScreen.styles';
 import { Subject, updateFlashcardDeck, type FlashcardDeck } from '../../services/api';
 import { useCustomAlert } from '../ui/CustomAlert';
 
@@ -133,54 +134,3 @@ export const FlashcardEditDeckScreen: React.FC<Props> = ({ deck, subjects, onBac
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: 0,
-    paddingHorizontal: 0,
-  },
-  subjectScrollContainer: {
-    paddingHorizontal: 0,
-    paddingVertical: 4,
-    gap: 8,
-  },
-  subjectItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: theme.colors.inputBackground,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    minWidth: 110,
-  },
-  subjectBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 6,
-  },
-  subjectName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    flex: 1,
-  },
-  submitBtn: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 28,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Platform.OS === 'ios' ? 12 : 16,
-  },
-  submitBtnText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});

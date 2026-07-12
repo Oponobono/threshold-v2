@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { View, Text } from 'react-native';
 import Markdown, { ASTNode } from 'react-native-markdown-display';
 import { CodeHighlighter } from './CodeHighlighter';
+import { s, markdownStyles } from '../../styles/MarkdownWithCode.styles';
 
 interface Props {
   children: string;
@@ -42,32 +43,3 @@ export const MarkdownWithCode: React.FC<Props> = ({ children, style, rules: cust
     </View>
   );
 };
-
-const s = StyleSheet.create({
-  markdownContainer: {
-    flex: 1,
-    width: '100%',
-  },
-  codeInline: {
-    backgroundColor: 'rgba(17, 30, 37, 0.10)',
-    color: '#0E7490',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 5,
-    fontFamily: 'monospace',
-    fontSize: 14,
-  },
-});
-
-const markdownStyles = StyleSheet.create({
-  body: {
-    fontSize: 16,
-    color: '#333333',
-    lineHeight: 24,
-    textAlign: 'left',
-  },
-  paragraph: {
-    marginTop: 4,
-    marginBottom: 4,
-  },
-});

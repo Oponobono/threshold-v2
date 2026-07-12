@@ -1,0 +1,108 @@
+import { StyleSheet } from 'react-native';
+import { theme } from './theme';
+
+export const urgentReviewsCardStyles = StyleSheet.create({
+  wrapper: {
+    marginTop: 24,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    letterSpacing: -0.3,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  snoozeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chip: {
+    backgroundColor: theme.colors.dangerTransparent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.colors.danger + '20',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chipCount: {
+    color: theme.colors.danger,
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  chipLabel: {
+    color: theme.colors.danger,
+    fontWeight: '500',
+    fontSize: 10,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    padding: 14,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  badge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: theme.colors.dangerTransparent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  cardBody: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+  },
+  cardSubtext: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    marginTop: 3,
+  },
+  reviewBtn: {
+    backgroundColor: theme.colors.inputBackground,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.danger + '30',
+    flexShrink: 0,
+  },
+  reviewBtnText: {
+    color: theme.colors.danger,
+    fontWeight: '600',
+    fontSize: theme.typography.sizes.sm,
+  },
+});

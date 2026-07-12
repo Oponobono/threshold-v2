@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { ringGaugeStyles } from '../../styles/RingGauge.styles';
 
 interface Props {
   value: number;
@@ -25,7 +26,7 @@ export function RingGauge({
   const offset = circumference - (clamped / 100) * circumference;
 
   return (
-    <View style={[styles.container, { width: size, height: size }]}>
+    <View style={[ringGaugeStyles.container, { width: size, height: size }]}>
       <Svg width={size} height={size}>
         <Circle
           cx={size / 2}
@@ -50,7 +51,7 @@ export function RingGauge({
         />
       </Svg>
       {children && (
-        <View style={styles.children}>
+        <View style={ringGaugeStyles.children}>
           {children}
         </View>
       )}
@@ -58,14 +59,3 @@ export function RingGauge({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  children: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

@@ -1,5 +1,6 @@
 import React, { useRef, useImperativeHandle, forwardRef, useState } from 'react';
-import { Animated, Text, StyleSheet, Easing } from 'react-native';
+import { Animated, Text, Easing } from 'react-native';
+import { styles } from '../../styles/Toast.styles';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface ToastMethods {
@@ -85,33 +86,3 @@ export const Toast = forwardRef<ToastMethods>((_, ref) => {
 });
 
 Toast.displayName = 'Toast';
-
-// ─── Estilos ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    // Se posiciona justo encima de la tab bar (~80px) + margen
-    bottom: 96,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(30, 30, 30, 0.88)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
-    maxWidth: '80%',
-    // Z-order: encima de la tab bar y cualquier otro contenido
-    zIndex: 9999,
-    elevation: 20,
-    // Sombra sutil
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-  },
-  text: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
-    letterSpacing: 0.1,
-  },
-});

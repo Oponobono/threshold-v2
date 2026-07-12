@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { formatGrade } from '../../utils/grades';
 import { theme } from '../../styles/theme';
 import { subjectDetailStyles as globalSectionStyles } from '../../styles/SubjectDetail.styles';
-import { globalStyles } from '../../styles/globalStyles';
+import { styles } from '../../styles/SubjectStats.styles';
 
 interface SubjectStatsProps {
   averageGrade: number;
@@ -153,148 +153,3 @@ export const SubjectStats: React.FC<SubjectStatsProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    borderWidth: 0,
-    marginTop: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  col: {
-    flex: 1,
-    paddingVertical: 18,
-    paddingHorizontal: 12,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-  },
-  colLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: theme.colors.text.placeholder,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  titleContainer: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  contentContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-  },
-  colValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: theme.colors.text.primary,
-    letterSpacing: -0.5,
-  },
-  colDenominator: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#007AFF',
-    letterSpacing: 0.3,
-  },
-  differenceBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    marginTop: 2,
-  },
-  differenceText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  projectedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  separator: {
-    width: 1,
-    marginVertical: 14,
-    backgroundColor: theme.colors.border,
-  },
-  circleProgressContainer: {
-    width: 55,
-    height: 55,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    marginVertical: 4,
-  },
-  circleProgressOuter: {
-    width: 55,
-    height: 55,
-    borderRadius: 27.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  circleProgressTrack: {
-    position: 'absolute',
-    width: 55,
-    height: 55,
-    borderRadius: 27.5,
-    borderWidth: 4,
-    borderColor: '#FF9500',
-    opacity: 0.15,
-  },
-  circleProgressSegment: {
-    position: 'absolute',
-    width: 55,
-    height: 55,
-    borderRadius: 27.5,
-    borderWidth: 4,
-    borderColor: '#FF9500',
-    borderLeftColor: 'transparent',
-    borderBottomColor: 'transparent',
-  },
-  circleProgressSegmentSecond: {
-    position: 'absolute',
-    width: 55,
-    height: 55,
-    borderRadius: 27.5,
-    borderWidth: 4,
-    borderColor: '#FF9500',
-    borderRightColor: 'transparent',
-    borderTopColor: 'transparent',
-  },
-  circleProgressCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 0,
-  },
-
-  circleCounter: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: theme.colors.text.primary,
-  },
-  circleCounterSub: {
-    fontSize: 8,
-    fontWeight: '600',
-    color: theme.colors.text.placeholder,
-  },
-  tasksSubLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: theme.colors.text.placeholder,
-    marginTop: 0,
-  },
-});

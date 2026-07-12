@@ -16,12 +16,12 @@ import {
   Text,
   TouchableOpacity,
   Modal,
-  StyleSheet,
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import { styles } from '../../styles/CustomAlert.styles';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -168,77 +168,4 @@ export const CustomAlertProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: theme.colors.white,
-    borderRadius: 24,
-    paddingTop: 32,
-    paddingBottom: 24,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    elevation: 16,
-  },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    textAlign: 'center',
-    marginBottom: 8,
-    letterSpacing: -0.3,
-  },
-  message: {
-    fontSize: 14,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 21,
-    marginBottom: 4,
-  },
-  divider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: 20,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    width: '100%',
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnFull: { flex: 1 },
-  btnPrimary:     { backgroundColor: theme.colors.primary },
-  btnDestructive: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
-  btnCancel:      { backgroundColor: theme.colors.card },
-  btnText:             { fontSize: 15, fontWeight: '600' },
-  btnTextPrimary:      { color: '#FFFFFF' },
-  btnTextDestructive:  { color: '#EF4444' },
-  btnTextCancel:       { color: theme.colors.text.secondary },
-});
