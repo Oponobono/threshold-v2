@@ -60,7 +60,7 @@ exports.createCalendarEvent = (req, res) => {
     return res.status(400).json({ error: 'Tipo de evento inválido' });
   }
 
-  if (!startDate || !endDate) {
+  if (!resolvedStartDate || !resolvedEndDate) {
     return res.status(400).json({ error: 'Las fechas son requeridas' });
   }
 
