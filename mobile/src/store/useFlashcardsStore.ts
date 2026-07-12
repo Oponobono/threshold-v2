@@ -31,7 +31,7 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
     const deckIds = decks.map(d => String(d.id));
     const placeholders = deckIds.map(() => '?').join(',');
     const db = databaseService.getDb();
-    const relevantFlashcards = await db.getAllAsync(`SELECT deck_id, status, next_review_date FROM flashcards WHERE deck_id IN (${placeholders})`, deckIds);
+    const relevantFlashcards = await db.getAllAsync(`SELECT deck_id, status, next_review_date FROM flashcards WHERE deck_id IN (${placeholders}) AND deleted_at IS NULL`, ...deckIds);
     
     const eventMap = new Map<string, { id: string; title: string; start_date: string }>();
     const deckToExam = new Map<string, { id: string; title: string; start_date: string }>();
@@ -67,17 +67,17 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
       }
 
       const localCards = deckCardsMap.get(String(d.id)) || [];
-      if (d.card_count == null) enrichedDeck.card_count = localCards.length;
-      if (d.new_count == null) enrichedDeck.new_count = localCards.filter(c => !c.status || c.status === 'new').length;
-      if (d.learning_count == null) enrichedDeck.learning_count = localCards.filter(c => c.status === 'learning').length;
+      
+      // Always recalculate from local DB state, ensuring accuracy and avoiding stale or missing counts
+      enrichedDeck.card_count = localCards.length;
+      enrichedDeck.new_count = localCards.filter(c => !c.status || c.status === 'new').length;
+      enrichedDeck.learning_count = localCards.filter(c => c.status === 'learning').length;
       
       const now = new Date();
-      if (d.review_count == null) {
-        enrichedDeck.review_count = localCards.filter(c => 
-          (c.status === 'review' || c.status === 'graduated') && 
-          c.next_review_date && new Date(c.next_review_date) <= now
-        ).length;
-      }
+      enrichedDeck.review_count = localCards.filter(c => 
+        (c.status === 'review' || c.status === 'graduated') && 
+        c.next_review_date && new Date(c.next_review_date) <= now
+      ).length;
 
       const linkedEventId = (d as any).linked_event_id;
       if (linkedEventId) {
@@ -167,7 +167,7 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
         // Fetch only affected decks
         const placeholders = affectedDeckIds.map(() => '?').join(',');
         const db = databaseService.getDb();
-        const rows = await db.getAllAsync(`SELECT * FROM flashcard_decks WHERE id IN (${placeholders})`, affectedDeckIds);
+        const rows = await db.getAllAsync(`SELECT * FROM flashcard_decks WHERE id IN (${placeholders})`, ...affectedDeckIds);
         
         if (rows.length > 0) {
           const enriched = await enrichWithLocalMetrics(rows as unknown as FlashcardDeck[]);
@@ -191,12 +191,12 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
         const db = databaseService.getDb();
         
         // Get unique deck_ids for these cards
-        const rows = await db.getAllAsync(`SELECT DISTINCT deck_id FROM flashcards WHERE id IN (${placeholders})`, cardIds);
+        const rows = await db.getAllAsync(`SELECT DISTINCT deck_id FROM flashcards WHERE id IN (${placeholders})`, ...cardIds);
         const affectedDeckIds = rows.map((r: any) => String(r.deck_id));
         
         if (affectedDeckIds.length > 0) {
           const deckPlaceholders = affectedDeckIds.map(() => '?').join(',');
-          const deckRows = await db.getAllAsync(`SELECT * FROM flashcard_decks WHERE id IN (${deckPlaceholders})`, affectedDeckIds);
+          const deckRows = await db.getAllAsync(`SELECT * FROM flashcard_decks WHERE id IN (${deckPlaceholders})`, ...affectedDeckIds);
           
           if (deckRows.length > 0) {
             const enriched = await enrichWithLocalMetrics(deckRows as unknown as FlashcardDeck[]);
