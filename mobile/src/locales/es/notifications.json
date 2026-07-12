@@ -29,8 +29,6 @@
   "dueDeckBody": "\"{{title}}\" tiene {{count}} tarjeta(s) pendientes de repaso.",
   "classAlertTitle": "📚 Clase próxima",
   "classAlertBody": "\"{{name}}\" comienza en {{minutes}} minutos",
-  "urgentReviewTitle": "🔬 Tarjetas pendientes",
-  "urgentReviewBody": "Tienes {{count}} mazo(s) con tarjetas por repasar",
   "backupProgressTitle": "⬆️ Respaldo en progreso",
   "backupProgressBody": "{{current}} / {{total}} elementos respaldados",
   "backupComplete": "✅ Respaldo completado",

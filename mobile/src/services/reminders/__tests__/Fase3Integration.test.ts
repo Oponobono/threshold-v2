@@ -5,6 +5,7 @@ import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
 import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
+import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { FakeClock } from '../Clock';
 import { InterruptionPolicy } from '../InterruptionPolicy';
 import { TemplateResolver } from '../TemplateResolver';
@@ -190,7 +191,8 @@ describe('Fase 3 - Cross-entity integration', () => {
   it('completa el pipeline de assessment produciendo una notificacion programada', async () => {
     const clock = new FakeClock(ANCHOR);
     const registry = createRegistry();
-    const factory = new SequenceFactory(clock);
+    const assembler = new ReminderSnapshotAssembler();
+    const factory = new SequenceFactory(clock, assembler);
     const interruption = new InterruptionPolicy(clock);
     const templates = new TemplateResolver(new FakeI18n());
     const reconciler = new NotificationReconciler();
@@ -233,7 +235,8 @@ describe('Fase 3 - Cross-entity integration', () => {
   it('combina assessment + schedule + flashcard_deck respetando el limite de 3 recordatorios', async () => {
     const clock = new FakeClock(ANCHOR);
     const registry = createRegistry();
-    const factory = new SequenceFactory(clock);
+    const assembler = new ReminderSnapshotAssembler();
+    const factory = new SequenceFactory(clock, assembler);
     const interruption = new InterruptionPolicy(clock);
     const templates = new TemplateResolver(new FakeI18n());
     const reconciler = new NotificationReconciler();
@@ -265,7 +268,8 @@ describe('Fase 3 - Cross-entity integration', () => {
   it('cancela notificaciones previas y programa nuevas tras cambio de entidades', async () => {
     const clock = new FakeClock(ANCHOR);
     const registry = createRegistry();
-    const factory = new SequenceFactory(clock);
+    const assembler = new ReminderSnapshotAssembler();
+    const factory = new SequenceFactory(clock, assembler);
     const interruption = new InterruptionPolicy(clock);
     const templates = new TemplateResolver(new FakeI18n());
     const reconciler = new NotificationReconciler();
@@ -301,7 +305,8 @@ describe('Fase 3 - Cross-entity integration', () => {
   it('produce deliverable ids y propiedades identicas para el mismo input', () => {
     const clock = new FakeClock(ANCHOR);
     const registry = createRegistry();
-    const factory = new SequenceFactory(clock);
+    const assembler = new ReminderSnapshotAssembler();
+    const factory = new SequenceFactory(clock, assembler);
     const interruption = new InterruptionPolicy(clock);
     const templates = new TemplateResolver(new FakeI18n());
 

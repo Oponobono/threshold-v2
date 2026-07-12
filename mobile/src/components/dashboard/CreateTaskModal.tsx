@@ -100,7 +100,7 @@ export const CreateTaskModal = ({ visible, onClose, subjects, initialSubjectId, 
 
       if ((result as any)._isPending) {
         useDataStore.setState(state => ({
-          assessments: [result, ...state.assessments.filter(a => a.id !== (result as any).id)]
+          assessments: [result as any, ...state.assessments.filter(a => a.id !== (result as any).id)]
         }));
       } else {
         await onTaskCreated();

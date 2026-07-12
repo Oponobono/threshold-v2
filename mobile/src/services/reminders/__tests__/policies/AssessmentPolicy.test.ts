@@ -1,4 +1,5 @@
 import { AssessmentPolicy } from '../../policies/AssessmentPolicy';
+import { ReminderSnapshot } from '../../types';
 import type { ReminderProfile, Reminder } from '../../types';
 
 describe('AssessmentPolicy', () => {
@@ -75,7 +76,7 @@ describe('AssessmentPolicy', () => {
 
   describe('shouldCancelReminder', () => {
     const makeReminder = (overrides: Partial<Reminder> = {}): Reminder =>
-      ({ id: 'r1', entityType: 'assessment', entityId: 'a1', scheduledAt: new Date(), intent: 'prepare_exam', profile: { name: 'standard', defaultOffsets: [] }, priority: 'high', sequenceId: 's1', ordinal: 0, status: 'pending', ...overrides });
+      ({ id: 'r1', entityType: 'assessment', entityId: 'a1', scheduledAt: new Date(), intent: 'prepare_exam', profile: { name: 'standard', defaultOffsets: [] }, priority: 'high', sequenceId: 's1', ordinal: 0, status: 'pending', snapshot: new ReminderSnapshot({ entity: { id: 'a1', type: 'assessment', name: '' } }), ...overrides });
 
     it('entidad activa → false', () => {
       expect(policy.shouldCancelReminder(makeReminder(), { status: 'active' })).toBe(false);

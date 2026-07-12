@@ -19,9 +19,7 @@ interface ScheduledInfo {
 
 const DEADLINE_PREFIX = 'deadline_';
 const WEEKLY_ID = 'weekly_digest';
-const DUEDECK_PREFIX = 'duedeck_';
 const CLASS_PREFIX = 'class_';
-const URGENT_REVIEW_ID = 'urgent_review';
 
 function toExpoWeekday(apiDayOfWeek: number): number {
   // API: 1=Monday..7=Sunday → Expo: 1=Sunday..7=Saturday
@@ -193,6 +191,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -218,10 +218,6 @@ export async function requestPermissions(): Promise<boolean> {
 
 function deadlineId(eventId: string): string {
   return `${DEADLINE_PREFIX}${eventId}`;
-}
-
-function dueDeckId(deckId: string | number): string {
-  return `${DUEDECK_PREFIX}${deckId}`;
 }
 
 // ── Deadline notifications ──────────────────────────────────────────────────────
@@ -316,36 +312,6 @@ export async function cancelAllClassNotifications(): Promise<void> {
   }
 }
 
-// ── Urgent review notifications ─────────────────────────────────────
-
-export async function scheduleUrgentReviewNotification(
-  dueCount: number,
-): Promise<string | undefined> {
-  const granted = await requestPermissions();
-  if (!granted) return undefined;
-
-  await cancelUrgentReviewNotification();
-
-  const id = await Notifications.scheduleNotificationAsync({
-    identifier: URGENT_REVIEW_ID,
-    content: {
-      title: i18n.t('notifications.urgentReviewTitle'),
-      body: i18n.t('notifications.urgentReviewBody', { count: dueCount }),
-      data: { type: 'urgent_review' },
-      sound: true,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: 1,
-    },
-  });
-  return id;
-}
-
-export async function cancelUrgentReviewNotification(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(URGENT_REVIEW_ID);
-}
-
 // ── Weekly digest ───────────────────────────────────────────────────────────────
 
 export async function scheduleWeeklyDigest(
@@ -377,42 +343,6 @@ export async function scheduleWeeklyDigest(
 
 export async function cancelWeeklyDigest(): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(WEEKLY_ID);
-}
-
-// ── Due deck notifications ──────────────────────────────────────────────────────
-
-export async function scheduleDueDeckNotification(
-  deckId: string | number,
-  deckTitle: string,
-  dueCount: number,
-): Promise<string | undefined> {
-  const granted = await requestPermissions();
-  if (!granted) return undefined;
-
-  const id = await Notifications.scheduleNotificationAsync({
-    identifier: dueDeckId(deckId),
-    content: {
-      title: i18n.t('notifications.dueDeckTitle'),
-      body: i18n.t('notifications.dueDeckBody', { title: deckTitle, count: dueCount }),
-      data: { deckId, type: 'duedeck' },
-      sound: true,
-    },
-    trigger: { seconds: 60, channelId: 'default', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
-  });
-  return id;
-}
-
-export async function cancelDueDeckNotification(deckId: string | number): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(dueDeckId(deckId));
-}
-
-export async function cancelAllDueDeckNotifications(): Promise<void> {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  for (const n of scheduled) {
-    if (n.identifier.startsWith(DUEDECK_PREFIX)) {
-      await Notifications.cancelScheduledNotificationAsync(n.identifier);
-    }
-  }
 }
 
 // ── Get all scheduled ───────────────────────────────────────────────────────────

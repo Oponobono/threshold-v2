@@ -1,4 +1,5 @@
 import { TemplateResolver } from '../TemplateResolver';
+import { ReminderSnapshot } from '../types';
 import type { I18nService } from '../I18nService';
 import type { DeliveryPlan, DeliveryPlanResolved, DeliveryReminderDomain } from '../types';
 
@@ -35,6 +36,7 @@ function domainReminder(overrides: Partial<DeliveryReminderDomain> = {}): Delive
     subjectId: 'subj-1',
     intent: 'prepare_exam',
     priority: 'high',
+    snapshot: new ReminderSnapshot({ entity: { id: 'a-1', type: 'assessment', name: '' } }),
     ...overrides,
   };
 }

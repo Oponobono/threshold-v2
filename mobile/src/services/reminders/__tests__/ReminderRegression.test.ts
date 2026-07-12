@@ -5,6 +5,7 @@ import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
 import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
+import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { ReminderEngine } from '../ReminderEngine';
 import { ReminderCoordinator } from '../ReminderCoordinator';
 import { ReminderSnapshotBuilder } from '../ReminderSnapshotBuilder';
@@ -15,7 +16,7 @@ import { NotificationReconciler } from '../NotificationReconciler';
 import { RepositoryEventBus } from '../../events/RepositoryEventBus';
 import type { NotificationProvider, ScheduledNotificationInfo } from '../NotificationProvider';
 import type { I18nService } from '../I18nService';
-import type { EntitySnapshot, ScheduledReminder, ReminderSequence } from '../types';
+import type { ReminderSourceSnapshot, ScheduledReminder, ReminderSequence } from '../types';
 
 // ── Fakes compartidos ──────────────────────────────────────────────
 
@@ -145,7 +146,8 @@ function createEngineContext(): EngineContext {
   registry.register(new EventPolicy());
   registry.register(new GradingPolicy());
 
-  const factory = new SequenceFactory(clock);
+  const assembler = new ReminderSnapshotAssembler();
+  const factory = new SequenceFactory(clock, assembler);
   const interruption = new InterruptionPolicy(clock);
   const templates = new TemplateResolver(new FakeI18n());
   const provider = new CaptureProvider();
@@ -155,7 +157,7 @@ function createEngineContext(): EngineContext {
   return { clock, provider, engine };
 }
 
-function emptySnapshot(): EntitySnapshot {
+function emptySnapshot(): ReminderSourceSnapshot {
   return {
     assessments: [],
     schedules: [],

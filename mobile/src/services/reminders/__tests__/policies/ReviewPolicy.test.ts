@@ -1,4 +1,5 @@
 import { ReviewPolicy } from '../../policies/ReviewPolicy';
+import { ReminderSnapshot } from '../../types';
 import type { ReminderProfile, Reminder } from '../../types';
 
 describe('ReviewPolicy', () => {
@@ -44,7 +45,7 @@ describe('ReviewPolicy', () => {
   });
 
   describe('shouldCancelReminder', () => {
-    const r = (): Reminder => ({ id: 'r1', entityType: 'flashcard_deck', entityId: 'd1', scheduledAt: new Date(), intent: 'review_cards', profile: { name: 'standard', defaultOffsets: [] }, priority: 'normal', sequenceId: 's1', ordinal: 0, status: 'pending' });
+    const r = (): Reminder => ({ id: 'r1', entityType: 'flashcard_deck', entityId: 'd1', scheduledAt: new Date(), intent: 'review_cards', profile: { name: 'standard', defaultOffsets: [] }, priority: 'normal', sequenceId: 's1', ordinal: 0, status: 'pending', snapshot: new ReminderSnapshot({ entity: { id: 'd1', type: 'flashcard_deck', name: '' } }) });
 
     it('dueCardsCount > 0 → false', () => {
       expect(policy.shouldCancelReminder(r(), { dueCardsCount: 3 })).toBe(false);

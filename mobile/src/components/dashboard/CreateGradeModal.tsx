@@ -120,7 +120,7 @@ export const CreateGradeModal = ({ visible, onClose, subjects, initialSubjectId 
 
       if ((result as any)._isPending) {
         useDataStore.setState(state => ({
-          assessments: [result, ...state.assessments.filter(a => a.id !== (result as any).id)]
+          assessments: [result as any, ...state.assessments.filter(a => a.id !== (result as any).id)]
         }));
         alertRef.show({
           title: t('common.success'),

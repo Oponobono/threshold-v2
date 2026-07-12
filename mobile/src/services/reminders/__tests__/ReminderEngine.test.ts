@@ -5,6 +5,7 @@ import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
 import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
+import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { FakeClock } from '../Clock';
 import { InterruptionPolicy } from '../InterruptionPolicy';
 import { TemplateResolver } from '../TemplateResolver';
@@ -16,7 +17,7 @@ import type {
 } from '../NotificationProvider';
 import type { ScheduledReminder, EngineTraceEntry } from '../types';
 import type { I18nService } from '../I18nService';
-import type { EntitySnapshot } from '../types';
+import type { ReminderSourceSnapshot } from '../types';
 
 // ── Fakes ──────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ function createEngine(clock?: FakeClock): {
   const provider = new FakeProvider();
   const engine = new ReminderEngine(
     registry,
-    new SequenceFactory(c),
+    new SequenceFactory(c, new ReminderSnapshotAssembler()),
     new InterruptionPolicy(c),
     new TemplateResolver(new FakeI18n()),
     new NotificationReconciler(),
@@ -118,7 +119,7 @@ function createEngine(clock?: FakeClock): {
   return { engine, provider, clock: c };
 }
 
-const SNAPSHOT: EntitySnapshot = {
+const SNAPSHOT: ReminderSourceSnapshot = {
   assessments: [{ id: 'a-1', date: ASSESSMENT_DATE.toISOString(), status: 'active' }],
   schedules: [{ id: 's-1', endTime: SCHEDULE_END.toISOString(), status: 'active' }],
   flashcard_decks: [{ id: 'd-1', dueCardsCount: 5, status: 'active' }],

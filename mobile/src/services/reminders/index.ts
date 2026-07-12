@@ -15,7 +15,7 @@ export type {
   EnvironmentContext,
   PermissionState,
   ScheduledReminder,
-  EntitySnapshot,
+  ReminderSourceSnapshot,
   EngineTraceEntry,
   StageTiming,
 } from './types';
@@ -39,6 +39,7 @@ export { EventPolicy } from './policies/EventPolicy';
 export { ReviewPolicy } from './policies/ReviewPolicy';
 export { GradingPolicy } from './policies/GradingPolicy';
 
+export { ReminderSnapshotAssembler } from './ReminderSnapshotAssembler';
 export { SequenceFactory } from './SequenceFactory';
 export { InterruptionPolicy } from './InterruptionPolicy';
 export { TemplateResolver } from './TemplateResolver';

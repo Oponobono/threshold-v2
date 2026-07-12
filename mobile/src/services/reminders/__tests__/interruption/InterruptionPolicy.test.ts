@@ -1,5 +1,6 @@
 import { InterruptionPolicy } from '../../InterruptionPolicy';
 import { FakeClock } from '../../Clock';
+import { ReminderSnapshot } from '../../types';
 import type { ReminderSequence, Reminder, InterruptionPriority, ReminderProfile } from '../../types';
 
 const ANCHOR = new Date('2026-07-10T12:00:00Z');
@@ -18,6 +19,7 @@ function reminder(overrides: Partial<Reminder> = {}): Reminder {
     sequenceId: 's1',
     ordinal: 0,
     status: 'pending',
+    snapshot: new ReminderSnapshot({ entity: { id: 'a1', type: 'assessment', name: '' } }),
     ...overrides,
   };
 }

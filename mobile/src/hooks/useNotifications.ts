@@ -1,19 +1,28 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+/**
+ * TEMPORARY
+ *
+ * Legacy notification scheduler que sobrevive mientras
+ * AssessmentReminderPolicy y ScheduleReminderPolicy no migran
+ * al Reminder Engine.
+ *
+ * Pendiente:
+ * ✅ Flashcards → Reminder Engine.
+ * ⏳ Assessments → migrar.
+ * ⏳ Schedules → migrar.
+ * ⏳ Calendar Events → migrar.
+ * ⏳ Eliminar este hook cuando ya no tenga responsabilidades.
+ */
+
+import { useEffect, useRef } from 'react';
 import {
   cancelAllDeadlineNotifications,
   cancelAllClassNotifications,
-  cancelAllDueDeckNotifications,
   cancelWeeklyDigest,
-  cancelUrgentReviewNotification,
   scheduleWeeklyDigest,
-  scheduleDueDeckNotification,
   scheduleDeadlineNotification,
   scheduleClassNotification,
-  scheduleUrgentReviewNotification,
-  cancelDueDeckNotification,
   type WeeklyDigestConfig,
 } from '../services/notificationService';
-import type { PredictionResponse } from '../services/api';
 
 export function useNotifications(
   notifDeadline: boolean,
@@ -22,7 +31,6 @@ export function useNotifications(
   assessments?: any[],
   schedules?: any[],
   calendarEvents?: any[],
-  predictions?: PredictionResponse | null,
 ) {
   const prevDeadline = useRef(notifDeadline);
 
@@ -42,11 +50,8 @@ export function useNotifications(
       now.setHours(0, 0, 0, 0);
 
       const scheduleAll = async () => {
-        // Cancelar notificaciones previas antes de reprogramar
-        // Esto evita notificaciones stale cuando datos cambian offline
         await cancelAllDeadlineNotifications();
 
-        // Schedule assessments (tasks, exams, trabajos)
         for (const a of assessments || []) {
           if (a.is_completed || !a.date) continue;
           try {
@@ -59,7 +64,6 @@ export function useNotifications(
           } catch (_) {}
         }
 
-        // Schedule calendar events (exam, task, class, other)
         for (const ev of calendarEvents || []) {
           const startDate = ev.startDate || ev.start_date;
           const startTime = ev.startTime || ev.start_time || '09:00';
@@ -94,29 +98,4 @@ export function useNotifications(
     };
     scheduleAll();
   }, [schedules]);
-
-  // ── Urgent review notifications ───────────────────────────────────────
-  useEffect(() => {
-    const dueCount = predictions?.dueCount ?? 0;
-    if (dueCount > 0) {
-      scheduleUrgentReviewNotification(dueCount);
-    } else {
-      cancelUrgentReviewNotification();
-    }
-  }, [predictions?.dueCount]);
-
-  return {
-    scheduleDueDeck: useCallback(
-      async (deckId: number, deckTitle: string, dueCount: number) => {
-        await scheduleDueDeckNotification(deckId, deckTitle, dueCount);
-      },
-      [],
-    ),
-    cancelDueDeck: useCallback(async (deckId: number) => {
-      await cancelDueDeckNotification(deckId);
-    }, []),
-    cancelAllDue: useCallback(async () => {
-      await cancelAllDueDeckNotifications();
-    }, []),
-  };
 }

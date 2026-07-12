@@ -1,4 +1,5 @@
 import { NotificationReconciler } from '../NotificationReconciler';
+import { ReminderSnapshot } from '../types';
 import type { NotificationProvider, ScheduledNotificationInfo } from '../NotificationProvider';
 import type { DeliveryPlanResolved, DeliveryReminder } from '../types';
 
@@ -45,6 +46,7 @@ function makeReminder(id: string, overrides?: Partial<DeliveryReminder>): Delive
     intent: 'prepare_exam',
     priority: 'high',
     deeplink: 'assessments/a-1',
+    snapshot: new ReminderSnapshot({ entity: { id: 'a-1', type: 'assessment', name: '' } }),
     ...overrides,
   };
 }

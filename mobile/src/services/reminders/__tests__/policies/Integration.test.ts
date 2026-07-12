@@ -5,8 +5,11 @@ import { EventPolicy } from '../../policies/EventPolicy';
 import { ReviewPolicy } from '../../policies/ReviewPolicy';
 import { GradingPolicy } from '../../policies/GradingPolicy';
 import { SequenceFactory } from '../../SequenceFactory';
+import { ReminderSnapshotAssembler } from '../../ReminderSnapshotAssembler';
 import { FakeClock } from '../../Clock';
 import type { ReminderProfile, ReminderSequence } from '../../types';
+
+const assembler = new ReminderSnapshotAssembler();
 
 const ANCHOR = new Date('2026-07-10T12:00:00Z');
 
@@ -42,7 +45,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('produce secuencia con 5 reminders en standard', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active', subjectId: 'subj-1' };
       const seq = buildSequence(registry, factory, 'assessment', entity);
@@ -57,7 +60,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('primer reminder: -10080 min → prepare_exam, high', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active', subjectId: 'subj-1' };
       const seq = buildSequence(registry, factory, 'assessment', entity);
@@ -72,7 +75,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('expiresAt = assessment date + 1h', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'assessment', entity);
@@ -83,7 +86,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('profile persistent produce 7 reminders', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'assessment', entity, 'persistent');
@@ -95,7 +98,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('profile minimal produce 2 reminders', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'assessment', entity, 'minimal');
@@ -108,7 +111,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('produce secuencia con 3 reminders en standard', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 's-1', endTime: '2026-07-10T13:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'schedule', entity);
@@ -122,7 +125,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('expiresAt = endTime + 30min', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 's-1', endTime: '2026-07-10T13:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'schedule', entity);
@@ -135,7 +138,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('produce secuencia con 1 reminder en standard', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'd-1', dueCardsCount: 10, status: 'active' };
       const seq = buildSequence(registry, factory, 'flashcard_deck', entity);
@@ -149,7 +152,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const registry = createRegistry();
       const policy = registry.get('flashcard_deck');
       const entity = { id: 'd-1', dueCardsCount: 0, status: 'active' };
-      const seq = buildSequence(registry, new SequenceFactory(new FakeClock(ANCHOR)), 'flashcard_deck', entity);
+      const seq = buildSequence(registry, new SequenceFactory(new FakeClock(ANCHOR), new ReminderSnapshotAssembler()), 'flashcard_deck', entity);
 
       expect(policy.shouldCancel(seq, entity)).toBe(true);
     });
@@ -159,7 +162,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('produce secuencia con 3 reminders en standard', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'g-1', closeDate: '2026-08-01T00:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'grading_period', entity);
@@ -174,7 +177,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('produce secuencia con 2 reminders en standard', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'e-1', endDate: '2026-07-10T14:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'calendar_event', entity);
@@ -213,7 +216,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     it('mismos parámetros → mismo sequence', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
-      const factory = new SequenceFactory(clock);
+      const factory = new SequenceFactory(clock, assembler);
 
       const entity = { id: 'x', date: '2026-07-15T10:00:00Z', status: 'active' };
 

@@ -29,8 +29,6 @@
   "dueDeckBody": "\"{{title}}\" has {{count}} card(s) pending review.",
   "classAlertTitle": "📚 Class soon",
   "classAlertBody": "\"{{name}}\" starts in {{minutes}} minutes",
-  "urgentReviewTitle": "🔬 Cards pending",
-  "urgentReviewBody": "You have {{count}} deck(s) with cards to review",
   "backupProgressTitle": "⬆️ Backup in progress",
   "backupProgressBody": "{{current}} / {{total}} items backed up",
   "backupComplete": "✅ Backup complete",

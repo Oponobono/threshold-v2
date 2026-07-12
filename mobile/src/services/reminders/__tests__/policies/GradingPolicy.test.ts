@@ -1,4 +1,5 @@
 import { GradingPolicy } from '../../policies/GradingPolicy';
+import { ReminderSnapshot } from '../../types';
 import type { ReminderProfile, Reminder } from '../../types';
 
 describe('GradingPolicy', () => {
@@ -44,7 +45,7 @@ describe('GradingPolicy', () => {
   });
 
   describe('shouldCancelReminder', () => {
-    const r = (): Reminder => ({ id: 'r1', entityType: 'grading_period', entityId: 'g1', scheduledAt: new Date(), intent: 'submit_work', profile: { name: 'standard', defaultOffsets: [] }, priority: 'normal', sequenceId: 's1', ordinal: 0, status: 'pending' });
+    const r = (): Reminder => ({ id: 'r1', entityType: 'grading_period', entityId: 'g1', scheduledAt: new Date(), intent: 'submit_work', profile: { name: 'standard', defaultOffsets: [] }, priority: 'normal', sequenceId: 's1', ordinal: 0, status: 'pending', snapshot: new ReminderSnapshot({ entity: { id: 'g1', type: 'grading_period', name: '' } }) });
 
     it('status active → false', () => {
       expect(policy.shouldCancelReminder(r(), { status: 'active' })).toBe(false);

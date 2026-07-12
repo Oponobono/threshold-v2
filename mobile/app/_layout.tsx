@@ -166,15 +166,11 @@ function RootNavigator() {
         }
       }
 
-      // 2. Fallback: legacy data.type (notificationService.ts)
+      // Fallback: legacy notification types (por migrar al Engine)
       const type = data?.type as string | undefined;
       if (type === 'deadline') {
         router.push('/calendar');
-      } else if (type === 'duedeck' || type === 'urgent_review') {
-        router.push('/flashcards');
       } else if (type === 'class') {
-        router.push('/');
-      } else if (type === 'weekly_digest') {
         router.push('/');
       }
     });

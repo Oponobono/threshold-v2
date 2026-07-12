@@ -79,6 +79,7 @@ export class InterruptionPolicy {
           scheduledAt: reminder.scheduledAt,
           entityType: reminder.entityType,
           entityId: reminder.entityId,
+          snapshot: reminder.snapshot,
           subjectId: reminder.subjectId,
           intent: reminder.intent,
           priority: reminder.priority,

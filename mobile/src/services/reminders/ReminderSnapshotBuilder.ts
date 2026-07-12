@@ -1,4 +1,4 @@
-import type { EntitySnapshot } from './types';
+import type { ReminderSourceSnapshot } from './types';
 import type { Assessment } from '../database/repositories/AssessmentRepository';
 import type { Schedule } from '../database/repositories/ScheduleRepository';
 import type { FlashcardDeck } from '../database/repositories/FlashcardDeckRepository';
@@ -20,7 +20,7 @@ export class ReminderSnapshotBuilder {
     this.repos = repos;
   }
 
-  async build(): Promise<EntitySnapshot> {
+  async build(): Promise<ReminderSourceSnapshot> {
     const [
       assessments,
       schedules,

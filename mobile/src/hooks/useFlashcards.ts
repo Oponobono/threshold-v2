@@ -8,11 +8,7 @@ import { useCustomAlert } from '../components/ui/CustomAlert';
 import {
   getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck, shareDeck, removeDeckFromGroup,
 } from '../services/api';
-import {
-  scheduleDueDeckNotification,
-  cancelDueDeckNotification,
-  cancelAllDueDeckNotifications,
-} from '../services/notificationService';
+
 import { getUserGroups, getGroupDecks } from '../services/api/learning/groups';
 import { databaseService } from '../services/database/DatabaseService';
 import { useFlashcardsStore } from '../store/useFlashcardsStore';
@@ -260,30 +256,6 @@ export function useFlashcards() {
     }
   };
 
-  // ── Due deck notifications ──────────────────────────────────────────
-  const dueNotifScheduled = useRef<Set<string>>(new Set());
-  const filteredDecksRef = useRef(filteredDecks);
-  filteredDecksRef.current = filteredDecks;
-
-  const scheduleDueNotifications = useCallback(async () => {
-    const dueIds = getDuedeckIds();
-    if (!dueIds || dueIds.size === 0) return;
-
-    for (const deck of filteredDecksRef.current) {
-      if (dueIds.has(deck.id) && !dueNotifScheduled.current.has(deck.id)) {
-        await scheduleDueDeckNotification(deck.id, deck.title, 1);
-        dueNotifScheduled.current.add(deck.id);
-      } else if (!dueIds.has(deck.id) && dueNotifScheduled.current.has(deck.id)) {
-        await cancelDueDeckNotification(deck.id);
-        dueNotifScheduled.current.delete(deck.id);
-      }
-    }
-  }, [getDuedeckIds]);
-
-  useEffect(() => {
-    scheduleDueNotifications();
-  }, [filteredDecks]);
-
   useEffect(() => {
     const unsub = subscribeToEvents();
     return () => unsub();
@@ -313,8 +285,6 @@ export function useFlashcards() {
 
       return () => {
         task.cancel();
-        cancelAllDueDeckNotifications();
-        dueNotifScheduled.current.clear();
       };
     }, [loadDecks]),
   );

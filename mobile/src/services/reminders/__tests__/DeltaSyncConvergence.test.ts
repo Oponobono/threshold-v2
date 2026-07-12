@@ -5,6 +5,7 @@ import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
 import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
+import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { ReminderEngine } from '../ReminderEngine';
 import { ReminderSnapshotBuilder } from '../ReminderSnapshotBuilder';
 import { FakeClock } from '../Clock';
@@ -13,7 +14,7 @@ import { TemplateResolver } from '../TemplateResolver';
 import { NotificationReconciler } from '../NotificationReconciler';
 import type { NotificationProvider, ScheduledNotificationInfo } from '../NotificationProvider';
 import type { I18nService } from '../I18nService';
-import type { EntitySnapshot, ScheduledReminder, ReminderSequence } from '../types';
+import type { ReminderSourceSnapshot, ScheduledReminder, ReminderSequence } from '../types';
 
 // ── Fake implementations ──────────────────────────────────────────
 
@@ -177,7 +178,8 @@ function createEngineContext(): EngineContext {
   registry.register(new EventPolicy());
   registry.register(new GradingPolicy());
 
-  const factory = new SequenceFactory(clock);
+  const assembler = new ReminderSnapshotAssembler();
+  const factory = new SequenceFactory(clock, assembler);
   const interruption = new InterruptionPolicy(clock);
   const templates = new TemplateResolver(new FakeI18n());
   const provider = new CaptureProvider();
@@ -213,7 +215,7 @@ async function applyDeltas(ctx: EngineContext, deltas: Delta[]): Promise<void> {
   }
 }
 
-async function buildSnapshot(repos: FakeRepos): Promise<EntitySnapshot> {
+async function buildSnapshot(repos: FakeRepos): Promise<ReminderSourceSnapshot> {
   const builder = new ReminderSnapshotBuilder(repos);
   return builder.build();
 }

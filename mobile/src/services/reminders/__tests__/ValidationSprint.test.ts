@@ -5,6 +5,7 @@ import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
 import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
+import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { ReminderEngine } from '../ReminderEngine';
 import { FakeClock } from '../Clock';
 import { InterruptionPolicy } from '../InterruptionPolicy';
@@ -12,7 +13,7 @@ import { TemplateResolver } from '../TemplateResolver';
 import { NotificationReconciler } from '../NotificationReconciler';
 import type { NotificationProvider, ScheduledNotificationInfo } from '../NotificationProvider';
 import type { I18nService } from '../I18nService';
-import type { EntitySnapshot, ScheduledReminder } from '../types';
+import type { ReminderSourceSnapshot, ScheduledReminder } from '../types';
 
 // ── Fake implementations ──────────────────────────────────────────
 
@@ -128,7 +129,8 @@ function createEngineComponents(clock = new FakeClock(ANCHOR)) {
   registry.register(new EventPolicy());
   registry.register(new GradingPolicy());
 
-  const factory = new SequenceFactory(clock);
+  const assembler = new ReminderSnapshotAssembler();
+  const factory = new SequenceFactory(clock, assembler);
   const interruption = new InterruptionPolicy(clock);
   const templates = new TemplateResolver(new FakeI18n());
   const reconciler = new NotificationReconciler();
@@ -147,7 +149,7 @@ function assessmentEntity(overrides: Record<string, any> = {}): any {
   };
 }
 
-function emptySnapshot(): EntitySnapshot {
+function emptySnapshot(): ReminderSourceSnapshot {
   return { assessments: [], schedules: [], flashcard_decks: [], grading_periods: [], calendar_events: [] };
 }
 
@@ -347,7 +349,7 @@ describe('Sprint 6.1.1 — Event Storm', () => {
     it('initialize con snapshot + event storm → converge correctamente', async () => {
       const { engine, provider } = createEngineComponents();
 
-      const snapshot: EntitySnapshot = {
+      const snapshot: ReminderSourceSnapshot = {
         assessments: [assessmentEntity({ id: 'a-pre' })],
         schedules: [],
         flashcard_decks: [],

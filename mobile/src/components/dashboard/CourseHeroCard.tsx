@@ -1,12 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import { cHCardStyles, HERO_CARD_WIDTH } from '../../styles/CourseHeroCard.styles';
+export { HERO_CARD_WIDTH };
 import { Course, Subject } from '../../services/api/types';
 import { openCourseLink } from '../../utils/linking';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-export const HERO_CARD_WIDTH = SCREEN_WIDTH - 48; // 16px visible margin each side + 16px gap between cards
 
 const PLATFORM_CONFIG: Record<string, { color: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string }> = {
   Platzi:   { color: '#98CA3F', icon: 'school',           label: 'Platzi' },
@@ -54,27 +53,27 @@ export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress,
       <TouchableOpacity
         activeOpacity={0.92}
         onPress={onPress}
-        style={[styles.card, isActive && styles.cardActive]}
+        style={[cHCardStyles.card, isActive && cHCardStyles.cardActive]}
       >
         {/* Top Row: Platform badge + Momentum */}
-        <View style={styles.topRow}>
+        <View style={cHCardStyles.topRow}>
           {platform && !isIndependent ? (
-            <View style={[styles.platformBadge, { backgroundColor: platform.color + '18', borderColor: platform.color + '40' }]}>
+            <View style={[cHCardStyles.platformBadge, { backgroundColor: platform.color + '18', borderColor: platform.color + '40' }]}>
               <MaterialCommunityIcons name={platform.icon} size={13} color={platform.color} />
-              <Text style={[styles.platformText, { color: platform.color }]}>{platform.label}</Text>
+              <Text style={[cHCardStyles.platformText, { color: platform.color }]}>{platform.label}</Text>
             </View>
           ) : isIndependent ? (
-            <View style={[styles.platformBadge, { backgroundColor: theme.colors.text.secondary + '18', borderColor: theme.colors.text.secondary + '40' }]}>
+            <View style={[cHCardStyles.platformBadge, { backgroundColor: theme.colors.text.secondary + '18', borderColor: theme.colors.text.secondary + '40' }]}>
               <MaterialCommunityIcons name="bookshelf" size={13} color={theme.colors.text.secondary} />
-              <Text style={[styles.platformText, { color: theme.colors.text.secondary }]}>Sin Asignar</Text>
+              <Text style={[cHCardStyles.platformText, { color: theme.colors.text.secondary }]}>Sin Asignar</Text>
             </View>
           ) : <View />}
 
           {!isIndependent && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={styles.momentumBadge}>
+              <View style={cHCardStyles.momentumBadge}>
                 <Ionicons name="flame" size={12} color="#FF9500" />
-                <Text style={styles.momentumText}>{momentumPct}%</Text>
+                <Text style={cHCardStyles.momentumText}>{momentumPct}%</Text>
               </View>
               {onEditPress || onDeletePress ? (
                 <TouchableOpacity onPress={() => setMenuVisible(true)} style={{ padding: 4 }}>
@@ -86,21 +85,21 @@ export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress,
         </View>
 
       {course.instructor ? (
-        <View style={styles.instructorRow}>
+        <View style={cHCardStyles.instructorRow}>
           <Ionicons name="person-outline" size={12} color={theme.colors.text.placeholder} />
-          <Text style={styles.instructorText} numberOfLines={1}>{course.instructor}</Text>
+          <Text style={cHCardStyles.instructorText} numberOfLines={1}>{course.instructor}</Text>
         </View>
       ) : null}
 
       {/* Course Name */}
-      <Text style={styles.courseName} numberOfLines={2}>{course.name}</Text>
+      <Text style={cHCardStyles.courseName} numberOfLines={2}>{course.name}</Text>
 
       {/* Tags */}
       {course.tags ? (
-        <View style={styles.tagsRow}>
+        <View style={cHCardStyles.tagsRow}>
           {course.tags.split(',').map((tag, i) => (
-            <View key={i} style={styles.tagBadge}>
-              <Text style={styles.tagText}>{tag.trim()}</Text>
+            <View key={i} style={cHCardStyles.tagBadge}>
+              <Text style={cHCardStyles.tagText}>{tag.trim()}</Text>
             </View>
           ))}
         </View>
@@ -109,47 +108,47 @@ export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress,
       {/* main_url external link */}
       {course.main_url && (
         <TouchableOpacity
-          style={styles.mainUrlRow}
+          style={cHCardStyles.mainUrlRow}
           onPress={() => openCourseLink(course.main_url!, course.platform ?? undefined)}
         >
           <Ionicons name="open-outline" size={12} color={theme.colors.primary} />
-          <Text style={styles.mainUrlText} numberOfLines={1}>Ir al curso original</Text>
+          <Text style={cHCardStyles.mainUrlText} numberOfLines={1}>Ir al curso original</Text>
         </TouchableOpacity>
       )}
 
       {/* URL hint */}
       {displayUrl && (
-        <View style={styles.urlRow}>
+        <View style={cHCardStyles.urlRow}>
           <Ionicons name="link-outline" size={12} color={theme.colors.text.placeholder} />
-          <Text style={styles.urlText} numberOfLines={1}>{displayUrl}</Text>
+          <Text style={cHCardStyles.urlText} numberOfLines={1}>{displayUrl}</Text>
         </View>
       )}
 
       {/* Divider */}
-      <View style={styles.divider} />
+      <View style={cHCardStyles.divider} />
 
       {/* Stats Row */}
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={styles.statValue}>{subjectCount}</Text>
-          <Text style={styles.statLabel}>{subjectCount === 1 ? 'Materia' : 'Materias'}</Text>
+      <View style={cHCardStyles.statsRow}>
+        <View style={cHCardStyles.stat}>
+          <Text style={cHCardStyles.statValue}>{subjectCount}</Text>
+          <Text style={cHCardStyles.statLabel}>{subjectCount === 1 ? 'Materia' : 'Materias'}</Text>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.stat}>
-          <Text style={styles.statValue}>{totalCredits > 0 ? totalCredits : '—'}</Text>
-          <Text style={styles.statLabel}>Créditos</Text>
+        <View style={cHCardStyles.statDivider} />
+        <View style={cHCardStyles.stat}>
+          <Text style={cHCardStyles.statValue}>{totalCredits > 0 ? totalCredits : '—'}</Text>
+          <Text style={cHCardStyles.statLabel}>Créditos</Text>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: theme.colors.success }]}>{completedCount}</Text>
-          <Text style={styles.statLabel}>Aprobadas</Text>
+        <View style={cHCardStyles.statDivider} />
+        <View style={cHCardStyles.stat}>
+          <Text style={[cHCardStyles.statValue, { color: theme.colors.success }]}>{completedCount}</Text>
+          <Text style={cHCardStyles.statLabel}>Aprobadas</Text>
         </View>
       </View>
 
         {/* Progress bar */}
         {subjectCount > 0 && (
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${Math.round(progressRatio * 100)}%` as any }]} />
+          <View style={cHCardStyles.progressBarBg}>
+            <View style={[cHCardStyles.progressBarFill, { width: `${Math.round(progressRatio * 100)}%` as any }]} />
           </View>
         )}
       </TouchableOpacity>
@@ -257,12 +256,12 @@ export const AllSubjectsHeroCard = React.memo(({ subjects, courses, nextAssessme
     : '#D32F2F';
 
   return (
-    <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={[styles.card, styles.cardAllGlobal, isActive && styles.cardActiveGlobal]}>
+    <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={[cHCardStyles.card, cHCardStyles.cardAllGlobal, isActive && cHCardStyles.cardActiveGlobal]}>
       {/* Top Row: badge + global avg */}
-      <View style={styles.topRow}>
-        <View style={[styles.platformBadge, { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary + '30', borderWidth: 1 }]}>
+      <View style={cHCardStyles.topRow}>
+        <View style={[cHCardStyles.platformBadge, { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary + '30', borderWidth: 1 }]}>
           <Ionicons name="globe-outline" size={13} color={theme.colors.primary} />
-          <Text style={[styles.platformText, { color: theme.colors.primary }]}>Vista Global</Text>
+          <Text style={[cHCardStyles.platformText, { color: theme.colors.primary }]}>Vista Global</Text>
         </View>
         {globalAvg !== null && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: avgColor + '18', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 }}>
@@ -272,7 +271,7 @@ export const AllSubjectsHeroCard = React.memo(({ subjects, courses, nextAssessme
         )}
       </View>
 
-      <Text style={[styles.courseName, { color: theme.colors.text.primary }]} numberOfLines={1}>Todas tus materias</Text>
+      <Text style={[cHCardStyles.courseName, { color: theme.colors.text.primary }]} numberOfLines={1}>Todas tus materias</Text>
 
       {/* Course distribution pills */}
       {courseBreakdown.length > 0 && (
@@ -293,25 +292,25 @@ export const AllSubjectsHeroCard = React.memo(({ subjects, courses, nextAssessme
         </View>
       )}
 
-      <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+      <View style={[cHCardStyles.divider, { backgroundColor: theme.colors.border }]} />
 
       {/* Stats row */}
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: theme.colors.text.primary }]}>{subjectCount}</Text>
-          <Text style={[styles.statLabel, { color: theme.colors.text.placeholder }]}>{subjectCount === 1 ? 'Materia' : 'Materias'}</Text>
+      <View style={cHCardStyles.statsRow}>
+        <View style={cHCardStyles.stat}>
+          <Text style={[cHCardStyles.statValue, { color: theme.colors.text.primary }]}>{subjectCount}</Text>
+          <Text style={[cHCardStyles.statLabel, { color: theme.colors.text.placeholder }]}>{subjectCount === 1 ? 'Materia' : 'Materias'}</Text>
         </View>
-        <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: theme.colors.text.primary }]}>{totalCredits > 0 ? totalCredits : '—'}</Text>
-          <Text style={[styles.statLabel, { color: theme.colors.text.placeholder }]}>Créditos</Text>
+        <View style={[cHCardStyles.statDivider, { backgroundColor: theme.colors.border }]} />
+        <View style={cHCardStyles.stat}>
+          <Text style={[cHCardStyles.statValue, { color: theme.colors.text.primary }]}>{totalCredits > 0 ? totalCredits : '—'}</Text>
+          <Text style={[cHCardStyles.statLabel, { color: theme.colors.text.placeholder }]}>Créditos</Text>
         </View>
-        <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: atRiskCount > 0 ? '#D32F2F' : theme.colors.text.placeholder }]}>
+        <View style={[cHCardStyles.statDivider, { backgroundColor: theme.colors.border }]} />
+        <View style={cHCardStyles.stat}>
+          <Text style={[cHCardStyles.statValue, { color: atRiskCount > 0 ? '#D32F2F' : theme.colors.text.placeholder }]}>
             {atRiskCount > 0 ? atRiskCount : '—'}
           </Text>
-          <Text style={[styles.statLabel, { color: atRiskCount > 0 ? '#D32F2F' : theme.colors.text.placeholder }]}>En riesgo</Text>
+          <Text style={[cHCardStyles.statLabel, { color: atRiskCount > 0 ? '#D32F2F' : theme.colors.text.placeholder }]}>En riesgo</Text>
         </View>
       </View>
 
@@ -329,173 +328,4 @@ export const AllSubjectsHeroCard = React.memo(({ subjects, courses, nextAssessme
       )}
     </TouchableOpacity>
   );
-});
-
-const styles = StyleSheet.create({
-  card: {
-    width: HERO_CARD_WIDTH,
-    backgroundColor: theme.colors.card,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  cardActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: '#FAFBFF',
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  platformBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  platformText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  momentumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 149, 0, 0.10)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 100,
-  },
-  momentumText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FF9500',
-  },
-  instructorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
-  },
-  instructorText: {
-    fontSize: 12,
-    color: theme.colors.text.placeholder,
-    fontWeight: '500',
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginBottom: 8,
-  },
-  tagBadge: {
-    backgroundColor: theme.colors.primary + '18',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  tagText: {
-    fontSize: 10,
-    color: theme.colors.primary,
-    fontWeight: '600',
-  },
-  mainUrlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 6,
-  },
-  mainUrlText: {
-    fontSize: 12,
-    color: theme.colors.primary,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  courseName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: theme.colors.text.primary,
-    letterSpacing: -0.4,
-    lineHeight: 26,
-    marginBottom: 6,
-  },
-  urlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 16,
-  },
-  urlText: {
-    fontSize: 11,
-    color: theme.colors.text.placeholder,
-    fontWeight: '500',
-    flex: 1,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginBottom: 14,
-    opacity: 0.6,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  stat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: theme.colors.text.primary,
-    letterSpacing: -0.3,
-  },
-  statLabel: {
-    fontSize: 10,
-    color: theme.colors.text.placeholder,
-    fontWeight: '500',
-    marginTop: 1,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  statDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: theme.colors.border,
-  },
-  progressBarBg: {
-    height: 3,
-    backgroundColor: theme.colors.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: theme.colors.success,
-    borderRadius: 4,
-  },
-  // "All subjects" card variant (Global Dashboard)
-  cardAllGlobal: {
-    backgroundColor: theme.colors.card,
-    borderColor: 'transparent',
-  },
-  cardActiveGlobal: {
-    borderColor: theme.colors.primary,
-    borderWidth: 1.5,
-    backgroundColor: '#FAFBFF',
-  },
 });

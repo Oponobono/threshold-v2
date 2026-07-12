@@ -5,6 +5,7 @@ import { ReviewPolicy } from './policies/ReviewPolicy';
 import { EventPolicy } from './policies/EventPolicy';
 import { GradingPolicy } from './policies/GradingPolicy';
 import { SequenceFactory } from './SequenceFactory';
+import { ReminderSnapshotAssembler } from './ReminderSnapshotAssembler';
 import { SystemClock } from './Clock';
 import { InterruptionPolicy } from './InterruptionPolicy';
 import { TemplateResolver } from './TemplateResolver';
@@ -31,7 +32,8 @@ export function createDefaultReminderCoordinator(
   registry.register(new EventPolicy());
   registry.register(new GradingPolicy());
 
-  const factory = new SequenceFactory(clock);
+  const assembler = new ReminderSnapshotAssembler();
+  const factory = new SequenceFactory(clock, assembler);
   const interruption = new InterruptionPolicy(clock);
 
   const i18n: I18nService = options?.i18n ?? {

@@ -1,4 +1,5 @@
 import { Clock } from './Clock';
+import { ReminderSnapshotAssembler } from './ReminderSnapshotAssembler';
 import type {
   ReminderSequence,
   Reminder,
@@ -8,7 +9,10 @@ import type {
 } from './types';
 
 export class SequenceFactory {
-  constructor(private clock: Clock) {}
+  constructor(
+    private clock: Clock,
+    private snapshotAssembler: ReminderSnapshotAssembler,
+  ) {}
 
   buildSequence(
     entity: any,
@@ -18,7 +22,8 @@ export class SequenceFactory {
     expiresAt?: Date | null,
   ): ReminderSequence {
     const now = this.clock.now();
-    const entityId = this._resolveEntityId(entity);
+    const entityId = this._id(entity);
+    const snapshot = this.snapshotAssembler.build(entity, entityType);
     const seqId = `${entityType}::${entityId}`;
 
     const reminders: Reminder[] = [];
@@ -34,6 +39,7 @@ export class SequenceFactory {
         id,
         entityType,
         entityId,
+        snapshot,
         subjectId,
         scheduledAt,
         intent,
@@ -60,7 +66,7 @@ export class SequenceFactory {
     });
   }
 
-  private _resolveEntityId(entity: any): string {
+  private _id(entity: any): string {
     if (entity == null) return '';
     return String(entity.id ?? entity.ID ?? '');
   }

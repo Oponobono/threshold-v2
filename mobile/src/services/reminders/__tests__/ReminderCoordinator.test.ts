@@ -1,5 +1,5 @@
 import { ReminderCoordinator } from '../ReminderCoordinator';
-import type { EntitySnapshot, EnvironmentContext } from '../types';
+import type { ReminderSourceSnapshot, EnvironmentContext } from '../types';
 
 function createMockEngine() {
   return {
@@ -16,7 +16,7 @@ function createMockEngine() {
   };
 }
 
-function createMockBuilder(snapshot?: EntitySnapshot) {
+function createMockBuilder(snapshot?: ReminderSourceSnapshot) {
   return {
     build: jest.fn().mockResolvedValue(snapshot ?? {}),
   };
@@ -37,7 +37,7 @@ describe('ReminderCoordinator', () => {
   describe('initialize', () => {
     it('builds snapshot and calls engine.initialize', async () => {
       const engine = createMockEngine();
-      const snapshot: EntitySnapshot = { assessments: [{ id: 'a1' }] };
+      const snapshot: ReminderSourceSnapshot = { assessments: [{ id: 'a1' }] };
       const builder = createMockBuilder(snapshot);
       const coordinator = new ReminderCoordinator(engine as any, builder as any, createMockRepos());
 

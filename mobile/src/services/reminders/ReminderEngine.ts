@@ -8,7 +8,7 @@ import type { NotificationProvider } from './NotificationProvider';
 import type {
   ReminderSequence,
   ReminderProfile,
-  EntitySnapshot,
+  ReminderSourceSnapshot,
   EnvironmentContext,
   EngineTraceEntry,
   StageTiming,
@@ -46,7 +46,7 @@ export class ReminderEngine {
     private clock: Clock,
   ) {}
 
-  async initialize(snapshot: EntitySnapshot): Promise<void> {
+  async initialize(snapshot: ReminderSourceSnapshot): Promise<void> {
     const start = this.clock.now().getTime();
 
     for (const entityType of ENTITY_TYPES) {
@@ -234,7 +234,7 @@ export class ReminderEngine {
     this._buildStages = undefined;
   }
 
-  private _getEntities(snapshot: EntitySnapshot, entityType: string): readonly any[] {
+  private _getEntities(snapshot: ReminderSourceSnapshot, entityType: string): readonly any[] {
     switch (entityType) {
       case 'assessment':
         return snapshot.assessments ?? [];

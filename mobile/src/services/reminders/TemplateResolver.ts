@@ -21,15 +21,17 @@ export class TemplateResolver {
     };
   }
 
+  private _resolveEntityName(reminder: DeliveryReminderDomain): string {
+    if (reminder.snapshot.entity.name) return reminder.snapshot.entity.name;
+    return this.i18n.translate('category.' + reminder.entityType, { default: reminder.entityType });
+  }
+
   private _resolveTitle(reminder: DeliveryReminderDomain): string {
-    const entity = this.i18n.translate('category.' + reminder.entityType, { default: reminder.entityType });
-    return this.i18n.translate('intentTitle.' + reminder.intent, { entity });
+    return this.i18n.translate('intentTitle.' + reminder.intent, { entity: this._resolveEntityName(reminder) });
   }
 
   private _resolveBody(reminder: DeliveryReminderDomain): string {
-    return this.i18n.translate('intentBody.' + reminder.intent, {
-      entity: this.i18n.translate('category.' + reminder.entityType, { default: reminder.entityType }),
-    });
+    return this.i18n.translate('intentBody.' + reminder.intent, { entity: this._resolveEntityName(reminder) });
   }
 
   private _resolveDeeplink(reminder: DeliveryReminderDomain): string | undefined {
