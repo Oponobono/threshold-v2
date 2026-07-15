@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Platform, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../styles/theme';
@@ -11,6 +11,7 @@ import { extractTextFromImageHybrid, extractTextFromPDFHybrid } from '../../serv
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as WebBrowser from 'expo-web-browser';
+import * as Sharing from 'expo-sharing';
 import { useTranslation } from 'react-i18next';
 import { SubjectDocumentCard } from './SubjectDocumentCard';
 
@@ -103,6 +104,28 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
           type: 'error',
         });
       }
+    }
+  };
+
+  const handleShare = async (doc: any) => {
+    try {
+      if (doc.local_uri) {
+        const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
+        if (fileInfo.exists) {
+          const canShare = await Sharing.isAvailableAsync();
+          if (canShare) {
+            await Sharing.shareAsync(doc.local_uri);
+            return;
+          }
+        }
+      }
+      if (doc.cloud_url && doc.cloud_url !== 'ghost_file') {
+        await Share.share({ message: doc.cloud_url, url: doc.cloud_url });
+      } else {
+        showAlert({ title: 'Aviso', message: 'No hay archivo disponible para compartir.', type: 'warning' });
+      }
+    } catch (e) {
+      console.error('Error sharing:', e);
     }
   };
 
@@ -390,6 +413,7 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
                 onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc)}
                 onLongPress={() => handleLongPress(docId)}
                 onDelete={() => handleDelete(docId)}
+                onShare={() => handleShare(doc)}
                 onExtractOCR={() => handleExtractOCR(docId)}
                 isExtractingOCR={isExtracting}
               />
@@ -436,3 +460,4 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
     </View>
   );
 };
+

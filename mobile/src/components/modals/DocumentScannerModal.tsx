@@ -10,6 +10,7 @@ import { extractTextFromImageHybrid } from '../../services/hybridAIService';
 import { AdvancedImageEnhancer, AdvancedImageEnhancerRef } from '../ai/AdvancedImageEnhancer';
 import * as Print from 'expo-print';
 import * as Clipboard from 'expo-clipboard';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 // Importes condicionales para plataformas nativas
 let DocumentScanner: any = null;
@@ -159,11 +160,39 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
       if (exportFormat === 'pdf') {
         // ── Ruta PDF (genera archivo local con expo-print) ──
         const imgSrc = base64Img ? `data:image/jpeg;base64,${base64Img}` : finalImageUri;
-        const html = `<html><body style="margin:0;padding:0;"><img src="${imgSrc}" style="width:100%;"/></body></html>`;
+        // Leer dimensiones de la imagen para un PDF exacto sin márgenes blancos
+        let pageWidth = 794; // Fallback A4
+        let pageHeight = 1123;
+        try {
+          const info = await ImageManipulator.manipulateAsync(finalImageUri, []);
+          if (info.width && info.height) {
+            pageWidth = info.width;
+            pageHeight = info.height;
+          }
+        } catch (err) {
+          console.warn('[Scanner] Falló al obtener dimensiones, usando A4', err);
+        }
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: ${pageWidth}px ${pageHeight}px; margin: 0; }
+    html, body { margin: 0; padding: 0; width: ${pageWidth}px; height: ${pageHeight}px; background: white; }
+    img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  </style>
+</head>
+<body><img src="${imgSrc}" /></body>
+</html>`;
 
         let pdfUri: string;
         try {
-          const { uri } = await Print.printToFileAsync({ html });
+          const { uri } = await Print.printToFileAsync({ 
+            html,
+            width: pageWidth,
+            height: pageHeight 
+          });
           pdfUri = uri;
         } catch (pdfErr) {
           console.error('[Scanner] Print.printToFileAsync falló:', pdfErr);

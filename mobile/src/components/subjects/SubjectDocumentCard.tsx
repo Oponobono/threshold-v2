@@ -13,6 +13,7 @@ export interface SubjectDocumentCardProps {
   onPress: () => void;
   onLongPress: () => void;
   onDelete: () => void;
+  onShare: () => void;
   onExtractOCR?: () => void;
   isExtractingOCR?: boolean;
 }
@@ -41,6 +42,7 @@ export const SubjectDocumentCard: React.FC<SubjectDocumentCardProps> = ({
   onPress,
   onLongPress,
   onDelete,
+  onShare,
   onExtractOCR,
   isExtractingOCR,
 }) => {
@@ -122,7 +124,12 @@ export const SubjectDocumentCard: React.FC<SubjectDocumentCardProps> = ({
               )}
             </TouchableOpacity>
           )}
-          <Ionicons name="open-outline" size={20} color={theme.colors.text.secondary} />
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation?.(); onShare(); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="open-outline" size={20} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={(e) => { e.stopPropagation?.(); onDelete(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
