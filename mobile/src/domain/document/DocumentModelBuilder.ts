@@ -32,7 +32,7 @@ export class DocumentModelBuilder {
 }
 
 function tagRoles(blocks: readonly TextBlock[]): TextBlock[] {
-  return blocks.map((block): TextBlock => {
+  return blocks.map((block, index): TextBlock => {
     const firstLine = block.content.split('\n')[0]?.trim() ?? '';
     const wordCount = firstLine.split(/\s+/).length;
     const charCount = firstLine.length;
@@ -49,7 +49,8 @@ function tagRoles(blocks: readonly TextBlock[]): TextBlock[] {
       }
     }
 
-    return { ...block, role };
+    const id = block.id || `block-${block.startIndex}-${index}`;
+    return { ...block, id, role };
   });
 }
 

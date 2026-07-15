@@ -33,7 +33,7 @@ describe('DocumentModelBuilder', () => {
 
     expect(model.pages).toHaveLength(1);
     expect(model.pages[0].pageIndex).toBe(0);
-    expect(model.pages[0].content).toBe(extracted);
+    expect(model.pages[0].content.textBlocks[0].content).toBe('Hello');
   });
 
   it('initializes empty table of contents', () => {
@@ -91,10 +91,15 @@ describe('DocumentModelBuilder', () => {
   });
 
   it('builds multiple pages for large content', () => {
-    const longText = 'A'.repeat(9000);
-    const extracted = createExtracted({
-      textBlocks: [{ content: longText, startIndex: 0, endIndex: 9000 }],
-    });
+    const blocks = [];
+    for (let i = 0; i < 40; i++) {
+      blocks.push({
+        content: `Section ${i + 1}. ${'Lorem ipsum dolor sit amet '.repeat(5)}`,
+        startIndex: i * 400,
+        endIndex: (i + 1) * 400,
+      });
+    }
+    const extracted = createExtracted({ textBlocks: blocks });
     const builder = new DocumentModelBuilder(extracted, createCapabilities());
     const model = builder.build('doc-1', 'Long Doc');
 
@@ -119,15 +124,21 @@ describe('DocumentModelBuilder', () => {
   });
 
   it('builds default TOC for multi-page without headings', () => {
-    const longText = 'Plain text without headings. '.repeat(200);
-    const extracted = createExtracted({
-      textBlocks: [{ content: longText, startIndex: 0, endIndex: longText.length }],
-    });
+    const blocks = [];
+    for (let i = 0; i < 40; i++) {
+      blocks.push({
+        content: `Plain text paragraph ${i + 1}. ${'word '.repeat(20)}`,
+        startIndex: i * 400,
+        endIndex: (i + 1) * 400,
+      });
+    }
+    const extracted = createExtracted({ textBlocks: blocks });
     const builder = new DocumentModelBuilder(extracted, createCapabilities());
     const model = builder.build('doc-1', 'Plain');
 
+    expect(model.pages.length).toBeGreaterThan(1);
     expect(model.tableOfContents.length).toBe(model.pages.length);
-    expect(model.tableOfContents[0].title).toBe('Page 1');
+    expect(model.tableOfContents[0].title).toContain('Página');
   });
 
   it('default capabilities exclude AskAI for empty extraction', () => {

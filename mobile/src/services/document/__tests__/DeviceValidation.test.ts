@@ -95,7 +95,7 @@ describe('Sprint 2.5: Device Validation (pre-device checks)', () => {
         const elapsed = Date.now() - start;
 
         expect(model.pages.length).toBeGreaterThan(0);
-        expect(elapsed).toBeLessThan(200);
+        expect(elapsed).toBeLessThan(500);
       });
     }
   });

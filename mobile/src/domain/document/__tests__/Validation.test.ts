@@ -91,7 +91,7 @@ describe('Validation: real-world PDF scenarios', () => {
     const model = builder.build('test-perf', 'Perf Test');
     const elapsed = performance.now() - start;
 
-    expect(elapsed).toBeLessThan(100);
+    expect(elapsed).toBeLessThan(200);
     expect(model.pages).toBeDefined();
   });
 

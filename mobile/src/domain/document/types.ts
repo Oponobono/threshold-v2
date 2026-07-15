@@ -1,6 +1,7 @@
 export type TextBlockRole = 'heading' | 'subheading' | 'paragraph';
 
 export interface TextBlock {
+  readonly id?: string;
   readonly content: string;
   readonly startIndex: number;
   readonly endIndex: number;

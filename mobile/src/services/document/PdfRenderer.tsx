@@ -1,44 +1,69 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   FlatList,
-  StyleSheet,
+  Pressable,
   useWindowDimensions,
   type ViewToken,
   type ListRenderItemInfo,
 } from 'react-native';
-import type { DocumentRenderer, OnPageChange, ScrollToPageRef } from '../../domain/document/DocumentRenderer';
+import type { DocumentRenderer, OnPageChange, ScrollToPageRef, OnTextSelection } from '../../domain/document/DocumentRenderer';
 import type { DocumentModel, DocumentPage } from '../../domain/document/DocumentModel';
-import { theme } from '../../styles/theme';
+import { pdfRendererStyles as styles } from '../../styles/PdfRenderer.styles';
+
+export interface TextSelectionEvent {
+  readonly documentId: string;
+  readonly pageIndex: number;
+  readonly blockIndex: number;
+  readonly text: string;
+  readonly startIndex: number;
+  readonly endIndex: number;
+}
+
+export interface PdfRendererProps {
+  model: DocumentModel;
+  onPageChange?: OnPageChange;
+  scrollToPageRef?: ScrollToPageRef;
+  onSelection?: OnTextSelection;
+  highlightedBlockId?: string;
+}
 
 export class PdfRenderer implements DocumentRenderer {
   render(
     model: DocumentModel,
     onPageChange?: OnPageChange,
     scrollToPageRef?: ScrollToPageRef,
+    onDocumentReady?: undefined,
+    onSelection?: OnTextSelection,
+    highlightedBlockId?: string,
   ): unknown {
     return (
       <PdfRendererContent
         model={model}
         onPageChange={onPageChange}
         scrollToPageRef={scrollToPageRef}
+        onSelection={onSelection}
+        highlightedBlockId={highlightedBlockId}
       />
     );
   }
 }
 
-interface PdfRendererContentProps {
-  model: DocumentModel;
-  onPageChange?: OnPageChange;
-  scrollToPageRef?: ScrollToPageRef;
-}
-
-function PdfRendererContent({ model, onPageChange, scrollToPageRef }: PdfRendererContentProps) {
+function PdfRendererContent({
+  model,
+  onPageChange,
+  scrollToPageRef,
+  onSelection,
+  highlightedBlockId,
+}: PdfRendererProps) {
   const { width } = useWindowDimensions();
   const listRef = useRef<FlatList<DocumentPage>>(null);
+  const [selectedBlock, setSelectedBlock] = useState<{
+    pageIndex: number;
+    blockIndex: number;
+  } | null>(null);
 
-  // Expose imperative scroll to workspace
   useEffect(() => {
     if (!scrollToPageRef) return;
     scrollToPageRef.current = (page: number) => {
@@ -58,22 +83,63 @@ function PdfRendererContent({ model, onPageChange, scrollToPageRef }: PdfRendere
     [onPageChange],
   );
 
+  const handleBlockLongPress = useCallback(
+    (pageIndex: number, blockIndex: number, text: string, startIndex: number, endIndex: number) => {
+      setSelectedBlock({ pageIndex, blockIndex });
+      onSelection?.({
+        documentId: model.documentId,
+        pageIndex,
+        blockIndex,
+        text,
+        startIndex,
+        endIndex,
+      });
+    },
+    [model.documentId, onSelection],
+  );
+
+  const handleBlockPress = useCallback(() => {
+    if (selectedBlock) {
+      setSelectedBlock(null);
+    }
+  }, [selectedBlock]);
+
   const renderPage = ({ item }: ListRenderItemInfo<DocumentPage>) => (
     <View style={[styles.page, { width }]}>
       {item.content.textBlocks.map((block, i) => {
         const role = block.role ?? 'paragraph';
+        const isSelected =
+          selectedBlock?.pageIndex === item.pageIndex &&
+          selectedBlock?.blockIndex === i;
+        const isHighlighted = block.id === highlightedBlockId;
+
         return (
-          <Text
-            key={i}
-            selectable
-            style={[
-              styles.baseText,
-              role === 'heading' && styles.heading,
-              role === 'subheading' && styles.subheading,
-            ]}
+          <Pressable
+            key={block.id || i}
+            onLongPress={() =>
+              handleBlockLongPress(
+                item.pageIndex,
+                i,
+                block.content,
+                block.startIndex,
+                block.endIndex,
+              )
+            }
+            onPress={handleBlockPress}
           >
-            {block.content}
-          </Text>
+            <Text
+              selectable
+              style={[
+                styles.baseText,
+                role === 'heading' && styles.heading,
+                role === 'subheading' && styles.subheading,
+                isSelected && styles.selectedBlock,
+                isHighlighted && styles.highlightedBlock,
+              ]}
+            >
+              {block.content}
+            </Text>
+          </Pressable>
         );
       })}
     </View>
@@ -94,7 +160,6 @@ function PdfRendererContent({ model, onPageChange, scrollToPageRef }: PdfRendere
       maxToRenderPerBatch={3}
       windowSize={5}
       onScrollToIndexFailed={({ index }) => {
-        // Fallback: scroll to end then retry
         listRef.current?.scrollToEnd({ animated: false });
         setTimeout(() => {
           listRef.current?.scrollToIndex({ index, animated: true });
@@ -103,31 +168,3 @@ function PdfRendererContent({ model, onPageChange, scrollToPageRef }: PdfRendere
     />
   );
 }
-
-const styles = StyleSheet.create({
-  page: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  baseText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: theme.colors.text.primary,
-    marginBottom: 8,
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginTop: 20,
-    marginBottom: 10,
-    letterSpacing: 0.2,
-  },
-  subheading: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginTop: 14,
-    marginBottom: 6,
-  },
-});

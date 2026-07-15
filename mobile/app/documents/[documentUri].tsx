@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { documentViewerStyles as styles } from '../../src/styles/DocumentViewer.styles';
 import { theme } from '../../src/styles/theme';
 import { createDocumentSystem } from '../../src/services/document/DocumentSystemFactory';
 import { AssetDocumentSource } from '../../src/services/document/AssetDocumentSource';
@@ -20,6 +21,19 @@ const nullRepo = {
   delete: async () => {},
 };
 
+// In-memory model cache — persists while the app is alive (max 5 docs)
+const MODEL_CACHE_MAX = 5;
+const modelCache = new Map<string, DocumentModel>();
+function getCached(key: string): DocumentModel | undefined { return modelCache.get(key); }
+function setCached(key: string, model: DocumentModel) {
+  if (modelCache.size >= MODEL_CACHE_MAX) {
+    // Evict the oldest entry
+    const oldest = modelCache.keys().next().value;
+    if (oldest) modelCache.delete(oldest);
+  }
+  modelCache.set(key, model);
+}
+
 export default function DocumentViewerScreen() {
   const { documentUri, documentTitle } = useLocalSearchParams<{
     documentUri: string;
@@ -31,47 +45,76 @@ export default function DocumentViewerScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Stable rendererRegistry — only created once per screen mount
+  const rendererRegistry = useMemo(() => createDocumentSystem(nullRepo).rendererRegistry, []);
+
   useEffect(() => {
-    if (!documentUri) {
-      setError('No se proporcionó URI del documento');
-      setLoading(false);
-      return;
-    }
-    loadDocument();
-  }, [documentUri]);
+    // Cancellation flag: if the user navigates back before the doc finishes
+    // loading, we abort all state updates to avoid stale-closure leaks.
+    let cancelled = false;
 
-  const loadDocument = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const system = createDocumentSystem(nullRepo);
+    const load = async () => {
+      if (!documentUri) {
+        if (!cancelled) { setError('No se proporcionó URI del documento'); setLoading(false); }
+        return;
+      }
 
       const fullUri = documentUri.startsWith('file://')
         ? documentUri
         : `${PDF_DIR}${documentUri}`;
 
-      const source = await AssetDocumentSource.fromFile(fullUri, 'application/pdf');
-      // Fast path: skip heavy textual extraction for visual rendering.
-      // NativePdfRenderer uses WebView + PDF.js which doesn't need the parsed text.
-      const extractedFast: ExtractedDocument = {
-        metadata: { format: 'application/pdf', title: documentTitle || 'Documento', pageCount: 0 },
-        textBlocks: [],
-        images: [],
-        tables: [],
-      };
+      // ── Fast path: model already cached ──────────────────────
+      const cached = getCached(fullUri);
+      if (cached) {
+        if (!cancelled) { setModel(cached); setLoading(false); }
+        return;
+      }
 
-      const builder = new DocumentModelBuilder(extractedFast);
-      const docModel = builder.build(fullUri, documentTitle || 'Documento');
+      // ── Slow path: parse PDF and build model ──────────────────
+      if (!cancelled) { setLoading(true); setError(null); }
 
-      setModel(docModel);
-    } catch (e: any) {
-      console.error('[DocumentViewer] Error loading:', e);
-      setError(e.message || 'Error al cargar el documento');
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const system = createDocumentSystem(nullRepo);
+
+        const source = await AssetDocumentSource.fromFile(fullUri, 'application/pdf');
+        if (cancelled) return;
+
+        let extracted: ExtractedDocument;
+        try {
+          extracted = await system.extractorRegistry.resolve(source).extractDocument(source);
+        } catch {
+          extracted = {
+            metadata: { format: 'application/pdf', title: documentTitle || 'Documento', pageCount: 0 },
+            textBlocks: [],
+            images: [],
+            tables: [],
+          };
+        }
+        if (cancelled) return;
+
+        const builder = new DocumentModelBuilder(extracted);
+        const docModel = builder.build(fullUri, documentTitle || 'Documento');
+
+        setCached(fullUri, docModel);
+        if (!cancelled) setModel(docModel);
+      } catch (e: any) {
+        console.error('[DocumentViewer] Error loading:', e);
+        if (!cancelled) setError(e.message || 'Error al cargar el documento');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      // Screen unmounting or documentUri changed — cancel any in-flight work
+      cancelled = true;
+      setModel(null);
+      setLoading(true);
+      setError(null);
+    };
+  }, [documentUri]);
 
   const title = documentTitle || 'Documento';
 
@@ -104,55 +147,9 @@ export default function DocumentViewerScreen() {
       {!loading && !error && model && (
         <DocumentWorkspace
           model={model}
-          rendererRegistry={createDocumentSystem(nullRepo).rendererRegistry}
+          rendererRegistry={rendererRegistry}
         />
       )}
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: theme.colors.card,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-  },
-  backBtn: {
-    marginRight: 8,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 15,
-    color: theme.colors.text.primary,
-  },
-  errorText: {
-    fontSize: 15,
-    color: theme.colors.text.primary,
-    textAlign: 'center',
-  },
-  errorHint: {
-    fontSize: 12,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
-  },
-});
