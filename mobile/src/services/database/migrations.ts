@@ -186,6 +186,8 @@ const migrations: Migration[] = [
         id TEXT PRIMARY KEY,
         subject_id TEXT,
         user_id TEXT NOT NULL,
+        name TEXT,
+        mime_type TEXT,
         local_uri TEXT,
         ocr_text TEXT,
         cloud_url TEXT,
@@ -738,6 +740,13 @@ const migrations: Migration[] = [
       `ALTER TABLE user_preferences ADD COLUMN last_modified_by TEXT`,
       `ALTER TABLE user_preferences ADD COLUMN deleted_at TEXT`,
       `ALTER TABLE assessment_files ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`,
+    ],
+  },
+  {
+    version: 33,
+    up: [
+      `ALTER TABLE scanned_documents ADD COLUMN name TEXT`,
+      `ALTER TABLE scanned_documents ADD COLUMN mime_type TEXT`,
     ],
   },
 ];

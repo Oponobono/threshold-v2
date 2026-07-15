@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { knowledgeHealthCardStyles } from '../../styles/KnowledgeHealthCard.styles';
 import { RingGauge } from './RingGauge';
+import { AutoScrollText } from '../ui/AutoScrollText';
 import { computeMaturity } from '../../domain/knowledge/stage';
 import type { KnowledgeSnapshot, SubjectKnowledge } from '../../domain/knowledge/types';
 import { getMemoryLevelLabel, getKnowledgeDescription, getRiskLabel, getLastReviewLabel } from '../../presentation/knowledge/labels';
@@ -131,7 +132,10 @@ export function KnowledgeHealthCard({ snapshot }: Props) {
               <MaterialCommunityIcons name="target" size={15} color="#FF6347" />
               <Text style={knowledgeHealthCardStyles.subjectLabel}>{t('knowledge.labels.todayPriority')}</Text>
             </View>
-            <Text style={knowledgeHealthCardStyles.subjectName}>{prioridad!.subjectName}</Text>
+            <AutoScrollText 
+              text={prioridad!.subjectName}
+              style={knowledgeHealthCardStyles.subjectName}
+            />
             <Text style={[knowledgeHealthCardStyles.subjectDetail, { color: forgettingRiskColor(prioridad!.risk) }]}>
               {Math.round(prioridad!.retrievability)}% · {prioridad!.dueCards} {t('knowledge.labels.pending')}
             </Text>
@@ -142,7 +146,10 @@ export function KnowledgeHealthCard({ snapshot }: Props) {
               <MaterialCommunityIcons name="trophy" size={15} color="#30D158" />
               <Text style={knowledgeHealthCardStyles.subjectLabel}>{t('knowledge.labels.mostSolid')}</Text>
             </View>
-            <Text style={knowledgeHealthCardStyles.subjectName}>{masSolida!.subjectName}</Text>
+            <AutoScrollText 
+              text={masSolida!.subjectName}
+              style={knowledgeHealthCardStyles.subjectName}
+            />
             <Text style={[knowledgeHealthCardStyles.subjectDetail, { color: '#30D158' }]}>
               {Math.round(masSolida!.retrievability)}% {t('knowledge.labels.consolidated').toLowerCase()}
             </Text>

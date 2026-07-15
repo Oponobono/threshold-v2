@@ -54,7 +54,9 @@ export class AssetUploadManager {
         type: job.mimeType,
       } as any);
 
-      const response = await fetchWithFallback(`/upload/${job.entityType}`, {
+      formData.append('entityType', job.entityType);
+
+      const response = await fetchWithFallback(`/upload`, {
         method: 'POST',
         body: formData,
         headers: { 'Content-Type': 'multipart/form-data' },

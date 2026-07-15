@@ -9,7 +9,7 @@ const MINUTES_PER_CARD = 0.6;
 const MAX_OTHER_SUBJECTS = 3;
 
 interface DailyReviewSubject {
-  subjectId: number;
+  subjectId: string;
   name: string;
   count: number;
   highUrgencyCount: number;
@@ -17,7 +17,7 @@ interface DailyReviewSubject {
 
 interface Props {
   cards: PredictionItem[];
-  subjectNames: Record<number, string>;
+  subjectNames: Record<string, string>;
   onStart: () => void;
 }
 
@@ -30,16 +30,17 @@ if (
 
 export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
   const subjects = useMemo<DailyReviewSubject[]>(() => {
-    const map: Record<number, { count: number; highUrgencyCount: number }> = {};
+    const map: Record<string, { count: number; highUrgencyCount: number }> = {};
     for (const c of cards) {
-      if (!map[c.subjectId]) map[c.subjectId] = { count: 0, highUrgencyCount: 0 };
-      map[c.subjectId].count++;
-      if (c.urgency === 'HIGH') map[c.subjectId].highUrgencyCount++;
+      const sId = String(c.subjectId);
+      if (!map[sId]) map[sId] = { count: 0, highUrgencyCount: 0 };
+      map[sId].count++;
+      if (c.urgency === 'HIGH') map[sId].highUrgencyCount++;
     }
     return Object.entries(map)
       .map(([id, { count, highUrgencyCount }]) => ({
-        subjectId: Number(id),
-        name: subjectNames[Number(id)] ?? 'Materia',
+        subjectId: id,
+        name: subjectNames[id] ?? 'Materia',
         count,
         highUrgencyCount,
       }))

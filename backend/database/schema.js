@@ -373,26 +373,6 @@ const tableSchema = {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id),
         subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
-        name TEXT,
-        local_uri TEXT NOT NULL,
-        ocr_text TEXT,
-        extracted_at TIMESTAMP,
-        cloud_url TEXT,
-        is_backed_up INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `,
-    columns: [
-      { name: 'ocr_text', type: 'TEXT' },
-      { name: 'extracted_at', type: 'TIMESTAMP' },
-      { name: 'cloud_url', type: 'TEXT' },
-      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' }
-    ]
-  },
-  audio_recordings: {
-    sqlite: `
-      CREATE TABLE IF NOT EXISTS audio_recordings (
-        id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         subject_id TEXT,
         name TEXT,

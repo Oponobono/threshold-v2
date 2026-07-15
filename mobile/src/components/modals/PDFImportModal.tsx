@@ -55,7 +55,18 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
 
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
+        type: [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/json',
+          'text/plain',
+          'text/csv',
+        ],
         copyToCacheDirectory: true,
       });
 
@@ -96,8 +107,13 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
         await FileSystem.makeDirectoryAsync(pdfDir, { intermediates: true });
       }
 
+      // Derivar nombre del archivo: file.name puede llegar vacío en algunos
+      // proveedores de almacenamiento de Android (ej. Google Drive).
+      const nameFromUri = file.uri.split('/').pop()?.split('?')[0] ?? '';
+      const displayName = (file.name && file.name.trim()) ? file.name.trim() : nameFromUri || 'documento';
+
       // Evitar espacios u otros caracteres raros en el nombre de archivo interno
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const safeName = displayName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
       const filename = `imported_${Date.now()}_${safeName}`;
       const localPdfUri = `${pdfDir}${filename}`;
 
@@ -132,15 +148,16 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
       const savedDoc = await createScannedDocument({
         subject_id: selectedSubjectId,
         local_uri: localPdfUri,
-        name: file.name,
-        ocr_text: ocrText ? ocrText : undefined, // Enviar undefined si es null (no se intentó) o "" (no encontró texto)
+        name: displayName,
+        ocr_text: ocrText ? ocrText : undefined,
+        mime_type: file.mimeType ?? 'application/octet-stream',
       });
       
       // createScannedDocument ya gestiona el auto-upload según las preferencias de backup
 
       showAlert({
         title: t('common.success') || 'Éxito',
-        message: t('documents.importedFile', { file: file.name, defaultValue: `${file.name} importado` }),
+        message: t('documents.importedFile', { file: displayName, defaultValue: `${displayName} importado` }),
         type: 'success',
       });
 
@@ -170,7 +187,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
           {/* Header */}
           <View style={s.header}>
             <View style={s.headerLeft}>
-              <Text style={s.headerTitle}>{t('documents.importTitle', 'Importar PDF')}</Text>
+              <Text style={s.headerTitle}>{t('documents.importTitle', 'Importar documento')}</Text>
             </View>
             <TouchableOpacity onPress={onClose} disabled={isProcessing} style={s.closeBtn}>
               <Ionicons name="close" size={16} color={theme.colors.text.secondary} />
@@ -188,7 +205,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
                 textAlign: 'center',
               }}
             >
-              {t('documents.uploadPrompt', 'Sube tu PDF y extrae el texto con IA 🚀')}
+              {t('documents.uploadPrompt', 'PDF, Word, Excel, PPT, TXT — la IA extrae el contenido 🚀')}
             </Text>
 
             {/* OCR Toggle */}
@@ -250,7 +267,7 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
                 <>
                   <Ionicons name="folder-outline" size={18} color={theme.colors.white} />
                   <Text style={{ color: theme.colors.white, fontSize: 14, fontWeight: '700' }}>
-                    {t('documents.selectPdf', 'Seleccionar PDF')}
+                    {t('documents.selectFile', 'Seleccionar archivo')}
                   </Text>
                 </>
               )}

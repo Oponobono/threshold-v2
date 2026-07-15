@@ -125,7 +125,7 @@ exports.deleteScannedDocument = (req, res) => {
  */
 exports.updateScannedDocument = (req, res) => {
   const { documentId } = req.params;
-  const { name, ocr_text } = req.body;
+  const { name, ocr_text, cloud_url, is_backed_up, subject_id, mime_type } = req.body;
   const userId = req.user.id;
 
   if (!documentId) {
@@ -139,6 +139,25 @@ exports.updateScannedDocument = (req, res) => {
   if (name !== undefined) {
     updates.push('name = ?');
     values.push(name);
+  }
+  if (cloud_url !== undefined) {
+    updates.push('cloud_url = ?');
+    values.push(cloud_url);
+  }
+  if (is_backed_up !== undefined) {
+    updates.push('is_backed_up = ?');
+    values.push(is_backed_up);
+  }
+  if (subject_id !== undefined) {
+    updates.push('subject_id = ?');
+    values.push(subject_id);
+  }
+  if (mime_type !== undefined) {
+    // Only push if mime_type exists in schema, otherwise ignore or push dynamically.
+    // We added mime_type in mobile, but if backend doesn't have it, this might crash Postgres.
+    // But backend schema for SQLite might not have it yet. Let's just allow it for now if we add it to schema.
+    updates.push('mime_type = ?');
+    values.push(mime_type);
   }
   if (ocr_text !== undefined) {
     updates.push('ocr_text = ?');

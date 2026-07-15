@@ -118,76 +118,85 @@ export function useSubjectDetail() {
       const isOnline = useConnectivityStore.getState().isOnline;
 
       try {
-        const [profileRes, subjectRes, photosRes, docsRes, , schedulesRes, , videosRes] =
-          await Promise.allSettled([
-            getCurrentUserProfile(),
-            getSubjectById(subjectId),
-            getPhotosBySubject(subjectId),
-            getScannedDocumentsBySubject(subjectId),
-            getAssessments(subjectId),
-            getSchedulesBySubject(subjectId),
-            getAudioRecordings(),
-            getYouTubeVideos(),
-          ]);
+        const pProfile = getCurrentUserProfile().then(p => {
+          if (mounted && p) setProfile(p);
+        });
 
-        if (!mounted) return;
-
-        if (profileRes.status === 'fulfilled') {
-          setProfile(profileRes.value);
-        }
-
-        if (subjectRes.status === 'fulfilled' && subjectRes.value) {
-          const fetchedSubject = subjectRes.value as DetailSubject;
-          // Guard: solo actualizar si la materia devuelta sigue existiendo en el
-          // store Zustand (en memoria). Si fue eliminada offline, _purgeFromStore()
-          // ya la quitó del store aunque MMKV todavía la tenga stale.
-          const existsInStore = useDataStore
-            .getState()
-            .subjects.some(s => String(s.id) === String(fetchedSubject.id));
-          if (existsInStore) {
-            setSelectedSubject(fetchedSubject);
-          } else {
-            console.warn(`[useSubjectDetail] Materia ${fetchedSubject.id} ignorada — ya no existe en el store (eliminada offline)`);
+        const pSubject = getSubjectById(subjectId).then(s => {
+          if (mounted && s) {
+            const existsInStore = useDataStore.getState().subjects.some(storeSub => String(storeSub.id) === String(s.id));
+            if (existsInStore) {
+              setSelectedSubject(s as DetailSubject);
+            } else {
+              console.warn(`[useSubjectDetail] Materia ${s.id} ignorada — ya no existe en el store`);
+            }
           }
-        }
+        });
 
-        if (photosRes.status === 'fulfilled' && photosRes.value != null) {
-          setPhotos(photosRes.value);
-        } else if (photosRes.status === 'rejected' && !isOnline) {
-          const cached = await photoRepository.getBySubject(subjectId);
-          if (cached.length > 0) setPhotos(cached);
-        }
+        const pPhotos = getPhotosBySubject(subjectId)
+          .then(p => { if (mounted && p) setPhotos(p); })
+          .catch(async () => {
+            if (!isOnline && mounted) {
+              const cached = await photoRepository.getBySubject(subjectId);
+              if (cached.length > 0 && mounted) setPhotos(cached);
+            }
+          });
 
-        if (docsRes.status === 'fulfilled' && docsRes.value != null) {
-          setScannedDocuments(docsRes.value);
-        } else if (docsRes.status === 'rejected' && !isOnline) {
-          const cached = await documentRepository.getBySubject(subjectId);
-          if (cached.length > 0) setScannedDocuments(cached);
-        }
+        const pDocs = getScannedDocumentsBySubject(subjectId)
+          .then(d => { if (mounted && d) setScannedDocuments(d); })
+          .catch(async () => {
+            if (!isOnline && mounted) {
+              const cached = await documentRepository.getBySubject(subjectId);
+              if (cached.length > 0 && mounted) setScannedDocuments(cached);
+            }
+          });
 
-        if (schedulesRes.status === 'fulfilled') {
-          setSubjectSchedules(schedulesRes.value || []);
-        } else if (schedulesRes.status === 'rejected' && !isOnline) {
-          const store = useDataStore.getState();
-          const cached = store.schedules.filter(s => s.subject_id === subjectId);
-          if (cached.length > 0) setSubjectSchedules(cached);
-        }
+        const pAssessments = getAssessments(subjectId);
 
-        if (videosRes.status === 'fulfilled') {
-          const videoList = Array.isArray(videosRes.value) ? videosRes.value : [];
-          const filtered = videoList.filter(v => v.subject_id == subjectId);
-          setAllSubjectVideos(filtered);
-          setRecentVideos(filtered.slice(0, 3));
-        } else if (videosRes.status === 'rejected' && !isOnline) {
-          const cached = await youTubeRepository.getBySubject(String(subjectId));
-          if (cached.length > 0) {
-            const filtered = cached.filter(v => v.subject_id === subjectId);
-            if (filtered.length > 0) {
+        const pSchedules = getSchedulesBySubject(subjectId)
+          .then(s => { if (mounted && s) setSubjectSchedules(s); })
+          .catch(async () => {
+            if (!isOnline && mounted) {
+              const store = useDataStore.getState();
+              const cached = store.schedules.filter(sch => sch.subject_id === subjectId);
+              if (cached.length > 0 && mounted) setSubjectSchedules(cached);
+            }
+          });
+
+        const pAudio = getAudioRecordings();
+
+        const pVideos = getYouTubeVideos()
+          .then(v => {
+            if (mounted && v) {
+              const videoList = Array.isArray(v) ? v : [];
+              const filtered = videoList.filter(vid => vid.subject_id == subjectId);
               setAllSubjectVideos(filtered);
               setRecentVideos(filtered.slice(0, 3));
             }
-          }
-        }
+          })
+          .catch(async () => {
+            if (!isOnline && mounted) {
+              const cached = await youTubeRepository.getBySubject(String(subjectId));
+              if (cached.length > 0 && mounted) {
+                const filtered = cached.filter(vid => vid.subject_id === subjectId);
+                if (filtered.length > 0) {
+                  setAllSubjectVideos(filtered);
+                  setRecentVideos(filtered.slice(0, 3));
+                }
+              }
+            }
+          });
+
+        await Promise.allSettled([
+          pProfile,
+          pSubject,
+          pPhotos,
+          pDocs,
+          pAssessments,
+          pSchedules,
+          pAudio,
+          pVideos,
+        ]);
       } catch (err) {
         console.error('Error loading subject data:', err);
       } finally {

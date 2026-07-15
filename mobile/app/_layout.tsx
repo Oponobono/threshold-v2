@@ -5,9 +5,15 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
-import { View, Text } from 'react-native';
+import { View, Text, LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import * as KeepAwake from 'expo-keep-awake';
+
+LogBox.ignoreLogs(['Unable to activate keep awake']);
+
+
 
 // Importación diferida para no bloquear el hilo principal en el milisegundo 0
 import '../src/locales/i18n';
@@ -260,6 +266,14 @@ function RootNavigator() {
               <Stack.Screen name="settings" options={{ headerShown: false }} />
               <Stack.Screen name="about" options={{ headerShown: false }} />
               <Stack.Screen name="developer" options={{ headerShown: false }} />
+              <Stack.Screen 
+                name="documents/[documentUri]" 
+                options={{ 
+                  headerShown: false,
+                  presentation: 'modal',
+                  animation: 'slide_from_bottom',
+                }} 
+              />
             </Stack>
             <FloatingYouTubePlayer />
             <StatusBar style="auto" />
@@ -269,3 +283,4 @@ function RootNavigator() {
     </GestureHandlerRootView>
   );
 }
+

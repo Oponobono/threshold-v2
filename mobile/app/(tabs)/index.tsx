@@ -540,10 +540,10 @@ export default function HybridDashboardScreen() {
     return todaySchedules.find((s: any) => s.end_time >= currentTime) || null;
   }, [todaySchedules]);
 
-  const subjectNamesMap = useMemo<Record<number, string>>(() => {
-    const map: Record<number, string> = {};
+  const subjectNamesMap = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
     for (const s of subjects) {
-      map[Number(s.id)] = s.name;
+      map[String(s.id)] = s.name;
     }
     return map;
   }, [subjects]);

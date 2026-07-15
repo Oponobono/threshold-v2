@@ -220,8 +220,8 @@ export class SyncService {
           let payload = op.payload;
 
           // Si es una entidad media, inyectamos la URL fresca desde SQLite para evitar sobrescribir con NULL
-          if (op.entity_id && (op.entity_type === 'photo' || op.entity_type === 'audio_recording' || op.entity_type === 'scanned_document')) {
-             const tableName = op.entity_type + 's'; // simplistic mapping
+          if (op.entity_id && (op.entity_type === 'photo' || op.entity_type === 'audio-recording' || op.entity_type === 'scanned-document')) {
+             const tableName = op.entity_type === 'photo' ? 'photos' : op.entity_type === 'audio-recording' ? 'audio_recordings' : 'scanned_documents';
              try {
                const db = databaseService.getDb();
                const freshRecord: any = await db.getFirstAsync(`SELECT cloud_url FROM ${tableName} WHERE id = ?`, [op.entity_id]);

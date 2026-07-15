@@ -14,7 +14,26 @@ export interface ScannedDocument {
   name?: string;
   local_uri?: string;
   ocr_text?: string;
+  mime_type?: string;
   created_at?: string;
+}
+
+function extFromMime(mime: string, fallbackName?: string): string {
+  const ext = fallbackName?.split('.').pop();
+  if (ext && ext.length <= 5 && ext !== fallbackName) return `.${ext}`;
+  const map: Record<string, string> = {
+    'application/pdf': '.pdf',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    'application/vnd.ms-powerpoint': '.ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+    'application/json': '.json',
+    'text/plain': '.txt',
+    'text/csv': '.csv',
+  };
+  return map[mime] ?? '.bin';
 }
 
 export const getScannedDocumentsBySubject = async (subjectId: string): Promise<ScannedDocument[]> => {
@@ -37,7 +56,7 @@ export const getScannedDocumentsBySubject = async (subjectId: string): Promise<S
   return localData;
 };
 
-export const createScannedDocument = async (data: { subject_id?: string; name?: string; local_uri: string; ocr_text?: string; id?: string }): Promise<ScannedDocument> => {
+export const createScannedDocument = async (data: { subject_id?: string; name?: string; local_uri: string; ocr_text?: string; id?: string; mime_type?: string }): Promise<ScannedDocument> => {
   const id = data.id || uuidv4();
   const userId = await getUserId();
   if (!userId) throw new Error('Usuario no autenticado');
@@ -50,8 +69,9 @@ export const createScannedDocument = async (data: { subject_id?: string; name?: 
   const doc: any = { id, user_id: String(userId), ...data };
   await documentRepository.create(doc);
 
-  // Schedule file upload via asset pipeline (background, with retry + progress)
-  assetSyncEngine.scheduleUpload('scanned-document', id, data.local_uri, 'application/pdf', `${id}.pdf`);
+  const mimeType = data.mime_type ?? 'application/pdf';
+  const fileExt = extFromMime(mimeType, data.name);
+  assetSyncEngine.scheduleUpload('scanned-document', id, data.local_uri, mimeType, `${id}${fileExt}`);
 
   // 2. Sincronizar con la nube SOLO si el usuario habilitó auto-upload (background, no bloqueante)
   (async () => {

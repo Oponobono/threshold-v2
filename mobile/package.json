@@ -65,6 +65,7 @@
     "llama.rn": "~0.12.4",
     "lottie-react-native": "~7.3.1",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "4.9.155",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-i18next": "^17.0.4",

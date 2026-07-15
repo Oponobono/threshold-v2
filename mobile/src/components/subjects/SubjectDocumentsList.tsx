@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Linking, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { theme } from '../../styles/theme';
 import { subjectDetailStyles as sectionStyles } from '../../styles/SubjectDetail.styles';
 import { documentListStyles as styles } from '../../styles/SubjectDocumentsList.styles';
@@ -43,6 +44,7 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
 }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
+  const router = useRouter();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
   const [ocrInProgress, setOcrInProgress] = useState<Set<string | number>>(new Set());
@@ -51,11 +53,20 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
   const openDocument = async (doc: any) => {
     try {
       if (doc.local_uri) {
-        // Verificar si el archivo existe antes de intentar abrirlo
         const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
         if (fileInfo.exists) {
+          if (doc.local_uri.toLowerCase().endsWith('.pdf')) {
+            router.push({
+              pathname: '/documents/[documentUri]',
+              params: {
+                documentUri: doc.local_uri,
+                documentTitle: doc.filename || doc.name || 'Documento',
+              },
+            });
+            return;
+          }
+          
           if (Platform.OS === 'android') {
-            // En Android: obtener content URI y usar IntentLauncher
             const contentUri = await FileSystem.getContentUriAsync(doc.local_uri);
             await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
               data: contentUri,
@@ -63,14 +74,12 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
               type: 'application/pdf',
             });
           } else {
-            // En iOS: Linking puede abrir archivos locales
             await Linking.openURL(doc.local_uri);
           }
           return;
         }
       }
 
-      // Fallback a cloud_url si el local_uri no existe
       if (doc.cloud_url && doc.cloud_url !== 'ghost_file') {
         await WebBrowser.openBrowserAsync(doc.cloud_url);
         return;
@@ -85,7 +94,6 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
       console.error('Error opening document:', error);
       const msg: string = error?.message || '';
       
-      // Si falla al abrir localmente por alguna razón, intentar la nube
       if (doc.cloud_url && doc.cloud_url !== 'ghost_file' && (msg.includes("doesn't exist") || msg.includes('Directory') || msg.includes('cache'))) {
         await WebBrowser.openBrowserAsync(doc.cloud_url);
       } else {

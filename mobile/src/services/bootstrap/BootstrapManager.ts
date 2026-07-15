@@ -287,45 +287,100 @@ class BootstrapManager {
 
   private _registerSyncHandlers(syncService: any): void {
     syncService.onSync(async ({ entity_type, entity_id, operation, payload }: any) => {
-      let path = `/${entity_type}s`;
-      if (entity_type === 'course') path = '/courses';
-      if (entity_type === 'assessment_category') path = '/assessmentCategories';
-      if (entity_type === 'audio_recording') path = '/audio-recordings';
-      if (entity_type === 'audio-transcript') path = '/audio-transcripts';
-      if (entity_type === 'scanned_document') path = '/scanned_documents';
-      if (entity_type === 'flashcard-deck') path = '/flashcard-decks';
-      if (entity_type === 'assessment_files') path = `/assessments/${payload?.assessment_id}/files`;
-      if (entity_type === 'flashcard') {
-        if (operation === 'CREATE') {
-          if (payload?.content_json) {
-            path = `/flashcard-decks/${payload?.deck_id}/items`;
-          } else {
-            path = `/flashcard-decks/${payload?.deck_id}/cards`;
-          }
-        } else {
-          path = '/flashcards';
-        }
-      }
-      if (entity_type === 'calendar-event') path = '/calendar/events';
-      if (entity_type === 'ai-chat') path = '/ai/chats';
-      if (entity_type === 'user-preference') path = '/user-preferences';
-      if (entity_type === 'threshold-overrides') path = '/threshold-overrides';
-      if (entity_type === 'category') {
-        if (operation === 'CREATE') path = `/subjects/${payload?.subject_id}/categories`;
-        else path = '/categories';
-      }
-      if (entity_type === 'study-session') path = '/learning/sessions';
+      // ── Route table: entity_type (all variants) → backend base path ──────
+      type RouteResolver = string | ((op: string, p: any) => string);
+      const ROUTE_TABLE: Record<string, RouteResolver> = {
+        // Academic
+        'subject':               '/subjects',
+        'course':                '/courses',
+        'assessment':            '/assessments',
+        'assessment_category':   '/assessmentCategories',
+        'assessment-category':   '/assessmentCategories',
+        'category':              (op, p) => op === 'CREATE' ? `/subjects/${p?.subject_id}/categories` : '/categories',
+        'schedule':              '/schedules',
+        'grading_period':        '/grading-periods',
+        'grading-period':        '/grading-periods',
+        'lms_account':           '/lms-accounts',
+        'lms-account':           '/lms-accounts',
+        'threshold_override':    '/threshold-overrides',
+        'threshold-overrides':   '/threshold-overrides',
+        // Calendar
+        'calendar_event':        '/calendar/events',
+        'calendar-event':        '/calendar/events',
+        // Flashcards
+        'flashcard_deck':        '/flashcard-decks',
+        'flashcard-deck':        '/flashcard-decks',
+        'flashcard':             (op, p) => {
+          if (op !== 'CREATE') return '/flashcards';
+          return p?.content_json
+            ? `/flashcard-decks/${p?.deck_id}/items`
+            : `/flashcard-decks/${p?.deck_id}/cards`;
+        },
+        // Media / assets
+        'photo':                 '/photos',
+        'audio_recording':       '/audio-recordings',
+        'audio-recording':       '/audio-recordings',
+        'audio_transcript':      '/audio-transcripts',
+        'audio-transcript':      '/audio-transcripts',
+        'youtube_video':         '/youtube-videos',
+        'youtube-video':         '/youtube-videos',
+        'youtube_transcript':    '/youtube-transcripts',
+        'youtube-transcript':    '/youtube-transcripts',
+        'scanned_document':      '/scanned_documents',
+        'scanned-document':      '/scanned_documents',
+        'assessment_file':       (_op, p) => `/assessments/${p?.assessment_id}/files`,
+        'assessment_files':      (_op, p) => `/assessments/${p?.assessment_id}/files`,
+        'assessment-file':       (_op, p) => `/assessments/${p?.assessment_id}/files`,
+        // AI
+        'ai_chat':               '/ai/chats',
+        'ai-chat':               '/ai/chats',
+        // Study
+        'study_session':         '/learning/sessions',
+        'study-session':         '/learning/sessions',
+        'card_review':           `/flashcards/${entity_id}/review`,
+        'card-review':           `/flashcards/${entity_id}/review`,
+        'card_log':              '/learning/card_logs',
+        'card-log':              '/learning/card_logs',
+        'card_snooze':           `/flashcards/${entity_id}/snooze`,
+        'card-snooze':           `/flashcards/${entity_id}/snooze`,
+        // Settings
+        'user_preference':       '/user-preferences',
+        'user-preference':       '/user-preferences',
+      };
 
-      if (entity_id && (entity_type === 'photo' || entity_type === 'audio_recording' || entity_type === 'scanned_document' || entity_type === 'assessment_files')) {
-        const tableName = entity_type === 'assessment_files'
-          ? 'assessment_files'
-          : entity_type + 's';
+      const routeEntry = ROUTE_TABLE[entity_type];
+      if (!routeEntry) {
+        throw new Error(`[SyncHandler] No route registered for entity_type="${entity_type}". Add it to ROUTE_TABLE.`);
+      }
+      const basePath = typeof routeEntry === 'function' ? routeEntry(operation, payload) : routeEntry;
+
+      // Entities whose path already includes the ID — never append /:entity_id
+      const NO_ID_SUFFIX = new Set([
+        'card-review', 'card_review',
+        'card-snooze', 'card_snooze',
+      ]);
+      let path = basePath;
+      if (entity_id && operation !== 'CREATE' && !NO_ID_SUFFIX.has(entity_type)) {
+        path += `/${entity_id}`;
+      }
+
+      // ── Inject fresh cloud_url for asset entities ────────────────────────
+      const ASSET_TABLE_MAP: Record<string, string> = {
+        'photo': 'photos',
+        'audio_recording': 'audio_recordings',
+        'audio-recording': 'audio_recordings',
+        'scanned_document': 'scanned_documents',
+        'scanned-document': 'scanned_documents',
+        'assessment_file': 'assessment_files',
+        'assessment_files': 'assessment_files',
+        'assessment-file': 'assessment_files',
+      };
+      const assetTable = entity_id ? ASSET_TABLE_MAP[entity_type] : undefined;
+      if (assetTable && payload) {
         try {
           const db = databaseService.getDb();
-          const freshRecord: any = await db.getFirstAsync(`SELECT cloud_url FROM ${tableName} WHERE id = ?`, [entity_id]);
-          if (freshRecord?.cloud_url && payload) {
-            payload.cloud_url = freshRecord.cloud_url;
-          }
+          const freshRecord: any = await db.getFirstAsync(`SELECT cloud_url FROM ${assetTable} WHERE id = ?`, [entity_id]);
+          if (freshRecord?.cloud_url) payload.cloud_url = freshRecord.cloud_url;
         } catch { }
       }
 
@@ -333,12 +388,6 @@ class BootstrapManager {
         const uid = await getUserId();
         if (uid && !payload.userId) payload.userId = uid;
       }
-
-      if (entity_type === 'card-review') path = `/flashcards/${entity_id}/review`;
-      if (entity_type === 'card-log') path = '/learning/card_logs';
-      if (entity_type === 'card-snooze') path = `/flashcards/${entity_id}/snooze`;
-
-      if (entity_id && operation !== 'CREATE' && entity_type !== 'card-review' && entity_type !== 'card-snooze') path += `/${entity_id}`;
 
       if (operation === 'CREATE' && payload) {
         let parentTable = '';

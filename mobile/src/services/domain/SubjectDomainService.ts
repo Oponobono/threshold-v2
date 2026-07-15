@@ -30,7 +30,7 @@ const SUBJECT_CHILDREN: ChildEntity[] = [
       { table: 'audio_transcripts', entityType: 'audio-transcript', fkField: 'recording_id' },
     ],
   },
-  { table: 'scanned_documents', entityType: 'scanned_document' },
+  { table: 'scanned_documents', entityType: 'scanned-document' },
   {
     table: 'youtube_videos',
     entityType: 'youtube-video',

@@ -11,10 +11,14 @@
             "id": "c4587e068d226fc5",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Vista gráfica"
+              "type": "markdown",
+              "state": {
+                "file": "docs/architecture/media-playback.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "media-playback"
             }
           }
         ]
@@ -181,6 +185,8 @@
   },
   "active": "c4587e068d226fc5",
   "lastOpenFiles": [
+    "docs/tech-stack.md",
+    "docs/intro.md",
     "traducciones_faltantes.md",
     "TECH_STACK.md",
     "API_DOCUMENTATION.md"

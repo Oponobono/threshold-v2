@@ -15,7 +15,7 @@ export function parseDeeplink(deeplink: string): ReminderNavigationPayload | nul
   return { deeplink, entityType: parsed.entityType, entityId: match[1] };
 }
 
-export function getTargetRoute(entityType: ReminderEntityType): string {
+export function getTargetRoute(entityType: ReminderEntityType): '/calendar' | '/' | '/flashcards' {
   switch (entityType) {
     case 'assessment':
     case 'calendar_event':
