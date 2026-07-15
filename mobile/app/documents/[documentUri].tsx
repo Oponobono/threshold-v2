@@ -57,8 +57,8 @@ export default function DocumentViewerScreen() {
       const extractedFast: ExtractedDocument = {
         metadata: { format: 'application/pdf', title: documentTitle || 'Documento', pageCount: 0 },
         textBlocks: [],
-        pages: [],
-        tableOfContents: [],
+        images: [],
+        tables: [],
       };
 
       const builder = new DocumentModelBuilder(extractedFast);

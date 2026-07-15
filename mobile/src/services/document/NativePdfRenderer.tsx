@@ -40,7 +40,9 @@ interface NativePdfRendererContentProps {
   onDocumentReady?: OnDocumentReady;
 }
 
-function buildHtml(base64: string, bgColor: string): string {
+function buildHtmlFromUri(fileUri: string, bgColor: string): string {
+  // Pass the file URI directly — PDF.js fetches it via XHR inside the WebView.
+  // This avoids reading the entire PDF into base64 on the JS bridge (critical for large PDFs).
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -61,11 +63,6 @@ function buildHtml(base64: string, bgColor: string): string {
       height: auto;
       display: block;
       box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    }
-    #page-markers span {
-      position: absolute;
-      opacity: 0;
-      pointer-events: none;
     }
   </style>
 </head>
@@ -105,28 +102,21 @@ function buildHtml(base64: string, bgColor: string): string {
       }
     }, { passive: true });
 
-    async function renderPDF(base64Data) {
+    async function renderPDF(pdfUri) {
       try {
-        var binary = window.atob(base64Data);
-        var len = binary.length;
-        var bytes = new Uint8Array(len);
-        for (var i = 0; i < len; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-
-        var loadingTask = pdfjsLib.getDocument({ data: bytes });
+        // PDF.js fetches the file directly — no base64 bridge, no RAM spike
+        var loadingTask = pdfjsLib.getDocument({ url: pdfUri });
         var pdf = await loadingTask.promise;
         totalPages = pdf.numPages;
         postMsg({ type: 'ready', totalPages: totalPages });
-        
-        // Hide loading indicator instantly so user sees pages as they appear
         postMsg({ type: 'loaded' });
 
         var container = document.getElementById('pdf-container');
 
         for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           var page = await pdf.getPage(pageNum);
-          var viewport = page.getViewport({ scale: window.devicePixelRatio || 1.5 });
+          var scale = Math.min(window.devicePixelRatio || 1.5, 2.0);
+          var viewport = page.getViewport({ scale: scale });
 
           var canvas = document.createElement('canvas');
           canvas.setAttribute('data-page', String(pageNum));
@@ -136,11 +126,11 @@ function buildHtml(base64: string, bgColor: string): string {
           container.appendChild(canvas);
 
           await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+          page.cleanup();
 
-          // Allow the WebView UI thread to breathe and paint the page
-          await new Promise(resolve => setTimeout(resolve, 10));
+          // Yield to the UI thread between pages
+          await new Promise(function(resolve) { setTimeout(resolve, 0); });
 
-          // After each page render, report progress
           postMsg({ type: 'pageRendered', page: pageNum, total: totalPages });
         }
       } catch (e) {
@@ -148,7 +138,7 @@ function buildHtml(base64: string, bgColor: string): string {
       }
     }
 
-    renderPDF('${base64}');
+    renderPDF('${fileUri}');
   </script>
 </body>
 </html>`;
@@ -183,21 +173,13 @@ function NativePdfRendererContent({
   }, [scrollToPageRef]);
 
   useEffect(() => {
-    async function loadPdf() {
-      try {
-        const base64 = await FileSystem.readAsStringAsync(fileUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        setHtml(buildHtml(base64, theme.colors.background));
-      } catch (e) {
-        console.error('[NativePdfRenderer] Failed to read file:', e);
-      }
-    }
-
+    // Build HTML immediately — no file reading, no base64, no memory spike.
+    // PDF.js inside the WebView fetches the file directly via XHR.
     if (Platform.OS !== 'ios') {
-      loadPdf();
+      setHtml(buildHtmlFromUri(fileUri, theme.colors.background));
     }
   }, [fileUri]);
+
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
@@ -244,14 +226,16 @@ function NativePdfRendererContent({
   return (
     <View style={styles.container}>
       <WebView
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={{ html }}
-        style={styles.webview}
-        allowFileAccess
-        allowUniversalAccessFromFileURLs
-        onMessage={handleMessage}
-      />
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={{ html, baseUrl: fileUri.substring(0, fileUri.lastIndexOf('/') + 1) }}
+          style={styles.webview}
+          allowFileAccess={true}
+          allowUniversalAccessFromFileURLs={true}
+          allowFileAccessFromFileURLs={true}
+          mixedContentMode="always"
+          onMessage={handleMessage}
+        />
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
