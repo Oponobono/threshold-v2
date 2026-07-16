@@ -19,7 +19,7 @@ export class NativePdfRenderer implements DocumentRenderer {
     onPageChange?: OnPageChange,
     scrollToPageRef?: ScrollToPageRef,
     onDocumentReady?: OnDocumentReady,
-    _onSelection?: unknown,
+    onSelection?: OnTextSelection,
     _highlightedBlockId?: string,
     searchRef?: MutableRefObject<PdfSearchRef | null>,
     onSearchResult?: OnSearchResult,
@@ -34,6 +34,7 @@ export class NativePdfRenderer implements DocumentRenderer {
         onPageChange={onPageChange}
         scrollToPageRef={scrollToPageRef}
         onDocumentReady={onDocumentReady}
+        onSelection={onSelection}
         searchRef={searchRef}
         onSearchResult={onSearchResult}
       />
@@ -46,6 +47,7 @@ interface NativePdfRendererContentProps {
   onPageChange?: OnPageChange;
   scrollToPageRef?: ScrollToPageRef;
   onDocumentReady?: OnDocumentReady;
+  onSelection?: OnTextSelection;
   searchRef?: MutableRefObject<PdfSearchRef | null>;
   onSearchResult?: OnSearchResult;
 }
@@ -80,9 +82,9 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
       display: block;
     }
     canvas {
+      display: block;
       width: 100% !important;
       height: auto !important;
-      display: block;
       box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
     .highlight {
@@ -90,9 +92,34 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
       background: rgba(255, 220, 0, 0.45);
       border-radius: 2px;
       pointer-events: none;
+      z-index: 5;
     }
     .highlight.active {
       background: rgba(255, 140, 0, 0.65);
+    }
+    .textLayer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      overflow: hidden;
+      line-height: 1.0;
+      -webkit-user-select: text;
+      user-select: text;
+      pointer-events: auto;
+      z-index: 10;
+    }
+    .textLayer > span, .textLayer > br {
+      position: absolute;
+      white-space: pre;
+      transform-origin: 0% 0%;
+      color: rgba(0,0,0,0.01) !important;
+      cursor: text;
+    }
+    .textLayer ::selection {
+      background: rgba(0, 110, 255, 0.3) !important;
+      color: rgba(0,0,0,0.01) !important;
     }
   </style>
 </head>
@@ -121,7 +148,6 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
 
     var totalPages = 0;
     var lastReportedPage = 0;
-    // pageData[pageNum] = { canvas, viewport, textItems }
     var pageData = {};
     var allMatches = [];
     var currentMatchIndex = -1;
@@ -147,42 +173,31 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
       }
     }, { passive: true });
 
-    // ── Search engine ───────────────────────────────────────────
     function clearHighlights() {
       document.querySelectorAll('.highlight').forEach(function(el) { el.remove(); });
       allMatches = [];
       currentMatchIndex = -1;
     }
 
-    function buildHighlight(wrapper, item, viewport, isActive) {
+    function buildHighlight(wrapper, item, unscaledW, unscaledH, isActive) {
       var canvas = wrapper.querySelector('canvas');
-      // displayScale: ratio between displayed canvas px and natural canvas px
-      var displayScale = canvas.offsetWidth / viewport.width;
+      var rect = canvas.getBoundingClientRect();
+      var actualW = rect.width > 0 ? rect.width : canvas.offsetWidth;
+      var effectiveScale = actualW / unscaledW;
+      var pageHeightCSS  = unscaledH * effectiveScale;
 
-      // item.transform = [a, b, c, d, tx, ty] in PDF user space
-      // viewport.scale converts user-space → natural canvas pixels
-      // Y-axis is flipped: PDF origin is bottom-left, CSS origin is top-left
-      var vScale = viewport.scale;
-      var tx = item.transform[4];
-      var ty = item.transform[5];
-      // font size (d component) gives the character height in user space
-      var fontSizeUser = Math.abs(item.transform[3]);
-      // ascent is roughly 80% of font size (typical for most fonts)
-      var ascentUser = fontSizeUser * 0.8;
-
-      // canvas-pixel coords (before display scaling)
-      var canvasX = tx * vScale;
-      // ty is the baseline; top of the glyph = baseline + ascent (PDF Y goes up)
-      var canvasY = viewport.height - (ty + ascentUser) * vScale;
-      var canvasW = item.width * vScale;
-      var canvasH = fontSizeUser * vScale;
+      var userX = item.transform[4];
+      var userY = item.transform[5];
+      var fontSizeUser  = Math.abs(item.transform[3]);
+      var fontSizePx    = fontSizeUser * effectiveScale;
+      var ascentPx      = fontSizePx * 0.8;
 
       var el = document.createElement('div');
       el.className = 'highlight' + (isActive ? ' active' : '');
-      el.style.left   = (canvasX * displayScale) + 'px';
-      el.style.top    = (canvasY * displayScale) + 'px';
-      el.style.width  = (canvasW * displayScale) + 'px';
-      el.style.height = (canvasH * displayScale) + 'px';
+      el.style.left   = (userX * effectiveScale) + 'px';
+      el.style.top    = (pageHeightCSS - userY * effectiveScale - ascentPx) + 'px';
+      el.style.width  = (item.width * effectiveScale) + 'px';
+      el.style.height = fontSizePx + 'px';
       wrapper.appendChild(el);
       return el;
     }
@@ -207,7 +222,8 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
           matches.push({
             pageNum: parseInt(pageNum),
             wrapper: wrapper,
-            viewport: data.viewport,
+            unscaledW: data.unscaledW,
+            unscaledH: data.unscaledH,
             item: item
           });
         });
@@ -215,7 +231,7 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
 
       allMatches = matches;
       matches.forEach(function(m) {
-        m.el = buildHighlight(m.wrapper, m.item, m.viewport, false);
+        m.el = buildHighlight(m.wrapper, m.item, m.unscaledW, m.unscaledH, false);
       });
 
       if (matches.length > 0) {
@@ -251,7 +267,6 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
       activateMatch(currentMatchIndex);
     }
 
-    // ── Command receiver from React Native ──────────────────────
     window.handleRNCommand = function(json) {
       try {
         var cmd = JSON.parse(json);
@@ -266,7 +281,71 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
       } catch(e) {}
     };
 
-    // ── PDF rendering ───────────────────────────────────────────
+    var selectionTimer = null;
+    document.addEventListener('selectionchange', function() {
+      if (selectionTimer) clearTimeout(selectionTimer);
+      selectionTimer = setTimeout(function() {
+        var sel = window.getSelection();
+        var text = sel ? sel.toString().trim() : '';
+        if (!text) return;
+        var anchor = sel.anchorNode;
+        var page = 1;
+        if (anchor) {
+          var el = anchor.nodeType === 3 ? anchor.parentElement : anchor;
+          var wrapper = el ? el.closest('.page-wrapper') : null;
+          if (wrapper) page = parseInt(wrapper.getAttribute('data-page'), 10) || 1;
+        }
+        var anchorOffset = sel.anchorOffset;
+        var focusOffset = sel.focusOffset;
+        postMsg({
+          type: 'textSelection',
+          text: text,
+          page: page,
+          anchorOffset: anchorOffset,
+          focusOffset: focusOffset,
+        });
+      }, 300);
+    });
+
+    function buildTextLayer(textLayerDiv, textItems, unscaledW, unscaledH, actualCSSWidth) {
+      // effectiveScale = how many CSS px per PDF user-space unit.
+      // We derive it from the ACTUAL rendered canvas width so it is always pixel-perfect,
+      // regardless of what window.innerWidth or devicePixelRatio report.
+      var effectiveScale = actualCSSWidth / unscaledW;
+      var pageHeightCSS  = unscaledH * effectiveScale;
+
+      textLayerDiv.innerHTML = '';
+      textItems.forEach(function(item) {
+        if (!item.str || item.str.trim() === '') return;
+        var span = document.createElement('span');
+        span.textContent = item.str;
+
+        // PDF user-space coordinates
+        var userX = item.transform[4];
+        var userY = item.transform[5];
+
+        // Font size in PDF user units is the absolute magnitude of the scaleY component
+        var fontSizeUser = Math.abs(item.transform[3]);
+        var fontSizePx   = fontSizeUser * effectiveScale;
+        // Ascent ~80 % of em height — used to convert baseline Y to CSS top
+        var ascentPx     = fontSizePx * 0.8;
+
+        span.style.left       = (userX * effectiveScale) + 'px';
+        // PDF Y is bottom-referenced; CSS top is top-referenced → flip
+        span.style.top        = (pageHeightCSS - userY * effectiveScale - ascentPx) + 'px';
+        span.style.fontSize   = fontSizePx + 'px';
+        span.style.fontFamily = item.fontName || 'sans-serif';
+        // No width constraint: constraining width makes adjacent spans' hit-areas
+        // overlap and corrupts getSelection().toString().
+
+        var angle = Math.atan2(item.transform[1], item.transform[0]);
+        if (Math.abs(angle) > 0.001) {
+          span.style.transform = 'rotate(' + (-angle) + 'rad)';
+        }
+        textLayerDiv.appendChild(span);
+      });
+    }
+
     async function renderPDF(pdfUri) {
       try {
         var loadingTask = pdfjsLib.getDocument({ url: pdfUri });
@@ -279,29 +358,61 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
 
         for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           var page = await pdf.getPage(pageNum);
-          var scale = Math.min(window.devicePixelRatio || 1.5, 2.0);
-          var viewport = page.getViewport({ scale: scale });
+
+          // Unscaled viewport gives us the page dimensions in PDF user units
+          var unscaledViewport = page.getViewport({ scale: 1.0 });
+          var unscaledW = unscaledViewport.width;
+          var unscaledH = unscaledViewport.height;
+
+          // Render the canvas at a high DPI scale for sharpness.
+          // CSS (width: 100%; height: auto) will scale it down to fit the container.
+          var pixelRatio   = window.devicePixelRatio || 1;
+          var renderScale  = 2 * pixelRatio;
+          var renderVP     = page.getViewport({ scale: renderScale });
 
           var wrapper = document.createElement('div');
           wrapper.className = 'page-wrapper';
           wrapper.setAttribute('data-page', String(pageNum));
+          // Let CSS set the visual width (width: 100%); height follows from aspect ratio.
 
           var canvas = document.createElement('canvas');
           canvas.setAttribute('data-page', String(pageNum));
           var ctx = canvas.getContext('2d');
-          canvas.height = viewport.height;
-          canvas.width  = viewport.width;
+          // Intrinsic pixel dimensions for high-DPI rendering
+          canvas.width  = renderVP.width;
+          canvas.height = renderVP.height;
+          // CSS scales it to fill the wrapper (see canvas { width: 100%; height: auto })
+
           wrapper.appendChild(canvas);
           container.appendChild(wrapper);
 
-          await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+          await page.render({ canvasContext: ctx, viewport: renderVP }).promise;
 
-          // Extract text for search
           var textContent = await page.getTextContent();
+          // Store unscaled dimensions + raw items for search highlighting
           pageData[pageNum] = {
-            viewport: viewport,
+            unscaledW: unscaledW,
+            unscaledH: unscaledH,
             textItems: textContent.items
           };
+
+          var textLayerDiv = document.createElement('div');
+          textLayerDiv.className = 'textLayer';
+          textLayerDiv.setAttribute('data-page', String(pageNum));
+          wrapper.appendChild(textLayerDiv);
+
+          // ResizeObserver gives us the true CSS pixel width of the canvas AFTER layout.
+          // This is the only reliable way to know the display scale in a WebView,
+          // because window.innerWidth may not match the actual rendered element width.
+          (function(canvas, textLayerDiv, textItems, unscaledW, unscaledH) {
+            var observer = new ResizeObserver(function(entries) {
+              var w = entries[0].contentRect.width;
+              if (w > 0) {
+                buildTextLayer(textLayerDiv, textItems, unscaledW, unscaledH, w);
+              }
+            });
+            observer.observe(canvas);
+          })(canvas, textLayerDiv, textContent.items, unscaledW, unscaledH);
 
           page.cleanup();
           await new Promise(function(resolve) { setTimeout(resolve, 0); });
@@ -323,6 +434,7 @@ function NativePdfRendererContent({
   onPageChange,
   scrollToPageRef,
   onDocumentReady,
+  onSelection,
   searchRef,
   onSearchResult,
 }: NativePdfRendererContentProps) {
@@ -375,6 +487,15 @@ function NativePdfRendererContent({
         setLoading(false);
       } else if (data.type === 'searchResult') {
         onSearchResult?.(data.total, data.current);
+      } else if (data.type === 'textSelection') {
+        onSelection?.({
+          documentId: fileUri,
+          pageIndex: (data.page || 1) - 1,
+          blockIndex: 0,
+          text: data.text,
+          startIndex: data.anchorOffset || 0,
+          endIndex: data.focusOffset || data.text.length,
+        });
       }
     } catch {}
   };
