@@ -193,3 +193,60 @@ export const extractTextFromPDF = async (base64Pdf: string): Promise<string> => 
     throw new Error(error.message || 'Error de red al invocar el servicio de extracción PDF');
   }
 };
+
+/**
+ * Envía un archivo de presentación (PPTX/PPT) al backend y recibe el PDF convertido.
+ * @param localUri  Ruta local del archivo de presentación.
+ * @param mimeType  MIME type del archivo.
+ * @returns         ArrayBuffer con el contenido del PDF resultante.
+ */
+export const convertPresentationToPdf = async (
+  localUri: string,
+  mimeType: string,
+): Promise<ArrayBuffer> => {
+  const FileSystem = require('expo-file-system/legacy');
+  const { getApiBaseUrl } = require('./client');
+  const { getToken } = require('./auth');
+
+  const base64 = await FileSystem.readAsStringAsync(localUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  // Convertir base64 → Uint8Array para construir el FormData
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  const fileName = localUri.split('/').pop() || 'presentation.pptx';
+  const formData = new FormData();
+  formData.append('file', {
+    uri: localUri,
+    type: mimeType,
+    name: fileName,
+  } as any);
+
+  const baseUrl = await getApiBaseUrl();
+  const token = await getToken();
+
+  const response = await fetch(`${baseUrl}/api/convert/presentation`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    const code = (errData as any)?.code;
+    if (code === 'LIBREOFFICE_UNAVAILABLE') {
+      throw new Error('LIBREOFFICE_UNAVAILABLE');
+    }
+    throw new Error((errData as any)?.error || `HTTP ${response.status}`);
+  }
+
+  return await response.arrayBuffer();
+};
+

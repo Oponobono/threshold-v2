@@ -47,8 +47,37 @@ export const SubjectDocumentCard: React.FC<SubjectDocumentCardProps> = ({
   isExtractingOCR,
 }) => {
   const { t } = useTranslation();
-  const isPdf = doc.local_uri?.endsWith('.pdf');
+  const lowerUri = doc.local_uri?.toLowerCase() || '';
+  const isPdf = lowerUri.endsWith('.pdf');
+  const isExcel = lowerUri.endsWith('.xlsx') || lowerUri.endsWith('.xlsm') || lowerUri.endsWith('.xls') || lowerUri.endsWith('.csv');
+  const isWord = lowerUri.endsWith('.doc') || lowerUri.endsWith('.docx');
+  const isPowerpoint = lowerUri.endsWith('.ppt') || lowerUri.endsWith('.pptx');
+  const isJson = lowerUri.endsWith('.json');
+  const isTxt = lowerUri.endsWith('.txt');
   const hasOCR = !!(doc.ocr_text && doc.ocr_text.length > 0);
+
+  let iconName = "image-outline";
+  let iconColor = theme.colors.primary;
+  
+  if (isPdf) {
+    iconName = "file-pdf-box";
+    iconColor = theme.colors.text.error || '#FF3B30'; // PDF Red
+  } else if (isExcel) {
+    iconName = "file-excel-box";
+    iconColor = '#107C41'; // Excel Green
+  } else if (isWord) {
+    iconName = "file-word-box";
+    iconColor = '#2B579A'; // Word Blue
+  } else if (isPowerpoint) {
+    iconName = "file-powerpoint-box";
+    iconColor = '#D24726'; // PPT Orange
+  } else if (isJson) {
+    iconName = "code-json";
+    iconColor = theme.colors.text.secondary || '#888'; // JSON Gray
+  } else if (isTxt) {
+    iconName = "file-document-outline";
+    iconColor = theme.colors.text.secondary || '#888'; // TXT Gray
+  }
 
   return (
     <TouchableOpacity 
@@ -64,9 +93,9 @@ export const SubjectDocumentCard: React.FC<SubjectDocumentCardProps> = ({
       )}
       <View style={styles.iconContainer}>
         <MaterialCommunityIcons 
-          name={isPdf ? "file-pdf-box" : "image-outline"} 
+          name={iconName as any} 
           size={32} 
-          color={isPdf ? (theme.colors.text.error || '#FF3B30') : theme.colors.primary} 
+          color={iconColor} 
         />
         {/* OCR Status Indicator */}
         <View 

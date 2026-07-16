@@ -32,6 +32,7 @@ const settingsRoutes = require('./routes/settings');
 const coursesRoutes = require('./routes/courses');
 const syncRoutes = require('./routes/sync');
 const aiChatsRoutes = require('./routes/aiChats');
+const convertRoutes = require('./routes/convert');
 
 const app = express();
 
@@ -135,6 +136,7 @@ app.use('/api', settingsRoutes);
 app.use('/api', coursesRoutes);
 app.use('/api', syncRoutes);
 app.use('/api', aiChatsRoutes);
+app.use('/api', convertRoutes);
 
 
 

@@ -19,7 +19,7 @@ const PDF_DIR = `${require('expo-file-system/legacy').documentDirectory}Threshol
 // Lazy-initialized: MMKV native module must not be called at module load time
 // or it crashes on HMR with 'prototype of undefined'.
 let _extractionStore: MMKV | null = null;
-const EXTRACTION_CACHE_VERSION = 1;
+const EXTRACTION_CACHE_VERSION = 2; // bumped: invalida cache de extracciones con regex roto
 
 function getStore(): MMKV {
   if (!_extractionStore) {
@@ -99,6 +99,11 @@ export default function DocumentViewerScreen() {
         ? documentUri
         : `${PDF_DIR}${documentUri}`;
 
+      // Evict stale in-memory model on every load.
+      // Prevents a version-bumped extractor from being blocked by a model
+      // that was built from a previous (broken) extraction in the same session.
+      modelCache.delete(fullUri);
+
       // ── Fast path: model already cached ──────────────────────
       const cached = getCached(fullUri);
       if (cached) {
@@ -118,8 +123,11 @@ export default function DocumentViewerScreen() {
           txt: 'text/plain',
           json: 'application/json',
           xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12',
           xls: 'application/vnd.ms-excel',
           csv: 'text/csv',
+          pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          ppt: 'application/vnd.ms-powerpoint',
         };
         const mimeType = mimeMap[ext] || 'application/pdf';
 

@@ -61,11 +61,13 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'application/vnd.ms-excel',
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel.sheet.macroEnabled.12',
           'application/vnd.ms-powerpoint',
           'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           'application/json',
           'text/plain',
           'text/csv',
+          '*/*',
         ],
         copyToCacheDirectory: true,
       });
@@ -89,6 +91,19 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
   const handleImportPDF = async (file: DocumentPicker.DocumentPickerAsset) => {
     try {
       setIsProcessing(true);
+
+      const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'xlsm', 'ppt', 'pptx', 'json', 'txt', 'csv'];
+      const fileExt = file.name?.split('.').pop()?.toLowerCase();
+      
+      if (!fileExt || !allowedExtensions.includes(fileExt)) {
+        showAlert({
+          title: t('common.error') || 'Error',
+          message: t('documents.invalidType', 'Formato no soportado. Por favor elige PDF, Word, Excel, PPT, o TXT.'),
+          type: 'error',
+        });
+        setIsProcessing(false);
+        return;
+      }
 
       const maxSize = 50 * 1024 * 1024; // 50MB
       if (file.size && file.size > maxSize) {

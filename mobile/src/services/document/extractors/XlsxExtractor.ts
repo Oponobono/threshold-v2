@@ -24,6 +24,7 @@ export class XlsxExtractor implements DocumentExtractor {
     const mt = source.mimeType?.toLowerCase() || '';
     return (
       mt === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mt === 'application/vnd.ms-excel.sheet.macroenabled.12' ||
       mt === 'application/vnd.ms-excel' ||
       mt === 'text/csv' ||
       mt === 'application/csv'

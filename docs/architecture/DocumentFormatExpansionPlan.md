@@ -16,7 +16,7 @@ Para lograr esto sin depender de visores externos que rompan el contexto de la a
 | JSON | ✅ `TextDocumentExtractor` | ✅ `NativeTextRenderer` + `CodeHighlighter` | 🔜 | 🔜 |
 | XLSX / XLS / CSV | ✅ `XlsxExtractor` | ✅ `SpreadsheetRenderer` | 🔜 | 🔜 |
 | DOCX | 🔜 Pendiente | 🔜 Pendiente | — | — |
-| PPTX | ⏳ Cloud-first | ⏳ Usa PDF convertido | — | — |
+| PPTX / PPT | ✅ `PptxExtractor` (semántico) | ✅ `PresentationRenderer` (fallback texto, Fase 1) | — | — |
 
 ---
 

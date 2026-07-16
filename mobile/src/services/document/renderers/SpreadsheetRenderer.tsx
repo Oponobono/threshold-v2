@@ -23,7 +23,7 @@ import type { MutableRefObject } from 'react';
 export class SpreadsheetRenderer implements DocumentRenderer {
   supports(model: DocumentModel): boolean {
     const format = model.pages[0]?.content?.metadata?.format?.toLowerCase() || '';
-    return format === 'xlsx' || format === 'xls' || format === 'csv';
+    return format === 'xlsx' || format === 'xlsm' || format === 'xls' || format === 'csv';
   }
 
   render(
@@ -42,6 +42,8 @@ export class SpreadsheetRenderer implements DocumentRenderer {
       <SpreadsheetRendererContent
         model={model}
         onDocumentReady={onDocumentReady}
+        onPageChange={onPageChange}
+        scrollToPageRef={scrollToPageRef}
       />
     );
   }
@@ -52,9 +54,11 @@ export class SpreadsheetRenderer implements DocumentRenderer {
 interface SpreadsheetRendererContentProps {
   model: DocumentModel;
   onDocumentReady?: OnDocumentReady;
+  onPageChange?: OnPageChange;
+  scrollToPageRef?: ScrollToPageRef;
 }
 
-function SpreadsheetRendererContent({ model, onDocumentReady }: SpreadsheetRendererContentProps) {
+function SpreadsheetRendererContent({ model, onDocumentReady, onPageChange, scrollToPageRef }: SpreadsheetRendererContentProps) {
   const meta = model.pages[0]?.content.metadata as unknown as SpreadsheetMetadata | undefined;
   const sheets: SpreadsheetSheet[] = (meta?.sheets as SpreadsheetSheet[]) ?? [];
 
@@ -77,7 +81,19 @@ function SpreadsheetRendererContent({ model, onDocumentReady }: SpreadsheetRende
 
   const handleSheetSelect = useCallback((index: number) => {
     setActiveSheetIndex(index);
-  }, []);
+    onPageChange?.(index);
+  }, [onPageChange]);
+
+  // Permite que los botones de HUD (<- ->) cambien la hoja
+  useMemo(() => {
+    if (scrollToPageRef) {
+      scrollToPageRef.current = (pageIndex: number) => {
+        if (pageIndex >= 0 && pageIndex < sheets.length) {
+          setActiveSheetIndex(pageIndex);
+        }
+      };
+    }
+  }, [scrollToPageRef, sheets.length]);
 
   return (
     <View style={styles.container}>
@@ -132,25 +148,33 @@ function SpreadsheetRendererContent({ model, onDocumentReady }: SpreadsheetRende
 
 // ── HTML generation ───────────────────────────────────────────────────────────
 
-function buildSheetHtml(sheet: SpreadsheetSheet): string {
-  const headerCells = sheet.headers
-    .map(
-      (h, colIdx) =>
-        `<th data-sheet="${esc(sheet.name)}" data-row="0" data-col="${colIdx}">${esc(h)}</th>`,
-    )
-    .join('');
+function getColumnLetter(index: number): string {
+  let name = '';
+  let i = index;
+  while (i >= 0) {
+    name = String.fromCharCode(65 + (i % 26)) + name;
+    i = Math.floor(i / 26) - 1;
+  }
+  return name;
+}
 
-  const dataRows = sheet.rows
-    .map((row, rowIdx) => {
-      const cells = sheet.headers
-        .map(
-          (_, colIdx) =>
-            `<td data-sheet="${esc(sheet.name)}" data-row="${rowIdx + 1}" data-col="${colIdx}">${esc(String(row[colIdx] ?? ''))}</td>`,
-        )
-        .join('');
-      return `<tr>${cells}</tr>`;
-    })
-    .join('');
+function buildSheetHtml(sheet: SpreadsheetSheet): string {
+  const colLetterHeaders = sheet.headers.map((_, colIdx) => {
+    return `<th class="col-header">${getColumnLetter(colIdx)}</th>`;
+  }).join('');
+  const theadHtml = `<thead><tr><th class="corner-header"></th>${colLetterHeaders}</tr></thead>`;
+
+  const row1Cells = sheet.headers.map((h, colIdx) => 
+    `<td data-sheet="${esc(sheet.name)}" data-row="0" data-col="${colIdx}">${esc(h)}</td>`
+  ).join('');
+  const row1Html = `<tr><td class="row-header">1</td>${row1Cells}</tr>`;
+
+  const dataRowsHtml = sheet.rows.map((row, rowIdx) => {
+    const cells = sheet.headers.map((_, colIdx) => 
+      `<td data-sheet="${esc(sheet.name)}" data-row="${rowIdx + 1}" data-col="${colIdx}">${esc(String(row[colIdx] ?? ''))}</td>`
+    ).join('');
+    return `<tr><td class="row-header">${rowIdx + 2}</td>${cells}</tr>`;
+  }).join('');
 
   return `<!DOCTYPE html>
 <html>
@@ -160,28 +184,36 @@ function buildSheetHtml(sheet: SpreadsheetSheet): string {
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  html, body {
+    height: 100%;
+    overflow: hidden; /* Prevent body scroll */
+  }
+
   body {
+    display: flex;
+    flex-direction: column;
     background: #1A1A1A;
     color: #E8E8E8;
     font-family: -apple-system, 'Helvetica Neue', sans-serif;
     font-size: 13px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .sheet-name {
+    flex-shrink: 0;
     padding: 10px 14px 6px;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.6px;
     text-transform: uppercase;
     color: #777;
+    background: #1A1A1A;
+    z-index: 30;
   }
 
   .table-wrapper {
-    overflow-x: auto;
+    flex: 1;
+    overflow: auto; /* Handles both X and Y scrolling */
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 40px;
   }
 
   table {
@@ -191,9 +223,7 @@ function buildSheetHtml(sheet: SpreadsheetSheet): string {
   }
 
   thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    /* Using position sticky directly on th is generally more robust in WebViews */
   }
 
   th {
@@ -202,7 +232,7 @@ function buildSheetHtml(sheet: SpreadsheetSheet): string {
     font-weight: 600;
     font-size: 11px;
     letter-spacing: 0.3px;
-    padding: 10px 14px;
+    padding: 8px 14px;
     border-bottom: 1px solid #333;
     border-right: 1px solid #2A2A2A;
     text-align: left;
@@ -228,9 +258,41 @@ function buildSheetHtml(sheet: SpreadsheetSheet): string {
     color: #444;
   }
 
-  td[data-col="0"] {
-    color: #E8E8E8;
-    font-weight: 500;
+  /* Excel-like coordinates styling */
+  .corner-header {
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 20;
+    background: #1F1F1F;
+    border-right: 1px solid #333;
+    border-bottom: 1px solid #333;
+    min-width: 40px;
+  }
+
+  .col-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    text-align: center;
+    background: #1F1F1F;
+    border-right: 1px solid #333;
+    border-bottom: 1px solid #333;
+    color: #888;
+  }
+
+  .row-header {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: #1F1F1F !important;
+    color: #888;
+    font-weight: 600;
+    font-size: 11px;
+    text-align: center;
+    border-right: 1px solid #333;
+    user-select: none;
+    min-width: 40px;
   }
 </style>
 </head>
@@ -238,8 +300,11 @@ function buildSheetHtml(sheet: SpreadsheetSheet): string {
   <div class="sheet-name">${esc(sheet.name)}</div>
   <div class="table-wrapper">
     <table>
-      <thead><tr>${headerCells}</tr></thead>
-      <tbody>${dataRows}</tbody>
+      ${theadHtml}
+      <tbody>
+        ${row1Html}
+        ${dataRowsHtml}
+      </tbody>
     </table>
   </div>
 </body>

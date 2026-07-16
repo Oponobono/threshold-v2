@@ -11,7 +11,9 @@ import { NativePdfRenderer } from './NativePdfRenderer';
 import { TextDocumentExtractor } from './extractors/TextDocumentExtractor';
 import { NativeTextRenderer } from './renderers/NativeTextRenderer';
 import { XlsxExtractor } from './extractors/XlsxExtractor';
+import { PptxExtractor } from './extractors/PptxExtractor';
 import { SpreadsheetRenderer } from './renderers/SpreadsheetRenderer';
+import { PresentationRenderer } from './renderers/PresentationRenderer';
 import { DocumentImporterService } from './DocumentImporterService';
 
 export interface DocumentSystem {
@@ -28,11 +30,13 @@ export function createDocumentSystem(
   extractorRegistry.register(new PdfDocumentExtractor());
   extractorRegistry.register(new TextDocumentExtractor());
   extractorRegistry.register(new XlsxExtractor());
+  extractorRegistry.register(new PptxExtractor());
 
   const rendererRegistry = new RendererRegistryImpl();
   rendererRegistry.register(new NativePdfRenderer());
   rendererRegistry.register(new NativeTextRenderer());
   rendererRegistry.register(new SpreadsheetRenderer());
+  rendererRegistry.register(new PresentationRenderer());
 
   const assetService = new PersistentLocalAssetService();
 

@@ -80,6 +80,22 @@ interface ExtractedDocument {
 ### 2.2 El Builder (Hacia el Modelo Visual)
 El `DocumentModelBuilder` toma el `ExtractedDocument` y construye paginación, TOC y capacidades. *(Nota de evolución: Podría dividirse a futuro en `TOCBuilder`, `PageBuilder`, etc.)*
 
+### 2.3 Representación Visual (Visual Representation)
+
+El concepto de *Visual Representation* separa la "Fidelidad Visual" (para el humano) de la "Fidelidad Semántica" (para la búsqueda e IA). Esta separación es fundamental para formatos complejos (PPTX, DOCX) que son imposibles de renderizar localmente con alta fidelidad, promoviendo al PDF como el "bytecode visual" universal del sistema.
+
+El pipeline se divide en dos ejes independientes:
+1. **Eje Semántico:** `Documento → Extractor → DocumentModel (TextBlocks) → IA/Búsqueda`.
+2. **Eje Visual:** `Documento → Render Service (Backend) → PDF → VisualCacheManager → DocumentModel.visualRepresentation → Renderer`.
+
+**Estados de Representación Visual (`VisualRepresentationStatus`):**
+- `NONE`: El formato no tiene ni requiere representación visual separada (ej. TXT, PDF nativo).
+- `PENDING`: La representación visual (PDF) se está procesando en el backend o descargando.
+- `AVAILABLE`: La representación visual está descargada y disponible en el caché local.
+- `FAILED`: Hubo un error permanente al generar la representación visual en el backend.
+
+El `DocumentWorkspace` **NO DEBE** conocer esta dualidad. El mecanismo de resolución (ej. `PresentationResolver` o equivalente) es responsable de evaluar el estado. Si la representación es `AVAILABLE`, resuelve hacia el `NativePdfRenderer`. Si está `PENDING` o `FAILED` (y no hay conexión), resuelve hacia el `NativeTextRenderer` (modo lectura/fallback) mostrando un banner informativo de estado. Esto mantiene la orquestación UI agnóstica de los formatos subyacentes.
+
 ## 3. Contratos de Interacción (Proyecciones Efímeras)
 
 ### 3.1 DocumentCapabilities & DocumentAction
