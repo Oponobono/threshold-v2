@@ -21,10 +21,10 @@ WORKDIR /app
 # 3. Copiar los archivos de manifiesto de dependencias primero
 # (Esto optimiza la caché de Docker: si no cambias las dependencias, 
 # se salta la instalación en el siguiente build)
-COPY package.json yarn.lock ./
+COPY package.json package-lock.json ./
 
 # 4. Instalar las dependencias de Node.js
-RUN yarn install --frozen-lockfile
+RUN npm ci
 
 # 5. Copiar el resto del código fuente del backend
 COPY . .
@@ -33,4 +33,4 @@ COPY . .
 EXPOSE 3000
 
 # 7. Comando de inicio (el equivalente a tu antiguo start command)
-CMD ["yarn", "start"]
+CMD ["npm", "start"]
