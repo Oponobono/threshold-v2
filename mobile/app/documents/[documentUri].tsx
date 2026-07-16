@@ -11,8 +11,44 @@ import { DocumentModelBuilder } from '../../src/domain/document/DocumentModelBui
 import type { DocumentModel } from '../../src/domain/document/DocumentModel';
 import type { ExtractedDocument } from '../../src/domain/document/ExtractedDocument';
 import { DocumentWorkspace } from '../../src/services/document/DocumentWorkspace';
+import { createMMKV, type MMKV } from 'react-native-mmkv';
 
 const PDF_DIR = `${require('expo-file-system/legacy').documentDirectory}Threshold/pdf/`;
+
+// ── Persistent extraction cache (survives process restarts) ────────────────
+// Lazy-initialized: MMKV native module must not be called at module load time
+// or it crashes on HMR with 'prototype of undefined'.
+let _extractionStore: MMKV | null = null;
+const EXTRACTION_CACHE_VERSION = 1;
+
+function getStore(): MMKV {
+  if (!_extractionStore) {
+    _extractionStore = createMMKV({ id: 'doc-extraction-cache' });
+  }
+  return _extractionStore;
+}
+
+function getExtractionCacheKey(hash: string) {
+  return `v${EXTRACTION_CACHE_VERSION}:${hash}`;
+}
+
+function readExtractionCache(hash: string): ExtractedDocument | null {
+  if (!hash) return null;
+  try {
+    const raw = getStore().getString(getExtractionCacheKey(hash));
+    if (!raw) return null;
+    return JSON.parse(raw) as ExtractedDocument;
+  } catch {
+    return null;
+  }
+}
+
+function writeExtractionCache(hash: string, doc: ExtractedDocument) {
+  if (!hash) return;
+  try {
+    getStore().set(getExtractionCacheKey(hash), JSON.stringify(doc));
+  } catch {}
+}
 
 const nullRepo = {
   getById: async () => null,
@@ -76,19 +112,35 @@ export default function DocumentViewerScreen() {
       try {
         const system = createDocumentSystem(nullRepo);
 
-        const source = await AssetDocumentSource.fromFile(fullUri, 'application/pdf');
+        const ext = fullUri.split('.').pop()?.toLowerCase() || '';
+        const mimeMap: Record<string, string> = {
+          pdf: 'application/pdf',
+          txt: 'text/plain',
+          json: 'application/json',
+          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          xls: 'application/vnd.ms-excel',
+          csv: 'text/csv',
+        };
+        const mimeType = mimeMap[ext] || 'application/pdf';
+
+        const source = await AssetDocumentSource.fromFile(fullUri, mimeType);
         if (cancelled) return;
 
-        let extracted: ExtractedDocument;
-        try {
-          extracted = await system.extractorRegistry.resolve(source).extractDocument(source);
-        } catch {
-          extracted = {
-            metadata: { format: 'application/pdf', title: documentTitle || 'Documento', pageCount: 0 },
-            textBlocks: [],
-            images: [],
-            tables: [],
-          };
+        // ── Persistent extraction cache (MMKV, keyed by file hash) ──
+        let extracted: ExtractedDocument | null = readExtractionCache(source.hash);
+
+        if (!extracted) {
+          try {
+            extracted = await system.extractorRegistry.resolve(source).extractDocument(source);
+            writeExtractionCache(source.hash, extracted);
+          } catch {
+            extracted = {
+              metadata: { format: 'application/pdf', title: documentTitle || 'Documento', pageCount: 0 },
+              textBlocks: [],
+              images: [],
+              tables: [],
+            };
+          }
         }
         if (cancelled) return;
 

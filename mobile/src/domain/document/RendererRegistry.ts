@@ -8,12 +8,13 @@ export class RendererRegistry {
     this._renderers.push(renderer);
   }
 
-  resolve(_model: DocumentModel): DocumentRenderer {
-    const renderer = this._renderers[0];
-    if (!renderer) {
+  resolve(model: DocumentModel): DocumentRenderer {
+    if (this._renderers.length === 0) {
       throw new Error('No renderer registered');
     }
-    return renderer;
+
+    const matched = this._renderers.find(r => r.supports?.(model));
+    return matched ?? this._renderers[0];
   }
 
   getAll(): readonly DocumentRenderer[] {

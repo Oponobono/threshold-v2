@@ -7,13 +7,24 @@ import type {
   DocumentRenderer,
   OnPageChange,
   OnDocumentReady,
+  OnTextSelection,
   ScrollToPageRef,
   OnSearchResult,
 } from '../../domain/document/DocumentRenderer';
 import type { DocumentModel } from '../../domain/document/DocumentModel';
+import type { DocumentHighlight } from '../../domain/document/DocumentHighlight';
 import type { MutableRefObject } from 'react';
 
+export interface PdfHighlightRef {
+  set: (highlights: readonly DocumentHighlight[]) => void;
+}
+
 export class NativePdfRenderer implements DocumentRenderer {
+  supports(model: DocumentModel): boolean {
+    const format = model.pages[0]?.content?.metadata?.format?.toLowerCase() || '';
+    return format === 'pdf' || format === 'application/pdf';
+  }
+
   render(
     model: DocumentModel,
     onPageChange?: OnPageChange,
@@ -23,6 +34,8 @@ export class NativePdfRenderer implements DocumentRenderer {
     _highlightedBlockId?: string,
     searchRef?: MutableRefObject<PdfSearchRef | null>,
     onSearchResult?: OnSearchResult,
+    highlightsRef?: MutableRefObject<PdfHighlightRef | null>,
+    onHighlightTapped?: (id: string) => void,
   ): unknown {
     const fileUri = model.documentId.startsWith('file://')
       ? model.documentId
@@ -37,6 +50,8 @@ export class NativePdfRenderer implements DocumentRenderer {
         onSelection={onSelection}
         searchRef={searchRef}
         onSearchResult={onSearchResult}
+        highlightsRef={highlightsRef}
+        onHighlightTapped={onHighlightTapped}
       />
     );
   }
@@ -50,6 +65,8 @@ interface NativePdfRendererContentProps {
   onSelection?: OnTextSelection;
   searchRef?: MutableRefObject<PdfSearchRef | null>;
   onSearchResult?: OnSearchResult;
+  highlightsRef?: MutableRefObject<PdfHighlightRef | null>;
+  onHighlightTapped?: (id: string) => void;
 }
 
 export interface PdfSearchRef {
@@ -79,13 +96,16 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
     .page-wrapper {
       position: relative;
       width: 100%;
-      display: block;
+      background-color: white;
+      margin-bottom: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
     canvas {
-      display: block;
+      position: absolute;
+      left: 0;
+      top: 0;
       width: 100% !important;
-      height: auto !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      height: 100% !important;
     }
     .highlight {
       position: absolute;
@@ -105,8 +125,8 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
       bottom: 0;
       overflow: hidden;
       line-height: 1.0;
-      -webkit-user-select: text;
-      user-select: text;
+      -webkit-user-select: none;
+      user-select: none;
       pointer-events: auto;
       z-index: 10;
     }
@@ -116,10 +136,9 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
       transform-origin: 0% 0%;
       color: rgba(0,0,0,0.01) !important;
       cursor: text;
-    }
-    .textLayer ::selection {
-      background: rgba(0, 110, 255, 0.3) !important;
-      color: rgba(0,0,0,0.01) !important;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
   </style>
 </head>
@@ -151,6 +170,8 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
     var pageData = {};
     var allMatches = [];
     var currentMatchIndex = -1;
+    var currentHighlights = [];
+    var currentSearchTerm = '';
 
     function getCurrentPage() {
       var wrappers = document.querySelectorAll('.page-wrapper[data-page]');
@@ -174,7 +195,7 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
     }, { passive: true });
 
     function clearHighlights() {
-      document.querySelectorAll('.highlight').forEach(function(el) { el.remove(); });
+      document.querySelectorAll('.highlight:not(.persistent-highlight)').forEach(function(el) { el.remove(); });
       allMatches = [];
       currentMatchIndex = -1;
     }
@@ -203,6 +224,7 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
     }
 
     function searchInAllPages(term) {
+      currentSearchTerm = term;
       clearHighlights();
       if (!term || !term.trim()) {
         postMsg({ type: 'searchResult', total: 0, current: 0 });
@@ -278,149 +300,486 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
           var c = document.querySelector('.page-wrapper[data-page="' + cmd.page + '"]');
           if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        else if (cmd.type === 'renderHighlights') { 
+          currentHighlights = cmd.highlights;
+          renderAllPersistentHighlights(); 
+        }
+        else if (cmd.type === 'clearSelection') { clearCustomSelection(); }
       } catch(e) {}
     };
 
-    var selectionTimer = null;
-    document.addEventListener('selectionchange', function() {
-      if (selectionTimer) clearTimeout(selectionTimer);
-      selectionTimer = setTimeout(function() {
-        var sel = window.getSelection();
-        var text = sel ? sel.toString().trim() : '';
-        if (!text) return;
-        var anchor = sel.anchorNode;
-        var page = 1;
-        if (anchor) {
-          var el = anchor.nodeType === 3 ? anchor.parentElement : anchor;
-          var wrapper = el ? el.closest('.page-wrapper') : null;
-          if (wrapper) page = parseInt(wrapper.getAttribute('data-page'), 10) || 1;
+    function renderPersistentHighlightsForPage(pageNum) {
+      var wrapper = document.querySelector('.page-wrapper[data-page="' + pageNum + '"]');
+      if (!wrapper) return;
+      wrapper.querySelectorAll('.persistent-highlight').forEach(function(el) { el.remove(); });
+      
+      var data = pageData[pageNum];
+      if (!data || data.state !== 'rendered') return;
+      
+      var pageHighlights = currentHighlights.filter(function(hl) { return (hl.pageIndex + 1) === pageNum; });
+      if (!pageHighlights.length) return;
+
+      var canvas = wrapper.querySelector('canvas');
+      if (!canvas) return;
+      var rect = canvas.getBoundingClientRect();
+      var actualW = rect.width > 0 ? rect.width : canvas.offsetWidth;
+      var effectiveScale = actualW / data.unscaledW;
+      var pageHeightCSS = data.unscaledH * effectiveScale;
+
+      var colorMap = {
+        yellow: 'rgba(255, 220, 0, 0.45)',
+        green:  'rgba(0, 200, 83, 0.35)',
+        blue:   'rgba(33, 150, 243, 0.35)',
+        pink:   'rgba(233, 30, 99, 0.30)',
+        orange: 'rgba(255, 152, 0, 0.40)',
+      };
+
+      pageHighlights.forEach(function(hl) {
+        var startIdx = hl.anchorOffset != null ? hl.anchorOffset : 0;
+        var endIdx = hl.focusOffset != null ? hl.focusOffset : 0;
+        
+        var spanIdx = 0;
+        var lineBlocks = [];
+        var currentBlock = null;
+
+        for (var i = 0; i < data.textItems.length; i++) {
+          var item = data.textItems[i];
+          if (!item.str || !item.str.trim()) continue;
+          
+          if (spanIdx >= startIdx && spanIdx <= endIdx) {
+            var userX = item.transform[4];
+            var userY = item.transform[5];
+            var fontSizeUser = Math.abs(item.transform[3]);
+            var itemWidth = item.width || (item.str.length * fontSizeUser * 0.5);
+
+            if (!currentBlock) {
+               currentBlock = { y: userY, minX: userX, maxX: userX + itemWidth, fontSize: fontSizeUser };
+            } else {
+               if (Math.abs(currentBlock.y - userY) < 5) { // Same line tolerance
+                  currentBlock.minX = Math.min(currentBlock.minX, userX);
+                  currentBlock.maxX = Math.max(currentBlock.maxX, userX + itemWidth);
+                  currentBlock.fontSize = Math.max(currentBlock.fontSize, fontSizeUser);
+               } else {
+                  lineBlocks.push(currentBlock);
+                  currentBlock = { y: userY, minX: userX, maxX: userX + itemWidth, fontSize: fontSizeUser };
+               }
+            }
+          } else if (spanIdx > endIdx) {
+            break; // Stop looping past the highlight end
+          }
+          spanIdx++;
         }
-        var anchorOffset = sel.anchorOffset;
-        var focusOffset = sel.focusOffset;
-        postMsg({
-          type: 'textSelection',
-          text: text,
-          page: page,
-          anchorOffset: anchorOffset,
-          focusOffset: focusOffset,
+        if (currentBlock) lineBlocks.push(currentBlock);
+
+        lineBlocks.forEach(function(block) {
+          var el = document.createElement('div');
+          el.className = 'highlight persistent-highlight';
+          el.style.background = colorMap[hl.color] || colorMap.yellow;
+          el.setAttribute('data-hl-id', hl.id);
+          el.style.borderRadius = '3px';
+
+          var fontSizePx = block.fontSize * effectiveScale;
+          var ascentPx = fontSizePx * 0.8;
+
+          el.style.left = (block.minX * effectiveScale) + 'px';
+          el.style.top = (pageHeightCSS - block.y * effectiveScale - ascentPx) + 'px';
+          el.style.width = ((block.maxX - block.minX) * effectiveScale) + 'px';
+          el.style.height = fontSizePx + 'px';
+
+          wrapper.appendChild(el);
         });
-      }, 300);
+      });
+    }
+
+    function renderAllPersistentHighlights() {
+      Object.keys(pageData).forEach(function(pageNum) {
+        var p = parseInt(pageNum, 10);
+        if (pageData[p] && pageData[p].state === 'rendered') {
+          renderPersistentHighlightsForPage(p);
+        }
+      });
+    }
+
+    var selectionMode = false;
+    var longPressTimer = null;
+    var touchStartX = 0, touchStartY = 0;
+    var selStartSpan = null;
+    var selEndSpan = null;
+
+    function clearCustomSelection() {
+      document.querySelectorAll('.custom-selection').forEach(function(el) { el.remove(); });
+      selStartSpan = null;
+      selEndSpan = null;
+    }
+
+    function renderCustomSelection() {
+      document.querySelectorAll('.custom-selection').forEach(function(el) { el.remove(); });
+      if (!selStartSpan || !selEndSpan) return '';
+      
+      var pageNum = selStartSpan.page;
+      var startIdx = Math.min(selStartSpan.idx, selEndSpan.idx);
+      var endIdx = Math.max(selStartSpan.idx, selEndSpan.idx);
+      
+      var wrapper = document.querySelector('.page-wrapper[data-page="' + pageNum + '"]');
+      if (!wrapper) return '';
+      var data = pageData[pageNum];
+      if (!data) return '';
+      
+      var canvas = wrapper.querySelector('canvas');
+      var rect = canvas.getBoundingClientRect();
+      var actualW = rect.width > 0 ? rect.width : canvas.offsetWidth;
+      var effectiveScale = actualW / data.unscaledW;
+      var pageHeightCSS = data.unscaledH * effectiveScale;
+      
+      var spanIdx = 0;
+      var textParts = [];
+      var lineBlocks = [];
+      var currentBlock = null;
+
+      data.textItems.forEach(function(item) {
+        if (!item.str || !item.str.trim()) return;
+        if (spanIdx >= startIdx && spanIdx <= endIdx) {
+          textParts.push(item.str);
+          
+          var userX = item.transform[4];
+          var userY = item.transform[5];
+          var fontSizeUser = Math.abs(item.transform[3]);
+          var itemWidth = item.width || (item.str.length * fontSizeUser * 0.5);
+
+          if (!currentBlock) {
+             currentBlock = { y: userY, minX: userX, maxX: userX + itemWidth, fontSize: fontSizeUser };
+          } else {
+             if (Math.abs(currentBlock.y - userY) < 5) {
+                currentBlock.minX = Math.min(currentBlock.minX, userX);
+                currentBlock.maxX = Math.max(currentBlock.maxX, userX + itemWidth);
+                currentBlock.fontSize = Math.max(currentBlock.fontSize, fontSizeUser);
+             } else {
+                lineBlocks.push(currentBlock);
+                currentBlock = { y: userY, minX: userX, maxX: userX + itemWidth, fontSize: fontSizeUser };
+             }
+          }
+        }
+        spanIdx++;
+      });
+      if (currentBlock) lineBlocks.push(currentBlock);
+
+      lineBlocks.forEach(function(block) {
+         var el = document.createElement('div');
+         el.className = 'highlight custom-selection';
+         el.style.background = 'rgba(0, 110, 255, 0.3)';
+         el.style.borderRadius = '3px';
+         
+         var fontSizePx = block.fontSize * effectiveScale;
+         var ascentPx = fontSizePx * 0.8;
+         
+         el.style.left = (block.minX * effectiveScale) + 'px';
+         el.style.top = (pageHeightCSS - block.y * effectiveScale - ascentPx) + 'px';
+         el.style.width = ((block.maxX - block.minX) * effectiveScale) + 'px';
+         el.style.height = fontSizePx + 'px';
+         
+         wrapper.appendChild(el);
+      });
+      return textParts.join(' ');
+    }
+
+    document.addEventListener('touchstart', function(e) {
+      if (e.touches.length !== 1) return;
+      var touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      
+      if (!selectionMode && selStartSpan) {
+        var el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (!el || !el.classList.contains('custom-selection')) {
+           clearCustomSelection();
+           postMsg({ type: 'textSelection', text: '', page: 1, startItemIdx: 0, endItemIdx: 0 }); 
+        }
+      }
+
+      longPressTimer = setTimeout(function() {
+        selectionMode = true;
+        var el = document.elementFromPoint(touchStartX, touchStartY);
+        if (el && el.hasAttribute('data-item-idx')) {
+           var pageWrapper = el.closest('.page-wrapper');
+           var pageNum = parseInt(pageWrapper.getAttribute('data-page'), 10);
+           var idx = parseInt(el.getAttribute('data-item-idx'), 10);
+           selStartSpan = { page: pageNum, idx: idx };
+           selEndSpan = { page: pageNum, idx: idx };
+           renderCustomSelection();
+           if (window.navigator && window.navigator.vibrate) {
+              window.navigator.vibrate(50);
+           }
+        }
+      }, 400);
+    }, { passive: false });
+
+    document.addEventListener('touchmove', function(e) {
+      if (selectionMode) {
+        e.preventDefault(); 
+        var touch = e.touches[0];
+        var el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (el && el.hasAttribute('data-item-idx')) {
+           var pageWrapper = el.closest('.page-wrapper');
+           if (pageWrapper) {
+             var pageNum = parseInt(pageWrapper.getAttribute('data-page'), 10);
+             if (pageNum === selStartSpan.page) { 
+               var idx = parseInt(el.getAttribute('data-item-idx'), 10);
+               if (idx !== selEndSpan.idx) {
+                 selEndSpan.idx = idx;
+                 renderCustomSelection();
+               }
+             }
+           }
+        }
+      } else if (longPressTimer) {
+         var touch = e.touches[0];
+         var dx = touch.clientX - touchStartX;
+         var dy = touch.clientY - touchStartY;
+         if (dx*dx + dy*dy > 100) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+         }
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchend', function(e) {
+      if (longPressTimer) {
+         clearTimeout(longPressTimer);
+         longPressTimer = null;
+      }
+      if (selectionMode) {
+         selectionMode = false;
+         if (selStartSpan && selEndSpan) {
+            var text = renderCustomSelection();
+            var startIdx = Math.min(selStartSpan.idx, selEndSpan.idx);
+            var endIdx = Math.max(selStartSpan.idx, selEndSpan.idx);
+            postMsg({
+               type: 'textSelection',
+               text: text,
+               page: selStartSpan.page,
+               startItemIdx: startIdx,
+               endItemIdx: endIdx
+            });
+         }
+      }
+    });
+
+    document.addEventListener('contextmenu', function(e) {
+      e.preventDefault(); 
     });
 
     function buildTextLayer(textLayerDiv, textItems, unscaledW, unscaledH, actualCSSWidth) {
-      // effectiveScale = how many CSS px per PDF user-space unit.
-      // We derive it from the ACTUAL rendered canvas width so it is always pixel-perfect,
-      // regardless of what window.innerWidth or devicePixelRatio report.
       var effectiveScale = actualCSSWidth / unscaledW;
       var pageHeightCSS  = unscaledH * effectiveScale;
 
       textLayerDiv.innerHTML = '';
-      textItems.forEach(function(item) {
+      var spanIdx = 0;
+      textItems.forEach(function(item, i) {
         if (!item.str || item.str.trim() === '') return;
         var span = document.createElement('span');
         span.textContent = item.str;
+        span.setAttribute('data-item-idx', spanIdx);
 
-        // PDF user-space coordinates
         var userX = item.transform[4];
         var userY = item.transform[5];
-
-        // Font size in PDF user units is the absolute magnitude of the scaleY component
         var fontSizeUser = Math.abs(item.transform[3]);
         var fontSizePx   = fontSizeUser * effectiveScale;
-        // Ascent ~80 % of em height — used to convert baseline Y to CSS top
         var ascentPx     = fontSizePx * 0.8;
 
         span.style.left       = (userX * effectiveScale) + 'px';
-        // PDF Y is bottom-referenced; CSS top is top-referenced → flip
         span.style.top        = (pageHeightCSS - userY * effectiveScale - ascentPx) + 'px';
         span.style.fontSize   = fontSizePx + 'px';
         span.style.fontFamily = item.fontName || 'sans-serif';
-        // No width constraint: constraining width makes adjacent spans' hit-areas
-        // overlap and corrupts getSelection().toString().
+        
+        var itemWidth = item.width || (item.str.length * fontSizeUser * 0.5);
+        span.style.width      = (itemWidth * effectiveScale) + 'px';
+        span.style.height     = fontSizePx + 'px';
 
         var angle = Math.atan2(item.transform[1], item.transform[0]);
         if (Math.abs(angle) > 0.001) {
           span.style.transform = 'rotate(' + (-angle) + 'rad)';
         }
         textLayerDiv.appendChild(span);
+        spanIdx++;
       });
     }
+
+    var pdfDocument = null;
 
     async function renderPDF(pdfUri) {
       try {
         var loadingTask = pdfjsLib.getDocument({ url: pdfUri });
-        var pdf = await loadingTask.promise;
-        totalPages = pdf.numPages;
+        pdfDocument = await loadingTask.promise;
+        totalPages = pdfDocument.numPages;
         postMsg({ type: 'ready', totalPages: totalPages });
-        postMsg({ type: 'loaded' });
-
+        
         var container = document.getElementById('pdf-container');
 
-        for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-          var page = await pdf.getPage(pageNum);
+        var page1 = await pdfDocument.getPage(1);
+        var vp1 = page1.getViewport({ scale: 1.0 });
+        var defaultW = vp1.width;
+        var defaultH = vp1.height;
+        var defaultRatio = defaultH / defaultW;
+        page1.cleanup();
 
-          // Unscaled viewport gives us the page dimensions in PDF user units
-          var unscaledViewport = page.getViewport({ scale: 1.0 });
-          var unscaledW = unscaledViewport.width;
-          var unscaledH = unscaledViewport.height;
-
-          // Render the canvas at a high DPI scale for sharpness.
-          // CSS (width: 100%; height: auto) will scale it down to fit the container.
-          var pixelRatio   = window.devicePixelRatio || 1;
-          var renderScale  = 2 * pixelRatio;
-          var renderVP     = page.getViewport({ scale: renderScale });
-
+        for (var i = 1; i <= totalPages; i++) {
           var wrapper = document.createElement('div');
           wrapper.className = 'page-wrapper';
-          wrapper.setAttribute('data-page', String(pageNum));
-          // Let CSS set the visual width (width: 100%); height follows from aspect ratio.
-
-          var canvas = document.createElement('canvas');
-          canvas.setAttribute('data-page', String(pageNum));
-          var ctx = canvas.getContext('2d');
-          // Intrinsic pixel dimensions for high-DPI rendering
-          canvas.width  = renderVP.width;
-          canvas.height = renderVP.height;
-          // CSS scales it to fill the wrapper (see canvas { width: 100%; height: auto })
-
-          wrapper.appendChild(canvas);
+          wrapper.setAttribute('data-page', String(i));
+          wrapper.style.paddingBottom = (defaultRatio * 100) + '%';
           container.appendChild(wrapper);
-
-          await page.render({ canvasContext: ctx, viewport: renderVP }).promise;
-
-          var textContent = await page.getTextContent();
-          // Store unscaled dimensions + raw items for search highlighting
-          pageData[pageNum] = {
-            unscaledW: unscaledW,
-            unscaledH: unscaledH,
-            textItems: textContent.items
+          
+          pageData[i] = { 
+            state: 'empty', 
+            textExtracted: false,
+            unscaledW: defaultW, 
+            unscaledH: defaultH, 
+            textItems: [] 
           };
-
-          var textLayerDiv = document.createElement('div');
-          textLayerDiv.className = 'textLayer';
-          textLayerDiv.setAttribute('data-page', String(pageNum));
-          wrapper.appendChild(textLayerDiv);
-
-          // ResizeObserver gives us the true CSS pixel width of the canvas AFTER layout.
-          // This is the only reliable way to know the display scale in a WebView,
-          // because window.innerWidth may not match the actual rendered element width.
-          (function(canvas, textLayerDiv, textItems, unscaledW, unscaledH) {
-            var observer = new ResizeObserver(function(entries) {
-              var w = entries[0].contentRect.width;
-              if (w > 0) {
-                buildTextLayer(textLayerDiv, textItems, unscaledW, unscaledH, w);
-              }
-            });
-            observer.observe(canvas);
-          })(canvas, textLayerDiv, textContent.items, unscaledW, unscaledH);
-
-          page.cleanup();
-          await new Promise(function(resolve) { setTimeout(resolve, 0); });
-          postMsg({ type: 'pageRendered', page: pageNum, total: totalPages });
         }
+        
+        postMsg({ type: 'loaded' }); 
+
+        var observer = new IntersectionObserver(function(entries) {
+           entries.forEach(function(entry) {
+              if (entry.isIntersecting) {
+                 var pageNum = parseInt(entry.target.getAttribute('data-page'), 10);
+                 renderPageVisuals(pageNum, entry.target);
+              }
+           });
+        }, { rootMargin: "1000px 0px" }); 
+
+        document.querySelectorAll('.page-wrapper').forEach(function(el) {
+           observer.observe(el);
+        });
+
+        extractTextInBackground();
+
       } catch (e) {
         postMsg({ type: 'error', message: e.message });
       }
+    }
+
+    async function extractTextInBackground() {
+      for (var pageNum = 1; pageNum <= totalPages; pageNum++) {
+        if (pageData[pageNum].textExtracted) continue;
+        try {
+          var page = await pdfDocument.getPage(pageNum);
+          var textContent = await page.getTextContent();
+          
+          var newItems = [];
+          textContent.items.forEach(function(item) {
+             if (!item.str || !item.str.trim()) return;
+             var charWidth = (item.width || 0) / Math.max(1, item.str.length);
+             var currentX = item.transform[4];
+             var words = item.str.split(' ');
+             words.forEach(function(w) {
+                if (w.trim() !== '') {
+                   var newItem = Object.assign({}, item);
+                   newItem.str = w;
+                   newItem.width = w.length * charWidth;
+                   newItem.transform = item.transform.slice();
+                   newItem.transform[4] = currentX;
+                   newItems.push(newItem);
+                }
+                currentX += (w.length + 1) * charWidth;
+             });
+          });
+
+          pageData[pageNum].textItems = newItems;
+          pageData[pageNum].textExtracted = true;
+          
+          var vp = page.getViewport({ scale: 1.0 });
+          pageData[pageNum].unscaledW = vp.width;
+          pageData[pageNum].unscaledH = vp.height;
+          
+          page.cleanup();
+          await new Promise(function(r) { setTimeout(r, 10); });
+        } catch(e) {}
+      }
+    }
+
+    async function renderPageVisuals(pageNum, wrapper) {
+       var data = pageData[pageNum];
+       if (data.state !== 'empty') return;
+       data.state = 'loading';
+
+       try {
+         var page = await pdfDocument.getPage(pageNum);
+         var unscaledW = page.getViewport({ scale: 1.0 }).width;
+         var unscaledH = page.getViewport({ scale: 1.0 }).height;
+         
+         wrapper.style.paddingBottom = ((unscaledH / unscaledW) * 100) + '%';
+         data.unscaledW = unscaledW;
+         data.unscaledH = unscaledH;
+
+         var pixelRatio = window.devicePixelRatio || 1;
+         var renderScale = 2 * pixelRatio;
+         var renderVP = page.getViewport({ scale: renderScale });
+
+         var canvas = document.createElement('canvas');
+         canvas.setAttribute('data-page', String(pageNum));
+         var ctx = canvas.getContext('2d');
+         canvas.width = renderVP.width;
+         canvas.height = renderVP.height;
+         wrapper.appendChild(canvas);
+
+         await page.render({ canvasContext: ctx, viewport: renderVP }).promise;
+
+         if (!data.textExtracted) {
+           var textContent = await page.getTextContent();
+           var newItems = [];
+           textContent.items.forEach(function(item) {
+              if (!item.str || !item.str.trim()) return;
+              var charWidth = (item.width || 0) / Math.max(1, item.str.length);
+              var currentX = item.transform[4];
+              var words = item.str.split(' ');
+              words.forEach(function(w) {
+                 if (w.trim() !== '') {
+                    var newItem = Object.assign({}, item);
+                    newItem.str = w;
+                    newItem.width = w.length * charWidth;
+                    newItem.transform = item.transform.slice();
+                    newItem.transform[4] = currentX;
+                    newItems.push(newItem);
+                 }
+                 currentX += (w.length + 1) * charWidth;
+              });
+           });
+           data.textItems = newItems;
+           data.textExtracted = true;
+         }
+
+         var textLayerDiv = document.createElement('div');
+         textLayerDiv.className = 'textLayer';
+         textLayerDiv.setAttribute('data-page', String(pageNum));
+         wrapper.appendChild(textLayerDiv);
+
+         var w = wrapper.offsetWidth;
+         if (w > 0) {
+            buildTextLayer(textLayerDiv, data.textItems, unscaledW, unscaledH, w);
+         }
+         
+         var ro = new ResizeObserver(function(entries) {
+            var cw = entries[0].contentRect.width;
+            if (cw > 0) buildTextLayer(textLayerDiv, data.textItems, unscaledW, unscaledH, cw);
+         });
+         ro.observe(wrapper);
+
+         data.state = 'rendered';
+         page.cleanup();
+         
+         if (currentHighlights && currentHighlights.length) {
+            renderPersistentHighlightsForPage(pageNum);
+         }
+         if (currentSearchTerm) {
+            searchInAllPages(currentSearchTerm);
+         }
+         
+         postMsg({ type: 'pageRendered', page: pageNum, total: totalPages });
+       } catch(e) {
+         data.state = 'empty';
+       }
     }
 
     renderPDF('${fileUri}');
@@ -437,6 +796,8 @@ function NativePdfRendererContent({
   onSelection,
   searchRef,
   onSearchResult,
+  highlightsRef,
+  onHighlightTapped,
 }: NativePdfRendererContentProps) {
   const [loading, setLoading] = useState(true);
   const [html, setHtml] = useState<string | null>(null);
@@ -467,6 +828,17 @@ function NativePdfRendererContent({
     return () => { if (scrollToPageRef) scrollToPageRef.current = null; };
   }, [scrollToPageRef]);
 
+  // Expose highlights
+  useEffect(() => {
+    if (!highlightsRef) return;
+    highlightsRef.current = {
+      set: (highlights: readonly DocumentHighlight[]) => {
+        injectCommand({ type: 'renderHighlights', highlights });
+      },
+    };
+    return () => { if (highlightsRef) highlightsRef.current = null; };
+  }, [highlightsRef]);
+
   useEffect(() => {
     if (Platform.OS !== 'ios') {
       setHtml(buildHtmlFromUri(fileUri, theme.colors.background));
@@ -493,9 +865,13 @@ function NativePdfRendererContent({
           pageIndex: (data.page || 1) - 1,
           blockIndex: 0,
           text: data.text,
-          startIndex: data.anchorOffset || 0,
-          endIndex: data.focusOffset || data.text.length,
+          startIndex: data.startItemIdx || 0,
+          endIndex: data.endItemIdx || 0,
         });
+      } else if (data.type === 'highlightTapped') {
+        if (data.id) {
+           onHighlightTapped?.(data.id);
+        }
       }
     } catch {}
   };

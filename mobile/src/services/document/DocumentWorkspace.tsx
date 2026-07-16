@@ -19,12 +19,14 @@ import { documentWorkspaceStyles as styles } from '../../styles/DocumentWorkspac
 import { theme } from '../../styles/theme';
 import { DocumentSelectionToolbar } from './DocumentSelectionToolbar';
 import type { TextSelectionEvent } from './PdfRenderer';
-import type { PdfSearchRef } from './NativePdfRenderer';
+import type { PdfSearchRef, PdfHighlightRef } from './NativePdfRenderer';
 import { ClipboardCopyUseCase } from './ClipboardCopyUseCase';
 import { SharingTextUseCase } from './SharingTextUseCase';
 import { useCustomAlert } from '../../components/ui/CustomAlert';
 import { SearchBar } from './SearchBar';
 import { Ionicons } from '@expo/vector-icons';
+import { createHighlight, getHighlights, deleteHighlight, updateHighlightColor } from './HighlightService';
+import type { DocumentHighlight, HighlightColor } from '../../domain/document/DocumentHighlight';
 
 const copyUseCase = new ClipboardCopyUseCase();
 const shareUseCase = new SharingTextUseCase();
@@ -52,6 +54,9 @@ export function DocumentWorkspace({ model, rendererRegistry }: DocumentWorkspace
   const [searchTotal, setSearchTotal] = useState(0);
   const [searchCurrentIdx, setSearchCurrentIdx] = useState(0);
   const pdfSearchRef = useRef<PdfSearchRef | null>(null);
+  const highlightsRef = useRef<PdfHighlightRef | null>(null);
+  const [highlights, setHighlights] = useState<DocumentHighlight[]>([]);
+  const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardUp(true));
@@ -63,6 +68,19 @@ export function DocumentWorkspace({ model, rendererRegistry }: DocumentWorkspace
     return () => { show.remove(); hide.remove(); };
   }, []);
 
+  // Load highlights on mount
+  useEffect(() => {
+    getHighlights(model.documentId).then(hl => {
+      setHighlights(hl);
+      highlightsRef.current?.set(hl);
+    });
+  }, [model.documentId]);
+
+  // Push highlights to renderer whenever they change
+  useEffect(() => {
+    highlightsRef.current?.set(highlights);
+  }, [highlights]);
+
   const scrollToPageRef = useRef<((page: number) => void) | null>(null) as ScrollToPageRef;
 
   const handlePageChange = useCallback((pageIndex: number) => {
@@ -71,7 +89,10 @@ export function DocumentWorkspace({ model, rendererRegistry }: DocumentWorkspace
 
   const handleDocumentReady = useCallback((total: number) => {
     setTotalPages(total);
-  }, []);
+    if (highlightsRef.current) {
+      highlightsRef.current.set(highlights);
+    }
+  }, [highlights]);
 
   const goToPage = useCallback(
     (oneBased: number) => {
@@ -143,7 +164,56 @@ export function DocumentWorkspace({ model, rendererRegistry }: DocumentWorkspace
 
   const handleCloseSelection = useCallback(() => {
     setCurrentSelection(null);
+    setActiveHighlightId(null);
   }, []);
+
+  const handleHighlight = useCallback(async (color: HighlightColor) => {
+    if (!currentSelection) return;
+
+    if (activeHighlightId) {
+      const existing = highlights.find(h => h.id === activeHighlightId);
+      if (existing) {
+        const updated = await updateHighlightColor(existing, color);
+        setHighlights(prev => prev.map(h => (h.id === existing.id ? updated : h)));
+      }
+    } else {
+      const hl = await createHighlight({
+        documentId: model.documentId,
+        pageIndex: currentSelection.pageIndex,
+        text: currentSelection.text,
+        color,
+        anchorOffset: currentSelection.startIndex,
+        focusOffset: currentSelection.endIndex,
+      });
+      setHighlights(prev => [...prev, hl]);
+    }
+    
+    setCurrentSelection(null);
+    setActiveHighlightId(null);
+  }, [currentSelection, activeHighlightId, highlights, model.documentId]);
+
+  const handleHighlightTapped = useCallback((id: string) => {
+    const hl = highlights.find(h => h.id === id);
+    if (!hl) return;
+    
+    setActiveHighlightId(hl.id);
+    setCurrentSelection({
+      documentId: hl.documentId,
+      pageIndex: hl.pageIndex,
+      blockIndex: 0,
+      text: hl.text,
+      startIndex: hl.anchorOffset,
+      endIndex: hl.focusOffset
+    });
+  }, [highlights]);
+
+  const handleDeleteHighlight = useCallback(async () => {
+    if (!activeHighlightId) return;
+    await deleteHighlight(activeHighlightId);
+    setHighlights(prev => prev.filter(h => h.id !== activeHighlightId));
+    setCurrentSelection(null);
+    setActiveHighlightId(null);
+  }, [activeHighlightId]);
 
   const renderer = rendererRegistry.resolve(model);
   const rendered = renderer.render(
@@ -158,6 +228,8 @@ export function DocumentWorkspace({ model, rendererRegistry }: DocumentWorkspace
       setSearchTotal(total);
       setSearchCurrentIdx(current);
     },
+    highlightsRef,
+    handleHighlightTapped,
   );
 
   const knownTotal = totalPages > 0 ? totalPages : model.pages.length || 0;
@@ -186,7 +258,11 @@ export function DocumentWorkspace({ model, rendererRegistry }: DocumentWorkspace
         selection={currentSelection}
         onCopy={handleCopy}
         onShare={handleShare}
+        onHighlight={handleHighlight}
         onClose={handleCloseSelection}
+        onDelete={handleDeleteHighlight}
+        bottomInset={insets.bottom || 0}
+        mode={activeHighlightId ? 'edit' : 'create'}
       />
 
       {/* ── Bottom HUD ───────────────────────────────────────────── */}

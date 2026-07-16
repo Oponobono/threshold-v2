@@ -749,5 +749,21 @@ const migrations: Migration[] = [
       `ALTER TABLE scanned_documents ADD COLUMN mime_type TEXT`,
     ],
   },
+  {
+    version: 34,
+    up: [
+      `CREATE TABLE IF NOT EXISTS document_highlights (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        page_index INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT 'yellow',
+        anchor_offset INTEGER NOT NULL DEFAULT 0,
+        focus_offset INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_doc_highlights_doc ON document_highlights(document_id)`,
+    ],
+  },
 ];
 export default migrations;

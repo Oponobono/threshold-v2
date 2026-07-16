@@ -8,6 +8,7 @@ export type OnSearchResult = (total: number, current: number) => void;
 export type ScrollToPageRef = MutableRefObject<((page: number) => void) | null>;
 
 export interface DocumentRenderer {
+  supports?(model: DocumentModel): boolean;
   render(
     model: DocumentModel,
     onPageChange?: OnPageChange,
@@ -15,5 +16,9 @@ export interface DocumentRenderer {
     onDocumentReady?: OnDocumentReady,
     onSelection?: OnTextSelection,
     highlightedBlockId?: string,
+    searchRef?: MutableRefObject<any>,
+    onSearchResult?: OnSearchResult,
+    highlightsRef?: MutableRefObject<any>,
+    onHighlightTapped?: (id: string) => void,
   ): unknown;
 }

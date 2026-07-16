@@ -1,19 +1,31 @@
 # Plan de Implementación: Expansión de Formatos en DocumentWorkspace
 
 ## 1. Resumen Ejecutivo
-El objetivo de este plan es dotar a la aplicación móvil (y específicamente al componente `DocumentWorkspace`) de la capacidad de procesar, extraer y visualizar múltiples formatos de archivos (TXT, JSON, DOCX, XLSX, PPTX) de forma offline o semi-offline, manteniendo una experiencia de usuario unificada.
+El objetivo de este plan es dotar a la aplicación móvil (y específicamente al componente `DocumentWorkspace`) de la capacidad de procesar, extraer y visualizar múltiples formatos de archivos de forma offline o semi-offline, manteniendo una experiencia de usuario unificada.
 
 Para lograr esto sin depender de visores externos que rompan el contexto de la aplicación, el sistema se divide estrictamente en dos dominios de responsabilidad por cada formato:
 1.  **Extractores (`DocumentExtractor`)**: Responsables de parsear el archivo binario/texto y convertirlo al contrato estándar `DocumentModel` (para consumo de la IA, indexación y búsquedas).
 2.  **Renderizadores (`DocumentRenderer`)**: Responsables de la representación visual del documento en pantalla y de inyectar el motor de búsqueda resaltado (highlights).
 
+**Estado actual del sistema (Jul 2026):**
+
+| Formato | Extractor | Renderer | Búsqueda | Highlights |
+|---------|-----------|----------|----------|-----------|
+| PDF | ✅ `PdfDocumentExtractor` | ✅ `NativePdfRenderer` | ✅ | ✅ |
+| TXT / MD | ✅ `TextDocumentExtractor` | ✅ `NativeTextRenderer` | 🔜 | 🔜 |
+| JSON | ✅ `TextDocumentExtractor` | ✅ `NativeTextRenderer` + `CodeHighlighter` | 🔜 | 🔜 |
+| XLSX / XLS / CSV | ✅ `XlsxExtractor` | ✅ `SpreadsheetRenderer` | 🔜 | 🔜 |
+| DOCX | 🔜 Pendiente | 🔜 Pendiente | — | — |
+| PPTX | ⏳ Cloud-first | ⏳ Usa PDF convertido | — | — |
+
 ---
 
 ## 2. Invariantes Arquitectónicos (Reglas de Oro)
-1.  **Aislamiento del Workspace:** Ningún documento (excepto PPTX bajo ciertas condiciones de fallback) debe abrirse en una aplicación externa mediante *Intents*. Todo debe ocurrir dentro de `DocumentWorkspace` para conservar la barra de búsqueda y las herramientas de IA.
-2.  **Motor de Búsqueda Homologado:** Todos los renderizadores basados en WebView (PDF, HTML, DOCX) deben exponer un contrato imperativo (`PdfSearchRef` / `HtmlSearchRef`) con los métodos `search(term)`, `next()`, `prev()`, `clear()`.
-3.  **Extracción Síncrona/Cacheada:** La conversión y extracción de texto de formatos complejos (DOCX/XLSX) debe cachearse en memoria usando el mismo LRU Cache implementado para los PDFs para evitar re-parseos costosos en dispositivos de gama baja.
-4.  **Backend como Red de Seguridad (PPTX):** Las presentaciones (PPTX) son matemáticamente inviables de renderizar con fidelidad offline en React Native sin un motor pesado. La regla es: *Si el archivo requiere renderizado complejo, el backend debe convertirlo a PDF asíncronamente*.
+1.  **Aislamiento del Workspace:** Ningún documento (excepto PPTX bajo ciertas condiciones de fallback) debe abrirse en una aplicación externa mediante *Intents*. Todo debe ocurrir dentro de `DocumentWorkspace`.
+2.  **Motor de Búsqueda Homologado:** Todos los renderizadores que soporten búsqueda deben exponer un contrato imperativo con los métodos `search(term)`, `next()`, `prev()`, `clear()`.
+3.  **Extracción Cacheada en Dos Niveles:** (1) Cache en RAM por sesión (`modelCache`, max 5 docs). (2) Cache persistente en MMKV keyed por MD5 del archivo (`doc-extraction-cache`). Primera apertura lenta; todas las siguientes instantáneas.
+4.  **Resolución por Contrato:** `ExtractorRegistry` y `RendererRegistry` resuelven por `supports()` — nunca por índice. Agregar un formato nuevo sólo requiere implementar `supports()` en el extractor y el renderer. El resto del sistema permanece estático.
+5.  **Backend como Red de Seguridad (PPTX):** Las presentaciones PPTX deben convertirse a PDF en el backend. El móvil recibe el PDF resultante y usa el pipeline estándar.
 
 ---
 

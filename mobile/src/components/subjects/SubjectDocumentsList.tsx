@@ -56,7 +56,9 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
       if (doc.local_uri) {
         const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
         if (fileInfo.exists) {
-          if (doc.local_uri.toLowerCase().endsWith('.pdf')) {
+          const lower = doc.local_uri.toLowerCase();
+          const isSupported = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.json');
+          if (isSupported) {
             router.push({
               pathname: '/documents/[documentUri]',
               params: {
