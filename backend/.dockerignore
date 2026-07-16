@@ -1,0 +1,13 @@
+node_modules
+.npm
+.yarn
+database.sqlite
+database_backup*.sqlite
+data_export*.json
+*.log
+.env
+.git
+.github
+.idea
+docs
+mobile
