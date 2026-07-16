@@ -191,7 +191,8 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
           const { uri } = await Print.printToFileAsync({ 
             html,
             width: pageWidth,
-            height: pageHeight 
+            height: pageHeight,
+            margins: { top: 0, left: 0, right: 0, bottom: 0 }
           });
           pdfUri = uri;
         } catch (pdfErr) {
