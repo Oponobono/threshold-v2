@@ -60,7 +60,7 @@ La aplicación funciona **offline-first**: todos los datos se almacenan localmen
 
 | Componente | Descripción |
 |---|---|
-| API URL | `https://threshold-backend-cn82.onrender.com/api` |
+| API URL | `https://threshold-v2-d7vs.onrender.com/api` |
 | Cloud Storage | Uploadthing (fotos, audio, documentos) |
 | Autenticación | JWT + SecureStore |
 | LMS | Integración con Canvas, Moodle, Blackboard, Google Classroom, Schoology |

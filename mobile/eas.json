@@ -8,7 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://threshold-backend-cn82.onrender.com/api",
+        "EXPO_PUBLIC_API_URL": "https://threshold-v2-d7vs.onrender.com/api",
         "EXPO_PUBLIC_GROQ_API_KEY": "@env GROQ_API_KEY"
       }
     },
@@ -18,14 +18,14 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://threshold-backend-cn82.onrender.com/api",
+        "EXPO_PUBLIC_API_URL": "https://threshold-v2-d7vs.onrender.com/api",
         "EXPO_PUBLIC_GROQ_API_KEY": "@env GROQ_API_KEY"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://threshold-backend-cn82.onrender.com/api",
+        "EXPO_PUBLIC_API_URL": "https://threshold-v2-d7vs.onrender.com/api",
         "EXPO_PUBLIC_GROQ_API_KEY": "@env GROQ_API_KEY"
       }
     }
