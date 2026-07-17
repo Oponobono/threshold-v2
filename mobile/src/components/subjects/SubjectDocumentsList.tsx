@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, Platform, Share } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Platform, Share, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../styles/theme';
@@ -14,6 +14,8 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
 import { useTranslation } from 'react-i18next';
 import { SubjectDocumentCard } from './SubjectDocumentCard';
+
+const EXPANDED_MAX_HEIGHT = 340;
 
 export interface SubjectDocumentsListProps {
   documents: any[];
@@ -392,7 +394,7 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
         </View>
       </View>
 
-      <View style={documents.length === 0 ? sectionStyles.insightsCard : styles.list}>
+      <View style={documents.length === 0 ? sectionStyles.insightsCard : styles.documentContainer}>
         {documents.length === 0 ? (
           <View style={sectionStyles.emptyStateCard}>
             <Ionicons name="document-text-outline" size={24} color={theme.colors.text.secondary} />
@@ -400,27 +402,37 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
             <Text style={sectionStyles.emptyStateText}>{t('documents.emptyState')}</Text>
           </View>
         ) : (
-          documents.map((doc, index) => {
-            const docId = doc.id || index;
-            const isSelected = selectedIds.has(docId);
-            const isExtracting = ocrInProgress.has(docId);
+          <View style={documents.length > 4 ? { maxHeight: EXPANDED_MAX_HEIGHT } : undefined}>
+            <ScrollView
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={documents.length > 4}
+              bounces={false}
+            >
+              <View style={styles.list}>
+                {documents.map((doc, index) => {
+                  const docId = doc.id || index;
+                  const isSelected = selectedIds.has(docId);
+                  const isExtracting = ocrInProgress.has(docId);
 
-            return (
-              <SubjectDocumentCard
-                key={docId}
-                doc={doc}
-                index={index}
-                isSelected={isSelected}
-                selectionMode={selectionMode}
-                onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc)}
-                onLongPress={() => handleLongPress(docId)}
-                onDelete={() => handleDelete(docId)}
-                onShare={() => handleShare(doc)}
-                onExtractOCR={() => handleExtractOCR(docId)}
-                isExtractingOCR={isExtracting}
-              />
-            );
-          })
+                  return (
+                    <SubjectDocumentCard
+                      key={docId}
+                      doc={doc}
+                      index={index}
+                      isSelected={isSelected}
+                      selectionMode={selectionMode}
+                      onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc)}
+                      onLongPress={() => handleLongPress(docId)}
+                      onDelete={() => handleDelete(docId)}
+                      onShare={() => handleShare(doc)}
+                      onExtractOCR={() => handleExtractOCR(docId)}
+                      isExtractingOCR={isExtracting}
+                    />
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
         )}
       </View>
 

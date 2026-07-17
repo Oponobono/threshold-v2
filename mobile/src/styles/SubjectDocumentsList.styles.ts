@@ -90,5 +90,13 @@ export const documentListStyles = StyleSheet.create({
     color: theme.colors.primary,
     fontWeight: '700',
     fontSize: 13,
-  }
+  },
+  documentContainer: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 4,
+    overflow: 'hidden',
+  },
 });
