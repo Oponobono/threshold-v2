@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { cHCardStyles, HERO_CARD_WIDTH } from '../../styles/CourseHeroCard.styles';
+import { AutoScrollText } from '../ui/AutoScrollText';
 export { HERO_CARD_WIDTH };
 import { Course, Subject } from '../../services/api/types';
 import { openCourseLink } from '../../utils/linking';
@@ -92,7 +93,13 @@ export const CourseHeroCard = React.memo(({ course, subjects, isActive, onPress,
       ) : null}
 
       {/* Course Name */}
-      <Text style={cHCardStyles.courseName} numberOfLines={2}>{course.name}</Text>
+      <View style={{ marginBottom: 6 }}>
+        <AutoScrollText
+          text={course.name}
+          style={cHCardStyles.courseName}
+          lineHeight={26}
+        />
+      </View>
 
       {/* Tags */}
       {course.tags ? (
