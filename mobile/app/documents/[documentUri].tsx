@@ -10,7 +10,9 @@ import { AssetDocumentSource } from '../../src/services/document/AssetDocumentSo
 import { DocumentModelBuilder } from '../../src/domain/document/DocumentModelBuilder';
 import type { DocumentModel } from '../../src/domain/document/DocumentModel';
 import type { ExtractedDocument } from '../../src/domain/document/ExtractedDocument';
+import type { DocumentSource } from '../../src/domain/document/DocumentSource';
 import { DocumentWorkspace } from '../../src/services/document/DocumentWorkspace';
+import { persistDocumentIndex } from '../../src/services/documentIndexService';
 import { createMMKV, type MMKV } from 'react-native-mmkv';
 
 const PDF_DIR = `${require('expo-file-system/legacy').documentDirectory}Threshold/pdf/`;
@@ -71,13 +73,15 @@ function setCached(key: string, model: DocumentModel) {
 }
 
 export default function DocumentViewerScreen() {
-  const { documentUri, documentTitle } = useLocalSearchParams<{
+  const { documentUri, documentTitle, documentId } = useLocalSearchParams<{
     documentUri: string;
     documentTitle: string;
+    documentId?: string;
   }>();
   const router = useRouter();
 
   const [model, setModel] = useState<DocumentModel | null>(null);
+  const [source, setSource] = useState<DocumentSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,11 +132,14 @@ export default function DocumentViewerScreen() {
           csv: 'text/csv',
           pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           ppt: 'application/vnd.ms-powerpoint',
+          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          doc: 'application/msword',
         };
         const mimeType = mimeMap[ext] || 'application/pdf';
 
         const source = await AssetDocumentSource.fromFile(fullUri, mimeType);
         if (cancelled) return;
+        setSource(source);
 
         // ── Persistent extraction cache (MMKV, keyed by file hash) ──
         let extracted: ExtractedDocument | null = readExtractionCache(source.hash);
@@ -157,6 +164,8 @@ export default function DocumentViewerScreen() {
 
         setCached(fullUri, docModel);
         if (!cancelled) setModel(docModel);
+
+        persistDocumentIndex(documentId, extracted);
       } catch (e: any) {
         console.error('[DocumentViewer] Error loading:', e);
         if (!cancelled) setError(e.message || 'Error al cargar el documento');
@@ -171,6 +180,7 @@ export default function DocumentViewerScreen() {
       // Screen unmounting or documentUri changed — cancel any in-flight work
       cancelled = true;
       setModel(null);
+      setSource(null);
       setLoading(true);
       setError(null);
     };
@@ -208,6 +218,7 @@ export default function DocumentViewerScreen() {
         <DocumentWorkspace
           model={model}
           rendererRegistry={rendererRegistry}
+          source={source ?? undefined}
         />
       )}
     </SafeAreaView>

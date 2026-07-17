@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Linking, Platform, Share, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,6 +16,30 @@ import { useTranslation } from 'react-i18next';
 import { SubjectDocumentCard } from './SubjectDocumentCard';
 
 const EXPANDED_MAX_HEIGHT = 340;
+
+const FORMATS = ['all', 'pdf', 'doc', 'xls', 'ppt', 'txt', 'json'] as const;
+type FormatFilter = (typeof FORMATS)[number];
+
+const FORMAT_LABELS: Record<FormatFilter, string> = {
+  all: 'Todos',
+  pdf: 'PDF',
+  doc: 'DOC',
+  xls: 'XLS',
+  ppt: 'PPT',
+  txt: 'TXT',
+  json: 'JSON',
+};
+
+function getFormatFromUri(uri: string): string {
+  const lower = uri.toLowerCase();
+  if (lower.endsWith('.pdf')) return 'pdf';
+  if (lower.endsWith('.doc') || lower.endsWith('.docx')) return 'doc';
+  if (lower.endsWith('.xlsx') || lower.endsWith('.xlsm') || lower.endsWith('.xls') || lower.endsWith('.csv')) return 'xls';
+  if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) return 'ppt';
+  if (lower.endsWith('.txt')) return 'txt';
+  if (lower.endsWith('.json')) return 'json';
+  return 'other';
+}
 
 export interface SubjectDocumentsListProps {
   documents: any[];
@@ -52,6 +76,26 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
   const [ocrInProgress, setOcrInProgress] = useState<Set<string | number>>(new Set());
   const [isRescanningAll, setIsRescanningAll] = useState(false);
+  const [filterFormat, setFilterFormat] = useState<FormatFilter>('all');
+
+  const availableFormats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const doc of documents) {
+      const fmt = getFormatFromUri(doc.local_uri || '');
+      counts[fmt] = (counts[fmt] || 0) + 1;
+    }
+    return FORMATS.filter((f) => f === 'all' || (counts[f] && counts[f] > 0));
+  }, [documents]);
+
+  useEffect(() => {
+    if (filterFormat !== 'all' && !availableFormats.includes(filterFormat)) {
+      setFilterFormat('all');
+    }
+  }, [availableFormats, filterFormat]);
+
+  const filteredDocuments = filterFormat === 'all'
+    ? documents
+    : documents.filter((doc) => getFormatFromUri(doc.local_uri || '') === filterFormat);
 
   const openDocument = async (doc: any) => {
     try {
@@ -59,13 +103,14 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
         const fileInfo = await FileSystem.getInfoAsync(doc.local_uri);
         if (fileInfo.exists) {
           const lower = doc.local_uri.toLowerCase();
-          const isSupported = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.json') || lower.endsWith('.xlsx') || lower.endsWith('.xlsm') || lower.endsWith('.xls') || lower.endsWith('.csv') || lower.endsWith('.pptx') || lower.endsWith('.ppt');
+          const isSupported = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.json') || lower.endsWith('.xlsx') || lower.endsWith('.xlsm') || lower.endsWith('.xls') || lower.endsWith('.csv') || lower.endsWith('.pptx') || lower.endsWith('.ppt') || lower.endsWith('.docx') || lower.endsWith('.doc');
           if (isSupported) {
             router.push({
               pathname: '/documents/[documentUri]',
               params: {
                 documentUri: doc.local_uri,
                 documentTitle: doc.filename || doc.name || 'Documento',
+                documentId: String(doc.id),
               },
             });
             return;
@@ -367,6 +412,16 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
           <Text style={sectionStyles.sectionHint}>{t('documents.hint')}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+          <TouchableOpacity 
+            onPress={() => router.push('/documents')} 
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons 
+              name="menu" 
+              size={22} 
+              color={theme.colors.text.secondary} 
+            />
+          </TouchableOpacity>
           {documents.length > 0 && (
             <TouchableOpacity 
               onPress={() => {
@@ -394,22 +449,45 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
         </View>
       </View>
 
-      <View style={documents.length === 0 ? sectionStyles.insightsCard : styles.documentContainer}>
-        {documents.length === 0 ? (
+      {documents.length > 0 && (
+        <View style={styles.pillsRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsContent}>
+            {availableFormats.map((f) => {
+              const isActive = filterFormat === f;
+              return (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => setFilterFormat(f)}
+                  activeOpacity={0.72}
+                  style={[styles.pill, isActive && styles.pillActive]}
+                >
+                  <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
+                    {FORMAT_LABELS[f]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={filteredDocuments.length === 0 ? sectionStyles.insightsCard : styles.documentContainer}>
+        {filteredDocuments.length === 0 ? (
           <View style={sectionStyles.emptyStateCard}>
             <Ionicons name="document-text-outline" size={24} color={theme.colors.text.secondary} />
-            <Text style={sectionStyles.emptyStateTitle}>{t('documents.title')}</Text>
-            <Text style={sectionStyles.emptyStateText}>{t('documents.emptyState')}</Text>
+            <Text style={sectionStyles.emptyStateTitle}>{FORMAT_LABELS[filterFormat]}</Text>
+            <Text style={sectionStyles.emptyStateText}>
+              {filterFormat === 'all' ? t('documents.emptyState') : `No hay documentos ${FORMAT_LABELS[filterFormat]}`}
+            </Text>
           </View>
         ) : (
-          <View style={documents.length > 4 ? { maxHeight: EXPANDED_MAX_HEIGHT } : undefined}>
-            <ScrollView
-              nestedScrollEnabled={true}
-              showsVerticalScrollIndicator={documents.length > 4}
-              bounces={false}
-            >
-              <View style={styles.list}>
-                {documents.map((doc, index) => {
+          <ScrollView
+            nestedScrollEnabled={true}
+            showsVerticalScrollIndicator={filteredDocuments.length > 4}
+            bounces={false}
+          >
+            <View style={styles.list}>
+              {filteredDocuments.map((doc, index) => {
                   const docId = doc.id || index;
                   const isSelected = selectedIds.has(docId);
                   const isExtracting = ocrInProgress.has(docId);
@@ -432,7 +510,6 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
                 })}
               </View>
             </ScrollView>
-          </View>
         )}
       </View>
 

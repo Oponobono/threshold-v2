@@ -12,6 +12,10 @@ import android.media.MediaCodec
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 
 class ThresholdPdfExtractorModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -43,6 +47,55 @@ class ThresholdPdfExtractorModule : Module() {
       document.close()
 
       text
+    }
+
+    AsyncFunction("renderPdfPages") { filePath: String, dpi: Int ->
+      val context = appContext.reactContext
+        ?: throw Exception("No React context available")
+
+      val path = when {
+        filePath.startsWith("file:///") -> filePath.removePrefix("file://")
+        filePath.startsWith("file://")  -> filePath.removePrefix("file://")
+        else -> filePath
+      }
+
+      val file = File(path)
+      if (!file.exists()) {
+        throw Exception("PDF file not found: $path")
+      }
+
+      val cacheDir = File(context.cacheDir, "pdf_pages")
+      if (!cacheDir.exists()) cacheDir.mkdirs()
+
+      val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+      val renderer = PdfRenderer(pfd)
+      val uris = mutableListOf<String>()
+      val scale = dpi.toFloat() / 72f
+
+      try {
+        for (i in 0 until renderer.pageCount) {
+          val page = renderer.openPage(i)
+          val width = (page.width * scale).toInt()
+          val height = (page.height * scale).toInt()
+          val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+          bitmap.eraseColor(Color.WHITE)
+          page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+          val outFile = File(cacheDir, "page_${System.currentTimeMillis()}_$i.jpg")
+          val output = FileOutputStream(outFile)
+          bitmap.compress(Bitmap.CompressFormat.JPEG, 85, output)
+          output.flush()
+          output.close()
+          bitmap.recycle()
+          page.close()
+          uris.add("file://${outFile.absolutePath}")
+        }
+      } finally {
+        renderer.close()
+        pfd.close()
+      }
+
+      uris
     }
 
     AsyncFunction("audioToWav") { audioPath: String ->

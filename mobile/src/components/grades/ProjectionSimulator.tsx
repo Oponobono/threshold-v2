@@ -1,9 +1,20 @@
-import React from 'react';
+import React, { Component, ReactNode } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { theme } from '../../styles/theme';
 import { gradesStyles } from '../../styles/Grades.styles';
+
+class ChartErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err: any) {
+    console.warn('[ProjectionSimulator] Chart render error caught:', err?.message);
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 
 interface ProjectionSimulatorProps {
   simScore: string;
@@ -80,50 +91,56 @@ export const ProjectionSimulator: React.FC<ProjectionSimulatorProps> = ({
 
       <View style={gradesStyles.simChartCard}>
         <TouchableOpacity activeOpacity={0.9} onPress={onExpand}>
-          <LineChart
-            data={{
-              labels: trendSeries.map((_, i) => {
-                if (i === trendSeries.length - 1) return t('grades.projectedLabel');
-                if (gradedAssessmentsLength === 0) return '';
-                if (gradedAssessmentsLength === 1) return i === 0 ? '0' : '1';
-                const startIndex = gradedAssessmentsLength - historicalGpasLength;
-                return `${startIndex + i + 1}`;
-              }),
-              datasets: [{
-                data: trendSeries.map((v: number) => isFinite(v) ? v : 0),
-                color: () => theme.colors.text.primary,
-                strokeWidth: 2.8,
-              }],
-            }}
-            width={chartWidth}
-            height={160}
-            withDots={true}
-            getDotColor={(_, index) =>
-              (index === trendSeries.length - 1 && projectedGpa) ? '#FF9500' : theme.colors.primary
-            }
-            withShadow={false}
-            withVerticalLabels={true}
-            withHorizontalLabels={true}
-            withInnerLines={true}
-            withOuterLines={true}
-            bezier={true}
-            fromZero={false}
-            yAxisSuffix=""
-            yAxisInterval={1}
-            chartConfig={{
-              backgroundColor: '#EEF4FA',
-              backgroundGradientFrom: '#EEF4FA',
-              backgroundGradientTo: '#EEF4FA',
-              decimalPlaces: 1,
-              color: () => theme.colors.primary,
-              labelColor: () => theme.colors.text.secondary,
-              style: { borderRadius: 16, paddingRight: 20 },
-              propsForDots: { r: "4", strokeWidth: "2", stroke: '#EEF4FA' },
-              propsForBackgroundLines: { strokeWidth: 1, strokeDasharray: "4", stroke: theme.colors.border || '#e0e0e0' },
-              propsForLabels: { fontSize: 10 },
-            }}
-            style={gradesStyles.simChart}
-          />
+          <ChartErrorBoundary fallback={
+            <View style={{ height: 160, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: theme.colors.text.secondary, fontSize: 12 }}>Gráfico no disponible</Text>
+            </View>
+          }>
+            <LineChart
+              data={{
+                labels: trendSeries.map((_, i) => {
+                  if (i === trendSeries.length - 1) return t('grades.projectedLabel');
+                  if (gradedAssessmentsLength === 0) return '';
+                  if (gradedAssessmentsLength === 1) return i === 0 ? '0' : '1';
+                  const startIndex = gradedAssessmentsLength - historicalGpasLength;
+                  return `${startIndex + i + 1}`;
+                }),
+                datasets: [{
+                  data: trendSeries.map((v: number) => isFinite(v) && v >= 0 ? v : 0),
+                  color: () => theme.colors.text.primary,
+                  strokeWidth: 2.8,
+                }],
+              }}
+              width={chartWidth}
+              height={160}
+              withDots={true}
+              getDotColor={(_, index) =>
+                (index === trendSeries.length - 1 && projectedGpa) ? '#FF9500' : theme.colors.primary
+              }
+              withShadow={false}
+              withVerticalLabels={true}
+              withHorizontalLabels={true}
+              withInnerLines={true}
+              withOuterLines={true}
+              bezier={true}
+              fromZero={false}
+              yAxisSuffix=""
+              yAxisInterval={1}
+              chartConfig={{
+                backgroundColor: '#EEF4FA',
+                backgroundGradientFrom: '#EEF4FA',
+                backgroundGradientTo: '#EEF4FA',
+                decimalPlaces: 1,
+                color: () => theme.colors.primary,
+                labelColor: () => theme.colors.text.secondary,
+                style: { borderRadius: 16, paddingRight: 20 },
+                propsForDots: { r: "4", strokeWidth: "2", stroke: '#EEF4FA' },
+                propsForBackgroundLines: { strokeWidth: 1, strokeDasharray: "4", stroke: theme.colors.border || '#e0e0e0' },
+                propsForLabels: { fontSize: 10 },
+              }}
+              style={gradesStyles.simChart}
+            />
+          </ChartErrorBoundary>
         </TouchableOpacity>
       </View>
 

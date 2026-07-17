@@ -15,6 +15,7 @@ import type { DocumentModel, DocumentTocEntry } from '../../domain/document/Docu
 import type { DocumentSelection } from '../../domain/document/DocumentSelection';
 import type { RendererRegistry } from '../../domain/document/RendererRegistry';
 import type { ScrollToPageRef } from '../../domain/document/DocumentRenderer';
+import type { DocumentSource } from '../../domain/document/DocumentSource';
 import { documentWorkspaceStyles as styles } from '../../styles/DocumentWorkspace.styles';
 import { theme } from '../../styles/theme';
 import { DocumentSelectionToolbar } from './DocumentSelectionToolbar';
@@ -34,13 +35,14 @@ const shareUseCase = new SharingTextUseCase();
 interface DocumentWorkspaceProps {
   model: DocumentModel;
   rendererRegistry: RendererRegistry;
+  source?: DocumentSource;
   onAction?: (
     action: import('../../domain/document/DocumentAction').DocumentAction,
     selection?: DocumentSelection,
   ) => void;
 }
 
-export function DocumentWorkspace({ model, rendererRegistry }: DocumentWorkspaceProps): ReactNode {
+export function DocumentWorkspace({ model, rendererRegistry, source }: DocumentWorkspaceProps): ReactNode {
   const insets = useSafeAreaInsets();
   const { showAlert } = useCustomAlert();
   const [currentPage, setCurrentPage] = useState(1);
@@ -230,6 +232,7 @@ export function DocumentWorkspace({ model, rendererRegistry }: DocumentWorkspace
     },
     highlightsRef,
     handleHighlightTapped,
+    source,
   );
 
   const knownTotal = totalPages > 0 ? totalPages : model.pages.length || 0;

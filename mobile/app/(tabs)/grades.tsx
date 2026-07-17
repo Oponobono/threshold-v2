@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Component, ReactNode } from 'react';
 import { Modal, View, ScrollView, Dimensions, FlatList, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,17 @@ import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { gradesStyles } from '../../src/styles/Grades.styles';
 import { useGrades } from '../../src/hooks/useGrades';
+
+class ChartErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err: any) {
+    console.warn('[Grades] Chart render error caught:', err?.message);
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { MasteryRadarCard } from '../../src/components/grades/MasteryRadarCard';
 import { MasteryRadar } from '../../src/components/ui/MasteryRadar';
@@ -198,6 +209,18 @@ export default function GradesScreen() {
               <Ionicons name="close-circle" size={32} color="#fff" />
             </TouchableOpacity>
             <View style={{ backgroundColor: '#EEF4FA', borderRadius: 16, padding: 16 }}>
+              {g.trendSeries.every((v) => v === 0) ? (
+                <View style={{ width: Math.min(Dimensions.get('window').width - 64, 500), height: 280, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: theme.colors.text.secondary, textAlign: 'center' }}>
+                    {t('grades.noDataForChart', 'No hay calificaciones para mostrar la proyección')}
+                  </Text>
+                </View>
+              ) : (
+              <ChartErrorBoundary fallback={
+                <View style={{ width: Math.min(Dimensions.get('window').width - 64, 500), height: 280, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: theme.colors.text.secondary }}>Gráfico no disponible</Text>
+                </View>
+              }>
               <LineChart
                 data={{
                   labels: g.trendSeries.map((_, i) => {
@@ -208,7 +231,7 @@ export default function GradesScreen() {
                     return `${startIndex + i + 1}`;
                   }),
                   datasets: [{
-                    data: g.trendSeries,
+                    data: g.trendSeries.map((v) => isFinite(v) && v >= 0 ? v : 0),
                     color: () => theme.colors.primary,
                     strokeWidth: 2.8,
                   }],
@@ -242,6 +265,8 @@ export default function GradesScreen() {
                 }}
                 style={{ borderRadius: 16 }}
               />
+              </ChartErrorBoundary>
+              )}
             </View>
           </View>
         </Modal>

@@ -4,6 +4,7 @@ import type { DocumentModel } from '../../../domain/document/DocumentModel';
 import { CodeHighlighter } from '../../../components/ui/CodeHighlighter';
 import { theme } from '../../../styles/theme';
 import type { DocumentRenderer, OnDocumentReady, OnPageChange, ScrollToPageRef } from '../../../domain/document/DocumentRenderer';
+import type { DocumentSource } from '../../../domain/document/DocumentSource';
 
 export class NativeTextRenderer implements DocumentRenderer {
   supports(model: DocumentModel): boolean {
@@ -22,6 +23,7 @@ export class NativeTextRenderer implements DocumentRenderer {
     onSearchResult?: any,
     highlightsRef?: MutableRefObject<any>,
     onHighlightTapped?: (id: string) => void,
+    _source?: DocumentSource,
   ): unknown {
     return (
       <NativeTextRendererContent

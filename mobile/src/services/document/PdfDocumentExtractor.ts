@@ -2,7 +2,7 @@ import type { DocumentExtractor } from '../../domain/document/DocumentExtractor'
 import type { DocumentSource } from '../../domain/document/DocumentSource';
 import type { ExtractedDocument } from '../../domain/document/ExtractedDocument';
 import * as FileSystem from 'expo-file-system/legacy';
-import ThresholdPdfExtractor from '../../../modules/threshold-pdf-extractor/src';
+import { getPdfText } from '../pdfTextProvider';
 
 export class PdfDocumentExtractor implements DocumentExtractor {
   readonly id = 'pdf-extractor';
@@ -39,8 +39,8 @@ export class PdfDocumentExtractor implements DocumentExtractor {
       });
 
       try {
-        const text = await ThresholdPdfExtractor.extractTextFromPdf(tempUri);
-        return text || '';
+        const result = await getPdfText(tempUri);
+        return result.text;
       } finally {
         FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
       }

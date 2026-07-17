@@ -3,6 +3,7 @@ import type { ThresholdPdfExtractorModuleType } from './ThresholdPdfExtractor.ty
 
 declare class ThresholdPdfExtractorModule extends NativeModule<{}> {
   extractTextFromPdf(filePath: string): Promise<string>;
+  renderPdfPages(filePath: string, dpi?: number): Promise<string[]>;
   audioToWav(audioPath: string): Promise<string>;
 }
 

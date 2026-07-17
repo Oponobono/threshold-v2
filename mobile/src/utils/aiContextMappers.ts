@@ -40,7 +40,15 @@ export function mapPhotos(photos: any[]): AIContextItemData[] {
   }));
 }
 
-/** Mapea documentos escaneados — hasText=true si tienen ocr_text (se genera automáticamente al guardar) */
+/**
+ * Mapea documentos para contexto de IA.
+ *
+ * ocr_text almacena el índice documental del documento. Puede provenir de
+ * extracción nativa (PDF, XLSX, PPTX, TXT) o de OCR (imágenes, PDFs escaneados).
+ * El nombre se conserva por compatibilidad con versiones anteriores.
+ *
+ * hasText=true si existe contenido textual indexable.
+ */
 export function mapDocuments(documents: any[]): AIContextItemData[] {
   return documents.map((d, i) => ({
     id: `doc_${d.id ?? i}`,

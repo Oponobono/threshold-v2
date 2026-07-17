@@ -31,7 +31,8 @@ export const gradesStyles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.background,
     borderRadius: theme.borderRadius.lg, padding: theme.spacing.lg,
-    borderWidth: 1, borderColor: theme.colors.border, ...globalStyles.shadow,
+    borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden',
+    ...globalStyles.shadow,
   },
   gpaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   gpaLabel: { fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, marginBottom: 2 },

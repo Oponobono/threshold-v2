@@ -40,9 +40,10 @@ export const useRecordingsManager = () => {
       const cached = await youTubeRepository.getAll();
       if (cached.length > 0) {
         setYouTubeVideos(cached);
-        setIsLoadingVideos(false);
       }
     } catch (_e) {}
+
+    setIsLoadingVideos(false);
 
     // Fase 2: Refresh desde la red
     try {

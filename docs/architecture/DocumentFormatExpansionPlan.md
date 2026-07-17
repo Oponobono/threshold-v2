@@ -11,11 +11,12 @@ Para lograr esto sin depender de visores externos que rompan el contexto de la a
 
 | Formato | Extractor | Renderer | Búsqueda | Highlights |
 |---------|-----------|----------|----------|-----------|
-| PDF | ✅ `PdfDocumentExtractor` | ✅ `NativePdfRenderer` | ✅ | ✅ |
+| PDF (nativo) | ✅ `PdfDocumentExtractor` | ✅ `NativePdfRenderer` | ✅ | ✅ |
+| PDF (escaneado) | ✅ `PdfTextProvider` → OCR fallback | ✅ `NativePdfRenderer` | ✅ | ✅ |
 | TXT / MD | ✅ `TextDocumentExtractor` | ✅ `NativeTextRenderer` | 🔜 | 🔜 |
 | JSON | ✅ `TextDocumentExtractor` | ✅ `NativeTextRenderer` + `CodeHighlighter` | 🔜 | 🔜 |
 | XLSX / XLS / CSV | ✅ `XlsxExtractor` | ✅ `SpreadsheetRenderer` | 🔜 | 🔜 |
-| DOCX | 🔜 Pendiente | 🔜 Pendiente | — | — |
+| DOCX / DOC | ✅ `DocxExtractor` (mammoth) | ✅ `HtmlDocumentRenderer` (mammoth → WebView) | 🔜 | 🔜 |
 | PPTX / PPT | ✅ `PptxExtractor` (semántico) | ✅ `PresentationRenderer` (fallback texto, Fase 1) | — | — |
 
 ---
@@ -83,15 +84,19 @@ interface DocumentSearchRef {
     *   **Opción A**: Un componente `<ScrollView>` con `<Text>` nativo. La búsqueda dinámica usaría una librería como `react-native-highlight-words`.
     *   **Opción B**: Un WebView ligero que inyecte el texto en una etiqueta `<pre>` o `<div>` y reutilice exactamente el mismo código JS de búsqueda que creamos para el `NativePdfRenderer`. *(Recomendado para uniformidad).*
 
-### Fase 2: Documentos Enriquecidos (DOCX)
+### Fase 2: Documentos Enriquecidos (DOCX) ✅
 *Complejidad: Media | Dependencias: `mammoth`*
 
-*   **Librería JS**: Instalación de `mammoth.js` (diseñado para extraer HTML semántico limpio a partir de archivos `.docx`).
-*   **Extractor (`DocxExtractor`)**: Usa Mammoth en modo *extract-raw-text* para popular el `DocumentModel` sin etiquetas HTML.
+**Estado**: Implementado (Jul 2026)
+
+*   **Extractor (`DocxExtractor`)**: Usa Mammoth en modo `extractRawText()` para popular el `DocumentModel` con `TextBlock[]`.
 *   **Renderizador (`HtmlDocumentRenderer`)**:
-    *   Usa Mammoth en modo *convert-to-html*.
-    *   Inyecta el HTML resultante en un WebView.
-    *   **Búsqueda:** Se inyecta un script JS similar al del PDF pero basado en recorrer el DOM (TreeWalker) para envolver coincidencias en `<span class="highlight">`.
+    *   Usa Mammoth en modo `convertToHtml()`.
+    *   Inyecta el HTML resultante en un WebView con tema oscuro y tipografía legible.
+    *   Soporte futuro: búsqueda por DOM TreeWalker para highlights.
+*   **Importación**: `PDFImportModal` detecta DOCX y usa mammoth directamente en vez de extracción PDF.
+*   **Viewer**: `[documentUri].tsx` mapea MIME types DOCX/DOC al extractor correcto.
+*   **Evolución futura**: Representación visual de alta fidelidad via backend (DOCX → PDF con LibreOffice) usando `VisualCacheManager`, similar al patrón PPTX.
 
 ### Fase 3: Hojas de Cálculo (XLSX, CSV)
 *Complejidad: Media | Dependencias: `xlsx` (SheetJS)*
@@ -122,8 +127,42 @@ Para ejecutar este plan, se requerirá la adición y validación técnica de las
 2.  `xlsx` (Procesamiento de Excel). Versión *mini* para reducir el peso del bundle.
 3.  Reutilización agresiva del componente `react-native-webview` como contenedor de renderizado universal.
 
-## 6. Siguientes Pasos
-Una vez aprobado este plan, el flujo de trabajo comenzará por:
-1.  Implementar `TextDocumentExtractor` y `HtmlDocumentRenderer` (con soporte para búsqueda inyectada).
-2.  Validar el renderizado de archivos `.txt`.
-3.  Integrar `mammoth.js` e implementar el pipeline completo para `.docx`.
+## 6. OCR como Fallback de Extracción (PDFs Escaneados)
+
+**Estado**: Implementado (Jul 2026)
+
+### Problema
+Los extractores nativos (PDFKit/PDFBox) leen la capa de texto embebida. PDFs escaneados o imagen-puro no tienen esa capa → devuelven vacío. Esto afectaba tanto al DocumentWorkspace (visor) como a Zyren (AI context).
+
+### Solución
+`PdfTextProvider` actúa como único punto de decisión para obtener texto de un PDF:
+
+```
+PdfTextProvider.getText()
+    ├── extractTextFromPdf() → texto no vacío → return (native, ~0.3s)
+    └── texto vacío → renderPdfPages() → ML Kit OCR por página → return (ocr, ~6s/10 páginas)
+```
+
+- **`renderPdfPages(filePath, dpi)`** es una API genérica del módulo nativo (`threshold-pdf-extractor`). Renderiza cada página a imagen JPEG. Reutilizable para miniaturas, preview, IA multimodal, etc.
+- **Límite**: 50 páginas máximo para OCR (protección de memoria).
+- **Cleanup**: imágenes temporales se eliminan asíncronamente tras cada OCR.
+- **Ambos consumidores** (DocumentWorkspace vía `PdfDocumentExtractor` + Zyren vía `PDFCapability`) comparten la misma fuente de verdad.
+
+### Limitación conocida: PDFs híbridos
+
+Muchos escáneres generan documentos donde páginas 1–3 tienen texto embebido y páginas 4–8 son imágenes. Con la estrategia actual (OCR solo si el texto total está vacío), las páginas escaneadas de un PDF híbrido no se recuperan.
+
+**Causa**: `extractTextFromPdf()` retorna el texto concatenado de todas las páginas. Si las primeras páginas tienen texto, el resultado no es vacío y no se activa OCR.
+
+**Solución futura**: Extraer texto por página individualmente. Para cada página, intentar extracción nativa; si está vacía, renderizar + OCR. Esto aumenta complejidad (necesita API nativa por página) pero es la dirección correcta para cobertura completa.
+
+**Prioridad**: Baja. Los PDFs híbridos son un caso de uso menos común. La implementación actual cubre el caso dominante (PDFs totalmente nativos o totalmente escaneados).
+
+---
+
+## 7. Siguientes Pasos
+1. ~~Implementar `TextDocumentExtractor` y `HtmlDocumentRenderer`~~ ✅
+2. ~~Validar el renderizado de archivos `.txt`~~ ✅
+3. ~~Integrar `mammoth.js` e implementar el pipeline completo para `.docx`~~ ✅
+4. DOCX visual representation (backend DOCX → PDF via LibreOffice, `VisualCacheManager`)
+5. Búsqueda en DOCX via DOM TreeWalker en `HtmlDocumentRenderer`

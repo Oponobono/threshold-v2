@@ -26,10 +26,18 @@ export interface BackendConfig {
 }
 
 const HEALTH_CHECK_TIMEOUT = 3000;
-const RENDER_HEALTH_CHECK_TIMEOUT = 12000;
+const RENDER_HEALTH_CHECK_TIMEOUT = 5000;
 const HEALTH_CHECK_CACHE_DURATION = 30000;
 const HEALTH_CHECK_ENDPOINT = '/health';
 const LOCALHOST_TIMEOUT = 1500;
+
+/** Boot window: suppress warnings during first 30s after app start */
+const BOOT_STARTUP_TIME = Date.now();
+const BOOT_WARNING_SUPPRESS_MS = 30000;
+
+function isBooting(): boolean {
+  return Date.now() - BOOT_STARTUP_TIME < BOOT_WARNING_SUPPRESS_MS;
+}
 
 /** MMKV key para persistir el último backend exitoso entre sesiones */
 const LAST_BACKEND_KEY = 'last_successful_backend_url';
@@ -53,11 +61,10 @@ function saveSuccessfulBackend(url: string): void {
 function loadLastSuccessfulBackend(): string | null {
   try {
     const mmkv = createMMKV();
-    // TEMPORAL: Borrar la caché vieja para forzar al detector a usar el nuevo Render URL
-    mmkv.remove(LAST_BACKEND_KEY);
-  } catch {}
-  
-  return null;
+    return mmkv.getString(LAST_BACKEND_KEY) || null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -149,18 +156,18 @@ async function isBackendAvailable(
     if (cancelSignal?.aborted) return false;
 
     if (response.ok) {
-      console.log(`[Health Check] ✅ ${baseUrl} - OK (${response.status})`);
+      if (!isBooting()) console.log(`[Health Check] ✅ ${baseUrl} - OK (${response.status})`);
       return true;
     }
 
     const isRenderUrl = process.env.EXPO_PUBLIC_API_URL &&
       baseUrl === process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/?$/, '');
     if (response.status === 404 && isRenderUrl) {
-      console.log(`[Health Check] ✅ ${baseUrl} - HTTP 404 (asumido disponible — Render sin /health)`);
+      if (!isBooting()) console.log(`[Health Check] ✅ ${baseUrl} - HTTP 404 (asumido disponible — Render sin /health)`);
       return true;
     }
 
-    console.warn(`[Health Check] ⚠️ ${baseUrl} - HTTP ${response.status}`);
+    if (!isBooting()) console.warn(`[Health Check] ⚠️ ${baseUrl} - HTTP ${response.status}`);
     return false;
   } catch (error) {
     // Si la cancelación externa ya ocurrió, salimos en silencio
@@ -170,11 +177,11 @@ async function isBackendAvailable(
     const errorMsg = error instanceof Error ? error.message : String(error);
 
     if (errorName === 'AbortError') {
-      console.warn(`[Health Check] ⏱️ ${baseUrl} - TIMEOUT (${timeout}ms)`);
+      if (!isBooting()) console.warn(`[Health Check] ⏱️ ${baseUrl} - TIMEOUT (${timeout}ms)`);
     } else if (errorMsg.includes('Network') || errorMsg.includes('Failed to fetch')) {
-      console.warn(`[Health Check] 🌐 ${baseUrl} - Network error: ${errorMsg}`);
+      if (!isBooting()) console.warn(`[Health Check] 🌐 ${baseUrl} - Network error: ${errorMsg}`);
     } else {
-      console.warn(`[Health Check] ❌ ${baseUrl} - ${errorName}: ${errorMsg}`);
+      if (!isBooting()) console.warn(`[Health Check] ❌ ${baseUrl} - ${errorName}: ${errorMsg}`);
     }
 
     return false;
@@ -224,12 +231,12 @@ async function findAvailableBackendParallel(
 
           const elapsed = Date.now() - startTime;
           if (available) {
-            console.log(`[Health Check] ⏱️  ${url} took ${elapsed}ms  ← GANADOR`);
+            if (!isBooting()) console.log(`[Health Check] ⏱️  ${url} took ${elapsed}ms  ← GANADOR`);
             settled = true;
             abortAll();
             resolve(url);
           } else {
-            console.log(`[Health Check] ⏱️  ${url} took ${elapsed}ms`);
+            if (!isBooting()) console.log(`[Health Check] ⏱️  ${url} took ${elapsed}ms`);
             pending--;
             if (pending === 0) resolve(null);
           }
@@ -270,7 +277,7 @@ export async function detectAvailableBackend(
   
   // 1. Si tenemos caché en memoria válido, retornarlo
   if (cachedBackendConfig && now - lastHealthCheckTime < HEALTH_CHECK_CACHE_DURATION) {
-    console.log(`[Backend Detector] ⚡ Usando caché (${(now - lastHealthCheckTime) / 1000}s atrás):`, cachedBackendConfig.url);
+    if (!isBooting()) console.log(`[Backend Detector] ⚡ Usando caché (${(now - lastHealthCheckTime) / 1000}s atrás):`, cachedBackendConfig.url);
     return cachedBackendConfig;
   }
   
@@ -282,7 +289,7 @@ export async function detectAvailableBackend(
   const mmkvElapsed = performance.now() - t0;
 
   if (lastUrl) {
-    console.log(`[Backend Detector] ⚡ Intentando último backend exitoso: ${lastUrl} (MMKV: ${mmkvElapsed.toFixed(1)}ms)`);
+    if (!isBooting()) console.log(`[Backend Detector] ⚡ Intentando último backend exitoso: ${lastUrl} (MMKV: ${mmkvElapsed.toFixed(1)}ms)`);
     const t1 = performance.now();
     const fastTimeout = getTimeoutForUrl(lastUrl, HEALTH_CHECK_TIMEOUT);
     const available = await isBackendAvailable(lastUrl, fastTimeout);
@@ -303,30 +310,32 @@ export async function detectAvailableBackend(
         status: 'online',
       };
       lastHealthCheckTime = now;
-      console.log(`[Backend Detector] ✅ Fast path — ${lastUrl} (MMKV: ${mmkvElapsed.toFixed(1)}ms | Health: ${healthElapsed.toFixed(0)}ms | Total: ${totalElapsed.toFixed(0)}ms)`);
+      if (!isBooting()) console.log(`[Backend Detector] ✅ Fast path — ${lastUrl} (MMKV: ${mmkvElapsed.toFixed(1)}ms | Health: ${healthElapsed.toFixed(0)}ms | Total: ${totalElapsed.toFixed(0)}ms)`);
       return cachedBackendConfig;
     }
 
     const fastTotal = performance.now() - t0;
-    console.log(`[Backend Detector] ⏩ Fast path falló (${fastTotal.toFixed(0)}ms), ejecutando detección completa`);
+    if (!isBooting()) console.log(`[Backend Detector] ⏩ Fast path falló (${fastTotal.toFixed(0)}ms), ejecutando detección completa`);
   }
   
   const candidates = getCandidateBaseUrls(localIp, ports);
-  console.log(`[Backend Detector] 🔍 Detectando backend disponible...`);
-  console.log(`[Backend Detector] 📋 Candidatos (base URLs):`, candidates);
-  console.log(`[Backend Detector] ⏱️  Timeout por URL: ${HEALTH_CHECK_TIMEOUT}ms`);
+  if (!isBooting()) {
+    console.log(`[Backend Detector] 🔍 Detectando backend disponible...`);
+    console.log(`[Backend Detector] 📋 Candidatos (base URLs):`, candidates);
+    console.log(`[Backend Detector] ⏱️  Timeout por URL: ${HEALTH_CHECK_TIMEOUT}ms`);
+  }
   
   // Obtener base URL del env una sola vez
   const renderBase = process.env.EXPO_PUBLIC_API_URL?.replace(/\/api\/?$/, '');
   
-  // 2. Health checks en paralelo
-  console.log(`[Backend Detector] 🚀 Iniciando health checks en paralelo...`);
+  // Health checks en paralelo
+  if (!isBooting()) console.log(`[Backend Detector] 🚀 Iniciando health checks en paralelo...`);
   const startTime = Date.now();
   
   const availableUrl = await findAvailableBackendParallel(candidates, HEALTH_CHECK_TIMEOUT);
   
   const elapsed = Date.now() - startTime;
-  console.log(`[Backend Detector] ⏱️  Health checks completados en ${elapsed}ms`);
+  if (!isBooting()) console.log(`[Backend Detector] ⏱️  Health checks completados en ${elapsed}ms`);
   
   if (availableUrl) {
     // Determinar la fuente del URL disponible
@@ -350,7 +359,7 @@ export async function detectAvailableBackend(
     saveSuccessfulBackend(availableUrl);
     
     const emoji = source === 'local' ? '🖥️ Local' : '☁️ Render';
-    console.log(`[Backend Detector] ✅ Backend disponible: ${emoji}`, availableUrl);
+    if (!isBooting()) console.log(`[Backend Detector] ✅ Backend disponible: ${emoji}`, availableUrl);
     
     return cachedBackendConfig;
   }
@@ -367,9 +376,8 @@ export async function detectAvailableBackend(
       status: 'connecting',
     };
     lastHealthCheckTime = now;
-    console.log(`[Backend Detector] ⏳ Render no respondió en ${elapsed}ms (cold start?), lanzando verificación extendida (${RENDER_HEALTH_CHECK_TIMEOUT}ms)...`);
-    
-    // Background: verificar Render con timeout largo
+    if (!isBooting()) console.log(`[Backend Detector] ⏳ Render no respondió en ${elapsed}ms — usando como connecting`);
+
     isBackendAvailable(renderBase, RENDER_HEALTH_CHECK_TIMEOUT).then((renderOk) => {
       if (renderOk) {
         cachedBackendConfig = {
@@ -381,7 +389,7 @@ export async function detectAvailableBackend(
         };
         lastHealthCheckTime = Date.now();
         saveSuccessfulBackend(renderBase);
-        console.log(`[Backend Detector] ☁️ Render ahora responde (background) ✅`);
+        if (!isBooting()) console.log(`[Backend Detector] ☁️ Render ahora responde (background) ✅`);
       } else {
         cachedBackendConfig = {
           url: renderBase,
@@ -391,7 +399,7 @@ export async function detectAvailableBackend(
           status: 'offline',
         };
         lastHealthCheckTime = Date.now();
-        console.warn(`[Backend Detector] ☁️ Render sigue sin responder tras ${RENDER_HEALTH_CHECK_TIMEOUT}ms ❌`);
+        if (!isBooting()) console.warn(`[Backend Detector] ☁️ Render no disponible tras ${RENDER_HEALTH_CHECK_TIMEOUT}ms`);
       }
     });
     
@@ -411,20 +419,20 @@ export async function detectAvailableBackend(
   
   lastHealthCheckTime = now;
   
-  console.warn(
-    `[Backend Detector] ⚠️ Backends locales no disponibles. Usando fallback:`,
-    fallbackUrl
-  );
-  
-  // 🔧 DEBUG: Información adicional
-  console.warn(
-    `[Backend Detector] 🔧 DEBUG INFO:`,
-    `\n  EXPO_PUBLIC_API_HOST: ${process.env.EXPO_PUBLIC_API_HOST || 'NO CONFIGURADA'}`,
-    `\n  localIp (Expo Metro): ${localIp}`,
-    `\n  Puertos a intentar: ${ports.join(', ')}`,
-    `\n  EXPO_PUBLIC_API_URL: ${process.env.EXPO_PUBLIC_API_URL || 'NO CONFIGURADA'}`,
-    `\n  __DEV__: ${__DEV__}`
-  );
+  if (!isBooting()) {
+    console.warn(
+      `[Backend Detector] ⚠️ Backends locales no disponibles. Usando fallback:`,
+      fallbackUrl
+    );
+    console.warn(
+      `[Backend Detector] 🔧 DEBUG INFO:`,
+      `\n  EXPO_PUBLIC_API_HOST: ${process.env.EXPO_PUBLIC_API_HOST || 'NO CONFIGURADA'}`,
+      `\n  localIp (Expo Metro): ${localIp}`,
+      `\n  Puertos a intentar: ${ports.join(', ')}`,
+      `\n  EXPO_PUBLIC_API_URL: ${process.env.EXPO_PUBLIC_API_URL || 'NO CONFIGURADA'}`,
+      `\n  __DEV__: ${__DEV__}`
+    );
+  }
   
   return cachedBackendConfig;
 }

@@ -98,5 +98,34 @@ export const documentListStyles = StyleSheet.create({
     borderColor: theme.colors.border,
     padding: 4,
     overflow: 'hidden',
+    maxHeight: 340,
+  },
+  pillsRow: {
+    marginBottom: 10,
+  },
+  pillsContent: {
+    gap: 8,
+  },
+  pill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
+  },
+  pillActive: {
+    borderColor: theme.colors.text.primary,
+    backgroundColor: theme.colors.text.primary,
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: theme.colors.text.secondary,
+    letterSpacing: -0.1,
+  },
+  pillTextActive: {
+    fontWeight: '700',
+    color: theme.colors.white,
   },
 });

@@ -7,10 +7,10 @@ interface PDFResult {
 class PDFCapability {
   async extract(pdfUri: string): Promise<PDFResult> {
     try {
-      const { extractTextFromPdfLocal } = await import('../../localPDFService');
-      const localResult = await extractTextFromPdfLocal(pdfUri);
-      if (localResult && localResult.length > 20) {
-        return { text: localResult, provider: 'native' };
+      const { getPdfText } = await import('../../pdfTextProvider');
+      const result = await getPdfText(pdfUri);
+      if (result.text && result.text.length > 20) {
+        return { text: result.text, provider: result.source };
       }
     } catch { /* fall through */ }
 

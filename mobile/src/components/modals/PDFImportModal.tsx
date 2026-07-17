@@ -140,23 +140,35 @@ export const PDFImportModal: React.FC<PDFImportModalProps> = ({
       let ocrText: string | null = null;
       if (extractOCR) {
         try {
-          const base64Data = await FileSystem.readAsStringAsync(localPdfUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          const extracted = await extractTextFromPDFHybrid(base64Data);
-          ocrText = extracted !== undefined ? extracted : null;
+          const isDocx = fileExt === 'docx' || fileExt === 'doc';
+          
+          if (isDocx) {
+            const buffer = await FileSystem.readAsStringAsync(localPdfUri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            const { default: mammoth } = await import('mammoth');
+            const ab = Uint8Array.from(atob(buffer), c => c.charCodeAt(0)).buffer;
+            const result = await mammoth.extractRawText({ arrayBuffer: ab });
+            ocrText = result.value || null;
+          } else {
+            const base64Data = await FileSystem.readAsStringAsync(localPdfUri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            const extracted = await extractTextFromPDFHybrid(base64Data);
+            ocrText = extracted !== undefined ? extracted : null;
+          }
           
           if (!ocrText) {
-            console.warn('[PDFImportModal] OCR executó pero no extrajo texto. Base64 size:', base64Data.length);
+            console.warn('[PDFImportModal] Extraccion de texto no produjo contenido. Extension:', fileExt);
           }
         } catch (ocrErr) {
-          console.warn('[PDFImportModal] Extracción de texto falló:', ocrErr);
+          console.warn('[PDFImportModal] Extraccion de texto fallo:', ocrErr);
           showAlert({
             title: t('common.warning') || 'Aviso',
-            message: t('documents.textExtractionFailed', 'No se pudo extraer texto del PDF. El documento se guardará sin contenido textual.'),
+            message: t('documents.textExtractionFailed', 'No se pudo extraer texto del documento. Se guardara sin contenido textual.'),
             type: 'warning',
           });
-          ocrText = null; // null indica que el OCR falló, no que no se intentó
+          ocrText = null;
         }
       }
 

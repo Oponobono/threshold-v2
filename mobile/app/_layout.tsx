@@ -267,6 +267,13 @@ function RootNavigator() {
               <Stack.Screen name="about" options={{ headerShown: false }} />
               <Stack.Screen name="developer" options={{ headerShown: false }} />
               <Stack.Screen 
+                name="documents" 
+                options={{ 
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                }} 
+              />
+              <Stack.Screen 
                 name="documents/[documentUri]" 
                 options={{ 
                   headerShown: false,

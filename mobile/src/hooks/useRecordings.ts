@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Animated, Easing, TextInput, InteractionManager } from 'react-native';
+import { Animated, Easing, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useRecordingsManager } from './useRecordingsManager';
 import type { GridMediaItem } from '../components/recordings/RecordingsGrid';
@@ -63,11 +63,8 @@ export function useRecordings() {
   // Load data on focus
   useFocusEffect(
     useCallback(() => {
-      const task = InteractionManager.runAfterInteractions(() => {
-        loadYouTubeVideos();
-        loadRecordings();
-      });
-      return () => task.cancel();
+      loadYouTubeVideos();
+      loadRecordings();
     }, [loadRecordings, loadYouTubeVideos]),
   );
 

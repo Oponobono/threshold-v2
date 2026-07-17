@@ -12,6 +12,7 @@ import type {
   OnSearchResult,
 } from '../../domain/document/DocumentRenderer';
 import type { DocumentModel } from '../../domain/document/DocumentModel';
+import type { DocumentSource } from '../../domain/document/DocumentSource';
 import type { DocumentHighlight } from '../../domain/document/DocumentHighlight';
 import type { MutableRefObject } from 'react';
 
@@ -36,6 +37,7 @@ export class NativePdfRenderer implements DocumentRenderer {
     onSearchResult?: OnSearchResult,
     highlightsRef?: MutableRefObject<PdfHighlightRef | null>,
     onHighlightTapped?: (id: string) => void,
+    _source?: DocumentSource,
   ): unknown {
     const fileUri = model.documentId.startsWith('file://')
       ? model.documentId

@@ -19,6 +19,13 @@ import { detectAvailableBackend, getLastSuccessfulBackendUrl, resetBackendDetect
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { useConnectivityStore } from '../../store/useConnectivityStore';
 
+/** Suppress noisy warnings during first 30s after app start */
+const CLIENT_BOOT_STARTUP_TIME = Date.now();
+const CLIENT_BOOT_WARNING_SUPPRESS_MS = 30000;
+function isClientBooting(): boolean {
+  return Date.now() - CLIENT_BOOT_STARTUP_TIME < CLIENT_BOOT_WARNING_SUPPRESS_MS;
+}
+
 /**
  * Caché de fallos recientes por URL: evita reintentar servidores
  * que sabemos que no responden (circuit breaker suave).
@@ -415,7 +422,7 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
     } catch (error) {
       if (timeoutId) clearTimeout(timeoutId);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.warn(`[✗ API] Fallo conectando a ${base}${path} — ${errorMsg}`);
+      if (!isClientBooting()) console.warn(`[✗ API] Fallo conectando a ${base}${path} — ${errorMsg}`);
       recordUrlFailure(base);
       lastError = error;
     }

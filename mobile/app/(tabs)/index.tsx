@@ -610,11 +610,9 @@ export default function HybridDashboardScreen() {
         {/* ====================================================== */}
         <View style={styles.section}>
           {/* --- ORIENTATION --- */}
-          {knowledgeSnapshot && !knowledgeLoading ? (
-            <View style={{ marginBottom: 24 }}>
-              <KnowledgeHealthCard snapshot={knowledgeSnapshot} />
-            </View>
-          ) : null}
+          <View style={{ marginBottom: 24 }}>
+            <KnowledgeHealthCard snapshot={knowledgeSnapshot} loading={knowledgeLoading || !knowledgeSnapshot} />
+          </View>
 
           {/* --- TODAY FOCUS --- */}
           <DailyReviewCard

@@ -72,11 +72,11 @@ export const SubjectDocumentCard: React.FC<SubjectDocumentCardProps> = ({
     iconName = "file-powerpoint-box";
     iconColor = '#D24726'; // PPT Orange
   } else if (isJson) {
-    iconName = "code-json";
-    iconColor = theme.colors.text.secondary || '#888'; // JSON Gray
+    iconName = "code-braces-box";
+    iconColor = '#F7DF1E'; // JSON Yellow
   } else if (isTxt) {
-    iconName = "file-document-outline";
-    iconColor = theme.colors.text.secondary || '#888'; // TXT Gray
+    iconName = "text-box";
+    iconColor = '#00ACC1'; // TXT Cyan
   }
 
   return (

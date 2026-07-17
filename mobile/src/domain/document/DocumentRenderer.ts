@@ -1,5 +1,6 @@
 import type { MutableRefObject } from 'react';
 import type { DocumentModel } from './DocumentModel';
+import type { DocumentSource } from './DocumentSource';
 
 export type OnPageChange = (pageIndex: number) => void;
 export type OnDocumentReady = (totalPages: number) => void;
@@ -20,5 +21,6 @@ export interface DocumentRenderer {
     onSearchResult?: OnSearchResult,
     highlightsRef?: MutableRefObject<any>,
     onHighlightTapped?: (id: string) => void,
+    source?: DocumentSource,
   ): unknown;
 }

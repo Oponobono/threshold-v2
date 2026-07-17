@@ -20,6 +20,35 @@ public class ThresholdPdfExtractorModule: Module {
       return totalText
     }
 
+    AsyncFunction("renderPdfPages") { (filePath: String, dpi: Int) -> [String] in
+      let url = URL(fileURLWithPath: filePath)
+      guard let document = PDFDocument(url: url) else {
+        throw Exception(name: "PDFError", description: "No se pudo abrir el PDF")
+      }
+
+      let cacheDir = FileManager.default.temporaryDirectory.appendingPathComponent("pdf_pages")
+      if !FileManager.default.fileExists(atPath: cacheDir.path) {
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+      }
+
+      var uris: [String] = []
+      let scaleFactor = CGFloat(dpi) / 72.0
+
+      for i in 0..<document.pageCount {
+        guard let page = document.page(at: i) else { continue }
+        let pageSize = page.bounds(for: .mediaBox)
+        let scaledSize = CGSize(width: pageSize.width * scaleFactor, height: pageSize.height * scaleFactor)
+        let thumbnail = page.thumbnail(of: scaledSize, for: .mediaBox)
+
+        guard let jpegData = thumbnail.jpegData(compressionQuality: 0.85) else { continue }
+        let outURL = cacheDir.appendingPathComponent("page_\(Date().timeIntervalSince1970)_\(i).jpg")
+        try jpegData.write(to: outURL)
+        uris.append(outURL.path)
+      }
+
+      return uris
+    }
+
     AsyncFunction("audioToWav") { (audioPath: String) -> String in
       let sourceURL = URL(fileURLWithPath: audioPath)
       let wavURL = sourceURL.deletingPathExtension().appendingPathExtension("wav")

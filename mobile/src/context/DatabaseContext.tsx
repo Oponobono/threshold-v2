@@ -1,5 +1,5 @@
 import React, { createContext, useEffect, useState, useContext } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { initializeDatabase } from '../services/database/appInit';
 
 interface DatabaseContextType {
@@ -19,11 +19,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#0E0E18',
     padding: 24,
   },
-  text: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#888',
-  },
   errorTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -36,16 +31,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
+  text: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#888',
+  },
 });
-
-function LoadingScreen({ phase }: { phase: string }) {
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#4A90D9" />
-      <Text style={styles.text}>Inicializando... {phase}</Text>
-    </View>
-  );
-}
 
 function ErrorScreen({ message }: { message: string }) {
   return (
@@ -58,16 +49,15 @@ function ErrorScreen({ message }: { message: string }) {
 }
 
 /**
- * DatabaseProvider - Gates app rendering until SQLite is initialized
- * Prevents race condition where components mount before db.open() completes
- * Shows a loading screen instead of null to prevent white screen
+ * DatabaseProvider - Gates app rendering until SQLite is initialized.
+ * Prevents race condition where components mount before db.open() completes.
+ * Returns null while loading — the native splash screen covers this period.
  */
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   console.log('[BOOT 01a] DatabaseProvider mounted');
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [currentPhase, setCurrentPhase] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -76,9 +66,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     async function bootstrap() {
       try {
         console.log('[BOOT 02] DatabaseProvider: calling initializeDatabase()...');
-        setCurrentPhase('Base de datos');
 
-        // Timeout to prevent infinite hang
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutId = setTimeout(() => {
             reject(new Error(`Bootstrap timed out after ${BOOTSTRAP_TIMEOUT_MS}ms`));
@@ -94,7 +82,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
 
         console.log('[DatabaseProvider] BD lista ✅');
-        setCurrentPhase('');
         setIsReady(true);
       } catch (err) {
         if (timeoutId) clearTimeout(timeoutId);
@@ -104,11 +91,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         console.error('[DatabaseProvider] Error inicializando BD:', error.message);
         setError(error);
 
-        // Reintentar después de 2 segundos, máx 3 intentos
         if (retryCount < 3) {
           setTimeout(() => {
             console.log(`[DatabaseProvider] Reintentando (${retryCount + 1}/3)...`);
-            setCurrentPhase(`Reintento ${retryCount + 1}/3`);
             setRetryCount(prev => prev + 1);
           }, 2000);
         }
@@ -123,14 +108,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     };
   }, [retryCount]);
 
-  // Failed after retries — show error screen instead of loading forever
   if (!isReady && error && retryCount >= 3) {
     return <ErrorScreen message={error.message} />;
   }
 
-  // Show loading screen instead of null to prevent white screen
   if (!isReady) {
-    return <LoadingScreen phase={currentPhase} />;
+    return null;
   }
 
   return (

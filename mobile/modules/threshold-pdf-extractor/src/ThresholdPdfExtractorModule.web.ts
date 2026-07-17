@@ -5,6 +5,10 @@ class ThresholdPdfExtractorModule extends NativeModule<{}> {
     throw new Error('PDF extraction is not available on web.');
   }
 
+  async renderPdfPages(filePath: string, dpi?: number): Promise<string[]> {
+    throw new Error('PDF rendering is not available on web.');
+  }
+
   async audioToWav(audioPath: string): Promise<string> {
     throw new Error('Audio conversion is not available on web.');
   }

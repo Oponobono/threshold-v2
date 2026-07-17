@@ -8,6 +8,7 @@ import type {
   OnPageChange,
   ScrollToPageRef,
 } from '../../../domain/document/DocumentRenderer';
+import type { DocumentSource } from '../../../domain/document/DocumentSource';
 import type { PptxMetadata, PptxSlide } from '../extractors/PptxExtractor';
 import type { MutableRefObject } from 'react';
 import { theme } from '../../../styles/theme';
@@ -35,6 +36,7 @@ export class PresentationRenderer implements DocumentRenderer {
     onSearchResult?: any,
     highlightsRef?: MutableRefObject<any>,
     onHighlightTapped?: (id: string) => void,
+    _source?: DocumentSource,
   ): unknown {
     return (
       <PresentationRendererContent

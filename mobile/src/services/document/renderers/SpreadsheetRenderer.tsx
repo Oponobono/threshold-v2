@@ -14,6 +14,7 @@ import type {
   OnPageChange,
   ScrollToPageRef,
 } from '../../../domain/document/DocumentRenderer';
+import type { DocumentSource } from '../../../domain/document/DocumentSource';
 import type { SpreadsheetMetadata, SpreadsheetSheet } from '../extractors/XlsxExtractor';
 import { theme } from '../../../styles/theme';
 import type { MutableRefObject } from 'react';
@@ -37,6 +38,7 @@ export class SpreadsheetRenderer implements DocumentRenderer {
     onSearchResult?: any,
     highlightsRef?: MutableRefObject<any>,
     onHighlightTapped?: (id: string) => void,
+    _source?: DocumentSource,
   ): unknown {
     return (
       <SpreadsheetRendererContent
