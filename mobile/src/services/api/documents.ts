@@ -204,36 +204,26 @@ export const convertPresentationToPdf = async (
   localUri: string,
   mimeType: string,
 ): Promise<ArrayBuffer> => {
-  const FileSystem = require('expo-file-system/legacy');
-  const { getApiBaseUrl } = require('./client');
-  const { getToken } = require('./auth');
-
-  const base64 = await FileSystem.readAsStringAsync(localUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  // Convertir base64 → Uint8Array para construir el FormData
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+  const { fetchWithFallback } = require('./client');
 
   const fileName = localUri.split('/').pop() || 'presentation.pptx';
+  
+  // React Native FormData requires file:// prefix for local files
+  const fileUri = localUri.startsWith('file://') || localUri.startsWith('content://') 
+    ? localUri 
+    : `file://${localUri}`;
+
   const formData = new FormData();
   formData.append('file', {
-    uri: localUri,
+    uri: fileUri,
     type: mimeType,
     name: fileName,
   } as any);
 
-  const baseUrl = await getApiBaseUrl();
-  const token = await getToken();
-
-  const response = await fetch(`${baseUrl}/api/convert/presentation`, {
+  const response = await fetchWithFallback('/convert/presentation', {
     method: 'POST',
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'Accept': 'application/pdf',
     },
     body: formData,
   });

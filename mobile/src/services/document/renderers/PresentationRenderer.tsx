@@ -87,6 +87,7 @@ function PresentationRendererContent({
   const [visualStatus, setVisualStatus] = useState<VisualRepresentationStatus>(
     () => VisualCacheManager.getStatus(documentId),
   );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pdfModel, setPdfModel] = useState<DocumentModel | null>(null);
   const notifiedReady = useRef(false);
   const conversionStarted = useRef(false);
@@ -134,8 +135,12 @@ function PresentationRendererContent({
       } catch (err: any) {
         const isMissingLibreOffice = err?.message === 'LIBREOFFICE_UNAVAILABLE';
         const newStatus: VisualRepresentationStatus = isMissingLibreOffice ? 'NONE' : 'FAILED';
-        VisualCacheManager.setStatus(documentId, newStatus);
+        // DO NOT cache FAILED so it retries next time!
+        if (newStatus !== 'FAILED') {
+           VisualCacheManager.setStatus(documentId, newStatus);
+        }
         setVisualStatus(newStatus);
+        setErrorMessage(err?.message || String(err));
         console.warn('[PresentationRenderer] Conversión falló:', err?.message);
       }
     })();
@@ -183,7 +188,7 @@ function PresentationRendererContent({
   return (
     <View style={styles.container} onLayout={handleLayout}>
       {/* Banner de estado */}
-      <StatusBanner status={visualStatus} />
+      <StatusBanner status={visualStatus} errorMessage={errorMessage} />
 
       {/* Lista de diapositivas */}
       <ScrollView
@@ -205,7 +210,7 @@ function PresentationRendererContent({
 
 // ── Status Banner ──────────────────────────────────────────────────────────────
 
-function StatusBanner({ status }: { status: VisualRepresentationStatus }) {
+function StatusBanner({ status, errorMessage }: { status: VisualRepresentationStatus, errorMessage?: string | null }) {
   if (status === 'NONE') {
     return (
       <View style={[styles.banner, styles.bannerOffline]}>
@@ -229,7 +234,7 @@ function StatusBanner({ status }: { status: VisualRepresentationStatus }) {
     return (
       <View style={[styles.banner, styles.bannerFailed]}>
         <Text style={[styles.bannerText, styles.bannerTextFailed]}>
-          No fue posible generar la vista visual. El contenido sigue accesible en modo lectura.
+          No fue posible generar la vista visual: {errorMessage || 'Error desconocido'}. El contenido sigue accesible en modo lectura.
         </Text>
       </View>
     );

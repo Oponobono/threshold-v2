@@ -4,6 +4,7 @@ FROM node:18-bullseye-slim
 
 # Evitar prompts interactivos durante la instalación
 ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/tmp
 
 # 1. Instalar LibreOffice y dependencias necesarias
 # apt-get sí funciona aquí porque dentro del contenedor somos el usuario 'root' inicialmente

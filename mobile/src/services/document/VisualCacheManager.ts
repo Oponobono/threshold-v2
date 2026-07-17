@@ -6,7 +6,7 @@ export type VisualRepresentationStatus = 'NONE' | 'PENDING' | 'AVAILABLE' | 'FAI
 // ── MMKV store (lazy) ─────────────────────────────────────────────────────────
 let _store: MMKV | null = null;
 function getStore(): MMKV {
-  if (!_store) _store = createMMKV({ id: 'visual-representation-cache' });
+  if (!_store) _store = createMMKV({ id: 'visual-representation-cache-v3' });
   return _store;
 }
 
@@ -76,8 +76,8 @@ export const VisualCacheManager = {
   // ── Invalidation ────────────────────────────────────────────────────────────
 
   invalidate(documentId: string): void {
-    getStore().delete(statusKey(documentId));
-    getStore().delete(uriKey(documentId));
+    getStore().remove(statusKey(documentId));
+    getStore().remove(uriKey(documentId));
   },
 };
 
