@@ -346,7 +346,7 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
       let requestInit = customInit;
       
       let timeoutMs = 800;
-      const isSlowEndpoint = path.includes('/ocr') || path.includes('/ai') || path.includes('/transcribe') || path.includes('/generate') || path.includes('/upload');
+      const isSlowEndpoint = path.includes('/ocr') || path.includes('/ai') || path.includes('/transcribe') || path.includes('/generate') || path.includes('/upload') || path.includes('/convert');
       if (isSlowEndpoint) {
         timeoutMs = 30000;
       }

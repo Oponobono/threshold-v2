@@ -51,15 +51,13 @@ function saveSuccessfulBackend(url: string): void {
 
 /** Lee la URL del último backend exitoso desde MMKV */
 function loadLastSuccessfulBackend(): string | null {
-  if (lastSuccessfulBackendUrl) return lastSuccessfulBackendUrl;
   try {
     const mmkv = createMMKV();
-    const stored = mmkv.getString(LAST_BACKEND_KEY);
-    if (stored) lastSuccessfulBackendUrl = stored;
-    return lastSuccessfulBackendUrl;
-  } catch {
-    return null;
-  }
+    // TEMPORAL: Borrar la caché vieja para forzar al detector a usar el nuevo Render URL
+    mmkv.remove(LAST_BACKEND_KEY);
+  } catch {}
+  
+  return null;
 }
 
 /**
@@ -441,7 +439,7 @@ export function resetBackendDetectionCache(): void {
   lastSuccessfulBackendUrl = null;
   try {
     const mmkv = createMMKV();
-    mmkv.delete(LAST_BACKEND_KEY);
+    mmkv.remove(LAST_BACKEND_KEY);
   } catch { /* ignore */ }
   console.log(`[Backend Detector] 🔄 Caché de detección y MMKV resetados.`);
 }

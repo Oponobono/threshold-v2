@@ -4,10 +4,12 @@ import type { DocumentSource } from '../../domain/document/DocumentSource';
 export class AssetDocumentSource implements DocumentSource {
   readonly mimeType: string;
   readonly hash: string;
+  readonly uri: string;
   private readonly _path: string;
 
   private constructor(path: string, mimeType: string, hash: string) {
     this._path = path;
+    this.uri = path;
     this.mimeType = mimeType;
     this.hash = hash;
   }

@@ -19,7 +19,7 @@ const PDF_DIR = `${require('expo-file-system/legacy').documentDirectory}Threshol
 // Lazy-initialized: MMKV native module must not be called at module load time
 // or it crashes on HMR with 'prototype of undefined'.
 let _extractionStore: MMKV | null = null;
-const EXTRACTION_CACHE_VERSION = 2; // bumped: invalida cache de extracciones con regex roto
+const EXTRACTION_CACHE_VERSION = 3; // bumped: invalida cache sin localUri en PPTX
 
 function getStore(): MMKV {
   if (!_extractionStore) {

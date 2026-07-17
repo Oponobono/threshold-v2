@@ -16,11 +16,12 @@ export interface PptxMetadata {
   readonly slides: readonly PptxSlide[];
   readonly slideCount: number;
   readonly title?: string;
+  readonly localUri?: string;
 }
 
 export class PptxExtractor implements DocumentExtractor {
   readonly id = 'pptx-extractor';
-  readonly version = 2; // bumped: invalida la caché MMKV de extracciones previas
+  readonly version = 3; // bumped: agrega localUri a metadata
 
   supports(source: DocumentSource): boolean {
     const mt = source.mimeType?.toLowerCase() || '';
@@ -76,6 +77,7 @@ export class PptxExtractor implements DocumentExtractor {
       format: 'pptx',
       slides,
       slideCount: slides.length,
+      localUri: source.uri,
     };
 
     return {
