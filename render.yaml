@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: threshold-backend
+    runtime: image
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /api/health

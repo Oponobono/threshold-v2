@@ -83,6 +83,8 @@ function PresentationRendererContent({
   const documentId = model.documentId;
   const meta = model.pages[0]?.content.metadata as unknown as PptxMetadata | undefined;
   const slides: PptxSlide[] = (meta?.slides ?? []) as PptxSlide[];
+  // localUri viene en la metadata del extractor (field: sourceUri o uri)
+  const localUri: string = (meta as any)?.localUri ?? (meta as any)?.sourceUri ?? documentId;
 
   const [visualStatus, setVisualStatus] = useState<VisualRepresentationStatus>(
     () => VisualCacheManager.getStatus(documentId),
@@ -108,7 +110,7 @@ function PresentationRendererContent({
       return;
     }
 
-    if (visualStatus === 'PENDING' || visualStatus === 'FAILED') return;
+    if (visualStatus === 'PENDING' || visualStatus === 'FAILED' || visualStatus === 'UNSUPPORTED') return;
 
     // NONE → intentar conversión si hay internet
     if (conversionStarted.current) return;
@@ -116,29 +118,35 @@ function PresentationRendererContent({
 
     (async () => {
       const net = await NetInfo.fetch();
-      if (!net.isConnected) return; // sin conexión → quedarse en fallback de texto
+      console.log('[PPT] NetInfo:', net.isConnected, net.type);
+      if (!net.isConnected) {
+        console.warn('[PPT] Sin conexión, usando fallback de texto');
+        return;
+      }
 
       const mimeType = model.pages[0]?.content?.metadata?.format === 'ppt'
         ? 'application/vnd.ms-powerpoint'
         : 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+      console.log('[PPT] Iniciando conversión:', { localUri, mimeType });
 
       try {
         VisualCacheManager.setStatus(documentId, 'PENDING');
         setVisualStatus('PENDING');
 
         const { convertPresentationToPdf } = require('../../api/documents');
-        const pdfData: ArrayBuffer = await convertPresentationToPdf(documentId, mimeType);
+        console.log('[PPT] Llamando convertPresentationToPdf...');
+        const pdfData: ArrayBuffer = await convertPresentationToPdf(localUri, mimeType);
+        console.log('[PPT] PDF recibido, tamaño:', pdfData.byteLength);
 
         const pdfUri = await VisualCacheManager.storePdf(documentId, pdfData);
+        console.log('[PPT] PDF guardado en:', pdfUri);
         setVisualStatus('AVAILABLE');
         loadPdfModel(pdfUri);
       } catch (err: any) {
         const isMissingLibreOffice = err?.message === 'LIBREOFFICE_UNAVAILABLE';
-        const newStatus: VisualRepresentationStatus = isMissingLibreOffice ? 'NONE' : 'FAILED';
-        // DO NOT cache FAILED so it retries next time!
-        if (newStatus !== 'FAILED') {
-           VisualCacheManager.setStatus(documentId, newStatus);
-        }
+        const newStatus: VisualRepresentationStatus = isMissingLibreOffice ? 'UNSUPPORTED' : 'FAILED';
+        VisualCacheManager.setStatus(documentId, isMissingLibreOffice ? 'NONE' : 'FAILED');
         setVisualStatus(newStatus);
         setErrorMessage(err?.message || String(err));
         console.warn('[PresentationRenderer] Conversión falló:', err?.message);
@@ -216,6 +224,15 @@ function StatusBanner({ status, errorMessage }: { status: VisualRepresentationSt
       <View style={[styles.banner, styles.bannerOffline]}>
         <Text style={[styles.bannerText, styles.bannerTextOffline]}>
           Modo lectura. Conéctate a Internet para generar la vista visual de alta fidelidad.
+        </Text>
+      </View>
+    );
+  }
+  if (status === 'UNSUPPORTED') {
+    return (
+      <View style={[styles.banner, styles.bannerOffline]}>
+        <Text style={[styles.bannerText, styles.bannerTextOffline]}>
+          El servidor no dispone de conversión de presentaciones. Vista de texto disponible.
         </Text>
       </View>
     );

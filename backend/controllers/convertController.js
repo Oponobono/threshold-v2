@@ -1,8 +1,19 @@
 const libre = require('libreoffice-convert');
 const { promisify } = require('util');
+const { execSync } = require('child_process');
 const path = require('path');
 
 const convertAsync = promisify(libre.convert);
+
+// Log LibreOffice availability on module load
+try {
+  const loPath = execSync('which soffice', { encoding: 'utf8' }).trim();
+  console.log('[ConvertController] LibreOffice found at:', loPath);
+  const loVersion = execSync('soffice --version', { encoding: 'utf8' }).trim();
+  console.log('[ConvertController]', loVersion);
+} catch (e) {
+  console.warn('[ConvertController] WARNING: soffice not found in PATH. PPT conversion will return 503.');
+}
 
 /**
  * POST /api/convert/presentation
@@ -40,7 +51,8 @@ async function convertPresentation(req, res) {
   } catch (err) {
     console.error('[ConvertController] Error al convertir presentación:', err.message);
 
-    if (err.message?.includes('soffice') || err.message?.includes('LibreOffice')) {
+    const msg = (err.message || '').toLowerCase();
+    if (msg.includes('soffice') || msg.includes('libreoffice') || msg.includes('enoent')) {
       return res.status(503).json({
         error: 'El servicio de conversión no está disponible. LibreOffice no está instalado en el servidor.',
         code: 'LIBREOFFICE_UNAVAILABLE',

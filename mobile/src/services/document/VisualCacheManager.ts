@@ -1,12 +1,12 @@
 import { createMMKV, type MMKV } from 'react-native-mmkv';
 import * as FileSystem from 'expo-file-system/legacy';
 
-export type VisualRepresentationStatus = 'NONE' | 'PENDING' | 'AVAILABLE' | 'FAILED';
+export type VisualRepresentationStatus = 'NONE' | 'PENDING' | 'AVAILABLE' | 'FAILED' | 'UNSUPPORTED';
 
 // ── MMKV store (lazy) ─────────────────────────────────────────────────────────
 let _store: MMKV | null = null;
 function getStore(): MMKV {
-  if (!_store) _store = createMMKV({ id: 'visual-representation-cache-v3' });
+  if (!_store) _store = createMMKV({ id: 'visual-representation-cache-v5' });
   return _store;
 }
 
