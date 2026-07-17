@@ -8,8 +8,6 @@ ENV UNOPATH=/usr
 # Sin --no-install-recommends: necesitamos los filtros PDF/PPT y fuentes reales.
 RUN apt-get update && apt-get install -y \
     libreoffice \
-    libreoffice-pdf-import \
-    libreoffice-ppt-import \
     fonts-liberation \
     fonts-dejavu-core \
     fontconfig \
