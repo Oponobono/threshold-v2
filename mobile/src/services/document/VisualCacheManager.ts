@@ -6,7 +6,7 @@ export type VisualRepresentationStatus = 'NONE' | 'PENDING' | 'AVAILABLE' | 'FAI
 // ── MMKV store (lazy) ─────────────────────────────────────────────────────────
 let _store: MMKV | null = null;
 function getStore(): MMKV {
-  if (!_store) _store = createMMKV({ id: 'visual-representation-cache-v5' });
+  if (!_store) _store = createMMKV({ id: 'visual-representation-cache-v6' });
   return _store;
 }
 

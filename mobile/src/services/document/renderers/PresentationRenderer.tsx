@@ -146,7 +146,9 @@ function PresentationRendererContent({
       } catch (err: any) {
         const isMissingLibreOffice = err?.message === 'LIBREOFFICE_UNAVAILABLE';
         const newStatus: VisualRepresentationStatus = isMissingLibreOffice ? 'UNSUPPORTED' : 'FAILED';
-        VisualCacheManager.setStatus(documentId, isMissingLibreOffice ? 'NONE' : 'FAILED');
+        if (isMissingLibreOffice) {
+          VisualCacheManager.setStatus(documentId, 'NONE');
+        }
         setVisualStatus(newStatus);
         setErrorMessage(err?.message || String(err));
         console.warn('[PresentationRenderer] Conversión falló:', err?.message);
