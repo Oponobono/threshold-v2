@@ -58,34 +58,32 @@ export const createSchedule = async (payload: { subject_id: string; day_of_week:
   const schedule: any = { id, user_id: userId, ...payload };
   await scheduleRepository.create(schedule);
 
-  try {
-    const response = await fetchWithFallback('/schedules', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+  fetchWithFallback('/schedules', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(async (response) => {
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
       await scheduleRepository.update(data.id, data);
-      return data;
+    } else {
+      await syncService.enqueueCreate('schedule', id, payload);
     }
-    throw new Error(data?.error || 'Error del servidor');
-  } catch {
-    await syncService.enqueueCreate('schedule', id, payload);
-    return schedule;
-  }
+  }).catch(() => {
+    syncService.enqueueCreate('schedule', id, payload);
+  });
+
+  return schedule;
 };
 
 export const deleteSchedule = async (id: string) => {
   await scheduleRepository.delete(id);
 
-  try {
-    const response = await fetchWithFallback(`/schedules/${id}`, { method: 'DELETE' });
-    return await parseJsonSafely(response);
-  } catch {
-    await syncService.enqueueDelete('schedule', id);
-    return { success: true, _isPending: true };
-  }
+  fetchWithFallback(`/schedules/${id}`, { method: 'DELETE' })
+    .then((response) => parseJsonSafely(response))
+    .catch(() => syncService.enqueueDelete('schedule', id));
+
+  return { success: true };
 };
 
 export const getSchedulesBySubject = async (subjectId: string): Promise<any[]> => {

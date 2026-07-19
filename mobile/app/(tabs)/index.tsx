@@ -29,6 +29,7 @@ import { DocumentScannerModal } from '../../src/components/modals/DocumentScanne
 import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal';
 import { FlashcardsModal } from '../../src/components/flashcards/FlashcardsModal';
 import { SubjectTile, MetricCard, ActionCircle } from '../../src/components/dashboard/DashboardWidgets';
+import { NextClassCard } from '../../src/components/dashboard/NextClassCard';
 import { KnowledgeHealthCard } from '../../src/components/dashboard/KnowledgeHealthCard';
 import { DailyReviewCard } from '../../src/components/dashboard/DailyReviewCard';
 import { useKnowledgeInsights } from '../../src/hooks/useKnowledgeInsights';
@@ -979,6 +980,7 @@ export default function HybridDashboardScreen() {
               color="#AF52DE"
               onPress={() => setIsFlashcardsVisible(true)}
             />
+            <NextClassCard onPress={() => setIsScheduleModalVisible(true)} />
             <ActionCircle 
               title={t('dashboard.audioRecorder')} 
               icon="microphone-outline" 
@@ -1161,11 +1163,9 @@ export default function HybridDashboardScreen() {
         subjects={subjects}
         allSchedules={allSchedules}
         onScheduleUpdated={() => {
-          useDataStore.getState().refreshSchedules().then(() => {
-            const s = useDataStore.getState().schedules;
-            const today = new Date().getDay();
-            setTodaySchedules(s.filter((sch: any) => sch.day_of_week === today));
-          });
+          const s = useDataStore.getState().schedules;
+          const today = new Date().getDay();
+          setTodaySchedules(s.filter((sch: any) => sch.day_of_week === today));
         }}
       />
       
