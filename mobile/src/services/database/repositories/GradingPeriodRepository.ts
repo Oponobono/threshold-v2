@@ -5,10 +5,10 @@ export interface GradingPeriod {
   user_id: string;
   name: string;
   period_type: string;
-  start_date?: string;
-  end_date?: string;
-  is_active?: number;
-  created_at?: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: number | null;
+  created_at: string | null;
 }
 
 export class GradingPeriodRepository extends BaseRepository<GradingPeriod> {

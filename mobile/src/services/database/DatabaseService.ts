@@ -27,8 +27,8 @@ class DatabaseService {
     return this._track<T | null>(label || sql.substring(0, 60), () => this.getDb().getFirstAsync(sql, params as any));
   }
 
-  async runTracked(sql: string, params?: any[], label?: string): Promise<void> {
-    return this._track<void>(label || sql.substring(0, 60), () => this.getDb().runAsync(sql, params as any));
+  async runTracked(sql: string, params?: any[], label?: string): Promise<SQLite.SQLiteRunResult> {
+    return this._track<SQLite.SQLiteRunResult>(label || sql.substring(0, 60), () => this.getDb().runAsync(sql, params as any));
   }
 
   async execTracked(sql: string, label?: string): Promise<void> {

@@ -22,7 +22,6 @@ export interface CourseHeroViewModel {
   readonly continueLabel: string;
   readonly contentType: ContentType;
   readonly subjectCount: number;
-  readonly globalProgress: { completed: number; total: number; percentage: number };
   readonly creditCount?: number;
   readonly mainUrl?: string;
   readonly certificateUrl?: string;
@@ -30,6 +29,7 @@ export interface CourseHeroViewModel {
 
 export interface GlobalHeroViewModel {
   readonly health: number;
+  readonly globalProgress: { completed: number; total: number; percentage: number };
   readonly recommendation?: {
     readonly subjectName: string;
     readonly action: string;

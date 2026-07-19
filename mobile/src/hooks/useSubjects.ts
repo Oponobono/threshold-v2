@@ -1,10 +1,15 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../store/useDataStore';
 import { getSemesterSummary, SemesterSummary } from '../services/api/analytics';
 import { SCALE_MAX } from '../utils/grades';
 import { calculateProjection } from '../utils/projectionEngine';
+import { studyNoteRepository } from '../services/database/repositories/StudyNoteRepository';
+import { documentRepository } from '../services/database/repositories/DocumentRepository';
+import { youTubeRepository } from '../services/database/repositories/YouTubeRepository';
+import { audioRepository } from '../services/database/repositories/AudioRepository';
+import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
 
 export interface UnifiedActivityItem {
   id: string;
@@ -14,15 +19,22 @@ export interface UnifiedActivityItem {
   subjectId: string;
   subjectName?: string;
   subjectColor?: string;
-  type: 'assessment' | 'flashcard' | 'study' | 'calendar';
+  type: 'assessment' | 'deck' | 'flashcard' | 'study' | 'calendar' | 'subject' | 'course' | 'youtube' | 'recording' | 'note' | 'document';
   relativeTime?: string;
 }
 
-export const ACTIVITY_CONFIG = {
-  assessment: { icon: 'clipboard-outline', color: '#3498db', label: 'Evaluación' },
-  flashcard:  { icon: 'flash-outline',     color: '#e67e22', label: 'Repaso FSRS' },
-  study:      { icon: 'book-open-outline', color: '#2ecc71', label: 'Sesión' },
-  calendar:   { icon: 'calendar-outline',  color: '#9b59b6', label: 'Evento' },
+export const ACTIVITY_CONFIG: Record<UnifiedActivityItem['type'], { icon: string; color: string; label: string }> = {
+  assessment: { icon: 'clipboard-outline',      color: '#3498db', label: 'Evaluación' },
+  deck:       { icon: 'layers-outline',         color: '#e67e22', label: 'Mazo' },
+  flashcard:  { icon: 'flash-outline',          color: '#f39c12', label: 'Carta' },
+  study:      { icon: 'book-open-outline',      color: '#2ecc71', label: 'Sesión' },
+  calendar:   { icon: 'calendar-outline',       color: '#9b59b6', label: 'Evento' },
+  subject:    { icon: 'school-outline',         color: '#00b894', label: 'Materia' },
+  course:     { icon: 'ribbon-outline',         color: '#0984e3', label: 'Curso' },
+  youtube:    { icon: 'logo-youtube',           color: '#ff0000', label: 'Video' },
+  recording:  { icon: 'mic-outline',            color: '#fd79a8', label: 'Grabación' },
+  note:       { icon: 'document-text-outline',  color: '#6c5ce7', label: 'Apunte' },
+  document:   { icon: 'scan-outline',           color: '#00cec9', label: 'Documento' },
 };
 
 export const getStatusColor = (minNeeded: number, target: number) => {
@@ -74,33 +86,48 @@ function parseDateOrFail(dateStr: string): number {
 
 function getRelativeTime(then: number, t: any): string {
   if (isNaN(then) || then <= 0) return '—';
-  const now = Date.now();
-  const diffMs = now - then;
-  if (diffMs < 0) return t('subjects.timeJustNow'); // Future time? Just say now
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return t('subjects.timeJustNow');
-  if (diffMin < 60) return t('subjects.timeMinutesAgo', { count: diffMin });
-  const diffHrs = Math.floor(diffMin / 60);
-  if (diffHrs < 24) return t('subjects.timeHoursAgo', { count: diffHrs });
-  const diffDays = Math.floor(diffHrs / 24);
+  const now = new Date();
+  const event = new Date(then);
+  if (event > now) return t('subjects.timeJustNow');
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfEvent = new Date(event.getFullYear(), event.getMonth(), event.getDate());
+  const diffDays = Math.floor((startOfToday.getTime() - startOfEvent.getTime()) / 86400000);
+  if (diffDays === 0) {
+    const diffMin = Math.floor((now.getTime() - then) / 60000);
+    if (diffMin < 1) return t('subjects.timeJustNow');
+    if (diffMin < 60) return t('subjects.timeMinutesAgo', { count: diffMin });
+    const diffHrs = Math.floor(diffMin / 60);
+    return t('subjects.timeHoursAgo', { count: diffHrs });
+  }
   return t('subjects.timeDaysAgo', { count: diffDays });
 }
 
 export function useSubjects(t: any) {
-  const { subjects, assessments, loadAllData, predictions, calendarEvents, flashcardDecks, userStats } = useDataStore();
+  const { subjects, courses, assessments, loadAllData, predictions, calendarEvents, flashcardDecks, userStats } = useDataStore();
 
   const [search, setSearch] = useState('');
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayText, setOverlayText] = useState('');
   const [semesterSummary, setSemesterSummary] = useState<SemesterSummary | null>(null);
+  const [extraItems, setExtraItems] = useState<{ notes: any[]; docs: any[]; videos: any[]; recordings: any[]; flashcards: any[] }>({ notes: [], docs: [], videos: [], recordings: [], flashcards: [] });
 
   useFocusEffect(
     useCallback(() => {
-      InteractionManager.runAfterInteractions(() => {
+      InteractionManager.runAfterInteractions(async () => {
         loadAllData();
         getSemesterSummary()
           .then(setSemesterSummary)
           .catch(() => setSemesterSummary(null));
+        try {
+          const [notes, docs, videos, recordings, flashcards] = await Promise.all([
+            studyNoteRepository.getAll().catch(() => []),
+            documentRepository.getAll().catch(() => []),
+            youTubeRepository.getAll().catch(() => []),
+            audioRepository.getAll().catch(() => []),
+            flashcardRepository.getAll().catch(() => []),
+          ]);
+          setExtraItems({ notes, docs, videos, recordings, flashcards });
+        } catch {}
       });
     }, [loadAllData])
   );
@@ -203,43 +230,177 @@ export function useSubjects(t: any) {
     const items: UnifiedActivityItem[] = [];
     const now = Date.now();
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const cutoff = now - SEVEN_DAYS_MS;
 
-    // 1. Assessments (pasado reciente)
+    const inWindow = (ts: number) => ts > 0 && ts >= cutoff && ts <= now;
+
+    // 1. Assessments (evaluaciones, exámenes, tareas, trabajos)
     assessments.forEach(as => {
       const ts = parseDateOrFail(as.date || as.grading_date || as.due_date || '');
-      if (ts > 0 && ts <= now && ts > now - SEVEN_DAYS_MS) {
+      if (inWindow(ts)) {
         items.push({
           id: `asm-${as.id}`,
           title: as.name,
-          subtitle: `Nota: ${as.score ?? 'Pendiente'} (${as.weight ?? 0}%)`,
+          subtitle: as.score != null ? `Nota: ${as.score} (${as.weight ?? 0}%)` : `Peso: ${as.weight ?? 0}%`,
           date: ts,
           subjectId: as.subject_id,
-          type: 'assessment'
+          type: 'assessment',
         });
       }
     });
 
-    // 2. Flashcard Decks (repasados recientemente)
-    flashcardDecks.forEach(deck => {
-      // Usamos timestamp the última actualización si no hay last_reviewed_at
-      const lastReviewed = deck.last_reviewed_at ? new Date(deck.last_reviewed_at).getTime() : 0;
-      if (lastReviewed > now - SEVEN_DAYS_MS && lastReviewed <= now) {
+    // 2. Subjects (creados recientemente)
+    subjects.forEach(s => {
+      const ts = parseDateOrFail(s.created_at || '');
+      if (inWindow(ts)) {
         items.push({
-          id: `fc-${deck.id}`,
-          title: `Repaso: ${deck.title}`,
-          subtitle: `${deck.review_count || 0} tarjetas memorizadas`,
-          date: lastReviewed,
-          subjectId: deck.subject_id || '',
-          type: 'flashcard'
+          id: `sub-${s.id}`,
+          title: s.name,
+          subtitle: s.code || 'Materia',
+          date: ts,
+          subjectId: s.id,
+          type: 'subject',
         });
       }
     });
 
-    // 3. UserStats (Sesiones de estudio)
+    // 3. Courses (creados recientemente)
+    courses.forEach(c => {
+      const ts = parseDateOrFail(c.created_at || '');
+      if (inWindow(ts)) {
+        items.push({
+          id: `crs-${c.id}`,
+          title: c.name,
+          subtitle: c.platform || 'Curso',
+          date: ts,
+          subjectId: '',
+          type: 'course',
+        });
+      }
+    });
+
+    // 4. Flashcard Decks (creados + repasados)
+    flashcardDecks.forEach(deck => {
+      const createdTs = parseDateOrFail(deck.created_at || '');
+      const reviewedTs = deck.last_reviewed_at ? new Date(deck.last_reviewed_at).getTime() : 0;
+      if (inWindow(createdTs)) {
+        items.push({
+          id: `deck-${deck.id}`,
+          title: deck.title,
+          subtitle: `${deck.card_count ?? deck.review_count ?? 0} cartas`,
+          date: createdTs,
+          subjectId: deck.subject_id || '',
+          type: 'deck',
+        });
+      }
+      if (inWindow(reviewedTs) && reviewedTs !== createdTs) {
+        items.push({
+          id: `deck-rev-${deck.id}`,
+          title: deck.title,
+          subtitle: `Repasado • ${deck.review_count || 0} repasos`,
+          date: reviewedTs,
+          subjectId: deck.subject_id || '',
+          type: 'deck',
+        });
+      }
+    });
+
+    // 5. Flashcards (cartas individuales agregadas/importadas)
+    extraItems.flashcards.forEach(card => {
+      const ts = parseDateOrFail(card.created_at || '');
+      if (inWindow(ts)) {
+        const front = (card.front || '').substring(0, 40);
+        items.push({
+          id: `card-${card.id}`,
+          title: front ? `Carta: "${front}${front.length >= 40 ? '…' : ''}"` : 'Carta agregada',
+          subtitle: 'Flashcard',
+          date: ts,
+          subjectId: '',
+          type: 'flashcard',
+        });
+      }
+    });
+
+    // 6. YouTube Videos
+    extraItems.videos.forEach(v => {
+      const ts = parseDateOrFail(v.created_at || '');
+      if (inWindow(ts)) {
+        items.push({
+          id: `yt-${v.id}`,
+          title: v.title || 'Video de YouTube',
+          subtitle: v.subject_name || 'YouTube',
+          date: ts,
+          subjectId: v.subject_id || '',
+          type: 'youtube',
+        });
+      }
+    });
+
+    // 7. Audio Recordings
+    extraItems.recordings.forEach(r => {
+      const ts = parseDateOrFail(r.created_at || '');
+      if (inWindow(ts)) {
+        items.push({
+          id: `rec-${r.id}`,
+          title: r.name || 'Grabación de audio',
+          subtitle: r.subject_name || 'Audio',
+          date: ts,
+          subjectId: r.subject_id || '',
+          type: 'recording',
+        });
+      }
+    });
+
+    // 8. Study Notes (apuntes)
+    extraItems.notes.forEach(n => {
+      const ts = parseDateOrFail(n.created_at || '');
+      if (inWindow(ts)) {
+        items.push({
+          id: `note-${n.id}`,
+          title: n.title || 'Apunte',
+          subtitle: n.source || 'Apunte',
+          date: ts,
+          subjectId: n.subject_id || '',
+          type: 'note',
+        });
+      }
+    });
+
+    // 9. Scanned Documents
+    extraItems.docs.forEach(d => {
+      const ts = parseDateOrFail(d.created_at || '');
+      if (inWindow(ts)) {
+        items.push({
+          id: `doc-${d.id}`,
+          title: d.name || d.filename || 'Documento escaneado',
+          subtitle: 'Documento',
+          date: ts,
+          subjectId: d.subject_id || '',
+          type: 'document',
+        });
+      }
+    });
+
+    // 10. Calendar Events
+    calendarEvents.forEach(ev => {
+      const ts = parseDateOrFail(ev.startDate || '');
+      if (inWindow(ts)) {
+        items.push({
+          id: `cal-${ev.id}`,
+          title: ev.title,
+          subtitle: ev.eventType === 'class' ? 'Clase' : ev.eventType === 'exam' ? 'Examen' : 'Evento',
+          date: ts,
+          subjectId: ev.subjectId || '',
+          type: 'calendar',
+        });
+      }
+    });
+
+    // 11. UserStats (Sesiones de estudio)
     if (userStats?.recent_activity) {
       userStats.recent_activity.forEach((session: any, idx: number) => {
         const ts = new Date(session.review_date).getTime();
-        if (ts > now - SEVEN_DAYS_MS && ts <= now) {
+        if (inWindow(ts)) {
           const acc = session.total_attempts > 0 ? Math.round((session.correct_attempts / session.total_attempts) * 100) : 0;
           items.push({
             id: `study-${idx}-${ts}`,
@@ -247,26 +408,11 @@ export function useSubjects(t: any) {
             subtitle: `${session.total_attempts} tarjetas revisadas • ${acc}% de acierto`,
             date: ts,
             subjectId: '',
-            type: 'study'
+            type: 'study',
           });
         }
       });
     }
-
-    // 4. Calendar Events (pasado reciente)
-    calendarEvents.forEach(ev => {
-      const ts = parseDateOrFail(ev.startDate || '');
-      if (ts > 0 && ts <= now && ts > now - SEVEN_DAYS_MS) {
-        items.push({
-          id: `cal-${ev.id}`,
-          title: ev.title,
-          subtitle: ev.eventType === 'class' ? 'Clase' : ev.eventType === 'exam' ? 'Examen' : 'Tarea',
-          date: ts,
-          subjectId: ev.subjectId || '',
-          type: 'calendar'
-        });
-      }
-    });
 
     // Enriquecer con metadata de la materia y ordenar
     const sorted = items
@@ -279,11 +425,10 @@ export function useSubjects(t: any) {
           relativeTime: getRelativeTime(item.date, t),
         };
       })
-      .sort((a, b) => b.date - a.date)
-      .slice(0, 10); // Mostrar máximo los 10 eventos más recientes
+      .sort((a, b) => b.date - a.date);
 
     return sorted;
-  }, [assessments, flashcardDecks, userStats, calendarEvents, subjects, t]);
+  }, [assessments, flashcardDecks, userStats, calendarEvents, subjects, courses, extraItems, t]);
 
   // ── Hero footer: motor de aprendizaje ──
   const dueDecksToday = useMemo(() => {

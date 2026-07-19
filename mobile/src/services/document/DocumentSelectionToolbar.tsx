@@ -81,8 +81,8 @@ export function DocumentSelectionToolbar({
 
         {mode === 'edit' && onDelete && (
           <TouchableOpacity style={styles.actionBtn} onPress={onDelete}>
-            <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
-            <Text style={[styles.actionText, { color: theme.colors.error }]}>Eliminar</Text>
+            <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
+            <Text style={[styles.actionText, { color: theme.colors.danger }]}>Eliminar</Text>
           </TouchableOpacity>
         )}
 

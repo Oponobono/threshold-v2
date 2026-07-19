@@ -4,6 +4,7 @@ import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo 
 import { useAudioRecorder } from './useAudioRecorder';
 import { SubjectSection } from '../components/recordings/RecordingsGrid';
 import { youTubeRepository } from '../services/database';
+import { databaseService } from '../services/database/DatabaseService';
 
 /**
  * Hook para manejar la lógica de la pantalla de Grabaciones y Multimedia.
@@ -96,11 +97,10 @@ export const useRecordingsManager = () => {
       }
 
       // Check if video_id already exists to prevent duplicates
-      const existing = await new Promise((resolve) => {
-        db.get('SELECT id FROM youtube_videos WHERE video_id = ?', [videoId], (err, row) => {
-          resolve(row);
-        });
-      });
+      const existing = await databaseService.getFirstTracked(
+        'SELECT id FROM youtube_videos WHERE video_id = ?',
+        [videoId]
+      );
       if (existing) {
         console.log('[useRecordingsManager] YouTube video already exists, skipping:', videoId);
         return;

@@ -103,10 +103,18 @@ export class FlashcardDomainService {
     if (card.deck_id) {
       try {
         const { databaseService } = await import('../../services/database/DatabaseService');
+        const { repositoryEventBus } = await import('../../services/events/RepositoryEventBus');
         await databaseService.getDb().runAsync(
           `UPDATE flashcard_decks SET last_reviewed_at = datetime('now') WHERE id = ?`,
           [String(card.deck_id)]
         );
+        repositoryEventBus.emit({
+          entityType: 'flashcard_decks',
+          eventType: 'updated',
+          entityId: String(card.deck_id),
+          timestamp: Date.now(),
+          priority: 'NORMAL',
+        });
       } catch (e) {
         console.warn('[FlashcardDomainService] Error updating deck last_reviewed_at:', e);
       }

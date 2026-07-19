@@ -201,7 +201,7 @@ export const CourseHeroCard = React.memo(({ viewModel: vm, isActive, onPress, on
           {vm.mainUrl && (
             <TouchableOpacity
               style={cHCardStyles.mainUrlRow}
-              onPress={() => openCourseLink(vm.mainUrl!, vm.platform ?? undefined)}
+              onPress={() => openCourseLink(vm.mainUrl!, vm.platform)}
             >
               <Ionicons name="open-outline" size={12} color={theme.colors.primary} />
               <Text style={cHCardStyles.mainUrlText} numberOfLines={1}>Ir al curso original</Text>

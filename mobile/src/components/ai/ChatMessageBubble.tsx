@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
-import { chatStyles as styles } from '../../styles/SubjectAIChatModal.styles';
+import { s as styles } from '../../styles/SubjectAIChatModal.styles';
 
 export type ChatMessage = {
   id: string;
@@ -28,14 +28,14 @@ export const ChatMessageBubble: React.FC<{ item: ChatMessage }> = ({ item }) => 
   const isUser = item.role === 'user';
   const displayContent = isUser ? item.content : stripThinkTags(item.content);
   return (
-    <View style={[styles.messageBubble, isUser ? styles.messageUser : styles.messageBot]}>
+    <View style={[styles.bubbleRow, isUser ? styles.bubbleRowUser : styles.bubbleRowAI]}>
       {!isUser && (
-        <View style={styles.botIcon}>
+        <View style={styles.aiAvatar}>
           <MaterialCommunityIcons name="robot-outline" size={16} color={theme.colors.primary} />
         </View>
       )}
-      <View style={[styles.messageContent, isUser ? styles.messageContentUser : styles.messageContentBot]}>
-        <Text style={[styles.messageText, isUser ? styles.messageTextUser : styles.messageTextBot]}>
+      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}>
+        <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAI]}>
           {displayContent}
         </Text>
       </View>

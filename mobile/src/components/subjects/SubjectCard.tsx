@@ -23,7 +23,7 @@ function darkenHex(hex: string, factor: number = 0.5): string {
   let clean = hex.replace('#', '');
   if (clean.length === 3) clean = clean.split('').map(c => c + c).join('');
   if (clean.length !== 6) return hex;
-  
+
   const r = Math.max(0, Math.round(parseInt(clean.substring(0, 2), 16) * (1 - factor)));
   const g = Math.max(0, Math.round(parseInt(clean.substring(2, 4), 16) * (1 - factor)));
   const b = Math.max(0, Math.round(parseInt(clean.substring(4, 6), 16) * (1 - factor)));
@@ -42,28 +42,26 @@ export const SubjectCard = React.memo(({
 }: SubjectCardProps) => {
   const color = subject.color || theme.colors.primary;
 
-  // Grade calculation
   const raw = subject.avg_score ?? 0;
   const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
   const hasGrade = avg > 0;
-  
+
   let statusColor = '#999999';
   let statusBgColor = '#F2F2F2';
-  
+
   if (hasGrade) {
     if (avg >= 3.0) {
-      statusColor = '#059669'; // Emerald 600
-      statusBgColor = '#D1FAE5'; // Emerald 100
+      statusColor = '#059669';
+      statusBgColor = '#D1FAE5';
     } else if (avg >= 2.5) {
-      statusColor = '#D97706'; // Amber 600
-      statusBgColor = '#FEF3C7'; // Amber 100
+      statusColor = '#D97706';
+      statusBgColor = '#FEF3C7';
     } else {
-      statusColor = '#DC2626'; // Red 600
-      statusBgColor = '#FEE2E2'; // Red 100
+      statusColor = '#DC2626';
+      statusBgColor = '#FEE2E2';
     }
   }
 
-  // Progress calculation
   const progress = subject.total_lessons && subject.total_lessons > 0
     ? (subject.completed_lessons || 0) / subject.total_lessons
     : (subject.completion_percent || 0) / 100;
@@ -76,12 +74,11 @@ export const SubjectCard = React.memo(({
       onPress={onPress}
     >
       <View style={styles.content}>
-        {/* Header: Icon & Badge */}
         <View style={styles.header}>
           <View style={[styles.iconContainer, { backgroundColor: color }]}>
-            <SubjectIcon iconName={subject.icon} color={darkenHex(color, 0.45)} size={20} />
+            <SubjectIcon iconName={subject.icon} color={darkenHex(color, 0.45)} size={17} />
           </View>
-          
+
           {hasGrade ? (
             <View style={[styles.badge, { backgroundColor: statusBgColor }]}>
               <Text style={[styles.badgeText, { color: statusColor }]}>{avg.toFixed(1)}</Text>
@@ -93,15 +90,14 @@ export const SubjectCard = React.memo(({
           ) : null}
         </View>
 
-        {/* Title & Details */}
         <View style={styles.infoContainer}>
           <Text style={styles.title} numberOfLines={2}>
             {subject.name}
           </Text>
-          
+
           {(subject.next_micro_milestone || subject.next_milestone) && (
             <View style={styles.milestoneContainer}>
-              <Ionicons name="flag-outline" size={12} color="#6B7280" />
+              <Ionicons name="flag-outline" size={10} color="#6B7280" />
               <Text style={styles.milestoneText} numberOfLines={1}>
                 {subject.next_micro_milestone || subject.next_milestone}
               </Text>
@@ -111,7 +107,6 @@ export const SubjectCard = React.memo(({
 
         <View style={{ flex: 1 }} />
 
-        {/* Progress & Actions */}
         <View style={styles.footer}>
           <View style={styles.progressContainer}>
             <View style={styles.progressLabelRow}>
@@ -123,7 +118,6 @@ export const SubjectCard = React.memo(({
             </View>
           </View>
 
-          {/* Actions */}
           {(onContinue || onComplete) && (
             <View style={styles.actionsRow}>
               {onContinue && (
@@ -131,7 +125,7 @@ export const SubjectCard = React.memo(({
                   style={[styles.btn, styles.btnPrimary, { backgroundColor: color }]}
                   onPress={onContinue}
                 >
-                  <Ionicons name="play" size={12} color="#FFFFFF" />
+                  <Ionicons name="play" size={10} color="#FFFFFF" />
                   <Text style={styles.btnPrimaryText}>Continuar</Text>
                 </TouchableOpacity>
               )}
@@ -140,7 +134,7 @@ export const SubjectCard = React.memo(({
                   style={[styles.btn, styles.btnSecondary, !onContinue && { flex: 1 }]}
                   onPress={onComplete}
                 >
-                  <Ionicons name="sparkles" size={14} color="#059669" />
+                  <Ionicons name="sparkles" size={12} color="#059669" />
                   <Text style={styles.btnSecondaryText}>Procesar clase</Text>
                 </TouchableOpacity>
               )}

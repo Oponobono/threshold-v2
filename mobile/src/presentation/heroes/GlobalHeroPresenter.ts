@@ -53,7 +53,7 @@ export class GlobalHeroPresenter {
       recentActivity: recentSubjects.map(s => ({
         name: s.name,
         activityType: 'class' as ContentType,
-        lastActivity: formatRelativeTime(s.next_micro_milestone ?? undefined),
+        lastActivity: formatRelativeTime(s.next_micro_milestone),
       })),
       courseCount: courses.length,
       subjectCount: subjects.length,

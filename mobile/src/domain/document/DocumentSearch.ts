@@ -5,7 +5,7 @@ export interface SearchQuery {
 }
 
 export interface SearchMatch {
-  readonly blockId: string;
+  readonly blockId: string | undefined;
   readonly pageIndex: number;
   readonly startOffset: number;
   readonly endOffset: number;

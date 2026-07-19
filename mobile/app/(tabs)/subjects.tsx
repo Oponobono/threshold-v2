@@ -28,38 +28,36 @@ const MomentumCard = ({ score }: { score: number }) => {
   const isDanger = score < 0.5;
   return (
     <View style={[
-      styles.miniCard, 
-      isDanger && { backgroundColor: 'rgba(231, 76, 60, 0.08)', borderColor: 'rgba(231, 76, 60, 0.2)' }
+      styles.miniCard,
+      isDanger && styles.miniCardInRisk,
     ]}>
-      <Text style={styles.miniCardTitle}>MOMENTUM</Text>
-      <Text style={[styles.miniCardValue, isDanger && { color: '#E74C3C' }]}>
-        {isDanger ? '⚠️' : '🔥'} {Math.round(score * 100)}%
+      <Text style={isDanger ? styles.miniCardTitleRisk : styles.miniCardTitle}>MOMENTUM</Text>
+      <Text style={isDanger ? styles.miniCardValueRisk : styles.miniCardValue}>
+        {isDanger ? '⚠' : '🔥'} {Math.round(score * 100)}%
       </Text>
     </View>
   );
 };
 
 export default function SubjectsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const g = useSubjects(t);
   const { courses, loadAllData, refreshCourses, refreshSubjects } = useDataStore();
   const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore } = useGroupedSubjects(courses, g.filteredSubjects);
 
-  // ── Cargar cursos al enfocar la pantalla (lightweight: solo SQLite) ──
   useFocusEffect(
     useCallback(() => {
       refreshCourses();
     }, [refreshCourses])
   );
 
-  // ── Fase 5: Estado del modal de ingesta de Zyren ──
   const [zyrenModalVisible, setZyrenModalVisible] = useState(false);
-  const [zyrenSubject, setZyrenSubject] = useState<{ 
-    id: string; 
-    name: string; 
-    courseId?: string | null; 
-    courseName?: string; 
+  const [zyrenSubject, setZyrenSubject] = useState<{
+    id: string;
+    name: string;
+    courseId?: string | null;
+    courseName?: string;
     milestone?: string;
     color?: string;
     icon?: string;
@@ -67,22 +65,9 @@ export default function SubjectsScreen() {
 
   const [isCreationMenuVisible, setIsCreationMenuVisible] = useState(false);
   const [isCreateSubjectModalVisible, setIsCreateSubjectModalVisible] = useState(false);
-  // ── Tab de curso seleccionado (null = todas) ──
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
-  const handleClassComplete = useCallback(async (subject: any, courseName: string) => {
-    try {
-      const newCompleted = (subject.completed_lessons || 0) + 1;
-      await updateSubject(subject.id, { completed_lessons: newCompleted });
-      await refreshSubjects();
-      if (subject.course_id) {
-        await updateCourseCounters(subject.course_id);
-        await refreshCourses();
-        MomentumService.boostMomentum(subject.course_id).catch(console.warn);
-      }
-    } catch (e) {
-      console.warn('[handleClassComplete] Error persisting completed_lessons:', e);
-    }
+  const handleClassComplete = useCallback((subject: any, courseName: string) => {
     setZyrenSubject({
       id: subject.id,
       name: subject.name,
@@ -93,6 +78,20 @@ export default function SubjectsScreen() {
       icon: subject.icon,
     });
     setZyrenModalVisible(true);
+
+    const newCompleted = (subject.completed_lessons || 0) + 1;
+    updateSubject(subject.id, { completed_lessons: newCompleted })
+      .then(() => refreshSubjects())
+      .then(() => {
+        if (subject.course_id) {
+          return updateCourseCounters(subject.course_id)
+            .then(() => refreshCourses())
+            .then(() => MomentumService.boostMomentum(subject.course_id).catch(console.warn));
+        }
+      })
+      .catch((e) => {
+        console.warn('[handleClassComplete] Error persisting completed_lessons:', e);
+      });
   }, [refreshSubjects, refreshCourses]);
 
   const getCoursePlatform = useCallback((courseId?: string | null): string | undefined => {
@@ -129,31 +128,23 @@ export default function SubjectsScreen() {
     }).length;
   }, [g.subjects]);
 
-  const atRiskCount = useMemo(() => {
-    return g.subjects.length - approvedCount;
-  }, [g.subjects, approvedCount]);
-
-  // ── Cursos para CoursePills (derivados de las secciones agrupadas) ──
   const coursesForPills = useMemo(() => {
     return groupedSections
       .filter(s => s.courseId !== 'independent' && s.courseId)
       .map(s => ({ id: s.courseId as string, name: s.courseName, platform: s.coursePlatform }));
   }, [groupedSections]);
 
-  // ── Subjects filtered by selected tab ──
   const displayedSubjects = useMemo(() => {
     if (selectedCourseId === null) return g.filteredSubjects;
     const section = groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId);
     return section?.data ?? [];
   }, [selectedCourseId, groupedSections, g.filteredSubjects]);
 
-  // ── Course name for selected tab (for handleClassComplete) ──
   const selectedCourseName = useMemo(() => {
     if (!selectedCourseId) return '';
     return groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId)?.courseName ?? '';
   }, [selectedCourseId, groupedSections]);
 
-  // ── Agrupar materias en pares para grilla de 2 columnas ──
   const displayedPairs = useMemo(() => {
     const pairs: [any, any | null][] = [];
     for (let i = 0; i < displayedSubjects.length; i += 2) {
@@ -168,21 +159,21 @@ export default function SubjectsScreen() {
         <View style={[globalStyles.row, { justifyContent: 'space-between', flex: 1 }]}>
           <View>
             <View style={globalStyles.row}>
-              <Ionicons name="book-outline" size={20} color={theme.colors.primary} style={globalStyles.mr8} />
+              <Ionicons name="book-outline" size={18} color={theme.colors.primary} style={globalStyles.mr8} />
               <Text style={styles.headerTitle}>{t('subjects.title') || 'Materias'}</Text>
-              <AutoUploadIndicator size={18} />
+              <AutoUploadIndicator size={16} />
             </View>
             <OfflineIndicator />
           </View>
           <TouchableOpacity style={styles.addBtn} onPress={() => setIsCreationMenuVisible(true)}>
-            <Ionicons name="add" size={24} color={theme.colors.text.inverse} />
+            <Ionicons name="add" size={20} color={theme.colors.text.inverse} />
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={theme.colors.text.secondary} />
+          <Ionicons name="search" size={16} color={theme.colors.text.secondary} />
           <TextInput
             style={styles.searchInput}
             placeholder={t('subjects.searchPlaceholder')}
@@ -192,7 +183,7 @@ export default function SubjectsScreen() {
           />
         </View>
         <TouchableOpacity style={styles.filterBtn}>
-          <Feather name="sliders" size={18} color={theme.colors.text.primary} />
+          <Feather name="sliders" size={16} color={theme.colors.text.primary} />
         </TouchableOpacity>
       </View>
 
@@ -200,9 +191,9 @@ export default function SubjectsScreen() {
         data={displayedPairs}
         keyExtractor={(_, index) => `pair-${index}`}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { gap: 10 }]}
+        contentContainerStyle={[styles.scroll, { gap: 8 }]}
         renderItem={({ item: [left, right] }) => (
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             <SubjectCard
               subject={left}
               onPress={() => router.push(`/subjects/${left.id}`)}
@@ -223,18 +214,18 @@ export default function SubjectsScreen() {
         )}
         ListEmptyComponent={
           g.filteredSubjects.length === 0 ? (
-            <View style={[globalStyles.center, { paddingVertical: 60 }]}>
-              <MaterialCommunityIcons name="book-open-variant" size={48} color="rgba(255,255,255,0.1)" />
-              <Text style={[{ color: theme.colors.text.secondary }, globalStyles.mt16]}>
+            <View style={[globalStyles.center, { paddingVertical: 48 }]}>
+              <MaterialCommunityIcons name="book-open-variant" size={40} color="rgba(255,255,255,0.1)" />
+              <Text style={[{ color: theme.colors.text.secondary }, { marginTop: 12 }]}>
                 {g.search ? t('subjects.noResults', 'Sin resultados') : t('subjects.noSubjects', 'No hay materias')}
               </Text>
               {!g.search && (
-                <TouchableOpacity 
-                  style={[globalStyles.mt24, styles.addBtn, { width: 'auto', paddingHorizontal: 20, borderRadius: 24, flexDirection: 'row', gap: 8 }]} 
+                <TouchableOpacity
+                  style={[{ marginTop: 16 }, styles.addBtn, { width: 'auto', paddingHorizontal: 16, borderRadius: 20, flexDirection: 'row', gap: 6 }]}
                   onPress={() => setIsCreationMenuVisible(true)}
                 >
-                  <Ionicons name="add" size={20} color={theme.colors.text.inverse} />
-                  <Text style={{ color: theme.colors.text.inverse, fontWeight: '700' }}>Crear materia</Text>
+                  <Ionicons name="add" size={16} color={theme.colors.text.inverse} />
+                  <Text style={{ color: theme.colors.text.inverse, fontWeight: '700', fontSize: 13 }}>Crear materia</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -244,150 +235,146 @@ export default function SubjectsScreen() {
         ListHeaderComponent={
           g.subjects.length > 0 ? (
             <>
+              {/* ── Hero: Resumen del semestre ── */}
               <View style={styles.semesterHero}>
-              {/* Background decorations: concentric arcs emanating from the GPA circle */}
-              <View style={styles.gpaAmbientGlow} />
-              <View style={styles.heroArc1} />
-              <View style={styles.heroArc2} />
-              <View style={styles.heroArc3} />
+                <View style={styles.gpaAmbientGlow} />
+                <View style={styles.heroArc1} />
+                <View style={styles.heroArc2} />
+                <View style={styles.heroArc3} />
 
-              <View style={styles.heroContentRow}>
-                <View style={styles.gpaContainer}>
-                  <View style={styles.semesterGpaCircle}>
-                    <Text style={styles.semesterGpaValue}>{overallGpa.toFixed(1)}</Text>
-                    <Text style={styles.semesterGpaLabel}>{t('subjects.semesterGpa')}</Text>
+                <View style={styles.heroContentRow}>
+                  <View style={styles.gpaContainer}>
+                    <View style={styles.semesterGpaCircle}>
+                      <Text style={styles.semesterGpaValue}>{overallGpa.toFixed(1)}</Text>
+                      <Text style={styles.semesterGpaLabel}>{t('subjects.semesterGpa')}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.miniGridContainer}>
+                    <View style={styles.miniCard}>
+                      <Text style={styles.miniCardTitle}>{t('subjects.totalSubjects', { defaultValue: 'MATERIAS' })}</Text>
+                      <Text style={styles.miniCardValue}>{g.subjects.length}</Text>
+                    </View>
+
+                    <View style={styles.miniCard}>
+                      <Text style={styles.miniCardTitle}>{t('subjects.semesterCredits', { defaultValue: 'CRÉDITOS' })}</Text>
+                      <Text style={styles.miniCardValue}>
+                        {g.totalCredits}
+                        <Text style={styles.miniCardSub}>cr</Text>
+                      </Text>
+                    </View>
+
+                    <View style={styles.miniCard}>
+                      <Text style={styles.miniCardTitle}>{t('subjects.semesterApproved', { defaultValue: 'APROBADAS' })}</Text>
+                      <Text style={styles.miniCardValue}>{approvedCount}</Text>
+                    </View>
+
+                    <MomentumCard score={aggregatedMomentumScore} />
                   </View>
                 </View>
 
-                <View style={styles.miniGridContainer}>
-                  <View style={styles.miniCard}>
-                    <Text style={styles.miniCardTitle}>{t('subjects.totalSubjects', { defaultValue: 'MATERIAS' })}</Text>
-                    <Text style={styles.miniCardValue}>{g.subjects.length}</Text>
-                  </View>
-
-                  <View style={styles.miniCard}>
-                    <Text style={styles.miniCardTitle}>{t('subjects.semesterCredits', { defaultValue: 'CRÉDITOS' })}</Text>
-                    <Text style={styles.miniCardValue}>
-                      {g.totalCredits}
-                      <Text style={styles.miniCardSub}>cr</Text>
+                <View style={styles.heroEngineRow}>
+                  <View style={styles.heroEngineChip}>
+                    <Text style={styles.heroEngineIcon}>⚡</Text>
+                    <Text style={styles.heroEngineText}>
+                      {g.dueDecksToday > 0
+                        ? `${g.dueDecksToday} mazo${g.dueDecksToday !== 1 ? 's' : ''} para hoy`
+                        : 'Sin repasos pendientes'}
                     </Text>
                   </View>
+                  {g.studyStreak > 0 && (
+                    <>
+                      <Text style={styles.heroEngineSep}>·</Text>
+                      <View style={styles.heroEngineChip}>
+                        <Text style={styles.heroEngineIcon}>🔥</Text>
+                        <Text style={styles.heroEngineText}>Racha: {g.studyStreak} día{g.studyStreak !== 1 ? 's' : ''}</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
 
-                  <View style={styles.miniCard}>
-                    <Text style={styles.miniCardTitle}>{t('subjects.semesterApproved', { defaultValue: 'APROBADAS' })}</Text>
-                    <Text style={styles.miniCardValue}>{approvedCount}</Text>
+              {/* ── Atención necesaria: lista compacta ── */}
+              {g.criticalSubjects.length > 0 && (
+                <View style={styles.criticalSection}>
+                  <View style={styles.criticalHeader}>
+                    <Text style={styles.criticalIcon}>⚠</Text>
+                    <Text style={styles.criticalTitle}>Atención necesaria</Text>
+                    <Text style={styles.criticalCount}>({g.criticalSubjects.length})</Text>
                   </View>
+                  <View style={styles.criticalList}>
+                    {g.criticalSubjects.map((subject, idx) => {
+                      const raw = subject.avg_score ?? 0;
+                      const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
+                      const color = subject.color || '#FF2D55';
 
-                  <MomentumCard score={aggregatedMomentumScore} />
-                </View>
-              </View>
-
-              {/* ── Motor de aprendizaje: footer del hero ── */}
-              <View style={styles.heroEngineRow}>
-                <View style={styles.heroEngineChip}>
-                  <Text style={styles.heroEngineIcon}>⚡</Text>
-                  <Text style={styles.heroEngineText}>
-                    {g.dueDecksToday > 0
-                      ? `${g.dueDecksToday} mazo${g.dueDecksToday !== 1 ? 's' : ''} para hoy`
-                      : 'Sin repasos pendientes'}
-                  </Text>
-                </View>
-                {g.studyStreak > 0 && (
-                  <>
-                    <Text style={styles.heroEngineSep}>·</Text>
-                    <View style={styles.heroEngineChip}>
-                      <Text style={styles.heroEngineIcon}>🔥</Text>
-                      <Text style={styles.heroEngineText}>Racha: {g.studyStreak} día{g.studyStreak !== 1 ? 's' : ''}</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-            </View>
-
-            {g.criticalSubjects.length > 0 && (
-              <View style={styles.criticalSection}>
-                <View style={styles.criticalHeader}>
-                  <Text style={styles.criticalTitle}>{t('subjects.attentionNeededTitle')}</Text>
-                  <View style={styles.criticalBadge}>
-                    <Text style={styles.criticalBadgeText}>{g.criticalSubjects.length}</Text>
-                  </View>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.criticalScroll}
-                >
-                  {g.criticalSubjects.map((subject, idx) => {
-                    const raw = subject.avg_score ?? 0;
-                    const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
-                    const delta = (subject as any).delta ?? parseFloat((avg - 3.0).toFixed(2));
-                    const color = subject.color || '#FF2D55';
-
-                    return (
-                      <TouchableOpacity
-                        key={subject.id || idx}
-                        style={styles.criticalCard}
-                        activeOpacity={0.7}
-                        onPress={() => router.push(`/subjects/${subject.id}`)}
-                      >
-                        <View style={styles.criticalCardTop}>
-                          <View style={[styles.criticalCardDot, { backgroundColor: color }]} />
-                          <Text style={styles.criticalCardName} numberOfLines={1}>{subject.name}</Text>
-                        </View>
-                        <Text style={styles.criticalCardScore}>{avg.toFixed(1)}</Text>
-                        <Text style={styles.criticalCardDelta}>
-                          {delta >= 0 ? '+' : ''}{delta.toFixed(2)} {t('subjects.semesterGpa')}
-                        </Text>
-                        <View style={styles.criticalCardAction}>
-                          <Text style={styles.criticalCardActionText}>{t('subjects.reviewAction')}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-
-            {g.recentActivity.length > 0 && (
-              <View style={styles.timelineSection}>
-                <View style={styles.timelineHeader}>
-                  <Text style={styles.timelineTitle}>{t('subjects.recentActivityTitle')}</Text>
-                </View>
-                <View style={styles.timelineCard}>
-                  <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                    {g.recentActivity.map((item, idx, arr) => {
-                      const config = ACTIVITY_CONFIG[item.type];
                       return (
-                        <View key={item.id || idx} style={[styles.timelineItem, idx < arr.length - 1 && { position: 'relative' }]}>
-                          <View style={[styles.timelineDot, { backgroundColor: item.subjectColor, justifyContent: 'center', alignItems: 'center' }]}>
-                            <Ionicons name={config.icon as any} size={10} color="#FFFFFF" />
+                        <TouchableOpacity
+                          key={subject.id || idx}
+                          style={styles.criticalRow}
+                          activeOpacity={0.7}
+                          onPress={() => router.push(`/subjects/${subject.id}`)}
+                        >
+                          <View style={[styles.criticalDot, { backgroundColor: color }]} />
+                          <Text style={styles.criticalRowName} numberOfLines={1}>{subject.name}</Text>
+                          <Text style={styles.criticalRowScore}>{avg.toFixed(1)}</Text>
+                          <View style={styles.criticalRowAction}>
+                            <Text style={styles.criticalRowActionText}>{t('subjects.reviewAction')}</Text>
                           </View>
-                          {idx < arr.length - 1 && <View style={styles.timelineLine} />}
-                          <View style={styles.timelineContent}>
-                            <Text style={styles.timelineName} numberOfLines={1}>
-                              {item.title}
-                            </Text>
-                            <Text style={styles.timelineMeta}>
-                              <Text style={{ color: config.color, fontWeight: '600' }}>{config.label}</Text> • {item.subjectName}
-                            </Text>
-                            {item.subtitle ? <Text style={[styles.timelineMeta, { marginTop: 2 }]} numberOfLines={1}>{item.subtitle}</Text> : null}
-                          </View>
-                          <Text style={styles.timelineTime}>{item.relativeTime}</Text>
-                        </View>
+                        </TouchableOpacity>
                       );
                     })}
-                  </ScrollView>
+                  </View>
                 </View>
-              </View>
-            )}
-            {/* ── CoursePills (filtro de cursos) ── */}
-            {coursesForPills.length > 0 && (
-              <CoursePills
-                courses={coursesForPills}
-                selectedCourseId={selectedCourseId}
-                onSelectCourse={setSelectedCourseId}
-              />
-            )}
+              )}
+
+              {/* ── Actividad reciente ── */}
+              {g.recentActivity.length > 0 && (
+                <View style={styles.timelineSection}>
+                  <View style={styles.timelineHeader}>
+                    <Text style={styles.timelineTitle}>{t('subjects.recentActivityTitle')}</Text>
+                  </View>
+                  <View style={styles.timelineCard}>
+                    <ScrollView style={{ maxHeight: 120 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                      {g.recentActivity.map((item, idx, arr) => {
+                        const config = ACTIVITY_CONFIG[item.type];
+                        return (
+                          <View key={item.id || idx} style={[styles.timelineItem, idx < arr.length - 1 && { position: 'relative' }]}>
+                            <View style={[styles.timelineDot, { backgroundColor: item.subjectColor, justifyContent: 'center', alignItems: 'center' }]}>
+                              <Ionicons name={config.icon as any} size={8} color="#FFFFFF" />
+                            </View>
+                            {idx < arr.length - 1 && <View style={styles.timelineLine} />}
+                            <View style={styles.timelineContent}>
+                              <Text style={styles.timelineName} numberOfLines={1}>
+                                {item.title}
+                              </Text>
+                              <Text style={styles.timelineMeta}>
+                                <Text style={{ color: config.color, fontWeight: '600' }}>{config.label}</Text> • {item.subjectName}
+                              </Text>
+                              {item.subtitle ? <Text style={[styles.timelineMeta, { marginTop: 1 }]} numberOfLines={1}>{item.subtitle}</Text> : null}
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={styles.timelineTime}>{item.relativeTime}</Text>
+                              <Text style={[styles.timelineTime, { marginTop: 2, fontWeight: '400', fontSize: 8, opacity: 0.7 }]}>
+                                {new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short' }).format(item.date)}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </View>
+              )}
+
+              {/* ── CoursePills ── */}
+              {coursesForPills.length > 0 && (
+                <CoursePills
+                  courses={coursesForPills}
+                  selectedCourseId={selectedCourseId}
+                  onSelectCourse={setSelectedCourseId}
+                />
+              )}
             </>
           ) : null
         }
@@ -410,20 +397,20 @@ export default function SubjectsScreen() {
 
       <Modal visible={isCreationMenuVisible} transparent animationType="fade" onRequestClose={() => setIsCreationMenuVisible(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setIsCreationMenuVisible(false)}>
-          <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }} onPress={() => null}>
-            <View style={{ width: 40, height: 4, backgroundColor: theme.colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 16 }}>¿Qué deseas crear?</Text>
-            
-            <TouchableOpacity 
-              style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16, marginBottom: 12 }}
+          <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 }} onPress={() => null}>
+            <View style={{ width: 36, height: 3, backgroundColor: theme.colors.border, borderRadius: 1.5, alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 14 }}>¿Qué deseas crear?</Text>
+
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: theme.colors.background, borderRadius: 12, marginBottom: 10 }}
               onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsCreateSubjectModalVisible(true), 300); }}
             >
-              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
-                <Ionicons name="book" size={24} color={theme.colors.primary} />
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+                <Ionicons name="book" size={20} color={theme.colors.primary} />
               </View>
               <View>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
-                <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Para clases individuales de tu Universidad</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
+                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginTop: 2 }}>Para clases individuales de tu Universidad</Text>
               </View>
             </TouchableOpacity>
           </Pressable>
@@ -445,5 +432,3 @@ export default function SubjectsScreen() {
     </SafeAreaView>
   );
 }
-
-

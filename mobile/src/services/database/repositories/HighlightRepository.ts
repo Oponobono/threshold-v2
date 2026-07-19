@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { DocumentHighlight, HighlightColor } from '../../domain/document/DocumentHighlight';
+import type { DocumentHighlight, HighlightColor } from '../../../domain/document/DocumentHighlight';
 
 const DB_NAME = 'threshold.db';
 

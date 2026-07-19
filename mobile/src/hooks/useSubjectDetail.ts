@@ -23,13 +23,15 @@ import { useSubjectGrades } from './useSubjectGrades';
 import { useAudioRecorder } from './useAudioRecorder';
 import { useDataStore } from '../store/useDataStore';
 import { useConnectivityStore } from '../store/useConnectivityStore';
-import { photoRepository, documentRepository, youTubeRepository } from '../services/database';
+import { photoRepository, documentRepository, youTubeRepository, studyNoteRepository } from '../services/database';
 import { useCustomAlert, alertRef } from '../components/ui/CustomAlert';
 import { generatePdfFromImages } from '../utils/pdfGenerator';
 
 type DetailSubject = Subject & {
   avg_score?: number | null;
   completion_percent?: number | null;
+  course_name?: string;
+  milestone?: string;
 };
 
 export function useSubjectDetail() {
@@ -57,6 +59,7 @@ export function useSubjectDetail() {
   const [subjectSchedules, setSubjectSchedules] = useState<any[]>([]);
   const [photos, setPhotos] = useState<any[]>([]);
   const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>([]);
+  const [studyNotes, setStudyNotes] = useState<any[]>([]);
   const [allSubjects] = useState<Subject[]>([]);
   // Si ya tenemos el sujeto en caché, no mostramos el spinner de carga inicial.
   const [isLoading, setIsLoading] = useState(immediateSubject === null);
@@ -187,6 +190,10 @@ export function useSubjectDetail() {
             }
           });
 
+        const pNotes = studyNoteRepository.getBySubject(subjectId)
+          .then(n => { if (mounted && n) setStudyNotes(n); })
+          .catch(() => {});
+
         await Promise.allSettled([
           pProfile,
           pSubject,
@@ -196,6 +203,7 @@ export function useSubjectDetail() {
           pSchedules,
           pAudio,
           pVideos,
+          pNotes,
         ]);
       } catch (err) {
         console.error('Error loading subject data:', err);
@@ -436,6 +444,7 @@ export function useSubjectDetail() {
     profile,
     photos,
     scannedDocuments,
+    studyNotes,
     isLoading,
     isReady,
     recentVideos,

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Linking, Platform, Share, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { createMMKV } from 'react-native-mmkv';
 import { theme } from '../../styles/theme';
 import { subjectDetailStyles as sectionStyles } from '../../styles/SubjectDetail.styles';
 import { documentListStyles as styles } from '../../styles/SubjectDocumentsList.styles';
@@ -14,6 +15,22 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
 import { useTranslation } from 'react-i18next';
 import { SubjectDocumentCard } from './SubjectDocumentCard';
+
+const segmentMMKV = createMMKV({ id: 'subject-detail-prefs' });
+const SEGMENT_KEY = 'subject_detail.documents_segment';
+
+type DocumentSegment = 'documents' | 'notes';
+
+const SOURCE_ICONS: Record<string, { name: string; bg: string }> = {
+  manual: { name: 'create-outline', bg: '#E8F5E9' },
+  camera: { name: 'camera-outline', bg: '#E3F2FD' },
+  pdf: { name: 'document-text-outline', bg: '#FFF3E0' },
+  youtube: { name: 'logo-youtube', bg: '#FFEBEE' },
+  audio: { name: 'mic-outline', bg: '#F3E5F5' },
+  web: { name: 'globe-outline', bg: '#E0F7FA' },
+  ai: { name: 'sparkles-outline', bg: '#FFF8E1' },
+  import: { name: 'download-outline', bg: '#ECEFF1' },
+};
 
 const EXPANDED_MAX_HEIGHT = 340;
 
@@ -43,10 +60,12 @@ function getFormatFromUri(uri: string): string {
 
 export interface SubjectDocumentsListProps {
   documents: any[];
+  studyNotes?: any[];
   onGenerateFlashcards?: (uris: string[]) => void;
   onExportPdf?: (uris: string[]) => void;
   onDocumentDeleted?: (id: number | string) => void;
   onOpenImportPDF?: () => void;
+  onOpenZyren?: () => void;
 }
 
 /**
@@ -64,19 +83,30 @@ export interface SubjectDocumentsListProps {
  */
 export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({ 
   documents,
+  studyNotes = [],
   onGenerateFlashcards,
   onExportPdf,
   onDocumentDeleted,
-  onOpenImportPDF
+  onOpenImportPDF,
+  onOpenZyren
 }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const router = useRouter();
+  const [activeSegment, setActiveSegment] = useState<DocumentSegment>(() => {
+    const saved = segmentMMKV.getString(SEGMENT_KEY);
+    return (saved === 'notes' || saved === 'documents') ? saved : 'documents';
+  });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
   const [ocrInProgress, setOcrInProgress] = useState<Set<string | number>>(new Set());
   const [isRescanningAll, setIsRescanningAll] = useState(false);
   const [filterFormat, setFilterFormat] = useState<FormatFilter>('all');
+
+  const handleSegmentChange = (segment: DocumentSegment) => {
+    setActiveSegment(segment);
+    segmentMMKV.set(SEGMENT_KEY, segment);
+  };
 
   const availableFormats = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -406,147 +436,232 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
 
   return (
     <View style={sectionStyles.sectionBlock}>
+      {/* Segment Tabs */}
       <View style={sectionStyles.sectionHeaderRow}>
-        <View>
-          <Text style={sectionStyles.sectionTitle}>{t('documents.title')}</Text>
-          <Text style={sectionStyles.sectionHint}>{t('documents.hint')}</Text>
+        <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => handleSegmentChange('documents')}
+            activeOpacity={0.7}
+          >
+            <Text style={sectionStyles.sectionTitle}>
+              {t('documents.title')}
+            </Text>
+            {activeSegment === 'documents' && <View style={styles.segmentUnderline} />}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleSegmentChange('notes')}
+            activeOpacity={0.7}
+          >
+            <Text style={sectionStyles.sectionTitle}>
+              Apuntes
+            </Text>
+            {activeSegment === 'notes' && <View style={styles.segmentUnderline} />}
+          </TouchableOpacity>
         </View>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <TouchableOpacity 
-            onPress={() => router.push('/documents')} 
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons 
-              name="menu" 
-              size={22} 
-              color={theme.colors.text.secondary} 
-            />
-          </TouchableOpacity>
-          {documents.length > 0 && (
-            <TouchableOpacity 
-              onPress={() => {
-                if (selectionMode) {
-                  setSelectionMode(false);
-                  setSelectedIds(new Set());
-                } else {
-                  setSelectionMode(true);
-                }
-              }} 
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons 
-                name={selectionMode ? "document-text" : "document-text-outline"} 
-                size={22} 
-                color={selectionMode ? theme.colors.primary : theme.colors.text.secondary} 
-              />
+          {activeSegment === 'documents' && (
+            <>
+              <TouchableOpacity 
+                onPress={() => router.push('/documents')} 
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons 
+                  name="menu" 
+                  size={22} 
+                  color={theme.colors.text.secondary} 
+                />
+              </TouchableOpacity>
+              {documents.length > 0 && (
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (selectionMode) {
+                      setSelectionMode(false);
+                      setSelectedIds(new Set());
+                    } else {
+                      setSelectionMode(true);
+                    }
+                  }} 
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons 
+                    name={selectionMode ? "document-text" : "document-text-outline"} 
+                    size={22} 
+                    color={selectionMode ? theme.colors.primary : theme.colors.text.secondary} 
+                  />
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+          {activeSegment === 'documents' && onOpenImportPDF && (
+            <TouchableOpacity onPress={onOpenImportPDF} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
           )}
-          {onOpenImportPDF && (
-            <TouchableOpacity onPress={onOpenImportPDF} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          {activeSegment === 'notes' && onOpenZyren && (
+            <TouchableOpacity onPress={onOpenZyren} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {documents.length > 0 && (
-        <View style={styles.pillsRow}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsContent}>
-            {availableFormats.map((f) => {
-              const isActive = filterFormat === f;
-              return (
-                <TouchableOpacity
-                  key={f}
-                  onPress={() => setFilterFormat(f)}
-                  activeOpacity={0.72}
-                  style={[styles.pill, isActive && styles.pillActive]}
-                >
-                  <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
-                    {FORMAT_LABELS[f]}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
-
-      <View style={filteredDocuments.length === 0 ? sectionStyles.insightsCard : styles.documentContainer}>
-        {filteredDocuments.length === 0 ? (
-          <View style={sectionStyles.emptyStateCard}>
-            <Ionicons name="document-text-outline" size={24} color={theme.colors.text.secondary} />
-            <Text style={sectionStyles.emptyStateTitle}>{FORMAT_LABELS[filterFormat]}</Text>
-            <Text style={sectionStyles.emptyStateText}>
-              {filterFormat === 'all' ? t('documents.emptyState') : `No hay documentos ${FORMAT_LABELS[filterFormat]}`}
-            </Text>
-          </View>
-        ) : (
-          <ScrollView
-            nestedScrollEnabled={true}
-            showsVerticalScrollIndicator={filteredDocuments.length > 4}
-            bounces={false}
-          >
-            <View style={styles.list}>
-              {filteredDocuments.map((doc, index) => {
-                  const docId = doc.id || index;
-                  const isSelected = selectedIds.has(docId);
-                  const isExtracting = ocrInProgress.has(docId);
-
+      {activeSegment === 'documents' && (
+        <>
+          {documents.length > 0 && (
+            <View style={styles.pillsRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsContent}>
+                {availableFormats.map((f) => {
+                  const isActive = filterFormat === f;
                   return (
-                    <SubjectDocumentCard
-                      key={docId}
-                      doc={doc}
-                      index={index}
-                      isSelected={isSelected}
-                      selectionMode={selectionMode}
-                      onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc)}
-                      onLongPress={() => handleLongPress(docId)}
-                      onDelete={() => handleDelete(docId)}
-                      onShare={() => handleShare(doc)}
-                      onExtractOCR={() => handleExtractOCR(docId)}
-                      isExtractingOCR={isExtracting}
-                    />
+                    <TouchableOpacity
+                      key={f}
+                      onPress={() => setFilterFormat(f)}
+                      activeOpacity={0.72}
+                      style={[styles.pill, isActive && styles.pillActive]}
+                    >
+                      <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
+                        {FORMAT_LABELS[f]}
+                      </Text>
+                    </TouchableOpacity>
                   );
                 })}
-              </View>
-            </ScrollView>
-        )}
-      </View>
+              </ScrollView>
+            </View>
+          )}
 
-      {selectionMode && (
-        <View style={styles.actionBottomBar}>
-          {selectedIds.size === 0 ? (
-            <Text style={[styles.actionText, { flex: 1, textAlign: 'center' }]}>
-              Selecciona un documento
-            </Text>
-          ) : (
-            <>
-              <Text style={styles.actionText}>{selectedIds.size} documento(s)</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {(() => {
-                  const selectedDocs = documents.filter(d => selectedIds.has(d.id || documents.indexOf(d)));
-                  const canRescan = selectedDocs.some(d => !d.ocr_text || d.ocr_text.trim() === '');
-                  
-                  if (canRescan) {
+          <View style={filteredDocuments.length === 0 ? sectionStyles.insightsCard : styles.documentContainer}>
+            {filteredDocuments.length === 0 ? (
+              <View style={sectionStyles.emptyStateCard}>
+                <Ionicons name="document-text-outline" size={24} color={theme.colors.text.secondary} />
+                <Text style={sectionStyles.emptyStateTitle}>{FORMAT_LABELS[filterFormat]}</Text>
+                <Text style={sectionStyles.emptyStateText}>
+                  {filterFormat === 'all' ? t('documents.emptyState') : `No hay documentos ${FORMAT_LABELS[filterFormat]}`}
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={filteredDocuments.length > 4}
+                bounces={false}
+              >
+                <View style={styles.list}>
+                  {filteredDocuments.map((doc, index) => {
+                      const docId = doc.id || index;
+                      const isSelected = selectedIds.has(docId);
+                      const isExtracting = ocrInProgress.has(docId);
+
+                      return (
+                        <SubjectDocumentCard
+                          key={docId}
+                          doc={doc}
+                          index={index}
+                          isSelected={isSelected}
+                          selectionMode={selectionMode}
+                          onPress={() => selectionMode ? toggleSelection(docId) : openDocument(doc)}
+                          onLongPress={() => handleLongPress(docId)}
+                          onDelete={() => handleDelete(docId)}
+                          onShare={() => handleShare(doc)}
+                          onExtractOCR={() => handleExtractOCR(docId)}
+                          isExtractingOCR={isExtracting}
+                        />
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+            )}
+          </View>
+
+          {selectionMode && (
+            <View style={styles.actionBottomBar}>
+              {selectedIds.size === 0 ? (
+                <Text style={[styles.actionText, { flex: 1, textAlign: 'center' }]}>
+                  Selecciona un documento
+                </Text>
+              ) : (
+                <>
+                  <Text style={styles.actionText}>{selectedIds.size} documento(s)</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {(() => {
+                      const selectedDocs = documents.filter(d => selectedIds.has(d.id || documents.indexOf(d)));
+                      const canRescan = selectedDocs.some(d => !d.ocr_text || d.ocr_text.trim() === '');
+                      
+                      if (canRescan) {
+                        return (
+                          <TouchableOpacity style={styles.actionBtn} onPress={handleRescanSelected}>
+                            <Ionicons name="document-text" size={16} color={theme.colors.primary} />
+                            <Text style={styles.actionBtnText}>Reescanear</Text>
+                          </TouchableOpacity>
+                        );
+                      } else {
+                        return (
+                          <View style={[styles.actionBtn, { opacity: 0.7, backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.colors.border }]}>
+                            <Ionicons name="checkmark-done" size={16} color={theme.colors.text.secondary} />
+                            <Text style={[styles.actionBtnText, { color: theme.colors.text.secondary }]}>Texto activo</Text>
+                          </View>
+                        );
+                      }
+                    })()}
+                  </View>
+                </>
+              )}
+            </View>
+          )}
+        </>
+      )}
+
+      {/* Notes Segment */}
+      {activeSegment === 'notes' && (
+        <>
+          <View style={studyNotes.length === 0 ? sectionStyles.insightsCard : styles.documentContainer}>
+            {studyNotes.length === 0 ? (
+              <View style={sectionStyles.emptyStateCard}>
+                <Ionicons name="create-outline" size={24} color={theme.colors.text.secondary} />
+                <Text style={sectionStyles.emptyStateTitle}>Sin apuntes</Text>
+                <Text style={sectionStyles.emptyStateText}>
+                  Usa "Procesar clase" para capturar apuntes de esta materia
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={studyNotes.length > 4}
+                bounces={false}
+              >
+                <View style={styles.list}>
+                  {studyNotes.map((note: any) => {
+                    const source = note.source || 'manual';
+                    const iconInfo = SOURCE_ICONS[source] || SOURCE_ICONS.manual;
+                    const mediaCount = note.media_paths ? JSON.parse(note.media_paths).length : 0;
+
                     return (
-                      <TouchableOpacity style={styles.actionBtn} onPress={handleRescanSelected}>
-                        <Ionicons name="document-text" size={16} color={theme.colors.primary} />
-                        <Text style={styles.actionBtnText}>Reescanear</Text>
+                      <TouchableOpacity
+                        key={note.id}
+                        style={styles.noteCard}
+                        activeOpacity={0.7}
+                        onPress={() => {/* TODO: open note detail */}}
+                      >
+                        <View style={[styles.noteIcon, { backgroundColor: iconInfo.bg }]}>
+                          <Ionicons name={iconInfo.name as any} size={18} color={theme.colors.text.primary} />
+                        </View>
+                        <View style={styles.noteInfo}>
+                          <Text style={styles.noteTitle} numberOfLines={1}>
+                            {note.title || 'Sin título'}
+                          </Text>
+                          <Text style={styles.noteMeta} numberOfLines={1}>
+                            {note.content ? `${note.content.split(/\s+/).length} palabras` : ''}
+                            {mediaCount > 0 ? `${note.content ? ' · ' : ''}${mediaCount} archivo(s)` : ''}
+                            {note.ai_summary ? ' · Resumen IA' : ''}
+                          </Text>
+                        </View>
+                        <Text style={styles.noteSource}>{source.toUpperCase()}</Text>
                       </TouchableOpacity>
                     );
-                  } else {
-                    return (
-                      <View style={[styles.actionBtn, { opacity: 0.7, backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.colors.border }]}>
-                        <Ionicons name="checkmark-done" size={16} color={theme.colors.text.secondary} />
-                        <Text style={[styles.actionBtnText, { color: theme.colors.text.secondary }]}>Texto activo</Text>
-                      </View>
-                    );
-                  }
-                })()}
-              </View>
-            </>
-          )}
-        </View>
+                  })}
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </>
       )}
     </View>
   );

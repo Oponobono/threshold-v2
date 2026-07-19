@@ -108,6 +108,15 @@ jest.mock('../DatabaseService', () => {
     async open(): Promise<any> { return db; }
     getDb(): any { return db; }
     async close(): Promise<void> {}
+    async getAllTracked(sql: string, params?: any[], label?: string): Promise<any[]> {
+      return db.getAllAsync(sql, ...(params || []));
+    }
+    async getFirstTracked(sql: string, params?: any[], label?: string): Promise<any | null> {
+      return db.getFirstAsync(sql, ...(params || []));
+    }
+    async runTracked(sql: string, params?: any[], label?: string): Promise<any> {
+      return db.runAsync(sql, ...(params || []));
+    }
   }
   return { databaseService: new MockDatabaseService(), DatabaseService: MockDatabaseService };
 });

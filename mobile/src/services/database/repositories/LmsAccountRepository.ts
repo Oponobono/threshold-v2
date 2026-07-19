@@ -4,9 +4,9 @@ export interface LmsAccount {
   id: string;
   user_id: string;
   platform: string;
-  instance_url?: string;
-  username?: string;
-  created_at?: string;
+  instance_url: string | null;
+  username: string | null;
+  created_at: string | null;
 }
 
 export class LmsAccountRepository extends BaseRepository<LmsAccount> {

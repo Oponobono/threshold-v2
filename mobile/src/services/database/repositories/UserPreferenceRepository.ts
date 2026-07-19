@@ -1,6 +1,7 @@
 import { BaseRepository } from '../BaseRepository';
 
 export interface UserPreference {
+  id: string;
   key: string;
   value: string;
   cloud_url?: string;

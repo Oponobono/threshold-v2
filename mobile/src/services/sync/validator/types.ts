@@ -1,5 +1,6 @@
 export type EntityStatus =
   | 'OK'
+  | 'EMPTY'
   | 'COUNT_MISMATCH'
   | 'CHECKSUM_MISMATCH'
   | 'VERSION_MISMATCH'

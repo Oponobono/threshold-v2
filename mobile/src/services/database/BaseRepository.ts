@@ -11,13 +11,7 @@ export class BaseRepository<T extends { id: string }> {
 
   protected mapRow(row: any): T {
     if (!row) return row;
-    const result: any = {};
-    for (const key in row) {
-      if (Object.prototype.hasOwnProperty.call(row, key)) {
-        result[key] = row[key] === null ? undefined : row[key];
-      }
-    }
-    return result as T;
+    return { ...row } as T;
   }
 
   protected buildActiveWhereClause(extraWhere?: string): string {
@@ -125,7 +119,7 @@ export class BaseRepository<T extends { id: string }> {
       const val = (data as any)[k];
       if (val !== undefined) {
         filteredKeys.push(k);
-        filteredValues.push(val === undefined ? null : val);
+        filteredValues.push(val);
       }
     }
 

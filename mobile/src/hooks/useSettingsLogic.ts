@@ -188,7 +188,7 @@ export const useSettingsLogic = () => {
           return true;
         });
         if (customSystems.length > 0) {
-          const nextId = Math.max(...DEFAULT_GRADING_SYSTEMS.map(s => s.id)) + 1;
+          let nextId = Math.max(...DEFAULT_GRADING_SYSTEMS.map(s => s.id)) + 1;
           const remapped = customSystems.map(s => defaultIds.has(s.id) ? { ...s, id: nextId++ } : s);
           setGradingSystems(prev => [...prev, ...remapped]);
         }

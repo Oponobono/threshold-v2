@@ -84,6 +84,7 @@ interface DataState {
   refreshProfile: () => Promise<void>;
   refreshUserGroups: () => Promise<void>;
   refreshOverallGpa: () => Promise<void>;
+  refreshFlashcardDecks: () => Promise<void>;
   syncTodaySchedules: () => Promise<void>;
   refreshPredictions: (userId: string | number) => Promise<void>;
   loadCachedPredictions: () => Promise<void>;
@@ -104,6 +105,9 @@ export const useDataStore = create<DataState>((set, get) => {
   });
   repositoryEventBus.on('schedules', () => {
     get().refreshSchedules();
+  });
+  repositoryEventBus.on('flashcard_decks', () => {
+    get().refreshFlashcardDecks();
   });
 
   return {
@@ -163,6 +167,9 @@ export const useDataStore = create<DataState>((set, get) => {
 
       const dbSchedules = await scheduleRepository.getAll();
       set({ schedules: dbSchedules || [] });
+
+      const dbFlashcardDecks = await flashcardDeckRepository.getAll();
+      set({ flashcardDecks: dbFlashcardDecks || [] });
 
       const currentUser = await userRepository.getCurrentUser();
       if (currentUser) {
@@ -224,6 +231,15 @@ export const useDataStore = create<DataState>((set, get) => {
       set({ schedules: dbSchedules || [] });
     } catch (error) {
       console.error('[DataStore] refreshSchedules error:', error);
+    }
+  },
+
+  refreshFlashcardDecks: async () => {
+    try {
+      const dbDecks = await flashcardDeckRepository.getAll();
+      set({ flashcardDecks: dbDecks || [] });
+    } catch (error) {
+      console.error('[DataStore] refreshFlashcardDecks error:', error);
     }
   },
 

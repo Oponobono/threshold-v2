@@ -1,4 +1,4 @@
-export function formatRelativeTime(dateStr?: string): string {
+export function formatRelativeTime(dateStr?: string | null): string {
   if (!dateStr) return 'sin actividad';
   try {
     const date = new Date(dateStr);

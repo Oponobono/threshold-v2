@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const ASSET_DIR = `${FileSystem.documentDirectory}assets/`;
 const MAX_BYTES = 3 * 1024 * 1024 * 1024; // 3 GB
@@ -46,7 +46,7 @@ export class PersistentLocalAssetStore {
       if (!info.exists) return null;
       // expo-file-system provides md5, but we need sha256
       // Fallback: use a simple approach — read file info
-      const md5 = await FileSystem.getInfoAsync(path, { size: true, md5: true });
+      const md5 = await FileSystem.getInfoAsync(path, { md5: true });
       if (md5.exists && 'md5' in md5) {
         return (md5 as any).md5 || null;
       }

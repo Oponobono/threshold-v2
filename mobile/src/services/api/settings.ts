@@ -9,14 +9,14 @@ export interface GradingPeriod {
   period_type: string;
   start_date: string | null;
   end_date: string | null;
-  is_active: number;
-  created_at: string;
+  is_active: number | null;
+  created_at: string | null;
 }
 
 export interface ThresholdOverride {
   id: string;
   user_id: string;
-  subject_id: string;
+  subject_id: string | null;
   subject_name?: string;
   subject_color?: string;
   threshold: number;
@@ -26,9 +26,9 @@ export interface LmsAccount {
   id: string;
   user_id: string;
   platform: string;
-  instance_url: string;
-  username: string;
-  created_at: string;
+  instance_url: string | null;
+  username: string | null;
+  created_at: string | null;
 }
 
 export interface TwoFactorStatus {

@@ -26,6 +26,7 @@ import { AutoUploadIndicator } from '../../src/components/ui/AutoUploadIndicator
 import { SubjectYouTubeVideos } from '../../src/components/subjects/SubjectYouTubeVideos';
 import { PDFImportModal } from '../../src/components/modals/PDFImportModal';
 import { GradeCalculator } from '../../src/components/subjects/GradeCalculator';
+import { ZyrenIngestionModal } from '../../src/components/subjects/ZyrenIngestionModal';
 import { useSubjectDetail } from '../../src/hooks/useSubjectDetail';
 import { updateSubject } from '../../src/services/api';
 import { SCALE_MAX } from '../../src/utils/grades';
@@ -40,6 +41,7 @@ export default function SubjectDetailScreen() {
     imagePhotos,
     pdfDocuments,
     recentRecordings,
+    studyNotes,
     storeSubjects,
     averageGrade,
     projectedGrade,
@@ -108,6 +110,7 @@ export default function SubjectDetailScreen() {
   const [calcRemainingWeight, setCalcRemainingWeight] = useState('');
   const [calcMinNeeded, setCalcMinNeeded] = useState<number | null>(null);
   const [calcMaxAchievable, setCalcMaxAchievable] = useState<number | null>(null);
+  const [isZyrenModalVisible, setIsZyrenModalVisible] = useState(false);
 
   useEffect(() => {
     if (selectedSubject) {
@@ -269,8 +272,10 @@ export default function SubjectDetailScreen() {
 
           <SubjectDocumentsList
             documents={pdfDocuments}
+            studyNotes={studyNotes}
             onDocumentDeleted={handleDocumentDeleted}
             onOpenImportPDF={() => setIsPDFImportVisible(true)}
+            onOpenZyren={() => setIsZyrenModalVisible(true)}
             onGenerateFlashcards={handleGenerateFlashcardsFromDocs}
             onExportPdf={handleExportPdf}
           />
@@ -382,6 +387,19 @@ export default function SubjectDetailScreen() {
         explanation={overlayText}
         onDismiss={() => setOverlayVisible(false)}
       />
+
+      {selectedSubject && (
+        <ZyrenIngestionModal
+          visible={isZyrenModalVisible}
+          onClose={() => setIsZyrenModalVisible(false)}
+          courseName={selectedSubject.course_name || ''}
+          subjectName={selectedSubject.name}
+          subjectId={selectedSubject.id}
+          subjectColor={selectedSubject.color}
+          subjectIcon={selectedSubject.icon}
+          currentMilestone={selectedSubject.milestone}
+        />
+      )}
     </>
   );
 }

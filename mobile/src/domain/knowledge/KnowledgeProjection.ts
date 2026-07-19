@@ -5,7 +5,7 @@ import { snapshotTelemetry } from './SnapshotTelemetryService';
 import { ConsoleTelemetryCollector, MmkvTelemetryCollector } from './SnapshotTelemetryCollector';
 import type { KnowledgeSnapshot } from './types';
 import type { KnowledgeProvider } from './KnowledgeProvider';
-import type { SnapshotBuildReason } from './SnapshotTelemetryTypes';
+import { SnapshotBuildReason } from './SnapshotTelemetryTypes';
 
 let collectorsInitialized = false;
 

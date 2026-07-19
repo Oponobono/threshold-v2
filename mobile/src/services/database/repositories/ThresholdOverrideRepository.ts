@@ -3,9 +3,9 @@ import { BaseRepository } from '../BaseRepository';
 export interface ThresholdOverride {
   id: string;
   user_id: string;
-  subject_id?: string;
+  subject_id: string | null;
   threshold: number;
-  created_at?: string;
+  created_at: string | null;
 }
 
 export class ThresholdOverrideRepository extends BaseRepository<ThresholdOverride> {

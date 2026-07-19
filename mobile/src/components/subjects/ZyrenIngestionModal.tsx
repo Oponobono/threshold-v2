@@ -4,12 +4,13 @@ import {
   ActivityIndicator, ScrollView, Alert, Image, ActionSheetIOS, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { fetchWithFallback } from '../../services/api/client';
 import { addLocalCard, recalculateLocalDeckCounters } from '../../services/localFlashcardService';
+import { studyNoteRepository } from '../../services/database';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { extractTextFromImageHybrid, generateClassFlashcardsHybrid } from '../../services/hybridAIService';
@@ -109,6 +110,63 @@ export function ZyrenIngestionModal({
 
   const removeImage = (index: number) => {
     setAttachedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // ── Guardar apuntes localmente ──────────────────────────────────────────────
+
+  const saveNotesLocally = async () => {
+    const hasNotes = notes.trim().length > 0;
+    const hasImages = attachedImages.length > 0;
+
+    if (!hasNotes && !hasImages) {
+      Alert.alert('Sin contenido', 'Escribe algo o adjunta al menos una foto para guardar tus apuntes.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const noteId = uuidv4();
+      const mediaEntries: { id: string; type: string; path: string }[] = [];
+
+      // Copiar imágenes a almacenamiento permanente
+      if (hasImages) {
+        const notesDir = `${FileSystem.documentDirectory}notes/${noteId}/`;
+        await FileSystem.makeDirectoryAsync(notesDir, { intermediates: true });
+
+        for (let i = 0; i < attachedImages.length; i++) {
+          const ext = attachedImages[i].uri.split('.').pop() || 'jpg';
+          const dest = `${notesDir}img_${i}.${ext}`;
+          await FileSystem.copyAsync({ from: attachedImages[i].uri, to: dest });
+          mediaEntries.push({ id: uuidv4(), type: 'image', path: dest });
+        }
+      }
+
+      const wordCount = hasNotes ? notes.trim().split(/\s+/).length : 0;
+
+      const userId = await import('../../services/api').then(m => m.getUserId());
+
+      await studyNoteRepository.create({
+        id: noteId,
+        user_id: String(userId || 0),
+        subject_id: subjectId || undefined,
+        title: notes.trim().substring(0, 80).split('\n')[0] || `${subjectName} — ${new Date().toLocaleDateString('es')}`,
+        content: notes.trim(),
+        media_paths: mediaEntries.length > 0 ? JSON.stringify(mediaEntries) : undefined,
+        source: 'manual',
+        origin: subjectName,
+        processing_state: 'completed',
+      });
+
+      Alert.alert(
+        'Apuntes guardados 📝',
+        `${hasNotes ? `${wordCount} palabras` : ''}${hasNotes && hasImages ? ' y ' : ''}${hasImages ? `${attachedImages.length} foto(s)` : ''} guardados.`,
+        [{ text: 'Perfecto', onPress: handleClose }],
+      );
+    } catch (err: any) {
+      Alert.alert('Error al guardar', err.message || 'No se pudieron guardar los apuntes.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ── Generación ─────────────────────────────────────────────────────────────
@@ -380,15 +438,26 @@ export function ZyrenIngestionModal({
               )}
             </View>
 
-            <TouchableOpacity
-              style={[styles.primaryBtn, loading && { opacity: 0.6 }]}
-              onPress={generateCards}
-              disabled={loading}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <><Text style={styles.primaryBtnText}>Generar con Zyren</Text><Text style={styles.primaryBtnEmoji}>✨</Text></>}
-            </TouchableOpacity>
+            <View style={styles.buttonsRow}>
+              <TouchableOpacity
+                style={[styles.secondaryBtn, loading && { opacity: 0.6 }]}
+                onPress={saveNotesLocally}
+                disabled={loading}
+              >
+                <Text style={styles.secondaryBtnText}>Guardar apuntes</Text>
+                <Text style={styles.secondaryBtnEmoji}>📝</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, loading && { opacity: 0.6 }]}
+                onPress={generateCards}
+                disabled={loading}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <><Text style={styles.primaryBtnText}>Generar con Zyren</Text><Text style={styles.primaryBtnEmoji}>✨</Text></>}
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         )}
 

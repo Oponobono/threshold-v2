@@ -19,3 +19,4 @@ export { audioTranscriptRepository, type AudioTranscript } from './AudioTranscri
 export { youTubeTranscriptRepository, type YouTubeTranscript } from './YouTubeTranscriptRepository';
 export { AiChatRepository, aiChatRepository, type AiChat } from './AiChatRepository';
 export { UserPreferenceRepository, userPreferenceRepository, type UserPreference } from './UserPreferenceRepository';
+export { StudyNoteRepository, studyNoteRepository, type StudyNote } from './StudyNoteRepository';

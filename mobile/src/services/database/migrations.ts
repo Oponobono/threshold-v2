@@ -765,5 +765,33 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_doc_highlights_doc ON document_highlights(document_id)`,
     ],
   },
+  {
+    version: 35,
+    up: [
+      `CREATE TABLE IF NOT EXISTS study_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
+        title TEXT,
+        content TEXT,
+        media_paths TEXT,
+        source TEXT DEFAULT 'manual',
+        origin TEXT,
+        processing_state TEXT DEFAULT 'draft',
+        ai_summary TEXT,
+        ai_keywords TEXT,
+        last_opened_at TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER NOT NULL DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TEXT,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_study_notes_subject ON study_notes(subject_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_study_notes_user ON study_notes(user_id)`,
+    ],
+  },
 ];
 export default migrations;
