@@ -41,6 +41,8 @@ import { CreateGradeModal } from '../../src/components/dashboard/CreateGradeModa
 import { CreateTaskModal } from '../../src/components/dashboard/CreateTaskModal';
 import { SchedulePlannerModal } from '../../src/components/dashboard/SchedulePlannerModal';
 import { OfflineIndicator } from '../../src/components/ui/OfflineIndicator';
+import { GlobalHeroPresenter } from '../../src/presentation/heroes/GlobalHeroPresenter';
+import { CourseHeroPresenter } from '../../src/presentation/heroes/CourseHeroPresenter';
 
 
 
@@ -453,6 +455,9 @@ export default function HybridDashboardScreen() {
     subjectsCarouselRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, []);
 
+  const globalHeroPresenter = useMemo(() => new GlobalHeroPresenter(), []);
+  const courseHeroPresenter = useMemo(() => new CourseHeroPresenter(), []);
+
   const initialScrollIndex = useMemo(() => {
     if (!shouldUseInfiniteCarousel || !subjects.length) return 0;
     return Math.floor(SUBJECT_LOOP_MULTIPLIER / 2) * subjects.length;
@@ -755,32 +760,63 @@ export default function HybridDashboardScreen() {
                 }}
                 renderItem={({ item }) => {
                   if (item.type === 'all') {
+                    const globalViewModel = globalHeroPresenter.build({
+                      subjects: enrichedSubjects,
+                      courses,
+                      assessments,
+                      healthScore: knowledgeSnapshot?.health.score,
+                    });
                     return (
                       <AllSubjectsHeroCard
-                        subjects={enrichedSubjects}
-                        courses={courses}
-                        nextAssessment={nextAssessment}
+                        viewModel={globalViewModel}
                         isActive={selectedDashboardCourseId === null}
                         onPress={() => handleHeroCardSelect(null)}
                       />
                     );
                   }
-                  if (item.type === 'independent') {
+                   if (item.type === 'independent') {
                     const independentSubjects = enrichedSubjects.filter(s => !s.course_id);
+                    const independentCourse = { id: 'independent', user_id: '', name: 'Materias Independientes' } as Course;
+                    const primaryKnowledge = knowledgeSnapshot?.subjects
+                      ?.filter(s => independentSubjects.some(is_ => is_.id === s.subjectId))
+                      .sort((a, b) => a.retrievability - b.retrievability)[0];
+                    const viewModel = courseHeroPresenter.build({
+                      course: independentCourse,
+                      subjects: independentSubjects,
+                      primaryKnowledge: primaryKnowledge ? {
+                        subjectId: primaryKnowledge.subjectId,
+                        subjectName: primaryKnowledge.subjectName,
+                        score: Math.round(primaryKnowledge.retrievability),
+                        memoryLevel: primaryKnowledge.memoryLevel,
+                        retrievability: primaryKnowledge.retrievability,
+                      } : undefined,
+                    });
                     return (
                       <CourseHeroCard
-                        course={{ id: 'independent', user_id: '', name: 'Materias Independientes' }}
-                        subjects={independentSubjects}
+                        viewModel={viewModel}
                         isActive={selectedDashboardCourseId === 'independent'}
                         onPress={() => handleHeroCardSelect('independent')}
                       />
                     );
                   }
                   const courseSubjects = enrichedSubjects.filter(s => s.course_id === item.course.id);
+                  const primaryKnowledge = knowledgeSnapshot?.subjects
+                    ?.filter(s => courseSubjects.some(cs => cs.id === s.subjectId))
+                    .sort((a, b) => a.retrievability - b.retrievability)[0];
+                  const viewModel = courseHeroPresenter.build({
+                    course: item.course,
+                    subjects: courseSubjects,
+                    primaryKnowledge: primaryKnowledge ? {
+                      subjectId: primaryKnowledge.subjectId,
+                      subjectName: primaryKnowledge.subjectName,
+                      score: Math.round(primaryKnowledge.retrievability),
+                      memoryLevel: primaryKnowledge.memoryLevel,
+                      retrievability: primaryKnowledge.retrievability,
+                    } : undefined,
+                  });
                   return (
                     <CourseHeroCard
-                      course={item.course}
-                      subjects={courseSubjects}
+                      viewModel={viewModel}
                       isActive={selectedDashboardCourseId === item.course.id}
                       onPress={() => handleHeroCardSelect(item.course.id)}
                       onEditPress={() => handleEditCourse(item.course)}
@@ -813,6 +849,8 @@ export default function HybridDashboardScreen() {
               )}
             </>
           )}
+
+          
 
           {/* QuickActionRow: class progress for flat courses */}
           {selectedCourse && (selectedCourse.total_classes ?? 0) > 0 ? (() => {

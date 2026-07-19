@@ -1,13 +1,15 @@
-import { StyleSheet } from 'react-native';
-import { Dimensions } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 import { theme } from './theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-export const HERO_CARD_WIDTH = SCREEN_WIDTH - 48;
+export const HERO_CARD_WIDTH = SCREEN_WIDTH - 52;
+export const HERO_CARD_HEIGHT = 368;
 
 export const cHCardStyles = StyleSheet.create({
   card: {
     width: HERO_CARD_WIDTH,
+    height: HERO_CARD_HEIGHT,
+    overflow: 'hidden',
     backgroundColor: theme.colors.card,
     borderRadius: 20,
     padding: 20,
@@ -68,6 +70,14 @@ export const cHCardStyles = StyleSheet.create({
     color: theme.colors.text.placeholder,
     fontWeight: '500',
   },
+  courseName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.colors.text.primary,
+    letterSpacing: -0.4,
+    lineHeight: 26,
+    marginBottom: 6,
+  },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -84,38 +94,6 @@ export const cHCardStyles = StyleSheet.create({
     fontSize: 10,
     color: theme.colors.primary,
     fontWeight: '600',
-  },
-  mainUrlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 6,
-  },
-  mainUrlText: {
-    fontSize: 12,
-    color: theme.colors.primary,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  courseName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: theme.colors.text.primary,
-    letterSpacing: -0.4,
-    lineHeight: 26,
-    marginBottom: 6,
-  },
-  urlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 16,
-  },
-  urlText: {
-    fontSize: 11,
-    color: theme.colors.text.placeholder,
-    fontWeight: '500',
-    flex: 1,
   },
   divider: {
     height: 1,
@@ -152,15 +130,106 @@ export const cHCardStyles = StyleSheet.create({
     backgroundColor: theme.colors.border,
   },
   progressBarBg: {
-    height: 3,
+    height: 4,
     backgroundColor: theme.colors.border,
     borderRadius: 4,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: theme.colors.success,
+    backgroundColor: theme.colors.primary,
     borderRadius: 4,
+  },
+  classesText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    marginBottom: 2,
+  },
+  remainingText: {
+    fontSize: 12,
+    color: theme.colors.text.placeholder,
+    fontWeight: '500',
+  },
+  knowledgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: theme.colors.primary + '08',
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  knowledgeLabel: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
+  },
+  knowledgeValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  continueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: theme.colors.primary + '10',
+    borderRadius: 12,
+  },
+  continueText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.primary,
+    flex: 1,
+  },
+  continueIcon: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  statsSimple: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 12,
+  },
+  statSimpleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statSimpleText: {
+    fontSize: 12,
+    color: theme.colors.text.placeholder,
+    fontWeight: '500',
+  },
+  urlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 16,
+  },
+  urlText: {
+    fontSize: 11,
+    color: theme.colors.text.placeholder,
+    fontWeight: '500',
+    flex: 1,
+  },
+  mainUrlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  mainUrlText: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   cardAllGlobal: {
     backgroundColor: theme.colors.card,
@@ -170,5 +239,104 @@ export const cHCardStyles = StyleSheet.create({
     borderColor: theme.colors.primary,
     borderWidth: 1.5,
     backgroundColor: '#FAFBFF',
+  },
+  globalEcosystemRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 10,
+  },
+  ecosystemItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ecosystemText: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
+  },
+  recommendationSection: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: theme.colors.primary + '10',
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  recommendationHeader: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.text.placeholder,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 6,
+  },
+  recommendationSubject: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+  },
+  recommendationDetail: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  recentActivitySection: {
+    marginTop: 12,
+  },
+  recentActivityHeader: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.text.placeholder,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  activityDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 10,
+  },
+  activityName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    flex: 1,
+  },
+  activityTime: {
+    fontSize: 11,
+    color: theme.colors.text.placeholder,
+    fontWeight: '500',
+  },
+  moreCount: {
+    fontSize: 11,
+    color: theme.colors.text.placeholder,
+    fontWeight: '500',
+    marginTop: 4,
+    marginLeft: 16,
+  },
+  examBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  examText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  examCountdown: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

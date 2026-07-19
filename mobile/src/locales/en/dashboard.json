@@ -248,5 +248,11 @@
   "nothingPending": "Nothing pending",
   "progressSaved": "Progress saved",
   "errorSavingSession": "Error saving study session",
-  "syncing": "Syncing..."
+  "syncing": "Syncing...",
+  "heroTooltips": {
+    "globalHealth": "Average knowledge retention percentage across all your active subjects. Calculated based on time since your last review and how difficult each topic is for you.",
+    "momentum": "Measures recent study activity in this subject (last 4 weeks). 100% = consistent studying. Decreases when you skip studying for several days.",
+    "knowledge": "Percentage of knowledge retained in this subject based on the spaced repetition algorithm. Considers number of reviews, topic difficulty, and time elapsed.",
+    "tapToLearnMore": "Tap for more info"
+  }
 }
