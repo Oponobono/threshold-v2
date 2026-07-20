@@ -3,7 +3,7 @@ const secrets = require('../config/secrets');
 const { db } = require('../db');
 const pdfParse = require('pdf-parse');
 const { deleteFromUploadthing } = require('../utils/uploadthingServer');
-const { incrementSyncVersion, recordDeletion } = require('../helpers/syncVersion');
+const { incrementSyncVersion, recordDeletion, updateWithVersionGuard, respondStaleVersion } = require('../helpers/syncVersion');
 
 /**
  * Obtener documentos escaneados por materia
@@ -121,71 +121,49 @@ exports.deleteScannedDocument = (req, res) => {
 };
 
 /**
- * Actualizar un documento escaneado (ej. agregar ocr_text después de una extracción manual)
+ * Actualizar un documento escaneado (con version guard)
  */
 exports.updateScannedDocument = (req, res) => {
   const { documentId } = req.params;
-  const { name, ocr_text, cloud_url, is_backed_up, subject_id, mime_type } = req.body;
+  const { name, ocr_text, cloud_url, is_backed_up, subject_id, mime_type, sync_version: incomingVersion, version_number } = req.body;
   const userId = req.user.id;
 
   if (!documentId) {
     return res.status(400).json({ error: 'ID de documento requerido' });
   }
 
-  // Construir dinámicamente el query según qué campos se proporcionen
-  const updates = [];
-  const values = [];
-
-  if (name !== undefined) {
-    updates.push('name = ?');
-    values.push(name);
-  }
-  if (cloud_url !== undefined) {
-    updates.push('cloud_url = ?');
-    values.push(cloud_url);
-  }
-  if (is_backed_up !== undefined) {
-    updates.push('is_backed_up = ?');
-    values.push(is_backed_up);
-  }
-  if (subject_id !== undefined) {
-    updates.push('subject_id = ?');
-    values.push(subject_id);
-  }
-  if (mime_type !== undefined) {
-    // Only push if mime_type exists in schema, otherwise ignore or push dynamically.
-    // We added mime_type in mobile, but if backend doesn't have it, this might crash Postgres.
-    // But backend schema for SQLite might not have it yet. Let's just allow it for now if we add it to schema.
-    updates.push('mime_type = ?');
-    values.push(mime_type);
-  }
-  if (ocr_text !== undefined) {
-    updates.push('ocr_text = ?');
-    values.push(ocr_text);
-    if (ocr_text) {
-      updates.push('extracted_at = CURRENT_TIMESTAMP');
-    } else {
-      updates.push('extracted_at = NULL');
-    }
-  }
-
-  if (updates.length === 0) {
-    return res.status(400).json({ error: 'No hay campos para actualizar' });
-  }
-
-  values.push(documentId, userId); // Para el WHERE clause
-
-  const query = `UPDATE scanned_documents SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`;
-
-  db.run(query, values, function(err) {
+  db.get('SELECT id, user_id FROM scanned_documents WHERE id = ? AND user_id = ?', [documentId, userId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ error: 'Documento no encontrado' });
+    if (!row) return res.status(404).json({ error: 'Documento no encontrado o acceso denegado' });
 
-    // Retornar el documento actualizado
-    db.get(`SELECT * FROM scanned_documents WHERE id = ?`, [documentId], (getErr, row) => {
-      if (getErr) return res.status(500).json({ error: getErr.message });
+    const fieldsToUpdate = {};
+    if (name !== undefined) fieldsToUpdate['name'] = name;
+    if (cloud_url !== undefined) fieldsToUpdate['cloud_url'] = cloud_url;
+    if (is_backed_up !== undefined) fieldsToUpdate['is_backed_up'] = is_backed_up;
+    if (subject_id !== undefined) fieldsToUpdate['subject_id'] = subject_id;
+    if (mime_type !== undefined) fieldsToUpdate['mime_type'] = mime_type;
+    if (ocr_text !== undefined) {
+      fieldsToUpdate['ocr_text'] = ocr_text;
+      fieldsToUpdate['extracted_at'] = ocr_text ? new Date().toISOString() : null;
+    }
+    if (version_number !== undefined) fieldsToUpdate['version_number'] = version_number;
+    fieldsToUpdate['updated_at'] = new Date().toISOString();
+
+    if (Object.keys(fieldsToUpdate).length === 1 && fieldsToUpdate['updated_at']) {
+      return res.status(400).json({ error: 'No hay campos para actualizar' });
+    }
+
+    const columns = Object.keys(fieldsToUpdate);
+    const values = Object.values(fieldsToUpdate);
+
+    updateWithVersionGuard('scanned_documents', documentId, columns, values, incomingVersion, (err, changes) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (changes === 0) return respondStaleVersion(res, 'scanned_documents', documentId);
       incrementSyncVersion('scanned_documents', documentId, () => {
-        res.json(row);
+        db.get('SELECT * FROM scanned_documents WHERE id = ?', [documentId], (getErr, updated) => {
+          if (getErr) return res.status(500).json({ error: getErr.message });
+          res.json(updated);
+        });
       });
     });
   });

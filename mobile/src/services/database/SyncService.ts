@@ -93,7 +93,8 @@ export class SyncService {
       { name: 'card_logs', type: 'card-log' },
       { name: 'youtube_videos', type: 'youtube-video' },
       { name: 'ai_chats', type: 'ai-chat' },
-      { name: 'assessment_files', type: 'assessment-file' }
+      { name: 'assessment_files', type: 'assessment-file' },
+      { name: 'study_notes', type: 'study-note' }
     ];
 
     for (const table of tables) {

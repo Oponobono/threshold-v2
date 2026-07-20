@@ -337,6 +337,8 @@ class BootstrapManager {
         // Study
         'study_session':         '/learning/sessions',
         'study-session':         '/learning/sessions',
+        'study_notes':           '/study-notes',
+        'study-note':            '/study-notes',
         'card_review':           `/flashcards/${entity_id}/review`,
         'card-review':           `/flashcards/${entity_id}/review`,
         'card_log':              '/learning/card_logs',
