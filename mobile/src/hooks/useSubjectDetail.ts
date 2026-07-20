@@ -252,9 +252,20 @@ export function useSubjectDetail() {
   }, [photos, scannedDocuments]);
 
   const subjectSubtitle = selectedSubject?.professor || profile?.major || t('subjects.defaultSubtitle');
-  const subjectScheduleLabel = subjectSchedules[0]
-    ? `${subjectSchedules[0].start_time} - ${subjectSchedules[0].end_time}`
-    : t('subjects.noSchedule');
+  const subjectScheduleLabel = useMemo(() => {
+    if (!subjectSchedules.length) return t('subjects.noSchedule');
+    const merged = subjectSchedules.reduce(
+      (acc, s) => {
+        const st = s.start_time;
+        const et = s.end_time;
+        if (!acc.start || (st && st < acc.start)) acc.start = st;
+        if (!acc.end || (et && et > acc.end)) acc.end = et;
+        return acc;
+      },
+      { start: '' as string, end: '' as string },
+    );
+    return merged.start && merged.end ? `${merged.start} - ${merged.end}` : t('subjects.noSchedule');
+  }, [subjectSchedules, t]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 

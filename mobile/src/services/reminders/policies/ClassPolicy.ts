@@ -41,9 +41,40 @@ export class ClassPolicy implements ReminderPolicy {
     return false;
   }
 
-  getExpiration(entity: any): Date | null {
-    const endTime = entity?.endTime ?? entity?.end_date ?? entity?.end;
-    if (!endTime) return null;
-    return new Date(new Date(endTime).getTime() + 1800000);
+  getExpiration(entity: any, now?: Date): Date | null {
+    const eventTime = this.getEventTime(entity, now);
+    if (!eventTime) return null;
+    const endTimeStr = entity?.end_time;
+    if (!endTimeStr) return new Date(eventTime.getTime() + 3600000);
+    const [endHour, endMinute] = endTimeStr.split(':').map(Number);
+    const endTotalMinutes = endHour * 60 + endMinute;
+    const startTotalMinutes = eventTime.getHours() * 60 + eventTime.getMinutes();
+    const durationMs = (endTotalMinutes - startTotalMinutes) * 60000;
+    if (durationMs <= 0) return new Date(eventTime.getTime() + 3600000);
+    return new Date(eventTime.getTime() + durationMs);
+  }
+
+  getEventTime(entity: any, now?: Date): Date | null {
+    const dayOfWeek = entity?.day_of_week;
+    const startTime = entity?.start_time;
+    if (!dayOfWeek || !startTime) return null;
+
+    const [hour, minute] = startTime.split(':').map(Number);
+    if (isNaN(hour) || isNaN(minute)) return null;
+
+    const nowDate = now ?? new Date();
+    const currentDay = nowDate.getDay();
+    const jsDay = dayOfWeek === 7 ? 0 : dayOfWeek;
+
+    let daysUntil = jsDay - currentDay;
+    if (daysUntil < 0 || (daysUntil === 0 && (nowDate.getHours() > hour || (nowDate.getHours() === hour && nowDate.getMinutes() >= minute)))) {
+      daysUntil += 7;
+    }
+
+    const nextOccurrence = new Date(nowDate);
+    nextOccurrence.setDate(nowDate.getDate() + daysUntil);
+    nextOccurrence.setHours(hour, minute, 0, 0);
+
+    return nextOccurrence;
   }
 }

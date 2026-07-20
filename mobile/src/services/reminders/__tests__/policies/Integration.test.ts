@@ -7,6 +7,7 @@ import { GradingPolicy } from '../../policies/GradingPolicy';
 import { SequenceFactory } from '../../SequenceFactory';
 import { ReminderSnapshotAssembler } from '../../ReminderSnapshotAssembler';
 import { FakeClock } from '../../Clock';
+import type { Clock } from '../../Clock';
 import type { ReminderProfile, ReminderSequence } from '../../types';
 
 const assembler = new ReminderSnapshotAssembler();
@@ -29,15 +30,18 @@ function buildSequence(
   entityType: string,
   entity: any,
   profileName: ReminderProfile['name'] = 'standard',
+  clock?: Clock,
 ): ReminderSequence {
   const policy = registry.get(entityType);
   const profile: ReminderProfile = {
     name: profileName,
     defaultOffsets: policy.defaultProfile.defaultOffsets,
   };
+  const now = clock?.now() ?? new Date();
   const offsets = policy.getOffsets(entity, profile);
-  const expiresAt = policy.getExpiration(entity);
-  return factory.buildSequence(entity, entityType, offsets, profile, expiresAt);
+  const expiresAt = policy.getExpiration(entity, now);
+  const eventTime = policy.getEventTime?.(entity, now) ?? null;
+  return factory.buildSequence(entity, entityType, offsets, profile, expiresAt, eventTime);
 }
 
 describe('Integration: Registry → Policy → Factory → Sequence', () => {
@@ -113,8 +117,8 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const registry = createRegistry();
       const factory = new SequenceFactory(clock, assembler);
 
-      const entity = { id: 's-1', endTime: '2026-07-10T13:00:00Z', status: 'active' };
-      const seq = buildSequence(registry, factory, 'schedule', entity);
+      const entity = { id: 's-1', day_of_week: 5, start_time: '13:00', end_time: '13:30', status: 'active' };
+      const seq = buildSequence(registry, factory, 'schedule', entity, 'standard', clock);
 
       expect(seq.reminders).toHaveLength(3);
       expect(seq.entityType).toBe('schedule');
@@ -122,15 +126,18 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       expect(seq.reminders[0].priority).toBe('normal');
     });
 
-    it('expiresAt = endTime + 30min', () => {
+    it('expiresAt = class start + duration', () => {
       const clock = new FakeClock(ANCHOR);
       const registry = createRegistry();
       const factory = new SequenceFactory(clock, assembler);
 
-      const entity = { id: 's-1', endTime: '2026-07-10T13:00:00Z', status: 'active' };
-      const seq = buildSequence(registry, factory, 'schedule', entity);
+      const entity = { id: 's-1', day_of_week: 5, start_time: '13:00', end_time: '13:30', status: 'active' };
+      const seq = buildSequence(registry, factory, 'schedule', entity, 'standard', clock);
 
-      expect(seq.expiresAt!.toISOString()).toBe('2026-07-10T13:30:00.000Z');
+      const policy = registry.get('schedule');
+      const eventTime = policy.getEventTime!(entity, clock.now())!;
+      const expectedDuration = 30 * 60000;
+      expect(seq.expiresAt!.getTime()).toBe(eventTime.getTime() + expectedDuration);
     });
   });
 

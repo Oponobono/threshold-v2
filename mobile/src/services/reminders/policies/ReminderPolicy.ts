@@ -10,5 +10,7 @@ export interface ReminderPolicy {
 
   shouldCancelReminder(reminder: Reminder, entity: any): boolean;
 
-  getExpiration(entity: any): Date | null;
+  getExpiration(entity: any, now?: Date): Date | null;
+
+  getEventTime?(entity: any, now?: Date): Date | null;
 }

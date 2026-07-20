@@ -201,11 +201,13 @@ export class ReminderEngine {
 
   private _buildDesiredSequence(entity: any, entityType: string): ReminderSequence {
     const te0 = this.clock.now().getTime();
+    const now = this.clock.now();
     const policy = this.registry.get(entityType);
     const profile = this._getProfileFor(entityType);
     const offsets = policy.getOffsets(entity, profile);
-    const expiresAt = policy.getExpiration(entity);
-    const seq = this.factory.buildSequence(entity, entityType, offsets, profile, expiresAt);
+    const expiresAt = policy.getExpiration(entity, now);
+    const eventTime = policy.getEventTime?.(entity, now) ?? null;
+    const seq = this.factory.buildSequence(entity, entityType, offsets, profile, expiresAt, eventTime);
     if (!this._buildStages) this._buildStages = [];
     this._buildStages.push({ name: 'entity.build', durationMs: this.clock.now().getTime() - te0, entityCount: 1, sequenceCount: 1 });
     return seq;

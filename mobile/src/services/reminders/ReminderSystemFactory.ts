@@ -72,12 +72,14 @@ export function createDefaultSnapshotRepos(): ReminderEntityRepositories {
   const { flashcardDeckRepository } = require('../database/repositories/FlashcardDeckRepository');
   const { gradingPeriodRepository } = require('../database/repositories/GradingPeriodRepository');
   const { calendarEventRepository } = require('../database/repositories/CalendarEventRepository');
+  const { subjectRepository } = require('../database/repositories/SubjectRepository');
   return {
     assessments: assessmentRepository,
     schedules: scheduleRepository,
     flashcard_decks: flashcardDeckRepository,
     grading_periods: gradingPeriodRepository,
     calendar_events: calendarEventRepository,
+    subjects: subjectRepository,
   };
 }
 

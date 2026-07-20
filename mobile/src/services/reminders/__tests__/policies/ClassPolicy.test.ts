@@ -51,19 +51,45 @@ describe('ClassPolicy', () => {
     });
   });
 
+  describe('getEventTime', () => {
+    it('day_of_week + start_time → Date', () => {
+      const entity = { day_of_week: 2, start_time: '06:00' };
+      const result = policy.getEventTime!(entity);
+      expect(result).not.toBeNull();
+      expect(result!.getHours()).toBe(6);
+      expect(result!.getMinutes()).toBe(0);
+    });
+
+    it('sin day_of_week → null', () => {
+      expect(policy.getEventTime!({ start_time: '06:00' })).toBeNull();
+    });
+
+    it('sin start_time → null', () => {
+      expect(policy.getEventTime!({ day_of_week: 2 })).toBeNull();
+    });
+  });
+
   describe('getExpiration', () => {
-    it('endTime → endTime + 30 min', () => {
-      const exp = policy.getExpiration({ endTime: '2026-07-10T13:00:00Z' });
-      expect(exp!.toISOString()).toBe('2026-07-10T13:30:00.000Z');
+    it('day_of_week + start_time + end_time → start + duration', () => {
+      const entity = { day_of_week: 2, start_time: '06:00', end_time: '08:00' };
+      const exp = policy.getExpiration(entity);
+      expect(exp).not.toBeNull();
+      const eventTime = policy.getEventTime!(entity)!;
+      const durationMs = exp!.getTime() - eventTime.getTime();
+      expect(durationMs).toBe(2 * 3600000);
     });
 
-    it('end_date → end_date + 30 min', () => {
-      const exp = policy.getExpiration({ end_date: '2026-07-10T14:00:00Z' });
-      expect(exp!.toISOString()).toBe('2026-07-10T14:30:00.000Z');
-    });
-
-    it('sin endTime → null', () => {
+    it('sin start_time → null', () => {
       expect(policy.getExpiration({})).toBeNull();
+    });
+
+    it('sin end_time → fallback 1h', () => {
+      const entity = { day_of_week: 2, start_time: '06:00' };
+      const exp = policy.getExpiration(entity);
+      expect(exp).not.toBeNull();
+      const eventTime = policy.getEventTime!(entity)!;
+      const durationMs = exp!.getTime() - eventTime.getTime();
+      expect(durationMs).toBe(3600000);
     });
   });
 });

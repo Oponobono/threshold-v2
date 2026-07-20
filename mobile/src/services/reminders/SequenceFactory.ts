@@ -7,6 +7,7 @@ import type {
   InterruptionPriority,
   ReminderProfile,
 } from './types';
+import type { ReminderPolicy } from './policies/ReminderPolicy';
 
 export class SequenceFactory {
   constructor(
@@ -20,16 +21,19 @@ export class SequenceFactory {
     offsets: readonly number[],
     profile: ReminderProfile,
     expiresAt?: Date | null,
+    eventTime?: Date | null,
   ): ReminderSequence {
     const now = this.clock.now();
     const entityId = this._id(entity);
     const snapshot = this.snapshotAssembler.build(entity, entityType);
     const seqId = `${entityType}::${entityId}`;
 
+    const baseTime = eventTime ?? now;
+
     const reminders: Reminder[] = [];
     for (let i = 0; i < offsets.length; i++) {
       const offsetMinutes = offsets[i];
-      const scheduledAt = new Date(now.getTime() + offsetMinutes * 60000);
+      const scheduledAt = new Date(baseTime.getTime() + offsetMinutes * 60000);
       const intent = this._determineIntent(entityType, offsetMinutes);
       const priority = this._determinePriority(entityType, entity, offsetMinutes, now);
       const id = `${entityType}::${entityId}::${i}`;

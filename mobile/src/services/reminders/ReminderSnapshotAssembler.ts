@@ -27,10 +27,12 @@ export class ReminderSnapshotAssembler {
   }
 
   private _buildSubject(entity: any): { id: string; name: string } | undefined {
-    if (!entity.subject) return undefined;
+    const subjectId = entity?.subject_id ?? entity?.subject?.id;
+    if (!subjectId) return undefined;
+    const subjectName = entity?.subject?.name ?? entity?.subject_name ?? '';
     return {
-      id: String(entity.subject.id ?? EMPTY_ID),
-      name: entity.subject.name ?? '',
+      id: String(subjectId ?? EMPTY_ID),
+      name: subjectName,
     };
   }
 

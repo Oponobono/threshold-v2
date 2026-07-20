@@ -22,6 +22,9 @@ export class TemplateResolver {
   }
 
   private _resolveEntityName(reminder: DeliveryReminderDomain): string {
+    if (reminder.entityType === 'schedule' && reminder.snapshot.subject?.name) {
+      return reminder.snapshot.subject.name;
+    }
     if (reminder.snapshot.entity.name) return reminder.snapshot.entity.name;
     return this.i18n.translate('category.' + reminder.entityType, { default: reminder.entityType });
   }
