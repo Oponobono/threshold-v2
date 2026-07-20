@@ -26,6 +26,9 @@ async function main() {
 
     const scenarios = [
       require('./scenarios/basic'),
+      require('./scenarios/verification'),
+      require('./scenarios/backup'),
+      require('./scenarios/restoreValidation'),
     ];
 
     let totalPassed = 0;

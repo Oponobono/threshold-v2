@@ -20,17 +20,16 @@ class TestEnvironment {
 
   async start() {
     const db = new sqlite3.Database(this.backendDbPath);
-    // Force JWT_SECRET before dotenv loads the .env production key
     process.env.JWT_SECRET = 'test-secret-key-threshold';
     await new Promise((resolve, reject) => {
-      let pending = 0;
-      const done = () => { if (--pending <= 0) resolve(); };
+      let pending = 1;
+      const done = (err) => { if (err) console.error('[TestEnv] Schema error:', err.message); if (--pending <= 0) resolve(); };
       const run = (sql, params) => {
         pending++;
         if (params) db.run(sql, params, done);
         else db.run(sql, done);
       };
-      run(`PRAGMA foreign_keys = ON`);
+      run(`PRAGMA foreign_keys = OFF`);
       run(`CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY, email TEXT UNIQUE, password_hash TEXT NOT NULL,
         name TEXT, username TEXT UNIQUE, share_pin VARCHAR(8) UNIQUE,
@@ -49,6 +48,7 @@ class TestEnvironment {
         UNIQUE(entity_type, entity_id, user_id)
       )`);
       for (const sql of Object.values(TABLE_SCHEMAS)) run(sql);
+      done();
     });
     // Verify sync_version row exists
     const svRow = await new Promise((resolve) => {
@@ -133,8 +133,8 @@ class TestEnvironment {
     const galleryController = require('../../controllers/galleryController');
     const audioController = require('../../controllers/audioController');
     const scannedDocumentsController = require('../../controllers/scannedDocumentsController');
-
-    // Subjects routes
+    const assessmentsController = require('../../controllers/assessmentsController');
+    const backupController = require('../../controllers/backupController');
     app.post('/api/subjects', authMw, subjectsController.createSubject);
     app.put('/api/subjects/:subjectId', authMw, subjectsController.updateSubject);
     app.delete('/api/subjects/:subjectId', authMw, subjectsController.deleteSubject);
@@ -150,6 +150,26 @@ class TestEnvironment {
     app.delete('/api/flashcard-decks/:deckId', authMw, flashcardsController.deleteDeck);
     app.post('/api/flashcard-decks/:deckId/cards', authMw, flashcardsController.createCard);
     app.put('/api/flashcards/:cardId', authMw, flashcardsController.updateCardStatus);
+
+    // Assessment routes
+    app.post('/api/assessments', authMw, assessmentsController.createAssessment);
+    app.put('/api/assessments/:assessmentId', authMw, assessmentsController.updateAssessment);
+    app.delete('/api/assessments/:assessmentId', authMw, assessmentsController.deleteAssessment);
+
+    // Study notes route (minimal upsert for sync testing)
+    app.post('/api/study-notes', authMw, (req, res) => {
+      const { id: clientId, subject_id, title, content } = req.body;
+      const userId = req.user.id;
+      const noteId = clientId || require('uuid').v4();
+      reqDb.run(
+        `INSERT OR REPLACE INTO study_notes (id, user_id, subject_id, title, content, sync_version) VALUES (?, ?, ?, ?, ?, 0)`,
+        [noteId, userId, subject_id || null, title || '', content || ''],
+        function(err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.status(201).json({ id: noteId });
+        }
+      );
+    });
 
     // Photo routes
     app.post('/api/photos', authMw, galleryController.savePhoto);
@@ -170,6 +190,13 @@ class TestEnvironment {
     // Sync routes
     app.get('/api/sync/initial', authMw, syncController.initialSync);
     app.get('/api/sync/delta', authMw, syncController.deltaSync);
+
+    // Backup routes
+    app.get('/api/backup/stats', authMw, backupController.getBackupStats);
+    app.get('/api/backup/pending', authMw, backupController.getPendingItems);
+    app.post('/api/backup/mark', authMw, backupController.markAsBackedUp);
+    app.get('/api/backup/cloud-items', authMw, backupController.getCloudItems);
+    app.post('/api/backup/restore-local-uri', authMw, backupController.restoreLocalUri);
 
     // Health
     app.get('/health', (req, res) => res.sendStatus(200));
@@ -242,6 +269,8 @@ class TestEnvironment {
     const galleryController = require('../../controllers/galleryController');
     const audioController = require('../../controllers/audioController');
     const scannedDocumentsController = require('../../controllers/scannedDocumentsController');
+    const assessmentsController = require('../../controllers/assessmentsController');
+    const backupController = require('../../controllers/backupController');
 
     app.post('/api/subjects', authMw, subjectsController.createSubject);
     app.put('/api/subjects/:subjectId', authMw, subjectsController.updateSubject);
@@ -254,6 +283,22 @@ class TestEnvironment {
     app.delete('/api/flashcard-decks/:deckId', authMw, flashcardsController.deleteDeck);
     app.post('/api/flashcard-decks/:deckId/cards', authMw, flashcardsController.createCard);
     app.put('/api/flashcards/:cardId', authMw, flashcardsController.updateCardStatus);
+    app.post('/api/assessments', authMw, assessmentsController.createAssessment);
+    app.put('/api/assessments/:assessmentId', authMw, assessmentsController.updateAssessment);
+    app.delete('/api/assessments/:assessmentId', authMw, assessmentsController.deleteAssessment);
+    app.post('/api/study-notes', authMw, (req, res) => {
+      const { id: clientId, subject_id, title, content } = req.body;
+      const userId = req.user.id;
+      const noteId = clientId || require('uuid').v4();
+      reqDb.run(
+        `INSERT OR REPLACE INTO study_notes (id, user_id, subject_id, title, content, sync_version) VALUES (?, ?, ?, ?, ?, 0)`,
+        [noteId, userId, subject_id || null, title || '', content || ''],
+        function(err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.status(201).json({ id: noteId });
+        }
+      );
+    });
     app.post('/api/photos', authMw, galleryController.savePhoto);
     app.put('/api/photos/:photoId', authMw, galleryController.updatePhoto);
     app.delete('/api/photos/:photoId', authMw, galleryController.deletePhoto);
@@ -266,6 +311,11 @@ class TestEnvironment {
     app.delete('/api/scanned_documents/:documentId', authMw, scannedDocumentsController.deleteScannedDocument);
     app.get('/api/sync/initial', authMw, syncController.initialSync);
     app.get('/api/sync/delta', authMw, syncController.deltaSync);
+    app.get('/api/backup/stats', authMw, backupController.getBackupStats);
+    app.get('/api/backup/pending', authMw, backupController.getPendingItems);
+    app.post('/api/backup/mark', authMw, backupController.markAsBackedUp);
+    app.get('/api/backup/cloud-items', authMw, backupController.getCloudItems);
+    app.post('/api/backup/restore-local-uri', authMw, backupController.restoreLocalUri);
     app.get('/health', (req, res) => res.sendStatus(200));
 
     const port = await new Promise((resolve) => {
@@ -293,10 +343,12 @@ class TestEnvironment {
   async dumpBackend() {
     const tables = [
       'subjects', 'courses', 'flashcard_decks', 'flashcards',
-      'assessments', 'schedules', 'calendar_events',
+      'assessments', 'assessment_categories', 'assessment_files',
+      'schedules', 'calendar_events',
       'grading_periods', 'lms_accounts', 'subject_threshold_overrides',
+      'study_sessions', 'study_notes', 'document_highlights',
       'photos', 'audio_recordings', 'audio_transcripts', 'scanned_documents',
-      'youtube_videos', 'youtube_transcripts',
+      'youtube_videos', 'youtube_transcripts', 'ai_chats',
       'sync_deletions', 'sync_version',
     ];
     const result = {};
@@ -353,9 +405,11 @@ const TABLE_SCHEMAS = {
   )`,
   assessments: `CREATE TABLE IF NOT EXISTS assessments (
     id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, category_id TEXT,
-    name TEXT, description TEXT, max_score REAL, weight REAL,
-    score REAL, normalized_value REAL, is_completed INTEGER DEFAULT 0,
-    completed_at TEXT, due_date TEXT, created_at TEXT, updated_at TEXT,
+    name TEXT, type TEXT, description TEXT, date TEXT, max_score REAL, weight REAL,
+    out_of REAL, score REAL, percentage REAL, grade_value REAL,
+    normalized_value REAL, is_completed INTEGER DEFAULT 0,
+    completed_at TEXT, due_date TEXT, period_id TEXT, grading_date TEXT,
+    created_at TEXT, updated_at TEXT,
     sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
   )`,
   assessment_categories: `CREATE TABLE IF NOT EXISTS assessment_categories (
@@ -405,6 +459,42 @@ const TABLE_SCHEMAS = {
     FOREIGN KEY (deck_id) REFERENCES flashcard_decks(id) ON DELETE CASCADE,
     UNIQUE(deck_id, shared_to_user_id)
   )`,
+  ai_chats: `CREATE TABLE IF NOT EXISTS ai_chats (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT,
+    role TEXT, content TEXT, cloud_url TEXT, is_backed_up INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  assessment_files: `CREATE TABLE IF NOT EXISTS assessment_files (
+    id TEXT PRIMARY KEY, assessment_id TEXT, user_id TEXT,
+    file_name TEXT, file_type TEXT, local_uri TEXT, cloud_url TEXT,
+    is_backed_up INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0,
+    FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+  )`,
+  study_notes: `CREATE TABLE IF NOT EXISTS study_notes (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT,
+    title TEXT, content TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  document_highlights: `CREATE TABLE IF NOT EXISTS document_highlights (
+    id TEXT PRIMARY KEY, document_id TEXT, user_id TEXT,
+    page INTEGER, text TEXT, color TEXT, note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0,
+    FOREIGN KEY (document_id) REFERENCES scanned_documents(id) ON DELETE CASCADE
+  )`,
+  user_preferences: `CREATE TABLE IF NOT EXISTS user_preferences (
+    key TEXT PRIMARY KEY, value TEXT, cloud_url TEXT,
+    is_backed_up INTEGER DEFAULT 0,
+    updated_at TEXT DEFAULT (datetime('now'))
+  )`,
   photos: `CREATE TABLE IF NOT EXISTS photos (
     id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT,
     name TEXT, local_uri TEXT,
@@ -452,6 +542,9 @@ const TABLE_SCHEMAS = {
     title TEXT,
     thumbnail_url TEXT,
     duration INTEGER,
+    sync_version INTEGER DEFAULT 0,
+    deleted_at TEXT,
+    version_number INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
   youtube_transcripts: `CREATE TABLE IF NOT EXISTS youtube_transcripts (

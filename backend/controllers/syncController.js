@@ -137,7 +137,7 @@ exports.deltaSync = (req, res) => {
   const traceId = req.headers['x-trace-id'] || null;
   if (traceId) console.log(`[SyncController][${traceId}] deltaSync started — version=${version}`);
 
-  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'audio_recordings', 'scanned_documents', 'youtube_videos', 'ai_chats', 'study_notes'];
+  const regularTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'flashcards', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'study_sessions', 'audio_recordings', 'scanned_documents', 'youtube_videos', 'ai_chats', 'study_notes'];
   const specialTableQueries = {
     assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ? AND ac.sync_version > ?`,
     assessment_files: `SELECT af.* FROM assessment_files af JOIN assessments a ON af.assessment_id = a.id JOIN subjects s ON a.subject_id = s.id WHERE s.user_id = ? AND af.sync_version > ?`,

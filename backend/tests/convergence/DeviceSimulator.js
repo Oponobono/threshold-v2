@@ -5,11 +5,11 @@ const sqlite3 = require('sqlite3').verbose();
 
 const SYNCABLE_TABLES = [
   'subjects', 'courses', 'flashcard_decks', 'flashcards',
-  'assessments', 'assessment_categories', 'schedules',
-  'calendar_events', 'grading_periods', 'lms_accounts',
-  'subject_threshold_overrides', 'study_sessions',
+  'assessments', 'assessment_categories', 'assessment_files',
+  'schedules', 'calendar_events', 'grading_periods', 'lms_accounts',
+  'subject_threshold_overrides', 'study_sessions', 'study_notes',
   'photos', 'audio_recordings', 'audio_transcripts', 'scanned_documents',
-  'youtube_videos', 'youtube_transcripts',
+  'youtube_videos', 'youtube_transcripts', 'ai_chats', 'document_highlights',
 ];
 
 const TABLE_DEFS = {
@@ -91,6 +91,9 @@ const TABLE_DEFS = {
     title TEXT,
     thumbnail_url TEXT,
     duration INTEGER,
+    sync_version INTEGER DEFAULT 0,
+    deleted_at TEXT,
+    version_number INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
   youtube_transcripts: `CREATE TABLE IF NOT EXISTS youtube_transcripts (
@@ -130,6 +133,96 @@ const TABLE_DEFS = {
     sync_version INTEGER DEFAULT 0, deleted_at TEXT,
     version_number INTEGER DEFAULT 0
   )`,
+  ai_chats: `CREATE TABLE IF NOT EXISTS ai_chats (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT,
+    role TEXT, content TEXT, cloud_url TEXT, is_backed_up INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  assessments: `CREATE TABLE IF NOT EXISTS assessments (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, category_id TEXT,
+    name TEXT, type TEXT, description TEXT, date TEXT, max_score REAL, weight REAL,
+    out_of REAL, score REAL, percentage REAL, grade_value REAL,
+    normalized_value REAL, is_completed INTEGER DEFAULT 0,
+    completed_at TEXT, due_date TEXT, period_id TEXT, grading_date TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  schedules: `CREATE TABLE IF NOT EXISTS schedules (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, title TEXT,
+    description TEXT, day_of_week INTEGER, start_time TEXT, end_time TEXT,
+    location TEXT, color TEXT, is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  calendar_events: `CREATE TABLE IF NOT EXISTS calendar_events (
+    id TEXT PRIMARY KEY, user_id TEXT, title TEXT, description TEXT,
+    start_date TEXT, end_date TEXT, all_day INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  grading_periods: `CREATE TABLE IF NOT EXISTS grading_periods (
+    id TEXT PRIMARY KEY, user_id TEXT, name TEXT,
+    period_type TEXT DEFAULT 'custom', start_date TEXT, end_date TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT
+  )`,
+  lms_accounts: `CREATE TABLE IF NOT EXISTS lms_accounts (
+    id TEXT PRIMARY KEY, user_id TEXT, platform TEXT, instance_url TEXT,
+    username TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT
+  )`,
+  subject_threshold_overrides: `CREATE TABLE IF NOT EXISTS subject_threshold_overrides (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT,
+    threshold REAL DEFAULT 70,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT
+  )`,
+  study_sessions: `CREATE TABLE IF NOT EXISTS study_sessions (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, deck_id TEXT,
+    duration_minutes INTEGER, cards_reviewed INTEGER, rating TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  assessment_categories: `CREATE TABLE IF NOT EXISTS assessment_categories (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT, name TEXT, weight REAL,
+    created_at TEXT, updated_at TEXT,
+    sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT
+  )`,
+  assessment_files: `CREATE TABLE IF NOT EXISTS assessment_files (
+    id TEXT PRIMARY KEY, assessment_id TEXT, user_id TEXT,
+    file_name TEXT, file_type TEXT, local_uri TEXT, cloud_url TEXT,
+    is_backed_up INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0,
+    FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+  )`,
+  study_notes: `CREATE TABLE IF NOT EXISTS study_notes (
+    id TEXT PRIMARY KEY, user_id TEXT, subject_id TEXT,
+    title TEXT, content TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  document_highlights: `CREATE TABLE IF NOT EXISTS document_highlights (
+    id TEXT PRIMARY KEY, document_id TEXT, user_id TEXT,
+    page INTEGER, text TEXT, color TEXT, note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0,
+    FOREIGN KEY (document_id) REFERENCES scanned_documents(id) ON DELETE CASCADE
+  )`,
 };
 
 const QUEUE_SCHEMA = `CREATE TABLE IF NOT EXISTS sync_queue (
@@ -150,12 +243,15 @@ const ENTITY_MAP = {
   'flashcard-deck': { table: 'flashcard_decks', path: '/flashcard-decks' },
   flashcard: { table: 'flashcards', path: '/flashcards' },
   assessment: { table: 'assessments', path: '/assessments' },
+  'assessment-category': { table: 'assessment_categories', path: '/assessment-categories' },
   schedule: { table: 'schedules', path: '/schedules' },
   'calendar-event': { table: 'calendar_events', path: '/calendar/events' },
   photo: { table: 'photos', path: '/photos' },
   'audio-recording': { table: 'audio_recordings', path: '/audio-recordings' },
   'audio-transcript': { table: 'audio_transcripts', path: '/audio-transcripts' },
   'scanned-document': { table: 'scanned_documents', path: '/scanned_documents' },
+  'study-note': { table: 'study_notes', path: '/study-notes' },
+  'ai-chat': { table: 'ai_chats', path: '/ai-chats' },
 };
 
 class DeviceSimulator {
@@ -262,6 +358,19 @@ class DeviceSimulator {
     }
     if (operation === 'CREATE') return `${this.backendUrl}/api${map.path}`;
     return `${this.backendUrl}/api${map.path}/${entityId}`;
+  }
+
+  async _api(method, path, body) {
+    try {
+      const opts = {
+        method,
+        headers: { 'Authorization': `Bearer ${this.jwtToken}`, 'Content-Type': 'application/json' },
+      };
+      if (body && method !== 'GET') opts.body = JSON.stringify(body);
+      const res = await fetch(`${this.backendUrl}${path}`, opts);
+      const json = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, body: json };
+    } catch (err) { return { ok: false, error: err.message }; }
   }
 
   async op(entityType, operation, entityId, data = {}) {
@@ -441,12 +550,18 @@ class DeviceSimulator {
           }
           const table = {
             courses: 'courses', subjects: 'subjects', assessments: 'assessments',
-            assessment_categories: 'assessment_categories', schedules: 'schedules',
+            assessment_categories: 'assessment_categories',
+            assessment_files: 'assessment_files',
+            schedules: 'schedules',
             flashcards: 'flashcards',
             calendar_events: 'calendar_events', grading_periods: 'grading_periods',
             lms_accounts: 'lms_accounts',
             subject_threshold_overrides: 'subject_threshold_overrides',
-            study_sessions: 'study_sessions', photos: 'photos',
+            study_sessions: 'study_sessions',
+            study_notes: 'study_notes',
+            document_highlights: 'document_highlights',
+            ai_chats: 'ai_chats',
+            photos: 'photos',
             audio_recordings: 'audio_recordings', audio_transcripts: 'audio_transcripts',
             scanned_documents: 'scanned_documents',
             youtube_videos: 'youtube_videos', youtube_transcripts: 'youtube_transcripts',
@@ -464,11 +579,17 @@ class DeviceSimulator {
         for (const d of data.deleted) {
           const t = {
             subjects: 'subjects', courses: 'courses', assessments: 'assessments',
+            assessment_categories: 'assessment_categories',
+            assessment_files: 'assessment_files',
             schedules: 'schedules', flashcard_decks: 'flashcard_decks', flashcards: 'flashcards',
             calendar_events: 'calendar_events', grading_periods: 'grading_periods',
             lms_accounts: 'lms_accounts',
             subject_threshold_overrides: 'subject_threshold_overrides',
-            study_sessions: 'study_sessions', photos: 'photos',
+            study_sessions: 'study_sessions',
+            study_notes: 'study_notes',
+            document_highlights: 'document_highlights',
+            ai_chats: 'ai_chats',
+            photos: 'photos',
             audio_recordings: 'audio_recordings', audio_transcripts: 'audio_transcripts',
             scanned_documents: 'scanned_documents',
             youtube_videos: 'youtube_videos', youtube_transcripts: 'youtube_transcripts',
@@ -499,6 +620,65 @@ class DeviceSimulator {
 
   async destroy() {
     try { this.db.close(); fs.unlinkSync(this.dbPath); } catch {}
+  }
+
+  async markAsBackedUp(type, id, cloudUrl, extra = {}) {
+    const body = { type, id, cloud_url: cloudUrl, ...extra };
+    try {
+      const res = await fetch(`${this.backendUrl}/api/backup/mark`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.jwtToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return { ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) };
+    } catch (err) { return { ok: false, error: err.message }; }
+  }
+
+  async getBackupStats() {
+    try {
+      const res = await fetch(`${this.backendUrl}/api/backup/stats`, {
+        headers: { 'Authorization': `Bearer ${this.jwtToken}` },
+      });
+      return await res.json();
+    } catch { return null; }
+  }
+
+  async getPendingItems() {
+    try {
+      const res = await fetch(`${this.backendUrl}/api/backup/pending`, {
+        headers: { 'Authorization': `Bearer ${this.jwtToken}` },
+      });
+      return await res.json();
+    } catch { return null; }
+  }
+
+  async getCloudItems() {
+    try {
+      const res = await fetch(`${this.backendUrl}/api/backup/cloud-items`, {
+        headers: { 'Authorization': `Bearer ${this.jwtToken}` },
+      });
+      return await res.json();
+    } catch { return null; }
+  }
+
+  async restoreLocalUri(type, id, localUri) {
+    const body = { type, id, local_uri: localUri };
+    try {
+      const res = await fetch(`${this.backendUrl}/api/backup/restore-local-uri`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.jwtToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return { ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) };
+    } catch (err) { return { ok: false, error: err.message }; }
+  }
+
+  async wipeLocalData() {
+    for (const table of SYNCABLE_TABLES) {
+      try { await this._run(`DELETE FROM ${table}`); } catch {}
+    }
+    try { await this._run(`DELETE FROM sync_queue`); } catch {}
+    this.lastSyncVersion = 0;
   }
 }
 

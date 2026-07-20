@@ -256,8 +256,8 @@ exports.createFlashcardDeck = (req, res) => {
           const itemType = card.item_type || 'flashcard';
           const contentJson = JSON.stringify({ front, back });
           db.run(
-            `INSERT OR IGNORE INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
-            [cid, deckId, front, back, itemType, contentJson, hint, explanation],
+            `INSERT OR IGNORE INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+            [cid, deckId, userId, front, back, itemType, contentJson, hint, explanation],
             (cErr) => {
               if (cErr && !cardErr) cardErr = cErr;
               cardDone();
@@ -697,6 +697,7 @@ exports.getCardsByDeckPrioritized = (req, res) => {
 exports.createCard = (req, res) => {
   const { deckId } = req.params;
   const { id: clientId, front, back, sync_version } = req.body;
+  const userId = req.user.id;
   if (!front) return res.status(400).json({ error: 'Faltan campos requeridos (front).' });
 
   db.get(`SELECT id FROM flashcard_decks WHERE id = ?`, [deckId], (deckErr, deck) => {
@@ -716,13 +717,13 @@ exports.createCard = (req, res) => {
     const incomingVersion = sync_version ?? 0;
 
     db.run(
-      `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions, sync_version)
-       VALUES (?, ?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0, ?)
+      `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions, sync_version)
+       VALUES (?, ?, ?, ?, ?, 'flashcard', ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0, ?)
        ON CONFLICT(id) DO UPDATE SET
          front = excluded.front, back = excluded.back,
          content_json = excluded.content_json
        WHERE ? >= COALESCE(flashcards.sync_version, 0)`,
-      [cardId, deckId, safeFront, safeBack, contentJson, nextReviewDateStr, incomingVersion, incomingVersion],
+      [cardId, deckId, userId, safeFront, safeBack, contentJson, nextReviewDateStr, incomingVersion, incomingVersion],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
         incrementSyncVersion('flashcards', cardId, (err2) => {
@@ -750,6 +751,7 @@ exports.createCard = (req, res) => {
 exports.createEvaluationItem = (req, res) => {
   const { deckId } = req.params;
   const { id: clientId, item_type, content_json, hint, explanation } = req.body;
+  const userId = req.user.id;
 
   const validTypes = ['flashcard', 'multiple_choice', 'boolean'];
   if (!item_type || !validTypes.includes(item_type)) {
@@ -781,14 +783,14 @@ exports.createEvaluationItem = (req, res) => {
   const itemId = clientId || uuidv4();
   const incomingVersion = req.body.sync_version ?? 0;
 
-  db.run(
-    `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions, sync_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0, ?)
-     ON CONFLICT(id) DO UPDATE SET
-       front = excluded.front, back = excluded.back,
-       item_type = excluded.item_type, content_json = excluded.content_json,
-       hint = excluded.hint, explanation = excluded.explanation
-     WHERE ? >= COALESCE(flashcards.sync_version, 0)`,
-    [itemId, deckId, front, back, item_type, safeContentStr, safeHint, safeExplanation, nextReviewDateStr, incomingVersion, incomingVersion],
+    db.run(
+      `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status, next_review_date, sm2_ease_factor, sm2_interval, sm2_repetitions, fsrs_stability, fsrs_difficulty, fsrs_repetitions, sync_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, 2.5, 1, 0, 1, 0.5, 0, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         front = excluded.front, back = excluded.back,
+         item_type = excluded.item_type, content_json = excluded.content_json,
+         hint = excluded.hint, explanation = excluded.explanation
+       WHERE ? >= COALESCE(flashcards.sync_version, 0)`,
+      [itemId, deckId, userId, front, back, item_type, safeContentStr, safeHint, safeExplanation, nextReviewDateStr, incomingVersion, incomingVersion],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       incrementSyncVersion('flashcards', itemId, () =>
@@ -986,12 +988,12 @@ exports.shareDeck = (req, res) => {
 /**
  * Helper: Inserta un card en la BD de forma asÃ­ncrona
  */
-function insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count) {
+function insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count, userId) {
   const cardId = uuidv4();
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT INTO flashcards (id, deck_id, front, back, item_type, content_json, hint, explanation, status, is_atomic, parent_card_id, word_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)`,
-      [cardId, deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count],
+      `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status, is_atomic, parent_card_id, word_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)`,
+      [cardId, deckId, userId || null, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count],
       function(err) {
         if (err) reject(err);
         else resolve(cardId);
@@ -1021,7 +1023,7 @@ async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, des
           console.log(`[Atomic] Fragmentando tarjeta densa: ${front.substring(0, 30)}...`);
           const parentContentStr = JSON.stringify(content);
           // Insertar padre (contenedor)
-          const parentId = await insertSingleCard(deckId, front, back, itemType, parentContentStr, hint, explanation, 0, null, density.wordCount);
+          const parentId = await insertSingleCard(deckId, front, back, itemType, parentContentStr, hint, explanation, 0, null, density.wordCount, userId);
           
           // Generar e insertar hijas
           const atomicCards = fragmentCard({ front, back });
@@ -1030,17 +1032,17 @@ async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, des
             const childContentStr = JSON.stringify({ front: atomic.front, back: atomic.back });
             const childWordCount = atomic.back.split(/\s+/).length;
             // Se asume is_atomic = 1
-            await insertSingleCard(deckId, atomic.front, atomic.back, itemType, childContentStr, hint, explanation, 1, parentId, childWordCount);
+            await insertSingleCard(deckId, atomic.front, atomic.back, itemType, childContentStr, hint, explanation, 1, parentId, childWordCount, userId);
           }
         } else {
           // Tarjeta normal
           const contentStr = JSON.stringify(content);
-          await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, density.wordCount);
+          await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, density.wordCount, userId);
         }
       } else {
         // multiple_choice o boolean, no las fragmentamos por ahora
         const contentStr = JSON.stringify(content);
-        await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, 20);
+        await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, 20, userId);
       }
     }
 
