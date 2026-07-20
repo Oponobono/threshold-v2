@@ -793,5 +793,16 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_study_notes_user ON study_notes(user_id)`,
     ],
   },
+  {
+    version: 36,
+    up: [
+      `ALTER TABLE document_highlights ADD COLUMN user_id TEXT`,
+      `ALTER TABLE document_highlights ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE document_highlights ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE document_highlights ADD COLUMN last_modified_by TEXT`,
+      `ALTER TABLE document_highlights ADD COLUMN deleted_at TEXT`,
+      `ALTER TABLE document_highlights ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`,
+    ],
+  },
 ];
 export default migrations;

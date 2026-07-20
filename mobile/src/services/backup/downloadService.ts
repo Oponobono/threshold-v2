@@ -359,13 +359,29 @@ export const downloadCloudItems = async (
     }
   }
 
-  // ── Chats IA ──
+  // ── Chats IA (Procesados por chunks JSON o individuales) ──
   if (data.aiChats && data.aiChats.length > 0) {
+    // Agrupar por cloud_url para no descargar el mismo chunk varias veces
+    const chunksToDownload = new Map<string, any[]>();
+    const localChats: any[] = [];
+
     for (const chat of data.aiChats) {
+      if (chat.cloud_url && chat.cloud_url.endsWith('.json')) {
+        if (!chunksToDownload.has(chat.cloud_url)) {
+          chunksToDownload.set(chat.cloud_url, []);
+        }
+        chunksToDownload.get(chat.cloud_url)!.push(chat);
+      } else {
+        localChats.push(chat); // Chats que no usan JSON chunk
+      }
+    }
+
+    // Tareas para chats sueltos (sin JSON)
+    for (const chat of localChats) {
       tasks.push(async () => {
         try {
-          const role = (chat as any).role || 'user';
-          const content = (chat as any).content || '';
+          const role = chat.role || 'user';
+          const content = chat.content || '';
           const subjectId = chat.subject_id || null;
           await databaseService.getDb().runAsync(
             `INSERT INTO ai_chats (id, subject_id, role, content, cloud_url, created_at, is_backed_up)
@@ -377,6 +393,72 @@ export const downloadCloudItems = async (
         } catch (err) {
           console.error(`[DownloadService] ERROR guardando chat IA ${chat.id} en SQLite local:`, err);
           result.errors++;
+        }
+      });
+    }
+
+    // Tareas para descargar y procesar los chunks JSON
+    for (const [cloudUrl, chatsInChunk] of chunksToDownload.entries()) {
+      tasks.push(async () => {
+        try {
+          const tempUri = `${FileSystem.cacheDirectory}ai_chats_${Date.now()}.json`;
+          await FileSystem.downloadAsync(cloudUrl, tempUri);
+          const chunkStr = await FileSystem.readAsStringAsync(tempUri, { encoding: FileSystem.EncodingType.UTF8 });
+          const parsedChunk = JSON.parse(chunkStr);
+          await FileSystem.deleteAsync(tempUri, { idempotent: true });
+
+          const itemsToInsert = Array.isArray(parsedChunk) ? parsedChunk : [parsedChunk];
+
+          for (const chat of itemsToInsert) {
+            const role = chat.role || 'user';
+            const content = chat.content || '';
+            const subjectId = chat.subject_id || null;
+            await databaseService.getDb().runAsync(
+              `INSERT INTO ai_chats (id, subject_id, role, content, cloud_url, created_at, is_backed_up)
+               VALUES (?, ?, ?, ?, ?, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET content = excluded.content, cloud_url = excluded.cloud_url, is_backed_up = 1`,
+              [chat.id, subjectId ?? null, role, content, cloudUrl, chat.created_at || new Date().toISOString()]
+            );
+          }
+          result.downloaded += chatsInChunk.length;
+        } catch (err) {
+          console.error(`[DownloadService] ERROR procesando chunk de chats IA ${cloudUrl}:`, err);
+          result.errors += chatsInChunk.length;
+        }
+      });
+    }
+  }
+
+  // ── Preferencias de Usuario (JSON chunk) ──
+  if (data.userPreferences && data.userPreferences.length > 0) {
+    const urlsToDownload = new Set<string>();
+    for (const pref of data.userPreferences) {
+      if (pref.cloud_url) urlsToDownload.add(pref.cloud_url);
+    }
+
+    for (const cloudUrl of urlsToDownload) {
+      tasks.push(async () => {
+        try {
+          const tempUri = `${FileSystem.cacheDirectory}user_prefs_${Date.now()}.json`;
+          await FileSystem.downloadAsync(cloudUrl, tempUri);
+          const chunkStr = await FileSystem.readAsStringAsync(tempUri, { encoding: FileSystem.EncodingType.UTF8 });
+          const parsedChunk = JSON.parse(chunkStr);
+          await FileSystem.deleteAsync(tempUri, { idempotent: true });
+
+          const itemsToInsert = Array.isArray(parsedChunk) ? parsedChunk : [parsedChunk];
+
+          for (const pref of itemsToInsert) {
+            await databaseService.getDb().runAsync(
+              `INSERT INTO user_preferences (key, value, cloud_url, updated_at, is_backed_up)
+               VALUES (?, ?, ?, datetime('now'), 1)
+               ON CONFLICT(key) DO UPDATE SET value = excluded.value, cloud_url = excluded.cloud_url, is_backed_up = 1, updated_at = excluded.updated_at`,
+              [pref.key, pref.value, cloudUrl]
+            );
+          }
+          result.downloaded += itemsToInsert.length;
+        } catch (err) {
+          console.error(`[DownloadService] ERROR procesando preferencias desde ${cloudUrl}:`, err);
+          result.errors += urlsToDownload.size;
         }
       });
     }
@@ -508,26 +590,30 @@ export const downloadCloudItems = async (
     }
   }
 
-  // Ejecutar con progreso
+  // Ejecutar con progreso en lotes concurrentes (con límite de 5)
   const total = tasks.length;
   let done = 0;
 
   console.log(`[DownloadService] Ejecutando ${total} tarea(s) de descarga...`);
 
-  for (const task of tasks) {
-    await task();
-    done++;
-    onProgress?.({
-      total,
-      done,
-      current: `${done}/${total}`,
-      errors: result.errors,
-      skipped: result.skipped,
-    });
-    // Ceder el JS Event Loop entre cada tarea para que React Native pueda:
-    // 1. Repintar la UI con el progreso actualizado.
-    // 2. Ejecutar el GC y liberar la memoria del archivo recién descargado.
-    // 3. Responder a los heartbeats del SO (evita ANR / cierre de sesión).
+  const CONCURRENCY_LIMIT = 5;
+  for (let i = 0; i < total; i += CONCURRENCY_LIMIT) {
+    const chunk = tasks.slice(i, i + CONCURRENCY_LIMIT);
+    await Promise.all(
+      chunk.map(async (task) => {
+        await task();
+        done++;
+        const percent = total > 0 ? Math.round((done / total) * 100) : 100;
+        onProgress?.({
+          total,
+          done,
+          current: `${percent}%`,
+          errors: result.errors,
+          skipped: result.skipped,
+        });
+      })
+    );
+    // Ceder el JS Event Loop entre cada lote para que React Native pueda repintar
     await new Promise(resolve => setTimeout(resolve, 0));
   }
 

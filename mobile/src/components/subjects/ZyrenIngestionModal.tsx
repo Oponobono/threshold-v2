@@ -145,7 +145,7 @@ export function ZyrenIngestionModal({
 
       const userId = await import('../../services/api').then(m => m.getUserId());
 
-      await studyNoteRepository.create({
+      const notePayload = {
         id: noteId,
         user_id: String(userId || 0),
         subject_id: subjectId || undefined,
@@ -155,7 +155,19 @@ export function ZyrenIngestionModal({
         source: 'manual',
         origin: subjectName,
         processing_state: 'completed',
-      });
+      };
+
+      await studyNoteRepository.create(notePayload);
+
+      try {
+        if (userId) {
+          const { syncService } = await import('../../services/database/SyncService');
+          await syncService.enqueueCreate('study_notes', noteId, notePayload);
+          console.log('[ZyrenIngestionModal] Study note enqueued for sync');
+        }
+      } catch (syncErr) {
+        console.warn('[ZyrenIngestionModal] Error preparing study note sync:', syncErr);
+      }
 
       Alert.alert(
         'Apuntes guardados 📝',

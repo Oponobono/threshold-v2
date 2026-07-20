@@ -44,6 +44,10 @@ const ENTITY_RANK: Record<string, number> = {
   category: 26,
   feedback: 27,
   notification: 28,
+  'study-notes': 29,
+  study_notes: 29,
+  'document-highlights': 30,
+  document_highlights: 30,
 };
 
 const OPERATION_RANK: Record<string, number> = {

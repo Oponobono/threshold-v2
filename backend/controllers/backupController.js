@@ -654,7 +654,18 @@ exports.getCloudItems = (req, res) => {
                                 (err, rows) => {
                                   if (err) console.error(`[CloudItems] Error ai_chats (User ${userId}):`, err.message);
                                   if (!err && rows) result.aiChats = rows;
-                                  res.json(result);
+
+                                  db.all(
+                                    `SELECT key, cloud_url, updated_at
+                                     FROM user_preferences
+                                     WHERE COALESCE(is_backed_up, 0) = 1 AND cloud_url IS NOT NULL`,
+                                    [],
+                                    (err, rows) => {
+                                      if (err) console.error(`[CloudItems] Error user_preferences:`, err.message);
+                                      if (!err && rows) result.userPreferences = rows;
+                                      res.json(result);
+                                    }
+                                  );
                                 }
                               );
                             }

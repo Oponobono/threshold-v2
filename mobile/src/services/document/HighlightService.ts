@@ -1,5 +1,6 @@
 import type { DocumentHighlight, HighlightColor } from '../../domain/document/DocumentHighlight';
 import { HighlightRepository } from '../../services/database/repositories/HighlightRepository';
+import { syncService } from '../../services/database/SyncService';
 
 const repo = new HighlightRepository();
 
@@ -29,6 +30,7 @@ export async function createHighlight(input: CreateHighlightInput): Promise<Docu
   };
 
   await repo.save(highlight);
+  await syncService.enqueueCreate('document_highlights', highlight.id, highlight);
   return highlight;
 }
 
@@ -37,11 +39,13 @@ export async function getHighlights(documentId: string): Promise<DocumentHighlig
 }
 
 export async function deleteHighlight(id: string): Promise<void> {
-  return repo.deleteById(id);
+  await repo.deleteById(id);
+  await syncService.enqueueDelete('document_highlights', id);
 }
 
 export async function updateHighlightColor(highlight: DocumentHighlight, newColor: HighlightColor): Promise<DocumentHighlight> {
   const updated = { ...highlight, color: newColor };
   await repo.save(updated);
+  await syncService.enqueueUpdate('document_highlights', updated.id, updated);
   return updated;
 }

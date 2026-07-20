@@ -408,8 +408,7 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
        FROM ai_chats ac
        WHERE (ac.is_backed_up IS NULL OR ac.is_backed_up = 0)
        AND ac.content IS NOT NULL AND ac.content != ''
-       ORDER BY ac.created_at DESC
-       LIMIT 6`
+       ORDER BY ac.created_at ASC`
     );
     result.aiChats = unbackedChats.map((c: any) => ({
       id: String(c.id),
@@ -1020,38 +1019,44 @@ export const runBackup = async (
     }
   }
 
-  // ── Chats de IA (subir como .json) ──
-  for (const chat of (pending.aiChats || [])) {
+  // ── Chats de IA (subir en chunks) ──
+  const aiChats = pending.aiChats || [];
+  const chunkSize = 200;
+  for (let i = 0; i < aiChats.length; i += chunkSize) {
+    const chunk = aiChats.slice(i, i + chunkSize);
     tasks.push(async () => {
       try {
-        console.log(`[BackupService] Iniciando backup de chat IA ID: ${chat.id}`);
-        const chatPayload = JSON.stringify({ id: chat.id, user_id: chat.user_id, subject_id: chat.subject_id, role: chat.role, content: chat.content }, null, 2);
-        const tempUri = `${FileSystem.cacheDirectory}ai_chat_${chat.id}.json`;
+        const chunkId = `chunk_${Date.now()}_${i}`;
+        console.log(`[BackupService] Iniciando backup de chat IA chunk: ${chunkId} (${chunk.length} mensajes)`);
+        const chatPayload = JSON.stringify(chunk, null, 2);
+        const tempUri = `${FileSystem.cacheDirectory}ai_chats_${chunkId}.json`;
         await FileSystem.writeAsStringAsync(tempUri, chatPayload, { encoding: FileSystem.EncodingType.UTF8 });
 
-        const result = await uploadFileToUploadthing(tempUri, `ai_chat_${chat.id}.json`, 'application/json');
+        const result = await uploadFileToUploadthing(tempUri, `ai_chats_${chunkId}.json`, 'application/json');
         await FileSystem.deleteAsync(tempUri, { idempotent: true });
 
-        try {
-          await fetchWithFallback(`/backup/mark`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'ai_chat', id: chat.id, user_id: chat.user_id, subject_id: chat.subject_id, cloud_url: result.url }),
-          });
-        } catch (_e) { /* ignora fallo de marca en backend */ }
-        try {
-          await db.runAsync(
-            `UPDATE ai_chats SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
-            [result.url, chat.id]
-          );
-        } catch (e) {
-          console.warn(`[BackupService] No se pudo marcar localmente chat IA ${chat.id}:`, e);
+        for (const chat of chunk) {
+          try {
+            await fetchWithFallback(`/backup/mark`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'ai_chat', id: chat.id, user_id: chat.user_id, subject_id: chat.subject_id, cloud_url: result.url }),
+            });
+          } catch (_e) { /* ignora fallo de marca en backend */ }
+          try {
+            await db.runAsync(
+              `UPDATE ai_chats SET is_backed_up = 1, cloud_url = ? WHERE id = ?`,
+              [result.url, chat.id]
+            );
+          } catch (e) {
+            console.warn(`[BackupService] No se pudo marcar localmente chat IA ${chat.id}:`, e);
+          }
         }
-        console.log(`[BackupService] ÉXITO: Chat IA ${chat.id} respaldado.`);
-        uploaded++;
+        console.log(`[BackupService] ÉXITO: Chat IA chunk ${chunkId} respaldado.`);
+        uploaded += chunk.length;
       } catch (err) {
-        console.error(`[BackupService] ERROR: Falló el backup de chat IA ${chat.id}:`, err);
-        errors++;
+        console.error(`[BackupService] ERROR subiendo chat IA chunk ${i}:`, err);
+        errors += chunk.length;
       }
     });
   }
@@ -1143,14 +1148,22 @@ export const runBackup = async (
     });
   }
 
-  // Ejecutar todas las tareas en lotes con pausas para no bloquear el UI ni el Event Loop
+  // Ejecutar todas las tareas en lotes concurrentes (con límite de 5)
   const total = tasks.length;
   let done = 0;
-  for (const task of tasks) {
-    await task();
-    done++;
-    onProgress?.({ total, done, current: `${done}/${total}`, errors });
-    // Ceder el JS Event Loop entre cada tarea para evitar ANR / OOM
+  
+  const CONCURRENCY_LIMIT = 5;
+  for (let i = 0; i < total; i += CONCURRENCY_LIMIT) {
+    const chunk = tasks.slice(i, i + CONCURRENCY_LIMIT);
+    await Promise.all(
+      chunk.map(async (task) => {
+        await task();
+        done++;
+        const percent = total > 0 ? Math.round((done / total) * 100) : 100;
+        onProgress?.({ total, done, current: `${percent}%`, errors });
+      })
+    );
+    // Ceder el JS Event Loop entre cada lote para evitar ANR / OOM
     await new Promise(resolve => setTimeout(resolve, 0));
   }
 

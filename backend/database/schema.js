@@ -1490,6 +1490,117 @@ const tableSchema = {
       )
     `,
   },
+  study_notes: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS study_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        subject_id TEXT,
+        title TEXT,
+        content TEXT,
+        media_paths TEXT,
+        source TEXT DEFAULT 'manual',
+        origin TEXT,
+        processing_state TEXT DEFAULT 'draft',
+        ai_summary TEXT,
+        ai_keywords TEXT,
+        last_opened_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS study_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
+        title TEXT,
+        content TEXT,
+        media_paths TEXT,
+        source TEXT DEFAULT 'manual',
+        origin TEXT,
+        processing_state TEXT DEFAULT 'draft',
+        ai_summary TEXT,
+        ai_keywords TEXT,
+        last_opened_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'title', type: 'TEXT' },
+      { name: 'content', type: 'TEXT' },
+      { name: 'media_paths', type: 'TEXT' },
+      { name: 'source', type: "TEXT DEFAULT 'manual'" },
+      { name: 'origin', type: 'TEXT' },
+      { name: 'processing_state', type: "TEXT DEFAULT 'draft'" },
+      { name: 'ai_summary', type: 'TEXT' },
+      { name: 'ai_keywords', type: 'TEXT' },
+      { name: 'last_opened_at', type: 'TIMESTAMP' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 0' },
+      { name: 'last_modified_by', type: 'TEXT' },
+      { name: 'deleted_at', type: 'TEXT' },
+    ]
+  },
+  document_highlights: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS document_highlights (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        user_id TEXT,
+        page_index INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT 'yellow',
+        anchor_offset INTEGER NOT NULL DEFAULT 0,
+        focus_offset INTEGER NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TEXT,
+        FOREIGN KEY (document_id) REFERENCES scanned_documents(id) ON DELETE CASCADE
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS document_highlights (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES scanned_documents(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id),
+        page_index INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT 'yellow',
+        anchor_offset INTEGER NOT NULL DEFAULT 0,
+        focus_offset INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'user_id', type: 'TEXT' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 0' },
+      { name: 'last_modified_by', type: 'TEXT' },
+      { name: 'deleted_at', type: 'TEXT' },
+    ]
+  },
 };
 
 module.exports = tableSchema;

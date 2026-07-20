@@ -77,6 +77,17 @@ export class ReminderCoordinator {
     if (!repo) return;
     const entity = await repo.getById(entityId);
     if (entity) {
+      if (entityType === 'schedule' && entity.subject_id && !entity.subject_name) {
+        try {
+          const { subjectRepository } = require('../database/repositories/SubjectRepository');
+          const subject = await subjectRepository.getById(entity.subject_id);
+          if (subject) {
+            entity.subject_name = subject.name;
+          }
+        } catch (e) {
+          console.warn('[ReminderCoordinator] Failed to enrich schedule with subject_name', e);
+        }
+      }
       this.engine.onEntityChanged(entityType, entityId, entity);
     }
   }

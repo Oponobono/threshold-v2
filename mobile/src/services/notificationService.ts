@@ -95,12 +95,12 @@ export async function showBackupUploadNotification(total: number): Promise<void>
     identifier: BACKUP_UPLOAD_ID,
     content: {
       title: `⬆️ ${i18n.t('backup.backingUp')}`,
-      body: `0 / ${total}`,
+      body: `Progreso: 0%`,
       data: { type: 'backup_upload_progress' },
       sound: true,
       ...(Platform.OS === 'android' ? { priority: Notifications.AndroidNotificationPriority.DEFAULT } : {}),
     },
-    trigger: { seconds: 1, channelId: 'backup-progress', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+    trigger: null,
   });
 }
 
@@ -111,12 +111,12 @@ export async function updateBackupUploadNotification(done: number, total: number
     identifier: BACKUP_UPLOAD_ID,
     content: {
       title: `⬆️ ${i18n.t('backup.backingUp')}`,
-      body: `${done} / ${total} · ${currentItem}`,
+      body: `Progreso: ${currentItem}`,
       data: { type: 'backup_upload_progress' },
       sound: true,
       ...(Platform.OS === 'android' ? { priority: Notifications.AndroidNotificationPriority.DEFAULT } : {}),
     },
-    trigger: { seconds: 1, channelId: 'backup-progress', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+    trigger: null,
   });
 }
 
@@ -126,7 +126,7 @@ export async function completeBackupUploadNotification(title: string, body: stri
   await Notifications.scheduleNotificationAsync({
     identifier: BACKUP_UPLOAD_ID,
     content: { title, body, data: { type: 'backup_upload_complete' }, sound: true },
-    trigger: { seconds: 1, channelId: 'backup-progress', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+    trigger: null,
   });
 }
 
@@ -145,12 +145,12 @@ export async function showBackupDownloadNotification(total: number): Promise<voi
     identifier: BACKUP_DOWNLOAD_ID,
     content: {
       title: `⬇️ ${i18n.t('backup.downloading')}`,
-      body: `0 / ${total}`,
+      body: `Progreso: 0%`,
       data: { type: 'backup_download_progress' },
       sound: true,
       ...(Platform.OS === 'android' ? { priority: Notifications.AndroidNotificationPriority.DEFAULT } : {}),
     },
-    trigger: { seconds: 1, channelId: 'backup-progress', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+    trigger: null,
   });
 }
 
@@ -161,12 +161,12 @@ export async function updateBackupDownloadNotification(done: number, total: numb
     identifier: BACKUP_DOWNLOAD_ID,
     content: {
       title: `⬇️ ${i18n.t('backup.downloading')}`,
-      body: `${done} / ${total} · ${currentItem}`,
+      body: `Progreso: ${currentItem}`,
       data: { type: 'backup_download_progress' },
       sound: true,
       ...(Platform.OS === 'android' ? { priority: Notifications.AndroidNotificationPriority.DEFAULT } : {}),
     },
-    trigger: { seconds: 1, channelId: 'backup-progress', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+    trigger: null,
   });
 }
 
@@ -176,7 +176,7 @@ export async function completeBackupDownloadNotification(title: string, body: st
   await Notifications.scheduleNotificationAsync({
     identifier: BACKUP_DOWNLOAD_ID,
     content: { title, body, data: { type: 'backup_download_complete' }, sound: true },
-    trigger: { seconds: 1, channelId: 'backup-progress', type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+    trigger: null,
   });
 }
 

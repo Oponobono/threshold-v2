@@ -6,10 +6,22 @@ export class NotificationReconciler {
     const planIds = new Set(plan.deliverables.map((d) => d.id));
     const existing = await provider.getAll();
 
-    const toCancel = existing.filter((e) => !planIds.has(e.identifier));
-    const toSchedule = plan.deliverables.filter(
-      (d) => !existing.some((e) => e.identifier === d.id),
-    );
+    const planMap = new Map(plan.deliverables.map((d) => [d.id, d]));
+    const existingMap = new Map(existing.map((e) => [e.identifier, e]));
+
+    const toCancel = existing.filter((e) => {
+      const d = planMap.get(e.identifier);
+      if (!d) return true;
+      const timeDiff = d.scheduledAt.getTime() - (e.triggerDate?.getTime() ?? 0);
+      return Math.abs(timeDiff) > 1000 || d.title !== e.title || d.body !== e.body;
+    });
+
+    const toSchedule = plan.deliverables.filter((d) => {
+      const e = existingMap.get(d.id);
+      if (!e) return true;
+      const timeDiff = d.scheduledAt.getTime() - (e.triggerDate?.getTime() ?? 0);
+      return Math.abs(timeDiff) > 1000 || d.title !== e.title || d.body !== e.body;
+    });
 
     const cancelPromises = toCancel.map((e) => provider.cancel(e.identifier));
     const schedulePromises = toSchedule.map((d) =>

@@ -27,6 +27,10 @@ import {
   YouTubeSynchronizer,
   AiChatSynchronizer,
   AssessmentFileSynchronizer,
+  StudyNoteSynchronizer,
+  DocumentHighlightSynchronizer,
+  AudioTranscriptSynchronizer,
+  YouTubeTranscriptSynchronizer,
 } from './synchronizers';
 import { assetSyncEngine } from './asset/AssetSyncEngine';
 import { generateConsistencyReport } from './ConsistencyReport';
@@ -83,6 +87,10 @@ class SyncManager {
     this.registerSynchronizer(new YouTubeSynchronizer());
     this.registerSynchronizer(new AiChatSynchronizer());
     this.registerSynchronizer(new AssessmentFileSynchronizer());
+    this.registerSynchronizer(new StudyNoteSynchronizer());
+    this.registerSynchronizer(new DocumentHighlightSynchronizer());
+    this.registerSynchronizer(new AudioTranscriptSynchronizer());
+    this.registerSynchronizer(new YouTubeTranscriptSynchronizer());
   }
 
   registerSynchronizer(synchronizer: EntitySynchronizer): void {
