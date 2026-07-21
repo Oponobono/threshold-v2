@@ -801,7 +801,17 @@ const migrations: Migration[] = [
       `ALTER TABLE document_highlights ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
       `ALTER TABLE document_highlights ADD COLUMN last_modified_by TEXT`,
       `ALTER TABLE document_highlights ADD COLUMN deleted_at TEXT`,
-      `ALTER TABLE document_highlights ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`,
+      `ALTER TABLE document_highlights ADD COLUMN updated_at TEXT`,
+      `UPDATE document_highlights SET updated_at = datetime('now') WHERE updated_at IS NULL`,
+    ],
+  },
+  {
+    version: 37,
+    up: [
+      `ALTER TABLE study_sessions ADD COLUMN version_number INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE study_sessions ADD COLUMN sync_version INTEGER DEFAULT 0`,
+      `ALTER TABLE study_sessions ADD COLUMN last_modified_by TEXT`,
+      `ALTER TABLE study_sessions ADD COLUMN deleted_at TEXT`,
     ],
   },
 ];

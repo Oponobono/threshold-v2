@@ -69,7 +69,7 @@ exports.createSchedule = (req, res) => {
 
   const scheduleId = clientId || uuidv4();
   const userId = req.user.id;
-  const query = `INSERT INTO schedules (id, user_id, subject_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)`;
+  const query = `INSERT INTO schedules (id, user_id, subject_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, day_of_week = excluded.day_of_week, start_time = excluded.start_time, end_time = excluded.end_time`;
   db.run(query, [scheduleId, userId, subject_id, day_of_week, start_time, end_time], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     incrementSyncVersion('schedules', scheduleId, () => {

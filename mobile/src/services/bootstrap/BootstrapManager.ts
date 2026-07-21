@@ -341,8 +341,7 @@ class BootstrapManager {
         'study-note':            '/study-notes',
         'card_review':           `/flashcards/${entity_id}/review`,
         'card-review':           `/flashcards/${entity_id}/review`,
-        'card_log':              '/learning/card_logs',
-        'card-log':              '/learning/card_logs',
+        // card_logs excluido intencionalmente: auditoría histórica (NO sincronizable)
         'card_snooze':           `/flashcards/${entity_id}/snooze`,
         'card-snooze':           `/flashcards/${entity_id}/snooze`,
         // Settings

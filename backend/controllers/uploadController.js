@@ -3,7 +3,7 @@
  * Recibe archivos del móvil vía multipart/form-data y los sube
  * a Uploadthing usando UTApi (server-side SDK). Devuelve la URL permanente.
  */
-const { UTApi } = require('uploadthing/server');
+const { UTApi, UTFile } = require('uploadthing/server');
 
 // Lazy singleton: se inicializa en la primera petición para garantizar
 // que process.env.UPLOADTHING_TOKEN ya ha sido inyectado por dotenv.
@@ -26,8 +26,8 @@ exports.uploadFile = async (req, res) => {
   try {
     const utapi = getUtapi();
 
-    // Convertir el Buffer de multer en un objeto File (compatible con UTApi)
-    const file = new File([req.file.buffer], req.file.originalname, {
+    // Convertir el Buffer de multer en un UTFile (compatible con UTApi en Node 18+)
+    const file = new UTFile([req.file.buffer], req.file.originalname, {
       type: req.file.mimetype,
     });
 

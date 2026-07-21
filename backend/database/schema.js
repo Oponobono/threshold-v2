@@ -589,9 +589,10 @@ const tableSchema = {
       )
     `,
     postgres: `
-      CREATE TABLE IF NOT EXISTS flashcards (
+       CREATE TABLE IF NOT EXISTS flashcards (
         id TEXT PRIMARY KEY,
         deck_id TEXT NOT NULL REFERENCES flashcard_decks(id) ON DELETE CASCADE,
+        user_id TEXT,
         front TEXT NOT NULL DEFAULT '',
         back TEXT NOT NULL DEFAULT '',
         item_type TEXT NOT NULL DEFAULT 'flashcard',
@@ -603,6 +604,10 @@ const tableSchema = {
         success_count INTEGER DEFAULT 0,
         failure_count INTEGER DEFAULT 0,
         last_review_timestamp TIMESTAMP,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        deleted_at TIMESTAMP,
+        last_modified_by TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `,

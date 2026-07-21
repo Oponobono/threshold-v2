@@ -90,7 +90,7 @@ export class SyncService {
       { name: 'lms_accounts', type: 'lms-account' },
       { name: 'subject_threshold_overrides', type: 'threshold-overrides' },
       { name: 'study_sessions', type: 'study-session' },
-      { name: 'card_logs', type: 'card-log' },
+      // card_logs excluido intencionalmente: auditoría histórica (NO sincronizable)
       { name: 'youtube_videos', type: 'youtube-video' },
       { name: 'ai_chats', type: 'ai-chat' },
       { name: 'assessment_files', type: 'assessment-file' },

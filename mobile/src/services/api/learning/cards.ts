@@ -53,7 +53,7 @@ export const createCardLog = async (logData: Omit<CardLog, 'id' | 'timestamp' | 
     if (response.ok) return responseData;
     throw new Error(responseData?.error || 'Error del servidor');
   } catch {
-    await syncService.enqueueCreate('card-log', id, { ...logData, user_id: userId });
+    // card_logs es auditoría local — no se encola en sync (política Sync Protocol)
     return log;
   }
 };

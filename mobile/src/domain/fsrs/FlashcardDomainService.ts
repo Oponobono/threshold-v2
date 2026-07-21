@@ -97,8 +97,8 @@ export class FlashcardDomainService {
       text_length_words: wordCount,
     };
 
+    // card_logs es auditoría local — nunca se sincroniza (política Sync Protocol)
     await cardLogRepository.create(logData as any);
-    await syncService.enqueueCreate('card-log', logId, logData);
 
     if (card.deck_id) {
       try {
