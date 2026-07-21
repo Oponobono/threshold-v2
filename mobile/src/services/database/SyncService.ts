@@ -76,7 +76,6 @@ export class SyncService {
 
   async enqueueLegacyUnsyncedData(): Promise<number> {
     const db = databaseService.getDb();
-    let count = 0;
     const tables = [
       { name: 'subjects', type: 'subject' },
       { name: 'courses', type: 'course' },
@@ -97,11 +96,14 @@ export class SyncService {
       { name: 'study_notes', type: 'study-note' }
     ];
 
-    for (const table of tables) {
+    let count = 0;
+    const fetchPromises = tables.map(async (table) => {
       try {
         const rows: any[] = await db.getAllAsync(
           `SELECT * FROM ${table.name} WHERE version_number = 0 OR version_number IS NULL`
         );
+        const chunk = [];
+        let localCount = 0;
         for (const row of rows) {
           if (row.deleted_at) continue;
           let payload = { ...row };
@@ -116,18 +118,31 @@ export class SyncService {
               performance_rating: row.performance_rating ?? (typeof row.rating === 'number' ? row.rating : null),
             };
           }
-          await syncQueueRepository.enqueue({
+          chunk.push(syncQueueRepository.enqueue({
             entity_type: table.type,
             entity_id: row.id,
             operation: 'CREATE',
             payload: JSON.stringify(payload),
-          });
-          count++;
+          }));
+          localCount++;
+          
+          if (chunk.length >= 20) {
+            await Promise.all(chunk);
+            chunk.length = 0;
+          }
         }
+        if (chunk.length > 0) {
+          await Promise.all(chunk);
+        }
+        return localCount;
       } catch (e) {
         console.warn(`[SyncService] Error enqueuing legacy data for ${table.name}:`, e);
+        return 0;
       }
-    }
+    });
+    
+    const results = await Promise.all(fetchPromises);
+    count = results.reduce((acc, curr) => acc + curr, 0);
     return count;
   }
 
@@ -137,7 +152,7 @@ export class SyncService {
     // Esta función existe solo como punto de extensión futuro.
   }
 
-  async sync(traceId?: string, options?: { force?: boolean }): Promise<{ success: number; failed: number; pending: number }> {
+  async sync(traceId?: string, options?: { force?: boolean; onProgress?: (done: number, total: number, message: string) => void }): Promise<{ success: number; failed: number; pending: number }> {
     if (this.isSyncing) {
       console.log('[SyncService] Sync ya en progreso, ignorando');
       return { success: 0, failed: 0, pending: 0 };
@@ -209,7 +224,14 @@ export class SyncService {
 
       console.log(`[SyncService] Iniciando Fase 2: sync de ${operations.length} operaciones (${items.length} → ${reduced.length} reducidas)`);
 
+      let doneCount = 0;
+      const totalCount = operations.length;
+
       for (const op of operations) {
+        if (options?.onProgress) {
+          options.onProgress(doneCount, totalCount, `Sincronizando base de datos...`);
+        }
+
         const operationId = syncDebugger.nextOperationId(tid);
         const entityTag = `${op.operation} ${op.entity_type}/${op.entity_id}`;
 
@@ -279,6 +301,10 @@ export class SyncService {
             }
             failed++;
           }
+        }
+        doneCount++;
+        if (options?.onProgress) {
+          options.onProgress(doneCount, totalCount, `Sincronizando base de datos...`);
         }
       }
 

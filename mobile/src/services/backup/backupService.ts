@@ -327,7 +327,7 @@ async function getLocalBackupStats(): Promise<BackupStats> {
  * Obtiene items NO respaldados directamente desde SQLite local.
  * Fuente de verdad para el proceso de backup (is_backed_up = 0).
  */
-async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
+export async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   photos: { id: string; uri: string; subject_id?: string }[];
   audio: { id: string; local_uri: string; name: string; subject_id?: string }[];
   docs: { id: string; local_uri: string; name?: string; subject_id?: string }[];
@@ -352,64 +352,66 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
   };
 
   try {
-    // Fotos no respaldadas
+    // Prepare all async queries
+    const queries = [];
+    
+    // 0: Fotos
+    queries.push(prefs.includePhotos ? db.getAllAsync(`SELECT id, local_uri, subject_id FROM photos WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`) : Promise.resolve([]));
+    
+    // 1: Audio
+    queries.push(prefs.includeAudio ? db.getAllAsync(`SELECT id, local_uri, name, subject_id FROM audio_recordings WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`) : Promise.resolve([]));
+    
+    // 2: Docs
+    queries.push(prefs.includeDocs ? db.getAllAsync(`SELECT id, local_uri, subject_id FROM scanned_documents WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`) : Promise.resolve([]));
+    
+    // 3: Audio Transcripts
+    queries.push(prefs.includeTranscripts ? db.getAllAsync(`SELECT id, recording_id, transcript_text FROM audio_transcripts WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`) : Promise.resolve([]));
+    
+    // 4: YouTube Transcripts
+    queries.push(prefs.includeTranscripts ? db.getAllAsync(`SELECT id, video_id, transcript_text FROM youtube_transcripts WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`) : Promise.resolve([]));
+    
+    // 5: Assessment Files
+    queries.push(prefs.includeAssessmentFiles ? db.getAllAsync(`SELECT id, local_uri, file_name, file_type, assessment_id FROM assessment_files WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`) : Promise.resolve([]));
+    
+    // 6: AI Chats
+    queries.push(db.getAllAsync(`SELECT ac.id, ac.user_id, ac.subject_id, ac.role, ac.content FROM ai_chats ac WHERE (ac.is_backed_up IS NULL OR ac.is_backed_up = 0) AND ac.content IS NOT NULL AND ac.content != '' ORDER BY ac.created_at ASC`));
+    
+    // 7: User Prefs
+    queries.push(db.getAllAsync(`SELECT up.key, up.value FROM user_preferences up WHERE (up.is_backed_up IS NULL OR up.is_backed_up = 0)`));
+    
+    // 8: Decks
+    queries.push(db.getAllAsync(`SELECT id, user_id, subject_id, title, description, linked_event_id, avg_ease_factor, total_reviews, last_reviewed_at FROM flashcard_decks WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`));
+
+    const [photos, audio, docs, audioTranscripts, ytTranscripts, assessFiles, unbackedChats, unbackedPrefs, unbackedDecks] = await Promise.all(queries);
+
     if (prefs.includePhotos) {
-      const photos = await db.getAllAsync(
-        `SELECT id, local_uri, subject_id FROM photos WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
-      );
       result.photos = photos.map((p: any) => ({ id: String(p.id), uri: p.local_uri, subject_id: p.subject_id ? String(p.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.photos.length} foto(s) pendientes`);
     }
 
-    // Grabaciones de audio no respaldadas
     if (prefs.includeAudio) {
-      const audio = await db.getAllAsync(
-        `SELECT id, local_uri, name, subject_id FROM audio_recordings WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
-      );
       result.audio = audio.map((a: any) => ({ id: String(a.id), local_uri: a.local_uri, name: String(a.name), subject_id: a.subject_id ? String(a.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.audio.length} grabación(es) pendiente(s)`);
     }
 
-    // Documentos no respaldados
     if (prefs.includeDocs) {
-      const docs = await db.getAllAsync(
-        `SELECT id, local_uri, subject_id FROM scanned_documents WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
-      );
       result.docs = docs.map((d: any) => ({ id: String(d.id), local_uri: d.local_uri, name: undefined, subject_id: d.subject_id ? String(d.subject_id) : undefined }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.docs.length} documento(s) pendiente(s)`);
     }
 
-    // Transcripciones no respaldadas (desde tablas dedicadas)
     if (prefs.includeTranscripts) {
-      const audioTranscripts = await db.getAllAsync(
-        `SELECT id, recording_id, transcript_text FROM audio_transcripts WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
-      );
       result.transcripts.push(...audioTranscripts.map((t: any) => ({ id: String(t.id), type: 'audio' as const, text: t.transcript_text, recording_id: String(t.recording_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${audioTranscripts.length} transcripción(es) de audio pendiente(s)`);
 
-      const ytTranscripts = await db.getAllAsync(
-        `SELECT id, video_id, transcript_text FROM youtube_transcripts WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`
-      );
       result.transcripts.push(...ytTranscripts.map((t: any) => ({ id: String(t.id), type: 'youtube' as const, text: t.transcript_text, video_id: String(t.video_id) })));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${ytTranscripts.length} transcripción(es) de YouTube pendiente(s)`);
     }
-    // Soportes de evaluaciones no respaldados
+
     if (prefs.includeAssessmentFiles) {
-      const assessFiles = await db.getAllAsync(
-        `SELECT id, local_uri, file_name, file_type, assessment_id FROM assessment_files WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`
-      );
       result.assessmentFiles = assessFiles.map((f: any) => ({ id: String(f.id), local_uri: f.local_uri, file_name: f.file_name, file_type: f.file_type, assessment_id: String(f.assessment_id) }));
       console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.assessmentFiles.length} soporte(s) de evaluación pendiente(s)`);
     }
-    // ── Chats de Zyren (AI) no respaldados ──
-    // Solo respaldar los últimos 6 mensajes
-    const unbackedChats: any[] = await db.getAllAsync(
-      `SELECT ac.id, ac.user_id, ac.subject_id, ac.role, ac.content
-       FROM ai_chats ac
-       WHERE (ac.is_backed_up IS NULL OR ac.is_backed_up = 0)
-       AND ac.content IS NOT NULL AND ac.content != ''
-       ORDER BY ac.created_at ASC`
-    );
+
     result.aiChats = unbackedChats.map((c: any) => ({
       id: String(c.id),
       user_id: String(c.user_id),
@@ -419,25 +421,11 @@ async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
     }));
     console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.aiChats.length} chat(s) de IA pendiente(s)`);
 
-    // ── Preferencias de usuario no respaldadas ──
-    // Agrupar todo en un solo blob JSON para backup
-    const unbackedPrefs: any[] = await db.getAllAsync(
-      `SELECT up.key, up.value FROM user_preferences up
-       WHERE (up.is_backed_up IS NULL OR up.is_backed_up = 0)`
-    );
     result.userPreferences = unbackedPrefs.map((p: any) => ({
       key: String(p.key),
       value: String(p.value),
     }));
     console.log(`[BackupService] getPendingItemsFromLocalDB: ${result.userPreferences.length} preferencia(s) pendiente(s)`);
-
-    // ── Mazos de flashcards no respaldados ──
-    const unbackedDecks: any[] = await db.getAllAsync(
-      `SELECT id, user_id, subject_id, title, description, linked_event_id,
-              avg_ease_factor, total_reviews, last_reviewed_at
-       FROM flashcard_decks
-       WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
-    );
     result.flashcardDecks = unbackedDecks.map((d: any) => ({
       id: String(d.id),
       user_id: String(d.user_id),
@@ -640,6 +628,13 @@ export const runBackup = async (
   // Los ítems creados offline (sin auto-upload) solo existen en SQLite local.
   // En modo online, registrarlos en el backend ANTES de pedir los pendientes.
   // ──────────────────────────────────────────────────────────────────
+  const FASE0_CONCURRENCY = 10;
+  const runParallel = async <T>(items: T[], fn: (item: T) => Promise<void>) => {
+    for (let i = 0; i < items.length; i += FASE0_CONCURRENCY) {
+      await Promise.allSettled(items.slice(i, i + FASE0_CONCURRENCY).map(fn));
+    }
+  };
+
   if (!isOffline) {
     // ── Fase 0a: Fotos locales sin registro en backend ──
     if (prefs.includePhotos) {
@@ -650,17 +645,13 @@ export const runBackup = async (
            WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0a: ${localOnlyPhotos.length} foto(s) sin registro en backend.`);
-        for (const photo of localOnlyPhotos) {
-          try {
-            await fetchWithFallback('/photos', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: photo.id, subject_id: photo.subject_id, local_uri: photo.local_uri, es_favorita: photo.es_favorita, ocr_text: photo.ocr_text, group_id: photo.group_id, userId }),
-            });
-          } catch (_e) {
-            // Ignorar — el UPSERT en /backup/mark lo registrará al marcar
-          }
-        }
+        await runParallel(localOnlyPhotos, async (photo) => {
+          await fetchWithFallback('/photos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: photo.id, subject_id: photo.subject_id, local_uri: photo.local_uri, es_favorita: photo.es_favorita, ocr_text: photo.ocr_text, group_id: photo.group_id, userId }),
+          });
+        });
       } catch (e) {
         console.warn('[BackupService] Fase 0a: Error leyendo fotos locales:', e);
       }
@@ -675,17 +666,13 @@ export const runBackup = async (
            WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0b: ${localOnlyAudio.length} grabación(es) sin registro en backend.`);
-        for (const rec of localOnlyAudio) {
-          try {
-            await fetchWithFallback('/audio-recordings', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: rec.id, user_id: Number(rec.user_id || userId), subject_id: rec.subject_id, name: rec.name, local_uri: rec.local_uri, duration: rec.duration }),
-            });
-          } catch (_e) {
-            // Ignorar
-          }
-        }
+        await runParallel(localOnlyAudio, async (rec) => {
+          await fetchWithFallback('/audio-recordings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: rec.id, user_id: Number(rec.user_id || userId), subject_id: rec.subject_id, name: rec.name, local_uri: rec.local_uri, duration: rec.duration }),
+          });
+        });
       } catch (e) {
         console.warn('[BackupService] Fase 0b: Error leyendo grabaciones locales:', e);
       }
@@ -700,21 +687,18 @@ export const runBackup = async (
            WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0c: ${localOnlyDocs.length} documento(s) sin registro en backend.`);
-        for (const doc of localOnlyDocs) {
-          try {
-            await fetchWithFallback('/scanned_documents', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
-            });
-          } catch (_e) {
-            // Ignorar
-          }
-        }
+        await runParallel(localOnlyDocs, async (doc) => {
+          await fetchWithFallback('/scanned_documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: doc.id, user_id: doc.user_id || userId, subject_id: doc.subject_id, local_uri: doc.local_uri, ocr_text: doc.ocr_text }),
+          });
+        });
       } catch (e) {
         console.warn('[BackupService] Fase 0c: Error leyendo documentos locales:', e);
       }
     }
+
     // ── Fase 0d: Soportes de evaluaciones sin registro en backend ──
     if (prefs.includeAssessmentFiles) {
       try {
@@ -723,20 +707,18 @@ export const runBackup = async (
            WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
         );
         console.log(`[BackupService] Fase 0d: ${localOnlyFiles.length} soporte(s) de evaluación sin registro en backend.`);
-        for (const f of localOnlyFiles) {
-          try {
-            await fetchWithFallback(`/assessments/${f.assessment_id}/files`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: f.id, file_name: f.file_name, file_type: f.file_type, local_uri: f.local_uri, file_size: f.file_size }),
-            });
-          } catch (_e) { /* ignorar — se registrará al marcar */ }
-        }
+        await runParallel(localOnlyFiles, async (f) => {
+          await fetchWithFallback(`/assessments/${f.assessment_id}/files`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: f.id, file_name: f.file_name, file_type: f.file_type, local_uri: f.local_uri, file_size: f.file_size }),
+          });
+        });
       } catch (e) {
         console.warn('[BackupService] Fase 0d: Error leyendo soportes de evaluaciones locales:', e);
       }
     }
-    } // Cierre de if (!isOffline)
+  } // Cierre de if (!isOffline)
 
 
   // ──────────────────────────────────────────────────────────────────
@@ -1148,24 +1130,43 @@ export const runBackup = async (
     });
   }
 
-  // Ejecutar todas las tareas en lotes concurrentes (con límite de 5)
   const total = tasks.length;
   let done = 0;
-  
-  const CONCURRENCY_LIMIT = 5;
-  for (let i = 0; i < total; i += CONCURRENCY_LIMIT) {
-    const chunk = tasks.slice(i, i + CONCURRENCY_LIMIT);
-    await Promise.all(
-      chunk.map(async (task) => {
-        await task();
-        done++;
-        const percent = total > 0 ? Math.round((done / total) * 100) : 100;
-        onProgress?.({ total, done, current: `${percent}%`, errors });
-      })
-    );
-    // Ceder el JS Event Loop entre cada lote para evitar ANR / OOM
-    await new Promise(resolve => setTimeout(resolve, 0));
-  }
+
+  const CONCURRENCY_LIMIT = 10;
+  let active = 0;
+  let index = 0;
+
+  await new Promise<void>((resolve) => {
+    if (total === 0) return resolve();
+    
+    const next = () => {
+      if (done === total) {
+        resolve();
+        return;
+      }
+      
+      while (active < CONCURRENCY_LIMIT && index < total) {
+        const taskIndex = index++;
+        active++;
+        tasks[taskIndex]().then(() => {
+          active--;
+          done++;
+          const percent = total > 0 ? Math.round((done / total) * 100) : 100;
+          onProgress?.({ total, done, current: `${percent}%`, errors });
+          next();
+        }).catch(() => {
+          // Errors are caught inside the individual tasks and added to `errors` counter
+          active--;
+          done++;
+          const percent = total > 0 ? Math.round((done / total) * 100) : 100;
+          onProgress?.({ total, done, current: `${percent}%`, errors });
+          next();
+        });
+      }
+    };
+    next();
+  });
 
   // Guardar fecha del último backup
   await storageService.saveSecure(BACKUP_PREFS.LAST_RUN, new Date().toISOString());
