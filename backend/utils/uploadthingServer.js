@@ -7,7 +7,9 @@ const { UTApi } = require('uploadthing/server');
 let _utapi = null;
 function getUtapi() {
   if (!_utapi) {
-    _utapi = new UTApi();
+    _utapi = new UTApi({
+      token: process.env.UPLOADTHING_TOKEN,
+    });
   }
   return _utapi;
 }

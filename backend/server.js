@@ -1,4 +1,12 @@
 require('dotenv').config();
+
+// UploadThing v7 usa Web Crypto API (crypto.subtle) que en Node 18 no es global.
+// Polyfill necesario hasta migrar a Node 20+.
+if (!globalThis.crypto) {
+  const { webcrypto } = require('node:crypto');
+  globalThis.crypto = webcrypto;
+}
+
 const express = require('express');
 const secrets = require('./config/secrets');
 const cors = require('cors');
