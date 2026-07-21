@@ -36,6 +36,8 @@ import { storageService } from '../services/storageService';
 import { alertRef } from '../components/ui/CustomAlert';
 import { syncService } from '../services/database';
 import { useConnectivityStore } from '../store/useConnectivityStore';
+import { OperationType, OperationStage, createLRO } from '../services/lro/OperationProgress';
+import { operationProgressBus } from '../services/lro/OperationProgressEmitter';
 
 // ─── Helpers de formato ──────────────────────────────────────────────────────
 
@@ -230,12 +232,29 @@ export const useBackupLogic = () => {
 
       // 1. Descargar Datos (JSON desde Supabase via sync initial)
       if (type === 'datos' || type === 'ambos') {
-        const syncResult = await syncManager.requestInitialSync(true);
-        await useDataStore.getState().loadAllData(true);
-        const entitiesMsg = syncResult.entitiesSynced > 0
-          ? `${syncResult.entitiesSynced} registros descargados.`
-          : 'Datos actualizados.';
-        dataMessage = entitiesMsg;
+        const op = createLRO(OperationType.Download);
+        operationProgressBus.emit('started', { operation: op });
+        op.stage = OperationStage.Preparing;
+        op.progress = { current: 0, total: 100, percentage: 0, indeterminate: true };
+        op.message = 'Descargando base de datos...';
+        operationProgressBus.emit('progress', { operation: op });
+
+        try {
+          const syncResult = await syncManager.requestInitialSync(true);
+          op.message = 'Cargando datos en memoria...';
+          operationProgressBus.emit('progress', { operation: op });
+          await useDataStore.getState().loadAllData(true);
+          
+          const entitiesMsg = syncResult.entitiesSynced > 0
+            ? `${syncResult.entitiesSynced} registros descargados.`
+            : 'Datos actualizados.';
+          dataMessage = entitiesMsg;
+          
+          operationProgressBus.emit('completed', { operation: op, result: { downloaded: syncResult.entitiesSynced } });
+        } catch (error: any) {
+          operationProgressBus.emit('failed', { operation: op, error: error.message || 'Error en descarga de datos' });
+          throw error;
+        }
         
         if (type === 'datos') {
           alertRef.show({ title: t('backup.downloadComplete'), message: dataMessage, type: 'success' });
@@ -332,25 +351,18 @@ export const useBackupLogic = () => {
   const totalCount = Number(stats.photos.total) + Number(stats.audio.total) + Number(stats.docs.total) + Number(stats.transcripts.total) + Number(stats.assessmentFiles?.total || 0);
   const backedCount = Number(stats.photos.backed) + Number(stats.audio.backed) + Number(stats.docs.backed) + Number(stats.transcripts.backed) + Number(stats.assessmentFiles?.backed || 0);
 
-  const isBackupRunning = isUploading || isDownloading;
-
   return {
     prefs,
     updatePref,
     stats,
     cloudItemsCount,
     // Upload
-    isUploading,
-    uploadProgress,
     handleBackupNow,
     lastUploadLabel,
     // Download
-    isDownloading,
-    downloadProgress,
     handleDownloadNow,
     lastDownloadLabel,
     // Shared
-    isBackupRunning,
     pendingCount,
     totalCount,
     backedCount,

@@ -20,6 +20,7 @@ import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModa
 import { DeleteAccountModal } from '../src/components/modals/DeleteAccountModal';
 import { LocalAIEngineSection } from '../src/components/settings/LocalAIEngineSection';
 import { OfflineIndicator } from '../src/components/ui/OfflineIndicator';
+import { useConnectivityStore } from '../src/store/useConnectivityStore';
 import {
   AddTermModal,
   ManageOverridesModal,
@@ -183,7 +184,6 @@ export default function SettingsScreen() {
     cloudItemsCount,
     handleBackupNow,
     handleDownloadNow,
-    isBackupRunning,
     pendingCount,
     totalCount,
     backedCount,
@@ -217,6 +217,8 @@ export default function SettingsScreen() {
   const activeDownloadOp = activeDownloads[0] || activeRestores[0];
   const downloadPct = activeDownloadOp?.progress?.percentage ?? 0;
   const isDownloadIndeterminate = activeDownloadOp?.progress?.indeterminate ?? false;
+
+  const isBackupRunning = isUploadingLRO || isDownloadingLRO;
 
   useEffect(() => {
     if (isUploadingLRO && !isUploadIndeterminate && uploadPct > 0) {
@@ -756,7 +758,7 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   style={[styles.backupButton, styles.backupButtonPrimary, isBackupRunning && { opacity: 0.6 }]}
                   onPress={() => handleBackupNow('ambos')}
-                  disabled={isUploadingLRO || pendingCount === 0 || !useConnectivityStore.getState().isOnline}
+                  disabled={isUploadingLRO || !useConnectivityStore.getState().isOnline}
                 >
                   {isUploadingLRO ? (
                     <ActivityIndicator size="small" color="#fff" />
@@ -798,32 +800,19 @@ export default function SettingsScreen() {
               )}
 
               {/* ── Barra de Progreso de Descarga ── */}
-              {(isDownloading && downloadProgress) && (
-                <View style={{ marginTop: 16, paddingHorizontal: 4 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 13, color: theme.colors.text.secondary, fontWeight: '500' }}>
-                      {downloadProgress.current || 'Preparando descarga...'}
+              {isDownloadingLRO && activeDownloadOp && (
+                <View style={styles.syncProgressContainer}>
+                  <View style={styles.syncProgressHeader}>
+                    <Text style={styles.syncProgressText}>
+                      {activeDownloadOp.progress?.message || activeDownloadOp.message || 'Preparando descarga...'}
                     </Text>
-                    <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '600' }}>
-                      {downloadProgress.total > 0 ? Math.round((downloadProgress.done / downloadProgress.total) * 100) : 0}%
+                    <Text style={styles.syncProgressPercent}>
+                      {isDownloadIndeterminate ? '...' : `${downloadPct}%`}
                     </Text>
                   </View>
-                  <View style={{ height: 6, backgroundColor: theme.colors.border + '50', borderRadius: 3, overflow: 'hidden' }}>
-                    <Animated.View
-                      style={{
-                        height: '100%',
-                        backgroundColor: theme.colors.primary,
-                        borderRadius: 3,
-                        width: downloadProgressAnim.interpolate({
-                          inputRange: [0, 100],
-                          outputRange: ['0%', '100%']
-                        })
-                      }}
-                    />
+                  <View style={styles.progressBarBg}>
+                    <Animated.View style={[styles.progressBarFill, { width: downloadProgressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]} />
                   </View>
-                  <Text style={{ fontSize: 11, color: theme.colors.text.secondary, marginTop: 6, textAlign: 'right' }}>
-                    {downloadProgress.done} de {downloadProgress.total} ítems completados
-                  </Text>
                 </View>
               )}
 

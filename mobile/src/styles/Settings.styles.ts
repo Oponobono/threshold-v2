@@ -208,6 +208,34 @@ export const settingsStyles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
+  // ── Sync Progress ──
+  syncProgressContainer: {
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  syncProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  syncProgressText: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    flex: 1,
+    marginRight: 8,
+  },
+  syncProgressPercent: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+  },
+
   // ── Scheduled Backup Section ──
   scheduledSection: {
     marginTop: 16,

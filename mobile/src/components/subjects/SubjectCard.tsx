@@ -5,6 +5,7 @@ import { SubjectIcon } from './SubjectIcon';
 import { SCALE_MAX } from '../../utils/grades';
 import { styles } from '../../styles/SubjectCard.styles';
 import { theme } from '../../styles/theme';
+import { AutoScrollText } from '../ui/AutoScrollText';
 
 function hexToRgba(hex: string, alpha: number): string {
   if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(0,0,0,${alpha})`;
@@ -91,9 +92,10 @@ export const SubjectCard = React.memo(({
         </View>
 
         <View style={styles.infoContainer}>
-          <Text style={styles.title} numberOfLines={2}>
-            {subject.name}
-          </Text>
+          <AutoScrollText
+            text={subject.name}
+            style={styles.title}
+          />
 
           {(subject.next_micro_milestone || subject.next_milestone) && (
             <View style={styles.milestoneContainer}>

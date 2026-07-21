@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { operationProgressBus } from '../../services/lro/OperationProgressEmitter';
-import { LongRunningOperation } from '../../services/lro/OperationProgress';
+import { operationProgressBus } from '../services/lro/OperationProgressEmitter';
+import { LongRunningOperation } from '../services/lro/OperationProgress';
 
 /**
  * Hook to consume all active Long Running Operations (LRO).

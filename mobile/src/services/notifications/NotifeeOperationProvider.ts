@@ -72,7 +72,7 @@ export class NotifeeOperationProvider implements NotificationProvider {
         progress: progress
           ? { max: 100, current: progress.percentage, indeterminate: progress.indeterminate }
           : { max: 100, current: 0, indeterminate: true }, // Estado inicial indeterminado
-        smallIcon: 'ic_notification',
+
       },
     });
   }
@@ -90,7 +90,7 @@ export class NotifeeOperationProvider implements NotificationProvider {
         channelId: CHANNEL_ID,
         ongoing: false,
         progress: { max: 100, current: 100, indeterminate: false },
-        smallIcon: 'ic_notification',
+
         autoCancel: true, // Se descarta al tocarla
       },
     });
@@ -113,7 +113,7 @@ export class NotifeeOperationProvider implements NotificationProvider {
       android: {
         channelId: CHANNEL_ID,
         ongoing: false,
-        smallIcon: 'ic_notification',
+
         autoCancel: true,
       },
     });
@@ -131,7 +131,7 @@ export class NotifeeOperationProvider implements NotificationProvider {
       android: {
         channelId: CHANNEL_ID,
         ongoing: false,
-        smallIcon: 'ic_notification',
+
         autoCancel: true,
       },
     });
