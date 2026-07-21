@@ -73,6 +73,9 @@ const upload = multer({
 app.get('/health', (_req, res) => {
   res.sendStatus(200);
 });
+app.head('/health', (_req, res) => {
+  res.sendStatus(200);
+});
 
 // Root route for Render health checks if configured to /
 app.get('/', (_req, res) => {
