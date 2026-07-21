@@ -32,6 +32,13 @@ exports.createStudySession = (req, res) => {
   const query = `
     INSERT INTO study_sessions (id, user_id, subject_id, session_type, config_value, duration_seconds, performance_rating)
     VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      user_id = excluded.user_id,
+      subject_id = excluded.subject_id,
+      session_type = excluded.session_type,
+      config_value = excluded.config_value,
+      duration_seconds = excluded.duration_seconds,
+      performance_rating = excluded.performance_rating
   `;
 
   db.run(query, [sessionId, user_id, subject_id || null, session_type, config_value || null, duration_seconds, performance_rating || null], function(err) {
