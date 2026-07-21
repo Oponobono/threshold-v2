@@ -30,6 +30,9 @@ import { parseDeeplink, getTargetRoute } from '../src/services/reminders/Navigat
 import { getScheduledBackupConfig } from '../src/services/backup/backupService';
 import { FloatingYouTubePlayer } from '../src/components/player/FloatingYouTubePlayer';
 import { ErrorBoundary } from '../src/components/ui/ErrorBoundary';
+import { initializeConsoleProgressListener } from '../src/services/lro/ConsoleProgressListener';
+import { NotifeeOperationProvider } from '../src/services/notifications/NotifeeOperationProvider';
+import { OperationNotificationController } from '../src/services/notifications/OperationNotificationController';
 
 // [BOOT 00] — Module-level code: se ejecuta DURANTE la evaluación del bundle JS
 // Si la app se queda en blanco sin llegar al splash, el problema está en módulo previo
@@ -117,6 +120,15 @@ function RootNavigator() {
         requestPermissions().then(granted => {
           console.log(`[RootLayout] 📱 Permiso de notificaciones: ${granted ? 'concedido' : 'denegado'}`);
         });
+
+        // 🔷 2b. [LRO-Dev] Registrar ConsoleProgressListener para verificar el bus LRO
+        initializeConsoleProgressListener();
+        
+        // 🔷 2c. Registrar OperationNotificationController con Notifee
+        const notifeeProvider = new NotifeeOperationProvider();
+        const notificationController = new OperationNotificationController(notifeeProvider);
+        await notificationController.initialize();
+        console.log('[RootLayout] ✅ LRO NotificationController (Notifee) registrado');
 
         // 🔷 3. Registrar backup automático si está habilitado
         // IMPORTANTE: Esto debe ocurrir DESPUÉS de que BD esté inicializada

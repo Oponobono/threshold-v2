@@ -13,6 +13,8 @@ import { getUserId } from '../api/auth/session';
 import * as FileSystem from 'expo-file-system/legacy';
 import { databaseService } from '../database/DatabaseService';
 import { useConnectivityStore } from '../../store/useConnectivityStore';
+import { operationProgressBus } from '../lro/OperationProgressEmitter';
+import { OperationType, OperationStage, createLRO, LongRunningOperation } from '../lro/OperationProgress';
 
 // ─── Auto-subida individual ──────────────────────────────────────────────────
 
@@ -580,7 +582,6 @@ export const resetStuckBackupFlags = async (): Promise<{
  * @param onProgress - Callback con el progreso actual (llamado en cada ítem)
  */
 export const runBackup = async (
-  onProgress?: (progress: BackupProgress) => void,
   overridePrefs?: Partial<BackupPreferences>
 ): Promise<{ success: boolean; uploaded: number; errors: number }> => {
   const userId = await getUserId();
@@ -597,6 +598,20 @@ export const runBackup = async (
 
   let uploaded = 0;
   let errors = 0;
+
+  // ── LRO Initialization ──
+  const operation = createLRO(OperationType.Backup);
+  operationProgressBus.emit('started', { operation });
+
+  const emitProgress = (stage: OperationStage, done: number, total: number, msg?: string) => {
+    const percentage = total > 0 ? Math.round((done / total) * 100) : 100;
+    operation.stage = stage;
+    operation.progress = { current: done, total, percentage, indeterminate: total === 0 };
+    if (msg) operation.message = msg;
+    operationProgressBus.emit('progress', { operation });
+  };
+  
+  emitProgress(OperationStage.Preparing, 0, 0, 'Detectando conectividad...');
 
   // Detectar si estamos en modo offline.
   // La probe tiene timeout de 3s para no asumir offline en cold starts de Render.
@@ -1130,12 +1145,16 @@ export const runBackup = async (
     });
   }
 
+  emitProgress(OperationStage.Collecting, 0, 0, 'Preparando elementos...');
+
   const total = tasks.length;
   let done = 0;
 
   const CONCURRENCY_LIMIT = 10;
   let active = 0;
   let index = 0;
+
+  emitProgress(OperationStage.Uploading, 0, total);
 
   await new Promise<void>((resolve) => {
     if (total === 0) return resolve();
@@ -1152,15 +1171,12 @@ export const runBackup = async (
         tasks[taskIndex]().then(() => {
           active--;
           done++;
-          const percent = total > 0 ? Math.round((done / total) * 100) : 100;
-          onProgress?.({ total, done, current: `${percent}%`, errors });
+          emitProgress(OperationStage.Uploading, done, total, `${done} / ${total} elementos`);
           next();
         }).catch(() => {
-          // Errors are caught inside the individual tasks and added to `errors` counter
           active--;
           done++;
-          const percent = total > 0 ? Math.round((done / total) * 100) : 100;
-          onProgress?.({ total, done, current: `${percent}%`, errors });
+          emitProgress(OperationStage.Uploading, done, total, `${done} / ${total} elementos`);
           next();
         });
       }
@@ -1168,8 +1184,16 @@ export const runBackup = async (
     next();
   });
 
+  emitProgress(OperationStage.Verifying, total, total, 'Verificando integridad...');
+
   // Guardar fecha del último backup
   await storageService.saveSecure(BACKUP_PREFS.LAST_RUN, new Date().toISOString());
+
+  if (errors === 0) {
+    operationProgressBus.emit('completed', { operation, result: { uploaded } });
+  } else {
+    operationProgressBus.emit('failed', { operation, error: `Finalizado con ${errors} errores` });
+  }
 
   return { success: errors === 0, uploaded, errors };
 };

@@ -117,7 +117,7 @@ export default function SubjectDetailScreen() {
       const raw = selectedSubject.avg_score || 0;
       const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
       setCalcCurrentGrade(avg ? String(Math.round(avg)) : '');
-      setCalcRequiredPass(selectedSubject.target_grade ? String(selectedSubject.target_grade) : '60');
+      setCalcRequiredPass(selectedSubject.target_grade !== null && selectedSubject.target_grade !== undefined ? String(selectedSubject.target_grade) : '');
       setCalcRemainingWeight('');
       setCalcMinNeeded(null);
       setCalcMaxAchievable(null);
@@ -147,7 +147,7 @@ export default function SubjectDetailScreen() {
       const raw = selectedSubject.avg_score || 0;
       const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
       setCalcCurrentGrade(avg ? avg.toFixed(1) : '');
-      setCalcRequiredPass(selectedSubject.target_grade ? String(selectedSubject.target_grade) : '60');
+      setCalcRequiredPass(selectedSubject.target_grade !== null && selectedSubject.target_grade !== undefined ? String(selectedSubject.target_grade) : '');
     }
     setCalcRemainingWeight('');
     setCalcMinNeeded(null);

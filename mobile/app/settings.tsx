@@ -11,6 +11,8 @@ import * as Clipboard from 'expo-clipboard';
 
 import { useSettingsLogic } from '../src/hooks/useSettingsLogic';
 import { useBackupLogic } from '../src/hooks/useBackupLogic';
+import { useOperationsByType } from '../src/hooks/useLongRunningOperations';
+import { OperationType } from '../src/services/lro/OperationProgress';
 import { useReminderSettings } from '../src/hooks/useReminderSettings';
 import type { ReminderProfileName } from '../src/hooks/useReminderSettings';
 import { EditProfileModal } from '../src/components/modals/EditProfileModal';
@@ -179,11 +181,7 @@ export default function SettingsScreen() {
     updatePref: updateBackupPref,
     stats: backupStats,
     cloudItemsCount,
-    isUploading,
-    uploadProgress,
     handleBackupNow,
-    isDownloading,
-    downloadProgress,
     handleDownloadNow,
     isBackupRunning,
     pendingCount,
@@ -203,31 +201,46 @@ export default function SettingsScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const downloadProgressAnim = useRef(new Animated.Value(0)).current;
 
+  const activeBackups = useOperationsByType(OperationType.Backup);
+  const activeSyncs = useOperationsByType(OperationType.Sync);
+  const activeDownloads = useOperationsByType(OperationType.Download);
+  const activeRestores = useOperationsByType(OperationType.Restore);
+
+  // Consideramos "uploading" si hay un Backup o Sync activo
+  const isUploadingLRO = activeBackups.length > 0 || activeSyncs.length > 0;
+  const activeUploadOp = activeBackups[0] || activeSyncs[0];
+  const uploadPct = activeUploadOp?.progress?.percentage ?? 0;
+  const isUploadIndeterminate = activeUploadOp?.progress?.indeterminate ?? false;
+
+  // Consideramos "downloading" si hay Download o Restore activo
+  const isDownloadingLRO = activeDownloads.length > 0 || activeRestores.length > 0;
+  const activeDownloadOp = activeDownloads[0] || activeRestores[0];
+  const downloadPct = activeDownloadOp?.progress?.percentage ?? 0;
+  const isDownloadIndeterminate = activeDownloadOp?.progress?.indeterminate ?? false;
+
   useEffect(() => {
-    if (uploadProgress && uploadProgress.total > 0) {
-      const percentage = (uploadProgress.done / uploadProgress.total) * 100;
+    if (isUploadingLRO && !isUploadIndeterminate && uploadPct > 0) {
       Animated.timing(progressAnim, {
-        toValue: percentage,
+        toValue: uploadPct,
         duration: 300,
         useNativeDriver: false,
       }).start();
     } else {
       progressAnim.setValue(0);
     }
-  }, [uploadProgress, progressAnim]);
+  }, [uploadPct, isUploadIndeterminate, isUploadingLRO, progressAnim]);
 
   useEffect(() => {
-    if (downloadProgress && downloadProgress.total > 0) {
-      const percentage = (downloadProgress.done / downloadProgress.total) * 100;
+    if (isDownloadingLRO && !isDownloadIndeterminate && downloadPct > 0) {
       Animated.timing(downloadProgressAnim, {
-        toValue: percentage,
+        toValue: downloadPct,
         duration: 300,
         useNativeDriver: false,
       }).start();
     } else {
       downloadProgressAnim.setValue(0);
     }
-  }, [downloadProgress, downloadProgressAnim]);
+  }, [downloadPct, isDownloadIndeterminate, isDownloadingLRO, downloadProgressAnim]);
 
   return (
     <SafeAreaView style={globalStyles.safeArea}>
@@ -743,9 +756,9 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   style={[styles.backupButton, styles.backupButtonPrimary, isBackupRunning && { opacity: 0.6 }]}
                   onPress={() => handleBackupNow('ambos')}
-                  disabled={isBackupRunning}
+                  disabled={isUploadingLRO || pendingCount === 0 || !useConnectivityStore.getState().isOnline}
                 >
-                  {isUploading ? (
+                  {isUploadingLRO ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
                     <Ionicons name="cloud-upload" size={16} color="#fff" />
@@ -756,9 +769,9 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   style={[styles.backupButton, styles.backupButtonSecondary, isBackupRunning && { opacity: 0.6 }]}
                   onPress={() => handleDownloadNow('ambos')}
-                  disabled={isBackupRunning}
+                  disabled={isDownloadingLRO}
                 >
-                  {isDownloading ? (
+                  {isDownloadingLRO ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
                     <Ionicons name="cloud-download" size={16} color="#fff" />
@@ -768,32 +781,19 @@ export default function SettingsScreen() {
               </View>
 
               {/* ── Barra de Progreso Unificada ── */}
-              {(isUploading && uploadProgress) && (
-                <View style={{ marginTop: 16, paddingHorizontal: 4 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 13, color: theme.colors.text.secondary, fontWeight: '500' }}>
-                      {uploadProgress.current || 'Preparando respaldo...'}
+              {isUploadingLRO && activeUploadOp && (
+                <View style={styles.syncProgressContainer}>
+                  <View style={styles.syncProgressHeader}>
+                    <Text style={styles.syncProgressText}>
+                      {activeUploadOp.progress?.message || activeUploadOp.message || 'Preparando respaldo...'}
                     </Text>
-                    <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '600' }}>
-                      {uploadProgress.total > 0 ? Math.round((uploadProgress.done / uploadProgress.total) * 100) : 0}%
+                    <Text style={styles.syncProgressPercent}>
+                      {isUploadIndeterminate ? '...' : `${uploadPct}%`}
                     </Text>
                   </View>
-                  <View style={{ height: 6, backgroundColor: theme.colors.border + '50', borderRadius: 3, overflow: 'hidden' }}>
-                    <Animated.View 
-                      style={{ 
-                        height: '100%', 
-                        backgroundColor: theme.colors.primary, 
-                        borderRadius: 3,
-                        width: progressAnim.interpolate({
-                          inputRange: [0, 100],
-                          outputRange: ['0%', '100%']
-                        })
-                      }} 
-                    />
+                  <View style={styles.progressBarBg}>
+                    <Animated.View style={[styles.progressBarFill, { width: progressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]} />
                   </View>
-                  <Text style={{ fontSize: 11, color: theme.colors.text.secondary, marginTop: 6, textAlign: 'right' }}>
-                    {uploadProgress.done} de {uploadProgress.total} ítems completados
-                  </Text>
                 </View>
               )}
 

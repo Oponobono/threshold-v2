@@ -5,6 +5,8 @@ import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { useConnectivityStore } from '../../store/useConnectivityStore';
 import { syncDebugger } from '../sync/SyncDebugger';
 import { reduce } from '../sync/reducer/index';
+import { operationProgressBus } from '../lro/OperationProgressEmitter';
+import { OperationType, OperationStage, createLRO } from '../lro/OperationProgress';
 
 type SyncHandler = (operation: {
   entity_type: string;
@@ -152,7 +154,7 @@ export class SyncService {
     // Esta función existe solo como punto de extensión futuro.
   }
 
-  async sync(traceId?: string, options?: { force?: boolean; onProgress?: (done: number, total: number, message: string) => void }): Promise<{ success: number; failed: number; pending: number }> {
+  async sync(traceId?: string, options?: { force?: boolean }): Promise<{ success: number; failed: number; pending: number }> {
     if (this.isSyncing) {
       console.log('[SyncService] Sync ya en progreso, ignorando');
       return { success: 0, failed: 0, pending: 0 };
@@ -175,6 +177,20 @@ export class SyncService {
     this.isSyncing = true;
     let success = 0;
     let failed = 0;
+
+    // ── LRO Initialization ──
+    const lroOperation = createLRO(OperationType.Sync);
+    operationProgressBus.emit('started', { operation: lroOperation });
+
+    const emitSyncProgress = (stage: OperationStage, done: number, total: number, msg?: string) => {
+      const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
+      lroOperation.stage = stage;
+      lroOperation.progress = { current: done, total, percentage, indeterminate: total === 0 };
+      if (msg) lroOperation.message = msg;
+      operationProgressBus.emit('progress', { operation: lroOperation });
+    };
+
+    emitSyncProgress(OperationStage.Preparing, 0, 0, 'Iniciando sincronización...');
 
     const tid = traceId || 'sync_unknown';
     syncDebugger.log(tid, null, null, 'QUEUE_READ', 'SyncService.sync() started', { itemsCount: 0 });
@@ -227,10 +243,10 @@ export class SyncService {
       let doneCount = 0;
       const totalCount = operations.length;
 
+      emitSyncProgress(OperationStage.Processing, 0, totalCount);
+
       for (const op of operations) {
-        if (options?.onProgress) {
-          options.onProgress(doneCount, totalCount, `Sincronizando base de datos...`);
-        }
+        emitSyncProgress(OperationStage.Processing, doneCount, totalCount, `Sincronizando base de datos...`);
 
         const operationId = syncDebugger.nextOperationId(tid);
         const entityTag = `${op.operation} ${op.entity_type}/${op.entity_id}`;
@@ -303,9 +319,7 @@ export class SyncService {
           }
         }
         doneCount++;
-        if (options?.onProgress) {
-          options.onProgress(doneCount, totalCount, `Sincronizando base de datos...`);
-        }
+        emitSyncProgress(OperationStage.Processing, doneCount, totalCount, `Sincronizando base de datos...`);
       }
 
       console.log(`[SyncService] Sync completado: ${success} exitosos, ${failed} fallidos`);
@@ -314,11 +328,20 @@ export class SyncService {
       console.error('[SyncService] Fatal error durante sync:', error);
       syncDebugger.logError(tid, null, 'QUEUE_PROCESS', 'Fatal error', error);
       failed++;
+      operationProgressBus.emit('failed', { operation: lroOperation, error: error as Error });
     } finally {
       this.isSyncing = false;
     }
 
     const pending = await syncQueueRepository.countPending();
+
+    if (failed === 0) {
+      operationProgressBus.emit('completed', { operation: lroOperation, result: { success, pending } });
+    } else if (success > 0) {
+      // Partial success: still mark as completed (we synced something)
+      operationProgressBus.emit('completed', { operation: lroOperation, result: { success, failed, pending } });
+    }
+
     return { success, failed, pending };
   }
 

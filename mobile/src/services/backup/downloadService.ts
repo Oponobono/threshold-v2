@@ -17,6 +17,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { fetchWithFallback, parseJsonSafely } from '../api/client';
 import { getBackupPreferences } from './backupService';
 import { databaseService } from '../database/DatabaseService';
+import { operationProgressBus } from '../lro/OperationProgressEmitter';
+import { OperationType, OperationStage, createLRO, LongRunningOperation } from '../lro/OperationProgress';
 
 // ─── Directorios de descarga ─────────────────────────────────────────────────
 
@@ -86,9 +88,7 @@ export interface DownloadResult {
  * @param onProgress - Callback con progreso por ítem
  * @returns Resumen con archivos descargados, omitidos y errores
  */
-export const downloadCloudItems = async (
-  onProgress?: (progress: DownloadProgress) => void
-): Promise<DownloadResult> => {
+export const downloadCloudItems = async (): Promise<DownloadResult> => {
   console.log(`[DownloadService] downloadCloudItems iniciado`);
   const prefs = await getBackupPreferences();
   const result: DownloadResult = {
@@ -96,6 +96,20 @@ export const downloadCloudItems = async (
     skipped: 0,
     errors: 0,
   };
+
+  // ── LRO Initialization ──
+  const operation = createLRO(OperationType.Restore);
+  operationProgressBus.emit('started', { operation });
+
+  const emitProgress = (stage: OperationStage, done: number, total: number, msg?: string) => {
+    const percentage = total > 0 ? Math.round((done / total) * 100) : 100;
+    operation.stage = stage;
+    operation.progress = { current: done, total, percentage, indeterminate: total === 0 };
+    if (msg) operation.message = msg;
+    operationProgressBus.emit('progress', { operation });
+  };
+
+  emitProgress(OperationStage.Preparing, 0, 0, 'Obteniendo lista de la nube...');
 
   // Obtener lista de ítems en la nube
   const response = await fetchWithFallback('/backup/cloud-items');
@@ -606,6 +620,7 @@ export const downloadCloudItems = async (
   let done = 0;
 
   console.log(`[DownloadService] Ejecutando ${total} tarea(s) de descarga...`);
+  emitProgress(OperationStage.Downloading, 0, total);
 
   const CONCURRENCY_LIMIT = 10;
   let active = 0;
@@ -626,26 +641,12 @@ export const downloadCloudItems = async (
         tasks[taskIndex]().then(() => {
           active--;
           done++;
-          const percent = total > 0 ? Math.round((done / total) * 100) : 100;
-          onProgress?.({
-            total,
-            done,
-            current: `${percent}%`,
-            errors: result.errors,
-            skipped: result.skipped,
-          });
+          emitProgress(OperationStage.Downloading, done, total, `${done} / ${total} elementos`);
           next();
         }).catch(() => {
           active--;
           done++;
-          const percent = total > 0 ? Math.round((done / total) * 100) : 100;
-          onProgress?.({
-            total,
-            done,
-            current: `${percent}%`,
-            errors: result.errors,
-            skipped: result.skipped,
-          });
+          emitProgress(OperationStage.Downloading, done, total, `${done} / ${total} elementos`);
           next();
         });
       }
@@ -654,6 +655,13 @@ export const downloadCloudItems = async (
   });
 
   console.log(`[DownloadService] Finalizado: descargadas=${result.downloaded}, saltadas=${result.skipped}, errores=${result.errors}`);
+
+  if (result.errors === 0) {
+    operationProgressBus.emit('completed', { operation, result });
+  } else {
+    operationProgressBus.emit('failed', { operation, error: `Finalizado con ${result.errors} errores` });
+  }
+
   return result;
 };
 
