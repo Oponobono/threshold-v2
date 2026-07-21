@@ -612,6 +612,11 @@ const tableSchema = {
       )
     `,
     columns: [
+      { name: 'user_id', type: 'TEXT' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 0' },
+      { name: 'deleted_at', type: 'TIMESTAMP' },
+      { name: 'last_modified_by', type: 'TEXT' },
       { name: 'view_count', type: 'INTEGER DEFAULT 0' },
       { name: 'success_count', type: 'INTEGER DEFAULT 0' },
       { name: 'failure_count', type: 'INTEGER DEFAULT 0' },
