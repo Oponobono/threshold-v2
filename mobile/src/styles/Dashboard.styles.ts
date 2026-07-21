@@ -305,12 +305,12 @@ export const dashboardStyles = StyleSheet.create({
   },
   actionsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
   },
   actionItem: {
-    width: 72,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: theme.spacing.xs,

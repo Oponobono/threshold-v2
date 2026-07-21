@@ -654,7 +654,7 @@ export default function HybridDashboardScreen() {
               return (
                 <MetricCard 
                   title={t('dashboard.nextClass')}
-                  value={nextClass ? nextClass.name : (todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'))}
+                  value={nextClass ? (subjectNamesMap[nextClass.subject_id] || t('dashboard.unknownSubject', { defaultValue: 'Materia' })) : (todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'))}
                   subtext={nextClassSubtext}
                   icon="time-outline"
                   color={nextClass ? theme.colors.primary : "#5856D6"}
@@ -980,7 +980,12 @@ export default function HybridDashboardScreen() {
               color="#AF52DE"
               onPress={() => setIsFlashcardsVisible(true)}
             />
-            <NextClassCard onPress={() => setIsScheduleModalVisible(true)} />
+            <ActionCircle 
+              title={t('dashboard.schedule', { defaultValue: 'Planificador' })} 
+              icon="calendar-outline" 
+              color="#FF9500" 
+              onPress={() => setIsScheduleModalVisible(true)}
+            />
             <ActionCircle 
               title={t('dashboard.audioRecorder')} 
               icon="microphone-outline" 
