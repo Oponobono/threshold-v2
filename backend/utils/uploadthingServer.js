@@ -4,7 +4,13 @@
  */
 const { UTApi } = require('uploadthing/server');
 
-const utapi = new UTApi();
+let _utapi = null;
+function getUtapi() {
+  if (!_utapi) {
+    _utapi = new UTApi();
+  }
+  return _utapi;
+}
 
 /**
  * Extrae el key de Uploadthing desde una URL completa.
@@ -37,7 +43,7 @@ async function deleteFromUploadthing(cloudUrl) {
   if (!key) return false;
 
   try {
-    await utapi.deleteFiles(key);
+    await getUtapi().deleteFiles(key);
     console.log(`[Uploadthing] Archivo eliminado: ${key}`);
     return true;
   } catch (err) {
@@ -56,11 +62,11 @@ async function deleteMultipleFromUploadthing(cloudUrls) {
   if (keys.length === 0) return;
 
   try {
-    await utapi.deleteFiles(keys);
+    await getUtapi().deleteFiles(keys);
     console.log(`[Uploadthing] ${keys.length} archivo(s) eliminado(s)`);
   } catch (err) {
     console.warn('[Uploadthing] Error al eliminar múltiples archivos:', err.message);
   }
 }
 
-module.exports = { deleteFromUploadthing, deleteMultipleFromUploadthing, extractKeyFromUrl };
+module.exports = { deleteFromUploadthing, deleteMultipleFromUploadthing, extractKeyFromUrl, getUtapi };

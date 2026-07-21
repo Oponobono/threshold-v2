@@ -59,7 +59,6 @@ export class AssetUploadManager {
       const response = await fetchWithFallback(`/upload`, {
         method: 'POST',
         body: formData,
-        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       if (!response.ok) throw new Error(`Upload failed: HTTP ${response.status}`);

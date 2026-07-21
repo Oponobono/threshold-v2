@@ -3,15 +3,8 @@
  * Recibe archivos del móvil vía multipart/form-data y los sube
  * a Uploadthing usando UTApi (server-side SDK). Devuelve la URL permanente.
  */
-const { UTApi, UTFile } = require('uploadthing/server');
-
-// Lazy singleton: se inicializa en la primera petición para garantizar
-// que process.env.UPLOADTHING_TOKEN ya ha sido inyectado por dotenv.
-let _utapi = null;
-function getUtapi() {
-  if (!_utapi) _utapi = new UTApi();
-  return _utapi;
-}
+const { UTFile } = require('uploadthing/server');
+const { getUtapi } = require('../utils/uploadthingServer');
 
 /**
  * POST /api/upload
@@ -25,6 +18,9 @@ exports.uploadFile = async (req, res) => {
 
   try {
     const utapi = getUtapi();
+
+    // Si el token no está configurado, el UTApi fallará.
+    // El error se captura en el catch y se devuelve 500 con mensaje descriptivo.
 
     // Convertir el Buffer de multer en un UTFile (compatible con UTApi en Node 18+)
     const file = new UTFile([req.file.buffer], req.file.originalname, {
@@ -67,7 +63,7 @@ exports.deleteFile = async (req, res) => {
   }
 
   try {
-    await utapi.deleteFiles(key);
+    await getUtapi().deleteFiles(key);
     return res.json({ message: 'Archivo eliminado correctamente.' });
   } catch (error) {
     console.error('[Uploadthing] Error al eliminar:', error.message);

@@ -104,11 +104,23 @@ export class SyncService {
         );
         for (const row of rows) {
           if (row.deleted_at) continue;
+          let payload = { ...row };
+          if (table.name === 'study_sessions') {
+            payload = {
+              id: row.id,
+              user_id: row.user_id,
+              subject_id: row.subject_id,
+              session_type: row.session_type || 'Threshold',
+              duration_seconds: row.duration_seconds ?? (row.duration_minutes ? row.duration_minutes * 60 : 0),
+              config_value: row.config_value ?? null,
+              performance_rating: row.performance_rating ?? (typeof row.rating === 'number' ? row.rating : null),
+            };
+          }
           await syncQueueRepository.enqueue({
             entity_type: table.type,
             entity_id: row.id,
             operation: 'CREATE',
-            payload: JSON.stringify(row),
+            payload: JSON.stringify(payload),
           });
           count++;
         }
