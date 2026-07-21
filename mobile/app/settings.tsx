@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Image, TextInput, ActivityIndicator, Platform, Animated } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -180,8 +180,10 @@ export default function SettingsScreen() {
     stats: backupStats,
     cloudItemsCount,
     isUploading,
+    uploadProgress,
     handleBackupNow,
     isDownloading,
+    downloadProgress,
     handleDownloadNow,
     isBackupRunning,
     pendingCount,
@@ -197,6 +199,35 @@ export default function SettingsScreen() {
   const scheduledTimeDate = new Date();
   scheduledTimeDate.setHours(scheduledConfig.hour, scheduledConfig.minute, 0, 0);
   const scheduledTimeLabel = `${String(scheduledConfig.hour).padStart(2, '0')}:${String(scheduledConfig.minute).padStart(2, '0')}`;
+
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const downloadProgressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (uploadProgress && uploadProgress.total > 0) {
+      const percentage = (uploadProgress.done / uploadProgress.total) * 100;
+      Animated.timing(progressAnim, {
+        toValue: percentage,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    } else {
+      progressAnim.setValue(0);
+    }
+  }, [uploadProgress, progressAnim]);
+
+  useEffect(() => {
+    if (downloadProgress && downloadProgress.total > 0) {
+      const percentage = (downloadProgress.done / downloadProgress.total) * 100;
+      Animated.timing(downloadProgressAnim, {
+        toValue: percentage,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    } else {
+      downloadProgressAnim.setValue(0);
+    }
+  }, [downloadProgress, downloadProgressAnim]);
 
   return (
     <SafeAreaView style={globalStyles.safeArea}>
@@ -735,6 +766,66 @@ export default function SettingsScreen() {
                   <Text style={styles.backupButtonTextLight}>{t('backup.downloadAll', 'Descargar Todo')}</Text>
                 </TouchableOpacity>
               </View>
+
+              {/* ── Barra de Progreso Unificada ── */}
+              {(isUploading && uploadProgress) && (
+                <View style={{ marginTop: 16, paddingHorizontal: 4 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 13, color: theme.colors.text.secondary, fontWeight: '500' }}>
+                      {uploadProgress.current || 'Preparando respaldo...'}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '600' }}>
+                      {uploadProgress.total > 0 ? Math.round((uploadProgress.done / uploadProgress.total) * 100) : 0}%
+                    </Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: theme.colors.border + '50', borderRadius: 3, overflow: 'hidden' }}>
+                    <Animated.View 
+                      style={{ 
+                        height: '100%', 
+                        backgroundColor: theme.colors.primary, 
+                        borderRadius: 3,
+                        width: progressAnim.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%']
+                        })
+                      }} 
+                    />
+                  </View>
+                  <Text style={{ fontSize: 11, color: theme.colors.text.secondary, marginTop: 6, textAlign: 'right' }}>
+                    {uploadProgress.done} de {uploadProgress.total} ítems completados
+                  </Text>
+                </View>
+              )}
+
+              {/* ── Barra de Progreso de Descarga ── */}
+              {(isDownloading && downloadProgress) && (
+                <View style={{ marginTop: 16, paddingHorizontal: 4 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 13, color: theme.colors.text.secondary, fontWeight: '500' }}>
+                      {downloadProgress.current || 'Preparando descarga...'}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '600' }}>
+                      {downloadProgress.total > 0 ? Math.round((downloadProgress.done / downloadProgress.total) * 100) : 0}%
+                    </Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: theme.colors.border + '50', borderRadius: 3, overflow: 'hidden' }}>
+                    <Animated.View
+                      style={{
+                        height: '100%',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: 3,
+                        width: downloadProgressAnim.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%']
+                        })
+                      }}
+                    />
+                  </View>
+                  <Text style={{ fontSize: 11, color: theme.colors.text.secondary, marginTop: 6, textAlign: 'right' }}>
+                    {downloadProgress.done} de {downloadProgress.total} ítems completados
+                  </Text>
+                </View>
+              )}
 
               {/* ── Backup Automático Programado ── */}
               <View style={styles.scheduledSection}>

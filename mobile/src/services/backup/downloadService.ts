@@ -60,6 +60,7 @@ export interface CloudItemsResponse {
   assessmentFiles: CloudItem[];
   aiChats?: CloudItem[];
   flashcardDecks?: CloudItem[];
+  userPreferences?: CloudItem[];
 }
 
 export interface DownloadProgress {
@@ -113,9 +114,30 @@ export const downloadCloudItems = async (
   console.log(`[DownloadService] prefs:`, JSON.stringify(prefs));
   const tasks: (() => Promise<void>)[] = [];
 
+  // Preparar todos los directorios en paralelo antes de construir las tareas
+  const [
+    photosDir,
+    audioDir,
+    docsDir,
+    assessFilesDir,
+    transcriptsDir,
+  ] = await Promise.all([
+    prefs.includePhotos ? getDownloadSubdirUri('photos') : Promise.resolve(''),
+    prefs.includeAudio ? getDownloadSubdirUri('audio') : Promise.resolve(''),
+    prefs.includeDocs ? getDownloadSubdirUri('docs') : Promise.resolve(''),
+    prefs.includeAssessmentFiles ? getDownloadSubdirUri('assessment_files') : Promise.resolve(''),
+    (async () => {
+      const dir = `${FileSystem.documentDirectory}Threshold/transcripts/`;
+      const info = await FileSystem.getInfoAsync(dir);
+      if (!info.exists) {
+        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      }
+      return dir;
+    })(),
+  ]);
+
   // ── Fotos ──
   if (prefs.includePhotos) {
-    const photosDir = await getDownloadSubdirUri('photos');
     for (const item of data.photos || []) {
       tasks.push(async () => {
         const nameExt = item.name?.match(/\.([^.]+)$/)?.[1];
@@ -160,7 +182,6 @@ export const downloadCloudItems = async (
 
   // ── Audio ──
   if (prefs.includeAudio) {
-    const audioDir = await getDownloadSubdirUri('audio');
     for (const item of data.audio || []) {
       tasks.push(async () => {
         const nameExt = item.name?.match(/\.([^.]+)$/)?.[1];
@@ -204,7 +225,6 @@ export const downloadCloudItems = async (
 
   // ── Documentos ──
   if (prefs.includeDocs) {
-    const docsDir = await getDownloadSubdirUri('docs');
     for (const item of data.docs || []) {
       tasks.push(async () => {
         const nameExt = item.name?.match(/\.([^.]+)$/)?.[1];
@@ -248,13 +268,6 @@ export const downloadCloudItems = async (
 
   // ── Transcripciones ──
   if (prefs.includeTranscripts) {
-    // Las transcripciones se guardan en la misma carpeta que usa RecordingDetail.tsx
-    const transcriptsDir = `${FileSystem.documentDirectory}Threshold/transcripts/`;
-    const transcriptsDirInfo = await FileSystem.getInfoAsync(transcriptsDir);
-    if (!transcriptsDirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(transcriptsDir, { intermediates: true });
-    }
-
     for (const item of data.transcripts || []) {
       tasks.push(async () => {
         if (!item.transcript_text) { result.skipped++; return; }
@@ -318,7 +331,6 @@ export const downloadCloudItems = async (
 
   // ── Soportes de Evaluaciones ──
   if (prefs.includeAssessmentFiles) {
-    const assessFilesDir = await getDownloadSubdirUri('assessment_files');
     for (const item of data.assessmentFiles || []) {
       tasks.push(async () => {
         const ext = item.name?.split('.').pop() || 'bin';
@@ -590,32 +602,56 @@ export const downloadCloudItems = async (
     }
   }
 
-  // Ejecutar con progreso en lotes concurrentes (con límite de 5)
   const total = tasks.length;
   let done = 0;
 
   console.log(`[DownloadService] Ejecutando ${total} tarea(s) de descarga...`);
 
-  const CONCURRENCY_LIMIT = 5;
-  for (let i = 0; i < total; i += CONCURRENCY_LIMIT) {
-    const chunk = tasks.slice(i, i + CONCURRENCY_LIMIT);
-    await Promise.all(
-      chunk.map(async (task) => {
-        await task();
-        done++;
-        const percent = total > 0 ? Math.round((done / total) * 100) : 100;
-        onProgress?.({
-          total,
-          done,
-          current: `${percent}%`,
-          errors: result.errors,
-          skipped: result.skipped,
+  const CONCURRENCY_LIMIT = 10;
+  let active = 0;
+  let index = 0;
+
+  await new Promise<void>((resolve) => {
+    if (total === 0) return resolve();
+
+    const next = () => {
+      if (done === total) {
+        resolve();
+        return;
+      }
+
+      while (active < CONCURRENCY_LIMIT && index < total) {
+        const taskIndex = index++;
+        active++;
+        tasks[taskIndex]().then(() => {
+          active--;
+          done++;
+          const percent = total > 0 ? Math.round((done / total) * 100) : 100;
+          onProgress?.({
+            total,
+            done,
+            current: `${percent}%`,
+            errors: result.errors,
+            skipped: result.skipped,
+          });
+          next();
+        }).catch(() => {
+          active--;
+          done++;
+          const percent = total > 0 ? Math.round((done / total) * 100) : 100;
+          onProgress?.({
+            total,
+            done,
+            current: `${percent}%`,
+            errors: result.errors,
+            skipped: result.skipped,
+          });
+          next();
         });
-      })
-    );
-    // Ceder el JS Event Loop entre cada lote para que React Native pueda repintar
-    await new Promise(resolve => setTimeout(resolve, 0));
-  }
+      }
+    };
+    next();
+  });
 
   console.log(`[DownloadService] Finalizado: descargadas=${result.downloaded}, saltadas=${result.skipped}, errores=${result.errors}`);
   return result;

@@ -21,6 +21,7 @@ import {
   ScheduledBackupType,
   ScheduledBackupConfig,
   getScheduledBackupLastRun,
+  getPendingItemsFromLocalDB,
 } from '../services/backup/backupService';
 import {
   downloadCloudItems,
@@ -162,6 +163,36 @@ export const useBackupLogic = () => {
     try {
       let dataMessage = '';
       
+      const overridePrefs: BackupPreferences = {
+        enabled: true,
+        autoUpload: false,
+        autoDownload: false,
+        includeDocs: true,
+        includeTranscripts: true,
+        includePhotos: true,
+        includeAudio: true,
+        includeAssessmentFiles: true,
+        lastRun: null,
+        lastDownload: null,
+      };
+
+      let totalLogic = 0;
+      let totalMedia = 0;
+      let doneLogic = 0;
+      let doneMedia = 0;
+
+      if (type === 'ambos' || type === 'datos') {
+        totalLogic = await syncService.getPendingCount();
+      }
+      if (type === 'ambos' || type === 'multimedia') {
+        const pM = await getPendingItemsFromLocalDB(overridePrefs);
+        totalMedia = pM.photos.length + pM.audio.length + pM.docs.length + pM.transcripts.length + (pM.assessmentFiles?.length || 0) + pM.flashcardDecks.length + pM.aiChats.length;
+      }
+
+      const totalItems = (totalLogic + totalMedia) || 1; // avoid division by zero
+
+      setUploadProgress({ total: totalItems, done: 0, current: t('backup.starting'), errors: 0 });
+
       // 1. Respaldar Datos (SyncQueue → Backend)
       if (type === 'datos' || type === 'ambos') {
         const enqueuedCount = await syncService.enqueueLegacyUnsyncedData();
@@ -169,13 +200,24 @@ export const useBackupLogic = () => {
           console.log(`[useBackupLogic] Enqueued ${enqueuedCount} legacy unsynced items.`);
         }
         
-        const syncResult = await syncService.sync(undefined, { force: true });
+        const syncResult = await syncService.sync(undefined, { 
+          force: true,
+          onProgress: (done, total, msg) => {
+            doneLogic = done;
+            if (totalLogic !== total) {
+              totalLogic = total;
+            }
+            const currentTotal = (totalLogic + totalMedia) || 1;
+            // actualizamos uploadProgress con la suma global
+            setUploadProgress(prev => prev ? { ...prev, total: currentTotal, done: doneLogic + doneMedia, current: msg } : null);
+          }
+        });
         if (syncResult.success > 0 || enqueuedCount > 0) {
-          dataMessage = `Datos sincronizados (${syncResult.success} subidos).`;
+          dataMessage = `Base de datos sincronizada (${syncResult.success} registros).`;
         } else if (syncResult.failed > 0) {
           dataMessage = `${syncResult.failed} operaciones fallaron. Reintenta o revisa conexión.`;
         } else {
-          dataMessage = 'Tus datos ya están sincronizados.';
+          dataMessage = 'La base de datos ya está sincronizada.';
         }
         
         if (type === 'datos') {
@@ -191,32 +233,29 @@ export const useBackupLogic = () => {
 
       // 2. Respaldar Multimedia (Archivos en Uploadthing)
       if (type === 'multimedia' || type === 'ambos') {
-        const overridePrefs = {
-          includeDocs: true,
-          includeTranscripts: true,
-          includePhotos: true,
-          includeAudio: true,
-          includeAssessmentFiles: true,
-        };
-
         await showBackupUploadNotification(0);
         const result = await runBackup((p) => {
-          setUploadProgress(p);
-          updateBackupUploadNotification(p.done, p.total, p.current).catch(() => {});
+          doneMedia = p.done;
+          if (p.total !== undefined && totalMedia !== p.total) {
+            totalMedia = p.total;
+          }
+          const currentTotal = (totalLogic + totalMedia) || 1;
+          setUploadProgress(prev => prev ? { ...prev, total: currentTotal, done: doneLogic + doneMedia, current: p.current, errors: p.errors } : null);
+          updateBackupUploadNotification(doneLogic + doneMedia, currentTotal, p.current).catch(() => {});
         }, overridePrefs);
 
         if (result.uploaded === 0 && result.errors === 0) {
           cancelBackupUploadNotification().catch(() => {});
           alertRef.show({ 
             title: t('backup.allUpToDate'), 
-            message: type === 'ambos' ? `${dataMessage} No hay multimedia nueva.` : 'No hay multimedia nueva por respaldar.', 
+            message: type === 'ambos' ? `${dataMessage} No hay archivos multimedia nuevos.` : 'No hay archivos multimedia nuevos por respaldar.', 
             type: 'success' 
           });
         } else if (result.errors === 0) {
           cancelBackupUploadNotification().catch(() => {});
           alertRef.show({ 
             title: t('backup.complete'), 
-            message: type === 'ambos' ? `${dataMessage} ${result.uploaded} archivos subidos.` : t('backup.uploadResult', { uploaded: result.uploaded }), 
+            message: type === 'ambos' ? `${dataMessage} ${result.uploaded} archivos multimedia respaldados.` : t('backup.uploadResult', { uploaded: result.uploaded }), 
             type: 'success' 
           });
         } else {
@@ -257,12 +296,24 @@ export const useBackupLogic = () => {
 
     try {
       let dataMessage = '';
-      
+      let doneData = 0;
+      let doneMedia = 0;
+      let totalData = 0;
+      let totalMedia = 0;
+
+      if (type === 'ambos' || type === 'datos') totalData = 0;
+      if (type === 'ambos' || type === 'multimedia') totalMedia = cloudItemsCount;
+
+      const computeTotal = () => (totalData + totalMedia) || 1;
+
       // 1. Descargar Datos (JSON desde Supabase via sync initial)
       if (type === 'datos' || type === 'ambos') {
-        setDownloadProgress({ total: 1, done: 0, current: 'Conectando con el servidor...', errors: 0, skipped: 0 });
+        setDownloadProgress({ total: computeTotal(), done: 0, current: 'Conectando con el servidor...', errors: 0, skipped: 0 });
         const syncResult = await syncManager.requestInitialSync(true);
-        setDownloadProgress({ total: 1, done: 1, current: 'Guardando datos localmente...', errors: syncResult.errors.length, skipped: 0 });
+        // Ahora sabemos el total real: usarlo en lugar de 1
+        totalData = syncResult.entitiesSynced > 0 ? syncResult.entitiesSynced : 1;
+        doneData = totalData;
+        setDownloadProgress({ total: computeTotal(), done: doneData + doneMedia, current: 'Guardando datos localmente...', errors: syncResult.errors.length, skipped: 0 });
         await useDataStore.getState().loadAllData(true);
         const entitiesMsg = syncResult.entitiesSynced > 0
           ? `${syncResult.entitiesSynced} registros descargados.`
@@ -281,8 +332,19 @@ export const useBackupLogic = () => {
       if (type === 'multimedia' || type === 'ambos') {
         await showBackupDownloadNotification(0);
         const result = await downloadCloudItems((p) => {
-          setDownloadProgress(p);
-          updateBackupDownloadNotification(p.done, p.total, p.current).catch(() => {});
+          doneMedia = p.done;
+          if (p.total !== undefined && totalMedia !== p.total) {
+            totalMedia = p.total;
+          }
+          const currentTotal = computeTotal();
+          setDownloadProgress({
+            total: currentTotal,
+            done: doneData + doneMedia,
+            current: p.current,
+            errors: p.errors,
+            skipped: p.skipped,
+          });
+          updateBackupDownloadNotification(doneData + doneMedia, currentTotal, p.current).catch(() => {});
         });
 
         // Guardar fecha de última descarga
@@ -321,7 +383,7 @@ export const useBackupLogic = () => {
       setIsDownloading(false);
       setDownloadProgress(null);
     }
-  }, [isDownloading, isUploading, prefs.enabled, loadAll, t]);
+  }, [isDownloading, isUploading, prefs.enabled, cloudItemsCount, loadAll, t]);
 
   // ─── Backup programado ────────────────────────────────────────────────────
 
