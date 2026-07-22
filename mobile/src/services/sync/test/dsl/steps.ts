@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { databaseService } from '../../../database/DatabaseService';
 import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { syncService } from '../../../database/SyncService';

@@ -59,5 +59,31 @@
     "a3Subject": "Ciencias",
     "a3Type": "Laboratorio",
     "a3Date": "10 Oct"
+  },
+  "academicImport": {
+    "title": "Importación Académica",
+    "desc": "Importa tus cursos, materias y calificaciones de forma masiva utilizando nuestra plantilla CSV estándar.",
+    "downloadTemplate": "Descargar Plantilla",
+    "selectFile": "Seleccionar Archivo CSV",
+    "previewTitle": "Confirmar Importación",
+    "previewDesc": "Hemos detectado la siguiente estructura de datos en tu archivo. Confirma para guardarla en la base de datos.",
+    "coursesCount": "{{count}} Curso(s)",
+    "subjectsCount": "{{count}} Materia(s)",
+    "assessmentsCount": "{{count}} Calificación(es)",
+    "confirmButton": "Guardar en Base de Datos",
+    "cancelButton": "Cancelar",
+    "success": "Importación completada correctamente.",
+    "errorEmpty": "El archivo CSV está vacío.",
+    "errorHeaders": "Los encabezados del archivo no coinciden con la plantilla oficial.",
+    "errorInvalid": "Error al parsear el archivo. Revisa que el formato sea correcto.",
+    "headers": {
+      "course": "Curso",
+      "subject": "Materia",
+      "credits": "Creditos",
+      "assessment": "Evaluacion",
+      "weight": "Peso(%)",
+      "score": "Nota",
+      "outOf": "NotaMaximo"
+    }
   }
 }

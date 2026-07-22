@@ -94,6 +94,24 @@ export const globalStyles = StyleSheet.create({
   
   // Common visual
   circle: { borderRadius: theme.borderRadius.full, justifyContent: 'center', alignItems: 'center' },
+  buttonPrimary: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonSecondary: {
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   
   // --- Standardized App Headers ---
   standardHeader: {

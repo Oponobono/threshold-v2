@@ -95,3 +95,6 @@ analysis/
 private_docs/
 *_ANALYSIS.md
 *.analysis.md
+
+# ==================== MACROS ====================
+macros.txt

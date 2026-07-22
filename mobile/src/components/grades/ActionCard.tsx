@@ -22,18 +22,15 @@ export const ActionCard: React.FC<ActionCardProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <View style={[gradesStyles.card, gradesStyles.bulkCard]}>
+    <View style={gradesStyles.card}>
       <View style={gradesStyles.actionCardContent}>
         <View style={gradesStyles.actionCardHeader}>
           <Text style={gradesStyles.sectionTitle}>{title}</Text>
-          <TouchableOpacity style={gradesStyles.smallBadgeBtn} onPress={onPress}>
-            <Ionicons name={buttonIcon as any} size={14} color={theme.colors.text.primary} />
-            <Text style={gradesStyles.smallBadgeText}>{buttonLabel}</Text>
-          </TouchableOpacity>
         </View>
         <Text style={gradesStyles.descText}>{description}</Text>
-        <TouchableOpacity>
-          <Text style={gradesStyles.chooseFileText}>{t('common.seeMore')}</Text>
+        <TouchableOpacity style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center' }} onPress={onPress}>
+          <Ionicons name={buttonIcon as any} size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />
+          <Text style={gradesStyles.chooseFileText}>{buttonLabel}</Text>
         </TouchableOpacity>
       </View>
     </View>

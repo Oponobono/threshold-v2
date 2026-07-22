@@ -59,5 +59,31 @@
     "a3Subject": "Science",
     "a3Type": "Lab",
     "a3Date": "Oct 10"
+  },
+  "academicImport": {
+    "title": "Academic Import",
+    "desc": "Import your courses, subjects, and grades in bulk using our standard CSV template.",
+    "downloadTemplate": "Download Template",
+    "selectFile": "Select CSV File",
+    "previewTitle": "Confirm Import",
+    "previewDesc": "We detected the following data structure in your file. Confirm to save to the database.",
+    "coursesCount": "{{count}} Course(s)",
+    "subjectsCount": "{{count}} Subject(s)",
+    "assessmentsCount": "{{count}} Grade(s)",
+    "confirmButton": "Save to Database",
+    "cancelButton": "Cancel",
+    "success": "Import completed successfully.",
+    "errorEmpty": "The CSV file is empty.",
+    "errorHeaders": "The file headers do not match the official template.",
+    "errorInvalid": "Error parsing the file. Please check that the format is correct.",
+    "headers": {
+      "course": "Course",
+      "subject": "Subject",
+      "credits": "Credits",
+      "assessment": "Assessment",
+      "weight": "Weight(%)",
+      "score": "Score",
+      "outOf": "OutOf"
+    }
   }
 }

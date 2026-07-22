@@ -102,8 +102,6 @@ export const FloatingYouTubePlayer = () => {
 
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
-      <View style={styles.accentBar} />
-
       <GestureDetector gesture={dragGesture}>
         <View style={styles.header}>
           <View style={styles.headerContent}>

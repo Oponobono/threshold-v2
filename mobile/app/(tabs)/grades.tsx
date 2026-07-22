@@ -30,12 +30,14 @@ import { AssessmentItem } from '../../src/components/grades/AssessmentItem';
 import { ProjectionSimulator } from '../../src/components/grades/ProjectionSimulator';
 import { ActionCard } from '../../src/components/grades/ActionCard';
 import { CoursePills } from '../../src/components/ui/CoursePills';
+import { AcademicImportModal } from '../../src/components/grades/AcademicImportModal';
 
 export default function GradesScreen() {
   const { t } = useTranslation();
   const chartWidth = Math.max(240, Dimensions.get('window').width - theme.spacing.lg * 2 - theme.spacing.lg * 2 - 2);
   const g = useGrades(t);
   const [expandedChart, setExpandedChart] = useState<'mastery' | 'projection' | null>(null);
+  const [isImportModalVisible, setImportModalVisible] = useState(false);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
@@ -104,9 +106,9 @@ export default function GradesScreen() {
                 <View style={gradesStyles.addBtn}>
                   <Text style={gradesStyles.addBtnText}>{t('grades.add')}</Text>
                 </View>
-                <View style={[gradesStyles.addBtn, gradesStyles.bulkBtn]}>
-                  <Text style={[gradesStyles.addBtnText, { color: theme.colors.text.primary }]}>{t('grades.bulk')}</Text>
-                </View>
+                <TouchableOpacity onPress={() => setImportModalVisible(true)} style={[gradesStyles.addBtn, gradesStyles.bulkBtn]}>
+                  <Text style={[gradesStyles.addBtnText, { color: theme.colors.text.primary }]}>{t('academicImport.title', 'Importación')}</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -162,11 +164,11 @@ export default function GradesScreen() {
         />
 
         <ActionCard
-          title={t('grades.bulkImport')}
-          description={t('grades.bulkImportDesc')}
-          buttonLabel={t('grades.importCsv')}
+          title={t('academicImport.title', 'Importación Académica')}
+          description={t('academicImport.desc', 'Importa tus cursos, materias y calificaciones de forma masiva utilizando nuestra plantilla CSV estándar.')}
+          buttonLabel={t('academicImport.selectFile', 'Importar Datos')}
           buttonIcon="cloud-upload-outline"
-          onPress={() => {}}
+          onPress={() => setImportModalVisible(true)}
         />
 
         <ActionCard
@@ -276,6 +278,12 @@ export default function GradesScreen() {
         visible={g.overlayVisible}
         explanation={g.overlayText}
         onDismiss={() => g.setOverlayVisible(false)}
+      />
+
+      <AcademicImportModal 
+        visible={isImportModalVisible} 
+        onClose={() => setImportModalVisible(false)} 
+        userId={g.userId as string | null} 
       />
     </SafeAreaView>
   );

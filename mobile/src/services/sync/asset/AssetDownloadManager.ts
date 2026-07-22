@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { persistentLocalAssetStore } from './PersistentLocalAssetStore';
 import { AssetDownloadJob, ASSET_PRIORITY, MAX_CONCURRENT_DOWNLOADS, DOWNLOAD_RETRY_MAX } from './types';
 import { syncDebugger } from '../SyncDebugger';
