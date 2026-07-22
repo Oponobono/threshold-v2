@@ -31,6 +31,7 @@ import { ProjectionSimulator } from '../../src/components/grades/ProjectionSimul
 import { ActionCard } from '../../src/components/grades/ActionCard';
 import { CoursePills } from '../../src/components/ui/CoursePills';
 import { AcademicImportModal } from '../../src/components/grades/AcademicImportModal';
+import { PagedList } from '../../src/components/ui/PagedList';
 
 export default function GradesScreen() {
   const { t } = useTranslation();
@@ -38,6 +39,7 @@ export default function GradesScreen() {
   const g = useGrades(t);
   const [expandedChart, setExpandedChart] = useState<'mastery' | 'projection' | null>(null);
   const [isImportModalVisible, setImportModalVisible] = useState(false);
+  const [assessmentsPage, setAssessmentsPage] = useState(0);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
@@ -56,13 +58,17 @@ export default function GradesScreen() {
           g.setSelectedCourseId(id);
           // Al cambiar de curso, resetear el filtro de materia
           g.setSelectedSubjectId(null);
+          setAssessmentsPage(0);
         }}
       />
 
       <SubjectFilterBar
         subjects={g.subjectsForCourse}
         selectedSubjectId={g.selectedSubjectId as string | null}
-        onSelectSubject={g.setSelectedSubjectId as (id: string | null) => void}
+        onSelectSubject={(id) => {
+          g.setSelectedSubjectId(id);
+          setAssessmentsPage(0);
+        }}
         t={t}
       />
 
@@ -100,7 +106,16 @@ export default function GradesScreen() {
 
         <View style={gradesStyles.section}>
           <View style={gradesStyles.sectionHeaderRow}>
-            <Text style={gradesStyles.sectionTitle}>{t('grades.assessments')}</Text>
+            <View style={gradesStyles.sectionTitleRow}>
+              <Text style={gradesStyles.sectionTitle}>
+                {t('grades.assessments')} {g.filteredAssessments.length > 0 && `(${g.filteredAssessments.length})`}
+              </Text>
+              {g.filteredAssessments.length > 10 && (
+                <Text style={gradesStyles.sectionContextText}>
+                  {assessmentsPage * 10 + 1}–{Math.min((assessmentsPage + 1) * 10, g.filteredAssessments.length)}
+                </Text>
+              )}
+            </View>
             <View style={globalStyles.row}>
               <View style={gradesStyles.sectionActions}>
                 <View style={gradesStyles.addBtn}>
@@ -114,31 +129,28 @@ export default function GradesScreen() {
           </View>
 
           <View style={[gradesStyles.card, { padding: 0, overflow: 'hidden' }]}>
-            {g.filteredAssessments.length === 0 ? (
-              <View style={gradesStyles.emptyAssessments}>
-                <Ionicons name="document-text-outline" size={32} color={theme.colors.text.secondary} style={{ opacity: 0.5, marginBottom: 8 }} />
-                <Text style={{ color: theme.colors.text.secondary, fontSize: 13 }}>{t('subjects.noAssessments')}</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={g.filteredAssessments}
-                keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
-                scrollEnabled={false}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                initialNumToRender={6}
-                windowSize={5}
-                renderItem={({ item: a, index }) => (
-                  <AssessmentItem
-                    assessment={a}
-                    index={index}
-                    isLast={index === g.filteredAssessments.length - 1}
-                    subject={g.subjects.find(s => s.id === a.subject_id)}
-                    t={t}
-                  />
-                )}
-              />
-            )}
+            <PagedList
+              items={g.filteredAssessments}
+              pageSize={10}
+              currentPage={assessmentsPage}
+              onPageChange={setAssessmentsPage}
+              ListEmptyComponent={
+                <View style={gradesStyles.emptyAssessments}>
+                  <Ionicons name="document-text-outline" size={32} color={theme.colors.text.secondary} style={{ opacity: 0.5, marginBottom: 8 }} />
+                  <Text style={{ color: theme.colors.text.secondary, fontSize: 13 }}>{t('subjects.noAssessments')}</Text>
+                </View>
+              }
+              renderItem={({ item: a, index, globalIndex }) => (
+                <AssessmentItem
+                  assessment={a}
+                  index={index}
+                  globalIndex={globalIndex}
+                  isLast={index === 9 || globalIndex === g.filteredAssessments.length - 1}
+                  subject={g.subjects.find(s => s.id === a.subject_id)}
+                  t={t}
+                />
+              )}
+            />
           </View>
         </View>
 

@@ -45,7 +45,9 @@ export const gradesStyles = StyleSheet.create({
   projectedText: { fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary },
   editScaleText: { fontSize: theme.typography.sizes.sm, color: theme.colors.primary, fontWeight: '600' },
   section: { gap: 12 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  sectionContextText: { fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, fontWeight: '500' },
   projectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
@@ -266,20 +268,24 @@ export const gradesStyles = StyleSheet.create({
 
   // Assessment list item
   assessItem: {
-    padding: 16, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
+    paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
   assessItemLast: { borderBottomWidth: 0 },
   assessItemPending: { opacity: 0.6 },
+  assessGlobalIndexBox: { width: 24, alignItems: 'flex-start', justifyContent: 'center' },
+  assessGlobalIndexText: { fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600', opacity: 0.6 },
   assessInfo: { flex: 1 },
-  assessNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  assessNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 1 },
   assessPendingBadge: { backgroundColor: theme.colors.warning, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   assessPendingText: { fontSize: 9, fontWeight: '600', color: '#FFF' },
   assessMeta: { fontSize: 11, color: theme.colors.text.secondary, fontWeight: '500' },
   assessScoreWrap: { alignItems: 'flex-end', justifyContent: 'center' },
-  assessScore: { fontSize: 16, fontWeight: '800' },
+  assessScore: { fontSize: 16, fontWeight: '700', color: theme.colors.text.primary, letterSpacing: -0.3 },
+  assessScoreScale: { fontSize: 14, fontWeight: '500', color: theme.colors.text.secondary, opacity: 0.6 },
   assessPct: { fontSize: 11, color: theme.colors.text.secondary, fontWeight: '600', marginTop: 1, textTransform: 'uppercase' },
   assessStatus: { fontSize: 12, fontWeight: '600' },
+  assessDateDiscreet: { fontSize: 10, color: theme.colors.text.secondary, fontWeight: '500', marginTop: 4, letterSpacing: -0.2 },
 
   // Action cards
   actionCardContent: { flexDirection: 'column', flex: 1, gap: 4 },

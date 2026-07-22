@@ -16,6 +16,7 @@ import { ScheduleGrid } from '../../src/components/subjects/ScheduleGrid';
 import { SCALE_MAX } from '../../src/utils/grades';
 import { useGroupedSubjects } from '../../src/hooks/useGroupedSubjects';
 import { SubjectCard } from '../../src/components/subjects/SubjectCard';
+import { SubjectGridSection } from '../../src/components/subjects/SubjectGridSection';
 import { openCourseLink } from '../../src/utils/linking';
 import { ZyrenIngestionModal } from '../../src/components/subjects/ZyrenIngestionModal';
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
@@ -145,14 +146,6 @@ export default function SubjectsScreen() {
     return groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId)?.courseName ?? '';
   }, [selectedCourseId, groupedSections]);
 
-  const displayedPairs = useMemo(() => {
-    const pairs: [any, any | null][] = [];
-    for (let i = 0; i < displayedSubjects.length; i += 2) {
-      pairs.push([displayedSubjects[i], displayedSubjects[i + 1] ?? null]);
-    }
-    return pairs;
-  }, [displayedSubjects]);
-
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <View style={styles.header}>
@@ -188,36 +181,17 @@ export default function SubjectsScreen() {
       </View>
 
       <FlatList
-        data={displayedPairs}
-        keyExtractor={(_, index) => `pair-${index}`}
+        data={[]}
+        keyExtractor={(_, index) => `item-${index}`}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { gap: 8 }]}
-        renderItem={({ item: [left, right] }) => (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <SubjectCard
-              subject={left}
-              onPress={() => router.push(`/subjects/${left.id}`)}
-              onContinue={left.external_url ? () => handleContinueClass(left.external_url, getCoursePlatform(left.course_id), left, left.courseName || selectedCourseName) : undefined}
-              onComplete={() => handleClassComplete(left, left.courseName || selectedCourseName)}
-            />
-            {right ? (
-              <SubjectCard
-                subject={right}
-                onPress={() => router.push(`/subjects/${right.id}`)}
-                onContinue={right.external_url ? () => handleContinueClass(right.external_url, getCoursePlatform(right.course_id), right, right.courseName || selectedCourseName) : undefined}
-                onComplete={() => handleClassComplete(right, right.courseName || selectedCourseName)}
-              />
-            ) : (
-              <View style={{ flex: 1 }} />
-            )}
-          </View>
-        )}
+        contentContainerStyle={[styles.scroll]}
+        renderItem={() => null}
         ListEmptyComponent={
           g.filteredSubjects.length === 0 ? (
             <View style={[globalStyles.center, { paddingVertical: 48 }]}>
               <MaterialCommunityIcons name="book-open-variant" size={40} color="rgba(255,255,255,0.1)" />
               <Text style={[{ color: theme.colors.text.secondary }, { marginTop: 12 }]}>
-                {g.search ? t('subjects.noResults', 'Sin resultados') : t('subjects.noSubjects', 'No hay materias')}
+                {g.search ? t('subjects.noResults', 'Sin resultados') : t('subjects.noSubjects', 'Agrega tu primera materia')}
               </Text>
               {!g.search && (
                 <TouchableOpacity
@@ -225,7 +199,7 @@ export default function SubjectsScreen() {
                   onPress={() => setIsCreationMenuVisible(true)}
                 >
                   <Ionicons name="add" size={16} color={theme.colors.text.inverse} />
-                  <Text style={{ color: theme.colors.text.inverse, fontWeight: '700', fontSize: 13 }}>Crear materia</Text>
+                  <Text style={{ color: theme.colors.text.inverse, fontWeight: '700', fontSize: 13 }}>{t('subjects.newSubject', 'Nueva materia')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -375,6 +349,16 @@ export default function SubjectsScreen() {
                   onSelectCourse={setSelectedCourseId}
                 />
               )}
+
+              {/* ── Bounded Subjects Grid ── */}
+              <SubjectGridSection
+                subjects={displayedSubjects}
+                courseName={selectedCourseName}
+                onSubjectPress={(s) => router.push(`/subjects/${s.id}`)}
+                onContinue={(s) => s.external_url ? handleContinueClass(s.external_url, getCoursePlatform(s.course_id), s, s.courseName || selectedCourseName) : undefined}
+                onComplete={(s) => handleClassComplete(s, s.courseName || selectedCourseName)}
+                onCreateSubject={() => setIsCreationMenuVisible(true)}
+              />
             </>
           ) : null
         }

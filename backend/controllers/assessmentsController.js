@@ -284,9 +284,9 @@ exports.createAssessment = (req, res) => {
               console.log(`[POST] 📊 Normalización: raw=${rawValue}, normalized=${normalized}, maxValue=${effectiveVersion.max_value}`);
               
               db.run(`
-                INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
-                VALUES (?, ?, ?, ?, ?)
-              `, [newAssessmentId, subject.user_id, rawValue, normalized, gradingVersionId], async (err) => {
+                INSERT INTO assessment_results (id, assessment_id, user_id, raw_value, normalized_value, grading_version_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+              `, [uuidv4(), newAssessmentId, subject.user_id, rawValue, normalized, gradingVersionId], async (err) => {
                 if (err) {
                   console.error('[POST] ❌ Error insertando assessment_results:', err.message);
                   return res.status(500).json({ error: 'Error al insertar los resultados: ' + err.message });
@@ -618,9 +618,9 @@ function handleAssessmentResultsUpdate(assessmentId, score, percentage, grade_va
             console.log('[AssessmentsController] ➕ Creando nuevo assessment_results');
             await new Promise((resolve, reject) => {
               db.run(`
-                INSERT INTO assessment_results (assessment_id, user_id, raw_value, normalized_value, grading_version_id)
-                VALUES (?, ?, ?, ?, ?)
-              `, [assessmentId, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
+                INSERT INTO assessment_results (id, assessment_id, user_id, raw_value, normalized_value, grading_version_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+              `, [uuidv4(), assessmentId, userId, rawValue, normalized, gradingVersionId], (err) => {
                 if (err) {
                   console.error('[AssessmentsController] ❌ Error INSERT assessment_results:', err.message);
                   reject(err);
