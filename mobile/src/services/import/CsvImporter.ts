@@ -1,5 +1,5 @@
 import { HeaderNormalizer } from './HeaderNormalizer';
-import { AcademicImportModel, AcademicImportRow, ImportErrorCode } from './types';
+import { AcademicImportModel, AcademicImportRow, ImportCourseRow, ImportErrorCode } from './types';
 import { CsvImportError } from './CsvImportError';
 
 export class CsvImporter {

@@ -18,12 +18,13 @@ interface CourseHeroCardProps {
   viewModel: CourseHeroViewModel;
   isActive: boolean;
   onPress: () => void;
+  onContinue?: () => void;
   onEditPress?: () => void;
   onDeletePress?: () => void;
   onHeightChange?: (height: number) => void;
 }
 
-export const CourseHeroCard = React.memo(({ viewModel: vm, isActive, onPress, onEditPress, onDeletePress, onHeightChange }: CourseHeroCardProps) => {
+export const CourseHeroCard = React.memo(({ viewModel: vm, isActive, onPress, onContinue, onEditPress, onDeletePress, onHeightChange }: CourseHeroCardProps) => {
   const { t } = useTranslation();
   const platform = PlatformMapper.toVisual(vm.platform);
   const remaining = vm.totalClasses - vm.completedClasses;
@@ -159,23 +160,27 @@ export const CourseHeroCard = React.memo(({ viewModel: vm, isActive, onPress, on
         </View>
 
         {/* Continue action — always rendered */}
-        <View style={cHCardStyles.continueRow}>
+        <TouchableOpacity
+          style={cHCardStyles.continueRow}
+          onPress={onContinue}
+          activeOpacity={onContinue ? 0.7 : 1}
+        >
           <Ionicons name="play-circle-outline" size={18} color={theme.colors.primary} />
           <Text style={cHCardStyles.continueText}>
-            Continuar: {vm.continueLabel}
+            Continuar: {vm.continueTarget.label}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.colors.primary + '15', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 100 }}>
             <Ionicons
-              name={vm.contentType === 'flashcard' ? 'albums-outline' : vm.contentType === 'exam' ? 'document-text-outline' : 'school-outline'}
+              name={vm.continueTarget.type === 'flashcard' ? 'albums-outline' : vm.continueTarget.type === 'exam' ? 'document-text-outline' : 'school-outline'}
               size={10}
               color={theme.colors.primary}
             />
             <Text style={{ fontSize: 10, fontWeight: '600', color: theme.colors.primary }}>
-              {vm.contentType === 'class' ? 'clase' : vm.contentType}
+              {vm.continueTarget.type === 'class' ? 'clase' : vm.continueTarget.type}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
-        </View>
+        </TouchableOpacity>
 
         {/* Divider — always rendered */}
         <View style={cHCardStyles.divider} />

@@ -797,6 +797,14 @@ export default function HybridDashboardScreen() {
                         viewModel={viewModel}
                         isActive={selectedDashboardCourseId === 'independent'}
                         onPress={() => handleHeroCardSelect('independent')}
+                        onContinue={() => {
+                          const subjectId = viewModel.continueTarget.subjectId;
+                          if (subjectId) {
+                            router.push(`/subjects/${subjectId}`);
+                          } else {
+                            handleHeroCardSelect('independent');
+                          }
+                        }}
                       />
                     );
                   }
@@ -820,6 +828,14 @@ export default function HybridDashboardScreen() {
                       viewModel={viewModel}
                       isActive={selectedDashboardCourseId === item.course.id}
                       onPress={() => handleHeroCardSelect(item.course.id)}
+                      onContinue={() => {
+                        const subjectId = viewModel.continueTarget.subjectId;
+                        if (subjectId) {
+                          router.push(`/subjects/${subjectId}`);
+                        } else {
+                          handleHeroCardSelect(item.course.id);
+                        }
+                      }}
                       onEditPress={() => handleEditCourse(item.course)}
                       onDeletePress={() => handleDeleteCourse(item.course)}
                     />

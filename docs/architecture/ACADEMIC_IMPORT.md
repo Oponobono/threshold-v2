@@ -62,9 +62,11 @@ Course,Platform,Instructor,Course URL,Total Hours,Subject,Code,Professor,Credits
 ```
 # Threshold Academic Import
 # Version: 1
-# Locale: es
+# Language: <idioma activo de la app al momento de generar>
 # GeneratedAt: <ISO-8601 UTC>
 ```
+
+`Language` refleja el idioma de la app configurado por el usuario en el momento de pulsar "Exportar plantilla". No es un locale de sistema ni un código de región; es únicamente el idioma de los textos de la plantilla (`es` o `en`).
 
 La clave `Version: 1` identifica este contrato. Futuras versiones publicarán `Version: 2` sin romper compatibilidad con archivos v1.
 
@@ -146,3 +148,46 @@ Course (programa)
 ```
 
 El CSV v2 añadirá una columna `Período` entre `Curso` y `Materia`. Los archivos v1 (sin esa columna) seguirán siendo válidos gracias al campo `# Version: 1` en los metadatos.
+
+---
+
+## 7. Compatibility Guarantees
+
+Threshold guarantees that **CSV Contract v1 remains readable by all future versions of the app**.
+
+Future versions may add optional columns but will **never**:
+- Remove an existing column.
+- Change the meaning of an existing column.
+- Change the position of an existing column.
+- Change the `# Version: 1` identifier on v1 files.
+
+These rules apply within the same major contract version. A `Version: 2` contract may introduce breaking changes only when explicitly documented and only when a migration path from v1 is provided.
+
+> This rule is what converts a file format into a stable contract. Once a user downloads a v1 template and fills it out, that file must be importable by Threshold forever.
+
+### El protagonista es el AcademicImportModel
+
+El CSV es solo el primer formato de entrada. Cualquier fuente externa — Excel, PDF + IA, Notion, Canvas LMS, Moodle — debe terminar produciendo exactamente el mismo `AcademicImportModel`. El CSV no es el protagonista; es un adaptador.
+
+```
+CSV          →
+Excel        →
+PDF + IA     →  AcademicImportModel  →  SQLite
+Notion       →
+Canvas LMS   →
+Moodle       →
+```
+
+---
+
+## Estado del Sprint
+
+| Campo | Valor |
+|---|---|
+| **Sprint** | AI-1 — Academic Import |
+| **Status** | ✅ Frozen |
+| **Version** | 1.0 |
+| **Production Ready** | Sí (pendiente hardening con datasets reales) |
+| **Próximo hito** | Sprint AI-1.1 — Hardening con CSV reales |
+
+> La arquitectura del módulo no debe modificarse hasta completar el Sprint AI-1.1. Cualquier cambio posterior debe estar respaldado por evidencia de uso real, no por hipótesis de diseño.

@@ -1,6 +1,13 @@
 import type { MemoryLevel } from '../domain/knowledge/types';
 import type { ContentType } from './content';
 
+export interface ContinueTarget {
+  readonly type: ContentType;
+  readonly subjectId: string;
+  readonly entityId: string;
+  readonly label: string;
+}
+
 export interface KnowledgeSummary {
   readonly subjectId: string;
   readonly subjectName: string;
@@ -19,8 +26,7 @@ export interface CourseHeroViewModel {
   readonly totalClasses: number;
   readonly knowledge?: KnowledgeSummary;
   readonly momentum: number;
-  readonly continueLabel: string;
-  readonly contentType: ContentType;
+  readonly continueTarget: ContinueTarget;
   readonly subjectCount: number;
   readonly creditCount?: number;
   readonly mainUrl?: string;
