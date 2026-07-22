@@ -62,7 +62,9 @@ export class CsvImporter {
           case 'weight':
           case 'score':
           case 'outOf':
-          case 'credits':
+          case 'subjectCredits':
+          case 'subjectTargetGrade':
+          case 'courseTotalHours':
             row[domainKey] = rawValue ? this.parseNumber(rawValue) : undefined;
             break;
           default:
@@ -96,13 +98,27 @@ export class CsvImporter {
 
       let course = coursesMap.get(courseName);
       if (!course) {
-        course = { name: courseName, subjects: [] };
+        course = {
+          name: courseName,
+          platform: r.coursePlatform?.trim() || undefined,
+          instructor: r.courseInstructor?.trim() || undefined,
+          mainUrl: r.courseUrl?.trim() || undefined,
+          totalHours: r.courseTotalHours,
+          subjects: []
+        };
         coursesMap.set(courseName, course);
       }
 
       let subject = course.subjects.find((s) => s.name === subjectName);
       if (!subject) {
-        subject = { name: subjectName, credits: r.credits, assessments: [] };
+        subject = {
+          name: subjectName,
+          code: r.subjectCode?.trim() || undefined,
+          professor: r.subjectProfessor?.trim() || undefined,
+          credits: r.subjectCredits,
+          targetGrade: r.subjectTargetGrade,
+          assessments: []
+        };
         course.subjects.push(subject);
       }
 

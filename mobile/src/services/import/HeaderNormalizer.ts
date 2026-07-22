@@ -1,20 +1,56 @@
 export class HeaderNormalizer {
   private static readonly DICTIONARY: Record<string, string> = {
-    // Curso / Course
+    // Curso / Course name
     curso: 'courseName',
     course: 'courseName',
-    periodo: 'courseName',
-    semestre: 'courseName',
-    semester: 'courseName',
-    term: 'courseName',
+    carrera: 'courseName',
+    programa: 'courseName',
+    program: 'courseName',
 
-    // Materia / Subject
+    // Plataforma / Platform
+    plataforma: 'coursePlatform',
+    platform: 'coursePlatform',
+
+    // Instructor del curso / Course instructor
+    instructor: 'courseInstructor',
+    docente: 'courseInstructor',
+    urldelcurso: 'courseUrl',
+
+    // Horas totales
+    horas: 'courseTotalHours',
+    hours: 'courseTotalHours',
+    totaldehorass: 'courseTotalHours',
+    totalhours: 'courseTotalHours',
+
+    // Materia / Subject name
     materia: 'subjectName',
     subject: 'subjectName',
     asignatura: 'subjectName',
     clase: 'subjectName',
     class: 'subjectName',
-    cursooasignatura: 'subjectName',
+
+    // Código de materia / Subject code
+    codigo: 'subjectCode',
+    code: 'subjectCode',
+    codigomateria: 'subjectCode',
+    subjectcode: 'subjectCode',
+
+    // Profesor de la materia / Subject professor
+    profesor: 'subjectProfessor',
+    professor: 'subjectProfessor',
+    teacher: 'subjectProfessor',
+    profesormateria: 'subjectProfessor',
+    professorsubject: 'subjectProfessor',
+
+    // Créditos / Credits (belong to Subject)
+    creditos: 'subjectCredits',
+    credits: 'subjectCredits',
+
+    // Nota mínima / Target grade
+    notaminima: 'subjectTargetGrade',
+    targetgrade: 'subjectTargetGrade',
+    notaaprobatoria: 'subjectTargetGrade',
+    minimumgrade: 'subjectTargetGrade',
 
     // Assessment / Evaluación
     evaluacion: 'assessmentName',
@@ -48,10 +84,6 @@ export class HeaderNormalizer {
     base: 'outOf',
     maxscore: 'outOf',
     notabase: 'outOf',
-
-    // Créditos / Credits
-    creditos: 'credits',
-    credits: 'credits',
 
     // Fecha / Date
     fecha: 'date',

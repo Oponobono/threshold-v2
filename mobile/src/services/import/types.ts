@@ -10,12 +10,19 @@ export interface ImportAssessmentRow {
 
 export interface ImportSubjectRow {
   name: string;
+  code?: string;
+  professor?: string;
   credits?: number;
+  targetGrade?: number;
   assessments: ImportAssessmentRow[];
 }
 
 export interface ImportCourseRow {
   name: string;
+  platform?: string;
+  instructor?: string;
+  mainUrl?: string;
+  totalHours?: number;
   subjects: ImportSubjectRow[];
 }
 
@@ -32,13 +39,23 @@ export interface AcademicImportModel {
 
 // Interfaz original plana usada solo temporalmente durante el parsing
 export interface AcademicImportRow {
+  // Course fields
   courseName: string;
+  coursePlatform?: string;
+  courseInstructor?: string;
+  courseUrl?: string;
+  courseTotalHours?: number;
+  // Subject fields
   subjectName: string;
+  subjectCode?: string;
+  subjectProfessor?: string;
+  subjectCredits?: number;
+  subjectTargetGrade?: number;
+  // Assessment fields
   assessmentName: string;
-  weight: number;
-  score: number;
-  outOf: number;
-  credits?: number;
+  weight?: number;
+  score?: number;
+  outOf?: number;
   date?: string;
 }
 

@@ -3,6 +3,11 @@ export class CsvTemplateGenerator {
    * Genera el contenido CSV de la plantilla.
    * Incluye los metadatos de versión y compatibilidad, seguidos por la cabecera.
    *
+   * CSV Contract v1 — Columnas en orden canónico:
+   * [Course] Curso, Plataforma, Instructor, URL del Curso, Horas Totales
+   * [Subject] Materia, Código, Profesor, Créditos, Nota Mínima
+   * [Assessment] Evaluación, Peso (%), Nota Obtenida, Nota Máxima, Fecha
+   *
    * @param language 'es' o 'en' para definir el idioma de los metadatos
    * @param delimiter ',' por defecto, puede ser ';' para Excel en ciertas regiones
    */
@@ -21,41 +26,79 @@ export class CsvTemplateGenerator {
     let instructions: string;
 
     if (language === 'es') {
+      const example = [
+        'Administración de Empresas', 'Udemy', 'Juan García',
+        'https://udemy.com/course/ejemplo', '40',
+        'Álgebra Lineal', 'MAT101', 'Prof. López', '4', '3.5',
+        'Parcial 1', '25', '4.5', '5', '2026-03-15'
+      ].join(delimiter);
+
       instructions = [
         '# No elimine la fila de cabeceras.',
-        '# Las columnas Curso, Materia y Evaluación son obligatorias.',
-        '# Peso, Nota, Nota Máxima, Créditos y Fecha son opcionales.',
+        '# Obligatorios: Curso, Materia, Evaluación.',
+        '# Opcionales del Curso: Plataforma, Instructor, URL del Curso, Horas Totales.',
+        '# Opcionales de la Materia: Código, Profesor, Créditos, Nota Mínima.',
+        '# Opcionales de la Evaluación: Peso (%), Nota Obtenida, Nota Máxima, Fecha.',
         '# El formato de fecha es YYYY-MM-DD.',
-        `# Ejemplo: 2026-I${delimiter}Álgebra Lineal${delimiter}Parcial 1${delimiter}25${delimiter}4.5${delimiter}5${delimiter}4${delimiter}2026-03-15`
+        `# Ejemplo: ${example}`
       ].join('\n');
-      
+
       headers = [
+        // Course
         'Curso',
+        'Plataforma',
+        'Instructor',
+        'URL del Curso',
+        'Horas Totales',
+        // Subject
         'Materia',
+        'Código',
+        'Profesor',
+        'Créditos',
+        'Nota Mínima',
+        // Assessment
         'Evaluación',
         'Peso (%)',
         'Nota Obtenida',
         'Nota Máxima',
-        'Créditos',
         'Fecha (YYYY-MM-DD)',
       ];
     } else {
+      const example = [
+        'Computer Science', 'Udemy', 'John Doe',
+        'https://udemy.com/course/example', '40',
+        'Linear Algebra', 'MAT101', 'Prof. Smith', '4', '3.5',
+        'Midterm 1', '25', '90', '100', '2026-03-15'
+      ].join(delimiter);
+
       instructions = [
         '# Do not delete the header row.',
-        '# The columns Course, Subject, and Assessment are mandatory.',
-        '# Weight, Score, Out Of, Credits, and Date are optional.',
+        '# Required: Course, Subject, Assessment.',
+        '# Optional (Course): Platform, Instructor, Course URL, Total Hours.',
+        '# Optional (Subject): Code, Professor, Credits, Minimum Grade.',
+        '# Optional (Assessment): Weight (%), Score, Out Of, Date.',
         '# The date format is YYYY-MM-DD.',
-        `# Example: 2026-Fall${delimiter}Linear Algebra${delimiter}Midterm 1${delimiter}25${delimiter}90${delimiter}100${delimiter}4${delimiter}2026-03-15`
+        `# Example: ${example}`
       ].join('\n');
 
       headers = [
+        // Course
         'Course',
+        'Platform',
+        'Instructor',
+        'Course URL',
+        'Total Hours',
+        // Subject
         'Subject',
+        'Code',
+        'Professor',
+        'Credits',
+        'Minimum Grade',
+        // Assessment
         'Assessment',
         'Weight (%)',
         'Score',
         'Out Of',
-        'Credits',
         'Date (YYYY-MM-DD)',
       ];
     }

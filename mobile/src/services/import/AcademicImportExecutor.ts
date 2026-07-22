@@ -58,6 +58,10 @@ export class AcademicImportExecutor {
             id: courseId,
             user_id: userId,
             name: course.name.trim(),
+            platform: course.platform || undefined,
+            instructor: course.instructor || undefined,
+            main_url: course.mainUrl || undefined,
+            total_hours: course.totalHours || undefined,
             status: 'active',
             momentum_score: 1.0,
             is_backed_up: 0,
@@ -84,9 +88,12 @@ export class AcademicImportExecutor {
               user_id: userId,
               course_id: courseId,
               name: subject.name.trim(),
+              code: subject.code || undefined,
+              professor: subject.professor || undefined,
               credits: subject.credits || 0,
-              color: '#4F46E5', // Color índigo por defecto
-              icon: 'book-outline', // Icono de libro por defecto
+              target_grade: subject.targetGrade || undefined,
+              color: '#4F46E5',
+              icon: 'book-outline',
             };
             await subjectRepository.create(newSubject);
             await syncService.enqueueCreate('subject', subjectId, newSubject);
