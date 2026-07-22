@@ -235,6 +235,21 @@ exports.createAssessment = (req, res) => {
     const query = `
       INSERT INTO assessments (id, user_id, subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        user_id = excluded.user_id,
+        subject_id = excluded.subject_id,
+        name = excluded.name,
+        type = excluded.type,
+        date = excluded.date,
+        weight = excluded.weight,
+        out_of = excluded.out_of,
+        score = excluded.score,
+        percentage = excluded.percentage,
+        grade_value = excluded.grade_value,
+        is_completed = excluded.is_completed,
+        category_id = excluded.category_id,
+        due_date = excluded.due_date,
+        grading_date = excluded.grading_date
     `;
     db.run(
       query,
@@ -283,23 +298,48 @@ exports.createAssessment = (req, res) => {
               const normalized = normalizeGrade(rawValue, effectiveVersion);
               console.log(`[POST] 📊 Normalización: raw=${rawValue}, normalized=${normalized}, maxValue=${effectiveVersion.max_value}`);
               
-              db.run(`
-                INSERT INTO assessment_results (id, assessment_id, user_id, raw_value, normalized_value, grading_version_id)
-                VALUES (?, ?, ?, ?, ?, ?)
-              `, [uuidv4(), newAssessmentId, subject.user_id, rawValue, normalized, gradingVersionId], async (err) => {
-                if (err) {
-                  console.error('[POST] ❌ Error insertando assessment_results:', err.message);
-                  return res.status(500).json({ error: 'Error al insertar los resultados: ' + err.message });
-                }
-                console.log('[POST] ✅ assessment_results insertado correctamente:', { assessmentId: newAssessmentId, raw_value: rawValue, normalized_value: normalized });
-                
-                try {
-                  const fullAssessment = await fetchAndDenormalizeAssessment(newAssessmentId, subject.user_id);
-                  incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json(fullAssessment); });
-                } catch (fetchErr) {
-                  incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' }); });
-                }
+              const existingResult = await new Promise((resolve, reject) => {
+                db.get('SELECT id FROM assessment_results WHERE assessment_id = ?', [newAssessmentId], (err, row) => {
+                  if (err) reject(err); else resolve(row);
+                });
               });
+
+              if (existingResult) {
+                db.run(`
+                  UPDATE assessment_results 
+                  SET raw_value = ?, normalized_value = ?, grading_version_id = ?
+                  WHERE assessment_id = ?
+                `, [rawValue, normalized, gradingVersionId, newAssessmentId], async (err) => {
+                  if (err) {
+                    console.error('[POST] ❌ Error actualizando assessment_results:', err.message);
+                    return res.status(500).json({ error: 'Error al actualizar los resultados: ' + err.message });
+                  }
+                  console.log('[POST] ✅ assessment_results actualizado correctamente:', { assessmentId: newAssessmentId });
+                  try {
+                    const fullAssessment = await fetchAndDenormalizeAssessment(newAssessmentId, subject.user_id);
+                    incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json(fullAssessment); });
+                  } catch (fetchErr) {
+                    incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' }); });
+                  }
+                });
+              } else {
+                db.run(`
+                  INSERT INTO assessment_results (id, assessment_id, user_id, raw_value, normalized_value, grading_version_id)
+                  VALUES (?, ?, ?, ?, ?, ?)
+                `, [uuidv4(), newAssessmentId, subject.user_id, rawValue, normalized, gradingVersionId], async (err) => {
+                  if (err) {
+                    console.error('[POST] ❌ Error insertando assessment_results:', err.message);
+                    return res.status(500).json({ error: 'Error al insertar los resultados: ' + err.message });
+                  }
+                  console.log('[POST] ✅ assessment_results insertado correctamente:', { assessmentId: newAssessmentId });
+                  try {
+                    const fullAssessment = await fetchAndDenormalizeAssessment(newAssessmentId, subject.user_id);
+                    incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json(fullAssessment); });
+                  } catch (fetchErr) {
+                    incrementSyncVersion('assessments', newAssessmentId, () => { res.status(201).json({ id: newAssessmentId, message: 'Evaluación agregada' }); });
+                  }
+                });
+              }
             } else {
               console.log('[POST] ⚠️  No hay rawValue para insertar en assessment_results');
               try {

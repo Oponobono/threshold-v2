@@ -12,16 +12,16 @@
  */
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
+import { LogBox } from 'react-native';
 import { getScheduledBackupConfig, runBackup, BACKUP_PREFS } from './backupService';
 import { syncService } from '../database';
 import { storageService } from '../storageService';
-import {
-  showBackupUploadNotification,
-  updateBackupUploadNotification,
-  cancelBackupUploadNotification,
-} from '../notificationService';
+
 import { databaseService } from '../database/DatabaseService';
 import { initializeApiClient } from '../api/client';
+
+// Ignore the deprecation warning from expo-background-fetch (still functional in current Expo SDK)
+LogBox.ignoreLogs(['expo-background-fetch: This library is deprecated']);
 
 export const BACKUP_TASK_NAME = 'threshold-scheduled-backup';
 
@@ -81,11 +81,6 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
     
     console.log(`[ScheduledBackup] ✅ Ventana de ejecución válida. Ejecutando backup tipo: ${config.type}`);
 
-    console.log(`[ScheduledBackup] ✅ Ejecutando backup tipo: ${config.type}`);
-
-    // Mostrar notificación de progreso
-    await showBackupUploadNotification(0).catch(() => {});
-
     // 1. Sincronizar datos de BD
     if (config.type === 'datos' || config.type === 'ambos') {
       const syncResult = await syncService.sync();
@@ -94,9 +89,7 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
 
     // 2. Respaldar archivos multimedia
     if (config.type === 'multimedia' || config.type === 'ambos') {
-      const result = await runBackup((p) => {
-        updateBackupUploadNotification(p.done, p.total, p.current).catch(() => {});
-      }, {
+      const result = await runBackup({
         includePhotos: true,
         includeAudio: true,
         includeDocs: true,
@@ -110,14 +103,10 @@ TaskManager.defineTask(BACKUP_TASK_NAME, async () => {
     await storageService.saveSecure(BACKUP_PREFS.SCHEDULED_LAST_RUN, new Date().toISOString()).catch(() => {});
     console.log(`[ScheduledBackup] 💾 Última ejecución registrada`);
 
-    // Notificación desaparece al finalizar
-    await cancelBackupUploadNotification().catch(() => {});
-
     return BackgroundFetch.BackgroundFetchResult.NoData;
   } catch (error) {
     console.error('[ScheduledBackup] ❌ Error en el task:', error);
     console.error('[ScheduledBackup] Stack:', error instanceof Error ? error.stack : 'No stack available');
-    await cancelBackupUploadNotification().catch(() => {});
     return BackgroundFetch.BackgroundFetchResult.Failed;
   }
 });
@@ -200,9 +189,6 @@ export const testScheduledBackupNow = async (
 
     console.log(`[ScheduledBackup] 🧪 TEST: Ejecutando backup tipo: ${config.type}`);
 
-    // Mostrar notificación de progreso
-    await showBackupUploadNotification(0).catch(() => {});
-
     let hasNewData = false;
     let totalUploaded = 0;
     let totalErrors = 0;
@@ -216,10 +202,7 @@ export const testScheduledBackupNow = async (
 
     // 2. Respaldar archivos multimedia
     if (config.type === 'multimedia' || config.type === 'ambos') {
-      const result = await runBackup((p) => {
-        updateBackupUploadNotification(p.done, p.total, p.current).catch(() => {});
-        onProgress?.(p);
-      }, {
+      const result = await runBackup({
         includePhotos: true,
         includeAudio: true,
         includeDocs: true,
@@ -236,9 +219,6 @@ export const testScheduledBackupNow = async (
     await storageService.saveSecure(BACKUP_PREFS.SCHEDULED_LAST_RUN, new Date().toISOString()).catch(() => {});
     console.log(`[ScheduledBackup] 🧪 TEST: Última ejecución registrada`);
 
-    // Notificación desaparece al finalizar
-    await cancelBackupUploadNotification().catch(() => {});
-
     console.log(`[ScheduledBackup] 🧪 TEST: Completado - ${totalUploaded} subidos, ${totalErrors} errores`);
     return { success: totalErrors === 0, uploaded: totalUploaded, errors: totalErrors };
   } catch (error) {
@@ -246,7 +226,6 @@ export const testScheduledBackupNow = async (
     if (error instanceof Error) {
       console.error('[ScheduledBackup] 🧪 TEST: Stack:', error.stack);
     }
-    await cancelBackupUploadNotification().catch(() => {});
     return { success: false, uploaded: 0, errors: 1 };
   }
 };
