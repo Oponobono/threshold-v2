@@ -180,25 +180,29 @@ export default function CalendarScreen() {
         />
       </ScrollView>
 
-      <TaskDetailModal
-        visible={taskModalVisible}
-        onClose={() => {
-          setTaskModalVisible(false);
-          setSelectedTask(null);
-        }}
-        task={selectedTask}
-        t={t}
-      />
+      {calendar.isReady && (
+        <>
+          <TaskDetailModal
+            visible={taskModalVisible}
+            onClose={() => {
+              setTaskModalVisible(false);
+              setSelectedTask(null);
+            }}
+            task={selectedTask}
+            t={t}
+          />
 
-      <EventDetailModal
-        visible={eventDetailVisible}
-        onClose={() => {
-          setEventDetailVisible(false);
-          setSelectedEvent(null);
-        }}
-        event={selectedEvent}
-        t={t}
-      />
+          <EventDetailModal
+            visible={eventDetailVisible}
+            onClose={() => {
+              setEventDetailVisible(false);
+              setSelectedEvent(null);
+            }}
+            event={selectedEvent}
+            t={t}
+          />
+        </>
+      )}
 
       <AddEventMenu
         visible={addMenuVisible}
@@ -214,54 +218,58 @@ export default function CalendarScreen() {
         t={t}
       />
 
-      <EventCreationModal
-        visible={eventCreationVisible}
-        onClose={() => {
-          setEventCreationVisible(false);
-          setEditingEvent(null);
-        }}
-        onSave={async (event, eventId) => {
-          try {
-            if (eventId) {
-              await updateCalendarEvent(eventId, event);
-            } else {
-              await createCalendarEvent(event);
-            }
-            await calendar.reloadEventsForMonth();
-            alertRef.show({
-              title: t('common.success'),
-              message: eventId
-                ? t('calendar.eventUpdatedSuccess')
-                : t('calendar.eventCreatedSuccess'),
-              type: 'success',
-            });
-          } catch (error) {
-            console.error('Error guardando evento:', error);
-            alertRef.show({
-              title: t('common.error'),
-              message: error instanceof Error ? error.message : 'Error al guardar el evento',
-              type: 'error',
-            });
-          }
-        }}
-        selectedDate={new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum)}
-        subjects={subjects}
-        editingEvent={editingEvent}
-      />
+      {calendar.isReady && (
+        <>
+          <EventCreationModal
+            visible={eventCreationVisible}
+            onClose={() => {
+              setEventCreationVisible(false);
+              setEditingEvent(null);
+            }}
+            onSave={async (event, eventId) => {
+              try {
+                if (eventId) {
+                  await updateCalendarEvent(eventId, event);
+                } else {
+                  await createCalendarEvent(event);
+                }
+                await calendar.reloadEventsForMonth();
+                alertRef.show({
+                  title: t('common.success'),
+                  message: eventId
+                    ? t('calendar.eventUpdatedSuccess')
+                    : t('calendar.eventCreatedSuccess'),
+                  type: 'success',
+                });
+              } catch (error) {
+                console.error('Error guardando evento:', error);
+                alertRef.show({
+                  title: t('common.error'),
+                  message: error instanceof Error ? error.message : 'Error al guardar el evento',
+                  type: 'error',
+                });
+              }
+            }}
+            selectedDate={new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum)}
+            subjects={subjects}
+            editingEvent={editingEvent}
+          />
 
-      <CreateTaskModal
-        visible={taskCreationVisible}
-        onClose={() => setTaskCreationVisible(false)}
-        subjects={subjects}
-        onTaskCreated={async () => {
-          try {
-            await calendar.loadAllData(true);
-            await calendar.reloadEventsForMonth();
-          } catch (error) {
-            console.warn('Error reloading data after task creation:', error);
-          }
-        }}
-      />
+          <CreateTaskModal
+            visible={taskCreationVisible}
+            onClose={() => setTaskCreationVisible(false)}
+            subjects={subjects}
+            onTaskCreated={async () => {
+              try {
+                await calendar.loadAllData(true);
+                await calendar.reloadEventsForMonth();
+              } catch (error) {
+                console.warn('Error reloading data after task creation:', error);
+              }
+            }}
+          />
+        </>
+      )}
     </SafeAreaView>
   );
 }

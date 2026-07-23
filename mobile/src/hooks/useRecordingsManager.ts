@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { InteractionManager } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo } from '../services/api';
 import { useAudioRecorder } from './useAudioRecorder';
@@ -24,6 +25,19 @@ export const useRecordingsManager = () => {
   const [isAddingYouTubeVideo, setIsAddingYouTubeVideo] = useState(false);
   const isLoadingVideosRef = useRef(false);
   const isAddingYouTubeRef = useRef(false);
+
+  // ── Gate: defer heavy work until navigation animation completes
+  const [isReady, setIsReady] = useState(false);
+
+  // Defer YouTube sync + recordings load until after navigation animation
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      loadYouTubeVideos();
+      loadRecordings();
+      setIsReady(true);
+    });
+    return () => task.cancel();
+  }, [loadYouTubeVideos, loadRecordings]);
 
   // ── Search & filter
   const [searchQuery, setSearchQuery] = useState('');

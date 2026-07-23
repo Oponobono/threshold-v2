@@ -171,6 +171,25 @@ export function useSubjects(t: any) {
     return map;
   }, [assessments]);
 
+  const assessmentsBySubject = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const a of assessments) {
+      if (!map.has(a.subject_id)) map.set(a.subject_id, []);
+      map.get(a.subject_id)!.push(a);
+    }
+    return map;
+  }, [assessments]);
+
+  const projectionsBySubject = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const s of subjects) {
+      const subjectAssessments = assessmentsBySubject.get(s.id) || [];
+      const projection = calculateProjection(subjectAssessments, s, null);
+      map.set(s.id, projection);
+    }
+    return map;
+  }, [subjects, assessmentsBySubject]);
+
   const filteredSubjects = useMemo(() => {
     return subjects
       .filter(s =>
@@ -179,8 +198,7 @@ export function useSubjects(t: any) {
         (s.professor && s.professor.toLowerCase().includes(search.toLowerCase()))
       )
       .map(s => {
-        const subjectAssessments = assessments.filter(a => a.subject_id === s.id);
-        const projection = calculateProjection(subjectAssessments, s, null);
+        const projection = projectionsBySubject.get(s.id)!;
         return {
           ...s,
           avg_score: projection.currentAverage > 0 ? projection.currentAverage : s.avg_score,
@@ -190,21 +208,20 @@ export function useSubjects(t: any) {
           delta: projection.delta,
         };
       });
-  }, [subjects, search, pendingBySubject, nextMilestoneBySubject, assessments]);
+  }, [subjects, search, pendingBySubject, nextMilestoneBySubject, projectionsBySubject]);
 
   const localCriticalSubjects = useMemo(() => {
     return subjects
       .map(s => {
-        const subjectAssessments = assessments.filter(a => a.subject_id === s.id);
-        const projection = calculateProjection(subjectAssessments, s, null);
+        const projection = projectionsBySubject.get(s.id)!;
         const raw = projection.currentAverage > 0 ? projection.currentAverage : (s.avg_score ?? 0);
         const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
         return { ...s, computedAvg: avg, avg_score: raw };
       })
-      .filter(s => s.computedAvg < 3.0)
+      .filter(s => s.computedAvg > 0 && s.computedAvg < (s.target_grade || 3.0))
       .sort((a, b) => a.computedAvg - b.computedAvg)
       .slice(0, 3);
-  }, [subjects]);
+  }, [subjects, projectionsBySubject]);
 
   const localTotalCredits = useMemo(() => {
     return subjects.reduce((sum, s) => sum + (s.credits || 0), 0);
@@ -213,19 +230,16 @@ export function useSubjects(t: any) {
   const totalCredits = semesterSummary?.totalCredits ?? localTotalCredits;
 
   const criticalSubjects = useMemo(() => {
-    if (semesterSummary?.criticalSubjects) {
-      return semesterSummary.criticalSubjects.map(cs => ({
-        id: cs.id,
-        name: cs.name,
-        avg_score: cs.avgScore,
-        target_grade: cs.targetGrade,
-        delta: cs.delta,
-        color: cs.color,
-        icon: cs.icon,
-      }));
-    }
-    return localCriticalSubjects;
-  }, [semesterSummary, localCriticalSubjects]);
+    return localCriticalSubjects.map(s => ({
+      id: s.id,
+      name: s.name,
+      avg_score: s.computedAvg,
+      target_grade: s.target_grade || 3.0,
+      delta: (s.target_grade || 3.0) - s.computedAvg,
+      color: s.color || '#4F46E5',
+      icon: s.icon || 'book-outline',
+    }));
+  }, [localCriticalSubjects]);
   const recentActivity = useMemo(() => {
     const items: UnifiedActivityItem[] = [];
     const now = Date.now();
@@ -414,10 +428,12 @@ export function useSubjects(t: any) {
       });
     }
 
+    const subjectMap = new Map(subjects.map(s => [s.id, s]));
+
     // Enriquecer con metadata de la materia y ordenar
     const sorted = items
       .map(item => {
-        const subject = subjects.find(s => s.id === item.subjectId);
+        const subject = subjectMap.get(item.subjectId);
         return {
           ...item,
           subjectName: subject?.name || 'General',

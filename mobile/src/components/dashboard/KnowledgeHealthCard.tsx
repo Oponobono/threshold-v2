@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
@@ -77,9 +77,10 @@ function formatNumber(n: number): string {
 interface Props {
   snapshot: KnowledgeSnapshot | null;
   loading?: boolean;
+  onInfoPress?: () => void;
 }
 
-export function KnowledgeHealthCard({ snapshot, loading }: Props) {
+export function KnowledgeHealthCard({ snapshot, loading, onInfoPress }: Props) {
   const { t } = useTranslation();
   const subjects = snapshot?.subjects ?? [];
 
@@ -124,11 +125,12 @@ export function KnowledgeHealthCard({ snapshot, loading }: Props) {
       descripcion={descripcion}
       lastReviewLabel={lastReviewLabel}
       showSubjects={!!showSubjects}
+      onInfoPress={onInfoPress}
     />
   );
 }
 
-function KnowledgeHealthCardContent({ snapshot, t, mainColor, prioridad, masSolida, consolidado, descripcion, lastReviewLabel, showSubjects }: {
+function KnowledgeHealthCardContent({ snapshot, t, mainColor, prioridad, masSolida, consolidado, descripcion, lastReviewLabel, showSubjects, onInfoPress }: {
   snapshot: KnowledgeSnapshot;
   t: any;
   mainColor: string;
@@ -138,6 +140,7 @@ function KnowledgeHealthCardContent({ snapshot, t, mainColor, prioridad, masSoli
   descripcion: string;
   lastReviewLabel: string;
   showSubjects: boolean;
+  onInfoPress?: () => void;
 }) {
   const { health, metadata } = snapshot;
 
@@ -145,8 +148,13 @@ function KnowledgeHealthCardContent({ snapshot, t, mainColor, prioridad, masSoli
     <View style={styles.card}>
       {/* ── Block 1: Estado ── */}
       <View style={styles.header}>
-        <MaterialCommunityIcons name="brain" size={20} color={theme.colors.primary} />
-        <Text style={styles.title}>{t('knowledge.labels.title')}</Text>
+        <View style={styles.headerLeft}>
+          <MaterialCommunityIcons name="brain" size={20} color={theme.colors.primary} />
+          <Text style={styles.title}>{t('knowledge.labels.title')}</Text>
+        </View>
+        <TouchableOpacity onPress={onInfoPress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.infoButton}>
+          <MaterialCommunityIcons name="information-outline" size={20} color="#C5A059" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.estadoRow}>

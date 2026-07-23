@@ -64,7 +64,7 @@ export class NotifeeOperationProvider implements NotificationProvider {
     await notifee.displayNotification({
       id: operation.id,
       title,
-      body: progress?.message ?? stageLabel,
+      body: operation.message ?? stageLabel,
       android: {
         channelId: CHANNEL_ID,
         ongoing: true,          // No descartable mientras está activa

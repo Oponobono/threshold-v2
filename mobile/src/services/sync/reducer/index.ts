@@ -8,6 +8,7 @@ export interface ReduceResult {
   operations: ReducedOperation[];
   report: ReductionReport;
   errors: ValidationError[];
+  droppedIds: number[];
 }
 
 export function reduce(
@@ -15,7 +16,7 @@ export function reduce(
   existingEntityIds?: Set<string>,
 ): ReduceResult {
   if (pending.length === 0) {
-    return { operations: [], report: EMPTY_REPORT, errors: [] };
+    return { operations: [], report: EMPTY_REPORT, errors: [], droppedIds: [] };
   }
 
   const startTime = Date.now();
@@ -37,6 +38,8 @@ export function reduce(
 
   // 2. Reducir cada grupo
   const reduced: ReducedOperation[] = [];
+  const droppedIds: number[] = [];
+  
   for (const [_key, items] of groups) {
     if (items.length > 1) {
       merged += items.length - 1;
@@ -45,8 +48,12 @@ export function reduce(
     if (result === null) {
       removed += items.length;
       noop++;
+      droppedIds.push(...items.map(i => i.id!));
     } else {
       reduced.push(result);
+      // Las operaciones fusionadas se pierden, el resultado solo tiene los originalIds de las que sobrevivieron?
+      // Wait, reduceEntity devuelve TODOS los originalIds en `result.originalIds`.
+      // Entonces droppedIds solo necesita los ítems que retornaron null.
     }
   }
 
@@ -62,5 +69,5 @@ export function reduce(
 
   const report = createReport(originalCount, sorted, merged, removed, noop, startTime);
 
-  return { operations: sorted, report, errors };
+  return { operations: sorted, report, errors, droppedIds };
 }

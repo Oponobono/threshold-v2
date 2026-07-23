@@ -148,6 +148,13 @@ export const subjectDetailStyles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    flex: 1,
+    paddingRight: 12,
+  },
   sectionHint: {
     marginTop: 4,
     fontSize: 11,
@@ -340,6 +347,122 @@ export const subjectDetailStyles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
   },
+  // ── Assessment-style table for SubjectInsights ──
+  insightsTableCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: 'hidden',
+    ...globalStyles.shadow,
+  },
+  insightsAssessRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  insightsAssessRowLast: {
+    borderBottomWidth: 0,
+  },
+  insightsAssessRowPending: {
+    opacity: 0.6,
+  },
+  insightsAssessInfo: {
+    flex: 1,
+  },
+  insightsAssessNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 1,
+  },
+  insightsAssessName: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    marginBottom: 4,
+  },
+  insightsAssessMeta: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
+  },
+  insightsAssessRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  insightsAssessScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  insightsAssessScore: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    letterSpacing: -0.3,
+  },
+  insightsAssessScale: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.text.secondary,
+    opacity: 0.6,
+  },
+  insightsAssessStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  assessPendingBadge: {
+    backgroundColor: theme.colors.warning,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  assessPendingText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  assessDateDiscreet: {
+    fontSize: 10,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
+    marginTop: 2,
+    letterSpacing: -0.2,
+    paddingRight: 26, // Align date with score, not under the ellipsis
+  },
+  insightsProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  insightsProgressTrack: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: theme.colors.inputBackground,
+    overflow: 'hidden',
+  },
+  insightsProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  insightsProgressPct: {
+    fontSize: 10,
+    color: theme.colors.text.secondary,
+    fontWeight: '600',
+    minWidth: 30,
+    textAlign: 'right',
+  },
+  insightsEmptyTable: {
+    padding: 32,
+    alignItems: 'center',
+  },
+
   emptyStateCard: {
     alignItems: 'center',
     justifyContent: 'center',

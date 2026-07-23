@@ -1,27 +1,34 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../store/useDataStore';
 import { useSubjectGrades } from './useSubjectGrades';
-import { getUserId, getCurrentUserProfile } from '../services/api/auth';
+import { getCurrentUserProfile } from '../services/api/auth';
 import { downloadReport } from '../services/api/analytics';
 import { normalizeGrade, parseWeight, SCALE_MAX } from '../utils/grades';
 import { DEFAULT_GRADING_SYSTEMS, US_LETTER_SCALES } from '../services/api/gradingDefaults';
 import { fetchSystemScales } from '../services/api/grading';
 import { buildDisplayGrade, type DisplayGrade } from '../services/gradingEngineDisplay';
 import { alertRef } from '../components/ui/CustomAlert';
-import { courseRepository } from '../services/database';
 import type { Course } from '../services/api/types';
 
 export function useGrades(t: any) {
-  const { subjects, assessments, refreshAssessments } = useDataStore();
+  const storeSubjects = useDataStore(s => s.subjects);
+  const storeAssessments = useDataStore(s => s.assessments);
+  const storeCourses = useDataStore(s => s.courses);
+  const storeProfile = useDataStore(s => s.profile);
+  const { refreshAssessments } = useDataStore();
 
-  const [profile, setProfile] = useState<any>(null);
+  const subjects = storeSubjects;
+  const assessments = storeAssessments;
+
+  const [profile, setProfile] = useState<any>(storeProfile);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [courses, setCourses] = useState<Course[]>(storeCourses);
+  const [userId, setUserId] = useState<string | null>(storeProfile?.id != null ? String(storeProfile.id) : null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   const [simScore, setSimScore] = useState('');
   const [simPossible, setSimPossible] = useState('');
@@ -32,9 +39,34 @@ export function useGrades(t: any) {
   const [activeSystem, setActiveSystem] = useState<any>(null);
   const [activeScales, setActiveScales] = useState<any[]>([]);
 
+  const hadInitialDataRef = useRef(storeProfile !== null && storeCourses.length > 0);
+
   useEffect(() => {
-    getCurrentUserProfile().then(p => setProfile(p)).catch(() => {});
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+      if (!hadInitialDataRef.current) {
+        getCurrentUserProfile().then(p => {
+          setProfile(p);
+          if (p?.id) setUserId(String(p.id));
+        }).catch(() => {});
+      }
+      hadInitialDataRef.current = false;
+    });
+    return () => task.cancel();
   }, []);
+
+  useEffect(() => {
+    if (storeProfile && !profile) {
+      setProfile(storeProfile);
+      if (storeProfile.id) setUserId(String(storeProfile.id));
+    }
+  }, [storeProfile]);
+
+  useEffect(() => {
+    if (storeCourses.length > 0 && courses.length === 0) {
+      setCourses(storeCourses as Course[]);
+    }
+  }, [storeCourses]);
 
   useEffect(() => {
     if (!profile?.active_grading_version_id) return;
@@ -52,21 +84,15 @@ export function useGrades(t: any) {
     }
   }, [profile]);
 
-  useEffect(() => {
-    getUserId().then(id => setUserId(id != null ? String(id) : null));
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       const task = InteractionManager.runAfterInteractions(() => {
         refreshAssessments();
-        courseRepository.getAll().then(c => setCourses(c as Course[])).catch(() => {});
       });
       return () => task.cancel();
     }, [refreshAssessments])
   );
 
-  // Materias visibles según el curso seleccionado
   const subjectsForCourse = useMemo(() =>
     selectedCourseId
       ? subjects.filter(s => (s as any).course_id === selectedCourseId)
@@ -75,7 +101,6 @@ export function useGrades(t: any) {
 
   const filteredAssessments = useMemo(() => {
     let base = assessments;
-    // Filtro por curso: solo assessments de materias del curso activo
     if (selectedCourseId) {
       const ids = new Set(subjectsForCourse.map(s => s.id));
       base = base.filter(a => ids.has(a.subject_id));
@@ -198,7 +223,7 @@ export function useGrades(t: any) {
   ).map(sanitize);
 
   const handleDownloadReport = async () => {
-    const uid = await getUserId();
+    const uid = userId || (storeProfile?.id != null ? String(storeProfile.id) : null);
     if (!uid || isExportingPdf) return;
     setIsExportingPdf(true);
     try {
@@ -220,6 +245,7 @@ export function useGrades(t: any) {
     selectedCourseId, setSelectedCourseId,
     courses, subjectsForCourse,
     userId,
+    isReady,
     displayGPA, displayProjectedGPA, displayDelta, globalGpaLetter, globalProjectedLetter, activeSystem,
     termGpa, evaluatedPercentage, selectedSubject,
     simScore, setSimScore,

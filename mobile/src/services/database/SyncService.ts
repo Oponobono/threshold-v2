@@ -223,20 +223,20 @@ export class SyncService {
 
       // Reducción de cola: compactar operaciones en estado final por entidad
       syncDebugger.timeStart(tid, 'queue_reduce');
-      const { operations: reduced, report, errors } = reduce(items);
+      const { operations: reduced, report, errors, droppedIds } = reduce(items);
       syncDebugger.timeEnd(tid, 'queue_reduce', 'QUEUE_READ', `Reduced ${items.length} → ${reduced.length} ops`, report);
 
       if (errors.length > 0) {
         syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', `Reduction validation errors: ${errors.length}`, { errors });
       }
 
-      const operations = reduced.length > 0 ? reduced : items.map(i => ({
-        operation: i.operation,
-        entity_type: i.entity_type,
-        entity_id: i.entity_id!,
-        payload: i.payload ? JSON.parse(i.payload) : undefined,
-        originalIds: [i.id!],
-      }));
+      if (droppedIds && droppedIds.length > 0) {
+        console.log(`[SyncService] Limpiando ${droppedIds.length} operaciones canceladas/NOOP de la base de datos.`);
+        syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', `Deleted ${droppedIds.length} no-op operations`, { count: droppedIds.length });
+        await syncQueueRepository.markCompletedBatch(droppedIds);
+      }
+
+      const operations = reduced;
 
       console.log(`[SyncService] Iniciando Fase 2: sync de ${operations.length} operaciones (${items.length} → ${reduced.length} reducidas)`);
 

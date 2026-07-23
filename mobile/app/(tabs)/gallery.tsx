@@ -186,7 +186,7 @@ export default function GalleryScreen() {
       />
 
       <Suspense fallback={<ActivityIndicator style={{ marginTop: 20 }} />}>
-        {g.viewerVisible && (
+        {g.isReady && g.viewerVisible && (
           <ImageViewerModal
             isVisible={g.viewerVisible}
             photos={g.viewerPhotos as any}
@@ -196,7 +196,7 @@ export default function GalleryScreen() {
             onOCRSaved={g.handleSave}
           />
         )}
-        {g.isScannerVisible && (
+        {g.isReady && g.isScannerVisible && (
           <DocumentScannerModal
             isVisible={g.isScannerVisible}
             onClose={() => g.setIsScannerVisible(false)}
@@ -204,7 +204,7 @@ export default function GalleryScreen() {
             onSave={g.handleSave}
           />
         )}
-        {g.isPhotoVisible && (
+        {g.isReady && g.isPhotoVisible && (
           <PhotoCaptureModal
             isVisible={g.isPhotoVisible}
             onClose={() => g.setIsPhotoVisible(false)}

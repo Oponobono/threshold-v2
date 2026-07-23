@@ -91,7 +91,7 @@ export default function GradesScreen() {
           t={t}
         />
 
-        {g.userId != null && (
+        {g.isReady && g.userId != null && (
           <MasteryRadarCard
             userId={g.userId as string}
             selectedSubjectId={g.selectedSubjectId as string | null}
@@ -193,7 +193,7 @@ export default function GradesScreen() {
       </ScrollView>
 
       {/* Expanded chart modals */}
-      {expandedChart === 'mastery' && g.userId != null && (
+      {g.isReady && expandedChart === 'mastery' && g.userId != null && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setExpandedChart(null)}>
           <View style={{
             flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
@@ -210,7 +210,7 @@ export default function GradesScreen() {
         </Modal>
       )}
 
-      {expandedChart === 'projection' && (
+      {g.isReady && expandedChart === 'projection' && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setExpandedChart(null)}>
           <View style={{
             flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
@@ -292,11 +292,13 @@ export default function GradesScreen() {
         onDismiss={() => g.setOverlayVisible(false)}
       />
 
-      <AcademicImportModal 
-        visible={isImportModalVisible} 
-        onClose={() => setImportModalVisible(false)} 
-        userId={g.userId as string | null} 
-      />
+      {g.isReady && (
+        <AcademicImportModal 
+          visible={isImportModalVisible} 
+          onClose={() => setImportModalVisible(false)} 
+          userId={g.userId as string | null} 
+        />
+      )}
     </SafeAreaView>
   );
 }

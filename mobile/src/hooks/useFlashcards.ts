@@ -6,7 +6,7 @@ import { useFlashcardsManager } from './useFlashcardsManager';
 import { useDataStore } from '../store/useDataStore';
 import { useCustomAlert } from '../components/ui/CustomAlert';
 import {
-  getSubjects, type Subject, type FlashcardDeck, deleteFlashcardDeck, getUserId, getFlashcardsPrioritized, updateFlashcardDeck, shareDeck, removeDeckFromGroup,
+  type Subject, type FlashcardDeck, deleteFlashcardDeck, getFlashcardsPrioritized, updateFlashcardDeck, shareDeck, removeDeckFromGroup,
 } from '../services/api';
 
 import { getUserGroups, getGroupDecks } from '../services/api/learning/groups';
@@ -16,6 +16,8 @@ export function useFlashcards() {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
   const { refreshPredictions, getDuedeckIds } = useDataStore();
+  const storeSubjects = useDataStore(s => s.subjects);
+  const storeProfile = useDataStore(s => s.profile);
 
   const [showSearch, setShowSearch] = useState(false);
   const [showNewDeckModal, setShowNewDeckModal] = useState(false);
@@ -24,12 +26,14 @@ export function useFlashcards() {
   const [showNewCardModal, setShowNewCardModal] = useState(false);
   const [showStudyModal, setShowStudyModal] = useState(false);
   const [showEditDeckModal, setShowEditDeckModal] = useState(false);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>(storeSubjects as Subject[]);
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [editingDeck, setEditingDeck] = useState<FlashcardDeck | null>(null);
   const [studyDeckCards, setStudyDeckCards] = useState<any[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(storeProfile?.id != null ? String(storeProfile.id) : null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const hadInitialDataRef = useRef(storeSubjects.length > 0 && storeProfile !== null);
 
   // Share deck state
   const [shareDeckTarget, setShareDeckTarget] = useState<FlashcardDeck | null>(null);
@@ -159,7 +163,7 @@ export function useFlashcards() {
           onPress: async () => {
             try {
               await deleteFlashcardDeck(deck.id);
-              const userId = await getUserId();
+              const userId = currentUserId || (storeProfile?.id != null ? String(storeProfile.id) : null);
               if (userId) {
                 await refreshPredictions(userId);
               }
@@ -261,32 +265,50 @@ export function useFlashcards() {
     return () => unsub();
   }, [subscribeToEvents]);
 
+  useEffect(() => {
+    if (storeSubjects.length > 0 && subjects.length === 0) {
+      setSubjects(storeSubjects as Subject[]);
+    }
+  }, [storeSubjects]);
+
+  useEffect(() => {
+    if (storeProfile?.id && !currentUserId) {
+      setCurrentUserId(String(storeProfile.id));
+    }
+  }, [storeProfile]);
+
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+      initializeStore();
+      if (!hadInitialDataRef.current) {
+        getUserGroups().then(userGroups => {
+          const valid = (userGroups || []).filter((g: any) => g.group_pin_id);
+          setGroups(valid);
+          setActiveGroupPin(prev => prev || (valid.length > 0 ? valid[0].group_pin_id : null));
+        }).catch(e => console.warn('Error loading groups:', e));
+      }
+      hadInitialDataRef.current = false;
+    });
+    return () => task.cancel();
+  }, [initializeStore]);
+
   useFocusEffect(
     useCallback(() => {
       const task = InteractionManager.runAfterInteractions(async () => {
         try {
-          const userId = await getUserId();
-          setCurrentUserId(userId ? String(userId) : null);
-
+          if (!currentUserId && storeProfile?.id) {
+            setCurrentUserId(String(storeProfile.id));
+          }
           await initializeStore();
-
-          const subs = await getSubjects();
-          setSubjects(subs || []);
-
-          getUserGroups().then(userGroups => {
-            const valid = (userGroups || []).filter((g: any) => g.group_pin_id);
-            setGroups(valid);
-            setActiveGroupPin(prev => prev || (valid.length > 0 ? valid[0].group_pin_id : null));
-          }).catch(e => console.warn('Error loading groups:', e));
         } catch (e) {
           console.warn('Error initializing flashcards:', e);
         }
       });
-
       return () => {
         task.cancel();
       };
-    }, [loadDecks]),
+    }, [initializeStore]),
   );
 
   // Load group decks when selected group changes
@@ -313,7 +335,7 @@ export function useFlashcards() {
   return {
     showSearch, showNewDeckModal, showImportModal, showMenuModal, showNewCardModal,
     showStudyModal, showEditDeckModal, subjects, activeDeck, editingDeck, studyDeckCards,
-    currentUserId, isRefreshing, activeCloseRef, searchAnim, searchInputRef,
+    currentUserId, isRefreshing, isReady, activeCloseRef, searchAnim, searchInputRef,
     isLoading, searchQuery, setSearchQuery, activeSubjectId, setActiveSubjectId,
     filteredDecks, loadDecks, getDuedeckIds,
     setShowNewDeckModal, setShowImportModal, setShowMenuModal, setShowNewCardModal,

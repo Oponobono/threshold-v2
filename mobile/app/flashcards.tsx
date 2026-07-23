@@ -36,7 +36,7 @@ export default function FlashcardsScreen() {
   const {
     showSearch, showNewDeckModal, showImportModal, showMenuModal, showNewCardModal,
     showStudyModal, showEditDeckModal, subjects, activeDeck, editingDeck, studyDeckCards,
-    currentUserId, isRefreshing, activeCloseRef, searchAnim, searchInputRef,
+    currentUserId, isRefreshing, isReady, activeCloseRef, searchAnim, searchInputRef,
     isLoading, searchQuery, setSearchQuery, activeSubjectId, setActiveSubjectId,
     filteredDecks, loadDecks, getDuedeckIds,
     setShowNewDeckModal, setShowImportModal, setShowMenuModal, setShowNewCardModal,
@@ -318,167 +318,171 @@ export default function FlashcardsScreen() {
         )}
       </SafeAreaView>
 
-      <NewDeckModal
-        visible={showNewDeckModal}
-        subjects={subjects}
-        onClose={() => setShowNewDeckModal(false)}
-        onDeckCreated={() => setShowNewDeckModal(false)}
-      />
+      {isReady && (
+        <>
+          <NewDeckModal
+            visible={showNewDeckModal}
+            subjects={subjects}
+            onClose={() => setShowNewDeckModal(false)}
+            onDeckCreated={() => setShowNewDeckModal(false)}
+          />
 
-      <FlashcardImportModal
-        isVisible={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        subjects={subjects}
-        onImportSuccess={() => {}}
-      />
+          <FlashcardImportModal
+            isVisible={showImportModal}
+            onClose={() => setShowImportModal(false)}
+            subjects={subjects}
+            onImportSuccess={() => {}}
+          />
 
-      <NewCardModal
-        visible={showNewCardModal}
-        deck={activeDeck}
-        onClose={() => setShowNewCardModal(false)}
-        onCardCreated={() => setShowNewCardModal(false)}
-      />
+          <NewCardModal
+            visible={showNewCardModal}
+            deck={activeDeck}
+            onClose={() => setShowNewCardModal(false)}
+            onCardCreated={() => setShowNewCardModal(false)}
+          />
 
-      <EditDeckModal
-        visible={showEditDeckModal}
-        deck={editingDeck}
-        subjects={subjects}
-        onClose={() => setShowEditDeckModal(false)}
-        onSaved={() => {}}
-      />
+          <EditDeckModal
+            visible={showEditDeckModal}
+            deck={editingDeck}
+            subjects={subjects}
+            onClose={() => setShowEditDeckModal(false)}
+            onSaved={() => {}}
+          />
 
-      <MenuModal
-        visible={showMenuModal}
-        onClose={() => setShowMenuModal(false)}
-        onCreateDeck={() => setShowNewDeckModal(true)}
-        onImportDeck={() => setShowImportModal(true)}
-      />
+          <MenuModal
+            visible={showMenuModal}
+            onClose={() => setShowMenuModal(false)}
+            onCreateDeck={() => setShowNewDeckModal(true)}
+            onImportDeck={() => setShowImportModal(true)}
+          />
 
-      <Modal
-        visible={showStudyModal}
-        animationType="slide"
-        onRequestClose={() => setShowStudyModal(false)}
-      >
-        <View style={{ flex: 1 }}>
-          {activeDeck && (
-            <FlashcardStudyScreenStandalone
-              activeDeck={activeDeck}
-              initialCards={studyDeckCards}
-              currentUserId={currentUserId}
-              onBack={() => {
-                setShowStudyModal(false);
-                setActiveDeck(null);
-                setStudyDeckCards([]);
-              }}
-            />
-          )}
-        </View>
-      </Modal>
-
-      {/* ─── LINK EXAM MODAL ─── */}
-      <LinkExamModal
-        visible={!!linkExamTarget}
-        deck={linkExamTarget}
-        onClose={() => setLinkExamTarget(null)}
-        onLinked={async (examTitle) => {
-          showAlert({
-            title: '¡Modo Examen activo!',
-            message: `El mazo "${linkExamTarget?.title}" ya está vinculado a "${examTitle}". Los intervalos se comprimirán automáticamente.`,
-            type: 'success',
-          });
-          setLinkExamTarget(null);
-        }}
-        onUnlinked={async () => {
-          showAlert({
-            title: 'Vínculo eliminado',
-            message: `El mazo "${linkExamTarget?.title}" ya no está vinculado a ningún examen.`,
-            type: 'info',
-          });
-          setLinkExamTarget(null);
-        }}
-      />
-
-      {/* ─── SHARE DECK MODAL ─── */}
-      <Modal visible={!!shareDeckTarget} transparent animationType="fade">
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
-          onPress={() => { setShareDeckTarget(null); setSharePin(''); }}
-        >
-          <Pressable
-            style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '85%', gap: 12 }}
-            onPress={() => null}
+          <Modal
+            visible={showStudyModal}
+            animationType="slide"
+            onRequestClose={() => setShowStudyModal(false)}
           >
-            <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text.primary }}>
-              {t('flashcards.shareDeck')}
-            </Text>
-            <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
-              {t('flashcards.shareDeckDesc', { title: shareDeckTarget?.title ?? '' })}
-            </Text>
-            <TextInput
-              style={{
-                borderWidth: 1.5,
-                borderColor: theme.colors.border,
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 20,
-                fontWeight: '700',
-                letterSpacing: 4,
-                textAlign: 'center',
-                color: theme.colors.text.primary,
-              }}
-              placeholder={t('flashcards.sharePinPlaceholder')}
-              placeholderTextColor={theme.colors.text.placeholder}
-              value={sharePin}
-              onChangeText={setSharePin}
-              autoCapitalize="characters"
-              maxLength={8}
-            />
-            {groups.length > 0 && (
-              <>
-                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center', marginTop: 4 }}>
-                  {t('flashcards.shareWithGroup')}
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 36 }}>
-                  {groups.map((g) => (
-                    <TouchableOpacity
-                      key={g.group_pin_id}
-                      onPress={() => handleShareDeck(g.group_pin_id)}
-                      style={{
-                        paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, marginRight: 8,
-                        backgroundColor: theme.colors.primary + '20',
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.primary }}>
-                        {g.name || g.group_pin_id}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </>
-            )}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-              <TouchableOpacity
-                style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}
-                onPress={() => { setShareDeckTarget(null); setSharePin(''); }}
-              >
-                <Text style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  { flex: 1, padding: 12, borderRadius: 10, backgroundColor: theme.colors.primary, alignItems: 'center' },
-                  (!sharePin.trim() || isSharing) && { opacity: 0.5 },
-                ]}
-                onPress={() => handleShareDeck()}
-                disabled={!sharePin.trim() || isSharing}
-              >
-                <Text style={{ color: '#fff', fontWeight: '700' }}>
-                  {isSharing ? t('flashcards.sharing') : t('flashcards.shareDeck')}
-                </Text>
-              </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              {activeDeck && (
+                <FlashcardStudyScreenStandalone
+                  activeDeck={activeDeck}
+                  initialCards={studyDeckCards}
+                  currentUserId={currentUserId}
+                  onBack={() => {
+                    setShowStudyModal(false);
+                    setActiveDeck(null);
+                    setStudyDeckCards([]);
+                  }}
+                />
+              )}
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </Modal>
+
+          {/* ─── LINK EXAM MODAL ─── */}
+          <LinkExamModal
+            visible={!!linkExamTarget}
+            deck={linkExamTarget}
+            onClose={() => setLinkExamTarget(null)}
+            onLinked={async (examTitle) => {
+              showAlert({
+                title: '¡Modo Examen activo!',
+                message: `El mazo "${linkExamTarget?.title}" ya está vinculado a "${examTitle}". Los intervalos se comprimirán automáticamente.`,
+                type: 'success',
+              });
+              setLinkExamTarget(null);
+            }}
+            onUnlinked={async () => {
+              showAlert({
+                title: 'Vínculo eliminado',
+                message: `El mazo "${linkExamTarget?.title}" ya no está vinculado a ningún examen.`,
+                type: 'info',
+              });
+              setLinkExamTarget(null);
+            }}
+          />
+
+          {/* ─── SHARE DECK MODAL ─── */}
+          <Modal visible={!!shareDeckTarget} transparent animationType="fade">
+            <Pressable
+              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+              onPress={() => { setShareDeckTarget(null); setSharePin(''); }}
+            >
+              <Pressable
+                style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '85%', gap: 12 }}
+                onPress={() => null}
+              >
+                <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text.primary }}>
+                  {t('flashcards.shareDeck')}
+                </Text>
+                <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+                  {t('flashcards.shareDeckDesc', { title: shareDeckTarget?.title ?? '' })}
+                </Text>
+                <TextInput
+                  style={{
+                    borderWidth: 1.5,
+                    borderColor: theme.colors.border,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 20,
+                    fontWeight: '700',
+                    letterSpacing: 4,
+                    textAlign: 'center',
+                    color: theme.colors.text.primary,
+                  }}
+                  placeholder={t('flashcards.sharePinPlaceholder')}
+                  placeholderTextColor={theme.colors.text.placeholder}
+                  value={sharePin}
+                  onChangeText={setSharePin}
+                  autoCapitalize="characters"
+                  maxLength={8}
+                />
+                {groups.length > 0 && (
+                  <>
+                    <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center', marginTop: 4 }}>
+                      {t('flashcards.shareWithGroup')}
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 36 }}>
+                      {groups.map((g) => (
+                        <TouchableOpacity
+                          key={g.group_pin_id}
+                          onPress={() => handleShareDeck(g.group_pin_id)}
+                          style={{
+                            paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, marginRight: 8,
+                            backgroundColor: theme.colors.primary + '20',
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.primary }}>
+                            {g.name || g.group_pin_id}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}
+                    onPress={() => { setShareDeckTarget(null); setSharePin(''); }}
+                  >
+                    <Text style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>{t('common.cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      { flex: 1, padding: 12, borderRadius: 10, backgroundColor: theme.colors.primary, alignItems: 'center' },
+                      (!sharePin.trim() || isSharing) && { opacity: 0.5 },
+                    ]}
+                    onPress={() => handleShareDeck()}
+                    disabled={!sharePin.trim() || isSharing}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>
+                      {isSharing ? t('flashcards.sharing') : t('flashcards.shareDeck')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        </>
+      )}
     </GestureHandlerRootView>
   );
 }

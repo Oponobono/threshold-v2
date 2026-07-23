@@ -25,6 +25,7 @@ export default function RecordingsScreen() {
     showYoutubeModal, youtubeUrl, showSearch, showFilterModal,
     searchAnim, searchInputRef, pulseAnim, meterAnim,
     isLoadingVideos, isAddingYouTubeVideo, youTubeVideos, recordings,
+    isReady,
     searchQuery, setSearchQuery, activeFilter, setActiveFilter,
     sortOrder, setSortOrder, dateFilter, setDateFilter,
     sections, playingId, playSound, stopSound,
@@ -87,23 +88,27 @@ export default function RecordingsScreen() {
         )}
       </ScrollView>
 
-      <FilterSortModal
-        visible={showFilterModal}
-        sortOrder={sortOrder}
-        dateFilter={dateFilter}
-        onSortChange={setSortOrder}
-        onFilterChange={setDateFilter}
-        onClose={() => setShowFilterModal(false)}
-      />
+      {isReady && (
+        <>
+          <FilterSortModal
+            visible={showFilterModal}
+            sortOrder={sortOrder}
+            dateFilter={dateFilter}
+            onSortChange={setSortOrder}
+            onFilterChange={setDateFilter}
+            onClose={() => setShowFilterModal(false)}
+          />
 
-      <YouTubeAddModal
-        visible={showYoutubeModal}
-        youtubeUrl={youtubeUrl}
-        isAdding={isAddingYouTubeVideo}
-        onUrlChange={setYoutubeUrl}
-        onCancel={() => { setShowYoutubeModal(false); setYoutubeUrl(''); }}
-        onAdd={onAddYouTubeVideo}
-      />
+          <YouTubeAddModal
+            visible={showYoutubeModal}
+            youtubeUrl={youtubeUrl}
+            isAdding={isAddingYouTubeVideo}
+            onUrlChange={setYoutubeUrl}
+            onCancel={() => { setShowYoutubeModal(false); setYoutubeUrl(''); }}
+            onAdd={onAddYouTubeVideo}
+          />
+        </>
+      )}
 
       <AudioRecorderBottomBar
         isRecording={isRecording}

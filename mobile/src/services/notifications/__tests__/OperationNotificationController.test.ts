@@ -1,6 +1,6 @@
 import { OperationNotificationController } from '../OperationNotificationController';
 import { NotificationProvider } from '../NotificationProvider';
-import { OperationStage, OperationType, LongRunningOperation } from '../../lro/OperationProgress';
+import { OperationStage, OperationType, LongRunningOperation, OperationState } from '../../lro/OperationProgress';
 import { operationProgressBus } from '../../lro/OperationProgressEmitter';
 
 describe('OperationNotificationController', () => {
@@ -34,6 +34,8 @@ describe('OperationNotificationController', () => {
     const operation: LongRunningOperation = {
       id: 'test-1',
       type: OperationType.Backup,
+      state: OperationState.Running,
+      startedAt: Date.now(),
       stage: OperationStage.Preparing,
     };
 
@@ -57,6 +59,8 @@ describe('OperationNotificationController', () => {
     const operation: LongRunningOperation = {
       id: 'test-throttle',
       type: OperationType.Backup,
+      state: OperationState.Running,
+      startedAt: Date.now(),
       stage: OperationStage.Uploading,
       progress: { current: 1, total: 100, percentage: 1, indeterminate: false }
     };
@@ -90,7 +94,7 @@ describe('OperationNotificationController', () => {
   });
 
   it('should clear operation maps on failed or cancelled', () => {
-    const operation: LongRunningOperation = { id: 'test-2', type: OperationType.Sync };
+    const operation: LongRunningOperation = { id: 'test-2', type: OperationType.Sync, state: OperationState.Running, startedAt: Date.now() };
     
     // Started
     operationProgressBus.emit('started', { operation });

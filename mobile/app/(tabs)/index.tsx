@@ -44,6 +44,7 @@ import { SchedulePlannerModal } from '../../src/components/dashboard/SchedulePla
 import { OfflineIndicator } from '../../src/components/ui/OfflineIndicator';
 import { GlobalHeroPresenter } from '../../src/presentation/heroes/GlobalHeroPresenter';
 import { CourseHeroPresenter } from '../../src/presentation/heroes/CourseHeroPresenter';
+import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 
 
 
@@ -101,6 +102,9 @@ export default function HybridDashboardScreen() {
   const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const subjectsCarouselRef = useRef<FlatList<any> | null>(null);
+  
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [overlayText, setOverlayText] = useState<string | null>(null);
   
   const [selectedDashboardCourseId, setSelectedDashboardCourseId] = useState<string | null>(null); // null = "todas"
   const heroCarouselRef = useRef<FlatList<any> | null>(null);
@@ -617,7 +621,27 @@ export default function HybridDashboardScreen() {
         <View style={styles.section}>
           {/* --- ORIENTATION --- */}
           <View style={{ marginBottom: 24 }}>
-            <KnowledgeHealthCard snapshot={knowledgeSnapshot} loading={knowledgeLoading || !knowledgeSnapshot} />
+            <KnowledgeHealthCard 
+              snapshot={knowledgeSnapshot} 
+              loading={knowledgeLoading || !knowledgeSnapshot} 
+              onInfoPress={() => {
+                setOverlayText(
+`### Entendiendo tu Estado de Aprendizaje
+
+Estas métricas te ayudan a separar lo que **realmente recuerdas** de qué tan **precisa** es la información que te mostramos.
+
+**Confianza**
+No mide tu memoria, mide **qué tantos datos tiene la IA para entender cómo aprendes**. Solo depende de cuántas tarjetas has creado. Al superar las 500 tarjetas en tu cuenta, las predicciones alcanzan su máxima precisión (96%).
+
+**Consolidado**
+Es el conocimiento que ya es tuyo a largo plazo. Es el porcentaje de información que has repasado tantas veces que ha alcanzado la **Maestría**. Tu cerebro tardará semanas o incluso meses en olvidar estos conceptos.
+
+**Riesgo Hoy**
+Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porcentaje de conocimiento en riesgo crítico (memorización por debajo del 70%). Si no repasas estas materias hoy, el esfuerzo que invertiste en aprenderlas podría perderse.`
+                );
+                setOverlayVisible(true);
+              }}
+            />
           </View>
 
           {/* --- TODAY FOCUS --- */}
@@ -798,7 +822,7 @@ export default function HybridDashboardScreen() {
                         isActive={selectedDashboardCourseId === 'independent'}
                         onPress={() => handleHeroCardSelect('independent')}
                         onContinue={() => {
-                          const subjectId = viewModel.continueTarget.subjectId;
+                          const subjectId = viewModel.continueTarget?.subjectId;
                           if (subjectId) {
                             router.push(`/subjects/${subjectId}`);
                           } else {
@@ -1311,6 +1335,12 @@ export default function HybridDashboardScreen() {
         visible={isSnoozeModalVisible}
         onClose={() => setIsSnoozeModalVisible(false)}
         onSelect={handleSnoozeSelection}
+      />
+
+      <ExplanationOverlay
+        visible={overlayVisible}
+        explanation={overlayText}
+        onDismiss={() => setOverlayVisible(false)}
       />
     </>
   );

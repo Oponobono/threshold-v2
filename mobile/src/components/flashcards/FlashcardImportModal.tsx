@@ -101,7 +101,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
     const t_ = t;
     const templateDeck: any = {
       _info: t_('flashcards.template.supportedLanguages', { count: languagesList.length, languages: languagesList.join(', ') }),
-      _security: 'IMPORTANTE: No incluir "user_id" en este archivo. El ID del usuario será asignado automáticamente según la cuenta que realice la importación.',
+      _instructions: '1. "title" y "description" son obligatorios. 2. Cada tarjeta en "cards" requiere un "type" ("flashcard", "multiple_choice", "boolean"). 3. El campo "data" depende del tipo. 4. "hint" (pista) y "explanation" (explicación) son opcionales.',
+      _security: 'IMPORTANTE: No incluyas "user_id" ni "id". El sistema sanitiza automáticamente todo el contenido eliminando etiquetas HTML y scripts para evitar código malicioso.',
       title: t_('flashcards.template.title'),
       description: t_('flashcards.template.description'),
       cards: [

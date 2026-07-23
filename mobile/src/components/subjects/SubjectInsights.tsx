@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Modal, Pressable, ActionSheetIOS, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Pressable, ActionSheetIOS, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Assessment, deleteAssessment } from '../../services/api';
@@ -18,12 +18,6 @@ import {
   SCALE_MAX,
 } from '../../utils/grades';
 
-const ProgressBar = ({ value, color }: { value: number; color: string }) => (
-  <View style={styles.progressTrack}>
-    <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, value))}%`, backgroundColor: color }]} />
-  </View>
-);
-
 interface SubjectInsightsProps {
   recentAssessments: Assessment[];
   onDeleteAssessment?: (id: string) => void;
@@ -33,23 +27,10 @@ interface SubjectInsightsProps {
   subjects: any[];
 }
 
-/**
- * SubjectInsights.tsx
- *
- * Sección de la pantalla de detalle de materia que muestra el historial reciente
- * de evaluaciones (notas, tareas, exámenes). Cada elemento incluye el nombre,
- * tipo, peso porcentual, fecha, calificación obtenida y una barra de progreso con
- * color semántico (verde/naranja/rojo) basado en el porcentaje de logro.
- * Permite eliminar evaluaciones individuales con confirmación, y editar las notas.
- *
- * @param recentAssessments - Lista de evaluaciones de la materia para mostrar.
- * @param onDeleteAssessment - Callback opcional llamado con el ID al eliminar una evaluación.
- * @param subjects - Lista de materias disponibles para cambiar de materia al editar.
- */
 export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessments, onDeleteAssessment, onOpenCategories, onAddAssessment, onAssessmentUpdated, subjects }) => {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
-  
+
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [isEditGradeModalVisible, setIsEditGradeModalVisible] = useState(false);
   const [isEditTaskModalVisible, setIsEditTaskModalVisible] = useState(false);
@@ -59,18 +40,18 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
   const handleShowMenu = (assessment: Assessment) => {
     setSelectedAssessment(assessment);
     const isIncompleteTask = assessment.type === 'task' && !assessment.is_completed;
-    
+
     if (Platform.OS === 'ios') {
       const options = [
         t('common.cancel'),
         ...(isIncompleteTask ? [t('tasks.markDelivered')] : []),
-              t('assessments.edit'),
+        t('assessments.edit'),
         t('common.delete'),
       ];
-      
+
       const deleteIndex = options.length - 1;
       const cancelIndex = 0;
-      
+
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options,
@@ -80,7 +61,6 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
         },
         (buttonIndex) => {
           if (isIncompleteTask) {
-            // For incomplete tasks: Cancel(0), MarkDelivered(1), Edit(2), Delete(3)
             if (buttonIndex === 1) {
               setIsCompleteTaskModalVisible(true);
             } else if (buttonIndex === 2) {
@@ -89,7 +69,6 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
               handleDelete(assessment.id!);
             }
           } else {
-            // For completed tasks/grades: Cancel(0), Edit(1), Delete(2)
             if (buttonIndex === 1) {
               setIsEditGradeModalVisible(true);
             } else if (buttonIndex === 2) {
@@ -99,7 +78,6 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
         }
       );
     } else {
-      // Android: mostrar modal personalizado
       setIsMenuModalVisible(true);
     }
   };
@@ -127,17 +105,18 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
     });
   };
 
+  const progressColor = (pct: number) => pct >= 80 ? theme.colors.success : pct >= 60 ? theme.colors.warning : theme.colors.danger;
+
   return (
     <>
       <View style={styles.sectionBlock}>
         <View style={styles.sectionHeaderRow}>
-          <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={styles.sectionTitle}>{t('analytics.insightsTitle')}</Text>
-            <Text style={styles.sectionHint}>{t('analytics.insightsHint')}</Text>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>
+              {t('analytics.insightsTitle')} {recentAssessments.length > 0 && `(${recentAssessments.length})`}
+            </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', flexShrink: 0 }}>
-            <Text style={styles.sectionChip}>{recentAssessments.length} {t('subjects.notes')}</Text>
-            
             {onOpenCategories && (
               <TouchableOpacity
                 onPress={onOpenCategories}
@@ -155,73 +134,158 @@ export const SubjectInsights: React.FC<SubjectInsightsProps> = ({ recentAssessme
           </View>
         </View>
 
-        <View style={styles.insightsCard}>
+        <View style={styles.insightsTableCard}>
           {recentAssessments.length > 0 ? (
-            recentAssessments.map((assessment) => {
-              const progress = getAssessmentProgress(assessment);
-              const grade = normalizeGrade(assessment);
-              const typeLabel = assessment.type === 'task' 
-                ? t('dashboard.quickAddMenu.newTask') 
+            <ScrollView 
+              style={{ maxHeight: 350 }} 
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={false}
+            >
+              {recentAssessments.map((assessment, index) => {
+                const progress = getAssessmentProgress(assessment);
+                const grade = normalizeGrade(assessment);
+              const typeLabel = assessment.type === 'task'
+                ? t('dashboard.quickAddMenu.newTask')
                 : t('subjects.note');
               const weightValue = parseWeight(assessment);
-              const weightText = weightValue > 0 ? ` (${weightValue}%)` : '';
+              const weightText = weightValue > 0 ? `${weightValue}%` : '';
               const isPending = (assessment as any)._isPending === true;
+              const isLast = index === recentAssessments.length - 1;
 
-              let scoreText = t('subjects.pending');
-              let scoreColor: string | undefined;
-              if (grade !== null) {
-                if ((assessment as any).display_label) {
-                  scoreText = `≈ ${(assessment as any).display_label}`;
-                  scoreColor = (assessment as any).display_color;
-                } else {
-                  scoreText = `${formatGrade(grade)} / ${SCALE_MAX}`;
+              const formattedDate = (() => {
+                if (!assessment.date) return null;
+                try {
+                  const parts = assessment.date.split('-');
+                  if (parts.length === 3) {
+                    const year = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10) - 1;
+                    const day = parseInt(parts[2], 10);
+                    const d = new Date(year, month, day);
+                    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+                  }
+                  return null;
+                } catch {
+                  return null;
                 }
-              } else if (assessment.type === 'task') {
-                scoreText = assessment.is_completed ? t('common.done') : t('subjects.pending');
-              }
+              })();
 
+              let finalDisplayLabel = (assessment as any).display_label;
+              let finalDisplayColor = (assessment as any).display_color;
+
+              if (!finalDisplayLabel || /^\d+(\.\d+)?%?$/.test(finalDisplayLabel.trim())) {
+                 if (progress >= 100) {
+                    finalDisplayLabel = t('grades.perfect', 'Excelente');
+                    finalDisplayColor = '#8B5CF6'; // Purple 500
+                 } else if (progress >= 90) {
+                    finalDisplayLabel = t('grades.excellent', 'Sobresaliente');
+                    finalDisplayColor = '#10B981';
+                 } else if (progress >= 75) {
+                    finalDisplayLabel = t('grades.good', 'Bueno');
+                    finalDisplayColor = '#3B82F6';
+                 } else if (progress >= 60) {
+                    finalDisplayLabel = t('grades.passing', 'Aprobado');
+                    finalDisplayColor = '#F59E0B';
+                 } else {
+                    finalDisplayLabel = t('grades.failing', 'Reprobado');
+                    finalDisplayColor = '#EF4444';
+                 }
+              }
+              
               return (
-                <View 
-                  key={`${assessment.id ?? assessment.name}-${assessment.date ?? 'no-date'}`} 
-                  style={[styles.insightRow, isPending && { opacity: 0.6 }]}
+                <View
+                  key={`${assessment.id ?? assessment.name}-${assessment.date ?? 'no-date'}`}
+                  style={[
+                    styles.insightsAssessRow,
+                    isLast && styles.insightsAssessRowLast,
+                    isPending && styles.insightsAssessRowPending,
+                  ]}
                 >
-                  <View style={styles.insightTopRow}>
-                    <View style={styles.insightTextBlock}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={styles.insightTitle} numberOfLines={1}>{assessment.name}</Text>
-                        {isPending && (
-                          <View style={{ backgroundColor: theme.colors.warning, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 9, fontWeight: '600', color: '#FFF' }}>
-                              {t('common.syncing')}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.insightMeta} numberOfLines={1}>
-                        {typeLabel}{weightText}{assessment.date ? ` · ${assessment.date}` : ''}
-                      </Text>
+                  {/* Left column: name, meta, progress bar */}
+                  <View style={styles.insightsAssessInfo}>
+                    <View style={styles.insightsAssessNameRow}>
+                      <Text style={styles.insightsAssessName} numberOfLines={1}>{assessment.name}</Text>
+                      {isPending && (
+                        <View style={styles.assessPendingBadge}>
+                          <Text style={styles.assessPendingText}>{t('common.syncing')}</Text>
+                        </View>
+                      )}
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <Text style={[styles.insightScore, scoreColor ? { color: scoreColor } : null]}>{scoreText}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+                      <Text style={styles.insightsAssessMeta}>
+                        {typeLabel}
+                        {weightText ? ` · ${weightText}` : ''}
+                      </Text>
+                      {finalDisplayLabel ? (
+                        <View style={{ 
+                          backgroundColor: finalDisplayColor ? `${finalDisplayColor}15` : theme.colors.inputBackground,
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                        }}>
+                          <Text style={{
+                            fontSize: 10,
+                            fontWeight: '700',
+                            color: finalDisplayColor || theme.colors.text.secondary,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5
+                          }}>
+                            {finalDisplayLabel}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <View style={styles.insightsProgressRow}>
+                      <View style={styles.insightsProgressTrack}>
+                        <View
+                          style={[
+                            styles.insightsProgressFill,
+                            {
+                              width: `${Math.max(0, Math.min(100, progress))}%`,
+                              backgroundColor: progressColor(progress),
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.insightsProgressPct}>{Math.round(progress)}%</Text>
+                    </View>
+                  </View>
+
+                  {/* Right column: score (top) + date (bottom) + options button (top-right) */}
+                  <View style={styles.insightsAssessRight}>
+                    <View style={styles.insightsAssessScoreRow}>
+                      {grade !== null ? (
+                        <Text style={styles.insightsAssessScore}>
+                          {formatGrade(grade)}<Text style={styles.insightsAssessScale}>/{SCALE_MAX}</Text>
+                        </Text>
+                      ) : (
+                        <Text style={[styles.insightsAssessStatus, { color: assessment.type === 'task' && assessment.is_completed ? theme.colors.text.primary : theme.colors.text.secondary }]}>
+                          {assessment.type === 'task'
+                            ? (assessment.is_completed ? t('common.done') : t('subjects.pending'))
+                            : t('subjects.pending')}
+                        </Text>
+                      )}
                       {assessment.id && (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           onPress={() => handleShowMenu(assessment)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={{ marginLeft: 6 }}
                         >
-                          <Ionicons name="ellipsis-vertical" size={20} color={theme.colors.text.secondary} />
+                          <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.text.secondary} />
                         </TouchableOpacity>
                       )}
                     </View>
+                    {formattedDate && (
+                      <Text style={styles.assessDateDiscreet}>{formattedDate}</Text>
+                    )}
                   </View>
-                  <ProgressBar value={progress} color={progress >= 80 ? '#34C759' : progress >= 60 ? '#FF9500' : '#FF3B30'} />
                 </View>
               );
-            })
+            })}
+            </ScrollView>
           ) : (
-            <View style={styles.emptyStateCard}>
-              <Ionicons name="stats-chart-outline" size={24} color={theme.colors.text.secondary} />
-              <Text style={styles.emptyStateTitle}>{t('analytics.emptyInsightsTitle')}</Text>
-              <Text style={styles.emptyStateText}>{t('analytics.emptyInsightsText')}</Text>
+            <View style={styles.insightsEmptyTable}>
+              <Ionicons name="stats-chart-outline" size={24} color={theme.colors.text.secondary} style={{ opacity: 0.5, marginBottom: 8 }} />
+              <Text style={{ color: theme.colors.text.secondary, fontSize: 13 }}>{t('analytics.emptyInsightsTitle')}</Text>
             </View>
           )}
         </View>

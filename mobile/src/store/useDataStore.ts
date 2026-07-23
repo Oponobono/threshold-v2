@@ -4,12 +4,15 @@ import type {
   Subject,
   Assessment,
   Schedule,
+  Photo,
 } from '../services/database/repositories';
 import {
   courseRepository,
   subjectRepository,
   assessmentRepository,
   scheduleRepository,
+  calendarEventRepository,
+  photoRepository,
   databaseService,
 } from '../services/database';
 import { syncManager } from '../services/sync/SyncManager';
@@ -62,6 +65,7 @@ interface DataState {
   schedules: Schedule[];
   predictions: PredictionResponse | null;
   calendarEvents: any[];
+  photos: Photo[];
   flashcardDecks: any[];
   userStats: any | null;
   profile: UserProfile | null;
@@ -84,6 +88,8 @@ interface DataState {
   refreshProfile: () => Promise<void>;
   refreshUserGroups: () => Promise<void>;
   refreshOverallGpa: () => Promise<void>;
+  refreshCalendarEvents: () => Promise<void>;
+  refreshPhotos: () => Promise<void>;
   refreshFlashcardDecks: () => Promise<void>;
   syncTodaySchedules: () => Promise<void>;
   refreshPredictions: (userId: string | number) => Promise<void>;
@@ -109,6 +115,12 @@ export const useDataStore = create<DataState>((set, get) => {
   repositoryEventBus.on('flashcard_decks', () => {
     get().refreshFlashcardDecks();
   });
+  repositoryEventBus.on('calendar_events', () => {
+    get().refreshCalendarEvents();
+  });
+  repositoryEventBus.on('photos', () => {
+    get().refreshPhotos();
+  });
 
   return {
   courses: [],
@@ -117,6 +129,7 @@ export const useDataStore = create<DataState>((set, get) => {
   schedules: [],
   predictions: null,
   calendarEvents: [],
+  photos: [],
   flashcardDecks: [],
   userStats: null,
   profile: null,
@@ -170,6 +183,12 @@ export const useDataStore = create<DataState>((set, get) => {
 
       const dbFlashcardDecks = await flashcardDeckRepository.getAll();
       set({ flashcardDecks: dbFlashcardDecks || [] });
+
+      const dbCalendarEvents = await calendarEventRepository.getAll();
+      set({ calendarEvents: dbCalendarEvents || [] });
+
+      const dbPhotos = await photoRepository.getAll();
+      set({ photos: dbPhotos || [] });
 
       const currentUser = await userRepository.getCurrentUser();
       if (currentUser) {
@@ -240,6 +259,24 @@ export const useDataStore = create<DataState>((set, get) => {
       set({ flashcardDecks: dbDecks || [] });
     } catch (error) {
       console.error('[DataStore] refreshFlashcardDecks error:', error);
+    }
+  },
+
+  refreshCalendarEvents: async () => {
+    try {
+      const dbEvents = await calendarEventRepository.getAll();
+      set({ calendarEvents: dbEvents || [] });
+    } catch (error) {
+      console.error('[DataStore] refreshCalendarEvents error:', error);
+    }
+  },
+
+  refreshPhotos: async () => {
+    try {
+      const dbPhotos = await photoRepository.getAll();
+      set({ photos: dbPhotos || [] });
+    } catch (error) {
+      console.error('[DataStore] refreshPhotos error:', error);
     }
   },
 

@@ -814,5 +814,47 @@ const migrations: Migration[] = [
       `ALTER TABLE study_sessions ADD COLUMN deleted_at TEXT`,
     ],
   },
+  {
+    version: 38,
+    up: [
+      `UPDATE subjects
+       SET avg_score = (
+           SELECT SUM(
+               (CASE 
+                   WHEN a.score IS NOT NULL AND a.out_of > 0 THEN (a.score * 1.0 / a.out_of) * 5.0
+                   WHEN a.grade_value IS NOT NULL AND a.grade_value <= 5 THEN a.grade_value
+                   WHEN a.grade_value IS NOT NULL AND a.grade_value > 10 THEN (a.grade_value / 100.0) * 5.0
+                   WHEN a.normalized_value IS NOT NULL THEN a.normalized_value * 5.0
+                   ELSE 0 
+               END) * (CASE WHEN a.percentage IS NOT NULL THEN a.percentage WHEN a.weight IS NOT NULL THEN a.weight ELSE 1 END)
+           ) / MAX(SUM(CASE WHEN a.percentage IS NOT NULL THEN a.percentage WHEN a.weight IS NOT NULL THEN a.weight ELSE 1 END), 1)
+           FROM assessments a
+           WHERE a.subject_id = subjects.id
+           AND a.deleted_at IS NULL
+       )
+       WHERE id IN (
+           SELECT DISTINCT subject_id FROM assessments WHERE deleted_at IS NULL
+       )`,
+    ],
+  },
+  {
+    version: 39,
+    up: [
+      `UPDATE subjects
+       SET color = CASE (ABS(CAST('' || id AS INTEGER)) % 10)
+           WHEN 0 THEN '#E7EDF8'
+           WHEN 1 THEN '#DDE7FF'
+           WHEN 2 THEN '#EAF4EE'
+           WHEN 3 THEN '#FCEFD9'
+           WHEN 4 THEN '#F7E9EE'
+           WHEN 5 THEN '#ECE8FF'
+           WHEN 6 THEN '#E3F2FD'
+           WHEN 7 THEN '#F2F5D9'
+           WHEN 8 THEN '#F3ECE6'
+           ELSE '#DDF3F0'
+       END
+       WHERE color = '#4F46E5'`,
+    ],
+  },
 ];
 export default migrations;

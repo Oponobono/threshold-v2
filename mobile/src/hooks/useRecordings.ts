@@ -21,6 +21,7 @@ export function useRecordings() {
     youTubeVideos,
     isLoadingVideos,
     isAddingYouTubeVideo,
+    isReady,
     searchQuery,
     setSearchQuery,
     activeFilter,
@@ -58,14 +59,6 @@ export function useRecordings() {
     useCallback(() => {
       return () => { cleanupAudio(); };
     }, [cleanupAudio]),
-  );
-
-  // Load data on focus
-  useFocusEffect(
-    useCallback(() => {
-      loadYouTubeVideos();
-      loadRecordings();
-    }, [loadRecordings, loadYouTubeVideos]),
   );
 
   // Pulse animation for recording indicator
@@ -154,6 +147,7 @@ export function useRecordings() {
     showYoutubeModal, youtubeUrl, showSearch, showFilterModal,
     searchAnim, searchInputRef, pulseAnim, meterAnim,
     isLoadingVideos, isAddingYouTubeVideo, youTubeVideos, recordings,
+    isReady,
     searchQuery, setSearchQuery, activeFilter, setActiveFilter,
     sortOrder, setSortOrder, dateFilter, setDateFilter,
     sections, playingId, playSound, stopSound,

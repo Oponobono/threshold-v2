@@ -14,8 +14,16 @@ export const knowledgeHealthCardStyles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 18,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoButton: {
+    padding: 4,
   },
   title: {
     fontSize: theme.typography.sizes.lg,

@@ -92,7 +92,7 @@ export class AcademicImportExecutor {
               professor: subject.professor || undefined,
               credits: subject.credits || 0,
               target_grade: subject.targetGrade || undefined,
-              color: '#4F46E5',
+              color: '#64748B',
               icon: 'book-outline',
             };
             await subjectRepository.create(newSubject);
@@ -105,7 +105,11 @@ export class AcademicImportExecutor {
           // Insertar evaluaciones
           for (const assessment of subject.assessments) {
             const assessmentId = uuidv4();
-            const defaultDate = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const defaultDate = `${yyyy}-${mm}-${dd}`;
             
             let validDate = defaultDate;
             if (assessment.date) {
@@ -114,7 +118,10 @@ export class AcademicImportExecutor {
                } else {
                  const parsedDate = new Date(assessment.date);
                  if (!isNaN(parsedDate.getTime())) {
-                   validDate = parsedDate.toISOString().split('T')[0];
+                   const py = parsedDate.getFullYear();
+                   const pm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                   const pd = String(parsedDate.getDate()).padStart(2, '0');
+                   validDate = `${py}-${pm}-${pd}`;
                  }
                }
             }
@@ -132,6 +139,28 @@ export class AcademicImportExecutor {
             await assessmentRepository.create(newAssessment);
             await syncService.enqueueCreate('assessment', assessmentId, newAssessment);
             assessmentsCreated++;
+          }
+
+          // Compute and update the subject's average score
+          let totalScore = 0;
+          let totalWeight = 0;
+          for (const assessment of subject.assessments) {
+            const outOf = assessment.outOf || 100;
+            const score = assessment.score || 0;
+            const weight = assessment.weight || 1; // Default to 1 for simple average if weight is missing
+            const w = weight > 0 ? weight : 1;
+            const norm = (score / outOf) * 5.0;
+            totalScore += norm * w;
+            totalWeight += w;
+          }
+          if (totalWeight > 0) {
+            const avgScore = totalScore / totalWeight;
+            await databaseService.getDb().runAsync(
+              'UPDATE subjects SET avg_score = ? WHERE id = ?',
+              [avgScore, subjectId]
+            );
+            const memSubj = existingSubjects.find(s => s.id === subjectId);
+            if (memSubj) memSubj.avg_score = avgScore;
           }
         }
       }

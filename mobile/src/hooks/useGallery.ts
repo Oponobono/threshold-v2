@@ -1,8 +1,8 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { updatePhoto } from '../services/api';
-import { photoRepository, courseRepository } from '../services/database';
+import { photoRepository } from '../services/database';
 import { useDataStore } from '../store/useDataStore';
 import { GalleryPhoto, FilterTab } from '../types/gallery';
 import type { Course } from '../services/api/types';
@@ -12,18 +12,36 @@ const formatDate = (dateStr?: string) => {
   return new Date(dateStr).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-export function useGallery(t: any) {
-  const { subjects, loadAllData } = useDataStore();
+function enrichPhotos(rawPhotos: any[], subjects: any[], t: any): GalleryPhoto[] {
+  const subjectMap = new Map(subjects.map((s: any) => [s.id, s]));
+  return rawPhotos.map((item: any) => {
+    const subj = subjectMap.get(item.subject_id);
+    return {
+      ...item,
+      subject_name: subj?.name ?? t('gallery.unknownSubject'),
+      subject_color: subj?.color ?? '#2F80ED',
+    };
+  });
+}
 
-  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export function useGallery(t: any) {
+  const storeSubjects = useDataStore(s => s.subjects);
+  const storePhotos = useDataStore(s => s.photos);
+  const storeCourses = useDataStore(s => s.courses);
+  const { loadAllData } = useDataStore();
+
+  const subjects = storeSubjects;
+
+  const [photos, setPhotos] = useState<GalleryPhoto[]>(() => enrichPhotos(storePhotos, storeSubjects, t));
+  const [isLoading, setIsLoading] = useState(storePhotos.length === 0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<Course[]>(storeCourses as Course[]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -33,21 +51,26 @@ export function useGallery(t: any) {
   const [ocrModalVisible, setOcrModalVisible] = useState(false);
   const [selectedOcrText, setSelectedOcrText] = useState('');
 
+  const hadInitialDataRef = useRef(storePhotos.length > 0);
+
+  useEffect(() => {
+    if (storePhotos.length > 0) {
+      setPhotos(enrichPhotos(storePhotos, storeSubjects, t));
+    }
+  }, [storePhotos, storeSubjects, t]);
+
+  useEffect(() => {
+    if (storeCourses.length > 0 && courses.length === 0) {
+      setCourses(storeCourses as Course[]);
+    }
+  }, [storeCourses]);
+
   const loadPhotos = useCallback(async (refreshing = false) => {
     if (refreshing) setIsRefreshing(true);
     else setIsLoading(true);
     try {
-      // Leer siempre desde SQLite local — la galería funciona 100% offline
       const list = await photoRepository.getAll();
-      const subjectMap = new Map(subjects.map((s) => [s.id, s]));
-      const enriched: GalleryPhoto[] = (list as any[]).map((item: any) => {
-        const subj = subjectMap.get(item.subject_id);
-        return {
-          ...item,
-          subject_name: subj?.name ?? t('gallery.unknownSubject'),
-          subject_color: subj?.color ?? '#2F80ED',
-        };
-      });
+      const enriched = enrichPhotos(list as any[], subjects, t);
       setPhotos(enriched);
     } catch (err) {
       console.warn('[GalleryScreen] loadPhotos error:', err);
@@ -57,15 +80,25 @@ export function useGallery(t: any) {
     }
   }, [subjects, t]);
 
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+      loadAllData();
+      if (!hadInitialDataRef.current) {
+        loadPhotos();
+      }
+      hadInitialDataRef.current = false;
+    });
+    return () => task.cancel();
+  }, [loadAllData, loadPhotos]);
+
   useFocusEffect(
     useCallback(() => {
       const task = InteractionManager.runAfterInteractions(() => {
-        loadAllData();
-        loadPhotos();
-        courseRepository.getAll().then(c => setCourses(c as Course[])).catch(() => {});
+        loadPhotos(true);
       });
       return () => task.cancel();
-    }, [loadAllData, loadPhotos])
+    }, [loadPhotos])
   );
 
   const toggleStar = useCallback(async (photo: GalleryPhoto) => {
@@ -99,13 +132,11 @@ export function useGallery(t: any) {
   const { imagePhotos, starred, totalPhotoCount } = useMemo(() => {
     const allImgs = photos.filter((p) => !p.local_uri?.endsWith('.pdf'));
 
-    // Derivan las materias visibles según el curso seleccionado
     const subjectIdsInCourse = selectedCourseId
       ? new Set(subjects.filter(s => (s as any).course_id === selectedCourseId).map(s => s.id))
       : null;
 
     const filteredBySubjectAndSearch = allImgs.filter((p) => {
-      // Filtro de curso: solo fotos de materias del curso activo
       if (subjectIdsInCourse && !subjectIdsInCourse.has(p.subject_id)) return false;
       const matchesSubject = selectedSubjectId === null || p.subject_id === selectedSubjectId;
       const q = searchQuery.trim().toLowerCase();
@@ -159,11 +190,11 @@ export function useGallery(t: any) {
 
   return {
     photos, isLoading, isRefreshing,
+    isReady,
     filterTab, setFilterTab,
     selectedSubjectId, setSelectedSubjectId,
     selectedCourseId, setSelectedCourseId,
     courses,
-    // Materias filtradas por curso (para los SubjectChips)
     subjectsForCourse: selectedCourseId
       ? subjects.filter(s => (s as any).course_id === selectedCourseId)
       : subjects,
