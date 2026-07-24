@@ -224,22 +224,25 @@ function startServer(port, retriesLeft) {
   });
 }
 
-// 🛡️ Inicializar DB primero, LUEGO arrancar servidor
-// Esto evita race conditions: el servidor no acepta peticiones
-// hasta que todas las tablas y semillas estén listas.
-(async () => {
-  try {
-    await initializeDb();
-    startServer(PORT, MAX_PORT_RETRIES);
-  } catch (err) {
+// Arrancar servidor PRIMERO para que /health responda de inmediato
+// mientras la DB se inicializa. Render mata el proceso si el health check
+// no responde dentro del grace period (~60s).
+startServer(PORT, MAX_PORT_RETRIES);
+
+// Inicializar DB en background. Si falla, el servidor queda vivo pero
+// las rutas de datos retornarán errores (mejor que no arrancar).
+initializeDb()
+  .then(() => {
+    console.log('✅ Base de datos inicializada correctamente — servidor listo para servir datos.');
+  })
+  .catch((err) => {
     console.error(`
 ╔═══════════════════════════════════════════════════════════╗
-║        ❌ SERVIDOR DETENIDO — DB NO DISPONIBLE          ║
+║  ⚠️ DB NO DISPONIBLE — servidor sigue activo            ║
+║  Las rutas de datos fallarán hasta que la DB esté lista  ║
 ╠═══════════════════════════════════════════════════════════╣
 ║ ${err.message.padEnd(61)}
 ╚═══════════════════════════════════════════════════════════╝
     `);
-    process.exit(1);
-  }
-})();
+  });
 
