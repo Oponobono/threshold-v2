@@ -12,7 +12,7 @@ import { AutoUploadIndicator } from '../../src/components/ui/AutoUploadIndicator
 import { OfflineIndicator } from '../../src/components/ui/OfflineIndicator';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
 import { useSubjects, ACTIVITY_CONFIG } from '../../src/hooks/useSubjects';
-import { ScheduleGrid } from '../../src/components/subjects/ScheduleGrid';
+import { ScheduleGrid, ScheduleModal } from '../../src/components/subjects/ScheduleGrid';
 import { SCALE_MAX } from '../../src/utils/grades';
 import { useGroupedSubjects } from '../../src/hooks/useGroupedSubjects';
 import { SubjectCard } from '../../src/components/subjects/SubjectCard';
@@ -22,8 +22,9 @@ import { ZyrenIngestionModal } from '../../src/components/subjects/ZyrenIngestio
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
 import { MomentumService } from '../../src/services/MomentumService';
 import { useDataStore } from '../../src/store/useDataStore';
-import { CoursePills } from '../../src/components/ui/CoursePills';
 import { updateSubject, updateCourseCounters } from '../../src/services/api/subjects';
+import { FilterDropdown } from '../../src/components/ui/FilterDropdown';
+import { OptionSelectorModal, SelectorOption } from '../../src/components/ui/OptionSelectorModal';
 
 const MomentumCard = ({ score }: { score: number }) => {
   const isDanger = score < 0.5;
@@ -67,6 +68,8 @@ export default function SubjectsScreen() {
   const [isCreationMenuVisible, setIsCreationMenuVisible] = useState(false);
   const [isCreateSubjectModalVisible, setIsCreateSubjectModalVisible] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [courseModalVisible, setCourseModalVisible] = useState(false);
+  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
 
   const handleClassComplete = useCallback((subject: any, courseName: string) => {
     setZyrenSubject({
@@ -146,6 +149,10 @@ export default function SubjectsScreen() {
     return groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId)?.courseName ?? '';
   }, [selectedCourseId, groupedSections]);
 
+  const courseOptions: SelectorOption[] = useMemo(() => {
+    return coursesForPills.map(c => ({ id: c.id, name: c.name }));
+  }, [coursesForPills]);
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <View style={styles.header}>
@@ -205,7 +212,7 @@ export default function SubjectsScreen() {
             </View>
           ) : null
         }
-        ListFooterComponent={g.subjects.length > 0 ? <ScheduleGrid /> : null}
+        ListFooterComponent={g.subjects.length > 0 ? <ScheduleGrid onPress={() => setScheduleModalVisible(true)} /> : null}
         ListHeaderComponent={
           g.subjects.length > 0 ? (
             <>
@@ -309,7 +316,7 @@ export default function SubjectsScreen() {
                     <Text style={styles.timelineTitle}>{t('subjects.recentActivityTitle')}</Text>
                   </View>
                   <View style={styles.timelineCard}>
-                    <ScrollView style={{ maxHeight: 120 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    <ScrollView style={{ maxHeight: 170 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                       {g.recentActivity.map((item, idx, arr) => {
                         const config = ACTIVITY_CONFIG[item.type];
                         return (
@@ -341,19 +348,23 @@ export default function SubjectsScreen() {
                 </View>
               )}
 
-              {/* ── CoursePills ── */}
-              {coursesForPills.length > 0 && (
-                <CoursePills
-                  courses={coursesForPills}
-                  selectedCourseId={selectedCourseId}
-                  onSelectCourse={setSelectedCourseId}
-                />
-              )}
-
               {/* ── Bounded Subjects Grid ── */}
               <SubjectGridSection
                 subjects={displayedSubjects}
                 courseName={selectedCourseName}
+                subHeader={
+                  coursesForPills.length > 0 ? (
+                    <View style={{ flexDirection: 'row' }}>
+                      <FilterDropdown
+                        label={t('dashboard.course', { defaultValue: 'Curso' })}
+                        value={selectedCourseName}
+                        iconName="folder"
+                        onPress={() => setCourseModalVisible(true)}
+                        isActive={!!selectedCourseId}
+                      />
+                    </View>
+                  ) : undefined
+                }
                 onSubjectPress={(s) => router.push(`/subjects/${s.id}`)}
                 onContinue={(s) => s.external_url ? handleContinueClass(s.external_url, getCoursePlatform(s.course_id), s, s.courseName || selectedCourseName) : undefined}
                 onComplete={(s) => handleClassComplete(s, s.courseName || selectedCourseName)}
@@ -413,6 +424,21 @@ export default function SubjectsScreen() {
           currentMilestone={zyrenSubject.milestone}
         />
       )}
+
+      <OptionSelectorModal
+        visible={courseModalVisible}
+        title={t('subjects.selectCourse', { defaultValue: 'Seleccionar curso' })}
+        options={courseOptions}
+        selectedId={selectedCourseId}
+        onSelect={setSelectedCourseId}
+        onClose={() => setCourseModalVisible(false)}
+        clearLabel={t('subjects.clearCourse', { defaultValue: 'Quitar filtro de curso' })}
+      />
+
+      <ScheduleModal 
+        visible={scheduleModalVisible} 
+        onClose={() => setScheduleModalVisible(false)} 
+      />
     </SafeAreaView>
   );
 }

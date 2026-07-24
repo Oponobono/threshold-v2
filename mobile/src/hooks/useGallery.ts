@@ -35,7 +35,8 @@ export function useGallery(t: any) {
   const [photos, setPhotos] = useState<GalleryPhoto[]>(() => enrichPhotos(storePhotos, storeSubjects, t));
   const [isLoading, setIsLoading] = useState(storePhotos.length === 0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [filterTab, setFilterTab] = useState<FilterTab>('all');
+  const [filterStarred, setFilterStarred] = useState(false);
+  const [filterOcr, setFilterOcr] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [courses, setCourses] = useState<Course[]>(storeCourses as Course[]);
@@ -148,9 +149,10 @@ export function useGallery(t: any) {
     });
 
     const gridPhotos = filteredBySubjectAndSearch.filter((p) => {
-      if (filterTab === 'starred') return p.es_favorita === 1;
-      if (filterTab === 'ocr') return !!p.ocr_text;
-      return true;
+      let include = true;
+      if (filterStarred && p.es_favorita !== 1) include = false;
+      if (filterOcr && !p.ocr_text) include = false;
+      return include;
     });
 
     const groupedPhotos: GalleryPhoto[][] = [];
@@ -186,12 +188,26 @@ export function useGallery(t: any) {
       starred: starredPhotos,
       totalPhotoCount: totalPhotos,
     };
-  }, [photos, filterTab, selectedSubjectId, selectedCourseId, searchQuery, subjects]);
+  }, [photos, filterStarred, filterOcr, selectedSubjectId, selectedCourseId, searchQuery, subjects]);
+
+  const { availableCourseIds, availableSubjectIds } = useMemo(() => {
+    const subjectIds = new Set<string>();
+    const courseIds = new Set<string>();
+    photos.forEach((p) => {
+      if (p.subject_id) {
+        subjectIds.add(p.subject_id);
+        const subj = subjects.find((s: any) => s.id === p.subject_id);
+        if (subj && (subj as any).course_id) courseIds.add((subj as any).course_id);
+      }
+    });
+    return { availableCourseIds: courseIds, availableSubjectIds: subjectIds };
+  }, [photos, subjects]);
 
   return {
     photos, isLoading, isRefreshing,
     isReady,
-    filterTab, setFilterTab,
+    filterStarred, setFilterStarred,
+    filterOcr, setFilterOcr,
     selectedSubjectId, setSelectedSubjectId,
     selectedCourseId, setSelectedCourseId,
     courses,
@@ -211,5 +227,7 @@ export function useGallery(t: any) {
     loadPhotos, toggleStar,
     handlePhotoDeleted, handleGroupDeleted, handleSave, handleOcrPress,
     formatDate, subjects, loadAllData,
+    availableCourseIds,
+    availableSubjectIds,
   };
 }

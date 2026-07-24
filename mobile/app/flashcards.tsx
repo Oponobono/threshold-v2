@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, FlatList, RefreshControl, StatusBar, Text, TouchableOpacity, Modal, Pressable, TextInput, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -15,7 +15,8 @@ import { SwipeableCard } from '../src/components/ui/SwipeableCard';
 import { FlashcardStudyScreenStandalone } from '../src/components/flashcards/FlashcardStudyScreenStandalone';
 import { FlashcardHeader } from '../src/components/flashcards/FlashcardHeader';
 import { FlashcardSearchBar } from '../src/components/flashcards/FlashcardSearchBar';
-import { FlashcardSubjectPills } from '../src/components/flashcards/FlashcardSubjectPills';
+import { FilterDropdown } from '../src/components/ui/FilterDropdown';
+import { OptionSelectorModal, SelectorOption } from '../src/components/ui/OptionSelectorModal';
 import { GroupPills } from '../src/components/flashcards/GroupPills';
 import { FlashcardDeckCard } from '../src/components/flashcards/FlashcardDeckCard';
 import { EmptyFlashcards } from '../src/components/flashcards/EmptyFlashcards';
@@ -30,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { useCustomAlert } from '../src/components/ui/CustomAlert';
 import { useFlashcardsStore } from '../src/store/useFlashcardsStore';
 
+
 export default function FlashcardsScreen() {
   const { t } = useTranslation();
   const { showAlert } = useCustomAlert();
@@ -38,6 +40,7 @@ export default function FlashcardsScreen() {
     showStudyModal, showEditDeckModal, subjects, activeDeck, editingDeck, studyDeckCards,
     currentUserId, isRefreshing, isReady, activeCloseRef, searchAnim, searchInputRef,
     isLoading, searchQuery, setSearchQuery, activeSubjectId, setActiveSubjectId,
+    selectedCourseId, setSelectedCourseId,
     filteredDecks, loadDecks, getDuedeckIds,
     setShowNewDeckModal, setShowImportModal, setShowMenuModal, setShowNewCardModal,
     setShowStudyModal, setShowEditDeckModal, setActiveDeck, setStudyDeckCards,
@@ -54,7 +57,37 @@ export default function FlashcardsScreen() {
     groups, activeGroupPin, setActiveGroupPin,
     groupDecks, loadingGroups,
     isGroupAdmin, handleRemoveFromGroup,
+    // Course/Subject filter
+    courses, subjectsForCourse,
+    availableCourseIds, availableSubjectIds,
   } = useFlashcards();
+
+  const [courseModalVisible, setCourseModalVisible] = useState(false);
+  const [subjectModalVisible, setSubjectModalVisible] = useState(false);
+
+  const courseOptions: SelectorOption[] = useMemo(() =>
+    (courses as any[])
+      .filter((c: any) => availableCourseIds.has(c.id))
+      .map((c: any) => ({ id: c.id, name: c.name })),
+  [courses, availableCourseIds]);
+
+  const subjectOptions: SelectorOption[] = useMemo(() =>
+    subjectsForCourse
+      .filter((s: any) => availableSubjectIds.has(s.id))
+      .map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        icon: s.icon || 'book-outline',
+        color: s.color,
+        subtitle: s.professor,
+      })),
+  [subjectsForCourse, availableSubjectIds]);
+
+  const selectedCourseName = (courses as any[]).find((c: any) => c.id === selectedCourseId)?.name || null;
+  const selectedSubjectName = subjects.find((s: any) => s.id === activeSubjectId)?.name || null;
+
+  const showFilters = courseOptions.length > 0;
+  const showSubjectFilter = subjectOptions.length > 0;
 
   const { refresh: refreshDecks } = useFlashcardsStore();
 
@@ -85,11 +118,26 @@ export default function FlashcardsScreen() {
               inputRef={searchInputRef}
             />
 
-            <FlashcardSubjectPills
-              subjects={subjects}
-              activeSubjectId={activeSubjectId as string | null}
-              onSelect={setActiveSubjectId as (id: string | null) => void}
-            />
+            {showFilters && (
+              <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: theme.spacing.lg, marginBottom: 4 }}>
+                <FilterDropdown
+                  label={t('dashboard.course', { defaultValue: 'Curso' })}
+                  value={selectedCourseName}
+                  iconName="folder"
+                  onPress={() => setCourseModalVisible(true)}
+                  isActive={!!selectedCourseId}
+                />
+                {showSubjectFilter && (
+                  <FilterDropdown
+                    label={t('dashboard.newSubject.subjectPlaceholder', { defaultValue: 'Materia' })}
+                    value={selectedSubjectName}
+                    iconName="book"
+                    onPress={() => setSubjectModalVisible(true)}
+                    isActive={!!activeSubjectId}
+                  />
+                )}
+              </View>
+            )}
           </>
         )}
 
@@ -481,6 +529,39 @@ export default function FlashcardsScreen() {
               </Pressable>
             </Pressable>
           </Modal>
+
+          <OptionSelectorModal
+            visible={courseModalVisible}
+            title={t('dashboard.selectCourse', { defaultValue: 'Seleccionar curso' })}
+            options={courseOptions}
+            selectedId={selectedCourseId}
+            onSelect={(val) => {
+              setSelectedCourseId(val);
+              setActiveSubjectId(null);
+              setCourseModalVisible(false);
+            }}
+            onClose={() => setCourseModalVisible(false)}
+            allowClear
+          />
+
+          <OptionSelectorModal
+            visible={subjectModalVisible}
+            title={t('dashboard.selectSubject', { defaultValue: 'Seleccionar materia' })}
+            options={subjectOptions}
+            selectedId={activeSubjectId}
+            onSelect={(val) => {
+              setActiveSubjectId(val);
+              if (val) {
+                const subj = subjects.find((s: any) => s.id === val);
+                if (subj && (subj as any).course_id) {
+                  setSelectedCourseId((subj as any).course_id);
+                }
+              }
+              setSubjectModalVisible(false);
+            }}
+            onClose={() => setSubjectModalVisible(false)}
+            allowClear
+          />
         </>
       )}
     </GestureHandlerRootView>

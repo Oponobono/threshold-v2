@@ -58,8 +58,14 @@ export const getStatus = (minNeeded: number, target: number, t: any) => {
 
 function parseDateOrFail(dateStr: string): number {
   if (!dateStr) return NaN;
-  // ISO YYYY-MM-DD → native Date (correct)
+  // ISO YYYY-MM-DD → local Date (avoids timezone shift)
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const ts = new Date(y, m - 1, d).getTime();
+    if (!isNaN(ts) && ts >= -2208988800000) return ts;
+  }
+  // Full ISO String or other Date parseable string
+  if (dateStr.includes('T') || dateStr.includes(' ')) {
     const ts = new Date(dateStr).getTime();
     if (!isNaN(ts) && ts >= -2208988800000) return ts;
   }

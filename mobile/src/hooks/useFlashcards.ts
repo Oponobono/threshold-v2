@@ -18,6 +18,7 @@ export function useFlashcards() {
   const { refreshPredictions, getDuedeckIds } = useDataStore();
   const storeSubjects = useDataStore(s => s.subjects);
   const storeProfile = useDataStore(s => s.profile);
+  const storeCourses = useDataStore(s => s.courses);
 
   const [showSearch, setShowSearch] = useState(false);
   const [showNewDeckModal, setShowNewDeckModal] = useState(false);
@@ -105,9 +106,17 @@ export function useFlashcards() {
     setSearchQuery,
     activeSubjectId,
     setActiveSubjectId,
+    selectedCourseId,
+    setSelectedCourseId,
     filteredDecks,
     loadDecks,
+    availableCourseIds,
+    availableSubjectIds,
   } = useFlashcardsManager(subjects);
+
+  const subjectsForCourse = selectedCourseId
+    ? subjects.filter((s: any) => s.course_id === selectedCourseId)
+    : subjects;
 
   const { initialize: initializeStore, subscribeToEvents } = useFlashcardsStore();
 
@@ -337,6 +346,7 @@ export function useFlashcards() {
     showStudyModal, showEditDeckModal, subjects, activeDeck, editingDeck, studyDeckCards,
     currentUserId, isRefreshing, isReady, activeCloseRef, searchAnim, searchInputRef,
     isLoading, searchQuery, setSearchQuery, activeSubjectId, setActiveSubjectId,
+    selectedCourseId, setSelectedCourseId,
     filteredDecks, loadDecks, getDuedeckIds,
     setShowNewDeckModal, setShowImportModal, setShowMenuModal, setShowNewCardModal,
     setShowStudyModal, setShowEditDeckModal, setActiveDeck, setEditingDeck,
@@ -354,5 +364,10 @@ export function useFlashcards() {
     groups, activeGroupPin, setActiveGroupPin,
     groupDecks, loadingGroups,
     isGroupAdmin, handleRemoveFromGroup,
+    // Course/Subject filter
+    courses: storeCourses,
+    subjectsForCourse,
+    availableCourseIds,
+    availableSubjectIds,
   };
 }

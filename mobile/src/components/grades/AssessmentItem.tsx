@@ -41,7 +41,13 @@ export const AssessmentItem: React.FC<AssessmentItemProps> = ({
   const formattedDate = React.useMemo(() => {
     if (!a.date) return null;
     try {
-      const d = new Date(a.date);
+      let d: Date;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(a.date)) {
+        const [y, m, day] = a.date.split('-').map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(a.date);
+      }
       if (isNaN(d.getTime())) return null;
       return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
     } catch {

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, Pressable, ScrollView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, ScrollView, Platform, StyleSheet, Modal } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFonts, CabinSketch_700Bold, CabinSketch_400Regular } from '@expo-google-fonts/cabin-sketch';
@@ -14,11 +14,43 @@ const CHALK_TEXT = '#e8f0d8';
 const CHALK_MUTED = 'rgba(232,240,216,0.55)';
 const CHALK_HEADER_BG = '#1e3320';
 
-export const ScheduleGrid = () => {
+/**
+ * Abrevia nombres largos para que quepan en celdas pequeñas.
+ * Ej: "Lógica de Programación" → "L. de Programación"
+ */
+function abbreviateName(name: string, maxLen = 18): string {
+  if (!name || name.length <= maxLen) return name;
+  const words = name.trim().split(/\s+/);
+  if (words.length <= 1) return name.substring(0, maxLen - 1) + '…';
+  // Abreviar todas las palabras largas excepto la última
+  const abbreviated = words.map((w, i) =>
+    i < words.length - 1 && w.length > 3 ? w[0].toUpperCase() + '.' : w
+  ).join(' ');
+  if (abbreviated.length <= maxLen) return abbreviated;
+  // Si aún es largo, abreviar todo menos la última
+  const allAbbrev = words.map((w, i) =>
+    i < words.length - 1 ? w[0].toUpperCase() + '.' : w
+  ).join(' ');
+  if (allAbbrev.length <= maxLen) return allAbbrev;
+  return name.substring(0, maxLen - 1) + '…';
+}
+
+/**
+ * Calcula si el texto debe ser oscuro o claro según la luminancia del fondo.
+ */
+function getContrastColor(hex: string): string {
+  const clean = hex.replace('#', '');
+  if (clean.length < 6) return '#1a1a1a';
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? '#555555' : '#ffffff';
+}
+
+export const ScheduleGrid = ({ onPress }: { onPress: () => void }) => {
   const { t } = useTranslation();
   const { schedules, subjects } = useDataStore();
-  const [modalVisible, setModalVisible] = useState(false);
-  const [chalkMode, setChalkMode] = useState(false);
 
   const [fontsLoaded] = useFonts({ CabinSketch_700Bold, CabinSketch_400Regular });
 
@@ -60,12 +92,11 @@ export const ScheduleGrid = () => {
   const chalkFontRegular = fontsLoaded ? 'CabinSketch_400Regular' : undefined;
 
   return (
-    <>
-      <TouchableOpacity
-        style={styles.scheduleGridSection}
-        activeOpacity={0.8}
-        onPress={() => setModalVisible(true)}
-      >
+    <TouchableOpacity
+      style={styles.scheduleGridSection}
+      activeOpacity={0.8}
+      onPress={onPress}
+    >
         <View style={styles.scheduleGridHeader}>
           <Text style={styles.scheduleGridTitle}>{t('subjects.scheduleGridTitle')}</Text>
           <Ionicons name="expand" size={14} color={theme.colors.text.secondary} />
@@ -102,13 +133,59 @@ export const ScheduleGrid = () => {
           ))}
         </View>
       </TouchableOpacity>
+  );
+};
 
-      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
-          <Pressable
-            style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)' }}
-            onPress={() => setModalVisible(false)}
-          />
+export const ScheduleModal = ({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
+  const { t } = useTranslation();
+  const { schedules, subjects } = useDataStore();
+  const [chalkMode, setChalkMode] = useState(false);
+  const [fontsLoaded] = useFonts({ CabinSketch_700Bold, CabinSketch_400Regular });
+
+  const dayLabels = useMemo(() => {
+    const raw = t('common.daysShort', { returnObjects: true });
+    return Array.isArray(raw) ? (raw as string[]) : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  }, [t]);
+
+  const timeSlots = useMemo(() => {
+    if (!Array.isArray(schedules) || schedules.length === 0) return [];
+    const hours = new Set<number>();
+    schedules.forEach((s: any) => {
+      const sh = parseInt(s.start_time?.split(':')[0] || '0', 10);
+      const eh = parseInt(s.end_time?.split(':')[0] || '0', 10);
+      for (let h = sh; h < eh; h++) hours.add(h);
+    });
+    return Array.from(hours).sort((a, b) => a - b);
+  }, [schedules]);
+
+  const gridMap = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    if (!Array.isArray(schedules)) return map;
+    schedules.forEach((s: any) => {
+      const day = s.day_of_week;
+      const sh = parseInt(s.start_time?.split(':')[0] || '0', 10);
+      const eh = parseInt(s.end_time?.split(':')[0] || '0', 10);
+      for (let h = sh; h < eh; h++) {
+        const key = `${day}-${h}`;
+        if (!map[key]) map[key] = [];
+        map[key].push(s);
+      }
+    });
+    return map;
+  }, [schedules]);
+
+  if (!visible || !Array.isArray(schedules) || schedules.length === 0 || timeSlots.length === 0) return null;
+
+  const chalkFont = fontsLoaded ? 'CabinSketch_700Bold' : undefined;
+  const chalkFontRegular = fontsLoaded ? 'CabinSketch_400Regular' : undefined;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
+        <Pressable
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
+        onPress={onClose}
+      />
 
           <View style={{
             backgroundColor: chalkMode ? CHALK_BG : theme.colors.card,
@@ -177,7 +254,7 @@ export const ScheduleGrid = () => {
                 </TouchableOpacity>
 
                 {/* Close */}
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <TouchableOpacity onPress={onClose}>
                   <Ionicons name="close" size={24} color={chalkMode ? CHALK_MUTED : theme.colors.text.secondary} />
                 </TouchableOpacity>
               </View>
@@ -261,17 +338,17 @@ export const ScheduleGrid = () => {
                                     <Text
                                       style={{
                                         color: CHALK_TEXT,
-                                        fontSize: 11,
+                                        fontSize: 10,
                                         fontFamily: chalkFont,
                                         textAlign: 'center',
-                                        lineHeight: 18,
+                                        lineHeight: 14,
                                         textShadowColor: 'rgba(255,255,255,0.2)',
                                         textShadowOffset: { width: 0.5, height: 0.5 },
                                         textShadowRadius: 2,
                                       }}
                                       numberOfLines={3}
                                     >
-                                      {name}
+                                      {abbreviateName(name)}
                                     </Text>
                                   </View>
                                 );
@@ -292,8 +369,11 @@ export const ScheduleGrid = () => {
                                     overflow: 'hidden',
                                   }}
                                 >
-                                  <Text style={{ color: theme.colors.text.secondary, fontSize: 11, fontWeight: '700', textAlign: 'center' }} numberOfLines={3}>
-                                    {name}
+                                  <Text
+                                    style={{ color: getContrastColor(color), fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 14 }}
+                                    numberOfLines={3}
+                                  >
+                                    {abbreviateName(name)}
                                   </Text>
                                 </View>
                               );
@@ -317,8 +397,7 @@ export const ScheduleGrid = () => {
             </ScrollView>
 
           </View>
-        </View>
-      </Modal>
-    </>
+      </View>
+    </Modal>
   );
 };

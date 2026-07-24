@@ -13,6 +13,7 @@ interface BoundedGridProps<T> {
   title?: string;
   contextText?: string;
   headerAction?: React.ReactNode;
+  subHeader?: React.ReactNode;
 }
 
 export function BoundedGrid<T>({
@@ -26,6 +27,7 @@ export function BoundedGrid<T>({
   title,
   contextText,
   headerAction,
+  subHeader,
 }: BoundedGridProps<T>) {
 
   return (
@@ -39,6 +41,7 @@ export function BoundedGrid<T>({
           {headerAction && <View>{headerAction}</View>}
         </View>
       )}
+      {subHeader && <View style={{ marginBottom: 12 }}>{subHeader}</View>}
 
       {data.length === 0 ? (
         ListEmptyComponent

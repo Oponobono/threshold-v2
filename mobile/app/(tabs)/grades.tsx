@@ -24,14 +24,14 @@ import { MasteryRadarCard } from '../../src/components/grades/MasteryRadarCard';
 import { MasteryRadar } from '../../src/components/ui/MasteryRadar';
 import { GradesHeader } from '../../src/components/grades/GradesHeader';
 import { FilterBar } from '../../src/components/grades/FilterBar';
-import { SubjectFilterBar } from '../../src/components/grades/SubjectFilterBar';
 import { PerformanceCard } from '../../src/components/grades/PerformanceCard';
 import { AssessmentItem } from '../../src/components/grades/AssessmentItem';
 import { ProjectionSimulator } from '../../src/components/grades/ProjectionSimulator';
 import { ActionCard } from '../../src/components/grades/ActionCard';
-import { CoursePills } from '../../src/components/ui/CoursePills';
 import { AcademicImportModal } from '../../src/components/grades/AcademicImportModal';
 import { PagedList } from '../../src/components/ui/PagedList';
+import { FilterDropdown } from '../../src/components/ui/FilterDropdown';
+import { OptionSelectorModal, SelectorOption } from '../../src/components/ui/OptionSelectorModal';
 
 export default function GradesScreen() {
   const { t } = useTranslation();
@@ -40,6 +40,33 @@ export default function GradesScreen() {
   const [expandedChart, setExpandedChart] = useState<'mastery' | 'projection' | null>(null);
   const [isImportModalVisible, setImportModalVisible] = useState(false);
   const [assessmentsPage, setAssessmentsPage] = useState(0);
+
+  const [courseModalVisible, setCourseModalVisible] = useState(false);
+  const [subjectModalVisible, setSubjectModalVisible] = useState(false);
+
+  const courseOptions: SelectorOption[] = React.useMemo(() => {
+    return g.courses
+      .filter((c: any) => g.availableCourseIds.has(c.id))
+      .map(c => ({ id: c.id, name: c.name }));
+  }, [g.courses, g.availableCourseIds]);
+
+  const subjectOptions: SelectorOption[] = React.useMemo(() => {
+    return g.subjectsForCourse
+      .filter((s: any) => g.availableSubjectIds.has(s.id))
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        icon: (s as any).icon || 'book-outline',
+        color: s.color,
+        subtitle: (s as any).professor
+      }));
+  }, [g.subjectsForCourse, g.availableSubjectIds]);
+
+  const selectedCourseName = g.courses.find(c => c.id === g.selectedCourseId)?.name || null;
+  const selectedSubjectName = g.subjects.find(s => s.id === g.selectedSubjectId)?.name || null;
+
+  const showFilters = courseOptions.length > 0;
+  const showSubjectFilter = subjectOptions.length > 0;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
@@ -51,26 +78,26 @@ export default function GradesScreen() {
 
       <FilterBar t={t} />
 
-      <CoursePills
-        courses={g.courses}
-        selectedCourseId={g.selectedCourseId}
-        onSelectCourse={(id) => {
-          g.setSelectedCourseId(id);
-          // Al cambiar de curso, resetear el filtro de materia
-          g.setSelectedSubjectId(null);
-          setAssessmentsPage(0);
-        }}
-      />
-
-      <SubjectFilterBar
-        subjects={g.subjectsForCourse}
-        selectedSubjectId={g.selectedSubjectId as string | null}
-        onSelectSubject={(id) => {
-          g.setSelectedSubjectId(id);
-          setAssessmentsPage(0);
-        }}
-        t={t}
-      />
+      {showFilters && (
+        <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: theme.spacing.lg, marginBottom: 0, marginTop: 8 }}>
+          <FilterDropdown
+            label={t('dashboard.course', { defaultValue: 'Curso' })}
+            value={selectedCourseName}
+            iconName="folder"
+            onPress={() => setCourseModalVisible(true)}
+            isActive={!!g.selectedCourseId}
+          />
+          {showSubjectFilter && (
+            <FilterDropdown
+              label={t('dashboard.newSubject.subjectPlaceholder', { defaultValue: 'Materia' })}
+              value={selectedSubjectName}
+              iconName="book"
+              onPress={() => setSubjectModalVisible(true)}
+              isActive={!!g.selectedSubjectId}
+            />
+          )}
+        </View>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={gradesStyles.scroll}>
         <PerformanceCard
@@ -299,6 +326,33 @@ export default function GradesScreen() {
           userId={g.userId as string | null} 
         />
       )}
+
+      <OptionSelectorModal
+        visible={courseModalVisible}
+        title={t('grades.selectCourse', { defaultValue: 'Seleccionar curso' })}
+        options={courseOptions}
+        selectedId={g.selectedCourseId}
+        onSelect={(id) => {
+          g.setSelectedCourseId(id);
+          g.setSelectedSubjectId(null);
+          setAssessmentsPage(0);
+        }}
+        onClose={() => setCourseModalVisible(false)}
+        clearLabel={t('grades.clearCourse', { defaultValue: 'Quitar filtro de curso' })}
+      />
+
+      <OptionSelectorModal
+        visible={subjectModalVisible}
+        title={t('grades.selectSubject', { defaultValue: 'Seleccionar materia' })}
+        options={subjectOptions}
+        selectedId={g.selectedSubjectId as string | null}
+        onSelect={(id) => {
+          g.setSelectedSubjectId(id);
+          setAssessmentsPage(0);
+        }}
+        onClose={() => setSubjectModalVisible(false)}
+        clearLabel={t('grades.clearSubject', { defaultValue: 'Quitar filtro de materia' })}
+      />
     </SafeAreaView>
   );
 }

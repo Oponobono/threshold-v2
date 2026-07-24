@@ -392,7 +392,7 @@ export const subjectsStyles = StyleSheet.create({
   },
 
   // ── Schedule Grid ──
-  scheduleGridSection: { marginBottom: SPACING.SECTION },
+  scheduleGridSection: { marginBottom: SPACING.SECTION, width: '100%' },
   scheduleGridHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: SPACING.INNER,
@@ -402,6 +402,7 @@ export const subjectsStyles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.8,
   },
   scheduleGridContainer: {
+    width: '100%',
     backgroundColor: theme.colors.background,
     borderRadius: 10, padding: 8,
     borderWidth: 1, borderColor: theme.colors.border,

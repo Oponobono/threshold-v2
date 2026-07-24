@@ -2,38 +2,53 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { galleryStyles } from '../../styles/Gallery.styles';
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
-import { FilterTab } from '../../types/gallery';
 
-interface FilterTabsProps {
-  filterTab: FilterTab;
+interface GalleryFilterPillsProps {
+  filterStarred: boolean;
+  filterOcr: boolean;
+  onFilterChange: (starred: boolean, ocr: boolean) => void;
   totalPhotoCount: number;
-  onSelectTab: (tab: FilterTab) => void;
   t: any;
 }
 
-const TABS: FilterTab[] = ['all', 'starred', 'ocr'];
-
-export const FilterTabs: React.FC<FilterTabsProps> = ({
-  filterTab,
+export const FilterTabs: React.FC<GalleryFilterPillsProps> = ({
+  filterStarred,
+  filterOcr,
+  onFilterChange,
   totalPhotoCount,
-  onSelectTab,
   t,
 }) => {
+  const isAll = !filterStarred && !filterOcr;
+
   return (
     <View style={[galleryStyles.tabRow, { alignItems: 'center' }]}>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[galleryStyles.tab, filterTab === tab && galleryStyles.tabActive]}
-            onPress={() => onSelectTab(tab)}
-          >
-            <Text style={[galleryStyles.tabText, filterTab === tab && galleryStyles.tabTextActive]}>
-              {tab === 'all' ? (t('gallery.all') || 'Todas') :
-               tab === 'starred' ? (t('gallery.starred') || 'Favoritas') : 'OCR'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity
+          style={[galleryStyles.tab, isAll && galleryStyles.tabActive]}
+          onPress={() => onFilterChange(false, false)}
+        >
+          <Text style={[galleryStyles.tabText, isAll && galleryStyles.tabTextActive]}>
+            {t('gallery.all') || 'Todas'}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[galleryStyles.tab, filterStarred && galleryStyles.tabActive]}
+          onPress={() => onFilterChange(!filterStarred, filterOcr)}
+        >
+          <Text style={[galleryStyles.tabText, filterStarred && galleryStyles.tabTextActive]}>
+            {t('gallery.starred') || 'Favoritas'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[galleryStyles.tab, filterOcr && galleryStyles.tabActive]}
+          onPress={() => onFilterChange(filterStarred, !filterOcr)}
+        >
+          <Text style={[galleryStyles.tabText, filterOcr && galleryStyles.tabTextActive]}>
+            OCR
+          </Text>
+        </TouchableOpacity>
       </View>
       <View style={{ flex: 1 }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

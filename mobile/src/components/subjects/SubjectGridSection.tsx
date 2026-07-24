@@ -13,6 +13,7 @@ interface SubjectGridSectionProps {
   onContinue: (subject: any) => void;
   onComplete: (subject: any) => void;
   onCreateSubject: () => void;
+  subHeader?: React.ReactNode;
 }
 
 export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
@@ -22,6 +23,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
   onContinue,
   onComplete,
   onCreateSubject,
+  subHeader,
 }) => {
   const { t } = useTranslation();
 
@@ -57,6 +59,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
       numColumns={2}
       maxHeight={500}
       gap={8}
+      subHeader={subHeader}
       ListEmptyComponent={emptyState}
       renderItem={({ item }) => (
         <View style={{ flex: 1 }}>

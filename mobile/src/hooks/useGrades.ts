@@ -239,11 +239,25 @@ export function useGrades(t: any) {
     }
   };
 
+  const { availableCourseIds, availableSubjectIds } = useMemo(() => {
+    const subjectIds = new Set<string>();
+    const courseIds = new Set<string>();
+    assessments.forEach((a: any) => {
+      if (a.subject_id) {
+        subjectIds.add(a.subject_id);
+        const subj = subjects.find((s: any) => s.id === a.subject_id);
+        if (subj && (subj as any).course_id) courseIds.add((subj as any).course_id);
+      }
+    });
+    return { availableCourseIds: courseIds, availableSubjectIds: subjectIds };
+  }, [assessments, subjects]);
+
   return {
     subjects, filteredAssessments, gradedAssessments,
     selectedSubjectId, setSelectedSubjectId,
     selectedCourseId, setSelectedCourseId,
     courses, subjectsForCourse,
+    availableCourseIds, availableSubjectIds,
     userId,
     isReady,
     displayGPA, displayProjectedGPA, displayDelta, globalGpaLetter, globalProjectedLetter, activeSystem,

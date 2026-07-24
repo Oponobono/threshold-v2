@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from 'react';
-import { FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { Suspense, lazy, useState, useMemo } from 'react';
+import { FlatList, RefreshControl, ActivityIndicator, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { globalStyles } from '../../src/styles/globalStyles';
@@ -13,12 +13,12 @@ import { alertRef } from '../../src/components/ui/CustomAlert';
 import { GalleryHeader } from '../../src/components/gallery/GalleryHeader';
 import { SearchBar } from '../../src/components/gallery/SearchBar';
 import { FilterTabs } from '../../src/components/gallery/FilterTabs';
-import { SubjectChips } from '../../src/components/gallery/SubjectChips';
+import { FilterDropdown } from '../../src/components/ui/FilterDropdown';
+import { OptionSelectorModal, SelectorOption } from '../../src/components/ui/OptionSelectorModal';
 import { StarredRow } from '../../src/components/gallery/StarredRow';
 import { GridItem } from '../../src/components/gallery/GridItem';
 import { EmptyState } from '../../src/components/gallery/EmptyState';
 import { OcrModal } from '../../src/components/gallery/OcrModal';
-import { CoursePills } from '../../src/components/ui/CoursePills';
 
 const ImageViewerModal = lazy(() =>
   import('../../src/components/modals/ImageViewerModal').then(m => ({ default: m.ImageViewerModal }))
@@ -33,6 +33,41 @@ const DocumentScannerModal = lazy(() =>
 export default function GalleryScreen() {
   const { t } = useTranslation();
   const g = useGallery(t);
+
+  const [courseModalVisible, setCourseModalVisible] = useState(false);
+  const [subjectModalVisible, setSubjectModalVisible] = useState(false);
+
+  React.useEffect(() => {
+    console.log('[Gallery] courseModalVisible is now:', courseModalVisible);
+  }, [courseModalVisible]);
+
+  React.useEffect(() => {
+    console.log('[Gallery] subjectModalVisible is now:', subjectModalVisible);
+  }, [subjectModalVisible]);
+
+  const courseOptions: SelectorOption[] = useMemo(() => {
+    return g.courses
+      .filter((c: any) => g.availableCourseIds.has(c.id))
+      .map(c => ({ id: c.id, name: c.name }));
+  }, [g.courses, g.availableCourseIds]);
+
+  const subjectOptions: SelectorOption[] = useMemo(() => {
+    return g.subjectsForCourse
+      .filter((s: any) => g.availableSubjectIds.has(s.id))
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        icon: (s as any).icon || 'book-outline',
+        color: s.color,
+        subtitle: (s as any).professor
+      }));
+  }, [g.subjectsForCourse, g.availableSubjectIds]);
+
+  const selectedCourseName = g.courses.find(c => c.id === g.selectedCourseId)?.name || null;
+  const selectedSubjectName = g.subjects.find(s => s.id === g.selectedSubjectId)?.name || null;
+
+  const showFilters = courseOptions.length > 0;
+  const showSubjectFilter = subjectOptions.length > 0;
 
   const handleStarredPress = (photos: GalleryPhoto[], index: number) => {
     g.setViewerPhotos(photos);
@@ -107,27 +142,41 @@ export default function GalleryScreen() {
         />
       )}
 
+      {showFilters && (
+        <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: theme.spacing.lg, marginBottom: 4 }}>
+          <FilterDropdown
+            label={t('dashboard.course', { defaultValue: 'Curso' })}
+            value={selectedCourseName}
+            iconName="folder"
+            onPress={() => {
+              console.log('[Gallery] Course dropdown pressed!');
+              setCourseModalVisible(true);
+            }}
+            isActive={!!g.selectedCourseId}
+          />
+          {showSubjectFilter && (
+            <FilterDropdown
+              label={t('dashboard.newSubject.subjectPlaceholder', { defaultValue: 'Materia' })}
+              value={selectedSubjectName}
+              iconName="book"
+              onPress={() => {
+                console.log('[Gallery] Subject dropdown pressed!');
+                setSubjectModalVisible(true);
+              }}
+              isActive={!!g.selectedSubjectId}
+            />
+          )}
+        </View>
+      )}
+
       <FilterTabs
-        filterTab={g.filterTab}
+        filterStarred={g.filterStarred}
+        filterOcr={g.filterOcr}
         totalPhotoCount={g.totalPhotoCount}
-        onSelectTab={g.setFilterTab}
-        t={t}
-      />
-
-      <CoursePills
-        courses={g.courses}
-        selectedCourseId={g.selectedCourseId}
-        onSelectCourse={(id) => {
-          g.setSelectedCourseId(id);
-          // Al cambiar de curso, resetear el filtro de materia
-          g.setSelectedSubjectId(null);
+        onFilterChange={(starred, ocr) => {
+          g.setFilterStarred(starred);
+          g.setFilterOcr(ocr);
         }}
-      />
-
-      <SubjectChips
-        subjects={g.subjectsForCourse}
-        selectedSubjectId={g.selectedSubjectId as string | null}
-        onSelectSubject={g.setSelectedSubjectId as (id: string | null) => void}
         t={t}
       />
 
@@ -140,7 +189,7 @@ export default function GalleryScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <React.Fragment>
-            {g.filterTab === 'all' && g.starred.length > 0 && (
+            {!g.filterStarred && !g.filterOcr && g.starred.length > 0 && (
               <StarredRow
                 starred={g.starred}
                 onPress={handleStarredPress}
@@ -165,15 +214,15 @@ export default function GalleryScreen() {
         ListEmptyComponent={
           <EmptyState
             icon={
-              g.filterTab === 'starred' ? 'star-outline' :
-              g.filterTab === 'ocr' ? 'text-outline' : 'images-outline'
+              g.filterStarred ? 'star-outline' :
+              g.filterOcr ? 'text-outline' : 'images-outline'
             }
             message={
-              g.filterTab === 'starred' ? (t('gallery.emptyStarred') || 'No tienes fotos favoritas') :
-              g.filterTab === 'ocr' ? 'No hay fotos con texto OCR' :
+              g.filterStarred ? (t('gallery.emptyStarred') || 'No tienes fotos favoritas') :
+              g.filterOcr ? 'No hay fotos con texto OCR' :
               (t('gallery.emptyGallery') || 'Tu galería está vacía')
             }
-            sub={g.filterTab === 'all' ? (t('gallery.emptyGallerySub') || 'Toma fotos o escanea documentos para empezar') : undefined}
+            sub={(!g.filterStarred && !g.filterOcr) ? (t('gallery.emptyGallerySub') || 'Toma fotos o escanea documentos para empezar') : undefined}
           />
         }
         refreshControl={
@@ -219,6 +268,29 @@ export default function GalleryScreen() {
           t={t}
         />
       </Suspense>
+
+      <OptionSelectorModal
+        visible={courseModalVisible}
+        title={t('gallery.selectCourse', { defaultValue: 'Seleccionar curso' })}
+        options={courseOptions}
+        selectedId={g.selectedCourseId}
+        onSelect={(id) => {
+          g.setSelectedCourseId(id);
+          g.setSelectedSubjectId(null);
+        }}
+        onClose={() => setCourseModalVisible(false)}
+        clearLabel={t('gallery.clearCourse', { defaultValue: 'Quitar filtro de curso' })}
+      />
+
+      <OptionSelectorModal
+        visible={subjectModalVisible}
+        title={t('gallery.selectSubject', { defaultValue: 'Seleccionar materia' })}
+        options={subjectOptions}
+        selectedId={g.selectedSubjectId}
+        onSelect={g.setSelectedSubjectId}
+        onClose={() => setSubjectModalVisible(false)}
+        clearLabel={t('gallery.clearSubject', { defaultValue: 'Quitar filtro de materia' })}
+      />
     </SafeAreaView>
   );
 }

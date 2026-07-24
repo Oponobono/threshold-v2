@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, ScrollView, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
@@ -16,6 +16,8 @@ import { RecordingsSearchBar } from '../src/components/recordings/RecordingsSear
 import { RecordingsFilterPills } from '../src/components/recordings/RecordingsFilterPills';
 import { EmptyRecordings } from '../src/components/recordings/EmptyRecordings';
 import { useRecordings } from '../src/hooks/useRecordings';
+import { FilterDropdown } from '../src/components/ui/FilterDropdown';
+import { OptionSelectorModal, SelectorOption } from '../src/components/ui/OptionSelectorModal';
 
 export default function RecordingsScreen() {
   const { t } = useTranslation();
@@ -34,7 +36,42 @@ export default function RecordingsScreen() {
     formatDuration,
     setShowYoutubeModal, setYoutubeUrl, setShowFilterModal,
     onAddYouTubeVideo, toggleSearch, handlePressItem, handleDeleteItem,
+    selectedSubjectId, setSelectedSubjectId,
+    selectedCourseId, setSelectedCourseId,
+    subjects, courses,
+    availableCourseIds, availableSubjectIds,
   } = useRecordings();
+
+  const [courseModalVisible, setCourseModalVisible] = useState(false);
+  const [subjectModalVisible, setSubjectModalVisible] = useState(false);
+
+  const courseOptions: SelectorOption[] = useMemo(() => {
+    return (courses as any[])
+      .filter((c: any) => availableCourseIds.has(c.id))
+      .map(c => ({ id: c.id, name: c.name }));
+  }, [courses, availableCourseIds]);
+
+  const subjectsForCourse = useMemo(() =>
+    selectedCourseId ? subjects.filter((s: any) => s.course_id === selectedCourseId) : subjects
+  , [subjects, selectedCourseId]);
+
+  const subjectOptions: SelectorOption[] = useMemo(() => {
+    return subjectsForCourse
+      .filter((s: any) => availableSubjectIds.has(s.id))
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        icon: s.icon || 'book-outline',
+        color: s.color,
+        subtitle: s.professor
+      }));
+  }, [subjectsForCourse, availableSubjectIds]);
+
+  const selectedCourseName = (courses as any[]).find(c => c.id === selectedCourseId)?.name || null;
+  const selectedSubjectName = subjects.find(s => s.id === selectedSubjectId)?.name || null;
+
+  const showFilters = courseOptions.length > 0;
+  const showSubjectFilter = subjectOptions.length > 0;
 
   if (isLoadingVideos && youTubeVideos.length === 0 && recordings.length === 0) {
     return <PremiumLoading text={t('recordings.loadingList') || 'CARGANDO'} />;
@@ -64,6 +101,27 @@ export default function RecordingsScreen() {
         onSearchChange={setSearchQuery}
         inputRef={searchInputRef}
       />
+
+      {showFilters && (
+        <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: theme.spacing.lg, marginBottom: 4 }}>
+          <FilterDropdown
+            label={t('dashboard.course', { defaultValue: 'Curso' })}
+            value={selectedCourseName}
+            iconName="folder"
+            onPress={() => setCourseModalVisible(true)}
+            isActive={!!selectedCourseId}
+          />
+          {showSubjectFilter && (
+            <FilterDropdown
+              label={t('dashboard.newSubject.subjectPlaceholder', { defaultValue: 'Materia' })}
+              value={selectedSubjectName}
+              iconName="book"
+              onPress={() => setSubjectModalVisible(true)}
+              isActive={!!selectedSubjectId}
+            />
+          )}
+        </View>
+      )}
 
       <RecordingsFilterPills
         activeFilter={activeFilter}
@@ -106,6 +164,39 @@ export default function RecordingsScreen() {
             onUrlChange={setYoutubeUrl}
             onCancel={() => { setShowYoutubeModal(false); setYoutubeUrl(''); }}
             onAdd={onAddYouTubeVideo}
+          />
+
+          <OptionSelectorModal
+            visible={courseModalVisible}
+            title={t('dashboard.selectCourse', { defaultValue: 'Seleccionar curso' })}
+            options={courseOptions}
+            selectedId={selectedCourseId}
+            onSelect={(val) => {
+              setSelectedCourseId(val);
+              setSelectedSubjectId(null);
+              setCourseModalVisible(false);
+            }}
+            onClose={() => setCourseModalVisible(false)}
+            allowClear
+          />
+
+          <OptionSelectorModal
+            visible={subjectModalVisible}
+            title={t('dashboard.selectSubject', { defaultValue: 'Seleccionar materia' })}
+            options={subjectOptions}
+            selectedId={selectedSubjectId}
+            onSelect={(val) => {
+              setSelectedSubjectId(val);
+              if (val) {
+                const subj = subjects.find((s: any) => s.id === val);
+                if (subj && (subj as any).course_id) {
+                  setSelectedCourseId((subj as any).course_id);
+                }
+              }
+              setSubjectModalVisible(false);
+            }}
+            onClose={() => setSubjectModalVisible(false)}
+            allowClear
           />
         </>
       )}

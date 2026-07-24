@@ -35,6 +35,10 @@ export function useRecordings() {
     loadRecordings,
     handleAddYoutube,
     handleDeleteItem,
+    selectedSubjectId, setSelectedSubjectId,
+    selectedCourseId, setSelectedCourseId,
+    subjects, courses,
+    availableCourseIds, availableSubjectIds,
   } = useRecordingsManager();
 
   const {
@@ -156,5 +160,9 @@ export function useRecordings() {
     formatDuration,
     setShowYoutubeModal, setYoutubeUrl, setShowFilterModal,
     onAddYouTubeVideo, toggleSearch, handlePressItem, handleDeleteItem,
+    selectedSubjectId, setSelectedSubjectId,
+    selectedCourseId, setSelectedCourseId,
+    subjects, courses,
+    availableCourseIds, availableSubjectIds,
   };
 }

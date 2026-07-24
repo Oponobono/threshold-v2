@@ -6,6 +6,7 @@ import { useAudioRecorder } from './useAudioRecorder';
 import { SubjectSection } from '../components/recordings/RecordingsGrid';
 import { youTubeRepository } from '../services/database';
 import { databaseService } from '../services/database/DatabaseService';
+import { useDataStore } from '../store/useDataStore';
 
 /**
  * Hook para manejar la lógica de la pantalla de Grabaciones y Multimedia.
@@ -28,22 +29,6 @@ export const useRecordingsManager = () => {
 
   // ── Gate: defer heavy work until navigation animation completes
   const [isReady, setIsReady] = useState(false);
-
-  // Defer YouTube sync + recordings load until after navigation animation
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      loadYouTubeVideos();
-      loadRecordings();
-      setIsReady(true);
-    });
-    return () => task.cancel();
-  }, [loadYouTubeVideos, loadRecordings]);
-
-  // ── Search & filter
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'recording' | 'video'>('all');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
   const loadYouTubeVideos = useCallback(async () => {
     if (isLoadingVideosRef.current) return;
@@ -87,6 +72,29 @@ export const useRecordingsManager = () => {
       isLoadingVideosRef.current = false;
     }
   }, []);
+
+  // Defer YouTube sync + recordings load until after navigation animation
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      loadYouTubeVideos();
+      loadRecordings();
+      setIsReady(true);
+    });
+    return () => task.cancel();
+  }, [loadYouTubeVideos, loadRecordings]);
+
+  // ── Search & filter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'recording' | 'video'>('all');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+
+  const storeSubjects = useDataStore(s => s.subjects);
+  const storeCourses = useDataStore(s => s.courses);
+
+
 
   const handleAddYoutube = async (youtubeUrl: string) => {
     if (isAddingYouTubeRef.current) return;
@@ -209,16 +217,18 @@ export const useRecordingsManager = () => {
       recordings.forEach((rec) => {
         if (q && !rec.name?.toLowerCase().includes(q) && !(rec.subject_name || '').toLowerCase().includes(q)) return;
         if (!passesDateFilter(rec.created_at || rec.date)) return;
+        if (selectedSubjectId && rec.subject_id !== selectedSubjectId) return;
+        if (selectedCourseId) {
+          const subj = storeSubjects.find(s => s.id === rec.subject_id);
+          if (!subj || (subj as any).course_id !== selectedCourseId) return;
+        }
         const subjectName = rec.subject_name || UNCLASSIFIED;
         const section = getOrCreate(subjectName, rec.subject_color || undefined);
         
-        // DEBUG: Log recording color
         if (process.env.NODE_ENV !== 'production' && rec.name) {
           console.log(`[useRecordingsManager] Recording "${rec.name}": subject_color="${rec.subject_color}" (id=${rec.id}, subject_id=${rec.subject_id})`);
         }
         
-        // Garantizar que siempre hay un ID válido (nunca vacío)
-        // Fallback: id_string → id → local_uri filename → uri
         const recordingId = 
           rec.id_string || 
           rec.id?.toString() || 
@@ -246,6 +256,11 @@ export const useRecordingsManager = () => {
         const title = video.title || t('recordings.defaultVideoTitle');
         if (q && !title.toLowerCase().includes(q) && !(video.subject_name || '').toLowerCase().includes(q)) return;
         if (!passesDateFilter(video.created_at)) return;
+        if (selectedSubjectId && video.subject_id !== selectedSubjectId) return;
+        if (selectedCourseId) {
+          const subj = storeSubjects.find(s => s.id === video.subject_id);
+          if (!subj || (subj as any).course_id !== selectedCourseId) return;
+        }
         const subjectName = video.subject_name || UNCLASSIFIED;
         const section = getOrCreate(subjectName, undefined);
         section.items.push({
@@ -276,13 +291,28 @@ export const useRecordingsManager = () => {
         if (b.subjectName === UNCLASSIFIED) return -1;
         return a.subjectName.localeCompare(b.subjectName);
       });
-  }, [recordings, youTubeVideos, t, searchQuery, activeFilter, sortOrder, dateFilter]);
+  }, [recordings, youTubeVideos, t, searchQuery, activeFilter, sortOrder, dateFilter, selectedSubjectId, selectedCourseId, storeSubjects]);
+
+  const { availableCourseIds, availableSubjectIds } = useMemo(() => {
+    const subjectIds = new Set<string>();
+    const courseIds = new Set<string>();
+    const addItem = (subject_id?: string | null) => {
+      if (!subject_id) return;
+      subjectIds.add(subject_id);
+      const subj = storeSubjects.find((s: any) => s.id === subject_id);
+      if (subj && (subj as any).course_id) courseIds.add((subj as any).course_id);
+    };
+    recordings.forEach((r: any) => addItem(r.subject_id));
+    youTubeVideos.forEach((v: any) => addItem(v.subject_id));
+    return { availableCourseIds: courseIds, availableSubjectIds: subjectIds };
+  }, [recordings, youTubeVideos, storeSubjects]);
 
   return {
     audioContext,
     youTubeVideos,
     isLoadingVideos,
     isAddingYouTubeVideo,
+    isReady,
     searchQuery,
     setSearchQuery,
     activeFilter,
@@ -295,6 +325,13 @@ export const useRecordingsManager = () => {
     loadYouTubeVideos,
     loadRecordings,
     handleAddYoutube,
-    handleDeleteItem
+    handleDeleteItem,
+    cleanupAudio: audioContext.cleanupAudio,
+    selectedSubjectId, setSelectedSubjectId,
+    selectedCourseId, setSelectedCourseId,
+    subjects: storeSubjects,
+    courses: storeCourses,
+    availableCourseIds,
+    availableSubjectIds,
   };
 };
