@@ -196,25 +196,27 @@ export function useSubjects(t: any) {
     return map;
   }, [subjects, assessmentsBySubject]);
 
+  const enrichedSubjects = useMemo(() => {
+    return subjects.map(s => {
+      const projection = projectionsBySubject.get(s.id)!;
+      return {
+        ...s,
+        avg_score: projection.currentAverage > 0 ? projection.currentAverage : s.avg_score,
+        completion_percent: projection.evaluatedWeight > 0 ? projection.evaluatedWeight : s.completion_percent,
+        pending_flashcards: pendingBySubject.get(s.id),
+        next_milestone: nextMilestoneBySubject.get(s.id),
+        delta: projection.delta,
+      };
+    });
+  }, [subjects, pendingBySubject, nextMilestoneBySubject, projectionsBySubject]);
+
   const filteredSubjects = useMemo(() => {
-    return subjects
-      .filter(s =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
-        (s.professor && s.professor.toLowerCase().includes(search.toLowerCase()))
-      )
-      .map(s => {
-        const projection = projectionsBySubject.get(s.id)!;
-        return {
-          ...s,
-          avg_score: projection.currentAverage > 0 ? projection.currentAverage : s.avg_score,
-          completion_percent: projection.evaluatedWeight > 0 ? projection.evaluatedWeight : s.completion_percent,
-          pending_flashcards: pendingBySubject.get(s.id),
-          next_milestone: nextMilestoneBySubject.get(s.id),
-          delta: projection.delta,
-        };
-      });
-  }, [subjects, search, pendingBySubject, nextMilestoneBySubject, projectionsBySubject]);
+    return enrichedSubjects.filter(s =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
+      (s.professor && s.professor.toLowerCase().includes(search.toLowerCase()))
+    );
+  }, [enrichedSubjects, search]);
 
   const localCriticalSubjects = useMemo(() => {
     return subjects
@@ -465,7 +467,7 @@ export function useSubjects(t: any) {
   }, [userStats]);
 
   return {
-    subjects, filteredSubjects, criticalSubjects,
+    subjects, filteredSubjects, enrichedSubjects, criticalSubjects,
     totalCredits, recentActivity,
     dueDecksToday, studyStreak,
     search, setSearch,

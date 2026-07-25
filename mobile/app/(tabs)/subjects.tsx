@@ -116,21 +116,24 @@ export default function SubjectsScreen() {
   }, [handleClassComplete]);
 
   const overallGpa = useMemo(() => {
-    if (g.subjects.length === 0) return 0;
-    const sum = g.subjects.reduce((acc, s) => {
+    const scored = g.enrichedSubjects.filter(s => (s.avg_score ?? 0) > 0);
+    if (scored.length === 0) return 0;
+    const sum = scored.reduce((acc, s) => {
       const raw = s.avg_score ?? 0;
       return acc + (raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw);
     }, 0);
-    return sum / g.subjects.length;
-  }, [g.subjects]);
+    return sum / scored.length;
+  }, [g.enrichedSubjects]);
 
   const approvedCount = useMemo(() => {
-    return g.subjects.filter(s => {
+    return g.enrichedSubjects.filter(s => {
       const raw = s.avg_score ?? 0;
+      if (raw === 0) return false;
       const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
-      return avg >= 3.0;
+      const threshold = s.target_grade ?? 3.0;
+      return avg >= threshold;
     }).length;
-  }, [g.subjects]);
+  }, [g.enrichedSubjects]);
 
   const coursesForPills = useMemo(() => {
     return groupedSections
