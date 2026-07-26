@@ -22,7 +22,7 @@ interface CourseSubjectCardProps {
 }
 
 export const CourseSubjectCard = React.memo(({ subject, onPress, onContinue, onClassComplete, platform }: CourseSubjectCardProps) => {
-  const cardColor = subject.color || '#5856D6';
+  const cardColor = subject.color || theme.colors.primary;
   const progressText = subject.total_lessons && subject.total_lessons > 0
     ? `${subject.completed_lessons || 0}/${subject.total_lessons} clases`
     : `${Math.round(subject.completion_percent || 0)}%`;

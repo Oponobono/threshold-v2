@@ -63,7 +63,7 @@ export const SubjectHeroCard: React.FC<SubjectHeroCardProps> = ({
             width: 40,
             height: 40,
             borderRadius: 10,
-            backgroundColor: color || '#5856D6',
+            backgroundColor: color || theme.colors.primary,
             alignItems: 'center',
             justifyContent: 'center'
           }}>

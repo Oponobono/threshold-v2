@@ -39,32 +39,6 @@ export const galleryStyles = StyleSheet.create({
   tabTextActive: { fontWeight: '700', color: theme.colors.white },
   itemCount: { marginLeft: 'auto', fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary },
 
-  // Search bar
-  searchBarContainer: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: 2,
-    paddingBottom: 10,
-    backgroundColor: theme.colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  searchInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.inputBackground,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 12,
-    height: 44,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: theme.typography.sizes.md,
-    color: theme.colors.text.primary,
-    height: '100%',
-  },
-
   // Subject chips
   subjectChipsScroll: { maxHeight: 46, flexGrow: 0, minHeight: 46 },
   subjectChipsContent: { paddingHorizontal: 20, paddingVertical: 6, gap: 6, alignItems: 'center' },

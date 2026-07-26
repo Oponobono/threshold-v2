@@ -32,7 +32,7 @@ export const AssessmentItem: React.FC<AssessmentItemProps> = ({
   const gradeVal = normalizeGrade(a);
   const weight = parseWeight(a);
   const pct = gradeVal !== null ? Math.round((gradeVal / SCALE_MAX) * 100) : null;
-  const color = subject?.color || '#5856D6';
+  const color = subject?.color || theme.colors.primary;
   const isTask = a.type === 'task';
   const isCompleted = a.is_completed;
   const isPending = a._isPending === true;

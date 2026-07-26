@@ -1,31 +1,38 @@
 import React from 'react';
 import { View, TextInput, TouchableOpacity } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { theme } from '../../styles/theme';
-import { galleryStyles } from '../../styles/Gallery.styles';
+import { theme } from '../../../styles/theme';
+import { searchBarStyles as styles } from './ExpandableSearchBar.styles';
 
-interface SearchBarProps {
+export interface ExpandableSearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
-  onClear: () => void;
-  t: any;
+  placeholder: string;
+  autoFocus?: boolean;
+  onClear?: () => void;
 }
 
-export const SearchBar: React.FC<SearchBarProps> = ({ value, onChangeText, onClear, t }) => {
+export const ExpandableSearchBar: React.FC<ExpandableSearchBarProps> = ({
+  value,
+  onChangeText,
+  placeholder,
+  autoFocus = false,
+  onClear,
+}) => {
   return (
-    <View style={galleryStyles.searchBarContainer}>
-      <View style={galleryStyles.searchInner}>
+    <View style={styles.container}>
+      <View style={styles.inner}>
         <Feather name="search" size={16} color={theme.colors.text.secondary} style={{ marginRight: 8 }} />
         <TextInput
-          autoFocus
+          autoFocus={autoFocus}
           value={value}
           onChangeText={onChangeText}
-          placeholder={t('gallery.searchPlaceholder') || 'Buscar fotos, materias, OCR...'}
+          placeholder={placeholder}
           placeholderTextColor={theme.colors.text.placeholder}
-          style={galleryStyles.searchInput}
+          style={styles.input}
           returnKeyType="search"
         />
-        {value.length > 0 && (
+        {value.length > 0 && onClear && (
           <TouchableOpacity onPress={onClear}>
             <Ionicons name="close-circle" size={18} color={theme.colors.text.placeholder} />
           </TouchableOpacity>

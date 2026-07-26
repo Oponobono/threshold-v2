@@ -22,7 +22,7 @@ const ICON_MAP: Record<string, string> = {
   'grade': 'medal-outline',
 };
 
-const BAR_COLORS = ['#5856D6', '#FF9500', '#34C759', '#FF2D55'];
+const BAR_COLORS = [theme.colors.primary, '#FF9500', '#34C759', '#FF2D55'];
 
 const getFileIcon = (fileName: string): string => {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';

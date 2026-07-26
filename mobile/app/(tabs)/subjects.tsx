@@ -25,6 +25,7 @@ import { useDataStore } from '../../src/store/useDataStore';
 import { updateSubject, updateCourseCounters } from '../../src/services/api/subjects';
 import { FilterDropdown } from '../../src/components/ui/FilterDropdown';
 import { OptionSelectorModal, SelectorOption } from '../../src/components/ui/OptionSelectorModal';
+import { ExpandableSearchBar } from '../../src/components/common/ExpandableSearchBar';
 
 const MomentumCard = ({ score }: { score: number }) => {
   const isDanger = score < 0.5;
@@ -70,6 +71,12 @@ export default function SubjectsScreen() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [courseModalVisible, setCourseModalVisible] = useState(false);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  const closeSearch = useCallback(() => {
+    setIsSearchOpen(false);
+    g.setSearch('');
+  }, [g.setSearch]);
 
   const handleClassComplete = useCallback((subject: any, courseName: string) => {
     setZyrenSubject({
@@ -168,27 +175,29 @@ export default function SubjectsScreen() {
             </View>
             <OfflineIndicator />
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setIsCreationMenuVisible(true)}>
-            <Ionicons name="add" size={20} color={theme.colors.text.inverse} />
-          </TouchableOpacity>
+          <View style={globalStyles.row}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => isSearchOpen ? closeSearch() : setIsSearchOpen(true)}
+            >
+              <Feather name={isSearchOpen ? 'x' : 'search'} size={18} color={theme.colors.text.secondary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addBtn} onPress={() => setIsCreationMenuVisible(true)}>
+              <Ionicons name="add" size={20} color={theme.colors.text.inverse} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
-      <View style={styles.searchRow}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={16} color={theme.colors.text.secondary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t('subjects.searchPlaceholder')}
-            placeholderTextColor={theme.colors.text.secondary}
-            value={g.search}
-            onChangeText={g.setSearch}
-          />
-        </View>
-        <TouchableOpacity style={styles.filterBtn}>
-          <Feather name="sliders" size={16} color={theme.colors.text.primary} />
-        </TouchableOpacity>
-      </View>
+      {isSearchOpen && (
+        <ExpandableSearchBar
+          value={g.search}
+          onChangeText={g.setSearch}
+          placeholder={t('subjects.searchPlaceholder')}
+          autoFocus
+          onClear={() => g.setSearch('')}
+        />
+      )}
 
       <FlatList
         data={[]}

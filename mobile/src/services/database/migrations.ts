@@ -853,7 +853,26 @@ const migrations: Migration[] = [
            WHEN 8 THEN '#F3ECE6'
            ELSE '#DDF3F0'
        END
-       WHERE color = '#4F46E5'`,
+       WHERE color IN ('#4F46E5', '#64748B', '#5856D6')`,
+    ],
+  },
+  {
+    version: 40,
+    up: [
+      `UPDATE subjects
+       SET color = CASE (ABS(CAST('' || id AS INTEGER)) % 10)
+           WHEN 0 THEN '#E7EDF8'
+           WHEN 1 THEN '#DDE7FF'
+           WHEN 2 THEN '#EAF4EE'
+           WHEN 3 THEN '#FCEFD9'
+           WHEN 4 THEN '#F7E9EE'
+           WHEN 5 THEN '#ECE8FF'
+           WHEN 6 THEN '#E3F2FD'
+           WHEN 7 THEN '#F2F5D9'
+           WHEN 8 THEN '#F3ECE6'
+           ELSE '#DDF3F0'
+       END
+       WHERE color IN ('#4F46E5', '#64748B', '#5856D6')`,
     ],
   },
 ];

@@ -7,6 +7,12 @@ import { uuidv4 } from '../../utils/uuid';
 import { Course, Subject, Assessment } from '../api/types';
 import { AcademicImportModel, AcademicImportResult } from './types';
 
+const SUBJECT_COLORS = [
+  '#E7EDF8', '#DDE7FF', '#EAF4EE', '#FCEFD9', '#F7E9EE', '#ECE8FF',
+  '#E3F2FD', '#F2F5D9', '#F3ECE6', '#DDF3F0', '#EDEDED', '#D7E3FC',
+  '#CDEAC0', '#FFD6BA', '#FFC8DD', '#CDE7F0', '#E8F0D8', '#E6E2D3',
+];
+
 export class AcademicImportExecutor {
   /**
    * Ejecuta la importación en la base de datos local de manera atómica.
@@ -29,6 +35,7 @@ export class AcademicImportExecutor {
     let coursesCreated = 0;
     let subjectsCreated = 0;
     let assessmentsCreated = 0;
+    let colorIndex = 0;
 
     await databaseService.runInTransaction(async () => {
       // 1. Obtener datos existentes
@@ -92,7 +99,7 @@ export class AcademicImportExecutor {
               professor: subject.professor || undefined,
               credits: subject.credits || 0,
               target_grade: subject.targetGrade || undefined,
-              color: '#64748B',
+              color: SUBJECT_COLORS[colorIndex % SUBJECT_COLORS.length],
               icon: 'book-outline',
             };
             await subjectRepository.create(newSubject);
@@ -100,6 +107,7 @@ export class AcademicImportExecutor {
             subjectKeyToId.set(subjectKey, subjectId);
             existingSubjects.push(newSubject);
             subjectsCreated++;
+            colorIndex++;
           }
 
           // Insertar evaluaciones

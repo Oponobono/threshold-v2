@@ -10,6 +10,7 @@ import { documentRepository } from '../services/database/repositories/DocumentRe
 import { youTubeRepository } from '../services/database/repositories/YouTubeRepository';
 import { audioRepository } from '../services/database/repositories/AudioRepository';
 import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
+import { theme } from '../styles/theme';
 
 export interface UnifiedActivityItem {
   id: string;
@@ -45,7 +46,7 @@ export const getStatusColor = (minNeeded: number, target: number) => {
 };
 
 export const getPillColor = (s: any, index: number): string => {
-  const PILL_COLORS = ['#5856D6', '#FF9500', '#34C759', '#FF2D55', '#AF52DE', '#FF3B30'];
+  const PILL_COLORS = [theme.colors.primary, '#FF9500', '#34C759', '#FF2D55', '#AF52DE', '#FF3B30'];
   return s.color || PILL_COLORS[index % PILL_COLORS.length];
 };
 
@@ -445,7 +446,7 @@ export function useSubjects(t: any) {
         return {
           ...item,
           subjectName: subject?.name || 'General',
-          subjectColor: subject?.color || '#5856D6',
+          subjectColor: subject?.color || theme.colors.primary,
           relativeTime: getRelativeTime(item.date, t),
         };
       })

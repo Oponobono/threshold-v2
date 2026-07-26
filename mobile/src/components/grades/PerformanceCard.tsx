@@ -36,7 +36,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
   activeSystem,
 }) => {
   const letterBadge = selectedSubject?.display_label
-    ? { label: selectedSubject.display_label, color: selectedSubject.display_color || '#5856D6' }
+    ? { label: selectedSubject.display_label, color: selectedSubject.display_color || theme.colors.primary }
     : (!selectedSubjectId && globalGpaLetter)
       ? { label: globalGpaLetter.label, color: globalGpaLetter.color }
       : null;

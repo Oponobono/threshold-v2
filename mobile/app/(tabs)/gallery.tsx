@@ -11,7 +11,7 @@ import { deletePhoto } from '../../src/services/api';
 import { alertRef } from '../../src/components/ui/CustomAlert';
 
 import { GalleryHeader } from '../../src/components/gallery/GalleryHeader';
-import { SearchBar } from '../../src/components/gallery/SearchBar';
+import { ExpandableSearchBar } from '../../src/components/common/ExpandableSearchBar';
 import { FilterTabs } from '../../src/components/gallery/FilterTabs';
 import { FilterDropdown } from '../../src/components/ui/FilterDropdown';
 import { OptionSelectorModal, SelectorOption } from '../../src/components/ui/OptionSelectorModal';
@@ -134,11 +134,12 @@ export default function GalleryScreen() {
       />
 
       {g.isSearchOpen && (
-        <SearchBar
+        <ExpandableSearchBar
           value={g.searchQuery}
           onChangeText={g.setSearchQuery}
+          placeholder={t('gallery.searchPlaceholder') || 'Buscar fotos, materias, OCR...'}
+          autoFocus
           onClear={() => g.setSearchQuery('')}
-          t={t}
         />
       )}
 
