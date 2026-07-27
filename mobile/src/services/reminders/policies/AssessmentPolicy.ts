@@ -42,8 +42,14 @@ export class AssessmentPolicy implements ReminderPolicy {
   }
 
   getExpiration(entity: any): Date | null {
-    const eventDate = entity?.date ?? entity?.startDate ?? entity?.dueDate;
+    const eventDate = entity?.date ?? entity?.due_date ?? entity?.startDate ?? entity?.dueDate;
     if (!eventDate) return null;
     return new Date(new Date(eventDate).getTime() + 3600000);
+  }
+
+  getEventTime(entity: any): Date | null {
+    const eventDate = entity?.date ?? entity?.due_date ?? entity?.startDate ?? entity?.dueDate;
+    if (!eventDate) return null;
+    return new Date(eventDate);
   }
 }

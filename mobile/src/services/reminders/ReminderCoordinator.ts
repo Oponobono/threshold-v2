@@ -23,6 +23,9 @@ export class ReminderCoordinator {
   private repos: Record<string, EntityRepository>;
   private initialized = false;
   private unsubscribeBus: (() => void) | null = null;
+  private _pendingResync: ReturnType<typeof setTimeout> | null = null;
+  private _lastResyncAt = 0;
+  private static RESYNC_DEBOUNCE_MS = 5000;
 
   constructor(
     engine: ReminderEngine,
@@ -46,6 +49,23 @@ export class ReminderCoordinator {
   }
 
   async resync(): Promise<void> {
+    const now = Date.now();
+    const elapsed = now - this._lastResyncAt;
+    if (elapsed < ReminderCoordinator.RESYNC_DEBOUNCE_MS) {
+      const remaining = ReminderCoordinator.RESYNC_DEBOUNCE_MS - elapsed;
+      if (this._pendingResync) clearTimeout(this._pendingResync);
+      return new Promise<void>((resolve) => {
+        this._pendingResync = setTimeout(() => {
+          this._pendingResync = null;
+          this._doResync().then(resolve);
+        }, remaining);
+      });
+    }
+    return this._doResync();
+  }
+
+  private async _doResync(): Promise<void> {
+    this._lastResyncAt = Date.now();
     const t0 = Date.now();
     const snapshot = await this.builder.build();
     this.observer.record('snapshot_builder.build', Date.now() - t0);

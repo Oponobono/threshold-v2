@@ -42,8 +42,14 @@ export class EventPolicy implements ReminderPolicy {
   }
 
   getExpiration(entity: any): Date | null {
-    const endDate = entity?.endDate ?? entity?.end_date ?? entity?.end;
+    const endDate = entity?.end_date ?? entity?.endDate;
     if (!endDate) return null;
     return new Date(new Date(endDate).getTime() + 1800000);
+  }
+
+  getEventTime(entity: any): Date | null {
+    const startDate = entity?.start_date ?? entity?.startDate;
+    if (!startDate) return null;
+    return new Date(startDate);
   }
 }

@@ -48,14 +48,21 @@ export class ReminderEngine {
 
   async initialize(snapshot: ReminderSourceSnapshot): Promise<void> {
     const start = this.clock.now().getTime();
+    let skipped = 0;
 
     for (const entityType of ENTITY_TYPES) {
       const entities = this._getEntities(snapshot, entityType);
       for (const entity of entities) {
         const seq = this._buildDesiredSequence(entity, entityType);
-        this.desiredSequences.set(seq.id, seq);
+        if (seq) {
+          this.desiredSequences.set(seq.id, seq);
+        } else {
+          skipped++;
+        }
       }
     }
+
+    console.log(`[ENGINE] init | entities=${this.desiredSequences.size} skipped=${skipped}`);
 
     const stats = await this._runPipeline();
     const durationMs = this.clock.now().getTime() - start;
@@ -149,7 +156,12 @@ export class ReminderEngine {
     switch (event.type) {
       case 'entity_changed': {
         const seq = this._buildDesiredSequence(event.entity, event.entityType);
-        this.desiredSequences.set(seq.id, seq);
+        if (seq) {
+          this.desiredSequences.set(seq.id, seq);
+        } else {
+          const key = `${event.entityType}::${event.entityId}`;
+          this.desiredSequences.delete(key);
+        }
         break;
       }
       case 'entity_deleted': {
@@ -199,17 +211,23 @@ export class ReminderEngine {
 
   private _pendingStages?: StageTiming[];
 
-  private _buildDesiredSequence(entity: any, entityType: string): ReminderSequence {
-    const te0 = this.clock.now().getTime();
+  private _buildDesiredSequence(entity: any, entityType: string): ReminderSequence | null {
     const now = this.clock.now();
     const policy = this.registry.get(entityType);
     const profile = this._getProfileFor(entityType);
     const offsets = policy.getOffsets(entity, profile);
-    const expiresAt = policy.getExpiration(entity, now);
     const eventTime = policy.getEventTime?.(entity, now) ?? null;
+
+    if (eventTime && offsets.length > 0) {
+      const maxOffset = Math.max(...offsets);
+      const latestPossible = new Date(eventTime.getTime() + maxOffset * 60000);
+      if (latestPossible < now) {
+        return null;
+      }
+    }
+
+    const expiresAt = policy.getExpiration(entity, now);
     const seq = this.factory.buildSequence(entity, entityType, offsets, profile, expiresAt, eventTime);
-    if (!this._buildStages) this._buildStages = [];
-    this._buildStages.push({ name: 'entity.build', durationMs: this.clock.now().getTime() - te0, entityCount: 1, sequenceCount: 1 });
     return seq;
   }
 

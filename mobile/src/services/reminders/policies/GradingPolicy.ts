@@ -43,8 +43,14 @@ export class GradingPolicy implements ReminderPolicy {
   }
 
   getExpiration(entity: any): Date | null {
-    const closeDate = entity?.closeDate ?? entity?.close_date ?? entity?.endDate;
+    const closeDate = entity?.end_date ?? entity?.closeDate ?? entity?.close_date;
     if (!closeDate) return null;
     return new Date(new Date(closeDate).getTime() + 86400000);
+  }
+
+  getEventTime(entity: any): Date | null {
+    const endDate = entity?.end_date ?? entity?.closeDate ?? entity?.close_date;
+    if (!endDate) return null;
+    return new Date(endDate);
   }
 }

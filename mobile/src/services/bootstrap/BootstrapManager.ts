@@ -208,12 +208,17 @@ class BootstrapManager {
           await coordinator.initialize();
           coordinator.subscribeToEventBus();
 
-          // Re-sync reminders after each sync cycle
+          // Re-sync reminders after each sync cycle (debounced: rapid syncs → single resync)
+          let resyncTimer: ReturnType<typeof setTimeout> | null = null;
           syncManager.subscribe((event) => {
             if (event.type === 'complete' && event.result?.success) {
-              coordinator.resync().catch((err: unknown) =>
-                console.warn('[BOOT 14r] Reminder resync after sync failed:', err)
-              );
+              if (resyncTimer) clearTimeout(resyncTimer);
+              resyncTimer = setTimeout(() => {
+                resyncTimer = null;
+                coordinator.resync().catch((err: unknown) =>
+                  console.warn('[BOOT 14r] Reminder resync after sync failed:', err)
+                );
+              }, 3000);
             }
           });
 

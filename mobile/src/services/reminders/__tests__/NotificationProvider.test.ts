@@ -17,7 +17,7 @@ jest.mock('expo-notifications', () => ({
   getAllScheduledNotificationsAsync: () => mockGetAll(),
   AndroidImportance: { HIGH: 'high', LOW: 'low' },
   AndroidNotificationPriority: { MAX: 'max', HIGH: 'high', DEFAULT: 'default' },
-  SchedulableTriggerInputTypes: { TIME_INTERVAL: 'time_interval' },
+  SchedulableTriggerInputTypes: { TIME_INTERVAL: 'time_interval', DATE: 'date' },
 }));
 
 jest.mock('react-native', () => ({
@@ -27,6 +27,7 @@ jest.mock('react-native', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockRequestPermissions.mockResolvedValue({ status: 'granted' });
+  mockGetAll.mockResolvedValue([]);
 });
 
 function makeReminder(overrides?: Partial<ScheduledReminder>): ScheduledReminder {
@@ -185,20 +186,28 @@ describe('ExpoNotificationProvider', () => {
         {
           identifier: 'n1',
           content: { title: 'Title 1', body: 'Body 1' },
-          trigger: { type: 'time_interval', seconds: 30 },
+          trigger: { type: 'date', date: future },
         },
         {
           identifier: 'n2',
           content: { title: 'Title 2', body: 'Body 2' },
+          trigger: { type: 'time_interval', seconds: 30 },
+        },
+        {
+          identifier: 'n3',
+          content: { title: 'Title 3', body: 'Body 3' },
           trigger: null,
         },
       ]);
       const result = await new ExpoNotificationProvider().getAll();
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(3);
       expect(result[0].identifier).toBe('n1');
       expect(result[0].title).toBe('Title 1');
+      expect(result[0].triggerDate).toEqual(future);
       expect(result[1].identifier).toBe('n2');
       expect(result[1].title).toBe('Title 2');
+      expect(result[2].identifier).toBe('n3');
+      expect(result[2].title).toBe('Title 3');
     });
   });
 });

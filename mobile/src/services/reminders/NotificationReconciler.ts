@@ -11,16 +11,30 @@ export class NotificationReconciler {
 
     const toCancel = existing.filter((e) => {
       const d = planMap.get(e.identifier);
-      if (!d) return true;
+      if (!d) {
+        console.log(`[RECON] CANCEL ${e.identifier} | reason: not in plan`);
+        return true;
+      }
       const timeDiff = d.scheduledAt.getTime() - (e.triggerDate?.getTime() ?? 0);
-      return Math.abs(timeDiff) > 1000 || d.title !== e.title || d.body !== e.body;
+      const changed = Math.abs(timeDiff) > 1000 || d.title !== e.title || d.body !== e.body;
+      if (changed) {
+        console.log(`[RECON] CANCEL ${e.identifier} | reason: delta=${timeDiff}ms title_changed=${d.title !== e.title} body_changed=${d.body !== e.body} | plan=${d.scheduledAt.toISOString()} existing=${e.triggerDate?.toISOString()}`);
+      }
+      return changed;
     });
 
     const toSchedule = plan.deliverables.filter((d) => {
       const e = existingMap.get(d.id);
-      if (!e) return true;
+      if (!e) {
+        console.log(`[RECON] SCHEDULE ${d.id} | reason: not yet scheduled | scheduledAt=${d.scheduledAt.toISOString()}`);
+        return true;
+      }
       const timeDiff = d.scheduledAt.getTime() - (e.triggerDate?.getTime() ?? 0);
-      return Math.abs(timeDiff) > 1000 || d.title !== e.title || d.body !== e.body;
+      const changed = Math.abs(timeDiff) > 1000 || d.title !== e.title || d.body !== e.body;
+      if (changed) {
+        console.log(`[RECON] SCHEDULE ${d.id} | reason: delta=${timeDiff}ms | plan=${d.scheduledAt.toISOString()} existing=${e.triggerDate?.toISOString()}`);
+      }
+      return changed;
     });
 
     const cancelPromises = toCancel.map((e) => provider.cancel(e.identifier));
@@ -37,6 +51,8 @@ export class NotificationReconciler {
     );
 
     await Promise.all([...cancelPromises, ...schedulePromises]);
+
+    console.log(`[RECON] sync done: scheduled=${toSchedule.length} cancelled=${toCancel.length} existing=${existing.length} plan=${plan.deliverables.length}`);
 
     return { scheduled: toSchedule.length, cancelled: toCancel.length };
   }

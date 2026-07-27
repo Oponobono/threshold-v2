@@ -58,17 +58,22 @@ export class ExpoNotificationProvider implements NotificationProvider {
   }
 
   async schedule(reminder: ScheduledReminder): Promise<string> {
-    const triggerDate = reminder.scheduledAt.getTime();
     const now = Date.now();
-    const seconds = Math.max(1, Math.floor((triggerDate - now) / 1000));
+    const triggerTime = reminder.scheduledAt.getTime();
+    const secondsUntil = Math.floor((triggerTime - now) / 1000);
+
+    if (secondsUntil < -60) {
+      console.log(`[SCHEDULE] SKIP ${reminder.id} | scheduledAt is in the past by ${Math.abs(secondsUntil)}s`);
+      return reminder.id;
+    }
 
     const trigger = {
-      type: ExpoNotifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds,
+      type: ExpoNotifications.SchedulableTriggerInputTypes.DATE,
+      date: reminder.scheduledAt,
       channelId: 'reminders',
     };
 
-    console.log(`[SCHEDULE] ${reminder.id} | seconds=${seconds} | scheduledAt=${reminder.scheduledAt.toISOString()} | now=${new Date(now).toISOString()}`);
+    console.log(`[SCHEDULE] ${reminder.id} | DATE trigger | scheduledAt=${reminder.scheduledAt.toISOString()} | now=${new Date(now).toISOString()} | delta=${secondsUntil}s`);
 
     const identifier = await ExpoNotifications.scheduleNotificationAsync({
       identifier: reminder.id,
@@ -127,11 +132,13 @@ export class ExpoNotificationProvider implements NotificationProvider {
       title: n.content.title ?? '',
       body: n.content.body ?? '',
       triggerDate: n.trigger
-        ? 'value' in n.trigger && n.trigger.value instanceof Date
-          ? n.trigger.value
-          : 'seconds' in n.trigger
-            ? new Date(Date.now() + (n.trigger.seconds as number) * 1000)
-            : null
+        ? 'date' in n.trigger && n.trigger.date instanceof Date
+          ? n.trigger.date
+          : 'value' in n.trigger && n.trigger.value instanceof Date
+            ? n.trigger.value
+            : 'seconds' in n.trigger
+              ? new Date(Date.now() + (n.trigger.seconds as number) * 1000)
+              : null
         : null,
     }));
   }
