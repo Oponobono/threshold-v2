@@ -141,7 +141,7 @@ const initializePostgresDb = async (pool) => {
     console.log('✓ sync_version seeded');
 
     // Agregar columna sync_version a tablas sincronizables si no existe
-    const syncTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'flashcards', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'photos', 'audio_recordings', 'scanned_documents'];
+    const syncTables = ['courses', 'subjects', 'assessments', 'schedules', 'flashcard_decks', 'flashcards', 'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'photos', 'audio_recordings', 'scanned_documents', 'study_sessions', 'ai_chats', 'youtube_videos', 'assessment_files'];
     for (const t of syncTables) {
       try {
         await pool.query(`ALTER TABLE ${t} ADD COLUMN sync_version INTEGER DEFAULT 0`);
@@ -155,6 +155,31 @@ const initializePostgresDb = async (pool) => {
       }
     }
     console.log('✓ sync_version columns verified');
+
+    // Agregar version_number y updated_at a tablas que los usan en controllers
+    const versionNumberTables = ['ai_chats', 'youtube_videos', 'assessment_files'];
+    for (const t of versionNumberTables) {
+      try {
+        await pool.query(`ALTER TABLE ${t} ADD COLUMN version_number INTEGER DEFAULT 0`);
+        console.log(`  ✓ version_number column added to ${t}`);
+      } catch (e) {
+        if (e.message && e.message.includes('already exists')) {
+          // columna ya existe, ignorar
+        } else {
+          console.warn(`  ⚠ version_number column skipped for ${t}: ${e.message}`);
+        }
+      }
+      try {
+        await pool.query(`ALTER TABLE ${t} ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+        console.log(`  ✓ updated_at column added to ${t}`);
+      } catch (e) {
+        if (e.message && e.message.includes('already exists')) {
+          // columna ya existe, ignorar
+        } else {
+          console.warn(`  ⚠ updated_at column skipped for ${t}: ${e.message}`);
+        }
+      }
+    }
 
     console.log('✅ Base de datos PostgreSQL inicializada correctamente.');
     await seedGradingSystemsPostgres(pool);
