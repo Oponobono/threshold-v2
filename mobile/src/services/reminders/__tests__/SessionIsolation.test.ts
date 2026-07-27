@@ -44,6 +44,7 @@ class CaptureProvider implements NotificationProvider {
 
   async requestPermissions(): Promise<boolean> { return true; }
   async setupChannels(): Promise<void> {}
+  setForegroundHandler(_handler: any): void {}
 
   async schedule(reminder: ScheduledReminder): Promise<string> {
     this.scheduled.push(reminder);

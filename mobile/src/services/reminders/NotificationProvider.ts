@@ -9,9 +9,20 @@ export interface ScheduledNotificationInfo {
   readonly triggerDate: Date | null;
 }
 
+export interface NotificationHandler {
+  handleNotification: () => Promise<{
+    shouldShowAlert: boolean;
+    shouldPlaySound: boolean;
+    shouldSetBadge: boolean;
+    shouldShowBanner: boolean;
+    shouldShowList: boolean;
+  }>;
+}
+
 export interface NotificationProvider {
   requestPermissions(): Promise<boolean>;
   setupChannels(): Promise<void>;
+  setForegroundHandler(handler: NotificationHandler): void;
   schedule(reminder: ScheduledReminder): Promise<string>;
   cancel(id: string): Promise<void>;
   cancelAll(prefix?: string): Promise<void>;
@@ -40,6 +51,10 @@ export class ExpoNotificationProvider implements NotificationProvider {
         vibrationPattern: undefined,
       });
     }
+  }
+
+  setForegroundHandler(handler: NotificationHandler): void {
+    ExpoNotifications.setNotificationHandler(handler);
   }
 
   async schedule(reminder: ScheduledReminder): Promise<string> {

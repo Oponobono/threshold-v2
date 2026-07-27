@@ -204,13 +204,14 @@ class BootstrapManager {
       (async () => {
         try {
           const { getReminderCoordinator } = await import('../reminders/reminderCoordinatorInstance');
-          await getReminderCoordinator().initialize();
-          getReminderCoordinator().subscribeToEventBus();
+          const coordinator = await getReminderCoordinator();
+          await coordinator.initialize();
+          coordinator.subscribeToEventBus();
 
           // Re-sync reminders after each sync cycle
           syncManager.subscribe((event) => {
             if (event.type === 'complete' && event.result?.success) {
-              getReminderCoordinator().resync().catch((err: unknown) =>
+              coordinator.resync().catch((err: unknown) =>
                 console.warn('[BOOT 14r] Reminder resync after sync failed:', err)
               );
             }

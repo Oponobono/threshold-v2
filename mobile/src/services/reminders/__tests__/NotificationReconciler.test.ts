@@ -10,6 +10,7 @@ class MockProvider implements NotificationProvider {
 
   async requestPermissions(): Promise<boolean> { return true; }
   async setupChannels(): Promise<void> {}
+  setForegroundHandler(_handler: any): void {}
   async schedule(reminder: any): Promise<string> {
     this.scheduleCalls.push({ id: reminder.id, title: reminder.title, body: reminder.body });
     return reminder.id;
@@ -69,6 +70,8 @@ describe('NotificationReconciler', () => {
     expect(provider.cancelCalls[0]).toBe('existing-1');
   });
 
+  // TODO(NOTIF-TEST-001): Test preexistente con bug — triggerDate: new Date() (now) vs
+  // scheduledAt: now+24h causa diff > 1000ms y cancela r1 también. Fix en PR separado.
   it('cancels reminders in provider but not in plan', async () => {
     provider.existing = [
       { identifier: 'r1', title: 'R1', body: '', triggerDate: new Date() },

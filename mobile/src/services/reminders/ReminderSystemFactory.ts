@@ -20,10 +20,10 @@ import type { I18nService } from './I18nService';
 import type { NotificationProvider } from './NotificationProvider';
 import type { PerformanceObserver } from './PerformanceObserver';
 
-export function createDefaultReminderCoordinator(
+export async function createDefaultReminderCoordinator(
   provider?: NotificationProvider,
   options?: { clock?: Clock; i18n?: I18nService; observer?: PerformanceObserver },
-): ReminderCoordinator {
+): Promise<ReminderCoordinator> {
   const clock = options?.clock ?? new SystemClock();
   const registry = new PolicyRegistry();
   registry.register(new AssessmentPolicy());
@@ -48,6 +48,23 @@ export function createDefaultReminderCoordinator(
     const { ExpoNotificationProvider } = require('./NotificationProvider');
     return new ExpoNotificationProvider();
   })();
+
+  await resolvedProvider.setupChannels();
+  console.log('[ReminderFactory] Notification channels created');
+
+  const permissionsGranted = await resolvedProvider.requestPermissions();
+  console.log(`[ReminderFactory] Notification permissions: ${permissionsGranted ? 'granted' : 'denied'}`);
+
+  resolvedProvider.setForegroundHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  console.log('[ReminderFactory] Foreground notification handler registered');
 
   const engine = new ReminderEngine(
     registry,

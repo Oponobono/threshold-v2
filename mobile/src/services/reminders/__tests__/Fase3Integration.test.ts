@@ -60,6 +60,7 @@ class FakeProvider implements NotificationProvider {
   async setupChannels(): Promise<void> {
     // no-op
   }
+  setForegroundHandler(_handler: any): void {}
 
   async schedule(reminder: ScheduledReminder): Promise<string> {
     this.scheduled.push(reminder);
