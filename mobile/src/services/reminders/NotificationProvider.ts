@@ -62,6 +62,14 @@ export class ExpoNotificationProvider implements NotificationProvider {
     const now = Date.now();
     const seconds = Math.max(1, Math.floor((triggerDate - now) / 1000));
 
+    const trigger = {
+      type: ExpoNotifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds,
+      channelId: 'reminders',
+    };
+
+    console.log(`[SCHEDULE] ${reminder.id} | seconds=${seconds} | scheduledAt=${reminder.scheduledAt.toISOString()} | now=${new Date(now).toISOString()}`);
+
     const identifier = await ExpoNotifications.scheduleNotificationAsync({
       identifier: reminder.id,
       content: {
@@ -85,17 +93,17 @@ export class ExpoNotificationProvider implements NotificationProvider {
           : {}),
         ...(reminder.badge !== undefined ? { badge: reminder.badge } : {}),
       },
-      trigger: {
-        type: ExpoNotifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds,
-        channelId: 'reminders',
-      },
+      trigger,
     });
+
+    const all = await ExpoNotifications.getAllScheduledNotificationsAsync();
+    console.log(`[SCHEDULE] result=${identifier} | total_scheduled=${all.length}`);
 
     return identifier;
   }
 
   async cancel(id: string): Promise<void> {
+    console.log(`[CANCEL] ${id}`);
     await ExpoNotifications.cancelScheduledNotificationAsync(id);
   }
 
