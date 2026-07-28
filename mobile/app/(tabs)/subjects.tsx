@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, Profiler } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, Pressable, InteractionManager, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -41,10 +41,20 @@ const MomentumCard = ({ score }: { score: number }) => {
   );
 };
 
+let moduleEvalTime = performance.now();
+let firstRenderTime = 0;
+
 export default function SubjectsScreen() {
+  if (firstRenderTime === 0) {
+    firstRenderTime = performance.now();
+  }
+  
   const { t, i18n } = useTranslation();
   const router = useRouter();
+  
+  const startUseSubjects = performance.now();
   const g = useSubjects(t);
+  const endUseSubjects = performance.now();
   const courses = useDataStore(s => s.courses);
   const loadAllData = useDataStore(s => s.loadAllData);
   const refreshSubjects = useDataStore(s => s.refreshSubjects);
@@ -52,15 +62,23 @@ export default function SubjectsScreen() {
   const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore } = useGroupedSubjects(courses, g.filteredSubjects);
 
 
+  // Carga inicial: los datos ya están en el store gracias al BootstrapManager.
+  // No llamamos a loadAllData() aquí para evitar colapsar el bridge.
   
-  // Carga inicial: solo en mount, no en cada focus
   useEffect(() => {
-    loadAllData();
+    const commitTime = performance.now();
+    console.log(`[PerfProfile] Module Eval -> First Render: ${(firstRenderTime - moduleEvalTime).toFixed(1)} ms`);
+    console.log(`[PerfProfile] First Render -> Commit: ${(commitTime - firstRenderTime).toFixed(1)} ms`);
+    console.log(`[PerfProfile] useSubjects() duration: ${(endUseSubjects - startUseSubjects).toFixed(1)} ms`);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      g.loadActivityFeed();
+      const focusTime = performance.now();
+      console.log(`[PerfProfile] Focus acquired at: ${(focusTime - firstRenderTime).toFixed(1)} ms since first render`);
+      g.loadActivityFeed().then(() => {
+        console.log(`[PerfProfile] ActivityFeed loaded: ${(performance.now() - focusTime).toFixed(1)} ms after focus`);
+      });
     }, [g.loadActivityFeed])
   );
 
@@ -80,6 +98,19 @@ export default function SubjectsScreen() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [courseModalVisible, setCourseModalVisible] = useState(false);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+
+  const handleProfile = useCallback((id: string, phase: string, actualDuration: number) => {
+    if (phase === 'mount') {
+      console.log(`[PerfProfile] Deferred section '${id}' mount time: ${actualDuration.toFixed(1)} ms`);
+    }
+  }, []);
+
+  useEffect(() => {
+    InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+    });
+  }, []);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const closeSearch = useCallback(() => {
@@ -172,6 +203,24 @@ export default function SubjectsScreen() {
     return coursesForPills.map(c => ({ id: c.id, name: c.name }));
   }, [coursesForPills]);
 
+  const handleSubjectPress = useCallback((s: any) => {
+    router.push(`/subjects/${s.id}`);
+  }, [router]);
+
+  const handleContinueSubject = useCallback((s: any) => {
+    if (s.external_url) {
+      handleContinueClass(s.external_url, getCoursePlatform(s.course_id), s, s.courseName || selectedCourseName);
+    }
+  }, [handleContinueClass, getCoursePlatform, selectedCourseName]);
+
+  const handleCompleteSubject = useCallback((s: any) => {
+    handleClassComplete(s, s.courseName || selectedCourseName);
+  }, [handleClassComplete, selectedCourseName]);
+
+  const handleCreateSubject = useCallback(() => {
+    setIsCreationMenuVisible(true);
+  }, []);
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <View style={styles.header}>
@@ -233,12 +282,18 @@ export default function SubjectsScreen() {
             </View>
           ) : null
         }
-        ListFooterComponent={g.subjects.length > 0 ? <ScheduleGrid onPress={() => setScheduleModalVisible(true)} /> : null}
+        ListFooterComponent={isReady && g.subjects.length > 0 ? (
+          <Profiler id="ScheduleGrid" onRender={handleProfile}>
+            <ScheduleGrid onPress={() => setScheduleModalVisible(true)} />
+          </Profiler>
+        ) : null}
         ListHeaderComponent={
           g.subjects.length > 0 ? (
             <>
               {/* ── Hero: Resumen del semestre ── */}
-              <View style={styles.semesterHero}>
+              {isReady && (
+                <Profiler id="Hero" onRender={handleProfile}>
+                  <View style={styles.semesterHero}>
                 <View style={styles.gpaAmbientGlow} />
                 <View style={styles.heroArc1} />
                 <View style={styles.heroArc2} />
@@ -293,8 +348,10 @@ export default function SubjectsScreen() {
                       </View>
                     </>
                   )}
+                  </View>
                 </View>
-              </View>
+                </Profiler>
+              )}
 
               {/* ── Atención necesaria: lista compacta ── */}
               {g.criticalSubjects.length > 0 && (
@@ -309,7 +366,6 @@ export default function SubjectsScreen() {
                       const raw = subject.avg_score ?? 0;
                       const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
                       const color = subject.color || '#FF2D55';
-
                       return (
                         <TouchableOpacity
                           key={subject.id || idx}
@@ -331,8 +387,9 @@ export default function SubjectsScreen() {
               )}
 
               {/* ── Actividad reciente ── */}
-              {g.recentActivity.length > 0 && (
-                <View style={styles.timelineSection}>
+              {isReady && g.recentActivity.length > 0 && (
+                <Profiler id="Timeline" onRender={handleProfile}>
+                  <View style={styles.timelineSection}>
                   <View style={styles.timelineHeader}>
                     <Text style={styles.timelineTitle}>{t('subjects.recentActivityTitle')}</Text>
                   </View>
@@ -347,9 +404,7 @@ export default function SubjectsScreen() {
                             </View>
                             {idx < arr.length - 1 && <View style={styles.timelineLine} />}
                             <View style={styles.timelineContent}>
-                              <Text style={styles.timelineName} numberOfLines={1}>
-                                {item.title}
-                              </Text>
+                              <Text style={styles.timelineName} numberOfLines={1}>{item.title}</Text>
                               <Text style={styles.timelineMeta}>
                                 <Text style={{ color: config.color, fontWeight: '600' }}>{config.label}</Text> • {item.subjectName}
                               </Text>
@@ -366,7 +421,8 @@ export default function SubjectsScreen() {
                       })}
                     </ScrollView>
                   </View>
-                </View>
+                  </View>
+                </Profiler>
               )}
 
               {/* ── Bounded Subjects Grid ── */}
@@ -386,80 +442,86 @@ export default function SubjectsScreen() {
                     </View>
                   ) : undefined
                 }
-                onSubjectPress={(s) => router.push(`/subjects/${s.id}`)}
-                onContinue={(s) => s.external_url ? handleContinueClass(s.external_url, getCoursePlatform(s.course_id), s, s.courseName || selectedCourseName) : undefined}
-                onComplete={(s) => handleClassComplete(s, s.courseName || selectedCourseName)}
-                onCreateSubject={() => setIsCreationMenuVisible(true)}
+                onSubjectPress={handleSubjectPress}
+                onContinue={handleContinueSubject}
+                onComplete={handleCompleteSubject}
+                onCreateSubject={handleCreateSubject}
               />
             </>
           ) : null
         }
       />
 
-      <ExplanationOverlay
-        visible={g.overlayVisible}
-        explanation={g.overlayText}
-        onDismiss={() => g.setOverlayVisible(false)}
-      />
+      {isReady && (
+        <Profiler id="Modals" onRender={handleProfile}>
+          <>
+            <ExplanationOverlay
+            visible={g.overlayVisible}
+            explanation={g.overlayText}
+            onDismiss={() => g.setOverlayVisible(false)}
+          />
 
-      <CreateSubjectModal
-        visible={isCreateSubjectModalVisible}
-        onClose={() => {
-          setIsCreateSubjectModalVisible(false);
-          loadAllData(true);
-          refreshCourses();
-        }}
-      />
+          <CreateSubjectModal
+            visible={isCreateSubjectModalVisible}
+            onClose={() => {
+              setIsCreateSubjectModalVisible(false);
+              loadAllData(true);
+              refreshCourses();
+            }}
+          />
 
-      <Modal visible={isCreationMenuVisible} transparent animationType="fade" onRequestClose={() => setIsCreationMenuVisible(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setIsCreationMenuVisible(false)}>
-          <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 }} onPress={() => null}>
-            <View style={{ width: 36, height: 3, backgroundColor: theme.colors.border, borderRadius: 1.5, alignSelf: 'center', marginBottom: 16 }} />
-            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 14 }}>¿Qué deseas crear?</Text>
+          <Modal visible={isCreationMenuVisible} transparent animationType="fade" onRequestClose={() => setIsCreationMenuVisible(false)}>
+            <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setIsCreationMenuVisible(false)}>
+              <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 }} onPress={() => null}>
+                <View style={{ width: 36, height: 3, backgroundColor: theme.colors.border, borderRadius: 1.5, alignSelf: 'center', marginBottom: 16 }} />
+                <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 14 }}>¿Qué deseas crear?</Text>
 
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: theme.colors.background, borderRadius: 12, marginBottom: 10 }}
-              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsCreateSubjectModalVisible(true), 300); }}
-            >
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
-                <Ionicons name="book" size={20} color={theme.colors.primary} />
-              </View>
-              <View>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
-                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginTop: 2 }}>Para clases individuales de tu Universidad</Text>
-              </View>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: theme.colors.background, borderRadius: 12, marginBottom: 10 }}
+                  onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsCreateSubjectModalVisible(true), 300); }}
+                >
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+                    <Ionicons name="book" size={20} color={theme.colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
+                    <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginTop: 2 }}>Para clases individuales de tu Universidad</Text>
+                  </View>
+                </TouchableOpacity>
+              </Pressable>
+            </Pressable>
+          </Modal>
 
-      {zyrenSubject && (
-        <ZyrenIngestionModal
-          visible={zyrenModalVisible}
-          onClose={() => setZyrenModalVisible(false)}
-          courseName={zyrenSubject.courseName || ''}
-          subjectName={zyrenSubject.name}
-          subjectId={zyrenSubject.id}
-          subjectColor={zyrenSubject.color}
-          subjectIcon={zyrenSubject.icon}
-          currentMilestone={zyrenSubject.milestone}
-        />
+          {zyrenSubject && (
+            <ZyrenIngestionModal
+              visible={zyrenModalVisible}
+              onClose={() => setZyrenModalVisible(false)}
+              courseName={zyrenSubject.courseName || ''}
+              subjectName={zyrenSubject.name}
+              subjectId={zyrenSubject.id}
+              subjectColor={zyrenSubject.color}
+              subjectIcon={zyrenSubject.icon}
+              currentMilestone={zyrenSubject.milestone}
+            />
+          )}
+
+          <OptionSelectorModal
+            visible={courseModalVisible}
+            title={t('subjects.selectCourse', { defaultValue: 'Seleccionar curso' })}
+            options={courseOptions}
+            selectedId={selectedCourseId}
+            onSelect={setSelectedCourseId}
+            onClose={() => setCourseModalVisible(false)}
+            clearLabel={t('subjects.clearCourse', { defaultValue: 'Quitar filtro de curso' })}
+          />
+
+          <ScheduleModal
+            visible={scheduleModalVisible}
+            onClose={() => setScheduleModalVisible(false)}
+          />
+          </>
+        </Profiler>
       )}
-
-      <OptionSelectorModal
-        visible={courseModalVisible}
-        title={t('subjects.selectCourse', { defaultValue: 'Seleccionar curso' })}
-        options={courseOptions}
-        selectedId={selectedCourseId}
-        onSelect={setSelectedCourseId}
-        onClose={() => setCourseModalVisible(false)}
-        clearLabel={t('subjects.clearCourse', { defaultValue: 'Quitar filtro de curso' })}
-      />
-
-      <ScheduleModal 
-        visible={scheduleModalVisible} 
-        onClose={() => setScheduleModalVisible(false)} 
-      />
     </SafeAreaView>
   );
 }

@@ -66,12 +66,15 @@ export interface GroupMembership {
   password?: string;
 }
 
+export type PredictionsSource = 'none' | 'cache' | 'fresh';
+
 interface DataState {
   courses: Course[];
   subjects: Subject[];
   assessments: Assessment[];
   schedules: Schedule[];
   predictions: PredictionResponse | null;
+  predictionsSource: PredictionsSource;
   calendarEvents: any[];
   photos: Photo[];
   flashcardDecks: any[];
@@ -104,7 +107,6 @@ interface DataState {
   refreshFlashcardDecks: () => Promise<void>;
   syncTodaySchedules: () => Promise<void>;
   refreshPredictions: (userId: string | number) => Promise<void>;
-  loadCachedPredictions: () => Promise<void>;
   preloadOfflineCache: () => Promise<void>;
   syncPendingOperations: () => Promise<{ success: number; failed: number; pending: number }>;
   getDuedeckIds: () => Set<string>;
@@ -142,12 +144,17 @@ export const useDataStore = create<DataState>((set, get) => {
     get().refreshPhotos();
   });
 
+  // Boot Presentation Cache: hidratar síncronamente desde MMKV.
+  // El userId aún no está disponible en el constructor del store,
+  // así que el store arranca con predictionsSource='none' y predictions=null.
+  // La hidratación real ocurre en loadAllData() después de resolver el profile.
   return {
   courses: [],
   subjects: [],
   assessments: [],
   schedules: [],
   predictions: null,
+  predictionsSource: 'none' as PredictionsSource,
   calendarEvents: [],
   photos: [],
   flashcardDecks: [],
@@ -224,6 +231,13 @@ export const useDataStore = create<DataState>((set, get) => {
       const currentUser = await userRepository.getCurrentUser();
       if (currentUser) {
         set({ profile: currentUser as any });
+        // Hidratar Boot Presentation Cache de predicciones ahora que tenemos userId.
+        // loadPredictionsFromCache es síncrono (MMKV) — cero costo en el bridge.
+        const userId = String((currentUser as any).id);
+        const cachedPayload = loadPredictionsFromCache(userId);
+        if (cachedPayload) {
+          set({ predictions: cachedPayload.predictions, predictionsSource: 'cache' });
+        }
       }
 
       const groupsCache = await storageService.getLocal('app:cache:userGroups');
@@ -395,31 +409,12 @@ export const useDataStore = create<DataState>((set, get) => {
     try {
       const data = await getLocalPredictions(String(userId));
       const result = data || { dueCount: 0, cards: [] };
-      set({ predictions: result });
-      // Poblar el cache de AsyncStorage para que el próximo boot no toque SQLite
-      savePredictionsToCache(result).catch(() => {});
+      set({ predictions: result, predictionsSource: 'fresh' });
+      // Persistir en Boot Presentation Cache (MMKV, síncrono)
+      savePredictionsToCache(String(userId), result);
     } catch (error) {
       console.error('[DataStore] refreshPredictions error:', error);
-      if (!get().predictions) set({ predictions: { dueCount: 0, cards: [] } });
-    }
-  },
-
-  loadCachedPredictions: async () => {
-    // Reads from AsyncStorage first — zero SQLite cost on boot.
-    // Falls back to SQLite only if no cache exists (first install / cleared storage).
-    try {
-      const cached = await loadPredictionsFromCache();
-      if (cached) {
-        set({ predictions: cached });
-        return;
-      }
-      // No cache yet — fall back to SQLite (first install)
-      const userId = get().profile?.id;
-      if (!userId) return;
-      const data = await getLocalPredictions(String(userId));
-      set({ predictions: data || { dueCount: 0, cards: [] } });
-    } catch (error) {
-      console.warn('[DataStore] Error in loadCachedPredictions:', error);
+      if (!get().predictions) set({ predictions: { dueCount: 0, cards: [] }, predictionsSource: 'fresh' });
     }
   },
 

@@ -9,9 +9,16 @@ import { View, Text, LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import * as KeepAwake from 'expo-keep-awake';
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  for (const arg of args) {
+    if (typeof arg === 'string' && arg.includes('Unable to activate keep awake')) return;
+    if (arg instanceof Error && arg.message.includes('Unable to activate keep awake')) return;
+  }
+  originalConsoleError(...args);
+};
 
-LogBox.ignoreLogs(['Unable to activate keep awake']);
+LogBox.ignoreLogs(['Unable to activate keep awake', 'Uncaught (in promise']);
 
 
 

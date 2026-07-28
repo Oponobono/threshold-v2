@@ -125,14 +125,11 @@ export function useSubjects(t: any) {
   const [semesterSummary, setSemesterSummary] = useState<SemesterSummary | null>(null);
   const [extraItems, setExtraItems] = useState<{ notes: any[]; docs: any[]; videos: any[]; recordings: any[]; flashcards: any[] }>({ notes: [], docs: [], videos: [], recordings: [], flashcards: [] });
 
-  // Carga en mount únicamente — focus no ejecuta trabajo pesado (S1, S3)
+  // Carga en mount únicamente
   useEffect(() => {
-    InteractionManager.runAfterInteractions(async () => {
-      loadAllData();
-      getSemesterSummary()
-        .then(setSemesterSummary)
-        .catch(() => setSemesterSummary(null));
-    });
+    getSemesterSummary()
+      .then(setSemesterSummary)
+      .catch(() => setSemesterSummary(null));
   }, []);
 
   const loadActivityFeed = useCallback(async () => {

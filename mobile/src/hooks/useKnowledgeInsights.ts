@@ -4,17 +4,67 @@ import { SnapshotBuildReason } from '../domain/knowledge/SnapshotTelemetryTypes'
 import type { KnowledgeSnapshot } from '../domain/knowledge/types';
 import { repositoryEventBus } from '../services/events/RepositoryEventBus';
 import type { EntityEvent } from '../services/events/RepositoryEventBus';
+import type { MMKV } from 'react-native-mmkv';
 
 const REBUILD_DEBOUNCE_MS = 300;
-
 const RELEVANT_ENTITY_TYPES = ['flashcards', 'flashcard_decks'] as const;
-
 type RelevantEntityType = typeof RELEVANT_ENTITY_TYPES[number];
 
 const ENTITY_TO_REASON: Record<RelevantEntityType, SnapshotBuildReason> = {
   flashcards: SnapshotBuildReason.FLASHCARD_UPDATED,
   flashcard_decks: SnapshotBuildReason.ENTITY_UPDATED,
 };
+
+// Lazy init: el require() está DENTRO de la función para que se ejecute en el primer
+// call (post-bootstrap, nativo listo), no en la evaluación del módulo.
+// Expo Router evalúa los módulos del dashboard al escanear rutas, antes de que
+// el TurboModule de MMKV esté registrado — require() a nivel de módulo capturaría undefined.
+let _mmkv: MMKV | null = null;
+function getMMKV(): MMKV {
+  if (!_mmkv) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createMMKV } = require('react-native-mmkv');
+    _mmkv = createMMKV({ id: 'knowledge-cache' });
+  }
+  return _mmkv!;
+}
+const KNOWLEDGE_CACHE_KEY = 'cache:knowledge_snapshot:';
+const KNOWLEDGE_SCHEMA_VERSION = 1;
+
+interface CachedKnowledgePayload {
+  snapshot: KnowledgeSnapshot;
+  generatedAt: number;
+  schemaVersion: number;
+}
+
+function loadCachedSnapshot(userId: string | null | undefined): KnowledgeSnapshot | null {
+  if (!userId) return null;
+  try {
+    const data = getMMKV().getString(`${KNOWLEDGE_CACHE_KEY}${userId}`);
+    if (!data) return null;
+    const parsed = JSON.parse(data) as CachedKnowledgePayload;
+    if (parsed.schemaVersion === KNOWLEDGE_SCHEMA_VERSION && parsed.snapshot) {
+      return parsed.snapshot;
+    }
+  } catch (e) {
+    console.warn('[useKnowledgeInsights] Error loading cache', e);
+  }
+  return null;
+}
+
+function saveCachedSnapshot(userId: string | null | undefined, snapshot: KnowledgeSnapshot) {
+  if (!userId) return;
+  try {
+    const payload: CachedKnowledgePayload = {
+      snapshot,
+      generatedAt: Date.now(),
+      schemaVersion: KNOWLEDGE_SCHEMA_VERSION,
+    };
+    getMMKV().set(`${KNOWLEDGE_CACHE_KEY}${userId}`, JSON.stringify(payload));
+  } catch (e) {
+    console.warn('[useKnowledgeInsights] Error saving cache', e);
+  }
+}
 
 interface UseKnowledgeInsights {
   snapshot: KnowledgeSnapshot | null;
@@ -42,6 +92,8 @@ export function useKnowledgeInsights(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const projectionRef = useRef<KnowledgeProjection | null>(null);
+
+
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingReasonRef = useRef<SnapshotBuildReason | null>(null);
   const bootDoneRef = useRef(false);
@@ -59,6 +111,7 @@ export function useKnowledgeInsights(
       }
       const result = await projectionRef.current.buildSnapshot(userId, reason);
       setSnapshot(result);
+      saveCachedSnapshot(userId, result);
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       console.warn('[useKnowledgeInsights] Error building snapshot:', e.message);
@@ -104,6 +157,11 @@ export function useKnowledgeInsights(
   useEffect(() => {
     bootDoneRef.current = false;
     coordinatorFiredRef.current = false;
+    if (userId) {
+      setSnapshot(loadCachedSnapshot(userId));
+    } else {
+      setSnapshot(null);
+    }
   }, [userId]);
 
   useEffect(() => {

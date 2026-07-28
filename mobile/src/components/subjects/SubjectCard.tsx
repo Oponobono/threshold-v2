@@ -33,9 +33,9 @@ function darkenHex(hex: string, factor: number = 0.5): string {
 
 interface SubjectCardProps {
   subject: any;
-  onPress: () => void;
-  onContinue?: () => void;
-  onComplete?: () => void;
+  onPress: (subject: any) => void;
+  onContinue?: (subject: any) => void;
+  onComplete?: (subject: any) => void;
 }
 
 export const SubjectCard = React.memo(({
@@ -72,14 +72,14 @@ export const SubjectCard = React.memo(({
     <TouchableOpacity
       activeOpacity={0.8}
       style={styles.card}
-      onPress={onPress}
+      onPress={() => onPress(subject)}
     >
       <View style={styles.content}>
+        {/* header: icon + badge - fusionados en una sola capa */}
         <View style={styles.header}>
           <View style={[styles.iconContainer, { backgroundColor: color }]}>
             <SubjectIcon iconName={subject.icon} color={darkenHex(color, 0.45)} size={17} />
           </View>
-
           {hasGrade ? (
             <View style={[styles.badge, { backgroundColor: statusBgColor }]}>
               <Text style={[styles.badgeText, { color: statusColor }]}>{avg.toFixed(1)}</Text>
@@ -91,58 +91,48 @@ export const SubjectCard = React.memo(({
           ) : null}
         </View>
 
-        <View style={styles.infoContainer}>
-          <AutoScrollText
-            text={subject.name}
-            style={styles.title}
-          />
-
-          {(subject.next_micro_milestone || subject.next_milestone) && (
-            <View style={styles.milestoneContainer}>
-              <Ionicons name="flag-outline" size={10} color="#6B7280" />
-              <Text style={styles.milestoneText} numberOfLines={1}>
-                {subject.next_micro_milestone || subject.next_milestone}
-              </Text>
-            </View>
-          )}
-        </View>
+        {/* title + milestone sin infoContainer wrapper */}
+        <AutoScrollText text={subject.name} style={styles.title} />
+        {(subject.next_micro_milestone || subject.next_milestone) && (
+          <Text style={styles.milestoneText} numberOfLines={1}>
+            {subject.next_micro_milestone || subject.next_milestone}
+          </Text>
+        )}
 
         <View style={{ flex: 1 }} />
 
-        <View style={styles.footer}>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressLabelRow}>
-              <Text style={styles.progressLabel}>PROGRESO</Text>
-              <Text style={styles.progressPercent}>{progressPct}%</Text>
-            </View>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${progressPct}%`, backgroundColor: color }]} />
-            </View>
-          </View>
-
-          {(onContinue || onComplete) && (
-            <View style={styles.actionsRow}>
-              {onContinue && (
-                <TouchableOpacity
-                  style={[styles.btn, styles.btnPrimary, { backgroundColor: color }]}
-                  onPress={onContinue}
-                >
-                  <Ionicons name="play" size={10} color="#FFFFFF" />
-                  <Text style={styles.btnPrimaryText}>Continuar</Text>
-                </TouchableOpacity>
-              )}
-              {onComplete && (
-                <TouchableOpacity
-                  style={[styles.btn, styles.btnSecondary, !onContinue && { flex: 1 }]}
-                  onPress={onComplete}
-                >
-                  <Ionicons name="sparkles" size={12} color="#059669" />
-                  <Text style={styles.btnSecondaryText}>Procesar clase</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+        {/* progress: label row y barra sin progressContainer wrapper */}
+        <View style={styles.progressLabelRow}>
+          <Text style={styles.progressLabel}>PROGRESO</Text>
+          <Text style={styles.progressPercent}>{progressPct}%</Text>
         </View>
+        <View style={styles.progressBarBg}>
+          <View style={[styles.progressBarFill, { width: `${progressPct}%`, backgroundColor: color }]} />
+        </View>
+
+        {/* action buttons sin actionsRow wrapper cuando solo hay uno */}
+        {(onContinue || onComplete) && (
+          <View style={styles.actionsRow}>
+            {onContinue && (
+              <TouchableOpacity
+                style={[styles.btn, styles.btnPrimary, { backgroundColor: color }]}
+                onPress={() => onContinue(subject)}
+              >
+                <Ionicons name="play" size={10} color="#FFFFFF" />
+                <Text style={styles.btnPrimaryText}>Continuar</Text>
+              </TouchableOpacity>
+            )}
+            {onComplete && (
+              <TouchableOpacity
+                style={[styles.btn, styles.btnSecondary, !onContinue && { flex: 1 }]}
+                onPress={() => onComplete(subject)}
+              >
+                <Ionicons name="sparkles" size={12} color="#059669" />
+                <Text style={styles.btnSecondaryText}>Procesar clase</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );

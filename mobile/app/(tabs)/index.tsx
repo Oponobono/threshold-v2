@@ -73,11 +73,11 @@ export default function HybridDashboardScreen() {
   const syncStatusMessage = useDataStore(s => s.syncStatusMessage);
   const loadAllData = useDataStore(s => s.loadAllData);
   const refreshPredictions = useDataStore(s => s.refreshPredictions);
-  const loadCachedPredictions = useDataStore(s => s.loadCachedPredictions);
   const refreshProfile = useDataStore(s => s.refreshProfile);
   const refreshUserGroups = useDataStore(s => s.refreshUserGroups);
   const refreshOverallGpa = useDataStore(s => s.refreshOverallGpa);
   const syncTodaySchedules = useDataStore(s => s.syncTodaySchedules);
+  const predictionsSource = useDataStore(s => s.predictionsSource);
   const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
 
   useEffect(() => {
@@ -313,19 +313,6 @@ export default function HybridDashboardScreen() {
       // handles data loading. Only update derived state (schedules, profile).
       loadData(true);
     }, [loadData])
-  );
-
-  // ── Cargar predicciones al enfocar: primero del cache, luego actualizar con polling ───
-  useFocusEffect(
-    useCallback(() => {
-      if (!profile?.id) return;
-      // Diferir para no competir con el bridge frío de loadAllData en el primer foco
-      const { InteractionManager } = require('react-native');
-      const task = InteractionManager.runAfterInteractions(() => {
-        loadCachedPredictions?.();
-      });
-      return () => task.cancel();
-    }, [profile?.id, loadCachedPredictions])
   );
 
   // ── Polling de predicciones: P1, espera coreReady (Schedule+GPA done) ───
@@ -716,6 +703,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
             cards={predictions?.cards ?? []}
             subjectNames={subjectNamesMap}
             onStart={() => setIsFlashcardsVisible(true)}
+            predictionsSource={predictionsSource}
           />
 
           <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('dashboard.upNext', { defaultValue: 'Lo siguiente' })}</Text>

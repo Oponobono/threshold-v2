@@ -80,7 +80,7 @@ interface Props {
   onInfoPress?: () => void;
 }
 
-export function KnowledgeHealthCard({ snapshot, loading, onInfoPress }: Props) {
+const KnowledgeHealthCardComponent = ({ snapshot, loading, onInfoPress }: Props) => {
   const { t } = useTranslation();
   const subjects = snapshot?.subjects ?? [];
 
@@ -254,5 +254,6 @@ function KnowledgeHealthCardContent({ snapshot, t, mainColor, prioridad, masSoli
       </Text>
     </View>
   );
-}
+};
 
+export const KnowledgeHealthCard = React.memo(KnowledgeHealthCardComponent);

@@ -71,20 +71,21 @@ export async function getKnowledgeAggregation(
 
   // ── SQL query ────────────────────────────────────────────────
   const _tQuery = Date.now();
-  const rows = await databaseService.getAllTracked<CardRow>(
+  const rows = await databaseService.getAllTracked<CardRow & { global_subject_count: number }>(
     `SELECT
        fc.id, fc.deck_id, fc.status,
        fc.next_review_date, fc.last_review_timestamp,
        fc.fsrs_stability, fc.fsrs_difficulty, fc.fsrs_repetitions,
        fd.subject_id,
-       COALESCE(s.name, '') as subject_name
+       COALESCE(s.name, '') as subject_name,
+       (SELECT COUNT(*) FROM subjects WHERE user_id = ? AND deleted_at IS NULL) as global_subject_count
      FROM flashcards fc
      JOIN flashcard_decks fd ON fc.deck_id = fd.id
      LEFT JOIN subjects s ON fd.subject_id = s.id AND s.deleted_at IS NULL
      WHERE fd.user_id = ?
      AND fc.deleted_at IS NULL
      AND fd.deleted_at IS NULL`,
-    [userId],
+    [userId, userId],
     'Knowledge aggregation query'
   );
   const _tQueryEnd = Date.now();
@@ -205,12 +206,8 @@ export async function getKnowledgeAggregation(
     : 999;
 
   // Count real subjects (incl. those sin flashcards)
-  const subjectCountRow = await databaseService.getFirstTracked<{ count: number }>(
-    `SELECT COUNT(*) as count FROM subjects WHERE user_id = ? AND deleted_at IS NULL`,
-    [userId],
-    'Knowledge subject count'
-  );
-  const totalSubjectCount = Math.max(subjectCountRow?.count ?? 0, subjects.length);
+  const globalSubjectCount = rows.length > 0 ? rows[0].global_subject_count : 0;
+  const totalSubjectCount = Math.max(globalSubjectCount, subjects.length);
 
   const result: KnowledgeAggregation = {
     subjects,

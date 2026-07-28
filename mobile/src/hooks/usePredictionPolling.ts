@@ -1,9 +1,79 @@
 import { useEffect, useRef } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { MMKV } from 'react-native-mmkv';
+import type { PredictionResponse } from '../store/useDataStore';
 
-const PREDICTIONS_CACHE_KEY = '@threshold_predictions_cache';
-const PREDICTIONS_TIMESTAMP_KEY = '@threshold_predictions_timestamp';
+// eslint-disable-next-line @typescript-eslint/no-require-imports (moved inside getMMKV)
+
+const PREDICTIONS_CACHE_KEY = 'predictions_cache_v1';
+const PREDICTIONS_SCHEMA_VERSION = 1;
 const POLLING_INTERVAL_MS = 15 * 60 * 1000; // 15 minutos
+
+// Lazy init: el require() está DENTRO de la función para que se ejecute en el primer
+// call (post-bootstrap, nativo listo), no en la evaluación del módulo.
+// Expo Router evalúa los módulos al escanear rutas antes de que el TurboModule de MMKV esté registrado.
+let _mmkv: MMKV | null = null;
+function getMMKV(): MMKV {
+  if (!_mmkv) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createMMKV } = require('react-native-mmkv');
+    _mmkv = createMMKV({ id: 'predictions-cache' });
+  }
+  return _mmkv!;
+}
+
+export interface CachedPredictionsPayload {
+  schemaVersion: number;
+  generatedAt: number;
+  userId: string;
+  predictions: PredictionResponse;
+}
+
+/**
+ * Lee el Boot Presentation Cache de forma síncrona (MMKV).
+ *
+ * Responsabilidad única: hidratar la UI inmediatamente al arranque.
+ * No decide si el dato es "fresco" — eso es trabajo del refresco de fondo.
+ *
+ * Retorna null solo en tres casos:
+ *   1. No existe caché.
+ *   2. El userId no coincide (protección contra sesiones cruzadas).
+ *   3. El schemaVersion es incompatible.
+ */
+export function loadPredictionsFromCache(userId: string): CachedPredictionsPayload | null {
+  try {
+    const raw = getMMKV().getString(PREDICTIONS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedPredictionsPayload;
+    if (
+      parsed.schemaVersion !== PREDICTIONS_SCHEMA_VERSION ||
+      parsed.userId !== userId ||
+      !parsed.predictions
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Guarda el resultado de un cálculo fresco de SQLite en el Boot Presentation Cache.
+ * Síncrono — no cruza el bridge JS-Native.
+ */
+export function savePredictionsToCache(userId: string, predictions: PredictionResponse): void {
+  try {
+    const payload: CachedPredictionsPayload = {
+      schemaVersion: PREDICTIONS_SCHEMA_VERSION,
+      generatedAt: Date.now(),
+      userId,
+      predictions,
+    };
+    getMMKV().set(PREDICTIONS_CACHE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn('[PredictionsCache] Error guardando cache', e);
+  }
+}
 
 /**
  * Hook que:
@@ -11,13 +81,11 @@ const POLLING_INTERVAL_MS = 15 * 60 * 1000; // 15 minutos
  *    Dashboard ya terminó (coreReady=true), garantizando que el Flashcards
  *    JOIN no compita con Schedule/GPA/Knowledge.
  * 2. Hace polling cada 15 minutos a partir de ese punto.
- * 3. Guarda en cache automáticamente.
  *
  * @param userId    - ID del usuario
  * @param enabled   - Si el polling está habilitado
  * @param coreReady - Señal del DashboardCoordinator: true cuando Schedule+GPA
  *                    completaron. La primera carga espera esta señal.
- *                    Por defecto true para compatibilidad con llamadas sin coordinator.
  */
 export const usePredictionPolling = (
   userId: string | number | null | undefined,
@@ -25,7 +93,7 @@ export const usePredictionPolling = (
   coreReady: boolean = true,
 ) => {
   const { useDataStore } = require('../store/useDataStore') as typeof import('../store/useDataStore');
-  const { refreshPredictions, loadCachedPredictions } = useDataStore();
+  const { refreshPredictions } = useDataStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const firstRunDoneRef = useRef(false);
 
@@ -34,7 +102,6 @@ export const usePredictionPolling = (
   useEffect(() => {
     if (!enabled || !userId || !coreReady || firstRunDoneRef.current) return;
     firstRunDoneRef.current = true;
-    console.log(`[PredictionPolling] Primera actualización de predicciones`);
     refreshPredictions(userId);
   }, [userId, enabled, coreReady, refreshPredictions]);
 
@@ -53,7 +120,6 @@ export const usePredictionPolling = (
     }
 
     intervalRef.current = setInterval(() => {
-      console.log(`[PredictionPolling] Actualizando predicciones (polling)`);
       refreshPredictions(userId);
     }, POLLING_INTERVAL_MS);
 
@@ -64,66 +130,4 @@ export const usePredictionPolling = (
       }
     };
   }, [userId, enabled, refreshPredictions]);
-};
-
-/**
- * Guarda predicciones en cache
- */
-export const savePredictionsToCache = async (predictions: any) => {
-  try {
-    const timestamp = new Date().toISOString();
-    await Promise.all([
-      AsyncStorage.setItem(PREDICTIONS_CACHE_KEY, JSON.stringify(predictions)),
-      AsyncStorage.setItem(PREDICTIONS_TIMESTAMP_KEY, timestamp),
-    ]);
-    console.log(`[PredictionsCache] Guardado en cache: ${timestamp}`);
-  } catch (error) {
-    console.error('[PredictionsCache] Error guardando cache:', error);
-  }
-};
-
-/**
- * Carga predicciones del cache
- */
-const PREDICTIONS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-
-export const loadPredictionsFromCache = async () => {
-  try {
-    const [cached, timestamp] = await Promise.all([
-      AsyncStorage.getItem(PREDICTIONS_CACHE_KEY),
-      AsyncStorage.getItem(PREDICTIONS_TIMESTAMP_KEY),
-    ]);
-    if (cached) {
-      if (timestamp) {
-        const age = Date.now() - new Date(timestamp).getTime();
-        if (age > PREDICTIONS_CACHE_TTL_MS) {
-          // Stale-while-revalidate: devolver datos expirados en lugar de null
-          // cuando el usuario está offline, es mejor mostrar predicciones antiguas que nada
-          console.log(`[PredictionsCache] Cache expirado (${Math.round(age / 60000)}min > 30min), sirviendo stale`);
-          return JSON.parse(cached);
-        }
-      }
-      console.log(`[PredictionsCache] Predicciones cargadas del cache`);
-      return JSON.parse(cached);
-    }
-    return null;
-  } catch (error) {
-    console.error('[PredictionsCache] Error cargando cache:', error);
-    return null;
-  }
-};
-
-/**
- * Limpia el cache de predicciones
- */
-export const clearPredictionsCache = async () => {
-  try {
-    await Promise.all([
-      AsyncStorage.removeItem(PREDICTIONS_CACHE_KEY),
-      AsyncStorage.removeItem(PREDICTIONS_TIMESTAMP_KEY),
-    ]);
-    console.log(`[PredictionsCache] Cache limpiado`);
-  } catch (error) {
-    console.error('[PredictionsCache] Error limpiando cache:', error);
-  }
 };

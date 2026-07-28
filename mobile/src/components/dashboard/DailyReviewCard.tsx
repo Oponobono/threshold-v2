@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { dailyReviewCardStyles } from '../../styles/DailyReviewCard.styles';
 import type { PredictionItem } from '../../services/api/analytics';
+import type { PredictionsSource } from '../../store/useDataStore';
 
 const MINUTES_PER_CARD = 0.6;
 const MAX_OTHER_SUBJECTS = 3;
@@ -19,6 +20,7 @@ interface Props {
   cards: PredictionItem[];
   subjectNames: Record<string, string>;
   onStart: () => void;
+  predictionsSource: PredictionsSource;
 }
 
 if (
@@ -28,7 +30,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
+const DailyReviewCardComponent = ({ cards, subjectNames, onStart, predictionsSource }: Props) => {
   const subjects = useMemo<DailyReviewSubject[]>(() => {
     const map: Record<string, { count: number; highUrgencyCount: number }> = {};
     for (const c of cards) {
@@ -66,6 +68,40 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
     return `Esta sesión reducirá el riesgo de olvido en ${top2[0]} y ${top2[1]}.`;
   }, [subjects]);
 
+  // Estado: aún no hay caché disponible (primera instalación o caché limpiado)
+  // Mostrar skeleton neutro — nunca afirmar "0 tarjetas" sin datos validados.
+  if (predictionsSource === 'none') {
+    return (
+      <View style={dailyReviewCardStyles.card}>
+        <View style={dailyReviewCardStyles.header}>
+          <MaterialCommunityIcons name="book-open-variant" size={18} color={theme.colors.primary} importantForAccessibility="no" />
+          <Text style={dailyReviewCardStyles.title}>Sesión de hoy</Text>
+        </View>
+        <View style={{ gap: 8, marginTop: 8 }}>
+          <View style={{ height: 14, borderRadius: 7, backgroundColor: theme.colors.card ?? '#2a2a2a', width: '70%' }} />
+          <View style={{ height: 14, borderRadius: 7, backgroundColor: theme.colors.card ?? '#2a2a2a', width: '50%' }} />
+        </View>
+      </View>
+    );
+  }
+
+  // Estado: hay caché pero indica 0 tarjetas — puede ser stale (ayer no había, hoy sí).
+  // "¡Todo al día!" sólo se garantiza correcto cuando source === 'fresh'.
+  if (totalCards === 0 && predictionsSource === 'cache') {
+    return (
+      <View style={dailyReviewCardStyles.card}>
+        <View style={dailyReviewCardStyles.header}>
+          <MaterialCommunityIcons name="book-open-variant" size={18} color={theme.colors.primary} importantForAccessibility="no" />
+          <Text style={dailyReviewCardStyles.title}>Sesión de hoy</Text>
+        </View>
+        <Text style={dailyReviewCardStyles.emptyText}>
+          Calculando tu sesión...
+        </Text>
+      </View>
+    );
+  }
+
+  // Estado: datos frescos de SQLite confirman que no hay tarjetas pendientes.
   if (totalCards === 0) {
     return (
       <View style={dailyReviewCardStyles.card}>
@@ -173,5 +209,6 @@ export function DailyReviewCard({ cards, subjectNames, onStart }: Props) {
       </View>
     </View>
   );
-}
+};
 
+export const DailyReviewCard = React.memo(DailyReviewCardComponent);

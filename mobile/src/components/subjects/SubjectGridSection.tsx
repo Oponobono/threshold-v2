@@ -27,6 +27,12 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
 }) => {
   const { t } = useTranslation();
 
+  const startGridRender = performance.now();
+
+  React.useEffect(() => {
+    console.log(`[PerfProfile] Grid Render -> Commit: ${(performance.now() - startGridRender).toFixed(1)} ms`);
+  }, []);
+
   const sortedSubjects = useMemo(() => {
     return [...subjects].sort((a, b) => {
       const aAccess = a.last_accessed_at ? new Date(a.last_accessed_at).getTime() : 0;
@@ -65,9 +71,9 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
         <View style={{ flex: 1 }}>
           <SubjectCard
             subject={item}
-            onPress={() => onSubjectPress(item)}
-            onContinue={item.external_url ? () => onContinue(item) : undefined}
-            onComplete={() => onComplete(item)}
+            onPress={onSubjectPress}
+            onContinue={item.external_url ? onContinue : undefined}
+            onComplete={onComplete}
           />
         </View>
       )}
