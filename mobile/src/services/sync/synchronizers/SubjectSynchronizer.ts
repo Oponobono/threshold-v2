@@ -5,12 +5,8 @@ export class SubjectSynchronizer implements EntitySynchronizer {
   readonly entityType = 'subjects';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await subjectRepository.upsert(item);
-      count++;
-    }
-    return count;
+    await subjectRepository.upsertMany(items);
+    return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {

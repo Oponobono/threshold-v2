@@ -5,12 +5,8 @@ export class StudyNoteSynchronizer implements EntitySynchronizer {
   readonly entityType = 'study_notes';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await studyNoteRepository.upsert(item);
-      count++;
-    }
-    return count;
+    await studyNoteRepository.upsertMany(items);
+    return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {

@@ -22,10 +22,18 @@ import { storageService } from '../services/storageService';
 import { getCurrentUserProfile } from '../services/api/auth/profile';
 import { getUserGroups } from '../services/api/learning/groups';
 import { getLocalGlobalGPA, getLocalPredictions } from '../services/localMasteryService';
+import { loadPredictionsFromCache, savePredictionsToCache } from '../hooks/usePredictionPolling';
 import { getTodaySchedules } from '../services/api/schedules';
 import { flashcardDeckRepository } from '../services/database/repositories/FlashcardDeckRepository';
 import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
 import type { UserProfile } from '../services/api/types';
+import { cachePolicy } from '../services/cache/CachePolicy';
+import { perfDiagnostics } from '../services/performance';
+
+const __DEV__ = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development';
+function devLog(...args: any[]): void {
+  if (__DEV__) console.log(...args);
+}
 
 export interface PredictionItem {
   cardId: number;
@@ -72,6 +80,8 @@ interface DataState {
   userGroups: GroupMembership[];
   overallGpa: number | null;
 
+  entityTimestamps: Record<string, number>;
+
   isInitialLoading: boolean;
   isRefreshing: boolean;
   hasLoadedOnce: boolean;
@@ -81,6 +91,7 @@ interface DataState {
   syncState: string;
 
   loadAllData: (forceRefresh?: boolean) => Promise<void>;
+  loadSecondaryData: () => Promise<void>;
   refreshCourses: () => Promise<void>;
   refreshSubjects: () => Promise<void>;
   refreshAssessments: () => Promise<void>;
@@ -97,6 +108,15 @@ interface DataState {
   preloadOfflineCache: () => Promise<void>;
   syncPendingOperations: () => Promise<{ success: number; failed: number; pending: number }>;
   getDuedeckIds: () => Set<string>;
+}
+
+function shouldRefreshEntity(entity: string, lastLoaded: number): boolean {
+  if (!cachePolicy.isCacheable(entity)) return true;
+  if (cachePolicy.getTTL(entity) === Infinity) return false;
+  const age = Date.now() - lastLoaded;
+  const ttl = cachePolicy.getTTL(entity);
+  const isStale = age > ttl;
+  return isStale;
 }
 
 export const useDataStore = create<DataState>((set, get) => {
@@ -135,6 +155,7 @@ export const useDataStore = create<DataState>((set, get) => {
   profile: null,
   userGroups: [],
   overallGpa: null,
+  entityTimestamps: {},
 
   isInitialLoading: false,
   isRefreshing: false,
@@ -147,10 +168,8 @@ export const useDataStore = create<DataState>((set, get) => {
   loadAllData: async (forceRefresh = false) => {
     const state = get();
 
-    // Si ya se cargó hace menos de 1s, omitir incluso con forceRefresh.
-    // Esto evita la duplicación Bootstrap → ProgressiveDataLoading.
     if (state.hasLoadedOnce && forceRefresh && Date.now() - state.lastLoadTimestamp < 1000) {
-      console.log('[DataStore] loadAllData(true) skipped — loaded recently');
+      devLog('[DataStore] loadAllData(true) skipped — loaded recently');
       return;
     }
 
@@ -163,32 +182,44 @@ export const useDataStore = create<DataState>((set, get) => {
       set({ isRefreshing: true });
     }
 
-    console.trace('[DataStore] loadAllData() called');
-    console.log('[DataStore] loadAllData() caller stack captured above');
+    devLog('[DataStore] loadAllData() called');
+    const _auditT0 = __DEV__ ? performance.now() : 0;
+    const _entityTimings: Record<string, number> = {};
 
     try {
       await databaseService.open();
 
-      const dbCourses = await courseRepository.getAll();
-      set({ courses: dbCourses || [] });
+      const now = Date.now();
+      const timestamps = get().entityTimestamps;
 
-      const dbSubjects = await subjectRepository.getAll();
-      set({ subjects: dbSubjects || [] });
+      if (forceRefresh || shouldRefreshEntity('courses', timestamps.courses ?? 0)) {
+        const dbCourses = await perfDiagnostics.measureAsync('sqlite.courses.getAll', () => courseRepository.getAll());
+        const _hT = __DEV__ ? performance.now() : 0;
+        set({ courses: dbCourses || [], entityTimestamps: { ...get().entityTimestamps, courses: now } });
+        if (__DEV__) _entityTimings['courses'] = performance.now() - _hT;
+      }
 
-      const dbAssessments = await assessmentRepository.getAll();
-      set({ assessments: dbAssessments || [] });
+      if (forceRefresh || shouldRefreshEntity('subjects', timestamps.subjects ?? 0)) {
+        const dbSubjects = await perfDiagnostics.measureAsync('sqlite.subjects.getAll', () => subjectRepository.getAll());
+        const _hTS = __DEV__ ? performance.now() : 0;
+        set({ subjects: dbSubjects || [], entityTimestamps: { ...get().entityTimestamps, subjects: now } });
+        if (__DEV__) _entityTimings['subjects'] = performance.now() - _hTS;
+      }
 
-      const dbSchedules = await scheduleRepository.getAll();
-      set({ schedules: dbSchedules || [] });
+      if (forceRefresh || shouldRefreshEntity('assessments', timestamps.assessments ?? 0)) {
+        const dbAssessments = await perfDiagnostics.measureAsync('sqlite.assessments.getAll', () => assessmentRepository.getAll());
+        set({ assessments: dbAssessments || [], entityTimestamps: { ...get().entityTimestamps, assessments: now } });
+      }
 
-      const dbFlashcardDecks = await flashcardDeckRepository.getAll();
-      set({ flashcardDecks: dbFlashcardDecks || [] });
+      if (forceRefresh || shouldRefreshEntity('schedules', timestamps.schedules ?? 0)) {
+        const dbSchedules = await perfDiagnostics.measureAsync('sqlite.schedules.getAll', () => scheduleRepository.getAll());
+        set({ schedules: dbSchedules || [], entityTimestamps: { ...get().entityTimestamps, schedules: now } });
+      }
 
-      const dbCalendarEvents = await calendarEventRepository.getAll();
-      set({ calendarEvents: dbCalendarEvents || [] });
-
-      const dbPhotos = await photoRepository.getAll();
-      set({ photos: dbPhotos || [] });
+      if (forceRefresh || shouldRefreshEntity('calendar_events', timestamps.calendar_events ?? 0)) {
+        const dbCalendarEvents = await perfDiagnostics.measureAsync('sqlite.calendarEvents.getAll', () => calendarEventRepository.getAll());
+        set({ calendarEvents: dbCalendarEvents || [], entityTimestamps: { ...get().entityTimestamps, calendar_events: now } });
+      }
 
       const currentUser = await userRepository.getCurrentUser();
       if (currentUser) {
@@ -209,11 +240,46 @@ export const useDataStore = create<DataState>((set, get) => {
       }
 
       set({ hasLoadedOnce: true, lastLoadTimestamp: Date.now(), isInitialLoading: false });
+      if (__DEV__) {
+        const totalMs = (performance.now() - _auditT0).toFixed(0);
+        const hydrationSummary = Object.entries(_entityTimings).map(([k, v]) => `${k}:${v.toFixed(1)}ms`).join(' ');
+        console.log(`[HYDRATION] loadAllData TOTAL=${totalMs}ms | per-entity set() timings: ${hydrationSummary}`);
+      }
+      // Defer secondary data (flashcard_decks, photos) after bridge is warm
+      const { InteractionManager } = await import('react-native');
+      InteractionManager.runAfterInteractions(() => {
+        get().loadSecondaryData().catch(() => {});
+      });
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
       set({ hasLoadedOnce: true, lastLoadTimestamp: Date.now() });
     } finally {
       set({ isInitialLoading: false, isRefreshing: false, isSyncing: false, syncStatusMessage: '' });
+    }
+  },
+
+  loadSecondaryData: async () => {
+    try {
+      const now = Date.now();
+      const timestamps = get().entityTimestamps;
+      devLog('[DataStore] loadSecondaryData() start');
+      const _t0 = __DEV__ ? performance.now() : 0;
+
+      if (shouldRefreshEntity('flashcard_decks', timestamps.flashcard_decks ?? 0)) {
+        const decks = await flashcardDeckRepository.getAll();
+        set({ flashcardDecks: decks || [], entityTimestamps: { ...get().entityTimestamps, flashcard_decks: now } });
+      }
+
+      if (shouldRefreshEntity('photos', timestamps.photos ?? 0)) {
+        const photos = await photoRepository.getMetadata();
+        set({ photos: photos || [], entityTimestamps: { ...get().entityTimestamps, photos: now } });
+      }
+
+      if (__DEV__) {
+        console.log(`[HYDRATION] loadSecondaryData TOTAL=${(performance.now() - _t0).toFixed(0)}ms`);
+      }
+    } catch (error) {
+      console.error('[DataStore] loadSecondaryData error:', error);
     }
   },
 
@@ -273,7 +339,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshPhotos: async () => {
     try {
-      const dbPhotos = await photoRepository.getAll();
+      const dbPhotos = await photoRepository.getMetadata();
       set({ photos: dbPhotos || [] });
     } catch (error) {
       console.error('[DataStore] refreshPhotos error:', error);
@@ -328,7 +394,10 @@ export const useDataStore = create<DataState>((set, get) => {
   refreshPredictions: async (userId: string | number) => {
     try {
       const data = await getLocalPredictions(String(userId));
-      set({ predictions: data || { dueCount: 0, cards: [] } });
+      const result = data || { dueCount: 0, cards: [] };
+      set({ predictions: result });
+      // Poblar el cache de AsyncStorage para que el próximo boot no toque SQLite
+      savePredictionsToCache(result).catch(() => {});
     } catch (error) {
       console.error('[DataStore] refreshPredictions error:', error);
       if (!get().predictions) set({ predictions: { dueCount: 0, cards: [] } });
@@ -336,9 +405,17 @@ export const useDataStore = create<DataState>((set, get) => {
   },
 
   loadCachedPredictions: async () => {
-    const userId = get().profile?.id;
-    if (!userId) return;
+    // Reads from AsyncStorage first — zero SQLite cost on boot.
+    // Falls back to SQLite only if no cache exists (first install / cleared storage).
     try {
+      const cached = await loadPredictionsFromCache();
+      if (cached) {
+        set({ predictions: cached });
+        return;
+      }
+      // No cache yet — fall back to SQLite (first install)
+      const userId = get().profile?.id;
+      if (!userId) return;
       const data = await getLocalPredictions(String(userId));
       set({ predictions: data || { dueCount: 0, cards: [] } });
     } catch (error) {
@@ -372,8 +449,7 @@ export const useDataStore = create<DataState>((set, get) => {
   },
 
   syncPendingOperations: async () => {
-    console.trace('[DataStore] syncPendingOperations() called');
-    console.log('[DataStore] syncPendingOperations() caller stack captured above');
+    devLog('[DataStore] syncPendingOperations() called');
     const result = await syncManager.sync();
     return { success: result.entitiesSynced, failed: result.errors.length, pending: 0 };
   },

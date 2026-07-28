@@ -5,12 +5,8 @@ export class AssessmentCategorySynchronizer implements EntitySynchronizer {
   readonly entityType = 'assessment_categories';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await assessmentCategoryRepository.upsert(item);
-      count++;
-    }
-    return count;
+    await assessmentCategoryRepository.upsertMany(items);
+    return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {

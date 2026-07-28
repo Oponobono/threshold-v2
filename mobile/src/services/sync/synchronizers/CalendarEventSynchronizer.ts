@@ -5,12 +5,8 @@ export class CalendarEventSynchronizer implements EntitySynchronizer {
   readonly entityType = 'calendar_events';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await calendarEventRepository.upsert(item);
-      count++;
-    }
-    return count;
+    await calendarEventRepository.upsertMany(items);
+    return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {

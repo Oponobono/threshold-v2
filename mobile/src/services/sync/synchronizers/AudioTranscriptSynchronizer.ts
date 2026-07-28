@@ -5,12 +5,8 @@ export class AudioTranscriptSynchronizer implements EntitySynchronizer {
   readonly entityType = 'audio_transcripts';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await audioTranscriptRepository.upsert(item);
-      count++;
-    }
-    return count;
+    await audioTranscriptRepository.upsertMany(items);
+    return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {

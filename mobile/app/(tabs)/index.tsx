@@ -17,7 +17,7 @@ import { useDataStore } from '../../src/store/useDataStore';
 import { courseRepository } from '../../src/services/database/repositories';
 import type { Course } from '../../src/services/api/types';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
-import { useCachePreload } from '../../src/hooks/useCachePreload';
+
 import { downloadProfileImage, getLocalProfileImageUri } from '../../src/services/profileImageCache';
 import { StudyTimerCard } from '../../src/components/timer/StudyTimerCard';
 import { SnoozeModal } from '../../src/components/modals/SnoozeModal';
@@ -45,6 +45,9 @@ import { OfflineIndicator } from '../../src/components/ui/OfflineIndicator';
 import { GlobalHeroPresenter } from '../../src/presentation/heroes/GlobalHeroPresenter';
 import { CourseHeroPresenter } from '../../src/presentation/heroes/CourseHeroPresenter';
 import { ExplanationOverlay } from '../../src/components/evaluation/ExplanationOverlay';
+import { DashboardCoordinator } from '../../src/dashboard/DashboardCoordinator';
+import { buildDashboardTasks } from '../../src/dashboard/DashboardTasks';
+import { dashboardTelemetry } from '../../src/performance/DashboardTelemetry';
 
 
 
@@ -57,45 +60,64 @@ const SUBJECT_CARD_GAP = 12;
 export default function HybridDashboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  // ── Usar store global para subjects, assessments, schedules y predicciones ──
-  const { subjects, assessments, schedules: storeSchedules, predictions, loadAllData, refreshPredictions, loadCachedPredictions, isSyncing, syncStatusMessage, courses, profile: storeProfile, userGroups: storeGroups, overallGpa: storeOverallGpa, refreshProfile, refreshUserGroups, refreshOverallGpa, syncTodaySchedules } = useDataStore();
-  const [profile, setProfile] = useState<UserProfile | null>(storeProfile);
+  // ── Selectores individuales del store para minimizar re-renders ──
+  const subjects = useDataStore(s => s.subjects);
+  const assessments = useDataStore(s => s.assessments);
+  const storeSchedules = useDataStore(s => s.schedules);
+  const predictions = useDataStore(s => s.predictions);
+  const courses = useDataStore(s => s.courses);
+  const storeProfile = useDataStore(s => s.profile);
+  const storeGroups = useDataStore(s => s.userGroups);
+  const storeOverallGpa = useDataStore(s => s.overallGpa);
+  const isSyncing = useDataStore(s => s.isSyncing);
+  const syncStatusMessage = useDataStore(s => s.syncStatusMessage);
+  const loadAllData = useDataStore(s => s.loadAllData);
+  const refreshPredictions = useDataStore(s => s.refreshPredictions);
+  const loadCachedPredictions = useDataStore(s => s.loadCachedPredictions);
+  const refreshProfile = useDataStore(s => s.refreshProfile);
+  const refreshUserGroups = useDataStore(s => s.refreshUserGroups);
+  const refreshOverallGpa = useDataStore(s => s.refreshOverallGpa);
+  const syncTodaySchedules = useDataStore(s => s.syncTodaySchedules);
   const [localProfileImageUri, setLocalProfileImageUri] = useState<string | null>(null);
 
-  // Cargar datos locales al montar para hidratación instantánea
   useEffect(() => {
     (async () => {
-      const { userRepository } = await import('../../src/services/database/repositories/UserRepository');
-      const currentUser = await userRepository.getCurrentUser();
-      if (currentUser) setProfile(currentUser as any);
-
       const localUri = await getLocalProfileImageUri();
       if (localUri) setLocalProfileImageUri(localUri);
-
-      const { storageService } = await import('../../src/services/storageService');
-      const groupsCache = await storageService.getLocal('app:cache:userGroups');
-      if (groupsCache) {
-        try { setUserGroups(JSON.parse(groupsCache)); } catch {}
-      }
-
-      const gpaCache = await storageService.getLocal('app:cache:global_gpa');
-      if (gpaCache) {
-        try {
-          const parsed = JSON.parse(gpaCache);
-          setOverallGpa(parsed.currentAverage ?? null);
-        } catch {}
-      }
     })();
   }, []);
-  // Sync en background después del primer render (no bloquea)
+
+  // Red pura — no tocan SQLite, no causan contención en el bridge
   useEffect(() => {
     refreshProfile();
     refreshUserGroups();
-    refreshOverallGpa();
-    syncTodaySchedules();
   }, []);
 
-  const { preloadRelatedData } = useCachePreload();
+  // triggerBootSnapshotRef: puente síncrono coordinator → Knowledge (P0).
+  // Se llama directamente desde coordinator.start().then() para evitar
+  // el ciclo setState→render→useEffect (~500ms del React scheduler).
+  const triggerBootSnapshotRef = useRef<(() => void) | null>(null);
+  // coreReady: señal para inteligencia secundaria (P1: PredictionPolling).
+  // El ~500ms de React scheduler es aceptable aquí — es secondary intelligence.
+  const [coreReady, setCoreReady] = useState(false);
+
+  // Cargas SQLite coordinadas: Schedule (P1) → GPA (P2), ejecución secuencial.
+  // Cuando la Promise resuelve, emite dos señales:
+  //   • triggerBootSnapshot (síncrono): Knowledge accede al bridge sin delay
+  //   • setCoreReady (async vía React): PredictionPolling espera el ciclo completo
+  useEffect(() => {
+    dashboardTelemetry.mount();
+    const coordinator = new DashboardCoordinator(
+      buildDashboardTasks({ syncTodaySchedules, refreshOverallGpa })
+    );
+    coordinator.start().then(() => {
+      triggerBootSnapshotRef.current?.();  // P0: síncrono
+      setCoreReady(true);                  // P1: vía React scheduler
+    });
+    return () => coordinator.cancel();
+  }, []);
+
+
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
   const [isCourseModalVisible, setIsCourseModalVisible] = useState(false);
   const [isCreationMenuVisible, setIsCreationMenuVisible] = useState(false);
@@ -119,10 +141,15 @@ export default function HybridDashboardScreen() {
 
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
-  const [overallGpa, setOverallGpa] = useState<number | null>(null);
-  const [userGroups, setUserGroups] = useState<any[]>([]);
+
+  const profile = storeProfile;
+  const overallGpa = storeOverallGpa;
+  const userGroups = storeGroups;
+  const todaySchedules = useMemo(() => {
+    const today = new Date().getDay();
+    return storeSchedules.filter((s: any) => s.day_of_week === today);
+  }, [storeSchedules]);
 
   // ── allSchedules viene del store ahora ─────────────────────────────────
   const allSchedules = storeSchedules;
@@ -161,31 +188,10 @@ export default function HybridDashboardScreen() {
         lastFocusRefreshRef.current = now;
         await loadAllData(true);
       }
-
-      const currentSchedules = useDataStore.getState().schedules;
-      const today = new Date().getDay();
-      setTodaySchedules(
-        currentSchedules.filter((s: any) => s.day_of_week === today)
-      );
-
-      const currentProfile = useDataStore.getState().profile;
-      if (currentProfile) setProfile(currentProfile);
-
-      const currentGroups = useDataStore.getState().userGroups;
-      if (Array.isArray(currentGroups) && currentGroups.length > 0) {
-        setUserGroups(currentGroups);
-      }
-
-      const currentGpa = useDataStore.getState().overallGpa;
-      if (currentGpa != null) setOverallGpa(currentGpa);
-
-      setTimeout(() => {
-        preloadRelatedData().catch(err => console.warn('[Dashboard] Error preloading:', err));
-      }, 3000);
     } catch (err) {
       console.warn('Error loading dashboard data:', err);
     }
-  }, [loadAllData, preloadRelatedData, FOCUS_REFRESH_THROTTLE_MS]);
+  }, [loadAllData, FOCUS_REFRESH_THROTTLE_MS]);
 
   // Handle pull-to-refresh: actualizar datos y predicciones
   const handleRefresh = useCallback(async () => {
@@ -313,16 +319,22 @@ export default function HybridDashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!profile?.id) return;
-      // Solo cargar del cache al enfocar
-      loadCachedPredictions?.();
+      // Diferir para no competir con el bridge frío de loadAllData en el primer foco
+      const { InteractionManager } = require('react-native');
+      const task = InteractionManager.runAfterInteractions(() => {
+        loadCachedPredictions?.();
+      });
+      return () => task.cancel();
     }, [profile?.id, loadCachedPredictions])
   );
 
-  // ── Polling de predicciones cada 15 minutos ───────────────────────────────
-  usePredictionPolling(profile?.id, true);
+  // ── Polling de predicciones: P1, espera coreReady (Schedule+GPA done) ───
+  usePredictionPolling(profile?.id, true, coreReady);
 
-  // ── KnowledgeSnapshot (carga al montar, refresh manual) ───────────────────
-  const { snapshot: knowledgeSnapshot, loading: knowledgeLoading } = useKnowledgeInsights(profile?.id);
+  // ── KnowledgeSnapshot: P3, disparado por coordinator (Schedule+GPA done) ──
+  // triggerBootSnapshot es síncrono — coordinator lo llama directamente.
+  const { snapshot: knowledgeSnapshot, loading: knowledgeLoading, triggerBootSnapshot } = useKnowledgeInsights(profile?.id);
+  triggerBootSnapshotRef.current = triggerBootSnapshot;
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
@@ -332,8 +344,6 @@ export default function HybridDashboardScreen() {
 
   const nickname = useMemo(() => {
     const finalNickname = profile?.username?.trim() || fullName || '';
-    console.log('[Dashboard] Perfil cargado:', JSON.stringify(profile));
-    console.log('[Dashboard] Nickname calculado:', finalNickname);
     return finalNickname;
   }, [fullName, profile]);
 
@@ -462,6 +472,63 @@ export default function HybridDashboardScreen() {
 
   const globalHeroPresenter = useMemo(() => new GlobalHeroPresenter(), []);
   const courseHeroPresenter = useMemo(() => new CourseHeroPresenter(), []);
+
+  // C2: ViewModels precalculados — presenter.build() nunca corre dentro de renderItem
+  const heroItemsWithVMs = useMemo(() => {
+    const independentCourse = { id: 'independent', user_id: '', name: 'Materias Independientes' } as Course;
+    return heroCourseItems.map(item => {
+      if (item.type === 'all') {
+        return {
+          ...item,
+          vm: globalHeroPresenter.build({
+            subjects: enrichedSubjects,
+            courses,
+            assessments,
+            healthScore: knowledgeSnapshot?.health.score,
+          }),
+        };
+      }
+      if (item.type === 'independent') {
+        const independentSubjects = enrichedSubjects.filter(s => !s.course_id);
+        const primaryKnowledge = knowledgeSnapshot?.subjects
+          ?.filter(s => independentSubjects.some(is_ => is_.id === s.subjectId))
+          .sort((a, b) => a.retrievability - b.retrievability)[0];
+        return {
+          ...item,
+          vm: courseHeroPresenter.build({
+            course: independentCourse,
+            subjects: independentSubjects,
+            primaryKnowledge: primaryKnowledge ? {
+              subjectId: primaryKnowledge.subjectId,
+              subjectName: primaryKnowledge.subjectName,
+              score: Math.round(primaryKnowledge.retrievability),
+              memoryLevel: primaryKnowledge.memoryLevel,
+              retrievability: primaryKnowledge.retrievability,
+            } : undefined,
+          }),
+        };
+      }
+      // type === 'course'
+      const courseSubjects = enrichedSubjects.filter(s => s.course_id === item.course.id);
+      const primaryKnowledge = knowledgeSnapshot?.subjects
+        ?.filter(s => courseSubjects.some(cs => cs.id === s.subjectId))
+        .sort((a, b) => a.retrievability - b.retrievability)[0];
+      return {
+        ...item,
+        vm: courseHeroPresenter.build({
+          course: item.course,
+          subjects: courseSubjects,
+          primaryKnowledge: primaryKnowledge ? {
+            subjectId: primaryKnowledge.subjectId,
+            subjectName: primaryKnowledge.subjectName,
+            score: Math.round(primaryKnowledge.retrievability),
+            memoryLevel: primaryKnowledge.memoryLevel,
+            retrievability: primaryKnowledge.retrievability,
+          } : undefined,
+        }),
+      };
+    });
+  }, [heroCourseItems, enrichedSubjects, courses, assessments, knowledgeSnapshot, globalHeroPresenter, courseHeroPresenter]);
 
   const initialScrollIndex = useMemo(() => {
     if (!shouldUseInfiniteCarousel || !subjects.length) return 0;
@@ -658,7 +725,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
               let nextClassSubtext = t('dashboard.enjoyDay');
               if (nextClass) {
                 const now = new Date();
-                const [startH, startM] = nextClass.start_time.split(':').map(Number);
+                const [startH, startM] = (nextClass.start_time || '00:00').split(':').map(Number);
                 const classStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM, 0);
                 const diffMins = Math.floor((classStart.getTime() - now.getTime()) / 60000);
                 
@@ -678,7 +745,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
               return (
                 <MetricCard 
                   title={t('dashboard.nextClass')}
-                  value={nextClass ? (subjectNamesMap[nextClass.subject_id] || t('dashboard.unknownSubject', { defaultValue: 'Materia' })) : (todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'))}
+                  value={nextClass ? (subjectNamesMap[nextClass.subject_id!] || t('dashboard.unknownSubject', { defaultValue: 'Materia' })) : (todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'))}
                   subtext={nextClassSubtext}
                   icon="time-outline"
                   color={nextClass ? theme.colors.primary : "#5856D6"}
@@ -784,45 +851,30 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
                   else handleHeroCardSelect(item.course.id);
                 }}
                 renderItem={({ item }) => {
-                  if (item.type === 'all') {
-                    const globalViewModel = globalHeroPresenter.build({
-                      subjects: enrichedSubjects,
-                      courses,
-                      assessments,
-                      healthScore: knowledgeSnapshot?.health.score,
-                    });
+                  const itemWithVM = heroItemsWithVMs.find(i => {
+                    if (i.type !== item.type) return false;
+                    if (i.type === 'course' && item.type === 'course') return i.course.id === item.course.id;
+                    return true;
+                  });
+                  if (!itemWithVM) return null;
+
+                  if (itemWithVM.type === 'all') {
                     return (
                       <AllSubjectsHeroCard
-                        viewModel={globalViewModel}
+                        viewModel={itemWithVM.vm}
                         isActive={selectedDashboardCourseId === null}
                         onPress={() => handleHeroCardSelect(null)}
                       />
                     );
                   }
-                   if (item.type === 'independent') {
-                    const independentSubjects = enrichedSubjects.filter(s => !s.course_id);
-                    const independentCourse = { id: 'independent', user_id: '', name: 'Materias Independientes' } as Course;
-                    const primaryKnowledge = knowledgeSnapshot?.subjects
-                      ?.filter(s => independentSubjects.some(is_ => is_.id === s.subjectId))
-                      .sort((a, b) => a.retrievability - b.retrievability)[0];
-                    const viewModel = courseHeroPresenter.build({
-                      course: independentCourse,
-                      subjects: independentSubjects,
-                      primaryKnowledge: primaryKnowledge ? {
-                        subjectId: primaryKnowledge.subjectId,
-                        subjectName: primaryKnowledge.subjectName,
-                        score: Math.round(primaryKnowledge.retrievability),
-                        memoryLevel: primaryKnowledge.memoryLevel,
-                        retrievability: primaryKnowledge.retrievability,
-                      } : undefined,
-                    });
+                  if (itemWithVM.type === 'independent') {
                     return (
                       <CourseHeroCard
-                        viewModel={viewModel}
+                        viewModel={itemWithVM.vm}
                         isActive={selectedDashboardCourseId === 'independent'}
                         onPress={() => handleHeroCardSelect('independent')}
                         onContinue={() => {
-                          const subjectId = viewModel.continueTarget?.subjectId;
+                          const subjectId = itemWithVM.vm.continueTarget?.subjectId;
                           if (subjectId) {
                             router.push(`/subjects/${subjectId}`);
                           } else {
@@ -832,36 +884,22 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
                       />
                     );
                   }
-                  const courseSubjects = enrichedSubjects.filter(s => s.course_id === item.course.id);
-                  const primaryKnowledge = knowledgeSnapshot?.subjects
-                    ?.filter(s => courseSubjects.some(cs => cs.id === s.subjectId))
-                    .sort((a, b) => a.retrievability - b.retrievability)[0];
-                  const viewModel = courseHeroPresenter.build({
-                    course: item.course,
-                    subjects: courseSubjects,
-                    primaryKnowledge: primaryKnowledge ? {
-                      subjectId: primaryKnowledge.subjectId,
-                      subjectName: primaryKnowledge.subjectName,
-                      score: Math.round(primaryKnowledge.retrievability),
-                      memoryLevel: primaryKnowledge.memoryLevel,
-                      retrievability: primaryKnowledge.retrievability,
-                    } : undefined,
-                  });
+                  // type === 'course'
                   return (
                     <CourseHeroCard
-                      viewModel={viewModel}
-                      isActive={selectedDashboardCourseId === item.course.id}
-                      onPress={() => handleHeroCardSelect(item.course.id)}
+                      viewModel={itemWithVM.vm}
+                      isActive={selectedDashboardCourseId === itemWithVM.course.id}
+                      onPress={() => handleHeroCardSelect(itemWithVM.course.id)}
                       onContinue={() => {
-                        const subjectId = viewModel.continueTarget.subjectId;
+                        const subjectId = itemWithVM.vm.continueTarget?.subjectId;
                         if (subjectId) {
                           router.push(`/subjects/${subjectId}`);
                         } else {
-                          handleHeroCardSelect(item.course.id);
+                          handleHeroCardSelect(itemWithVM.course.id);
                         }
                       }}
-                      onEditPress={() => handleEditCourse(item.course)}
-                      onDeletePress={() => handleDeleteCourse(item.course)}
+                      onEditPress={() => handleEditCourse(itemWithVM.course)}
+                      onDeletePress={() => handleDeleteCourse(itemWithVM.course)}
                     />
                   );
                 }}
@@ -1207,11 +1245,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
         onClose={() => setIsScheduleModalVisible(false)}
         subjects={subjects}
         allSchedules={allSchedules}
-        onScheduleUpdated={() => {
-          const s = useDataStore.getState().schedules;
-          const today = new Date().getDay();
-          setTodaySchedules(s.filter((sch: any) => sch.day_of_week === today));
-        }}
+        onScheduleUpdated={() => loadData()}
       />
       
       {/* METRIC DETAIL MODAL */}

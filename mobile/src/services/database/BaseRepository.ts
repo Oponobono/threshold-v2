@@ -165,6 +165,10 @@ export class BaseRepository<T extends { id: string }> {
 
   async upsert(data: T): Promise<void> {
     const existing = await this.getByIdIncludingDeleted(data.id);
+    await this.upsertWithExisting(data, existing);
+  }
+
+  async upsertWithExisting(data: T, existing: T | null): Promise<void> {
     if (existing) {
       const localVer = (existing as any).version_number || 0;
       const remoteVer = (data as any).version_number || 0;
@@ -204,6 +208,33 @@ export class BaseRepository<T extends { id: string }> {
       await this.update(data.id, { ...data, version_number: remoteVer } as any);
     } else {
       await this.create(data);
+    }
+  }
+
+  async upsertMany(items: T[]): Promise<void> {
+    if (items.length === 0) return;
+    
+    // Process in chunks of 500 to avoid SQLite bind limit issues or long queries
+    const chunkSize = 500;
+    for (let i = 0; i < items.length; i += chunkSize) {
+      const chunk = items.slice(i, i + chunkSize);
+      const ids = chunk.map(item => `'${item.id}'`).join(', ');
+      
+      const existingRows = await databaseService.getAllTracked(
+        `SELECT * FROM ${this.tableName} WHERE id IN (${ids})`,
+        undefined,
+        `BaseRepo.${this.tableName}.upsertMany`
+      );
+      
+      const existingMap = new Map((existingRows as any[]).map(r => {
+        const mapped = this.mapRow ? this.mapRow(r) : r;
+        return [mapped.id, mapped];
+      }));
+      
+      for (const data of chunk) {
+        const existing = existingMap.get(data.id) || null;
+        await this.upsertWithExisting(data, existing);
+      }
     }
   }
 

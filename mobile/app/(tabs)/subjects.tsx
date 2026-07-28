@@ -3,8 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, P
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { theme } from '../../src/styles/theme';
 import { subjectsStyles as styles } from '../../src/styles/Subjects.styles';
@@ -46,13 +45,23 @@ export default function SubjectsScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const g = useSubjects(t);
-  const { courses, loadAllData, refreshCourses, refreshSubjects } = useDataStore();
+  const courses = useDataStore(s => s.courses);
+  const loadAllData = useDataStore(s => s.loadAllData);
+  const refreshSubjects = useDataStore(s => s.refreshSubjects);
+  const refreshCourses = useDataStore(s => s.refreshCourses);
   const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore } = useGroupedSubjects(courses, g.filteredSubjects);
+
+
+  
+  // Carga inicial: solo en mount, no en cada focus
+  useEffect(() => {
+    loadAllData();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      refreshCourses();
-    }, [refreshCourses])
+      g.loadActivityFeed();
+    }, [g.loadActivityFeed])
   );
 
   const [zyrenModalVisible, setZyrenModalVisible] = useState(false);

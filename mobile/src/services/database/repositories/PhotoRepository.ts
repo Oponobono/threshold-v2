@@ -1,4 +1,5 @@
 import { BaseRepository } from '../BaseRepository';
+import { databaseService } from '../DatabaseService';
 
 export interface Photo {
   id: string;
@@ -14,9 +15,26 @@ export interface Photo {
   updated_at?: string;
 }
 
+// Columns that are safe to fetch without ocr_text (avoids reading overflow pages)
+const PHOTO_METADATA_COLS = 'id, subject_id, local_uri, created_at, es_favorita, tags, cloud_url, is_backed_up, group_id, updated_at, user_id, filename, asset_state, sync_version';
+
 export class PhotoRepository extends BaseRepository<Photo> {
   constructor() {
     super('photos');
+  }
+
+  /**
+   * Lightweight fetch — excludes `ocr_text`.
+   * Use this for preloads, galleries, and any context that does not need OCR content.
+   * Avoids reading SQLite overflow pages for large text cells (~400ms → target <20ms).
+   */
+  async getMetadata(): Promise<Photo[]> {
+    const rows = await databaseService.getAllTracked(
+      `SELECT ${PHOTO_METADATA_COLS} FROM photos WHERE deleted_at IS NULL ORDER BY created_at DESC`,
+      undefined,
+      'BaseRepo.photos.getMetadata'
+    );
+    return (rows as any[]).map(row => this.mapRow(row));
   }
 
   async getBySubject(subjectId: string): Promise<Photo[]> {
@@ -42,3 +60,4 @@ export class PhotoRepository extends BaseRepository<Photo> {
 }
 
 export const photoRepository = new PhotoRepository();
+

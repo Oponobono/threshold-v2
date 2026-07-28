@@ -5,12 +5,8 @@ export class CourseSynchronizer implements EntitySynchronizer {
   readonly entityType = 'courses';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await courseRepository.upsert(item);
-      count++;
-    }
-    return count;
+    await courseRepository.upsertMany(items);
+    return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {

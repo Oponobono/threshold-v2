@@ -875,5 +875,17 @@ const migrations: Migration[] = [
        WHERE color IN ('#4F46E5', '#64748B', '#5856D6')`,
     ],
   },
+  {
+    version: 41,
+    up: [
+      // Fix: photos.getAll() caused ~409ms bridge time due to full table scan.
+      // deleted_at was added via ALTER TABLE (v21) with no composite index.
+      // Query is: SELECT * FROM photos WHERE deleted_at IS NULL ORDER BY created_at DESC
+      // This index allows SQLite to use a covering index scan instead.
+      `CREATE INDEX IF NOT EXISTS idx_photos_active ON photos(deleted_at, created_at DESC)`,
+      // Same pattern: scanned_documents also had no covering index for the active-rows query.
+      `CREATE INDEX IF NOT EXISTS idx_documents_active ON scanned_documents(deleted_at, created_at DESC)`,
+    ],
+  },
 ];
 export default migrations;

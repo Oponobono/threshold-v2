@@ -5,12 +5,8 @@ export class ThresholdOverrideSynchronizer implements EntitySynchronizer {
   readonly entityType = 'subject_threshold_overrides';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await thresholdOverrideRepository.upsert(item);
-      count++;
-    }
-    return count;
+    await thresholdOverrideRepository.upsertMany(items);
+    return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {

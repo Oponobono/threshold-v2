@@ -20,7 +20,21 @@ class DatabaseService {
   private t0 = 0;
 
   async getAllTracked<T = any>(sql: string, params?: any[], label?: string): Promise<T[]> {
-    return this._track<T[]>(label || sql.substring(0, 60), () => this.getDb().getAllAsync(sql, params as any));
+    if (!__DEV__) {
+      return this._track<T[]>(label || sql.substring(0, 60), () => this.getDb().getAllAsync(sql, params as any));
+    }
+    const entityLabel = label || sql.substring(0, 60);
+    const result = await this._track<T[]>(entityLabel, () => this.getDb().getAllAsync(sql, params as any));
+    // Payload audit: measure rows + serialized KB
+    try {
+      const rows = result.length;
+      const tSer = performance.now();
+      const bytes = JSON.stringify(result).length;
+      const serMs = performance.now() - tSer;
+      const kb = (bytes / 1024).toFixed(1);
+      console.log(`[PAYLOAD] ${entityLabel.padEnd(32)} | ${String(rows).padStart(4)} rows | ${String(kb).padStart(7)} KB | serialization: ${serMs.toFixed(1)}ms`);
+    } catch {}
+    return result;
   }
 
   async getFirstTracked<T = any>(sql: string, params?: any[], label?: string): Promise<T | null> {
@@ -225,6 +239,23 @@ class DatabaseService {
           } catch (_) {}
         }
         console.log(`[BOOT 07c] Warmup done: ${(performance.now() - tWarm).toFixed(0)}ms`);
+
+        // ── SQLite Internal Telemetry ──
+        try {
+          const pageCount = await db.getAllAsync<{page_count: number}>('PRAGMA page_count');
+          const freelistCount = await db.getAllAsync<{freelist_count: number}>('PRAGMA freelist_count');
+          const journalMode = await db.getAllAsync<{journal_mode: string}>('PRAGMA journal_mode');
+          
+          let walSize = -1;
+          try {
+             // In WAL mode, we can try to check WAL size but PRAGMA wal_checkpoint might be better to see status
+             // just logging the basics for now
+          } catch(e) {}
+
+          console.log(`[SQLITE] page_count=${pageCount[0]?.page_count ?? 0}, freelist_count=${freelistCount[0]?.freelist_count ?? 0}, journal_mode=${journalMode[0]?.journal_mode ?? 'unknown'}`);
+        } catch (e) {
+          console.warn('[SQLITE] Telemetry error:', e);
+        }
 
         this.db = db;
         this.openingPromise = null;

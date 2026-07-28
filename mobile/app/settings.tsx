@@ -812,7 +812,7 @@ export default function SettingsScreen() {
                 <View style={styles.syncProgressContainer}>
                   <View style={styles.syncProgressHeader}>
                     <Text style={styles.syncProgressText}>
-                      {activeUploadOp.progress?.message || activeUploadOp.message || 'Preparando respaldo...'}
+                      {activeUploadOp.message || 'Preparando respaldo...'}
                     </Text>
                     <Text style={styles.syncProgressPercent}>
                       {isUploadIndeterminate ? '...' : `${uploadPct}%`}
@@ -829,7 +829,7 @@ export default function SettingsScreen() {
                 <View style={styles.syncProgressContainer}>
                   <View style={styles.syncProgressHeader}>
                     <Text style={styles.syncProgressText}>
-                      {activeDownloadOp.progress?.message || activeDownloadOp.message || 'Preparando descarga...'}
+                      {activeDownloadOp.message || 'Preparando descarga...'}
                     </Text>
                     <Text style={styles.syncProgressPercent}>
                       {isDownloadIndeterminate ? '...' : `${downloadPct}%`}

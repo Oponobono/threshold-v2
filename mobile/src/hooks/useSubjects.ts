@@ -1,6 +1,5 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { InteractionManager } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 import { useDataStore } from '../store/useDataStore';
 import { getSemesterSummary, SemesterSummary } from '../services/api/analytics';
 import { SCALE_MAX } from '../utils/grades';
@@ -11,6 +10,7 @@ import { youTubeRepository } from '../services/database/repositories/YouTubeRepo
 import { audioRepository } from '../services/database/repositories/AudioRepository';
 import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
 import { theme } from '../styles/theme';
+import { perfDiagnostics } from '../services/performance';
 
 export interface UnifiedActivityItem {
   id: string;
@@ -110,7 +110,14 @@ function getRelativeTime(then: number, t: any): string {
 }
 
 export function useSubjects(t: any) {
-  const { subjects, courses, assessments, loadAllData, predictions, calendarEvents, flashcardDecks, userStats } = useDataStore();
+  const subjects = useDataStore(s => s.subjects);
+  const courses = useDataStore(s => s.courses);
+  const assessments = useDataStore(s => s.assessments);
+  const loadAllData = useDataStore(s => s.loadAllData);
+  const predictions = useDataStore(s => s.predictions);
+  const calendarEvents = useDataStore(s => s.calendarEvents);
+  const flashcardDecks = useDataStore(s => s.flashcardDecks);
+  const userStats = useDataStore(s => s.userStats);
 
   const [search, setSearch] = useState('');
   const [overlayVisible, setOverlayVisible] = useState(false);
@@ -118,26 +125,30 @@ export function useSubjects(t: any) {
   const [semesterSummary, setSemesterSummary] = useState<SemesterSummary | null>(null);
   const [extraItems, setExtraItems] = useState<{ notes: any[]; docs: any[]; videos: any[]; recordings: any[]; flashcards: any[] }>({ notes: [], docs: [], videos: [], recordings: [], flashcards: [] });
 
-  useFocusEffect(
-    useCallback(() => {
-      InteractionManager.runAfterInteractions(async () => {
-        loadAllData();
-        getSemesterSummary()
-          .then(setSemesterSummary)
-          .catch(() => setSemesterSummary(null));
-        try {
-          const [notes, docs, videos, recordings, flashcards] = await Promise.all([
-            studyNoteRepository.getAll().catch(() => []),
-            documentRepository.getAll().catch(() => []),
-            youTubeRepository.getAll().catch(() => []),
-            audioRepository.getAll().catch(() => []),
-            flashcardRepository.getAll().catch(() => []),
-          ]);
-          setExtraItems({ notes, docs, videos, recordings, flashcards });
-        } catch {}
-      });
-    }, [loadAllData])
-  );
+  // Carga en mount únicamente — focus no ejecuta trabajo pesado (S1, S3)
+  useEffect(() => {
+    InteractionManager.runAfterInteractions(async () => {
+      loadAllData();
+      getSemesterSummary()
+        .then(setSemesterSummary)
+        .catch(() => setSemesterSummary(null));
+    });
+  }, []);
+
+  const loadActivityFeed = useCallback(async () => {
+    try {
+      const [notes, docs, videos, recordings, flashcards] = await Promise.all([
+        studyNoteRepository.getAll().catch(() => []),
+        documentRepository.getAll().catch(() => []),
+        youTubeRepository.getAll().catch(() => []),
+        audioRepository.getAll().catch(() => []),
+        flashcardRepository.getAll().catch(() => []),
+      ]);
+      setExtraItems({ notes, docs, videos, recordings, flashcards });
+    } catch (err) {
+      console.warn('[useSubjects] Error preloading activity feed:', err);
+    }
+  }, []);
 
   // ── Pending FSRS cards per subject (real data from predictions engine) ──
   const pendingBySubject = useMemo(() => {
@@ -188,27 +199,31 @@ export function useSubjects(t: any) {
   }, [assessments]);
 
   const projectionsBySubject = useMemo(() => {
-    const map = new Map<string, any>();
-    for (const s of subjects) {
-      const subjectAssessments = assessmentsBySubject.get(s.id) || [];
-      const projection = calculateProjection(subjectAssessments, s, null);
-      map.set(s.id, projection);
-    }
-    return map;
+    return perfDiagnostics.measure('subjects.projectionsBySubject', () => {
+      const map = new Map<string, any>();
+      for (const s of subjects) {
+        const subjectAssessments = assessmentsBySubject.get(s.id) || [];
+        const projection = calculateProjection(subjectAssessments, s, null);
+        map.set(s.id, projection);
+      }
+      return map;
+    });
   }, [subjects, assessmentsBySubject]);
 
   const enrichedSubjects = useMemo(() => {
-    return subjects.map(s => {
-      const projection = projectionsBySubject.get(s.id)!;
-      return {
-        ...s,
-        avg_score: projection.currentAverage > 0 ? projection.currentAverage : s.avg_score,
-        completion_percent: projection.evaluatedWeight > 0 ? projection.evaluatedWeight : s.completion_percent,
-        pending_flashcards: pendingBySubject.get(s.id),
-        next_milestone: nextMilestoneBySubject.get(s.id),
-        delta: projection.delta,
-      };
-    });
+    return perfDiagnostics.measure('subjects.enrichedSubjects', () =>
+      subjects.map(s => {
+        const projection = projectionsBySubject.get(s.id)!;
+        return {
+          ...s,
+          avg_score: projection.currentAverage > 0 ? projection.currentAverage : s.avg_score,
+          completion_percent: projection.evaluatedWeight > 0 ? projection.evaluatedWeight : s.completion_percent,
+          pending_flashcards: pendingBySubject.get(s.id),
+          next_milestone: nextMilestoneBySubject.get(s.id),
+          delta: projection.delta,
+        };
+      })
+    );
   }, [subjects, pendingBySubject, nextMilestoneBySubject, projectionsBySubject]);
 
   const filteredSubjects = useMemo(() => {
@@ -250,12 +265,13 @@ export function useSubjects(t: any) {
     }));
   }, [localCriticalSubjects]);
   const recentActivity = useMemo(() => {
-    const items: UnifiedActivityItem[] = [];
-    const now = Date.now();
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-    const cutoff = now - SEVEN_DAYS_MS;
+    return perfDiagnostics.measure('subjects.recentActivity', () => {
+      const items: UnifiedActivityItem[] = [];
+      const now = Date.now();
+      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+      const cutoff = now - SEVEN_DAYS_MS;
 
-    const inWindow = (ts: number) => ts > 0 && ts >= cutoff && ts <= now;
+      const inWindow = (ts: number) => ts > 0 && ts >= cutoff && ts <= now;
 
     // 1. Assessments (evaluaciones, exámenes, tareas, trabajos)
     assessments.forEach(as => {
@@ -453,6 +469,7 @@ export function useSubjects(t: any) {
       .sort((a, b) => b.date - a.date);
 
     return sorted;
+    });
   }, [assessments, flashcardDecks, userStats, calendarEvents, subjects, courses, extraItems, t]);
 
   // ── Hero footer: motor de aprendizaje ──
@@ -469,7 +486,7 @@ export function useSubjects(t: any) {
 
   return {
     subjects, filteredSubjects, enrichedSubjects, criticalSubjects,
-    totalCredits, recentActivity,
+    totalCredits, recentActivity, loadActivityFeed,
     dueDecksToday, studyStreak,
     search, setSearch,
     overlayVisible, setOverlayVisible,

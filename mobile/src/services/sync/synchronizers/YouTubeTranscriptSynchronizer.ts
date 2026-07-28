@@ -5,12 +5,8 @@ export class YouTubeTranscriptSynchronizer implements EntitySynchronizer {
   readonly entityType = 'youtube_transcripts';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await youTubeTranscriptRepository.upsert(item);
-      count++;
-    }
-    return count;
+    await youTubeTranscriptRepository.upsertMany(items);
+    return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {

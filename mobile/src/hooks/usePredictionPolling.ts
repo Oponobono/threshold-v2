@@ -7,40 +7,38 @@ const POLLING_INTERVAL_MS = 15 * 60 * 1000; // 15 minutos
 
 /**
  * Hook que:
- * 1. Carga predicciones del cache al iniciar
- * 2. Hace polling cada 15 minutos
- * 3. Guarda en cache automáticamente
- * 
- * @param userId - ID del usuario
- * @param enabled - Si está habilitado el polling
+ * 1. Lanza la primera actualización de predicciones cuando el core del
+ *    Dashboard ya terminó (coreReady=true), garantizando que el Flashcards
+ *    JOIN no compita con Schedule/GPA/Knowledge.
+ * 2. Hace polling cada 15 minutos a partir de ese punto.
+ * 3. Guarda en cache automáticamente.
+ *
+ * @param userId    - ID del usuario
+ * @param enabled   - Si el polling está habilitado
+ * @param coreReady - Señal del DashboardCoordinator: true cuando Schedule+GPA
+ *                    completaron. La primera carga espera esta señal.
+ *                    Por defecto true para compatibilidad con llamadas sin coordinator.
  */
 export const usePredictionPolling = (
   userId: string | number | null | undefined,
-  enabled: boolean = true
+  enabled: boolean = true,
+  coreReady: boolean = true,
 ) => {
   const { useDataStore } = require('../store/useDataStore') as typeof import('../store/useDataStore');
   const { refreshPredictions, loadCachedPredictions } = useDataStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const initializedRef = useRef(false);
+  const firstRunDoneRef = useRef(false);
 
-  // Al iniciar: cargar del cache
+  // Primera actualización: espera coreReady (Schedule+GPA done).
+  // Sin timer fijo — el coordinator es la señal real.
   useEffect(() => {
-    if (initializedRef.current || !enabled) return;
-    initializedRef.current = true;
+    if (!enabled || !userId || !coreReady || firstRunDoneRef.current) return;
+    firstRunDoneRef.current = true;
+    console.log(`[PredictionPolling] Primera actualización de predicciones`);
+    refreshPredictions(userId);
+  }, [userId, enabled, coreReady, refreshPredictions]);
 
-    const initializePredictions = async () => {
-      try {
-        console.log(`[PredictionPolling] Cargando predicciones del cache`);
-        await loadCachedPredictions();
-      } catch (error) {
-        console.error('[PredictionPolling] Error cargando cache:', error);
-      }
-    };
-
-    initializePredictions();
-  }, [enabled, loadCachedPredictions]);
-
-  // Polling cada 15 minutos
+  // Polling recurrente cada 15 minutos
   useEffect(() => {
     if (!enabled || !userId) {
       if (intervalRef.current) {
@@ -50,22 +48,15 @@ export const usePredictionPolling = (
       return;
     }
 
-    // Limpieza previa
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
 
-    // Primera actualización inmediata
-    console.log(`[PredictionPolling] Primera actualización de predicciones`);
-    refreshPredictions(userId);
-
-    // Configurar polling cada 15 minutos
     intervalRef.current = setInterval(() => {
       console.log(`[PredictionPolling] Actualizando predicciones (polling)`);
       refreshPredictions(userId);
     }, POLLING_INTERVAL_MS);
 
-    // Cleanup
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
