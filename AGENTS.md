@@ -421,6 +421,7 @@ Items que no dependen de la fase actual. Se atienden cuando hay ventana.
 - **Migrar `expo-background-fetch` → `expo-background-task`** antes de SDK 54.
 - **Crear tabla SQLite para `user_groups`** y migrar OverallGPA a cálculo local.
 - **Restore Validator**: `downloadService.ts` como importador en 2 fases (Parse → Validate → Integrity Report → Import).
+- **Bridge JSI de expo-sqlite ~8x más lento en cold start**: consultas que en warmup toman ~31ms toman ~2450ms (bridge=1822ms) durante los primeros segundos del arranque. El patrón es consistente (Schedules: 627ms, GPA: 628ms). No es SQL ni JS — es el runtime nativo que aún no estabilizó su pipeline. Mitigación posible: mover consultas grandes fuera de la ventana crítica post-mount o diferirlas a un microtask tras el primer frame renderizado. Investigar si es contención con el hilo de React Native durante el primer render, cold start del native thread pool de expo-sqlite, o scheduler interno de Hermes.
 
 ## Hallazgos Críticos del Audit
 - **FOREIGN KEY constraint failed en restore de backup**: `downloadService.ts` falla al restaurar flashcard_decks cuyos `subject_id` ya no existe localmente. Causa raíz: `deleteSubject()` en móvil hace soft-delete SIN cascade local. El backend sí cascadea, pero entre el soft-delete local y la sincronización, un backup captura decks huérfanos. **CORREGIDO** vía `SubjectDomainService.deleteSubject()` con cascade transaccional + journal compaction. Sprint 2 pendiente: IntegrityReport en restore para prevenir inserciones huérfanas.
