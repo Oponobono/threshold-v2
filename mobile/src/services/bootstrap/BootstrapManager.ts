@@ -238,10 +238,10 @@ class BootstrapManager {
       this._emit();
       console.log('[BOOT 15] BootstrapManager.start() completed successfully');
 
-      // Start idle benchmark after system settles (dev only)
-      if (__DEV__) {
-        setTimeout(() => this._runIdleBenchmark(), 8000);
-      }
+      // Idle benchmark disabled — cumplió su función de medir latencia del bridge.
+      // La instrumentación mostró que el primer buildSnapshot(BOOT) tarda ~1.4s
+      // por cold start del bridge JSI de expo-sqlite, no por contención.
+      // El IdleBenchmark se encolaba DETRÁS del BOOT, no al revés.
     } catch (err: any) {
       this._status = 'error';
       this._error = err.message || 'Bootstrap failed';

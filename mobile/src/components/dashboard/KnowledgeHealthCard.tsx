@@ -256,4 +256,10 @@ function KnowledgeHealthCardContent({ snapshot, t, mainColor, prioridad, masSoli
   );
 };
 
-export const KnowledgeHealthCard = React.memo(KnowledgeHealthCardComponent);
+export const KnowledgeHealthCard = React.memo(
+  KnowledgeHealthCardComponent,
+  (prev, next) =>
+    prev.snapshot?.clock === next.snapshot?.clock &&
+    prev.loading === next.loading &&
+    prev.onInfoPress === next.onInfoPress
+);

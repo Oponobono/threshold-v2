@@ -71,19 +71,16 @@ interface UseKnowledgeInsights {
   loading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
-  /** Llamar desde fuera cuando el coordinator (Schedule+GPA) termina. */
-  triggerBootSnapshot: () => void;
 }
 
 /**
  * useKnowledgeInsights
  *
- * El snapshot de arranque (BOOT) NO se dispara automáticamente en mount.
- * El consumidor llama `triggerBootSnapshot()` cuando el coordinator completa,
- * garantizando que Knowledge accede al bridge sin contención.
+ * Dispara el snapshot de arranque (BOOT) automáticamente en mount,
+ * inmediatamente después de cargar la caché desde MMKV.
+ * No depende del DashboardCoordinator — es completamente autónomo.
  *
- * El trigger es síncrono (ref callback) para evitar los ~500ms del
- * React scheduler que introduce setCoordinatorDone(true) → useEffect.
+ * bootDoneRef previene duplicados si el hook se re-monta o userId cambia.
  */
 export function useKnowledgeInsights(
   userId: string | null | undefined,
@@ -97,8 +94,6 @@ export function useKnowledgeInsights(
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingReasonRef = useRef<SnapshotBuildReason | null>(null);
   const bootDoneRef = useRef(false);
-  const coordinatorFiredRef = useRef(false);
-  // Ref estable a buildSnapshot para que triggerBootSnapshot no cambie
   const buildSnapshotRef = useRef<((reason: SnapshotBuildReason, silent: boolean) => Promise<void>) | null>(null);
 
   const buildSnapshot = useCallback(async (reason: SnapshotBuildReason, silent: boolean) => {
@@ -121,17 +116,6 @@ export function useKnowledgeInsights(
     }
   }, [userId]);
 
-  // Wrapper para el BOOT snapshot:
-  // • La marca bootDoneRef ocurre ANTES del await — así dos llamadas simultáneas
-  //   (coordinator + sync-event) nunca pasan el guard al mismo tiempo.
-  // • Los builds de sync-event (ENTITY_UPDATED, etc.) no tocan bootDoneRef:
-  //   deben poder correr en cualquier momento sin afectar el ciclo de arranque.
-  const runBootSnapshot = useCallback(() => {
-    if (!userId || bootDoneRef.current) return;
-    bootDoneRef.current = true;  // marca atómica antes del async
-    buildSnapshotRef.current?.(SnapshotBuildReason.BOOT, false);
-  }, [userId]);
-
   // Mantener el ref actualizado con la última versión de buildSnapshot
   buildSnapshotRef.current = buildSnapshot;
 
@@ -139,29 +123,20 @@ export function useKnowledgeInsights(
     await buildSnapshot(SnapshotBuildReason.MANUAL_REFRESH, false);
   }, [buildSnapshot]);
 
-  // Callback síncrono: llamado directamente desde coordinator.start().then(...)
-  // Evita el ciclo setState → render → useEffect (~500ms en React scheduler).
-  const triggerBootSnapshot = useCallback(() => {
-    coordinatorFiredRef.current = true;
-    runBootSnapshot();
-  }, [runBootSnapshot]);
-
-  // Fallback: si el coordinator disparó antes de que userId estuviera disponible,
-  // re-intentamos cuando userId se vuelva no nulo.
-  useEffect(() => {
-    if (!userId || bootDoneRef.current || !coordinatorFiredRef.current) return;
-    runBootSnapshot();
-  }, [userId, runBootSnapshot]);
-
-  // Reset al cambiar sesión
+  // Reset al cambiar sesión y disparar boot snapshot automáticamente
   useEffect(() => {
     bootDoneRef.current = false;
-    coordinatorFiredRef.current = false;
-    if (userId) {
-      setSnapshot(loadCachedSnapshot(userId));
-    } else {
+    if (!userId) {
       setSnapshot(null);
+      return;
     }
+    setSnapshot(loadCachedSnapshot(userId));
+    // runBootSnapshot con userId ya verificado y bootDoneRef en false.
+    // bootDoneRef se marca dentro de runBootSnapshot para excluir el BOOT.
+    // Los builds por eventos (ENTITY_UPDATED, FLASHCARD_UPDATED) usan
+    // su propio debounce y no tocan bootDoneRef.
+    bootDoneRef.current = true;
+    buildSnapshotRef.current?.(SnapshotBuildReason.BOOT, true);
   }, [userId]);
 
   useEffect(() => {
@@ -204,5 +179,5 @@ export function useKnowledgeInsights(
     };
   }, [userId, buildSnapshot]);
 
-  return { snapshot, loading, error, refresh, triggerBootSnapshot };
+  return { snapshot, loading, error, refresh };
 }

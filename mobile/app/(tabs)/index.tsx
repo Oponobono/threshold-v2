@@ -93,28 +93,28 @@ export default function HybridDashboardScreen() {
     refreshUserGroups();
   }, []);
 
-  // triggerBootSnapshotRef: puente síncrono coordinator → Knowledge (P0).
-  // Se llama directamente desde coordinator.start().then() para evitar
-  // el ciclo setState→render→useEffect (~500ms del React scheduler).
-  const triggerBootSnapshotRef = useRef<(() => void) | null>(null);
-  // coreReady: señal para inteligencia secundaria (P1: PredictionPolling).
-  // El ~500ms de React scheduler es aceptable aquí — es secondary intelligence.
+  // coreReady: señal para PredictionPolling (inteligencia secundaria).
+  // El ~500ms de React scheduler es aceptable aquí.
   const [coreReady, setCoreReady] = useState(false);
 
   // Cargas SQLite coordinadas: Schedule (P1) → GPA (P2), ejecución secuencial.
-  // Cuando la Promise resuelve, emite dos señales:
-  //   • triggerBootSnapshot (síncrono): Knowledge accede al bridge sin delay
-  //   • setCoreReady (async vía React): PredictionPolling espera el ciclo completo
+  // Knowledge Snapshot es autónomo (useKnowledgeInsights lo maneja al mount).
   useEffect(() => {
     dashboardTelemetry.mount();
+    dashboardTelemetry.log('useEffect[coordinator] fired — Dashboard component mount');
     const coordinator = new DashboardCoordinator(
       buildDashboardTasks({ syncTodaySchedules, refreshOverallGpa })
     );
     coordinator.start().then(() => {
-      triggerBootSnapshotRef.current?.();  // P0: síncrono
-      setCoreReady(true);                  // P1: vía React scheduler
+      dashboardTelemetry.log('coordinator.then() — all tasks done');
+      setCoreReady(true);
+      dashboardTelemetry.log('Post-coordinator: all done');
+      dashboardTelemetry.report();
     });
-    return () => coordinator.cancel();
+    return () => {
+      dashboardTelemetry.log('coordinator cancelled');
+      coordinator.cancel();
+    };
   }, []);
 
 
@@ -318,10 +318,8 @@ export default function HybridDashboardScreen() {
   // ── Polling de predicciones: P1, espera coreReady (Schedule+GPA done) ───
   usePredictionPolling(profile?.id, true, coreReady);
 
-  // ── KnowledgeSnapshot: P3, disparado por coordinator (Schedule+GPA done) ──
-  // triggerBootSnapshot es síncrono — coordinator lo llama directamente.
-  const { snapshot: knowledgeSnapshot, loading: knowledgeLoading, triggerBootSnapshot } = useKnowledgeInsights(profile?.id);
-  triggerBootSnapshotRef.current = triggerBootSnapshot;
+  // ── KnowledgeSnapshot: autónomo, se dispara al mount (useKnowledgeInsights) ──
+  const { snapshot: knowledgeSnapshot, loading: knowledgeLoading } = useKnowledgeInsights(profile?.id);
 
   const fullName = useMemo(() => {
     const first = profile?.name?.trim() || '';
@@ -546,6 +544,24 @@ export default function HybridDashboardScreen() {
 
 
 
+  const handleKnowledgeInfoPress = useCallback(() => {
+    setOverlayText(
+`### Entendiendo tu Estado de Aprendizaje
+
+Estas métricas te ayudan a separar lo que **realmente recuerdas** de qué tan **precisa** es la información que te mostramos.
+
+**Confianza**
+No mide tu memoria, mide **qué tantos datos tiene la IA para entender cómo aprendes**. Solo depende de cuántas tarjetas has creado. Al superar las 500 tarjetas en tu cuenta, las predicciones alcanzan su máxima precisión (96%).
+
+**Consolidado**
+Es el conocimiento que ya es tuyo a largo plazo. Es el porcentaje de información que has repasado tantas veces que ha alcanzado la **Maestría**. Tu cerebro tardará semanas o incluso meses en olvidar estos conceptos.
+
+**Riesgo Hoy**
+Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porcentaje de conocimiento en riesgo crítico (memorización por debajo del 70%). Si no repasas estas materias hoy, el esfuerzo que invertiste en aprenderlas podría perderse.`
+    );
+    setOverlayVisible(true);
+  }, []);
+
   const handleOpenQuickAdd = async () => {
     setIsQuickAddMenuVisible(true);
     try {
@@ -678,23 +694,7 @@ export default function HybridDashboardScreen() {
             <KnowledgeHealthCard 
               snapshot={knowledgeSnapshot} 
               loading={knowledgeLoading || !knowledgeSnapshot} 
-              onInfoPress={() => {
-                setOverlayText(
-`### Entendiendo tu Estado de Aprendizaje
-
-Estas métricas te ayudan a separar lo que **realmente recuerdas** de qué tan **precisa** es la información que te mostramos.
-
-**Confianza**
-No mide tu memoria, mide **qué tantos datos tiene la IA para entender cómo aprendes**. Solo depende de cuántas tarjetas has creado. Al superar las 500 tarjetas en tu cuenta, las predicciones alcanzan su máxima precisión (96%).
-
-**Consolidado**
-Es el conocimiento que ya es tuyo a largo plazo. Es el porcentaje de información que has repasado tantas veces que ha alcanzado la **Maestría**. Tu cerebro tardará semanas o incluso meses en olvidar estos conceptos.
-
-**Riesgo Hoy**
-Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porcentaje de conocimiento en riesgo crítico (memorización por debajo del 70%). Si no repasas estas materias hoy, el esfuerzo que invertiste en aprenderlas podría perderse.`
-                );
-                setOverlayVisible(true);
-              }}
+              onInfoPress={handleKnowledgeInfoPress}
             />
           </View>
 

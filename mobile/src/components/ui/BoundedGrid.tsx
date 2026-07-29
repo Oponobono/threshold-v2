@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, ListRenderItemInfo, StyleSheet, ScrollView } from 'react-native';
 import { theme } from '../../styles/theme';
 
 interface BoundedGridProps<T> {
   data: T[];
-  renderItem: ({ item, index }: { item: T; index: number }) => React.ReactElement;
+  renderItem: (info: ListRenderItemInfo<T>) => React.ReactElement | null;
   keyExtractor: (item: T, index: number) => string;
   numColumns?: number;
   maxHeight?: number;
@@ -15,6 +15,12 @@ interface BoundedGridProps<T> {
   headerAction?: React.ReactNode;
   subHeader?: React.ReactNode;
 }
+
+const noopSeparators = {
+  highlight: () => {},
+  unhighlight: () => {},
+  updateProps: () => {},
+};
 
 export function BoundedGrid<T>({
   data,
@@ -53,25 +59,25 @@ export function BoundedGrid<T>({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 4 }}
           >
-          <View style={{ flexDirection: 'column', gap }}>
-            {Array.from({ length: Math.ceil(data.length / numColumns) }).map((_, rowIndex) => (
-              <View key={`row-${rowIndex}`} style={{ flexDirection: 'row', gap }}>
-                {Array.from({ length: numColumns }).map((_, colIndex) => {
-                  const itemIndex = rowIndex * numColumns + colIndex;
-                  const item = data[itemIndex];
-                  if (!item) {
-                    return <View key={`empty-${colIndex}`} style={{ flex: 1 }} />;
-                  }
-                  return (
-                    <React.Fragment key={keyExtractor(item, itemIndex)}>
-                      {renderItem({ item, index: itemIndex })}
-                    </React.Fragment>
-                  );
-                })}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+            <View style={{ flexDirection: 'column', gap }}>
+              {Array.from({ length: Math.ceil(data.length / numColumns) }).map((_, rowIndex) => (
+                <View key={`row-${rowIndex}`} style={{ flexDirection: 'row', gap }}>
+                  {Array.from({ length: numColumns }).map((_, colIndex) => {
+                    const itemIndex = rowIndex * numColumns + colIndex;
+                    const item = data[itemIndex];
+                    if (!item) {
+                      return <View key={`empty-${colIndex}`} style={{ flex: 1 }} />;
+                    }
+                    return (
+                      <React.Fragment key={keyExtractor(item, itemIndex)}>
+                        {renderItem({ item, index: itemIndex, separators: noopSeparators })}
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
         </View>
       )}
     </View>

@@ -11,12 +11,27 @@ import { audioRepository } from '../services/database/repositories/AudioReposito
 import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
 import { theme } from '../styles/theme';
 import { perfDiagnostics } from '../services/performance';
+import { getLocales } from 'expo-localization';
+
+// Singleton formatter — instanciado una vez a nivel de módulo, reutilizado para todos los items
+const _getDateFormatter = (() => {
+  let formatter: Intl.DateTimeFormat | null = null;
+  let cachedLang = '';
+  return (lang: string) => {
+    if (!formatter || cachedLang !== lang) {
+      cachedLang = lang;
+      formatter = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short' });
+    }
+    return formatter;
+  };
+})();
 
 export interface UnifiedActivityItem {
   id: string;
   title: string;
   subtitle: string;
   date: number;
+  dateStr: string;
   subjectId: string;
   subjectName?: string;
   subjectColor?: string;
@@ -109,7 +124,7 @@ function getRelativeTime(then: number, t: any): string {
   return t('subjects.timeDaysAgo', { count: diffDays });
 }
 
-export function useSubjects(t: any) {
+export function useSubjects(t: any, lang?: string) {
   const subjects = useDataStore(s => s.subjects);
   const courses = useDataStore(s => s.courses);
   const assessments = useDataStore(s => s.assessments);
@@ -208,7 +223,8 @@ export function useSubjects(t: any) {
   }, [subjects, assessmentsBySubject]);
 
   const enrichedSubjects = useMemo(() => {
-    return perfDiagnostics.measure('subjects.enrichedSubjects', () =>
+    const t0 = performance.now();
+    const res = perfDiagnostics.measure('subjects.enrichedSubjects', () =>
       subjects.map(s => {
         const projection = projectionsBySubject.get(s.id)!;
         return {
@@ -221,6 +237,7 @@ export function useSubjects(t: any) {
         };
       })
     );
+    return res;
   }, [subjects, pendingBySubject, nextMilestoneBySubject, projectionsBySubject]);
 
   const filteredSubjects = useMemo(() => {
@@ -451,6 +468,7 @@ export function useSubjects(t: any) {
     }
 
     const subjectMap = new Map(subjects.map(s => [s.id, s]));
+    const formatter = _getDateFormatter(lang || 'es');
 
     // Enriquecer con metadata de la materia y ordenar
     const sorted = items
@@ -461,6 +479,7 @@ export function useSubjects(t: any) {
           subjectName: subject?.name || 'General',
           subjectColor: subject?.color || theme.colors.primary,
           relativeTime: getRelativeTime(item.date, t),
+          dateStr: item.date > 0 ? formatter.format(item.date) : '',
         };
       })
       .sort((a, b) => b.date - a.date);

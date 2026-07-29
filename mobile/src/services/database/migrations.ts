@@ -887,5 +887,21 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_documents_active ON scanned_documents(deleted_at, created_at DESC)`,
     ],
   },
+  {
+    version: 42,
+    up: [
+      // Partial indexes for getKnowledgeAggregation() and general sync queries.
+      // All three tables had no index on user_id → forced full SCAN for the
+      // JOIN + WHERE clauses even with <200 rows.
+      // Partial (WHERE deleted_at IS NULL) = only active rows in index →
+      // smaller B-tree, same query perf, less write overhead.
+      `CREATE INDEX IF NOT EXISTS idx_fc_decks_user_deleted
+       ON flashcard_decks(user_id) WHERE deleted_at IS NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_flashcards_deck_deleted
+       ON flashcards(deck_id) WHERE deleted_at IS NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_subjects_user_deleted
+       ON subjects(user_id) WHERE deleted_at IS NULL`,
+    ],
+  },
 ];
 export default migrations;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SubjectIcon } from './SubjectIcon';
@@ -38,10 +38,12 @@ interface SubjectCardProps {
   onComplete?: (subject: any) => void;
 }
 
-export const SubjectCard = React.memo(({
-  subject, onPress, onContinue, onComplete,
-}: SubjectCardProps) => {
+export const SubjectCard = React.memo((
+  { subject, onPress, onContinue, onComplete }: SubjectCardProps,
+) => {
+
   const color = subject.color || theme.colors.primary;
+  const darkenedColor = useMemo(() => darkenHex(color, 0.45), [color]);
 
   const raw = subject.avg_score ?? 0;
   const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
@@ -78,7 +80,7 @@ export const SubjectCard = React.memo(({
         {/* header: icon + badge - fusionados en una sola capa */}
         <View style={styles.header}>
           <View style={[styles.iconContainer, { backgroundColor: color }]}>
-            <SubjectIcon iconName={subject.icon} color={darkenHex(color, 0.45)} size={17} />
+            <SubjectIcon iconName={subject.icon} color={darkenedColor} size={17} />
           </View>
           {hasGrade ? (
             <View style={[styles.badge, { backgroundColor: statusBgColor }]}>

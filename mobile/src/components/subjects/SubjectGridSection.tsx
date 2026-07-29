@@ -67,7 +67,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
       gap={8}
       subHeader={subHeader}
       ListEmptyComponent={emptyState}
-      renderItem={({ item }) => (
+      renderItem={({ item, index, separators }) => (
         <View style={{ flex: 1 }}>
           <SubjectCard
             subject={item}

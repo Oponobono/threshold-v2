@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, Profiler } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, Pressable, InteractionManager, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -44,17 +44,48 @@ const MomentumCard = ({ score }: { score: number }) => {
 let moduleEvalTime = performance.now();
 let firstRenderTime = 0;
 
-export default function SubjectsScreen() {
-  if (firstRenderTime === 0) {
-    firstRenderTime = performance.now();
+// Caché global de formateadores por idioma para evitar 29 instanciaciones costosas durante el render diferido
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const getFormatter = (lang: string) => {
+  if (!dateFormatterCache.has(lang)) {
+    dateFormatterCache.set(lang, new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short' }));
   }
-  
+  return dateFormatterCache.get(lang)!;
+};
+
+const TimelineItem = React.memo(({ item, index, isLast, config }: any) => {
+  return (
+    <View style={[styles.timelineItem, !isLast && { position: 'relative' }]}>
+      <View style={[styles.timelineDot, { backgroundColor: item.subjectColor, justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name={config.icon as any} size={8} color="#FFFFFF" />
+      </View>
+      {!isLast && <View style={styles.timelineLine} />}
+      <View style={styles.timelineContent}>
+        <Text style={styles.timelineName} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.timelineMeta}>
+          <Text style={{ color: config.color, fontWeight: '600' }}>{config.label}</Text> • {item.subjectName}
+        </Text>
+        {item.subtitle ? <Text style={[styles.timelineMeta, { marginTop: 1 }]} numberOfLines={1}>{item.subtitle}</Text> : null}
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={styles.timelineTime}>{item.relativeTime}</Text>
+        <Text style={[styles.timelineTime, { marginTop: 2, fontWeight: '400', fontSize: 8, opacity: 0.7 }]}>
+          {item.dateStr}
+        </Text>
+      </View>
+    </View>
+  );
+}, (prev, next) => {
+  return prev.item.id === next.item.id && 
+         prev.isLast === next.isLast &&
+         prev.item.relativeTime === next.item.relativeTime;
+});
+
+export default function SubjectsScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   
-  const startUseSubjects = performance.now();
-  const g = useSubjects(t);
-  const endUseSubjects = performance.now();
+  const g = useSubjects(t, i18n.language);
   const courses = useDataStore(s => s.courses);
   const loadAllData = useDataStore(s => s.loadAllData);
   const refreshSubjects = useDataStore(s => s.refreshSubjects);
@@ -65,20 +96,9 @@ export default function SubjectsScreen() {
   // Carga inicial: los datos ya están en el store gracias al BootstrapManager.
   // No llamamos a loadAllData() aquí para evitar colapsar el bridge.
   
-  useEffect(() => {
-    const commitTime = performance.now();
-    console.log(`[PerfProfile] Module Eval -> First Render: ${(firstRenderTime - moduleEvalTime).toFixed(1)} ms`);
-    console.log(`[PerfProfile] First Render -> Commit: ${(commitTime - firstRenderTime).toFixed(1)} ms`);
-    console.log(`[PerfProfile] useSubjects() duration: ${(endUseSubjects - startUseSubjects).toFixed(1)} ms`);
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
-      const focusTime = performance.now();
-      console.log(`[PerfProfile] Focus acquired at: ${(focusTime - firstRenderTime).toFixed(1)} ms since first render`);
-      g.loadActivityFeed().then(() => {
-        console.log(`[PerfProfile] ActivityFeed loaded: ${(performance.now() - focusTime).toFixed(1)} ms after focus`);
-      });
+      g.loadActivityFeed();
     }, [g.loadActivityFeed])
   );
 
@@ -99,12 +119,6 @@ export default function SubjectsScreen() {
   const [courseModalVisible, setCourseModalVisible] = useState(false);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
   const [isReady, setIsReady] = useState(false);
-
-  const handleProfile = useCallback((id: string, phase: string, actualDuration: number) => {
-    if (phase === 'mount') {
-      console.log(`[PerfProfile] Deferred section '${id}' mount time: ${actualDuration.toFixed(1)} ms`);
-    }
-  }, []);
 
   useEffect(() => {
     InteractionManager.runAfterInteractions(() => {
@@ -283,17 +297,14 @@ export default function SubjectsScreen() {
           ) : null
         }
         ListFooterComponent={isReady && g.subjects.length > 0 ? (
-          <Profiler id="ScheduleGrid" onRender={handleProfile}>
-            <ScheduleGrid onPress={() => setScheduleModalVisible(true)} />
-          </Profiler>
+          <ScheduleGrid onPress={() => setScheduleModalVisible(true)} />
         ) : null}
         ListHeaderComponent={
           g.subjects.length > 0 ? (
             <>
               {/* ── Hero: Resumen del semestre ── */}
               {isReady && (
-                <Profiler id="Hero" onRender={handleProfile}>
-                  <View style={styles.semesterHero}>
+                <View style={styles.semesterHero}>
                 <View style={styles.gpaAmbientGlow} />
                 <View style={styles.heroArc1} />
                 <View style={styles.heroArc2} />
@@ -350,7 +361,6 @@ export default function SubjectsScreen() {
                   )}
                   </View>
                 </View>
-                </Profiler>
               )}
 
               {/* ── Atención necesaria: lista compacta ── */}
@@ -388,41 +398,31 @@ export default function SubjectsScreen() {
 
               {/* ── Actividad reciente ── */}
               {isReady && g.recentActivity.length > 0 && (
-                <Profiler id="Timeline" onRender={handleProfile}>
-                  <View style={styles.timelineSection}>
+                <View style={styles.timelineSection}>
                   <View style={styles.timelineHeader}>
                     <Text style={styles.timelineTitle}>{t('subjects.recentActivityTitle')}</Text>
                   </View>
                   <View style={styles.timelineCard}>
                     <ScrollView style={{ maxHeight: 170 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                      {g.recentActivity.map((item, idx, arr) => {
-                        const config = ACTIVITY_CONFIG[item.type];
-                        return (
-                          <View key={item.id || idx} style={[styles.timelineItem, idx < arr.length - 1 && { position: 'relative' }]}>
-                            <View style={[styles.timelineDot, { backgroundColor: item.subjectColor, justifyContent: 'center', alignItems: 'center' }]}>
-                              <Ionicons name={config.icon as any} size={8} color="#FFFFFF" />
-                            </View>
-                            {idx < arr.length - 1 && <View style={styles.timelineLine} />}
-                            <View style={styles.timelineContent}>
-                              <Text style={styles.timelineName} numberOfLines={1}>{item.title}</Text>
-                              <Text style={styles.timelineMeta}>
-                                <Text style={{ color: config.color, fontWeight: '600' }}>{config.label}</Text> • {item.subjectName}
-                              </Text>
-                              {item.subtitle ? <Text style={[styles.timelineMeta, { marginTop: 1 }]} numberOfLines={1}>{item.subtitle}</Text> : null}
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                              <Text style={styles.timelineTime}>{item.relativeTime}</Text>
-                              <Text style={[styles.timelineTime, { marginTop: 2, fontWeight: '400', fontSize: 8, opacity: 0.7 }]}>
-                                {new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short' }).format(item.date)}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })}
+                      {(() => {
+                        const mapped = g.recentActivity.map((item, idx, arr) => {
+                          const config = ACTIVITY_CONFIG[item.type];
+                          const isLast = idx === arr.length - 1;
+                          return (
+                            <TimelineItem 
+                              key={item.id || idx} 
+                              item={item} 
+                              index={idx} 
+                              isLast={isLast} 
+                              config={config}
+                            />
+                          );
+                        });
+                        return mapped;
+                      })()}
                     </ScrollView>
                   </View>
                   </View>
-                </Profiler>
               )}
 
               {/* ── Bounded Subjects Grid ── */}
@@ -453,9 +453,8 @@ export default function SubjectsScreen() {
       />
 
       {isReady && (
-        <Profiler id="Modals" onRender={handleProfile}>
-          <>
-            <ExplanationOverlay
+        <>
+          <ExplanationOverlay
             visible={g.overlayVisible}
             explanation={g.overlayText}
             onDismiss={() => g.setOverlayVisible(false)}
@@ -520,7 +519,6 @@ export default function SubjectsScreen() {
             onClose={() => setScheduleModalVisible(false)}
           />
           </>
-        </Profiler>
       )}
     </SafeAreaView>
   );

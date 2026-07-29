@@ -1,4 +1,5 @@
 import type { DashboardTask } from './DashboardTask';
+import { dashboardTelemetry } from '../performance/DashboardTelemetry';
 
 /**
  * DashboardCoordinator
@@ -30,12 +31,16 @@ export class DashboardCoordinator {
   start(): Promise<void> {
     const sorted = [...this.tasks].sort((a, b) => a.priority - b.priority);
 
+    dashboardTelemetry.log('coordinator.start() called');
+
     return new Promise<void>((resolve) => {
       // setTimeout base: cede el primer frame antes de empezar las cargas.
       this.baseTimer = setTimeout(async () => {
+        dashboardTelemetry.log('coordinator 150ms timeout fired');
         for (const task of sorted) {
           if (this.cancelled) break;
 
+          dashboardTelemetry.log(`task begin: ${task.id} (priority ${task.priority})`);
           const ctrl = new AbortController();
           this.controllers.set(task.id, ctrl);
 
@@ -47,9 +52,11 @@ export class DashboardCoordinator {
             // El fallo de una tarea no bloquea las siguientes.
           } finally {
             this.controllers.delete(task.id);
+            dashboardTelemetry.log(`task end:   ${task.id}`);
           }
         }
 
+        dashboardTelemetry.log('all tasks done, resolving coordinator');
         // Resolver cuando TODAS las tareas completaron (o fueron canceladas).
         resolve();
       }, 150);

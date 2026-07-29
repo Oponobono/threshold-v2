@@ -41,13 +41,15 @@ export interface KnowledgeAggregation {
 }
 
 export interface AggregationTiming {
-  sqlQueryMs: number;
-  bridgeTransferMs: number;
+  /** Tiempo total dentro de db.getAllAsync (cola + SQL + bridge JS↔Native) */
+  dbCallMs: number;
+  /** Procesamiento JS posterior: separación en buckets */
   loopGroupingMs: number;
+  /** Cálculos por subject (retrievability, elapsedDays, stats) */
   loopAggregationMs: number;
   calculateRetrievabilityMs: number;
   elapsedDaysMs: number;
-  mapOperationsMs: number;
+  /** Ordenamiento y armado del resultado */
   buildSubjectsMs: number;
   totalMs: number;
   rowsReturned: number;
@@ -220,8 +222,7 @@ export async function getKnowledgeAggregation(
   const _tEnd = Date.now();
 
   // ── Instrumentation ─────────────────────────────────────────
-  const sqMs = _tQueryEnd - _tQuery;
-  const bridgeMs = _tGroup - _tQueryEnd;
+  const dbCallMs = _tQueryEnd - _tQuery;
   const groupMs = _tGroupEnd - _tGroup;
   const aggMs = _tAggEnd - _tAgg;
   const buildMs = _tEnd - _tBuild;
@@ -229,13 +230,11 @@ export async function getKnowledgeAggregation(
 
   const colCount = 10;
   const timing: AggregationTiming = {
-    sqlQueryMs: sqMs,
-    bridgeTransferMs: bridgeMs,
+    dbCallMs,
     loopGroupingMs: groupMs,
     loopAggregationMs: aggMs,
     calculateRetrievabilityMs: _tRetriev,
     elapsedDaysMs: _tElapsed,
-    mapOperationsMs: groupMs,
     buildSubjectsMs: buildMs,
     totalMs,
     rowsReturned: rows.length,
@@ -254,8 +253,8 @@ export async function getKnowledgeAggregation(
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('  Phase                        Duration     %Total   Timeline');
   console.log('  ──────────────────────────────────────────────────────────');
-  console.log(`  SQL query              ${String(sqMs).padStart(7)}ms  ${(sqMs/totalMs*100).toFixed(1).padStart(5)}%  ${BAR(sqMs, totalMs)}`);
-  console.log(`  JSI bridge transfer    ${String(bridgeMs).padStart(7)}ms  ${(bridgeMs/totalMs*100).toFixed(1).padStart(5)}%  ${BAR(bridgeMs, totalMs)}`);
+  console.log(`  db.getAllAsync()       ${String(dbCallMs).padStart(7)}ms  ${(dbCallMs/totalMs*100).toFixed(1).padStart(5)}%  ${BAR(dbCallMs, totalMs)}`);
+  console.log(`    └─ (cola+SQL+bridge)  ← ver Queue logging para detalle`);
   console.log(`  Loop 1 — grouping      ${String(groupMs).padStart(7)}ms  ${(groupMs/totalMs*100).toFixed(1).padStart(5)}%  ${BAR(groupMs, totalMs)}`);
   console.log(`  Loop 2 — aggregation   ${String(aggMs).padStart(7)}ms  ${(aggMs/totalMs*100).toFixed(1).padStart(5)}%  ${BAR(aggMs, totalMs)}`);
   console.log(`    ├─ elapsedDays()     ${String(_tElapsed).padStart(7)}ms  ${(_tElapsed/totalMs*100).toFixed(1).padStart(5)}%  ${BAR(_tElapsed, totalMs)}`);
