@@ -8,3 +8,5 @@ services:
       - key: NODE_ENV
         value: production
     healthCheckPath: /health
+    healthCheckTimeout: 30
+    startGracePeriod: 90s

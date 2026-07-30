@@ -1,5 +1,21 @@
 # Session Context
 
+## Product Context
+
+Threshold es una **Personal Knowledge Platform** para aprendizaje, construida bajo un enfoque **local-first / offline-first**. El conocimiento del usuario reside y es operable localmente (SQLite como fuente de verdad); la sincronización remota es complementaria (convergencia, respaldo, continuidad entre dispositivos).
+
+**Problema**: la información académica y personal está fragmentada (documentos, notas, calendario, LMS, mensajes), y el aprendizaje exige continuidad y contexto.
+
+**Diferenciación**: integración semántica de capacidades (no una colección de herramientas sueltas). Threshold conecta documentos, notas, materias, evaluaciones, horarios y recordatorios dentro de un mismo contexto.
+
+**Arquitectura**: local-first (filosofía), offline-first (consecuencia en experiencia). Backend es mecanismo de sync, no fuente de verdad de la UI.
+
+**Usuario primario**: estudiantes universitarios con alta carga de información.
+
+**Visión**: evolucionar desde herramienta universitaria hacia sistema personal de conocimiento que acompañe el aprendizaje continuo.
+
+Para referencia completa de producto, marca y posicionamiento, ver `docs/ProductBrandFoundation.md` y `docs/BrandBrief.md`.
+
 ## Goal
 - **[Protocol v1.0]** Sync engine convergence validated: all sync decisions ordered exclusively by version (`sync_version` for mutations, `deletion_version` for deletions). `deleted_at` is audit/metadata only.
 - **Stress Suite**: reproducible simulation engine with configurable devices (2/3/5/10), 5 perturbation types (kill/resume, simultaneous sync, random latency, packet loss, server restart, partial sync), SyncMetrics tracking (Convergence Score, sync timing P95, queue depth, conflicts, retries, per-op timing), and tiered runner (smoke/regression/nightly).
