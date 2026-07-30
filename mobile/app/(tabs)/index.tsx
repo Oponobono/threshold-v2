@@ -686,111 +686,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
 
 
         {/* ====================================================== */}
-        {/* ORIENTATION & TODAY FOCUS                              */}
-        {/* ====================================================== */}
-        <View style={styles.section}>
-          {/* --- ORIENTATION --- */}
-          <View style={{ marginBottom: 24 }}>
-            <KnowledgeHealthCard 
-              snapshot={knowledgeSnapshot} 
-              loading={knowledgeLoading || !knowledgeSnapshot} 
-              onInfoPress={handleKnowledgeInfoPress}
-            />
-          </View>
-
-          {/* --- TODAY FOCUS --- */}
-          <DailyReviewCard
-            cards={predictions?.cards ?? []}
-            subjectNames={subjectNamesMap}
-            onStart={() => setIsFlashcardsVisible(true)}
-            predictionsSource={predictionsSource}
-          />
-
-          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('dashboard.upNext', { defaultValue: 'Lo siguiente' })}</Text>
-          <View style={styles.grid}>
-            {/* NEXT CLASS */}
-            {(() => {
-              let nextClassSubtext = t('dashboard.enjoyDay');
-              if (nextClass) {
-                const now = new Date();
-                const [startH, startM] = (nextClass.start_time || '00:00').split(':').map(Number);
-                const classStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM, 0);
-                const diffMins = Math.floor((classStart.getTime() - now.getTime()) / 60000);
-                
-                if (diffMins > 0) {
-                  const h = Math.floor(diffMins / 60);
-                  const m = diffMins % 60;
-                  if (h > 0) {
-                    nextClassSubtext = m > 0 ? `En ${h}h ${m}m` : `En ${h}h`;
-                  } else {
-                    nextClassSubtext = `En ${m} min`;
-                  }
-                } else {
-                  nextClassSubtext = `En curso`;
-                }
-              }
-
-              return (
-                <MetricCard 
-                  title={t('dashboard.nextClass')}
-                  value={nextClass ? (subjectNamesMap[nextClass.subject_id!] || t('dashboard.unknownSubject', { defaultValue: 'Materia' })) : (todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'))}
-                  subtext={nextClassSubtext}
-                  icon="time-outline"
-                  color={nextClass ? theme.colors.primary : "#5856D6"}
-                  showMood={false}
-                  onPress={() => {
-                    if (nextClass?.subject_id) {
-                      router.push(`/subjects/${nextClass.subject_id}`);
-                    } else {
-                      setSelectedMetric({
-                        title: t('dashboard.nextClass'),
-                        value: todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'),
-                        subtext: t('dashboard.enjoyDay'),
-                        icon: "time-outline",
-                        color: "#5856D6"
-                      });
-                    }
-                  }}
-                />
-              );
-            })()}
-
-            {/* NEXT ASSIGNMENT */}
-            {(() => {
-              const mood = nextAssessment?.date ? (() => {
-                const [d, m, y] = nextAssessment.date.split('-').map(Number);
-                const dueDate = new Date(y, m - 1, d);
-                const today = new Date();
-                today.setHours(0,0,0,0);
-                const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDays <= 1) return { color: '#FF3B30', show: true };
-                if (diffDays <= 3) return { color: '#FF9500', show: true };
-                return { color: '#34C759', show: true };
-              })() : { color: '#5856D6', show: false };
-
-              return (
-                <MetricCard 
-                  title={t('dashboard.nextAssignment')} 
-                  value={nextAssessment ? nextAssessment.name : t('dashboard.nothingPending')} 
-                  subtext={nextAssessment ? nextAssessment.date : t('dashboard.takeABreak')} 
-                  icon="document-text-outline" 
-                  color={mood.color}
-                  showMood={mood.show}
-                  onPress={() => setSelectedMetric({
-                    title: t('dashboard.nextAssignment'),
-                    value: nextAssessment ? nextAssessment.name : "Nada pendiente",
-                    subtext: nextAssessment ? nextAssessment.date : t('dashboard.takeABreak'),
-                    icon: "document-text-outline",
-                    color: mood.color
-                  })}
-                />
-              );
-            })()}
-          </View>
-        </View>
-
-        {/* ====================================================== */}
-        {/* ECOSYSTEM                                              */}
+        {/* CURSOS Y MATERIAS                                    */}
         {/* ====================================================== */}
         {/* 2. COURSE HERO + YOUR SUBJECTS */}
         <View style={styles.section}>
@@ -1018,6 +914,112 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
                 })}
               />
             )}
+          </View>
+        </View>
+
+        {/* ====================================================== */}
+        {/* LO SIGUIENTE                                          */}
+        {/* ====================================================== */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('dashboard.upNext', { defaultValue: 'Lo siguiente' })}</Text>
+          <View style={styles.grid}>
+            {/* NEXT CLASS */}
+            {(() => {
+              let nextClassSubtext = t('dashboard.enjoyDay');
+              if (nextClass) {
+                const now = new Date();
+                const [startH, startM] = (nextClass.start_time || '00:00').split(':').map(Number);
+                const classStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM, 0);
+                const diffMins = Math.floor((classStart.getTime() - now.getTime()) / 60000);
+                
+                if (diffMins > 0) {
+                  const h = Math.floor(diffMins / 60);
+                  const m = diffMins % 60;
+                  if (h > 0) {
+                    nextClassSubtext = m > 0 ? `En ${h}h ${m}m` : `En ${h}h`;
+                  } else {
+                    nextClassSubtext = `En ${m} min`;
+                  }
+                } else {
+                  nextClassSubtext = `En curso`;
+                }
+              }
+
+              return (
+                <MetricCard 
+                  title={t('dashboard.nextClass')}
+                  value={nextClass ? (subjectNamesMap[nextClass.subject_id!] || t('dashboard.unknownSubject', { defaultValue: 'Materia' })) : (todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'))}
+                  subtext={nextClassSubtext}
+                  icon="time-outline"
+                  color={nextClass ? theme.colors.primary : "#5856D6"}
+                  showMood={false}
+                  onPress={() => {
+                    if (nextClass?.subject_id) {
+                      router.push(`/subjects/${nextClass.subject_id}`);
+                    } else {
+                      setSelectedMetric({
+                        title: t('dashboard.nextClass'),
+                        value: todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'),
+                        subtext: t('dashboard.enjoyDay'),
+                        icon: "time-outline",
+                        color: "#5856D6"
+                      });
+                    }
+                  }}
+                />
+              );
+            })()}
+
+            {/* NEXT ASSIGNMENT */}
+            {(() => {
+              const mood = nextAssessment?.date ? (() => {
+                const [d, m, y] = nextAssessment.date.split('-').map(Number);
+                const dueDate = new Date(y, m - 1, d);
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays <= 1) return { color: '#FF3B30', show: true };
+                if (diffDays <= 3) return { color: '#FF9500', show: true };
+                return { color: '#34C759', show: true };
+              })() : { color: '#5856D6', show: false };
+
+              return (
+                <MetricCard 
+                  title={t('dashboard.nextAssignment')} 
+                  value={nextAssessment ? nextAssessment.name : t('dashboard.nothingPending')} 
+                  subtext={nextAssessment ? nextAssessment.date : t('dashboard.takeABreak')} 
+                  icon="document-text-outline" 
+                  color={mood.color}
+                  showMood={mood.show}
+                  onPress={() => setSelectedMetric({
+                    title: t('dashboard.nextAssignment'),
+                    value: nextAssessment ? nextAssessment.name : "Nada pendiente",
+                    subtext: nextAssessment ? nextAssessment.date : t('dashboard.takeABreak'),
+                    icon: "document-text-outline",
+                    color: mood.color
+                  })}
+                />
+              );
+            })()}
+          </View>
+        </View>
+
+        {/* ====================================================== */}
+        {/* ESTADO DEL APRENDIZAJE                                 */}
+        {/* ====================================================== */}
+        <View style={styles.section}>
+          <KnowledgeHealthCard 
+              snapshot={knowledgeSnapshot} 
+              loading={knowledgeLoading || !knowledgeSnapshot} 
+              onInfoPress={handleKnowledgeInfoPress}
+            />
+          <View style={{ marginTop: 20 }}>
+            <DailyReviewCard
+            cards={predictions?.cards ?? []}
+            subjectNames={subjectNamesMap}
+            onStart={() => setIsFlashcardsVisible(true)}
+            predictionsSource={predictionsSource}
+          />
           </View>
         </View>
         {/* 5. STUDY TOOLS */}
