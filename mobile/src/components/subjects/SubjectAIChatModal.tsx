@@ -550,7 +550,14 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         message: err.message,
         err,
       });
-      showToast(t('subjects.generateError', { error: err.message }));
+      const errorString = (err.message || '').toLowerCase();
+      const isRateLimit = errorString.includes('limit') || errorString.includes('429') || errorString.includes('exhausted') || errorString.includes('too large');
+      
+      if (isRateLimit) {
+        showToast(`⚠️ Límite de procesamiento alcanzado para ${currentProvider}. Por favor, intenta más tarde o cambia de modelo.`);
+      } else {
+        showToast(t('subjects.generateError', { error: err.message }));
+      }
     } finally {
       setIsGenerating(false);
     }
