@@ -38,9 +38,13 @@ async function callGroqAPI(messages, systemPrompt) {
 
   // Limitar historial para evitar Rate Limits (TPM excedido en Groq)
   const maxHistoryMessages = 2;
-  const recentMessages = messages.length > maxHistoryMessages 
+  let recentMessages = messages.length > maxHistoryMessages 
     ? messages.slice(-maxHistoryMessages) 
     : messages;
+
+  if (recentMessages.length > 0 && recentMessages[0].role !== 'user') {
+    recentMessages = recentMessages.slice(1);
+  }
 
   const apiMessages = [{ role: 'system', content: systemPrompt }, ...recentMessages];
   

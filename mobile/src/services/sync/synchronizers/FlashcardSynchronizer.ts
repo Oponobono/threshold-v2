@@ -6,20 +6,11 @@ export class FlashcardSynchronizer implements EntitySynchronizer {
   readonly entityType = 'flashcards';
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      if (item.deck) {
-        await flashcardDeckRepository.upsert(item.deck);
-        count++;
-      }
-      if (Array.isArray(item.cards)) {
-        for (const card of item.cards) {
-          await flashcardRepository.upsert(card);
-          count++;
-        }
-      }
+    const validItems = items.filter(item => item.id && item.deck_id);
+    if (validItems.length > 0) {
+      await flashcardRepository.upsertMany(validItems);
     }
-    return count;
+    return validItems.length;
   }
 
   async deleteItem(id: string): Promise<void> {

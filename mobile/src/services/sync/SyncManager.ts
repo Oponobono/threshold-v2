@@ -14,6 +14,7 @@ import {
   SubjectSynchronizer,
   AssessmentSynchronizer,
   ScheduleSynchronizer,
+  FlashcardDeckSynchronizer,
   FlashcardSynchronizer,
   CalendarEventSynchronizer,
   GradingPeriodSynchronizer,
@@ -74,6 +75,7 @@ class SyncManager {
     this.registerSynchronizer(new SubjectSynchronizer());
     this.registerSynchronizer(new AssessmentSynchronizer());
     this.registerSynchronizer(new ScheduleSynchronizer());
+    this.registerSynchronizer(new FlashcardDeckSynchronizer());
     this.registerSynchronizer(new FlashcardSynchronizer());
     this.registerSynchronizer(new CalendarEventSynchronizer());
     this.registerSynchronizer(new GradingPeriodSynchronizer());

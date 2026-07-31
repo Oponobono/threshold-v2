@@ -300,9 +300,13 @@ async function processAcademicChat(contextText, messages, systemPrompt) {
     // Convertir formato OpenAI a formato Gemini
     // ⚠️ El último mensaje debe ser del usuario para sendMessage()
     const contents = [];
-    if (messages.length > 1) {
-      for (let i = 0; i < messages.length - 1; i++) {
-        const msg = messages[i];
+    let validMessages = messages.length > 0 && messages[0].role !== 'user' 
+      ? messages.slice(1) 
+      : messages;
+
+    if (validMessages.length > 1) {
+      for (let i = 0; i < validMessages.length - 1; i++) {
+        const msg = validMessages[i];
         contents.push({
           role: msg.role === "user" ? "user" : "model",
           parts: [{ text: msg.content }],
@@ -312,7 +316,7 @@ async function processAcademicChat(contextText, messages, systemPrompt) {
 
     const chat = model.startChat({ history: contents });
 
-    const lastMsg = messages[messages.length - 1];
+    const lastMsg = validMessages[validMessages.length - 1];
     if (!lastMsg || lastMsg.role !== "user") {
       throw new Error("El último mensaje debe ser del usuario");
     }

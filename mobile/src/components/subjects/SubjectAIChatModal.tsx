@@ -418,6 +418,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [isThinking, setIsThinking] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const streamAccumulated = useRef('');
+  const messagesRef = useRef<Message[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const streamingMarkdownRules = useMemo(() => createMarkdownRenderRules(setLightboxImage), []);
 
@@ -458,14 +462,15 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     const explicit = (localContextText || '') + (uploadedDocContext || '');
     if (explicit.trim()) return explicit;
     // Fallback: usar el historial de conversación como contexto
-    if (messages.length > 0) {
-      return messages
+    const latestMessages = messagesRef.current;
+    if (latestMessages.length > 0) {
+      return latestMessages
         .filter(m => !m.isDocument)
         .map(m => `${m.role === 'user' ? 'Estudiante' : 'Zyren'}: ${m.content}`)
         .join('\n\n');
     }
     return '';
-  }, [localContextText, uploadedDocContext, messages]);
+  }, [localContextText, uploadedDocContext]);
 
   /**
    * Ejecuta la generación del mazo con los parámetros actuales del panel.
@@ -526,6 +531,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       closeGenPanel();
       const aiMsg: Message = {
         role: 'assistant',
+        isSystemMessage: true,
         content: t('ai.deckGeneratedAiMsg', {
           title: deck.title,
           count: deck.card_count,
@@ -701,7 +707,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
       const data = await sendHybridChatMessage(
         combinedContext,
-        updatedMessages.filter(m => !m.isDocument),
+        updatedMessages.filter(m => !m.isDocument && !m.isSystemMessage),
         sessionId,
         currentProvider,
         isLocalProvider ? onLocalToken : undefined,

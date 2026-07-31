@@ -3,6 +3,7 @@ export { CourseSynchronizer } from './CourseSynchronizer';
 export { SubjectSynchronizer } from './SubjectSynchronizer';
 export { AssessmentSynchronizer } from './AssessmentSynchronizer';
 export { ScheduleSynchronizer } from './ScheduleSynchronizer';
+export { FlashcardDeckSynchronizer } from './FlashcardDeckSynchronizer';
 export { FlashcardSynchronizer } from './FlashcardSynchronizer';
 export { CalendarEventSynchronizer } from './CalendarEventSynchronizer';
 export { GradingPeriodSynchronizer } from './GradingPeriodSynchronizer';

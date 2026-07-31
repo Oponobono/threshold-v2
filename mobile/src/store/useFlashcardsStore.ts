@@ -164,6 +164,12 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
         const affectedDeckIds = [...new Set(event.entities.map(e => String(e.id)))];
         if (affectedDeckIds.length === 0) return;
         
+        if (event.eventType === 'batch_deleted') {
+          const { remove } = get();
+          affectedDeckIds.forEach(id => remove(id));
+          return;
+        }
+
         // Fetch only affected decks
         const placeholders = affectedDeckIds.map(() => '?').join(',');
         const db = databaseService.getDb();

@@ -52,8 +52,6 @@ export class RepositoryEventBus {
   }
 
   private _debounceBatch(event: EntityEvent): void {
-    if (event.priority === 'HIGH') return;
-
     const batchKey = `${event.entityType}:${event.eventType}`;
     if (!this._pendingBatches.has(batchKey)) {
       this._pendingBatches.set(batchKey, []);
