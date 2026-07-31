@@ -6,6 +6,7 @@ const path = require('path');
 const geminiService = require('../utils/geminiService');
 const { shieldPrompt, detectJailbreak, detectSystemPromptLeak } = require('../utils/promptShield');
 const { detectDeckGenerationIntent, buildDeckActionBlock, extractRequestedCount } = require('../utils/intentionDetector');
+const { incrementSyncCounterOnly } = require('../helpers/syncVersion');
 const {
   processDocumentWithFilesAPI,
   processDocumentBuffer,
@@ -185,32 +186,38 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
       item_count: items.length,
     });
 
-    // Crear el mazo en la BD
-    const deckId = uuidv4();
-    db.run(
-      `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
-      [deckId, subject_id, user_id, title, description],
-      function(err) {
-        if (err) {
-          console.error('[aiController] ❌ Error insertando flashcard_deck:', err.message);
-          return res.status(500).json({ error: err.message });
-        }
-        console.log('[aiController] ✅ Mazo creado en BD con ID:', deckId);
+    incrementSyncCounterOnly((errSync, newSyncVersion) => {
+      if (errSync) {
+        console.error('[aiController] ❌ Error incrementando sync_version:', errSync);
+        return res.status(500).json({ error: 'Error interno obteniendo sync_version' });
+      }
 
-        // Insertar todos los ítems
-        const inserts = items.map((item, idx) => new Promise((resolve, reject) => {
-          const itemType = item.type || 'flashcard';
-          const content = item.data || {};
-          const front = itemType === 'flashcard' ? (content.front || '') : '';
-          const back = itemType === 'flashcard' ? (content.back || '') : '';
-          const cardId = uuidv4();
-          const contentStr = JSON.stringify(content);
-          const hint = item.hint || null;
-          const explanation = item.explanation || null;
+      // Crear el mazo en la BD
+      const deckId = uuidv4();
+      db.run(
+        `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, sync_version, version_number) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+        [deckId, subject_id, user_id, title, description, newSyncVersion],
+        function(err) {
+          if (err) {
+            console.error('[aiController] ❌ Error insertando flashcard_deck:', err.message);
+            return res.status(500).json({ error: err.message });
+          }
+          console.log('[aiController] ✅ Mazo creado en BD con ID:', deckId);
 
-          db.run(
-            `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
-            [cardId, deckId, user_id, front, back, itemType, contentStr, hint, explanation],
+          // Insertar todos los ítems
+          const inserts = items.map((item, idx) => new Promise((resolve, reject) => {
+            const itemType = item.type || 'flashcard';
+            const content = item.data || {};
+            const front = itemType === 'flashcard' ? (content.front || '') : '';
+            const back = itemType === 'flashcard' ? (content.back || '') : '';
+            const cardId = uuidv4();
+            const contentStr = JSON.stringify(content);
+            const hint = item.hint || null;
+            const explanation = item.explanation || null;
+
+            db.run(
+              `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status, sync_version, version_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, 1)`,
+              [cardId, deckId, user_id, front, back, itemType, contentStr, hint, explanation, newSyncVersion],
             function(e) { 
               if (e) {
                 console.error(`[aiController] ❌ Error al insertar tarjeta #${idx} en el mazo ${deckId}:`, e.message);
@@ -250,8 +257,9 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
             db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], () => {});
             res.status(500).json({ error: 'Error insertando ítems', details: e.message });
           });
-      }
-    );
+        }
+      );
+    });
   } catch (err) {
     console.error('💥 [aiController] Error crítico en generateStudyMaterial:', err);
     res.status(500).json({ error: 'Error generando material de estudio con Zyren', details: err.message });
