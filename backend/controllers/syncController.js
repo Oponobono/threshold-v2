@@ -22,6 +22,7 @@ exports.initialSync = (req, res) => {
     assessment_categories: `SELECT ac.* FROM assessment_categories ac JOIN subjects s ON ac.subject_id = s.id WHERE s.user_id = ?`,
     schedules: `SELECT * FROM schedules WHERE user_id = ?`,
     flashcardDecks: `SELECT * FROM flashcard_decks WHERE user_id = ?`,
+    flashcards: `SELECT * FROM flashcards WHERE user_id = ?`,
     calendarEvents: `SELECT * FROM calendar_events WHERE user_id = ?`,
     gradingPeriods: `SELECT * FROM grading_periods WHERE user_id = ?`,
     lmsAccounts: `SELECT * FROM lms_accounts WHERE user_id = ?`,
@@ -65,6 +66,7 @@ exports.initialSync = (req, res) => {
     runQuery(queries.assessment_categories),
     runQuery(queries.schedules),
     runQuery(queries.flashcardDecks),
+    runQuery(queries.flashcards),
     runQuery(queries.calendarEvents),
     runQuery(queries.gradingPeriods),
     runQuery(queries.lmsAccounts),
@@ -82,17 +84,7 @@ exports.initialSync = (req, res) => {
     runQuery(queries.documentHighlights),
     getCurrentSyncVersion(),
   ])
-    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, youtubeVideos, youtubeTranscripts, aiChats, assessmentFiles, studyNotes, documentHighlights, syncVersion]) => {
-      const flashcards = [];
-      for (const deck of flashcardDecks) {
-        const cards = await new Promise((resolve) => {
-          db.all('SELECT * FROM flashcards WHERE deck_id = ?', [deck.id], (err, rows) => {
-            resolve(rows || []);
-          });
-        });
-        flashcards.push({ deck, cards });
-      }
-
+    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, flashcards, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, youtubeVideos, youtubeTranscripts, aiChats, assessmentFiles, studyNotes, documentHighlights, syncVersion]) => {
       if (traceId) console.log(`[SyncController][${traceId}] initialSync completed — ${Object.keys(queries).length} entities, version ${syncVersion}`);
 
       res.json({
@@ -106,6 +98,7 @@ exports.initialSync = (req, res) => {
           assessments,
           assessment_categories: assessmentCategories,
           schedules,
+          flashcard_decks: flashcardDecks,
           flashcards,
           calendar_events: calendarEvents,
           grading_periods: gradingPeriods,
