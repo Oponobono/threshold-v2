@@ -3,6 +3,7 @@ export interface AIRequest {
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
+  provider?: string;
   onStreamToken?: (token: string) => void;
 }
 

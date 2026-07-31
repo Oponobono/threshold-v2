@@ -6,6 +6,7 @@ export interface ChatParams {
   history?: { role: 'user' | 'assistant'; content: string }[];
   subjectContext?: string;
   temperature?: number;
+  provider?: string;
   onStreamToken?: (token: string) => void;
 }
 
@@ -62,6 +63,7 @@ class ChatCapability {
       temperature: params.temperature ?? 0.7,
       maxTokens: 1024,
       stream: !!params.onStreamToken,
+      provider: params.provider,
       onStreamToken: params.onStreamToken,
     });
 

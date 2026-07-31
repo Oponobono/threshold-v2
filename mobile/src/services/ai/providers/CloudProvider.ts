@@ -23,13 +23,14 @@ export class CloudProvider implements AIProvider {
       })),
       temperature: req.temperature ?? 0.7,
       maxTokens: req.maxTokens ?? 1024,
+      provider: req.provider || 'groq',
     };
 
     if (req.stream) {
       body.stream = true;
     }
 
-    const response = await fetchWithFallback('/ai/chat-proxy', {
+    const response = await fetchWithFallback(`/ai/chat-proxy?provider=${req.provider || 'groq'}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -37,7 +38,9 @@ export class CloudProvider implements AIProvider {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({ error: 'Cloud AI error' }));
-      throw new Error(err.error || `HTTP ${response.status}`);
+      const customError: any = new Error(err.error || `HTTP ${response.status}`);
+      customError.details = err.details;
+      throw customError;
     }
 
     const data = await response.json();

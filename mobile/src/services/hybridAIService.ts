@@ -46,6 +46,7 @@ export async function sendHybridChatMessage(
     message: lastMsg?.content || '',
     history: messages.slice(0, -1).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     subjectContext: contextText,
+    provider: provider,
     onStreamToken: onStreamToken as any,
   });
 
