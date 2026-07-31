@@ -203,13 +203,14 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
           const content = item.data || {};
           const front = itemType === 'flashcard' ? (content.front || '') : '';
           const back = itemType === 'flashcard' ? (content.back || '') : '';
+          const cardId = uuidv4();
           const contentStr = JSON.stringify(content);
           const hint = item.hint || null;
           const explanation = item.explanation || null;
 
           db.run(
-            `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
-            [deckId, front, back, itemType, contentStr, hint, explanation],
+            `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+            [cardId, deckId, user_id, front, back, itemType, contentStr, hint, explanation],
             function(e) { 
               if (e) {
                 console.error(`[aiController] ❌ Error al insertar tarjeta #${idx} en el mazo ${deckId}:`, e.message);
