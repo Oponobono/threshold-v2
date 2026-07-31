@@ -18,25 +18,25 @@
  */
 const DECK_GENERATION_PATTERNS = [
   // Palabras clave en español
-  /(?:generar?|crear?|hacer?)\s+(?:un\s+)?(?:mazo|mazos|deck|decks|flashcard|flashcards|tarjetas?|preguntas|examen|quiz|cuestionario|prueba|evaluación|material\s+(?:de\s+)?repaso)/i,
+  /(?:genera|generar|genere|genérame|generame|crea|crear|cree|créame|creame|haz|hacer|hazme|prepara|preparar|prepárame|preparame|dame|proporciona|necesito|quiero|quisiera|podrías?|puedes)\s+(?:un\s+|una\s+|unos\s+|unas\s+)?(?:\d+\s+)?(?:mazo|mazos|deck|decks|flashcard|flashcards|tarjetas?|preguntas?|examen|quiz|cuestionario|prueba|evaluación|material\s+(?:de\s+)?repaso)/iu,
   
   // "de estudio/repaso"
-  /(?:tarjetas?|preguntas|ejercicios?|material)\s+(?:de\s+)?(?:estudio|repaso|práctica|evaluación)/i,
+  /(?:tarjetas?|preguntas?|ejercicios?|material)\s+(?:de\s+)?(?:estudio|repaso|práctica|evaluación)/iu,
   
   // "necesito X para estudiar"
-  /(?:necesito|quiero|dame|dame|proporciona)\s+(?:un\s+)?(?:mazo|flashcard|tarjetas?|preguntas|examen)/i,
+  /(?:necesito|quiero|dame|proporciona)\s+(?:un\s+)?(?:mazo|flashcard|tarjetas?|preguntas?|examen)/iu,
   
   // Cantidad + tipo de contenido
-  /(\d+|varios|varios|muchas?)\s+(?:flashcard|tarjetas?|preguntas|ítems?|ejercicios?|casos)/i,
+  /(\d+|varios|varias|muchas?|algunas?|algunos?)\s+(?:flashcard|tarjetas?|preguntas?|ítems?|ejercicios?|casos)/iu,
   
   // Tipo de preguntas específico
-  /(?:verdadero|falso|opción\s+múltiple|respuesta\s+corta|ensayo|desarrollo)/i,
+  /(?:verdadero|falso|opción\s+múltiple|respuesta\s+corta|ensayo|desarrollo)/iu,
   
   // "Tipo de preguntas: X"
-  /tipos?\s+(?:de\s+)?(?:preguntas|ejercicios|ítems)/i,
+  /tipos?\s+(?:de\s+)?(?:preguntas?|ejercicios|ítems)/iu,
   
   // "para practicar"
-  /para\s+(?:practicar|entrenar|repasar|estudiar|prepararme|preparar(?:me)?(?:\s+para)?)/i,
+  /para\s+(?:practicar|entrenar|repasar|estudiar|prepararme|preparar(?:me)?(?:\s+para)?)/iu,
 ];
 
 /**
@@ -45,16 +45,16 @@ const DECK_GENERATION_PATTERNS = [
  */
 const EXCLUSION_PATTERNS = [
   // Preguntar por precio/costo de algo físico
-  /(?:cuánto|cuanto|cuál es el precio|precio|costo|vale)\s+(?:un\s+)?(?:mazo|deck)\s+(?:de\s+)?(?:cartas|poker|yu-gi-oh|magic)/i,
+  /(?:cuánto|cuanto|cuál es el precio|precio|costo|vale)\s+(?:un\s+)?(?:mazo|deck)\s+(?:de\s+)?(?:cartas|poker|yu-gi-oh|magic)/iu,
   
   // Referencia a examen sin pedir generación
-  /(?:este|ese|el)\s+(?:documento|archivo|pdf|texto)\s+es\s+para\s+(?:el\s+)?(?:examen|prueba|test)/i,
+  /(?:este|ese|el)\s+(?:documento|archivo|pdf|texto)\s+es\s+para\s+(?:el\s+)?(?:examen|prueba|test)/iu,
   
   // Hablando sobre mazos de cartas (juegos)
-  /(?:mazo\s+(?:de\s+)?cartas|deck\s+(?:de\s+)?(?:magic|yu-gi-oh|pokemon))/i,
+  /(?:mazo\s+(?:de\s+)?cartas|deck\s+(?:de\s+)?(?:magic|yu-gi-oh|pokemon))/iu,
   
   // No pide generar, solo pregunta sobre algo
-  /(?:cuéntame|explícame|qué\s+es|cómo\s+funciona|cuáles\s+son)\s+[^.]*(?:mazo|deck|flashcard|tarjeta)/i,
+  /(?:cuéntame|explícame|qué\s+es|cómo\s+funciona|cuáles\s+son)\s+[^.]*(?:mazo|deck|flashcard|tarjeta)/iu,
 ];
 
 /**
@@ -133,10 +133,13 @@ function extractRequestedCount(userMessage) {
 
   const msg = userMessage.toLowerCase();
 
-  // Buscar números explícitos
-  const numberMatch = msg.match(/(\d+)\s+(?:flashcard|tarjetas?|preguntas|ítems?|ejercicios?)/i);
-  if (numberMatch && numberMatch[1]) {
-    const count = parseInt(numberMatch[1], 10);
+  // Buscar números explícitos incluso si están separados por algunas palabras
+  const numberMatch = msg.match(/(?:quiero|necesito|crea|generar|haz|dame|prepara|con|de|unas|unos)\s+(?:[\w\s]{0,20})?(\d+)\s+(?:flashcard|tarjetas?|preguntas?|ítems?|ejercicios?|casos?)/i) || 
+                      msg.match(/(\d+)\s+(?:flashcard|tarjetas?|preguntas?|ítems?|ejercicios?)/i);
+                      
+  if (numberMatch) {
+    const countStr = numberMatch[1] || numberMatch[2] || numberMatch[0].match(/\d+/)[0];
+    const count = parseInt(countStr, 10);
     if (count >= 5 && count <= 20) return count;
     if (count > 20) return 20; // Cap máximo
     if (count < 5) return 5;   // Mínimo

@@ -34,12 +34,33 @@ Sé didáctico, claro y estructurado. Mantén un tono alentador y profesional.`;
 }
 
 export function detectDeckIntent(message: string): boolean {
-  const keywords = [
-    'crea flashcards', 'crea un mazo', 'genera flashcards', 'genera un mazo',
-    'necesito preguntas', 'haz preguntas', 'examen', 'tarjetas',
-    'material de repaso', 'flashcard', 'mazo de estudio', 'practica',
-    'crea tarjetas', 'genera tarjetas', 'crea material',
+  if (!message || typeof message !== 'string') return false;
+  const msg = message.toLowerCase().trim();
+
+  const exclusionPatterns = [
+    /(?:cuánto|cuanto|cuál es el precio|precio|costo|vale)\s+(?:un\s+)?(?:mazo|deck)\s+(?:de\s+)?(?:cartas|poker|yu-gi-oh|magic)/iu,
+    /(?:este|ese|el)\s+(?:documento|archivo|pdf|texto)\s+es\s+para\s+(?:el\s+)?(?:examen|prueba|test)/iu,
+    /(?:mazo\s+(?:de\s+)?cartas|deck\s+(?:de\s+)?(?:magic|yu-gi-oh|pokemon))/iu,
+    /(?:cuéntame|explícame|qué\s+es|cómo\s+funciona|cuáles\s+son)\s+[^.]*(?:mazo|deck|flashcard|tarjeta)/iu,
   ];
-  const lower = message.toLowerCase();
-  return keywords.some(kw => lower.includes(kw));
+
+  for (const pattern of exclusionPatterns) {
+    if (pattern.test(msg)) return false;
+  }
+
+  const generationPatterns = [
+    /(?:genera|generar|genere|genérame|generame|crea|crear|cree|créame|creame|haz|hacer|hazme|prepara|preparar|prepárame|preparame|dame|proporciona|necesito|quiero|quisiera|podrías?|puedes)\s+(?:un\s+|una\s+|unos\s+|unas\s+)?(?:\d+\s+)?(?:mazo|mazos|deck|decks|flashcard|flashcards|tarjetas?|preguntas?|examen|quiz|cuestionario|prueba|evaluación|material\s+(?:de\s+)?repaso)/iu,
+    /(?:tarjetas?|preguntas?|ejercicios?|material)\s+(?:de\s+)?(?:estudio|repaso|práctica|evaluación)/iu,
+    /(?:necesito|quiero|dame|proporciona)\s+(?:un\s+)?(?:mazo|flashcard|tarjetas?|preguntas?|examen)/iu,
+    /(\d+|varios|varias|muchas?|algunas?|algunos?)\s+(?:flashcard|tarjetas?|preguntas?|ítems?|ejercicios?|casos)/iu,
+    /(?:verdadero|falso|opción\s+múltiple|respuesta\s+corta|ensayo|desarrollo)/iu,
+    /tipos?\s+(?:de\s+)?(?:preguntas?|ejercicios|ítems)/iu,
+    /para\s+(?:practicar|entrenar|repasar|estudiar|prepararme|preparar(?:me)?(?:\s+para)?)/iu,
+  ];
+
+  for (const pattern of generationPatterns) {
+    if (pattern.test(msg)) return true;
+  }
+
+  return false;
 }

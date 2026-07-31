@@ -20,6 +20,10 @@ export interface ChatResult {
 class ChatCapability {
   async chat(params: ChatParams): Promise<ChatResult> {
     const includeDeckInstructions = detectDeckIntent(params.message);
+    console.log('[DECK FLOW] userMessage:', params.message);
+    console.log('[DECK FLOW] intent.shouldGenerate:', includeDeckInstructions);
+    console.log('[DECK FLOW] includeDeckInstructions:', includeDeckInstructions);
+    
     const systemPrompt = getSystemPrompt(includeDeckInstructions);
     if (includeDeckInstructions && !systemPrompt.includes('DECK_ACTION')) {
       systemPrompt + DECK_GENERATION_INSTRUCTIONS;
@@ -41,6 +45,9 @@ class ChatCapability {
 
     messages.push({ role: 'user', content: params.message });
 
+    const requestStart = Date.now();
+    console.log(`[DECK FLOW] request.start (${requestStart})`);
+
     const response = await aiOrchestrator.execute({
       messages,
       temperature: params.temperature ?? 0.7,
@@ -49,7 +56,17 @@ class ChatCapability {
       onStreamToken: params.onStreamToken,
     });
 
+    const requestDone = Date.now();
+    console.log(`[DECK FLOW] llm.done +${requestDone - requestStart}ms`);
+    console.log('[DECK FLOW] rawResponseLength:', response.content?.length);
+    console.log('[DECK FLOW] hasDeckSignal:', response.content?.includes('%%DECK_ACTION%%'));
+    console.log('[DECK FLOW] responseTail:', response.content?.slice(-500));
+
+    const parseStart = Date.now();
     const deckAction = this._parseDeckAction(response.content);
+    console.log(`[DECK FLOW] signal.parse +${Date.now() - parseStart}ms`);
+    console.log('[DECK FLOW] parsedAction:', deckAction);
+
     const cleanContent = deckAction
       ? response.content.replace(/%%DECK_ACTION%%\{.*?\}%%END%%/g, '').trim()
       : response.content;
