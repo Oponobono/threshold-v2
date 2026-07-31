@@ -195,7 +195,7 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
       // Crear el mazo en la BD
       const deckId = uuidv4();
       db.run(
-        `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, sync_version, version_number) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+        `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, sync_version) VALUES (?, ?, ?, ?, ?, ?)`,
         [deckId, subject_id, user_id, title, description, newSyncVersion],
         function(err) {
           if (err) {
@@ -216,7 +216,7 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
             const explanation = item.explanation || null;
 
             db.run(
-              `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status, sync_version, version_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, 1)`,
+              `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status, sync_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)`,
               [cardId, deckId, user_id, front, back, itemType, contentStr, hint, explanation, newSyncVersion],
             function(e) { 
               if (e) {
