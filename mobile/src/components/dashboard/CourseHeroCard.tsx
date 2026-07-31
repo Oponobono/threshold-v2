@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, Animated as RNAnimated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import Animated, { Layout } from 'react-native-reanimated';
@@ -13,6 +13,40 @@ import type { CourseHeroViewModel, GlobalHeroViewModel } from '../../types/heroV
 import { openCourseLink } from '../../utils/linking';
 import { formatExamCountdown } from '../../utils/date';
 import { ExplanationOverlay } from '../evaluation/ExplanationOverlay';
+
+const AnimatedSubtitle = ({ items, defaultText, style }: { items?: string[], defaultText: string, style: any }) => {
+  const [index, setIndex] = React.useState(0);
+  const opacity = React.useRef(new RNAnimated.Value(1)).current;
+
+  React.useEffect(() => {
+    if (!items || items.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      RNAnimated.timing(opacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setIndex((prev) => (prev + 1) % items.length);
+        RNAnimated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [items, opacity]);
+
+  const textToShow = items && items.length > 0 ? items[index] : defaultText;
+
+  return (
+    <RNAnimated.Text style={[style, { opacity }]} numberOfLines={1}>
+      {textToShow}
+    </RNAnimated.Text>
+  );
+};
 
 interface CourseHeroCardProps {
   viewModel: CourseHeroViewModel;
@@ -306,106 +340,96 @@ export const AllSubjectsHeroCard = React.memo(({ viewModel: vm, isActive, onPres
 
   return (
     <View style={{ overflow: 'visible' }} onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}>
-      <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={[cHCardStyles.card, cHCardStyles.cardAllGlobal, isActive && cHCardStyles.cardActiveGlobal]}>
-        {/* Header: Vista Global + Health Score */}
-        <View style={cHCardStyles.topRow}>
-          <View style={[cHCardStyles.platformBadge, { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary + '30', borderWidth: 1 }]}>
-            <Ionicons name="layers-outline" size={13} color={theme.colors.primary} />
-            <Text style={[cHCardStyles.platformText, { color: theme.colors.primary }]}>Panel Principal</Text>
+      <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={[cHCardStyles.cardGlobal, isActive && cHCardStyles.cardActiveGlobal]}>
+        {/* Header: Panel Principal + Health Score */}
+        <View style={cHCardStyles.globalHeaderBadgeRow}>
+          <View style={cHCardStyles.globalPlatformBadge}>
+            <Ionicons name="layers-outline" size={14} color="#4F46E5" />
+            <Text style={cHCardStyles.globalPlatformText}>Panel Principal</Text>
           </View>
           <TouchableOpacity
-            style={cHCardStyles.momentumBadge}
+            style={cHCardStyles.globalHealthBadge}
             onPress={() => {
-            const level = vm.health >= 90 ? 'excellent' : vm.health >= 70 ? 'good' : vm.health >= 50 ? 'fair' : vm.health >= 25 ? 'poor' : 'critical';
-            setTooltipText(t(`dashboard.heroTooltips.globalHealth.${level}`));
-          }}
+              const level = vm.health >= 90 ? 'excellent' : vm.health >= 70 ? 'good' : vm.health >= 50 ? 'fair' : vm.health >= 25 ? 'poor' : 'critical';
+              setTooltipText(t(`dashboard.heroTooltips.globalHealth.${level}`));
+            }}
           >
-            <MaterialCommunityIcons name="brain" size={12} color={healthColor} />
-            <Text style={[cHCardStyles.momentumText, { color: healthColor }]}>{vm.health}%</Text>
+            <MaterialCommunityIcons name="brain" size={14} color="#EA580C" />
+            <Text style={cHCardStyles.globalHealthText}>{vm.health}%</Text>
           </TouchableOpacity>
         </View>
 
         {/* Title */}
-        <View style={{ marginBottom: 6 }}>
-          <Text style={cHCardStyles.courseName}>
-            Resumen Académico
-          </Text>
+        <View style={cHCardStyles.globalTitleRow}>
+          <View style={cHCardStyles.globalTitleContainer}>
+            <Text style={cHCardStyles.globalTitle}>Resumen Académico</Text>
+            <Text style={cHCardStyles.globalSubtitle}>Tu progreso general en todos tus cursos</Text>
+          </View>
         </View>
 
         {/* Progreso Global */}
-        <View style={{ height: 44, marginVertical: 8 }}>
-          {vm.globalProgress.total > 0 ? (
-            <Animated.View layout={Layout.springify().damping(14).stiffness(140)}>
-              <View style={cHCardStyles.progressBarBg}>
-                <View style={[cHCardStyles.progressBarFill, { width: `${vm.globalProgress.percentage}%` as any, backgroundColor: theme.colors.primary }]} />
-              </View>
-              <Text style={cHCardStyles.classesText}>
-                {vm.globalProgress.completed} / {vm.globalProgress.total} clases en total
-              </Text>
-              <Text style={cHCardStyles.remainingText}>
-                Progreso académico global
-              </Text>
-            </Animated.View>
-          ) : <View style={{ height: 44 }} />}
+        <View style={cHCardStyles.globalProgressCard}>
+          <View style={cHCardStyles.globalProgressCircleContainer}>
+            <Text style={cHCardStyles.globalProgressCircleText}>{vm.globalProgress.percentage}%</Text>
+          </View>
+          <View style={cHCardStyles.globalProgressInfo}>
+            <Text style={cHCardStyles.globalProgressClassesText}>
+              {vm.globalProgress.completed} / {vm.globalProgress.total} clases completadas
+            </Text>
+            <View style={cHCardStyles.globalProgressBarBg}>
+              <View style={[cHCardStyles.globalProgressBarFill, { width: `${vm.globalProgress.percentage}%` as any }]} />
+            </View>
+            <Text style={cHCardStyles.globalProgressLabel}>Progreso académico global</Text>
+          </View>
         </View>
-
-        
-
-        {/* Divider */}
-        <View style={[cHCardStyles.divider, { backgroundColor: theme.colors.border }]} />
 
         {/* Ecosystem */}
-        <View style={cHCardStyles.globalEcosystemRow}>
-          <View style={cHCardStyles.ecosystemItem}>
-            <Ionicons name="school-outline" size={13} color={theme.colors.text.secondary} />
-            <Text style={cHCardStyles.ecosystemText}>{vm.courseCount} cursos</Text>
+        <View style={cHCardStyles.globalEcosystemContainer}>
+          <View style={cHCardStyles.globalEcosystemCard}>
+            <View style={[cHCardStyles.globalEcosystemIconContainer, { backgroundColor: '#EEF2FF' }]}>
+              <Ionicons name="cube-outline" size={14} color="#4F46E5" />
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+              <Text style={cHCardStyles.globalEcosystemNumber}>{vm.courseCount} </Text>
+              <Text style={cHCardStyles.globalEcosystemLabel}>cursos</Text>
+            </View>
           </View>
-          <View style={cHCardStyles.ecosystemItem}>
-            <Ionicons name="book-outline" size={13} color={theme.colors.text.secondary} />
-            <Text style={cHCardStyles.ecosystemText}>{vm.subjectCount} materias</Text>
+          <View style={cHCardStyles.globalEcosystemCard}>
+            <View style={[cHCardStyles.globalEcosystemIconContainer, { backgroundColor: '#DCFCE7' }]}>
+              <Ionicons name="book-outline" size={14} color="#16A34A" />
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+              <Text style={cHCardStyles.globalEcosystemNumber}>{vm.subjectCount} </Text>
+              <Text style={cHCardStyles.globalEcosystemLabel}>materias</Text>
+            </View>
           </View>
         </View>
 
-        {/* Recent Activity - Top 2 */}
-        {vm.recentActivity.length > 0 ? (
-          <Animated.View layout={Layout.springify().damping(14).stiffness(140)} style={cHCardStyles.recentActivitySection}>
-            <Text style={cHCardStyles.recentActivityHeader}>Más activas</Text>
-            {vm.recentActivity.map((item, i) => (
-              <View key={i} style={cHCardStyles.activityItem}>
-                <View style={[cHCardStyles.activityDot, { backgroundColor: i === 0 ? theme.colors.primary : theme.colors.text.placeholder }]} />
-                <Text style={cHCardStyles.activityName} numberOfLines={1}>{item.name}</Text>
-                <Text style={cHCardStyles.activityTime}>{item.lastActivity}</Text>
+        {/* Insights Section */}
+        {vm.insights && vm.insights.length > 0 && (
+          <View>
+            <View style={cHCardStyles.globalActivityHeaderRow}>
+              <Text style={cHCardStyles.globalActivityTitle}>Atención Requerida</Text>
+              <Ionicons name="sparkles" size={12} color="#A78BFA" />
+            </View>
+            {vm.insights.slice(0, 2).map((item, i) => (
+              <View key={i} style={cHCardStyles.globalActivityCard}>
+                <View style={[cHCardStyles.globalActivityDot, { backgroundColor: item.color }]} />
+                <View style={[cHCardStyles.globalActivityIconContainer, { backgroundColor: item.bgColor }]}>
+                  <Ionicons name={item.icon as any} size={14} color={item.color} />
+                </View>
+                <View style={cHCardStyles.globalActivityTextContainer}>
+                  <Text style={cHCardStyles.globalActivityName} numberOfLines={1}>{item.title}</Text>
+                  <AnimatedSubtitle 
+                    items={item.subtitles}
+                    defaultText={item.subtitle}
+                    style={cHCardStyles.globalActivityTime}
+                  />
+                </View>
               </View>
             ))}
-          </Animated.View>
-        ) : <View style={{ height: 70 }} />}
-
-        {/* Smart Exam Badge */}
-        {vm.upcomingExam ? (
-          <Animated.View layout={Layout.springify().damping(14).stiffness(140)} style={[cHCardStyles.examBadge, {
-            backgroundColor: vm.upcomingExam.isOverdue ? '#FF2D5518'
-              : vm.upcomingExam.isUrgent ? '#FF950018'
-              : theme.colors.primary + '10',
-          }]}>
-            <Ionicons
-              name={vm.upcomingExam.isOverdue ? 'alert-circle-outline' : vm.upcomingExam.isUrgent ? 'warning-outline' : 'calendar-outline'}
-              size={14}
-              color={vm.upcomingExam.isOverdue ? '#FF2D55' : vm.upcomingExam.isUrgent ? '#FF9500' : theme.colors.primary}
-            />
-            <Text style={[cHCardStyles.examText, {
-              color: vm.upcomingExam.isOverdue ? '#FF2D55' : vm.upcomingExam.isUrgent ? '#FF9500' : theme.colors.primary,
-            }]} numberOfLines={1}>
-              {vm.upcomingExam.isOverdue ? 'Pendiente de calificar' : vm.upcomingExam.name}
-            </Text>
-            <Text style={[cHCardStyles.examCountdown, {
-              color: vm.upcomingExam.isOverdue ? '#FF2D55' : vm.upcomingExam.isUrgent ? '#FF9500' : theme.colors.primary,
-            }]}>
-              {vm.upcomingExam.isOverdue
-                ? `${Math.abs(vm.upcomingExam.daysLeft)}d`
-                : formatExamCountdown(vm.upcomingExam.daysLeft)}
-            </Text>
-          </Animated.View>
-        ) : null}
+          </View>
+        )}
       </TouchableOpacity>
 
       <ExplanationOverlay

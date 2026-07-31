@@ -71,7 +71,7 @@ export async function clearChatHistory(userId: string | number, subjectId: strin
   try {
     const { createMMKV } = await import('react-native-mmkv');
     const mmkv = createMMKV();
-    mmkv.delete(`cache:chat_history:${userId}:${subjectId}`);
+    mmkv.remove(`cache:chat_history:${userId}:${subjectId}`);
   } catch { }
   return { session_id: undefined, messages: [] };
 }

@@ -6,15 +6,13 @@ export class PhotoSynchronizer implements EntitySynchronizer {
   private repo = new BaseRepository('photos');
 
   async saveAll(items: any[]): Promise<number> {
-    let count = 0;
-    for (const item of items) {
-      await this.repo.upsert({
-        ...item,
-        asset_state: item.asset_state || 'NOT_DOWNLOADED',
-      });
-      count++;
-    }
-    return count;
+    if (items.length === 0) return 0;
+    const prepared = items.map(item => ({
+      ...item,
+      asset_state: item.asset_state || 'NOT_DOWNLOADED',
+    }));
+    await this.repo.upsertMany(prepared);
+    return prepared.length;
   }
 
   async deleteItem(id: string): Promise<void> {

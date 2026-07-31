@@ -122,25 +122,25 @@ function shouldRefreshEntity(entity: string, lastLoaded: number): boolean {
 }
 
 export const useDataStore = create<DataState>((set, get) => {
-  repositoryEventBus.on('courses', () => {
+  repositoryEventBus.onBatch('courses', () => {
     get().refreshCourses();
   });
-  repositoryEventBus.on('subjects', () => {
+  repositoryEventBus.onBatch('subjects', () => {
     get().refreshSubjects();
   });
-  repositoryEventBus.on('assessments', () => {
+  repositoryEventBus.onBatch('assessments', () => {
     get().refreshAssessments();
   });
-  repositoryEventBus.on('schedules', () => {
+  repositoryEventBus.onBatch('schedules', () => {
     get().refreshSchedules();
   });
-  repositoryEventBus.on('flashcard_decks', () => {
+  repositoryEventBus.onBatch('flashcard_decks', () => {
     get().refreshFlashcardDecks();
   });
-  repositoryEventBus.on('calendar_events', () => {
+  repositoryEventBus.onBatch('calendar_events', () => {
     get().refreshCalendarEvents();
   });
-  repositoryEventBus.on('photos', () => {
+  repositoryEventBus.onBatch('photos', () => {
     get().refreshPhotos();
   });
 

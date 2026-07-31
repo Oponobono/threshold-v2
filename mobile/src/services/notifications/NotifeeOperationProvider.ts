@@ -40,8 +40,12 @@ const OP_COMPLETED_TITLES: Record<string, string> = {
   [OperationType.Indexing]: '📚 Indexación completada',
 };
 
+const UPDATE_THROTTLE_MS = 2000;
+
 export class NotifeeOperationProvider implements NotificationProvider {
   private channelCreated = false;
+  private _lastUpdateMap: Map<string, number> = new Map();
+  private _pendingUpdates: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   async initialize(): Promise<void> {
     await notifee.createChannel({
@@ -54,94 +58,60 @@ export class NotifeeOperationProvider implements NotificationProvider {
   }
 
   async showOperationProgress(operation: LongRunningOperation): Promise<void> {
-    if (!this.channelCreated) await this.initialize();
-
-    const title = OP_TITLES[operation.type] ?? 'Operación en progreso';
-    const stage = operation.stage;
-    const stageLabel = (stage && STAGE_LABELS[stage]) ?? operation.message ?? 'En progreso...';
-    const progress = operation.progress;
-
-    await notifee.displayNotification({
-      id: operation.id,
-      title,
-      body: operation.message ?? stageLabel,
-      android: {
-        channelId: CHANNEL_ID,
-        ongoing: true,          // No descartable mientras está activa
-        onlyAlertOnce: true,    // No repetir sonido en actualizaciones
-        progress: progress
-          ? { max: 100, current: progress.percentage, indeterminate: progress.indeterminate }
-          : { max: 100, current: 0, indeterminate: true }, // Estado inicial indeterminado
-
-      },
-    });
+    /**
+     * @dangerSISTEMA DESACTIVADO TEMPORALMENTE (DIAGNÓSTICO DESTELOS NEGROS)
+     * 
+     * Contexto:
+     * En dispositivos Android con MIUI/HyperOS, la actualización frecuente de
+     * notificaciones nativas (Notifee) durante el proceso de Delta Sync estaba
+     * provocando timeouts en SurfaceFlinger. Esto se manifestaba visualmente como un
+     * "destello negro" en la pantalla de la aplicación cada ~15 segundos.
+     * 
+     * Soluciones previas implementadas (que mitigan pero no eliminan el problema de raíz):
+     * 1. Se eliminó la propiedad de `progress` (barra de progreso nativa) en favor de texto,
+     *    ya que la barra forzaba a SystemUI a repintar a 60fps.
+     * 2. Se implementó un "throttle" (UPDATE_THROTTLE_MS = 2000ms) para limitar
+     *    la frecuencia de llamadas al módulo nativo.
+     * 3. Se corrigió un bug en NotificationProvider (parseo de triggerDate) y se
+     *    serializaron las llamadas al Reconciler (eliminando Promise.all).
+     * 
+     * Estado actual:
+     * Para confirmar aislar 100% que Notifee es el causante del bloqueo en el hilo JS/Nativo,
+     * todos los métodos visuales de LRO (progress, completed, failed, cancelled) han sido
+     * DESACTIVADOS mediante un early return. Si con esto los destellos desaparecen, el siguiente
+     * paso será rediseñar cómo se muestra el progreso de sincronización (quizá UI in-app en lugar
+     * de notificaciones de sistema para LRO de alta frecuencia).
+     */
+    return;
   }
 
+
+
   async showOperationCompleted(operation: LongRunningOperation, message?: string): Promise<void> {
-    if (!this.channelCreated) await this.initialize();
-
-    const title = OP_COMPLETED_TITLES[operation.type] ?? 'Operación completada';
-
-    await notifee.displayNotification({
-      id: operation.id,
-      title,
-      body: message ?? 'Proceso finalizado correctamente.',
-      android: {
-        channelId: CHANNEL_ID,
-        ongoing: false,
-        progress: { max: 100, current: 100, indeterminate: false },
-
-        autoCancel: true, // Se descarta al tocarla
-      },
-    });
-
-    // Auto-dismiss tras 4 segundos
-    setTimeout(() => {
-      notifee.cancelNotification(operation.id).catch(() => {});
-    }, 4000);
+    return; // Completamente desactivado para pruebas
   }
 
   async showOperationFailed(operation: LongRunningOperation, errorMessage?: string): Promise<void> {
-    if (!this.channelCreated) await this.initialize();
-
-    const title = `❌ ${OP_TITLES[operation.type] ?? 'Operación'} falló`;
-
-    await notifee.displayNotification({
-      id: operation.id,
-      title,
-      body: errorMessage ?? 'Ocurrió un error durante el proceso.',
-      android: {
-        channelId: CHANNEL_ID,
-        ongoing: false,
-
-        autoCancel: true,
-      },
-    });
+    return; // Completamente desactivado para pruebas
   }
 
   async showOperationCancelled(operation: LongRunningOperation): Promise<void> {
-    if (!this.channelCreated) await this.initialize();
-
-    const title = `⚠️ ${OP_TITLES[operation.type] ?? 'Operación'} cancelada`;
-
-    await notifee.displayNotification({
-      id: operation.id,
-      title,
-      body: 'La operación fue cancelada.',
-      android: {
-        channelId: CHANNEL_ID,
-        ongoing: false,
-
-        autoCancel: true,
-      },
-    });
+    return; // Completamente desactivado para pruebas
   }
 
   async dismissOperation(operationId: string): Promise<void> {
+    if (this._pendingUpdates.has(operationId)) {
+      clearTimeout(this._pendingUpdates.get(operationId));
+      this._pendingUpdates.delete(operationId);
+    }
     await notifee.cancelNotification(operationId);
   }
 
   async dismissAllOperations(): Promise<void> {
+    for (const timeout of this._pendingUpdates.values()) {
+      clearTimeout(timeout);
+    }
+    this._pendingUpdates.clear();
     await notifee.cancelAllNotifications();
   }
 }

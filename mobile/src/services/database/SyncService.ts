@@ -218,6 +218,9 @@ export class SyncService {
       if (items.length === 0) {
         console.log('[SyncService] No hay operaciones JSON pendientes');
         syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', 'No pending JSON operations, skipped');
+        
+        // Emitir completado silencioso (sin tareas)
+        operationProgressBus.emit('completed', { operation: lroOperation, result: { success: 0, pending: 0 } });
         return { success: 0, failed: 0, pending: 0 };
       }
 
@@ -340,6 +343,9 @@ export class SyncService {
     } else if (success > 0) {
       // Partial success: still mark as completed (we synced something)
       operationProgressBus.emit('completed', { operation: lroOperation, result: { success, failed, pending } });
+    } else {
+      // All failed: emit failed!
+      operationProgressBus.emit('failed', { operation: lroOperation, error: new Error(`${failed} operaciones fallaron`) });
     }
 
     return { success, failed, pending };

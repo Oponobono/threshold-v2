@@ -41,10 +41,13 @@ export interface GlobalHeroViewModel {
     readonly action: string;
     readonly detail: string;
   };
-  readonly recentActivity: ReadonlyArray<{
-    readonly name: string;
-    readonly activityType: ContentType;
-    readonly lastActivity: string;
+  readonly insights: ReadonlyArray<{
+    readonly title: string;
+    readonly subtitle: string;
+    readonly subtitles?: string[];
+    readonly icon: string;
+    readonly color: string;
+    readonly bgColor: string;
   }>;
   readonly courseCount: number;
   readonly subjectCount: number;

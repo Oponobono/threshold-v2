@@ -92,10 +92,14 @@ export class ReminderCoordinator {
     }
   }
 
-  async handleEntityChanged(entityType: string, entityId: string): Promise<void> {
+  async handleEntityChanged(entityType: string, entityId: string, preFetchedEntity?: any): Promise<void> {
     const repo = this.repos[entityType];
     if (!repo) return;
-    const entity = await repo.getById(entityId);
+    
+    // Si el evento ya trae la entidad (upsertMany emite el objeto), evitamos un costoso
+    // select N+1 a la base de datos por cada registro que llega por sincronización masiva.
+    const entity = preFetchedEntity || await repo.getById(entityId);
+    
     if (entity) {
       if (entityType === 'schedule' && entity.subject_id && !entity.subject_name) {
         try {

@@ -412,5 +412,5 @@ export function getPendingReviews(): Array<{ cardId: string; grade: number; stat
 export function clearPendingReviews(): void {
   const key = 'local_pending_reviews';
   const mmkv = require('react-native-mmkv').createMMKV();
-  mmkv.delete(key);
+  mmkv.remove(key);
 }

@@ -37,9 +37,14 @@ export class NotificationReconciler {
       return changed;
     });
 
-    const cancelPromises = toCancel.map((e) => provider.cancel(e.identifier));
-    const schedulePromises = toSchedule.map((d) =>
-      provider.schedule({
+    // Cancelaciones y agendamientos secuenciales para evitar saturar el sistema
+    // nativo de notificaciones en Android (MIUI/HyperOS). Promise.all concurrente
+    // causaba rafagas de llamadas nativas que generaban timeouts en SurfaceFlinger.
+    for (const e of toCancel) {
+      await provider.cancel(e.identifier);
+    }
+    for (const d of toSchedule) {
+      await provider.schedule({
         id: d.id,
         title: d.title,
         body: d.body,
@@ -47,10 +52,8 @@ export class NotificationReconciler {
         priority: d.priority,
         badge: d.badge,
         deeplink: d.deeplink,
-      }),
-    );
-
-    await Promise.all([...cancelPromises, ...schedulePromises]);
+      });
+    }
 
     console.log(`[RECON] sync done: scheduled=${toSchedule.length} cancelled=${toCancel.length} existing=${existing.length} plan=${plan.deliverables.length}`);
 

@@ -100,6 +100,8 @@ function RootNavigator() {
   useCacheCleanup();
 
   useEffect(() => {
+    let notificationController: OperationNotificationController | null = null;
+
     async function prepare() {
       try {
         // 🔷 0. Esperar a que BD local esté lista
@@ -133,7 +135,7 @@ function RootNavigator() {
         
         // 🔷 2c. Registrar OperationNotificationController con Notifee
         const notifeeProvider = new NotifeeOperationProvider();
-        const notificationController = new OperationNotificationController(notifeeProvider);
+        notificationController = new OperationNotificationController(notifeeProvider);
         await notificationController.initialize();
         console.log('[RootLayout] ✅ LRO NotificationController (Notifee) registrado');
 
@@ -165,6 +167,12 @@ function RootNavigator() {
     if (isDatabaseReady) {
       prepare();
     }
+
+    return () => {
+      if (notificationController) {
+        notificationController.dispose();
+      }
+    };
   }, [isDatabaseReady, databaseError]);
 
   // ── Offline Queue: Sincronización automática delegada a useAutoSync() ───

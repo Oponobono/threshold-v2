@@ -22,7 +22,7 @@ export function subscribeToEventBus(
     if (event.eventType === 'deleted') {
       coordinator.handleEntityDeleted(engineType, event.entityId);
     } else {
-      coordinator.handleEntityChanged(engineType, event.entityId).catch((err: unknown) => {
+      coordinator.handleEntityChanged(engineType, event.entityId, event.entity).catch((err: unknown) => {
         console.warn(`[Reminder] EventBus: error handling ${event.entityType} changed:`, err);
       });
     }

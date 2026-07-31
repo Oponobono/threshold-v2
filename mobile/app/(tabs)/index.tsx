@@ -692,7 +692,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
         <View style={styles.section}>
           {/* Section header */}
           <View style={styles.subjectsHeaderRow}>
-            <Text style={styles.sectionTitle}>Tus cursos</Text>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Tus cursos</Text>
             <TouchableOpacity style={styles.subjectsAddBtn} onPress={() => setIsCreationMenuVisible(true)}>
               <Ionicons name="add" size={18} color={theme.colors.white} />
             </TouchableOpacity>
@@ -921,7 +921,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
         {/* LO SIGUIENTE                                          */}
         {/* ====================================================== */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('dashboard.upNext', { defaultValue: 'Lo siguiente' })}</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>{t('dashboard.upNext', { defaultValue: 'Lo siguiente' })}</Text>
           <View style={styles.grid}>
             {/* NEXT CLASS */}
             {(() => {
@@ -1024,7 +1024,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
         </View>
         {/* 5. STUDY TOOLS */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('dashboard.studyTools')}</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>{t('dashboard.studyTools')}</Text>
           <View style={globalStyles.mb16}>
             <StudyTimerCard 
               refreshTrigger={timerRefreshTrigger}

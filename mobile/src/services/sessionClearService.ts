@@ -67,7 +67,7 @@ function clearMMKVUserData(): void {
 
     // 1. Borrar claves exactas conocidas
     for (const key of MMKV_KEYS_TO_DELETE) {
-      try { mmkv.delete(key); } catch {}
+      try { mmkv.remove(key); } catch {}
     }
 
     // 2. Borrar claves dinámicas por prefijo
@@ -75,7 +75,7 @@ function clearMMKVUserData(): void {
     for (const key of allKeys) {
       for (const prefix of MMKV_PREFIXES_TO_DELETE) {
         if (key.startsWith(prefix)) {
-          try { mmkv.delete(key); } catch {}
+          try { mmkv.remove(key); } catch {}
           break;
         }
       }

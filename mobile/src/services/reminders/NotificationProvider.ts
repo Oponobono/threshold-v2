@@ -132,10 +132,10 @@ export class ExpoNotificationProvider implements NotificationProvider {
       title: n.content.title ?? '',
       body: n.content.body ?? '',
       triggerDate: n.trigger
-        ? 'date' in n.trigger && n.trigger.date instanceof Date
-          ? n.trigger.date
-          : 'value' in n.trigger && n.trigger.value instanceof Date
-            ? n.trigger.value
+        ? 'date' in n.trigger
+          ? n.trigger.date instanceof Date ? n.trigger.date : new Date(n.trigger.date as number)
+          : 'value' in n.trigger
+            ? n.trigger.value instanceof Date ? n.trigger.value : new Date(n.trigger.value as number)
             : 'seconds' in n.trigger
               ? new Date(Date.now() + (n.trigger.seconds as number) * 1000)
               : null

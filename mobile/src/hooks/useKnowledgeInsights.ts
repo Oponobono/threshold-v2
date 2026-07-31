@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { KnowledgeProjection } from '../domain/knowledge/KnowledgeProjection';
+import { InteractionManager } from 'react-native';
+import { KnowledgeProjection, invalidateKnowledgeCache } from '../domain/knowledge/KnowledgeProjection';
 import { SnapshotBuildReason } from '../domain/knowledge/SnapshotTelemetryTypes';
 import type { KnowledgeSnapshot } from '../domain/knowledge/types';
 import { repositoryEventBus } from '../services/events/RepositoryEventBus';
@@ -131,13 +132,17 @@ export function useKnowledgeInsights(
       return;
     }
     setSnapshot(loadCachedSnapshot(userId));
-    // runBootSnapshot con userId ya verificado y bootDoneRef en false.
-    // bootDoneRef se marca dentro de runBootSnapshot para excluir el BOOT.
-    // Los builds por eventos (ENTITY_UPDATED, FLASHCARD_UPDATED) usan
-    // su propio debounce y no tocan bootDoneRef.
+    // Diferir el build de BOOT hasta que las animaciones de transición
+    // de pantalla hayan terminado. Evita bloquear el JS thread durante
+    // la animación de entrada, que era la causa del "black flash".
     bootDoneRef.current = true;
-    buildSnapshotRef.current?.(SnapshotBuildReason.BOOT, true);
+    const task = InteractionManager.runAfterInteractions(() => {
+      buildSnapshotRef.current?.(SnapshotBuildReason.BOOT, true);
+    });
+    return () => task.cancel();
   }, [userId]);
+
+  const lastEventTimeRef = useRef(0);
 
   useEffect(() => {
     if (!userId) return;
@@ -146,27 +151,31 @@ export function useKnowledgeInsights(
       if (!pendingReasonRef.current) {
         pendingReasonRef.current = reason;
       }
+      
+      lastEventTimeRef.current = Date.now();
 
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+      if (!debounceTimerRef.current) {
+        const checkDebounce = () => {
+          const elapsed = Date.now() - lastEventTimeRef.current;
+          if (elapsed < REBUILD_DEBOUNCE_MS) {
+            debounceTimerRef.current = setTimeout(checkDebounce, REBUILD_DEBOUNCE_MS - elapsed);
+          } else {
+            debounceTimerRef.current = null;
+            const r = pendingReasonRef.current ?? SnapshotBuildReason.ENTITY_UPDATED;
+            pendingReasonRef.current = null;
+            if (userId) invalidateKnowledgeCache(userId);
+            buildSnapshot(r, true);
+          }
+        };
+        debounceTimerRef.current = setTimeout(checkDebounce, REBUILD_DEBOUNCE_MS);
       }
-
-      debounceTimerRef.current = setTimeout(() => {
-        debounceTimerRef.current = null;
-        const r = pendingReasonRef.current ?? SnapshotBuildReason.ENTITY_UPDATED;
-        pendingReasonRef.current = null;
-        buildSnapshot(r, true);
-      }, REBUILD_DEBOUNCE_MS);
-    };
-
-    const handleEvent = (event: EntityEvent) => {
-      const entityType = event.entityType as RelevantEntityType;
-      const reason = ENTITY_TO_REASON[entityType] ?? SnapshotBuildReason.ENTITY_UPDATED;
-      scheduleRebuild(reason);
     };
 
     const unsubs = RELEVANT_ENTITY_TYPES.map(entityType =>
-      repositoryEventBus.on(entityType, handleEvent)
+      repositoryEventBus.onBatch(entityType, () => {
+        const reason = ENTITY_TO_REASON[entityType] ?? SnapshotBuildReason.ENTITY_UPDATED;
+        scheduleRebuild(reason);
+      })
     );
 
     return () => {
