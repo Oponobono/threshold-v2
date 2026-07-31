@@ -22,6 +22,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { generateStudyMaterialFromChat } from '../../services/api/ai';
+import { syncManager } from '../../services/sync/SyncManager';
 import { sendHybridChatMessage, generateHybridStudyMaterial, getChatHistory, clearChatHistory, processDocumentUploadHybrid } from '../../services/hybridAIService';
 import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
@@ -534,6 +535,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       };
       setMessages(prev => [...prev, aiMsg]);
       showToast(t('ai.deckGeneratedToast', { title: deck.title, count: deck.card_count, defaultValue: `Deck "${deck.title}" ready with ${deck.card_count} items ✅` }));
+      
+      // 🚀 Disparar sincronización inmediata para que el motor baje el mazo recién creado en el backend
+      syncManager.sync().catch(e => console.warn('[AIChatModal] ⚠️ Error al sincronizar el nuevo mazo:', e));
     } catch (err: any) {
       console.error('[AIChatModal] ❌ Error en generateStudyMaterialFromChat:', {
         message: err.message,
