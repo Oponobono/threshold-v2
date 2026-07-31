@@ -19,7 +19,16 @@ export interface ChatResult {
 
 class ChatCapability {
   async chat(params: ChatParams): Promise<ChatResult> {
-    const includeDeckInstructions = detectDeckIntent(params.message);
+    const intentFromMessage = detectDeckIntent(params.message);
+    // Detectar reintento: si un mensaje previo del usuario ya pidió un mazo
+    // y el nuevo mensaje contiene verbos de acción o referencia al mazo.
+    const hasRetryKeywords = /(?:de\s+nuevo|otra\s+vez|nuevamente|crea|genera|haz|vuelve?|repite?|in[eé]ntalo?\s+(?:de\s+nuevo|otra\s+vez)?)/iu.test(params.message);
+    const prevUserHadDeckIntent = (params.history || []).some(
+      m => m.role === 'user' && detectDeckIntent(m.content)
+    );
+    const intentFromHistory = !intentFromMessage && hasRetryKeywords && prevUserHadDeckIntent;
+    const includeDeckInstructions = intentFromMessage || intentFromHistory;
+    
     console.log('[DECK FLOW] userMessage:', params.message);
     console.log('[DECK FLOW] intent.shouldGenerate:', includeDeckInstructions);
     console.log('[DECK FLOW] includeDeckInstructions:', includeDeckInstructions);
@@ -81,13 +90,21 @@ class ChatCapability {
   }
 
   private _parseDeckAction(content: string): { mode: string; count: number } | null {
+    // Formato completo: %%DECK_ACTION%%{...}%%END%%
     const match = content.match(/%%DECK_ACTION%%(\{.*?\})%%END%%/);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[1]);
-    } catch {
-      return null;
+    if (match) {
+      try {
+        return JSON.parse(match[1]);
+      } catch {
+        return { mode: 'mixed', count: 10 };
+      }
     }
+    // Formato parcial: %%DECK_ACTION%% sin JSON ni END — el LLM emitió la señal
+    // pero malformó el payload. Usamos defaults seguros.
+    if (content.includes('%%DECK_ACTION%%')) {
+      return { mode: 'mixed', count: 10 };
+    }
+    return null;
   }
 }
 

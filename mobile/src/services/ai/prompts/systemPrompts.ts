@@ -49,13 +49,18 @@ export function detectDeckIntent(message: string): boolean {
   }
 
   const generationPatterns = [
-    /(?:genera|generar|genere|genérame|generame|crea|crear|cree|créame|creame|haz|hacer|hazme|prepara|preparar|prepárame|preparame|dame|proporciona|necesito|quiero|quisiera|podrías?|puedes)\s+(?:un\s+|una\s+|unos\s+|unas\s+)?(?:\d+\s+)?(?:mazo|mazos|deck|decks|flashcard|flashcards|tarjetas?|preguntas?|examen|quiz|cuestionario|prueba|evaluación|material\s+(?:de\s+)?repaso)/iu,
+    /(?:genera|generar|genere|genérame|generame|crea|crear|cree|créame|creame|haz|hacer|hazme|prepara|preparar|prepárame|preparame|dame|proporciona|necesito|quiero|quisiera|podrías?|puedes)\s+(?:un\s+|una\s+|unos\s+|unas\s+)?(?:de\s+nuevo\s+|nuevamente\s+|otra\s+vez\s+|de\s+vuelta\s+)?(?:\d+\s+)?(?:mazo|mazos|deck|decks|flashcard|flashcards|tarjetas?|preguntas?|examen|quiz|cuestionario|prueba|evaluación|material\s+(?:de\s+)?repaso)/iu,
     /(?:tarjetas?|preguntas?|ejercicios?|material)\s+(?:de\s+)?(?:estudio|repaso|práctica|evaluación)/iu,
     /(?:necesito|quiero|dame|proporciona)\s+(?:un\s+)?(?:mazo|flashcard|tarjetas?|preguntas?|examen)/iu,
     /(\d+|varios|varias|muchas?|algunas?|algunos?)\s+(?:flashcard|tarjetas?|preguntas?|ítems?|ejercicios?|casos)/iu,
     /(?:verdadero|falso|opción\s+múltiple|respuesta\s+corta|ensayo|desarrollo)/iu,
     /tipos?\s+(?:de\s+)?(?:preguntas?|ejercicios|ítems)/iu,
     /para\s+(?:practicar|entrenar|repasar|estudiar|prepararme|preparar(?:me)?(?:\s+para)?)/iu,
+    // Patrones de reintento: "de nuevo el mazo", "otro mazo", "céalo de nuevo"
+    /(?:de\s+nuevo|otra\s+vez|nuevamente|de\s+vuelta)\s+(?:el\s+)?(?:mazo|deck|flashcard|tarjetas?|preguntas?)/iu,
+    /(?:crea|genera|haz)\s+(?:de\s+nuevo|otra\s+vez|nuevamente|de\s+vuelta)/iu,
+    /(?:otro|nueva?|diferente)\s+(?:mazo|deck|flashcard|tarjetas?)/iu,
+    /(?:el|ese|ese|este)\s+mazo/iu,
   ];
 
   for (const pattern of generationPatterns) {
