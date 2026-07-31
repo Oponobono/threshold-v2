@@ -78,7 +78,13 @@ async function callGroqAPI(messages, systemPrompt) {
  * insertar directamente en la tabla `flashcards` (polimórfica).
  */
 exports.generateStudyMaterial = async (req, res) => {
-  const { context_text, mode = 'mixed', count = 10, title, subject_id, user_id } = req.body;
+  const { context_text, count = 10, title, subject_id, user_id } = req.body;
+  // Normalizar el modo: el LLM puede enviar 'flashcards' (plural) pero el sistema usa 'flashcard' (singular)
+  const rawMode = req.body.mode || 'mixed';
+  const mode = rawMode === 'flashcards' ? 'flashcard'
+    : rawMode === 'multiple_choices' ? 'multiple_choice'
+    : rawMode === 'booleans' ? 'boolean'
+    : rawMode;
 
   if (!context_text || !title || !subject_id || !user_id) {
     return res.status(400).json({ error: 'Faltan campos: context_text, title, subject_id, user_id' });
@@ -200,13 +206,10 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
           const contentStr = JSON.stringify(content);
           const hint = item.hint || null;
           const explanation = item.explanation || null;
-          const direction = item.direction || 'forward';
-          const sourceContextObj = item.source_context || null;
-          const sourceContextStr = sourceContextObj ? JSON.stringify(sourceContextObj) : null;
 
           db.run(
-            `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, direction, source_context) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)`,
-            [deckId, front, back, itemType, contentStr, hint, explanation, direction, sourceContextStr],
+            `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
+            [deckId, front, back, itemType, contentStr, hint, explanation],
             function(e) { 
               if (e) {
                 console.error(`[aiController] ❌ Error al insertar tarjeta #${idx} en el mazo ${deckId}:`, e.message);
