@@ -58,37 +58,21 @@ export async function sendHybridChatMessage(
 
 export async function getChatHistory(userId: string | number, subjectId: string | number) {
   try {
-    const { getChatHistory: cloudGetHistory } = await import('./api/ai');
-    const result = await cloudGetHistory(userId, subjectId);
-    try {
-      const { createMMKV } = await import('react-native-mmkv');
-      const mmkv = createMMKV();
-      mmkv.set(`cache:chat_history:${userId}:${subjectId}`, JSON.stringify(result));
-    } catch { }
-    return result;
-  } catch {
-    try {
-      const { createMMKV } = await import('react-native-mmkv');
-      const mmkv = createMMKV();
-      const raw = mmkv.getString(`cache:chat_history:${userId}:${subjectId}`);
-      if (raw) return JSON.parse(raw);
-    } catch { }
-    return { session_id: undefined, messages: [] };
-  }
+    const { createMMKV } = await import('react-native-mmkv');
+    const mmkv = createMMKV();
+    const raw = mmkv.getString(`cache:chat_history:${userId}:${subjectId}`);
+    if (raw) return JSON.parse(raw);
+  } catch { }
+  return { session_id: undefined, messages: [] };
 }
 
 export async function clearChatHistory(userId: string | number, subjectId: string | number) {
   try {
     const { createMMKV } = await import('react-native-mmkv');
     const mmkv = createMMKV();
-      mmkv.remove(`cache:chat_history:${userId}:${subjectId}`);
+    mmkv.delete(`cache:chat_history:${userId}:${subjectId}`);
   } catch { }
-  try {
-    const { clearChatHistory: cloudClearHistory } = await import('./api/ai');
-    return await cloudClearHistory(userId, subjectId);
-  } catch {
-    return { success: true };
-  }
+  return { session_id: undefined, messages: [] };
 }
 
 export async function buildAIContextHybrid(items: any[]) {
