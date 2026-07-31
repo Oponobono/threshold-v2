@@ -95,8 +95,13 @@ exports.generateStudyMaterial = async (req, res) => {
     return res.status(400).json({ error: 'Faltan campos: context_text, title, subject_id, user_id' });
   }
 
+  const provider = req.body.provider || 'groq';
+
   const groqApiKey = secrets.GROQ_API_KEY;
-  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no está configurada' });
+  const geminiApiKey = secrets.GEMINI_API_KEY;
+  if (!groqApiKey && !geminiApiKey) {
+    return res.status(500).json({ error: 'No hay API Keys de IA configuradas' });
+  }
 
   // ── Sistema prompt que le enseña a Zyren la estructura exacta ──────────────
   const modeInstructions = {
@@ -146,27 +151,40 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
       ? context_text.substring(0, 8000) + '\n[...contexto truncado]'
       : context_text;
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Genera el material de estudio basado en este contenido académico:\n\n${trimmedContext}` },
-        ],
-        temperature: 0.15,
-        max_tokens: 6000,
-      }),
-    });
+    let raw = '';
 
-    if (!response.ok) {
-      const err = await response.json();
-      return res.status(500).json({ error: 'Error llamando a Groq', details: err });
+    if (provider === 'gemini' && geminiApiKey) {
+      const { callGeminiAPI } = require('../utils/geminiService');
+      const result = await callGeminiAPI(
+        [{ role: 'user', content: `Genera el material de estudio basado en este contenido académico:\n\n${trimmedContext}` }],
+        systemPrompt
+      );
+      raw = result.reply.content.trim();
+    } else {
+      if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no está configurada' });
+      
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Genera el material de estudio basado en este contenido académico:\n\n${trimmedContext}` },
+          ],
+          temperature: 0.15,
+          max_tokens: 6000,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        return res.status(500).json({ error: 'Error llamando a Groq', details: err });
+      }
+
+      const groqData = await response.json();
+      raw = groqData.choices[0].message.content.trim();
     }
-
-    const groqData = await response.json();
-    const raw = groqData.choices[0].message.content.trim();
 
     // Extraer JSON array
     let jsonStr = raw;

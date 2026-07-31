@@ -250,6 +250,7 @@ export const generateStudyMaterialFromChat = async (params: {
   title: string;
   subjectId: string;
   userId: string;
+  provider?: string;
 }) => {
   try {
     const response = await fetchWithFallback('/ai/generate-study-material', {
@@ -262,6 +263,7 @@ export const generateStudyMaterialFromChat = async (params: {
         title: params.title,
         subject_id: params.subjectId,
         user_id: params.userId,
+        provider: params.provider,
       }),
     });
     const data = await parseJsonSafely(response);

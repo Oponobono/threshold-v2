@@ -524,6 +524,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         title: deckTitle,
         subjectId: currentSubjectId!,
         userId: currentUserId!,
+        provider: currentProvider,
       });
 
       console.log('[AIChatModal] ✅ Respuesta exitosa de generateStudyMaterialFromChat:', deck);
