@@ -267,7 +267,10 @@ export const generateStudyMaterialFromChat = async (params: {
       }),
     });
     const data = await parseJsonSafely(response);
-    if (!response.ok) throw new Error(data?.error || 'Error al generar el material de estudio');
+    if (!response.ok) {
+      const detailsStr = data?.details ? JSON.stringify(data.details) : '';
+      throw new Error(`${data?.error || 'Error al generar el material de estudio'} ${detailsStr}`);
+    }
     return data as { id: number; title: string; card_count: number; cards: any[] };
   } catch (error: any) {
     throw new Error(error.message || 'Error de red al generar material');
