@@ -402,6 +402,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const [messages, setMessages]   = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [isTruncated, setIsTruncated] = useState(false);
   const [currentProvider, setCurrentProvider] = useState<LLMProvider>('groq');
@@ -577,11 +578,11 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
   /** Cargar historial y preferencia de proveedor cuando se abre el modal */
   useEffect(() => {
-    const effectiveUserId = userId || 1; // Fallback para desarrollo/testing
-    if (isVisible && subjectId) {
-      setIsLoading(true);
+    // Evitar fetch con userId = 1 para no causar errores 500 por llaves foráneas en producción
+    if (isVisible && subjectId && userId) {
+      setIsFetchingHistory(true);
       Promise.all([
-        getChatHistory(effectiveUserId, subjectId),
+        getChatHistory(userId, subjectId),
         getPreferredLLMProvider(),
       ])
         .then(([data, provider]) => {
@@ -590,7 +591,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           setCurrentProvider(provider);
         })
         .catch(err => console.warn('[AIChat] Error cargando historial:', err))
-        .finally(() => setIsLoading(false));
+        .finally(() => setIsFetchingHistory(false));
     }
   }, [isVisible, subjectId, userId]);
 
@@ -1040,6 +1041,13 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 </View>
               )}
 
+              {isFetchingHistory && (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={PRIMARY} />
+                  <Text style={{ marginTop: 8, color: TXT_SEC, fontSize: 13 }}>{t('subjects.loadingHistory', 'Cargando historial...')}</Text>
+                </View>
+              )}
+
               {messages.length === 0 ? (
                 /* Estado vacío — sugerencias iniciales */
                 <View style={s.emptyState}>
@@ -1110,9 +1118,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 onSubmitEditing={handleSend}
               />
               <TouchableOpacity
-                style={[s.sendBtn, (!inputText.trim() || isLoading) && s.sendBtnDisabled]}
+                style={[s.sendBtn, (!inputText.trim() || isLoading || isFetchingHistory) && s.sendBtnDisabled]}
                 onPress={handleSend}
-                disabled={!inputText.trim() || isLoading}
+                disabled={!inputText.trim() || isLoading || isFetchingHistory}
                 activeOpacity={0.8}
               >
                 {isLoading
