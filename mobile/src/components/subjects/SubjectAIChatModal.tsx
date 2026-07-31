@@ -398,6 +398,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const userIdRef = useRef(userId);
+  const subjectIdRef = useRef(subjectId);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
+  useEffect(() => { subjectIdRef.current = subjectId; }, [subjectId]);
 
   const [messages, setMessages]   = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -467,14 +471,17 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
    * Usa buildGenerationContext() para obtener el mejor contexto disponible.
    */
   const handleGenerateMaterial = useCallback(async (overrideMode?: StudyMode, overrideCount?: number) => {
+    const currentUserId = userIdRef.current;
+    const currentSubjectId = subjectIdRef.current;
+
     console.log('[AIChatModal] 🎓 Iniciando handleGenerateMaterial:', {
       overrideMode,
       overrideCount,
-      subjectId,
-      userId,
+      subjectId: currentSubjectId,
+      userId: currentUserId,
     });
 
-    if (!subjectId || !userId) {
+    if (!currentSubjectId || !currentUserId) {
       console.warn('[AIChatModal] ⚠️ subjectId o userId faltantes en handleGenerateMaterial!');
       return;
     }
@@ -509,8 +516,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         mode: activeMode,
         count: activeCount,
         title: deckTitle,
-        subjectId: subjectId!,
-        userId: userId!,
+        subjectId: currentSubjectId!,
+        userId: currentUserId!,
       });
 
       console.log('[AIChatModal] ✅ Respuesta exitosa de generateStudyMaterialFromChat:', deck);
