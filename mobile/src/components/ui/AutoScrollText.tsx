@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Text,
   TextStyle,
@@ -16,6 +16,8 @@ interface Props {
   pauseAtEnd?: number;
   returnDuration?: number;
   maxLoops?: number;
+  autoplay?: boolean;
+  pointerEvents?: 'auto' | 'none';
 }
 
 export function AutoScrollText({
@@ -26,6 +28,8 @@ export function AutoScrollText({
   pauseAtEnd = 1000,
   returnDuration = 600,
   maxLoops = 0,
+  autoplay = false,
+  pointerEvents = 'auto',
 }: Props) {
   const scrollRef = useRef<ScrollView>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -50,9 +54,18 @@ export function AutoScrollText({
     trigger(dist);
   }, [trigger, dist]);
 
+  const hasAutoplayedRef = useRef(false);
+  useEffect(() => {
+    if (!autoplay || !overflows || hasAutoplayedRef.current) return;
+    hasAutoplayedRef.current = true;
+    trigger(dist);
+    return () => cancel();
+  }, [autoplay, overflows, dist, trigger, cancel]);
+
   return (
     <Pressable
-      onPress={handlePress}
+      onPress={autoplay ? undefined : handlePress}
+      pointerEvents={pointerEvents}
       style={{ overflow: 'hidden', paddingVertical: 1, minHeight: lineHeight }}
     >
       <ScrollView

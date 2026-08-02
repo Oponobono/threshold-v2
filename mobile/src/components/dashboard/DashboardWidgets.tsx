@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { globalStyles } from '../../styles/globalStyles';
 import { theme } from '../../styles/theme';
+import { AutoScrollText } from '../ui/AutoScrollText';
 import { type Subject } from '../../services/api';
 import { SCALE_MAX } from '../../utils/grades';
 
@@ -163,15 +164,8 @@ export const MetricCard = ({ title, value, subtext, icon, color, showMood, onPre
           <Ionicons name={icon as any} size={20} color={color} />
         </Animated.View>
       </View>
-      <Text 
-        style={styles.cardValue} 
-        numberOfLines={1} 
-        adjustsFontSizeToFit 
-        minimumFontScale={0.7}
-      >
-        {value}
-      </Text>
-      <Text style={styles.cardSubtext} numberOfLines={1}>{subtext}</Text>
+      <AutoScrollText text={value} style={styles.cardValue} lineHeight={18} />
+      <AutoScrollText text={subtext} style={styles.cardSubtext} lineHeight={16} />
     </TouchableOpacity>
   );
 };

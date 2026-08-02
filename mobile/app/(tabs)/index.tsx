@@ -11,7 +11,7 @@ import { theme } from '../../src/styles/theme';
 import { dashboardStyles as styles } from '../../src/styles/Dashboard.styles';
 import { getPredictedSubject, createStudySession, deleteSubject } from '../../src/services/api';
 import type { UserProfile } from '../../src/services/api/types';
-import type { Subject, Assessment } from '../../src/services/database/repositories';
+import type { Subject, Assessment, Schedule } from '../../src/services/database/repositories';
 import { calculateProjection } from '../../src/utils/projectionEngine';
 import { useDataStore } from '../../src/store/useDataStore';
 import { courseRepository } from '../../src/services/database/repositories';
@@ -28,8 +28,8 @@ import { StudyTimerModal } from '../../src/components/timer/StudyTimerModal';
 import { DocumentScannerModal } from '../../src/components/modals/DocumentScannerModal';
 import { PhotoCaptureModal } from '../../src/components/modals/PhotoCaptureModal';
 import { FlashcardsModal } from '../../src/components/flashcards/FlashcardsModal';
-import { SubjectTile, MetricCard, ActionCircle } from '../../src/components/dashboard/DashboardWidgets';
-import { NextClassCard } from '../../src/components/dashboard/NextClassCard';
+import { SubjectTile, ActionCircle } from '../../src/components/dashboard/DashboardWidgets';
+import { UpNextCard } from '../../src/components/dashboard/UpNextCard';
 import { KnowledgeHealthCard } from '../../src/components/dashboard/KnowledgeHealthCard';
 import { DailyReviewCard } from '../../src/components/dashboard/DailyReviewCard';
 import { useKnowledgeInsights } from '../../src/hooks/useKnowledgeInsights';
@@ -146,10 +146,6 @@ export default function HybridDashboardScreen() {
   const profile = storeProfile;
   const overallGpa = storeOverallGpa;
   const userGroups = storeGroups;
-  const todaySchedules = useMemo(() => {
-    const today = new Date().getDay();
-    return storeSchedules.filter((s: any) => s.day_of_week === today);
-  }, [storeSchedules]);
 
   // ── allSchedules viene del store ahora ─────────────────────────────────
   const allSchedules = storeSchedules;
@@ -274,38 +270,6 @@ export default function HybridDashboardScreen() {
       ],
     });
   }, [loadData]);
-
-  // Derivar el próximo examen directamente de los datos del store
-  const nextAssessment = useMemo(() => {
-    if (!Array.isArray(assessments) || assessments.length === 0) return null;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const upcoming = assessments.filter((a: Assessment) => {
-      if (a.is_completed || !a.date) return false;
-      try {
-        const [d, m, y] = a.date.split('-').map(Number);
-        const taskDate = new Date(y, m - 1, d);
-        return taskDate.getTime() >= today.getTime();
-      } catch {
-        return false;
-      }
-    });
-    
-    const sorted = upcoming.sort((a: Assessment, b: Assessment) => {
-      try {
-        if (!a.date || !b.date) return 0;
-        const [da, ma, ya] = a.date.split('-').map(Number);
-        const [db, mb, yb] = b.date.split('-').map(Number);
-        return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
-      } catch {
-        return 0;
-      }
-    });
-
-    return sorted[0] || null;
-  }, [assessments]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -612,14 +576,6 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
 
 
 
-  const nextClass = useMemo(() => {
-    if (!Array.isArray(todaySchedules) || todaySchedules.length === 0) return null;
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    // Encuentra la primera clase que termina en el futuro (o ahora)
-    return todaySchedules.find((s: any) => s.end_time >= currentTime) || null;
-  }, [todaySchedules]);
-
   const subjectNamesMap = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     for (const s of subjects) {
@@ -627,6 +583,138 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
     }
     return map;
   }, [subjects]);
+
+  // ── "Lo siguiente": estado de próxima clase (hoy / mañana) ─────────────
+  const upNextClass = useMemo(() => {
+    const now = new Date();
+    const todayDow = now.getDay();
+    const tomorrowDow = (todayDow + 1) % 7;
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    const todayScheds = (storeSchedules as Schedule[]).filter((s) => s.day_of_week === todayDow);
+    const tomorrowScheds = (storeSchedules as Schedule[])
+      .filter((s) => s.day_of_week === tomorrowDow)
+      .sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? ''));
+
+    const subjectName = (s: Schedule) =>
+      (s.subject_id && subjectNamesMap[s.subject_id]) || s.name || t('dashboard.unknownSubject', { defaultValue: 'Materia' });
+    const formatRange = (s: Schedule) => `${s.start_time || ''} - ${s.end_time || ''}`;
+
+    const timeUntil = (startTime: string) => {
+      const [h, m] = startTime.split(':').map(Number);
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+      const diffMins = Math.round((start.getTime() - now.getTime()) / 60000);
+      if (diffMins <= 0) return t('dashboard.inSession', { defaultValue: 'En este momento' });
+      const hours = Math.floor(diffMins / 60);
+      const mins = diffMins % 60;
+      if (hours > 0) {
+        return mins > 0
+          ? t('dashboard.inHoursMin', { hours, mins, defaultValue: `Dentro de ${hours}h ${mins}m` })
+          : t('dashboard.inHours', { hours, defaultValue: `Dentro de ${hours}h` });
+      }
+      return t('dashboard.inMinutes', { mins, defaultValue: `Dentro de ${mins} min` });
+    };
+
+    const todayNext = todayScheds.find((s) => (s.end_time ?? '') >= currentTime);
+
+    if (todayNext) {
+      const live = (todayNext.start_time ?? '') <= currentTime;
+      return {
+        context: live ? t('dashboard.inSession', { defaultValue: 'En este momento' }) : timeUntil(todayNext.start_time || ''),
+        value: subjectName(todayNext),
+        footer: formatRange(todayNext),
+        live,
+        subjectId: todayNext.subject_id,
+      };
+    }
+
+    if (tomorrowScheds.length > 0) {
+      const next = tomorrowScheds[0];
+      return {
+        context: todayScheds.length > 0
+          ? t('dashboard.untilTomorrow', { defaultValue: 'Hasta mañana' })
+          : t('dashboard.tomorrow'),
+        value: subjectName(next),
+        footer: formatRange(next),
+        live: false,
+        subjectId: next.subject_id,
+      };
+    }
+
+    return {
+      context: t('dashboard.today', { defaultValue: 'Hoy' }),
+      value: t('dashboard.noClasses'),
+      footer: t('dashboard.enjoyDay'),
+      live: false,
+      subjectId: undefined,
+    };
+  }, [storeSchedules, subjectNamesMap, t]);
+
+  // ── "Lo siguiente": próxima tarea (hoy / mañana) ───────────────────────
+  const upNextTask = useMemo(() => {
+    const fmt = (d: Date) =>
+      `${d.getDate().toString().padStart(2, '0')}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getFullYear()}`;
+    const todayStr = fmt(new Date());
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = fmt(tomorrow);
+
+    const byName = (a: Assessment, b: Assessment) => (a.name || '').localeCompare(b.name || '');
+    const todayPending = (assessments as Assessment[])
+      .filter((a) => a.date === todayStr && !a.is_completed)
+      .sort(byName);
+    const tomorrowPending = (assessments as Assessment[])
+      .filter((a) => a.date === tomorrowStr && !a.is_completed)
+      .sort(byName);
+
+    let target: Assessment | null = null;
+    let horizon: 'today' | 'tomorrow' | null = null;
+    if (todayPending.length > 0) {
+      target = todayPending[0];
+      horizon = 'today';
+    } else if (tomorrowPending.length > 0) {
+      target = tomorrowPending[0];
+      horizon = 'tomorrow';
+    }
+
+    if (!target || !horizon) {
+      return {
+        context: t('dashboard.today', { defaultValue: 'Hoy' }),
+        value: t('dashboard.nothingPending'),
+        footer: t('dashboard.takeABreak'),
+        color: '#5856D6',
+      };
+    }
+
+    const count = horizon === 'today' ? todayPending.length : tomorrowPending.length;
+    const context = horizon === 'today'
+      ? (count === 1 ? t('dashboard.pendingTodayOne') : t('dashboard.pendingToday', { count }))
+      : (count === 1 ? t('dashboard.pendingTomorrowOne') : t('dashboard.pendingTomorrow', { count }));
+
+    const subject = target.subject_id ? subjects.find((s) => s.id === target.subject_id) : undefined;
+    const parts: string[] = [];
+    if (subject?.name) parts.push(subject.name);
+    const avg = subject?.avg_score ?? subject?.normalized_avg_score;
+    if (avg != null && !Number.isNaN(Number(avg))) parts.push(Number(avg).toFixed(1));
+    if (subject?.completion_percent != null) parts.push(`${Math.round(subject.completion_percent)}%`);
+    const footer = parts.join(' · ') || t('dashboard.takeABreak');
+
+    let color = '#34C759';
+    try {
+      const [d, m, y] = (target.date || '').split('-').map(Number);
+      if (!d || !m || !y) throw new Error('invalid date');
+      const due = new Date(y, m - 1, d);
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((due.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays <= 1) color = '#FF3B30';
+      else if (diffDays <= 3) color = '#FF9500';
+    } catch {
+      color = '#5856D6';
+    }
+
+    return { context, value: target.name, footer, color };
+  }, [assessments, subjects, t]);
 
   return (
     <>
@@ -924,83 +1012,45 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
           <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>{t('dashboard.upNext', { defaultValue: 'Lo siguiente' })}</Text>
           <View style={styles.grid}>
             {/* NEXT CLASS */}
-            {(() => {
-              let nextClassSubtext = t('dashboard.enjoyDay');
-              if (nextClass) {
-                const now = new Date();
-                const [startH, startM] = (nextClass.start_time || '00:00').split(':').map(Number);
-                const classStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM, 0);
-                const diffMins = Math.floor((classStart.getTime() - now.getTime()) / 60000);
-                
-                if (diffMins > 0) {
-                  const h = Math.floor(diffMins / 60);
-                  const m = diffMins % 60;
-                  if (h > 0) {
-                    nextClassSubtext = m > 0 ? `En ${h}h ${m}m` : `En ${h}h`;
-                  } else {
-                    nextClassSubtext = `En ${m} min`;
-                  }
+            <UpNextCard
+              title={t('dashboard.nextClass')}
+              context={upNextClass.context}
+              value={upNextClass.value}
+              footer={upNextClass.footer}
+              icon="time-outline"
+              color={theme.colors.primary}
+              accent={upNextClass.live ? theme.colors.warning : undefined}
+              onPress={() => {
+                if (upNextClass.subjectId) {
+                  router.push(`/subjects/${upNextClass.subjectId}`);
                 } else {
-                  nextClassSubtext = `En curso`;
+                  setSelectedMetric({
+                    title: t('dashboard.nextClass'),
+                    value: upNextClass.value,
+                    subtext: upNextClass.footer,
+                    icon: "time-outline",
+                    color: theme.colors.primary,
+                  });
                 }
-              }
-
-              return (
-                <MetricCard 
-                  title={t('dashboard.nextClass')}
-                  value={nextClass ? (subjectNamesMap[nextClass.subject_id!] || t('dashboard.unknownSubject', { defaultValue: 'Materia' })) : (todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'))}
-                  subtext={nextClassSubtext}
-                  icon="time-outline"
-                  color={nextClass ? theme.colors.primary : "#5856D6"}
-                  showMood={false}
-                  onPress={() => {
-                    if (nextClass?.subject_id) {
-                      router.push(`/subjects/${nextClass.subject_id}`);
-                    } else {
-                      setSelectedMetric({
-                        title: t('dashboard.nextClass'),
-                        value: todaySchedules.length > 0 ? t('dashboard.doneForToday') : t('dashboard.noClasses'),
-                        subtext: t('dashboard.enjoyDay'),
-                        icon: "time-outline",
-                        color: "#5856D6"
-                      });
-                    }
-                  }}
-                />
-              );
-            })()}
+              }}
+            />
 
             {/* NEXT ASSIGNMENT */}
-            {(() => {
-              const mood = nextAssessment?.date ? (() => {
-                const [d, m, y] = nextAssessment.date.split('-').map(Number);
-                const dueDate = new Date(y, m - 1, d);
-                const today = new Date();
-                today.setHours(0,0,0,0);
-                const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDays <= 1) return { color: '#FF3B30', show: true };
-                if (diffDays <= 3) return { color: '#FF9500', show: true };
-                return { color: '#34C759', show: true };
-              })() : { color: '#5856D6', show: false };
-
-              return (
-                <MetricCard 
-                  title={t('dashboard.nextAssignment')} 
-                  value={nextAssessment ? nextAssessment.name : t('dashboard.nothingPending')} 
-                  subtext={nextAssessment ? nextAssessment.date : t('dashboard.takeABreak')} 
-                  icon="document-text-outline" 
-                  color={mood.color}
-                  showMood={mood.show}
-                  onPress={() => setSelectedMetric({
-                    title: t('dashboard.nextAssignment'),
-                    value: nextAssessment ? nextAssessment.name : "Nada pendiente",
-                    subtext: nextAssessment ? nextAssessment.date : t('dashboard.takeABreak'),
-                    icon: "document-text-outline",
-                    color: mood.color
-                  })}
-                />
-              );
-            })()}
+            <UpNextCard
+              title={t('dashboard.nextAssignment')}
+              context={upNextTask.context}
+              value={upNextTask.value}
+              footer={upNextTask.footer}
+              icon="document-text-outline"
+              color={upNextTask.color}
+              onPress={() => setSelectedMetric({
+                title: t('dashboard.nextAssignment'),
+                value: upNextTask.value,
+                subtext: upNextTask.footer,
+                icon: "document-text-outline",
+                color: upNextTask.color,
+              })}
+            />
           </View>
         </View>
 

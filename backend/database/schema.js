@@ -358,12 +358,18 @@ const tableSchema = {
         user_id TEXT NOT NULL,
         subject_id TEXT,
         name TEXT,
-        local_uri TEXT NOT NULL,
+        mime_type TEXT,
+        local_uri TEXT,
         ocr_text TEXT,
         extracted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
       )
@@ -373,14 +379,51 @@ const tableSchema = {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id),
         subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
+        name TEXT,
+        mime_type TEXT,
+        local_uri TEXT,
+        ocr_text TEXT,
+        extracted_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        cloud_url TEXT,
+        is_backed_up INTEGER DEFAULT 0,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        last_modified_by TEXT,
+        deleted_at TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'name', type: 'TEXT' },
+      { name: 'mime_type', type: 'TEXT' },
+      { name: 'ocr_text', type: 'TEXT' },
+      { name: 'extracted_at', type: 'TIMESTAMP' },
+      { name: 'cloud_url', type: 'TEXT' },
+      { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 0' },
+      { name: 'last_modified_by', type: 'TEXT' },
+      { name: 'deleted_at', type: 'TIMESTAMP' },
+    ]
+  },
+  audio_recordings: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS audio_recordings (
+        id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         subject_id TEXT,
         name TEXT,
-        local_uri TEXT NOT NULL,
-        duration INTEGER,
+        local_uri TEXT,
+        duration REAL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         cloud_url TEXT,
         is_backed_up INTEGER DEFAULT 0,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        deleted_at TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL
       )
@@ -391,17 +434,25 @@ const tableSchema = {
         user_id TEXT NOT NULL REFERENCES users(id),
         subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
         name TEXT,
-        local_uri TEXT NOT NULL,
-        duration INTEGER,
+        local_uri TEXT,
+        duration REAL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         cloud_url TEXT,
-        is_backed_up INTEGER DEFAULT 0
+        is_backed_up INTEGER DEFAULT 0,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 0,
+        deleted_at TIMESTAMP
       )
     `,
     columns: [
-      { name: 'name', type: 'TEXT' },
+      { name: 'duration', type: 'REAL' },
       { name: 'cloud_url', type: 'TEXT' },
       { name: 'is_backed_up', type: 'INTEGER DEFAULT 0' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 0' },
+      { name: 'deleted_at', type: 'TIMESTAMP' },
     ]
   },
   audio_transcripts: {
