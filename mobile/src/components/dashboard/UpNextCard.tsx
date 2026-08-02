@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AutoScrollText } from '../ui/AutoScrollText';
+import { AnimatedClockIcon, AnimatedTaskIcon } from './UpNextAnimatedIcon';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 
 interface UpNextCardProps {
@@ -25,26 +25,38 @@ export function UpNextCard({
   accent,
   onPress,
 }: UpNextCardProps) {
+  const tint = accent ?? color;
+
   return (
     <TouchableOpacity style={styles.upNextCard} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.upNextHeader}>
         <View style={styles.upNextHeaderCol}>
           <Text style={styles.upNextHeaderLine1} numberOfLines={1}>
-            {title}
+            {`${title}:`}
           </Text>
-          <Text style={styles.upNextHeaderLine2} numberOfLines={1}>
+          <Text style={[styles.upNextHeaderLine2, { color: tint }]} numberOfLines={1}>
             {context}
           </Text>
         </View>
-        <View style={[styles.upNextIcon, { backgroundColor: (accent ?? color) + '20', borderColor: (accent ?? color) + '40' }]}>
-          <Ionicons name={icon} size={18} color={accent ?? color} />
+        <View style={[styles.upNextIcon, { backgroundColor: tint + '15' }]}>
+          {icon === 'time-outline' ? (
+            <AnimatedClockIcon color={tint} size={18} live={!!accent} />
+          ) : icon === 'document-text-outline' ? (
+            <AnimatedTaskIcon color={tint} size={18} />
+          ) : (
+            <Ionicons name={icon} size={18} color={tint} />
+          )}
         </View>
       </View>
       <View style={styles.upNextValueSlot}>
-        <AutoScrollText text={value} style={styles.upNextValue} lineHeight={20} autoplay pointerEvents="none" />
+        <Text style={styles.upNextValue} numberOfLines={2}>
+          {value}
+        </Text>
       </View>
       <View style={styles.upNextFooterSlot}>
-        <AutoScrollText text={footer} style={styles.upNextFooter} lineHeight={16} autoplay pointerEvents="none" />
+        <Text style={styles.upNextFooter} numberOfLines={1}>
+          {footer}
+        </Text>
       </View>
     </TouchableOpacity>
   );

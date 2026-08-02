@@ -1018,7 +1018,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
               value={upNextClass.value}
               footer={upNextClass.footer}
               icon="time-outline"
-              color={theme.colors.primary}
+              color={theme.colors.warning}
               accent={upNextClass.live ? theme.colors.warning : undefined}
               onPress={() => {
                 if (upNextClass.subjectId) {
