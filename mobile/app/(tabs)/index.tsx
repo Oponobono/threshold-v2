@@ -137,8 +137,6 @@ export default function HybridDashboardScreen() {
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [predictedSubjectId, setPredictedSubjectId] = useState<string | null>(null);
 
-  const [selectedMetric, setSelectedMetric] = useState<any>(null);
-
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
@@ -1023,14 +1021,6 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
               onPress={() => {
                 if (upNextClass.subjectId) {
                   router.push(`/subjects/${upNextClass.subjectId}`);
-                } else {
-                  setSelectedMetric({
-                    title: t('dashboard.nextClass'),
-                    value: upNextClass.value,
-                    subtext: upNextClass.footer,
-                    icon: "time-outline",
-                    color: theme.colors.primary,
-                  });
                 }
               }}
             />
@@ -1043,13 +1033,6 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
               footer={upNextTask.footer}
               icon="document-text-outline"
               color={upNextTask.color}
-              onPress={() => setSelectedMetric({
-                title: t('dashboard.nextAssignment'),
-                value: upNextTask.value,
-                subtext: upNextTask.footer,
-                icon: "document-text-outline",
-                color: upNextTask.color,
-              })}
             />
           </View>
         </View>
@@ -1289,38 +1272,6 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
       />
       
       {/* METRIC DETAIL MODAL */}
-      <Modal
-        visible={!!selectedMetric}
-        transparent
-        animationType="fade"
-      >
-        <Pressable style={styles.sheetBackdrop} onPress={() => setSelectedMetric(null)}>
-          <View style={[styles.sheetContent, { marginHorizontal: 20, marginBottom: 'auto', marginTop: 'auto', borderRadius: 32 }]}>
-            <View style={styles.sheetHandle} />
-            {selectedMetric ? (
-              <View style={{ alignItems: 'center', paddingVertical: 10 }}>
-                <View style={[styles.iconBox, { backgroundColor: selectedMetric.color + '20', width: 60, height: 60, borderRadius: 20, marginBottom: 16 }]}>
-                  <Ionicons name={selectedMetric.icon} size={30} color={selectedMetric.color} />
-                </View>
-                <Text style={[styles.sectionTitle, { marginBottom: 4 }]}>{selectedMetric.title}</Text>
-                <Text style={[styles.cardValue, { fontSize: 22, textAlign: 'center', paddingHorizontal: 10 }]}>
-                  {selectedMetric.value}
-                </Text>
-                <Text style={[styles.greetingSubtext, { marginTop: 8 }]}>
-                  {selectedMetric.subtext}
-                </Text>
-                
-                <TouchableOpacity 
-                  style={[styles.sheetSaveBtn, { width: '100%', marginTop: 32 }]} 
-                  onPress={() => setSelectedMetric(null)}
-                >
-                  <Text style={styles.sheetSaveText}>{t('common.close')}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-          </View>
-        </Pressable>
-      </Modal>
       <TouchableOpacity 
         style={styles.fab} 
         onPress={handleOpenQuickAdd}

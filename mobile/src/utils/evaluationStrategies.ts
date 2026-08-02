@@ -147,6 +147,15 @@ export function adaptFlashcardsToEvaluationItems(cards: any[]): EvaluationItem[]
       }
     }
 
+    // Normalizar contenido de flashcard: claves legacy question/answer/pregunta/respuesta → front/back
+    if (itemType === 'flashcard' && content && typeof content === 'object') {
+      content = {
+        ...content,
+        front: content.front || content.question || content.pregunta || '',
+        back: content.back || content.answer || content.respuesta || '',
+      };
+    }
+
     // Aplicar direction flag: backward ↔ swap front/back, bidirectional ↔ random
     const direction = card.direction || 'forward';
     if (itemType === 'flashcard') {

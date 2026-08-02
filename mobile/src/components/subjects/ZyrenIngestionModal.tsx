@@ -17,7 +17,14 @@ import { extractTextFromImageHybrid, generateClassFlashcardsHybrid } from '../..
 import type { CardDirection } from '../../services/api/types';
 import { styles } from '../../styles/ZyrenIngestionModal.styles';
 
-interface GeneratedCard { front: string; back: string; }
+interface GeneratedCard {
+  front: string;
+  back: string;
+  question?: string;
+  pregunta?: string;
+  answer?: string;
+  respuesta?: string;
+}
 
 interface AttachedImage {
   uri: string;       // URI local de la imagen
@@ -307,7 +314,7 @@ export function ZyrenIngestionModal({
       for (const card of toSave) {
         addLocalCard(deckId, {
           type: 'flashcard',
-          data: { front: card.front, back: card.back },
+          data: { front: card.front || card.question || card.pregunta, back: card.back || card.answer || card.respuesta },
           direction,
         });
       }
@@ -334,8 +341,8 @@ export function ZyrenIngestionModal({
             subject_id: newDeck.subject_id,
             cards: mmkvCards.map(c => ({
               id: c.id,
-              front: c.front || c.content?.front || '',
-              back: c.back || c.content?.back || '',
+              front: c.front || c.content?.front || c.data?.front || '',
+              back: c.back || c.content?.back || c.data?.back || '',
               item_type: c.item_type || 'flashcard',
               content_json: c.content || c.data,
               hint: c.hint,

@@ -293,12 +293,12 @@ export const dashboardStyles = StyleSheet.create({
     marginRight: 8,
   },
   upNextHeaderLine1: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: theme.typography.sizes.xs,
     color: theme.colors.text.secondary,
     fontWeight: '500',
   },
   upNextHeaderLine2: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: theme.typography.sizes.xs,
     color: theme.colors.text.secondary,
     fontWeight: '500',
     marginTop: 1,
@@ -329,10 +329,10 @@ export const dashboardStyles = StyleSheet.create({
     marginTop: 8,
   },
   upNextFooter: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: theme.typography.sizes.xs,
     color: theme.colors.text.secondary,
     fontWeight: '400',
-    lineHeight: 16,
+    lineHeight: 14,
     backgroundColor: '#F4F4F4',
     paddingHorizontal: 6,
     paddingVertical: 2,

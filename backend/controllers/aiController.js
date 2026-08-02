@@ -1680,8 +1680,15 @@ Formato JSON esperado:
     }
 
     const cards = Array.isArray(parsed?.cards) ? parsed.cards : [];
+    const normalizedCards = cards
+      .map(card => ({
+        ...card,
+        front: card.front || card.question || card.pregunta || '',
+        back: card.back || card.answer || card.respuesta || '',
+      }))
+      .filter(card => card.front && card.back);
     const topic = parsed?.topic || 'Zyren';
-    return res.status(200).json({ cards, count: cards.length, topic });
+    return res.status(200).json({ cards: normalizedCards, count: normalizedCards.length, topic });
 
   } catch (error) {
     console.error('[aiController] Error en generateClassFlashcards:', error);
