@@ -236,27 +236,30 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
   }
 
   // 3. Si hay cards locales: sync en background (no bloquea).
-  // Si alguna card local tiene content_json nulo (por schema antiguo sin la columna),
-  // forzar update directo ignorando el version guard.
+  // IMPORTANTE: usar SQL crudo en lugar de flashcardRepository.update() para
+  // evitar emitir eventos al repositoryEventBus que causarían re-renders
+  // del study screen durante la sesión activa (content offset + flash).
   (async () => {
     try {
       const userId = await getUserId();
       const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards/prioritized?userId=${userId}`);
       if (response.ok) {
         const data = await parseJsonSafely(response);
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           const db = databaseService.getDb();
           for (const c of data) {
-            if (!c.id) continue;
-            const local: any = await db.getFirstAsync(
-              `SELECT content_json, item_type FROM flashcards WHERE id = ?`, [c.id]
+            if (!c.id || !c.content_json) continue;
+            // Update silencioso: solo campos de contenido, sin emitir eventos
+            await db.runAsync(
+              `UPDATE flashcards
+               SET item_type   = COALESCE(?, item_type),
+                   content_json = COALESCE(?, content_json),
+                   hint         = COALESCE(?, hint),
+                   explanation  = COALESCE(?, explanation)
+               WHERE id = ? AND (content_json IS NULL OR content_json = '')`,
+              [c.item_type ?? null, c.content_json ?? null,
+               c.hint ?? null, c.explanation ?? null, c.id]
             );
-            // Forzar update si el card local no tiene content_json pero el servidor sí
-            if (local && !local.content_json && c.content_json) {
-              await flashcardRepository.update(c.id, c as any);
-            } else {
-              await flashcardRepository.upsertFromCloud(c);
-            }
           }
         }
       }
