@@ -217,6 +217,18 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
   const mmkvCards = getLocalCardsFromMMKV(deckId);
   const localData = mergeCards(sqliteCards || [], mmkvCards);
 
+  // Helper: el backend devuelve `content` (objeto parseado via normalizeCard),
+  // no `content_json` (string). Normalizar siempre antes de persistir.
+  const toContentJson = (c: any): string | null => {
+    if (c.content_json) {
+      return typeof c.content_json === 'string' ? c.content_json : JSON.stringify(c.content_json);
+    }
+    if (c.content && typeof c.content === 'object') {
+      return JSON.stringify(c.content);
+    }
+    return null;
+  };
+
   // 2. Si no hay cards locales (mazo recién creado en el backend), fetch síncrono.
   // Garantiza que un mazo generado por Zyren sea jugable de inmediato,
   // sin esperar a que el ciclo de sync completo baje las cards a SQLite.
@@ -227,7 +239,11 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data) && data.length > 0) {
-          for (const c of data) await flashcardRepository.upsertFromCloud(c);
+          for (const c of data) {
+            // Normalizar content_json antes de persistir en SQLite
+            const contentJson = toContentJson(c);
+            await flashcardRepository.upsertFromCloud({ ...c, content_json: contentJson } as any);
+          }
           return mergeCards(data, mmkvCards);
         }
       }
@@ -239,6 +255,7 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
   // IMPORTANTE: usar SQL crudo en lugar de flashcardRepository.update() para
   // evitar emitir eventos al repositoryEventBus que causarían re-renders
   // del study screen durante la sesión activa (content offset + flash).
+  // El backend devuelve `content` (objeto), no `content_json` — se serializa aquí.
   (async () => {
     try {
       const userId = await getUserId();
@@ -248,16 +265,18 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
         if (Array.isArray(data) && data.length > 0) {
           const db = databaseService.getDb();
           for (const c of data) {
-            if (!c.id || !c.content_json) continue;
+            if (!c.id) continue;
+            const contentJson = toContentJson(c);
+            if (!contentJson) continue;
             // Update silencioso: solo campos de contenido, sin emitir eventos
             await db.runAsync(
               `UPDATE flashcards
-               SET item_type   = COALESCE(?, item_type),
+               SET item_type    = COALESCE(?, item_type),
                    content_json = COALESCE(?, content_json),
                    hint         = COALESCE(?, hint),
                    explanation  = COALESCE(?, explanation)
                WHERE id = ? AND (content_json IS NULL OR content_json = '')`,
-              [c.item_type ?? null, c.content_json ?? null,
+              [c.item_type ?? null, contentJson,
                c.hint ?? null, c.explanation ?? null, c.id]
             );
           }
