@@ -23,6 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { generateStudyMaterialFromChat } from '../../services/api/ai';
 import { syncManager } from '../../services/sync/SyncManager';
+import { useFlashcardsStore } from '../../store/useFlashcardsStore';
 import { sendHybridChatMessage, generateHybridStudyMaterial, getChatHistory, clearChatHistory, processDocumentUploadHybrid } from '../../services/hybridAIService';
 import { resolveIntent } from '../../services/ai/ConversationIntentResolver';
 import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
@@ -544,7 +545,24 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       setMessages(prev => [...prev, aiMsg]);
       showToast(t('ai.deckGeneratedToast', { title: deck.title, count: deck.card_count, defaultValue: `Deck "${deck.title}" ready with ${deck.card_count} items ✅` }));
       
-      // 🚀 Disparar sincronización inmediata para que el motor baje el mazo recién creado en el backend
+      // 🔄 Upsert optimista: añadir el mazo al store en memoria de forma inmediata.
+      // El mazo existe en el backend (Render) pero aún no en SQLite local.
+      // No usamos refresh() porque leería SQLite y el mazo todavía no está ahí.
+      if (deck.id) {
+        useFlashcardsStore.getState().upsert({
+          id: deck.id,
+          title: deck.title,
+          subject_id: currentSubjectId ?? undefined,
+          user_id: currentUserId ?? undefined,
+          card_count: deck.card_count,
+          new_count: deck.card_count,
+          learning_count: 0,
+          review_count: 0,
+          created_at: new Date().toISOString(),
+        } as any);
+      }
+
+      // 🚀 Disparar sync para bajar el mazo+cards a SQLite y mantener convergencia
       syncManager.sync().catch(e => console.warn('[AIChatModal] ⚠️ Error al sincronizar el nuevo mazo:', e));
     } catch (err: any) {
       console.error('[AIChatModal] ❌ Error en generateStudyMaterialFromChat:', {

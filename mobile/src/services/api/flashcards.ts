@@ -217,7 +217,25 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
   const mmkvCards = getLocalCardsFromMMKV(deckId);
   const localData = mergeCards(sqliteCards || [], mmkvCards);
 
-  // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
+  // 2. Si no hay cards locales (mazo recién creado en el backend), fetch síncrono.
+  // Garantiza que un mazo generado por Zyren sea jugable de inmediato,
+  // sin esperar a que el ciclo de sync completo baje las cards a SQLite.
+  if (localData.length === 0) {
+    try {
+      const userId = await getUserId();
+      const response = await fetchWithFallback(`/flashcard-decks/${deckId}/cards/prioritized?userId=${userId}`);
+      if (response.ok) {
+        const data = await parseJsonSafely(response);
+        if (Array.isArray(data) && data.length > 0) {
+          for (const c of data) await flashcardRepository.upsertFromCloud(c);
+          return mergeCards(data, mmkvCards);
+        }
+      }
+    } catch {}
+    return localData;
+  }
+
+  // 3. Si hay cards locales: sync en background (no bloquea)
   (async () => {
     try {
       const userId = await getUserId();
