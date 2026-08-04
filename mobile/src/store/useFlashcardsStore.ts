@@ -68,16 +68,20 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
 
       const localCards = deckCardsMap.get(String(d.id)) || [];
       
-      // Always recalculate from local DB state, ensuring accuracy and avoiding stale or missing counts
+      // Contadores semánticos: ✅ + 💪 siempre suman card_count.
+      // ✅ review_count  = cards bien repasadas (status review/graduated),
+      //                   independientemente de si la fecha de repaso ya llegó.
+      // 💪 new_count     = cards que aún necesitan refuerzo (new + learning).
+      // learning_count   = 0, absorbido por new_count para simplificar la UI.
       enrichedDeck.card_count = localCards.length;
-      enrichedDeck.new_count = localCards.filter(c => !c.status || c.status === 'new').length;
-      enrichedDeck.learning_count = localCards.filter(c => c.status === 'learning').length;
-      
-      const now = new Date();
-      enrichedDeck.review_count = localCards.filter(c => 
-        (c.status === 'review' || c.status === 'graduated') && 
-        c.next_review_date && new Date(c.next_review_date) <= now
+      enrichedDeck.review_count = localCards.filter(c =>
+        c.status === 'review' || c.status === 'graduated'
       ).length;
+      enrichedDeck.new_count = localCards.filter(c =>
+        !c.status || c.status === 'new' || c.status === 'learning'
+      ).length;
+      enrichedDeck.learning_count = 0;
+
 
       const linkedEventId = (d as any).linked_event_id;
       if (linkedEventId) {
