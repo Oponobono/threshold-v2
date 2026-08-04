@@ -903,5 +903,17 @@ const migrations: Migration[] = [
        ON subjects(user_id) WHERE deleted_at IS NULL`,
     ],
   },
+  {
+    version: 43,
+    up: [
+      // content_json e item_type nunca fueron agregados al schema local.
+      // Sin ellas, BaseRepository.create() los filtra de los INSERT →
+      // los cards de tipo multiple_choice/boolean se guardaban sin contenido.
+      `ALTER TABLE flashcards ADD COLUMN item_type TEXT NOT NULL DEFAULT 'flashcard'`,
+      `ALTER TABLE flashcards ADD COLUMN content_json TEXT`,
+      `ALTER TABLE flashcards ADD COLUMN hint TEXT`,
+      `ALTER TABLE flashcards ADD COLUMN explanation TEXT`,
+    ],
+  },
 ];
 export default migrations;

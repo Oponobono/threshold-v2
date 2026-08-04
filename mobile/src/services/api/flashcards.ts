@@ -235,7 +235,9 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
     return localData;
   }
 
-  // 3. Si hay cards locales: sync en background (no bloquea)
+  // 3. Si hay cards locales: sync en background (no bloquea).
+  // Si alguna card local tiene content_json nulo (por schema antiguo sin la columna),
+  // forzar update directo ignorando el version guard.
   (async () => {
     try {
       const userId = await getUserId();
@@ -243,7 +245,19 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const c of data) await flashcardRepository.upsertFromCloud(c);
+          const db = databaseService.getDb();
+          for (const c of data) {
+            if (!c.id) continue;
+            const local: any = await db.getFirstAsync(
+              `SELECT content_json, item_type FROM flashcards WHERE id = ?`, [c.id]
+            );
+            // Forzar update si el card local no tiene content_json pero el servidor sí
+            if (local && !local.content_json && c.content_json) {
+              await flashcardRepository.update(c.id, c as any);
+            } else {
+              await flashcardRepository.upsertFromCloud(c);
+            }
+          }
         }
       }
     } catch {}
