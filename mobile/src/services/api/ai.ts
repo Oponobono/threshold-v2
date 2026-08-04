@@ -125,114 +125,7 @@ export const buildAIContext = async (items: { id: string | number; type: string;
 };
 
 /**
- * Genera flashcards estructuradas (pares pregunta/respuesta) desde el contexto académico.
- * El backend usa Groq LLaMA para producir un array JSON de { front, back }.
- *
- * @param contextText - Texto de contexto ensamblado por buildAIContext.
- * @param count - Número de flashcards a generar (default: 10).
- */
-export const generateFlashcardsFromContext = async (
-  contextText: string,
-  count: number = 10,
-): Promise<{ front: string; back: string }[]> => {
-  try {
-    const response = await fetchWithFallback('/ai/generate-flashcards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ context_text: contextText, count }),
-    });
 
-    const data = await parseJsonSafely(response);
-    if (!response.ok) {
-      throw new Error(data?.error || 'Error al generar las flashcards con IA');
-    }
-
-    return data?.flashcards as { front: string; back: string }[] || [];
-  } catch (error: any) {
-    throw new Error(error.message || 'Error de red al generar flashcards');
-  }
-};
-
-/**
- * Procesa un documento cargado directamente (sin guardar en disco).
- * Envía el archivo multipart/form-data a Gemini.
- *
- * @param file - Archivo a procesar (objeto con uri, name, type)
- * @param prompt - Instrucción para procesar el documento
- * @returns Resultado del procesamiento de Gemini
- */
-export const processDocumentUpload = async (
-  file: { uri: string; name: string; type: string } | any,
-  prompt: string,
-): Promise<{ result: string; fileName: string; fileSize: string }> => {
-  try {
-    const formData = new FormData();
-    formData.append('file', file as any);
-    formData.append('prompt', prompt);
-
-    console.log(`[AI Service] 📄 Procesando documento: ${file.name || 'archivo'}`);
-
-    const response = await fetchWithFallback('/ai/process-document-upload', {
-      method: 'POST',
-      body: formData,
-      // NO incluir Content-Type header — el navegador lo configura automáticamente con boundary
-    });
-
-    const data = await parseJsonSafely(response);
-
-    if (!response.ok) {
-      console.error(`[AI Service] ❌ Error ${response.status}:`, data);
-      throw new Error(data?.error || `Error ${response.status} al procesar documento`);
-    }
-
-    console.log(`[AI Service] ✅ Documento procesado exitosamente`);
-    return data;
-  } catch (error: any) {
-    console.error(`[AI Service] Error procesando documento:`, error);
-    throw new Error(error.message || 'Error al procesar el documento');
-  }
-};
-
-/**
- * Genera flashcards desde un archivo cargado directamente.
- * Procesa en memoria con Gemini.
- *
- * @param file - Archivo a procesar (objeto con uri, name, type)
- * @param count - Número de flashcards a generar (default: 10)
- * @returns Array de flashcards { front, back }
- */
-export const generateFlashcardsUpload = async (
-  file: { uri: string; name: string; type: string } | any,
-  count: number = 10,
-): Promise<{ front: string; back: string }[]> => {
-  try {
-    const formData = new FormData();
-    formData.append('file', file as any);
-    formData.append('count', String(count));
-
-    console.log(`[AI Service] 📚 Generando ${count} flashcards desde: ${file.name || 'archivo'}`);
-
-    const response = await fetchWithFallback('/ai/generate-flashcards-upload', {
-      method: 'POST',
-      body: formData,
-      // NO incluir Content-Type header — el navegador lo configura automáticamente con boundary
-    });
-
-    const data = await parseJsonSafely(response);
-
-    if (!response.ok) {
-      console.error(`[AI Service] ❌ Error ${response.status}:`, data);
-      throw new Error(data?.error || `Error ${response.status} al generar flashcards`);
-    }
-
-    console.log(`[AI Service] ✅ ${data.count} flashcards generadas`);
-    return data?.flashcards as { front: string; back: string }[] || [];
-  } catch (error: any) {
-    console.error(`[AI Service] Error generando flashcards:`, error);
-    throw new Error(error.message || 'Error al generar flashcards del documento');
-  }
-};
-/**
  * Solicita a Zyren que genere un mazo de material de estudio directamente desde el chat.
  * Crea el mazo en la BD y lo devuelve listo para aparecer en la lista de mazos.
  *
@@ -251,31 +144,41 @@ export const generateStudyMaterialFromChat = async (params: {
   subjectId: string;
   userId: string;
   provider?: string;
+  items?: Array<{ id: string; type: string; label: string; ocr_text?: string; extracted_text?: string }>;
 }) => {
   try {
-    const response = await fetchWithFallback('/ai/generate-study-material', {
+    const response = await fetchWithFallback('/ai/capabilities/flashcards', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        context_text: params.contextText,
         mode: params.mode,
         count: params.count,
         title: params.title,
         subject_id: params.subjectId,
-        user_id: params.userId,
         provider: params.provider,
+        items: params.items && params.items.length > 0
+          ? params.items
+          : params.contextText?.trim()
+            ? [{ id: 'ctx', type: 'document', label: 'Contexto de conversación', extracted_text: params.contextText }]
+            : [],
       }),
     });
     const data = await parseJsonSafely(response);
     if (!response.ok) {
-      const detailsStr = data?.details ? JSON.stringify(data.details) : '';
-      throw new Error(`${data?.error || 'Error al generar el material de estudio'} ${detailsStr}`);
+      throw new Error(`${data?.error || 'Error al generar el material de estudio'}`);
     }
-    return data as { id: number; title: string; card_count: number; cards: any[] };
+    const deck = data?.deck;
+    return {
+      id: deck?.id,
+      title: deck?.title || params.title,
+      card_count: deck?.cards?.length ?? 0,
+      cards: deck?.cards ?? [],
+    } as { id: string; title: string; card_count: number; cards: any[] };
   } catch (error: any) {
     throw new Error(error.message || 'Error de red al generar material');
   }
 };
+
 
 /**
  * Analiza un mazo en busca de conceptos confundibles (Learning Engineering).

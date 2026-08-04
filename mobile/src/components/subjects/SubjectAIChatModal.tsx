@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { generateStudyMaterialFromChat } from '../../services/api/ai';
 import { syncManager } from '../../services/sync/SyncManager';
 import { sendHybridChatMessage, generateHybridStudyMaterial, getChatHistory, clearChatHistory, processDocumentUploadHybrid } from '../../services/hybridAIService';
+import { resolveIntent } from '../../services/ai/ConversationIntentResolver';
 import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import * as DocumentPicker from 'expo-document-picker';
@@ -687,6 +688,17 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     setInputText('');
     setIsLoading(true);
 
+    // ── Resolver intención antes de llamar a la IA ─────────────────────────
+    const history = updatedMessages.slice(0, -1).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    const intent = resolveIntent(text, history);
+
+    if (intent.type === 'generate_deck') {
+      setIsLoading(false);
+      await handleGenerateMaterial(intent.mode, intent.count);
+      return;
+    }
+
+    // ── Flujo de chat normal ───────────────────────────────────────────────
     const isLocalProvider = currentProvider === 'local';
 
     if (isLocalProvider) {
@@ -723,49 +735,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
       let replyContent: string = data?.reply?.content || t('subjects.couldNotProcess');
       let cleanReply = replyContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim() || replyContent;
-      // Strip markdown images from AI response
       cleanReply = cleanReply.replace(/!\[.*?\]\(.*?\)/g, '');
-      // Strip stray DECK_ACTION markers without valid JSON
-      cleanReply = cleanReply.replace(/%%DECK_ACTION%%(?!\{)/g, '');
 
-      console.log('[AIChatModal] 📥 Respuesta recibida del backend:', {
-        hasData: !!data,
-        hasDeck: !!data?.deck,
-        deckData: data?.deck,
-        replyLength: replyContent?.length,
-      });
-
-      // ── Interceptar señal de generación de mazo ────────────────────────────
-      const rawSignal = data?.deck ? JSON.stringify(data.deck) : replyContent.match(/%+DECK_ACTION%+(\{[\s\S]*?\})%+END%+/)?.[1];
-      
-      console.log('[AIChatModal] 🎯 Chequeo de señal %%DECK_ACTION%%:', {
-        matched: !!rawSignal,
-        rawSignal: rawSignal,
-      });
-
-      if (rawSignal) {
-        // Limpiar la señal del mensaje visible si aún existe en replyContent
-        replyContent = replyContent.replace(/%+DECK_ACTION%+[\s\S]*?%+END%+/g, '').trim();
-
-        // Mostrar el mensaje limpio inmediatamente
-        setMessages(prev => [...prev, { role: 'assistant' as const, content: replyContent }].slice(-6));
-        setIsLoading(false);
-
-        // Parsear parámetros y generar el mazo en segundo plano
-        try {
-          const deckParams = JSON.parse(rawSignal);
-          const mode: StudyMode = deckParams.mode || 'mixed';
-          const count: number = deckParams.count || 10;
-          console.log('[AIChatModal] 🧠 Parse de parámetros %%DECK_ACTION%% exitoso:', { mode, count });
-          await handleGenerateMaterial(mode, count);
-        } catch (parseErr: any) {
-          console.error('[AIChatModal] ❌ Error parseando parámetros JSON de la señal:', parseErr.message);
-        }
-      } else {
-        // Respuesta normal del chat sin generación de mazo
-        setMessages(prev => [...prev, { role: 'assistant' as const, content: cleanReply }].slice(-6));
-        setIsLoading(false);
-      }
+      setMessages(prev => [...prev, { role: 'assistant' as const, content: cleanReply }].slice(-6));
+      setIsLoading(false);
       setIsThinking(false);
       setStreamingContent(null);
       streamAccumulated.current = '';

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const aiController = require('../controllers/aiController');
+const flashcardController = require('../controllers/flashcardController');
 const { aiLimiter } = require('../middlewares/rateLimiter');
 const { validateFileMagicNumber } = require('../middlewares/fileValidator');
 
@@ -358,5 +359,8 @@ router.post('/ai/class-flashcards', aiController.generateClassFlashcards);
  *         description: Respuesta de la IA
  */
 router.post('/ai/chat-proxy', aiController.chatProxy);
+
+// --- Capabilities API (nueva arquitectura modular) ---
+router.post('/ai/capabilities/flashcards', flashcardController.generateFlashcards);
 
 module.exports = router;
