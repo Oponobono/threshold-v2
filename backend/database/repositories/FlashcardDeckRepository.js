@@ -1,39 +1,32 @@
-const { db } = require('../../db');
+const { db, pool, isProduction } = require('../../database/connection');
 const { v4: uuidv4 } = require('uuid');
 
 /**
  * FlashcardDeckRepository
- * Persiste un FlashcardDeckAggregate en SQLite usando una transacción real
- * (BEGIN → INSERT deck → INSERT cards × N → COMMIT / ROLLBACK).
+ * Persiste un FlashcardDeckAggregate. 
+ * Implementa una transacción SQL real tanto para SQLite (local) como PostgreSQL (Render).
  */
 class FlashcardDeckRepository {
 
   static async saveAggregate(aggregate) {
-    return new Promise((resolve, reject) => {
-      const deckId = aggregate.id || uuidv4();
+    const deckId = aggregate.id || uuidv4();
 
-      db.serialize(() => {
-        db.run('BEGIN TRANSACTION', (beginErr) => {
-          if (beginErr) return reject(beginErr);
-        });
+    if (isProduction && pool) {
+      // ── TRANSACCIÓN POSTGRESQL (Render) ──
+      // Usamos pool.connect() para garantizar que BEGIN, INSERTs y COMMIT
+      // se ejecuten sobre exactamente la misma conexión.
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
 
-        let failed = false;
-
-        // 1. Insertar el deck
-        db.run(
+        // 1. Insertar deck
+        await client.query(
           `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, sync_version)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [deckId, aggregate.subjectId, aggregate.userId, aggregate.title, aggregate.description, aggregate.syncVersion],
-          function (deckErr) {
-            if (deckErr) {
-              failed = true;
-              console.error('[FlashcardDeckRepository] ❌ Error insertando deck:', deckErr.message);
-              db.run('ROLLBACK', () => reject(deckErr));
-            }
-          }
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [deckId, aggregate.subjectId, aggregate.userId, aggregate.title, aggregate.description, aggregate.syncVersion]
         );
 
-        // 2. Insertar cada card (serializado dentro de la transacción abierta)
+        // 2. Insertar cards secuencialmente
         for (const card of aggregate.cards) {
           const itemType = card.type || 'flashcard';
           const content = card.data || {};
@@ -44,31 +37,88 @@ class FlashcardDeckRepository {
           const hint = card.hint || null;
           const explanation = card.explanation || null;
 
-          db.run(
+          await client.query(
             `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status, sync_version)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)`,
-            [cardId, deckId, aggregate.userId, front, back, itemType, contentStr, hint, explanation, aggregate.syncVersion],
-            function (cardErr) {
-              if (cardErr && !failed) {
-                failed = true;
-                console.error('[FlashcardDeckRepository] ❌ Error insertando card:', cardErr.message);
-                db.run('ROLLBACK', () => reject(cardErr));
-              }
-            }
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10)`,
+            [cardId, deckId, aggregate.userId, front, back, itemType, contentStr, hint, explanation, aggregate.syncVersion]
           );
         }
 
-        // 3. COMMIT — solo si ninguna instrucción anterior falló
-        db.run('COMMIT', (commitErr) => {
-          if (commitErr) {
-            db.run('ROLLBACK', () => reject(commitErr));
-          } else if (!failed) {
-            console.log(`[FlashcardDeckRepository] ✅ Transacción completada: deck ${deckId} con ${aggregate.cards.length} cards`);
-            resolve({ ...aggregate, id: deckId });
+        // 3. COMMIT
+        await client.query('COMMIT');
+        console.log(`[FlashcardDeckRepository] ✅ Transacción Postgres completada: deck ${deckId} con ${aggregate.cards.length} cards`);
+        return { ...aggregate, id: deckId };
+        
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('[FlashcardDeckRepository] ❌ Error en transacción Postgres:', err.message);
+        throw err;
+      } finally {
+        client.release();
+      }
+      
+    } else {
+      // ── TRANSACCIÓN SQLITE (Local) ──
+      // db.serialize() garantiza la ejecución secuencial en sqlite3
+      return new Promise((resolve, reject) => {
+        db.serialize(() => {
+          db.run('BEGIN TRANSACTION', (beginErr) => {
+            if (beginErr) return reject(beginErr);
+          });
+
+          let failed = false;
+
+          // 1. Insertar deck
+          db.run(
+            `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, sync_version)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [deckId, aggregate.subjectId, aggregate.userId, aggregate.title, aggregate.description, aggregate.syncVersion],
+            function (deckErr) {
+              if (deckErr) {
+                failed = true;
+                console.error('[FlashcardDeckRepository] ❌ Error insertando deck:', deckErr.message);
+                db.run('ROLLBACK', () => reject(deckErr));
+              }
+            }
+          );
+
+          // 2. Insertar cards
+          for (const card of aggregate.cards) {
+            const itemType = card.type || 'flashcard';
+            const content = card.data || {};
+            const front = itemType === 'flashcard' ? (content.front || '') : '';
+            const back = itemType === 'flashcard' ? (content.back || '') : '';
+            const cardId = uuidv4();
+            const contentStr = JSON.stringify(content);
+            const hint = card.hint || null;
+            const explanation = card.explanation || null;
+
+            db.run(
+              `INSERT INTO flashcards (id, deck_id, user_id, front, back, item_type, content_json, hint, explanation, status, sync_version)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)`,
+              [cardId, deckId, aggregate.userId, front, back, itemType, contentStr, hint, explanation, aggregate.syncVersion],
+              function (cardErr) {
+                if (cardErr && !failed) {
+                  failed = true;
+                  console.error('[FlashcardDeckRepository] ❌ Error insertando card:', cardErr.message);
+                  db.run('ROLLBACK', () => reject(cardErr));
+                }
+              }
+            );
           }
+
+          // 3. COMMIT
+          db.run('COMMIT', (commitErr) => {
+            if (commitErr) {
+              db.run('ROLLBACK', () => reject(commitErr));
+            } else if (!failed) {
+              console.log(`[FlashcardDeckRepository] ✅ Transacción SQLite completada: deck ${deckId} con ${aggregate.cards.length} cards`);
+              resolve({ ...aggregate, id: deckId });
+            }
+          });
         });
       });
-    });
+    }
   }
 }
 
