@@ -126,21 +126,35 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
   }, [itemIndex, items.length, resetItemState]);
 
   useEffect(() => {
-    const sortByExam = async () => {
+    const now = Date.now();
+
+    // 1. Establecer items SÍNCRONAMENTE para evitar el flash vacío al montar.
+    //    Ordenamiento base sin multiplicador de examen (cubre el 99% de casos).
+    const baseSorted = [...initialCards].sort((a, b) => {
+      const nrdA = a.next_review_date ? new Date(a.next_review_date).getTime() : Infinity;
+      const nrdB = b.next_review_date ? new Date(b.next_review_date).getTime() : Infinity;
+      return nrdA - nrdB;
+    });
+    setItems(adaptFlashcardsToEvaluationItems(baseSorted));
+
+    // 2. Ajuste asíncrono con multiplicador de examen (solo si aplica).
+    const applyExamMultiplier = async () => {
       const did = activeDeck?.id ?? null;
       const multiplier = await ExamSchedulerService.getCompressionMultiplier(did);
       setExamMultiplier(multiplier);
-      const now = Date.now();
-      const sorted = [...initialCards].sort((a, b) => {
-        const nrdA = a.next_review_date ? new Date(a.next_review_date).getTime() : 0;
-        const nrdB = b.next_review_date ? new Date(b.next_review_date).getTime() : 0;
-        const effectiveA = nrdA ? now + (nrdA - now) * multiplier : Infinity;
-        const effectiveB = nrdB ? now + (nrdB - now) * multiplier : Infinity;
-        return effectiveA - effectiveB;
-      });
-      setItems(adaptFlashcardsToEvaluationItems(sorted));
+      if (multiplier !== 1.0) {
+        const sorted = [...initialCards].sort((a, b) => {
+          const nrdA = a.next_review_date ? new Date(a.next_review_date).getTime() : 0;
+          const nrdB = b.next_review_date ? new Date(b.next_review_date).getTime() : 0;
+          const effectiveA = nrdA ? now + (nrdA - now) * multiplier : Infinity;
+          const effectiveB = nrdB ? now + (nrdB - now) * multiplier : Infinity;
+          return effectiveA - effectiveB;
+        });
+        setItems(adaptFlashcardsToEvaluationItems(sorted));
+      }
     };
-    sortByExam();
+    applyExamMultiplier();
+
     resetItemState();
     setItemIndex(0);
     setSessionDone(false);
