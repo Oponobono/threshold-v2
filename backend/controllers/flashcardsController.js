@@ -869,16 +869,22 @@ exports.recordCardReview = (req, res) => {
 
 
 /**
- * Actualizar el estado de una tarjeta
+ * Actualizar el estado de una tarjeta.
+ * Sin version guard: los updates de estado son generados por el motor FSRS
+ * local del cliente y siempre deben persistirse. El guard comparaba
+ * version_number local contra sync_version global causando 409 en cada review.
  */
 exports.updateCardStatus = (req, res) => {
   const { cardId } = req.params;
-  const { status, sync_version: incomingVersion } = req.body;
-  updateWithVersionGuard('flashcards', cardId, ['status'], [status], incomingVersion, (err, changes) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (changes === 0) return respondStaleVersion(res, 'flashcards', cardId);
-    incrementSyncVersion('flashcards', cardId, () => res.json({ success: true }));
-  });
+  const { status } = req.body;
+  db.run(
+    `UPDATE flashcards SET status = ? WHERE id = ?`,
+    [status, cardId],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      incrementSyncVersion('flashcards', cardId, () => res.json({ success: true }));
+    }
+  );
 };
 
 /**
