@@ -543,8 +543,11 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
       </View>
 
       {/* ── Question renderer (cada vista gestiona su scroll y touch para avanzar) ── */}
+      {/* key={item.id}: fuerza unmount+remount al cambiar de card, eliminando */}
+      {/* estados animados residuales (flipAnim, hintAnim) que causaban flash. */}
       <View style={{ flex: 1, marginHorizontal: -8, marginLeft: -Math.max(insets.left, 8), marginRight: -Math.max(insets.right, 8) }}>
         <QuestionRendererFactory
+          key={item.id}
           item={item}
           onAnswer={handleAnswer}
           onReveal={handleReveal}
