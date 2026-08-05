@@ -108,7 +108,7 @@ export async function generateHybridStudyMaterial(params: {
 export async function analyzeDeckConfusionsHybrid(deckId: number | string) {
   const { fetchWithFallback } = await import('./api/client');
   try {
-    const response = await fetchWithFallback(`/ai/deck/${deckId}/confusions`);
+    const response = await fetchWithFallback(`/ai/capabilities/anchor/detect/${deckId}`);
     if (response.ok) return await response.json();
   } catch { }
   return { suggestions: [] };
@@ -119,18 +119,20 @@ export async function generateDifferentiationCardHybrid(
   conceptA: string,
   conceptB: string,
   reason: string,
+  userId?: number | string,
 ) {
   const { fetchWithFallback } = await import('./api/client');
   try {
-    const response = await fetchWithFallback(`/ai/deck/${deckId}/differentiate`, {
+    const response = await fetchWithFallback('/ai/capabilities/anchor/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conceptA, conceptB, reason }),
+      body: JSON.stringify({ deckId, conceptA, conceptB, reason, userId }),
     });
     if (response.ok) return await response.json();
   } catch { }
   return { front: '', back: '' };
 }
+
 
 export async function summarizeHybrid(text: string, title?: string) {
   const response = await aiOrchestrator.execute({

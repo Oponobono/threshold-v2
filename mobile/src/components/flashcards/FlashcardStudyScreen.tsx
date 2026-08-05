@@ -27,6 +27,7 @@ import { ExplanationOverlay } from '../evaluation/ExplanationOverlay';
 import { SnoozeModal } from '../modals/SnoozeModal';
 import { useDueCardSnooze, SnoozeOption } from '../../hooks/useDueCardSnooze';
 import { ContextBottomSheet } from '../evaluation/ContextBottomSheet';
+import { flashcardRepository } from '../../services/database';
 
 interface Props {
   activeDeck: FlashcardDeck | null;
@@ -390,8 +391,28 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
     const key = suggestion.conceptA;
     setGeneratingDiff(key);
     try {
-      await generateDifferentiationCard(activeDeck.id, suggestion.conceptA, suggestion.conceptB, suggestion.reason);
-      // Remove suggestion once card is created
+      const anchorResponse = await generateDifferentiationCard(
+        activeDeck.id,
+        suggestion.conceptA,
+        suggestion.conceptB,
+        suggestion.reason,
+        currentUserId ?? undefined,
+      );
+
+      // Local-First: persistir en SQLite local de inmediato.
+      // repositoryEventBus emite 'created' → el store actualiza reactivamente.
+      // El Sync converge con el backend en el siguiente ciclo.
+      if (anchorResponse?.id && anchorResponse?.front) {
+        await flashcardRepository.create({
+          id: anchorResponse.id,
+          deck_id: String(activeDeck.id),
+          front: anchorResponse.front,
+          back: anchorResponse.back ?? '',
+          item_type: 'flashcard',
+          status: 'new',
+        } as any);
+      }
+
       setConfusionSuggestions(prev => prev.filter(s => s.conceptA !== key));
       showAlert({ title: t('flashcards.cardCreated'), message: t('flashcards.cardCreatedMsg', { conceptA: suggestion.conceptA, conceptB: suggestion.conceptB }), type: 'success' });
     } catch (e: any) {

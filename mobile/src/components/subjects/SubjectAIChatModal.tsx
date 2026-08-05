@@ -22,6 +22,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { generateStudyMaterialFromChat } from '../../services/api/ai';
+import { flashcardDeckRepository } from '../../services/database/repositories/FlashcardDeckRepository';
+import { flashcardRepository } from '../../services/database/repositories/FlashcardRepository';
 import { syncManager } from '../../services/sync/SyncManager';
 import { useFlashcardsStore } from '../../store/useFlashcardsStore';
 import { sendHybridChatMessage, generateHybridStudyMaterial, getChatHistory, clearChatHistory, processDocumentUploadHybrid } from '../../services/hybridAIService';
@@ -545,10 +547,43 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       setMessages(prev => [...prev, aiMsg]);
       showToast(t('ai.deckGeneratedToast', { title: deck.title, count: deck.card_count, defaultValue: `Deck "${deck.title}" ready with ${deck.card_count} items ✅` }));
       
-      // 🔄 Upsert optimista: añadir el mazo al store en memoria de forma inmediata.
-      // El mazo existe en el backend (Render) pero aún no en SQLite local.
-      // No usamos refresh() porque leería SQLite y el mazo todavía no está ahí.
+      // 💾 Local-First: persistir el deck y sus cards en SQLite de inmediato.
+      // El backend ya los tiene; los grabamos localmente para que la UI los
+      // encuentre sin esperar al delta sync (que puede tardar o no traerlos).
       if (deck.id) {
+        try {
+          await flashcardDeckRepository.create({
+            id: deck.id,
+            title: deck.title,
+            subject_id: currentSubjectId ?? undefined,
+            user_id: currentUserId ?? undefined,
+            created_at: new Date().toISOString(),
+          } as any);
+
+          if (deck.cards && deck.cards.length > 0) {
+            for (const card of deck.cards) {
+              const content = card.data || {};
+              const itemType = card.type || 'flashcard';
+              const front = itemType === 'flashcard' ? (content.front || card.front || '') : JSON.stringify(content);
+              const back = itemType === 'flashcard' ? (content.back || card.back || '') : '';
+              await flashcardRepository.create({
+                id: card.id || undefined,
+                deck_id: deck.id,
+                user_id: currentUserId ?? undefined,
+                front,
+                back,
+                item_type: itemType,
+                content_json: JSON.stringify(content),
+                hint: card.hint || null,
+                explanation: card.explanation || null,
+                status: 'new',
+              } as any);
+            }
+          }
+        } catch (persistErr: any) {
+          console.warn('[AIChatModal] ⚠️ Error persistiendo deck localmente (no crítico):', persistErr.message);
+        }
+
         useFlashcardsStore.getState().upsert({
           id: deck.id,
           title: deck.title,
@@ -562,7 +597,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         } as any);
       }
 
-      // 🚀 Disparar sync para bajar el mazo+cards a SQLite y mantener convergencia
+      // 🚀 Sync en background para convergencia (las cards ya están en SQLite)
       syncManager.sync().catch(e => console.warn('[AIChatModal] ⚠️ Error al sincronizar el nuevo mazo:', e));
     } catch (err: any) {
       console.error('[AIChatModal] ❌ Error en generateStudyMaterialFromChat:', {

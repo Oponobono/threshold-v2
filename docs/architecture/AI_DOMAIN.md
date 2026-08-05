@@ -42,7 +42,7 @@ backend/controllers/            ← patrón FROZEN (flashcardController)
 
 ---
 
-## Reglas de Congelamiento
+## Constitución del Dominio (Invariantes)
 
 Las siguientes reglas son **invariantes**. Cualquier cambio que las rompa debe justificar explícitamente por qué el invariante ya no aplica.
 
@@ -90,6 +90,25 @@ Planner, PlanEvaluator, Validator y Builder son determinísticos.
 
 El Repository solo persiste. Recibe un Aggregate y lo escribe en SQLite.
 
+### Regla 9 — Los Pipelines producen modelos del dominio
+> Ningún Stage devuelve objetos HTTP ni estructuras de persistencia.
+
+El Aggregate es el límite del dominio. La traducción a respuesta HTTP es
+responsabilidad del Controller + Mapper. El Engine y el Repository nunca
+conocen los Mappers.
+
+### Regla 10 — Ningún Stage puede invocar otro Stage directamente
+> Toda la orquestación pertenece exclusivamente al Engine.
+
+Un Stage recibe sus inputs por parámetro y devuelve su output.
+Nunca importa ni invoca a otro Stage del mismo pipeline.
+
+```
+❌  Planner → Generator.generate()
+❌  Validator → Builder.build()
+✅  Engine → Planner → Generator → Validator → Builder
+```
+
 ---
 
 ## Qué Puede Crecer Sin Romper el Congelamiento
@@ -107,18 +126,20 @@ El Repository solo persiste. Recibe un Aggregate y lo escribe en SQLite.
 
 ---
 
-## Capabilities Previstas (Roadmap)
+## AI Capability Registry
 
-Todas siguen exactamente el mismo patrón. Comparten `KnowledgeEngine` e `InferenceRouter`.
+Todas las capacidades activas o planificadas deben seguir exactamente el mismo patrón. Comparten `KnowledgeEngine` e `InferenceRouter`.
 
-| Capability | Engine | Estado | Descripción |
+| Capability | Estado | Pipeline | Endpoint |
 |---|---|---|---|
-| `FlashcardCapability` | `FlashcardEngine` | v1.0 FROZEN | Mazos flashcard, multiple choice, V/F, mixto |
-| `QuizCapability` | `QuizEngine` | Pendiente | Quiz de preguntas abiertas con rúbrica |
-| `SummaryCapability` | `SummaryEngine` | Pendiente | Resumen estructurado (keyPoints, conclusion, gaps) |
-| `ExplanationCapability` | `ExplanationEngine` | Pendiente | Explicación profunda de un concepto específico |
-| `StudyPlanCapability` | `StudyPlanEngine` | Pendiente | Plan de estudio personalizado por fecha de examen |
-| `MindMapCapability` | `MindMapEngine` | Pendiente | Grafo jerárquico de conceptos |
+| `FlashcardCapability` | ✅ v1.0 | Planner → Generator → Validator → Builder | `POST /ai/capabilities/flashcards` |
+| `AnchorCapability` | ✅ v1.0 | Planner → Generator → Validator → Builder | `POST /ai/capabilities/anchor/generate` |
+| `ConfusionDetectionCapability` | ✅ v1.0 | Loader → Builder → Detector → Builder | `GET /ai/capabilities/anchor/detect/:deckId` |
+| `QuizCapability` | Planned | — | — |
+| `SummaryCapability` | Planned | — | — |
+| `ExplanationCapability` | Planned | — | — |
+| `StudyPlanCapability` | Planned | — | — |
+| `MindMapCapability` | Planned | — | — |
 
 ---
 
@@ -137,3 +158,48 @@ Todas siguen exactamente el mismo patrón. Comparten `KnowledgeEngine` e `Infere
 - [`CAPABILITY_PATTERN.md`](./CAPABILITY_PATTERN.md) — Patrón arquitectónico oficial
 - [`backend/services/ai/`](../../backend/services/ai/) — Implementación del dominio
 - [`mobile/src/services/ai/ConversationIntentResolver.ts`](../../mobile/src/services/ai/ConversationIntentResolver.ts) — Intent detection en cliente
+
+---
+
+## Roadmap de evolución del dominio
+
+Estos ítems están documentados como evolución natural prevista. No se implementan hasta que un consumidor real los justifique (Invariante 6).
+
+### FlashcardAggregate — Taxonomía unificada
+
+Hoy existen `FlashcardDeckAggregate` (mazos completos) y `AnchorCardAggregate` (tarjetas individuales de diferenciación). La taxonomía futura los unificaría bajo:
+
+```
+FlashcardAggregate
+├── RecallCard          (front/back clásica — FlashcardDeckAggregate hoy)
+├── MultipleChoiceCard
+├── BooleanCard
+└── AnchorCard
+    ├── DifferentiationAnchor  ← AnchorCardAggregate hoy
+    ├── AnalogyAnchor
+    ├── MnemonicAnchor
+    └── TimelineAnchor
+```
+
+Cuando esta taxonomía se formalice, `FlashcardDeckRepository.addAnchorCard` y `AnchorCardAggregate` se unificarán bajo `FlashcardAggregate`. El Repository seguirá siendo el mismo punto de persistencia.
+
+### InferenceRouter → ModelProfile
+
+El `InferenceRouter` actual enruta por rol funcional (Reasoning, Generation, Chat). La evolución natural es enrutar por perfil pedagógico:
+
+```
+ModelProfile
+├── PedagogicalReasoning   (análisis de confusiones, evaluación de planes)
+├── FastGeneration         (flashcards, anclas — baja latencia)
+├── LongContext            (documentos extensos, resúmenes)
+├── Vision                 (OCR, análisis de imágenes)
+├── Summarization
+├── Classification
+├── Embedding
+└── Translation
+```
+
+Ningún pipeline necesitaría cambiar. El Router decidiría internamente si usar Gemini, Groq, OpenAI o un modelo local según el perfil solicitado.
+
+**Señal de cuándo introducirlo:** cuando dos Capabilities requieran el mismo modelo pero con perfiles distintos, o cuando la selección de modelo se vuelva un parámetro de configuración por usuario.
+

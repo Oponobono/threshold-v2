@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const aiController = require('../controllers/aiController');
 const flashcardController = require('../controllers/flashcardController');
+const anchorController = require('../controllers/anchorController');
 const { aiLimiter } = require('../middlewares/rateLimiter');
 const { validateFileMagicNumber } = require('../middlewares/fileValidator');
 
@@ -310,15 +311,20 @@ router.post('/ai/generate-study-material', aiController.generateStudyMaterial);
 
 /**
  * GET /api/ai/deck/:deckId/confusions
- * Detecta conceptos confundibles en un mazo (Learning Engineering).
+ * @deprecated Usar GET /api/ai/capabilities/anchor/detect/:deckId
+ * Mantenido por backward compatibility durante el rollout.
  */
-router.get('/ai/deck/:deckId/confusions', aiController.analyzeDeckConfusions);
+router.get('/ai/deck/:deckId/confusions', anchorController.detectConfusions);
 
 /**
  * POST /api/ai/deck/:deckId/differentiate
- * Genera e inserta una tarjeta de diferenciación basada en una sugerencia.
+ * @deprecated Usar POST /api/ai/capabilities/anchor/generate
+ * Mantenido por backward compatibility durante el rollout.
  */
-router.post('/ai/deck/:deckId/differentiate', aiController.generateDifferentiationCard);
+router.post('/ai/deck/:deckId/differentiate', (req, res) => {
+  req.body.deckId = req.params.deckId;
+  return anchorController.generateAnchor(req, res);
+});
 
 /**
  * POST /api/ai/class-flashcards
@@ -362,5 +368,17 @@ router.post('/ai/chat-proxy', aiController.chatProxy);
 
 // --- Capabilities API (nueva arquitectura modular) ---
 router.post('/ai/capabilities/flashcards', flashcardController.generateFlashcards);
+
+/**
+ * GET /api/ai/capabilities/anchor/detect/:deckId
+ * Detecta conceptos confundibles en un mazo (AI Domain v1.0).
+ */
+router.get('/ai/capabilities/anchor/detect/:deckId', anchorController.detectConfusions);
+
+/**
+ * POST /api/ai/capabilities/anchor/generate
+ * Genera un Ancla Cognitiva y la persiste en el mazo (AI Domain v1.0).
+ */
+router.post('/ai/capabilities/anchor/generate', anchorController.generateAnchor);
 
 module.exports = router;

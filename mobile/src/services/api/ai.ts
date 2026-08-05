@@ -9,6 +9,26 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
 
+// --- Anchor Cognitive Types ---
+export interface ConfusionSuggestion {
+  id: string;
+  conceptA: string;
+  conceptB: string;
+  reason: string;
+  confidence: number;
+  cardIds: string[];
+}
+
+export interface AnchorCardResponse {
+  id: string;
+  deckId: string | number;
+  front: string;
+  back: string;
+  hint: string | null;
+  explanation: string | null;
+  itemType: string;
+}
+
 /**
  * Envía un mensaje al LLM junto con el contexto académico del usuario.
  * @param contextText - Texto fuente (transcripción, resumen, OCR) que alimenta el sistema prompt.
@@ -181,32 +201,43 @@ export const generateStudyMaterialFromChat = async (params: {
 
 
 /**
- * Analiza un mazo en busca de conceptos confundibles (Learning Engineering).
+ * Analiza un mazo en busca de conceptos confundibles (AI Domain v1.0).
+ * Endpoint: GET /api/ai/capabilities/anchor/detect/:deckId
  */
-export const analyzeDeckConfusions = async (deckId: number | string): Promise<{ suggestions: any[] }> => {
+export const analyzeDeckConfusions = async (
+  deckId: number | string,
+): Promise<{ suggestions: ConfusionSuggestion[] }> => {
   try {
-    const response = await fetchWithFallback(`/ai/deck/${deckId}/confusions`, { method: 'GET' });
+    const response = await fetchWithFallback(`/ai/capabilities/anchor/detect/${deckId}`, { method: 'GET' });
     const data = await parseJsonSafely(response);
     if (!response.ok) throw new Error(data?.error || 'Error al analizar confusiones');
-    return data as { suggestions: any[] };
+    return data as { suggestions: ConfusionSuggestion[] };
   } catch (error: any) {
     throw new Error(error.message || 'Error de red al analizar mazo');
   }
 };
 
 /**
- * Genera un ancla cognitiva y la añade al mazo.
+ * Genera un Ancla Cognitiva y la persiste en el mazo (AI Domain v1.0).
+ * Endpoint: POST /api/ai/capabilities/anchor/generate
+ * El id retornado permite persistir localmente con el mismo UUID (Local-First).
  */
-export const generateDifferentiationCard = async (deckId: number | string, conceptA: string, conceptB: string, reason: string) => {
+export const generateDifferentiationCard = async (
+  deckId: number | string,
+  conceptA: string,
+  conceptB: string,
+  reason: string,
+  userId?: number | string,
+): Promise<AnchorCardResponse> => {
   try {
-    const response = await fetchWithFallback(`/ai/deck/${deckId}/differentiate`, {
+    const response = await fetchWithFallback('/ai/capabilities/anchor/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conceptA, conceptB, reason }),
+      body: JSON.stringify({ deckId, conceptA, conceptB, reason, userId }),
     });
     const data = await parseJsonSafely(response);
     if (!response.ok) throw new Error(data?.error || 'Error al generar el ancla cognitiva');
-    return data;
+    return data as AnchorCardResponse;
   } catch (error: any) {
     throw new Error(error.message || 'Error de red al generar ancla cognitiva');
   }

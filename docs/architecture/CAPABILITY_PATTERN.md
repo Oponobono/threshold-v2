@@ -158,6 +158,8 @@ HTTP Request
 | **Aggregate inmutable post-build** | Una vez construido el Aggregate, nadie lo muta. |
 | **Repository no conoce el LLM** | El Repository solo persiste. Nunca llama a la IA. |
 | **Capability no conoce SQL** | La Capability orquesta pero nunca escribe SQL directamente. |
+| **Regla 9 — Pipelines producen modelos del dominio** | Ningún Stage devuelve objetos HTTP ni estructuras de persistencia. El Aggregate es el límite del dominio. La traducción a respuesta HTTP es responsabilidad del Controller + Mapper. |
+| **Regla 10 — Ningún Stage invoca otro Stage** | Toda la orquestación pertenece exclusivamente al Engine. Un Stage recibe sus inputs por parámetro y devuelve su output. Nunca importa ni invoca a otro Stage del mismo pipeline. |
 
 ---
 

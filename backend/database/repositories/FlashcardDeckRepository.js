@@ -120,6 +120,78 @@ class FlashcardDeckRepository {
       });
     }
   }
+
+  /**
+   * addAnchorCard
+   * Persiste un AnchorCardAggregate como una sola fila en la tabla flashcards.
+   * Incluye user_id y sync_version correctos para que el Delta Sync la detecte.
+   *
+   * Regla 8: el Repository no conoce el LLM ni el InferenceRouter.
+   * @param {import('../../services/ai/models/AnchorCardAggregate')} aggregate
+   */
+  static async addAnchorCard(aggregate) {
+    const contentStr = JSON.stringify({ front: aggregate.front, back: aggregate.back });
+
+    if (isProduction && pool) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `INSERT INTO flashcards
+             (id, deck_id, user_id, front, back, item_type, content_json,
+              hint, explanation, status, is_atomic, sync_version)
+           VALUES ($1, $2, $3, $4, $5, 'flashcard', $6, $7, $8, 'new', 1, $9)`,
+          [
+            aggregate.id,
+            aggregate.deckId,
+            aggregate.userId,
+            aggregate.front,
+            aggregate.back,
+            contentStr,
+            aggregate.hint,
+            aggregate.explanation,
+            aggregate.syncVersion,
+          ]
+        );
+        await client.query('COMMIT');
+        console.log(`[FlashcardDeckRepository] ✅ Ancla cognitiva persistida (Postgres): ${aggregate.id}`);
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('[FlashcardDeckRepository] ❌ Error persistiendo ancla (Postgres):', err.message);
+        throw err;
+      } finally {
+        client.release();
+      }
+    } else {
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO flashcards
+             (id, deck_id, user_id, front, back, item_type, content_json,
+              hint, explanation, status, is_atomic, sync_version)
+           VALUES (?, ?, ?, ?, ?, 'flashcard', ?, ?, ?, 'new', 1, ?)`,
+          [
+            aggregate.id,
+            aggregate.deckId,
+            aggregate.userId,
+            aggregate.front,
+            aggregate.back,
+            contentStr,
+            aggregate.hint,
+            aggregate.explanation,
+            aggregate.syncVersion,
+          ],
+          function (err) {
+            if (err) {
+              console.error('[FlashcardDeckRepository] ❌ Error persistiendo ancla (SQLite):', err.message);
+              return reject(err);
+            }
+            console.log(`[FlashcardDeckRepository] ✅ Ancla cognitiva persistida (SQLite): ${aggregate.id}`);
+            resolve();
+          }
+        );
+      });
+    }
+  }
 }
 
 module.exports = FlashcardDeckRepository;

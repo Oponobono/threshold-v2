@@ -15,4 +15,14 @@
 - **Colaboración vs Expansión:** Ningún componente debe crecer resolviendo nuevas responsabilidades; debe crecer colaborando con nuevos componentes.
 
 ## Subdominios Congelados Oficialmente
-- **AI Domain v1.0 (Status: Frozen, 2026-08-04):** Arquitectura estable (Capability Pattern, InferenceRouter, KnowledgeEngine, Engine/Pipeline, Aggregate/Repository). Las nuevas capacidades (Quiz, Summary, StudyPlan) deben construirse sobre esta base reutilizando la infraestructura, sin reescribir ni romper la coherencia (ver `docs/architecture/AI_DOMAIN.md`).
+- **AI Domain v1.0 (Status: Frozen, 2026-08-04):** Arquitectura estable (Capability Pattern, InferenceRouter, KnowledgeEngine, Engine/Pipeline, Aggregate/Repository). Las nuevas capacidades (Quiz, Summary, StudyPlan) deben construirse sobre esta base reutilizando la infraestructura, sin reescribir ni romper la coherencia (ver `docs/architecture/AI_DOMAIN.md`). Invariantes oficiales de la Constitución:
+  1. Solo una Capability expone un caso de uso.
+  2. Solo un Engine orquesta.
+  3. Ningún Stage conoce otro Stage.
+  4. Solo un Stage puede hablar con el LLM.
+  5. Ningún Provider es importado fuera del InferenceRouter.
+  6. Ningún Repository conoce IA.
+  7. Ningún Stage devuelve HTTP.
+  8. Los Aggregates son el límite del dominio.
+  9. SQLite sigue siendo la única fuente de verdad del cliente.
+  10. Todo cambio debe respetar el patrón Capability.
