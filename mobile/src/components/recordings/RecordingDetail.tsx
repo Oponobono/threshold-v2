@@ -40,7 +40,7 @@ import { AnimatedSubjectSelector } from '../animated/AnimatedSubjectSelector';
 import { WaveformBars } from '../audio/WaveformBars';
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 import { transcribeWithFallback, summarizeWithFallback } from '../../utils/groqHelpers';
-import { DeckNamingService } from '../../services/domain/DeckNamingService';
+import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
 
 import { formatTranscription } from '../../utils/transcriptionFormatter';
 
@@ -644,8 +644,8 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         }}
         content={summary || transcription || ''}
         contentType="recording"
-        title={DeckNamingService.buildBaseDeckTitle({
-          source: DeckNamingService.truncateSource(recordingData?.name || recordingTitle, 40),
+        title={DeckTitleGenerator.buildTitle({
+          source: DeckTitleGenerator.truncateSource(recordingData?.name || recordingTitle, 40),
         })}
         subjectId={selectedSubjectId || ''}
         userId={currentUserId}

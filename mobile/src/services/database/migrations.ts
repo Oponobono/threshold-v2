@@ -944,5 +944,14 @@ const migrations: Migration[] = [
        ON document_anchors(document_id, page_index) WHERE deleted_at IS NULL`,
     ],
   },
+  {
+    version: 45,
+    up: [
+      // topic = dato semántico del mazo (el título es una representación derivada).
+      // Los motores (IA remota, IA local, ingesta de apuntes) producen topic;
+      // DeckTitleGenerator materializa el título. Se agrupa/busca por topic.
+      `ALTER TABLE flashcard_decks ADD COLUMN topic TEXT`,
+    ],
+  },
 ];
 export default migrations;

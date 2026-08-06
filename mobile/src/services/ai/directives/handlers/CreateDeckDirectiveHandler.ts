@@ -1,8 +1,9 @@
+import { v4 as uuidv4 } from 'uuid';
 import { AIDirective } from '../../providers/AIProvider';
 import { DirectiveHandler } from '../DirectiveHandlerRegistry';
 import { flashcardCapability } from '../../capabilities/FlashcardCapability';
 import { flashcardDomainService } from '../../../domain/FlashcardDomainService';
-import { DeckNamingService } from '../../../domain/DeckNamingService';
+import { DeckTitleGenerator } from '../../../domain/DeckTitleGenerator';
 
 export class CreateDeckDirectiveHandler implements DirectiveHandler {
   canHandle(directive: AIDirective): boolean {
@@ -25,7 +26,7 @@ export class CreateDeckDirectiveHandler implements DirectiveHandler {
 
     const mode = directive.mode || 'mixed';
     const count = directive.count || 10;
-    const title = DeckNamingService.buildBaseDeckTitle({
+    const title = DeckTitleGenerator.buildTitle({
       source: context.subjectName || 'Materia',
     });
 
@@ -42,11 +43,17 @@ export class CreateDeckDirectiveHandler implements DirectiveHandler {
       return;
     }
 
+    const deckId = uuidv4();
     const deck = await flashcardDomainService.saveGeneratedDeck({
+      id: deckId,
       title,
       description: `Mazo generado automáticamente por Zyren`,
       subjectId: context.subjectId,
-      cards,
+      cards: cards.map(card => ({
+        ...card,
+        id: uuidv4(),
+        deckId,
+      })),
     });
 
     console.log(`[CreateDeckDirectiveHandler] Deck created: id=${deck.id}, cards=${cards.length}`);

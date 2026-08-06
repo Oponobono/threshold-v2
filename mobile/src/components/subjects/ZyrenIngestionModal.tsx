@@ -12,7 +12,7 @@ import { fetchWithFallback } from '../../services/api/client';
 import { extractTextFromImageHybrid, generateClassFlashcardsHybrid } from '../../services/hybridAIService';
 import { uuidv4 } from '../../utils/uuid';
 import { studyNoteRepository } from '../../services/database';
-import { DeckNamingService } from '../../services/domain/DeckNamingService';
+import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
 import type { CardDirection } from '../../services/api/types';
 import { styles } from '../../styles/ZyrenIngestionModal.styles';
 
@@ -291,23 +291,28 @@ export function ZyrenIngestionModal({
       const { flashcardDomainService } = await import('../../services/domain/FlashcardDomainService');
       const userId = await import('../../services/api').then(m => m.getUserId());
       
+      const deckId = uuidv4();
+      const deckCards = toSave.map((c: any) => ({
+        ...c,
+        id: c.id || uuidv4(),
+        deckId,
+        direction,
+      }));
+
       const deck = await flashcardDomainService.saveGeneratedDeck({
-        title: DeckNamingService.buildBaseDeckTitle({
+        id: deckId,
+        title: DeckTitleGenerator.buildTitle({
           topic: generatedTopic,
           source: subjectName,
         }),
         description: `Mazo generado por Zyren desde apuntes de clase`,
+        topic: generatedTopic || undefined,
         subjectId: subjectId || undefined,
         subjectName,
         subjectColor,
         subjectIcon,
-        cards: toSave.map((c: any) => ({
-          ...c,
-          direction, // pass direction if needed (wait, flashcardDomainService needs to handle direction)
-        })),
+        cards: deckCards,
       });
-
-      const deckId = deck.id;
 
       try {
         if (userId) {

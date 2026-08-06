@@ -1,6 +1,6 @@
 # 📚 Documentación Completa del Sistema de Flashcards
 
-**Última actualización:** Mayo 2026
+**Última actualización:** Agosto 2026
 
 ---
 
@@ -1023,12 +1023,69 @@ exports.createEvaluationItem = async (req, res) => {
 | Versión | Fecha | Cambios |
 |---|---|---|
 | 1.0 | Mayo 2026 | Documentación inicial completa |
-| — | — | — |
+| 1.1 | Agosto 2026 | Sección 12: Flashcard Deck Topic Support — FROZEN (atributo `topic` del dominio FlashcardDeck) |
+
+---
+
+## 12. Flashcard Deck Topic Support — FROZEN
+
+**Status:** `FROZEN`
+**Versión:** 1.0
+**Fecha de congelamiento:** 2026-08-06
+**Aprobado por:** Cristian (Product Owner)
+
+---
+
+### Declaración
+
+`topic` pasa a ser un atributo oficial del dominio `FlashcardDeck`. Este cierre documenta su significado,
+quién puede asignarlo, cuándo es `null`, y por qué **no participa en la identidad del mazo**.
+
+### Qué representa `topic`
+
+- `topic` es el **tema semántico** del mazo: la idea o concepto central que el mazo estudia.
+- Es un dato **propio del dominio**, no un derivado del título ni una vista de él.
+- El **título** es una representación visible para el usuario; **no es la fuente de verdad del tema**.
+- Observación conceptual: **título = identidad visible**, **tema = información semántica**.
+
+### Quién puede asignarlo
+
+- Los motores de generación: IA remota (`aiController.js`), IA local, ingesta de apuntes y OCR.
+- Los motores **producen información semántica** (`topic`) y **nunca deciden el título final**.
+- El CRUD manual de mazos (backend `flashcardsController.js`) acepta `topic` como opcional.
+- `DeckTitleGenerator` es el **único componente autorizado** para construir títulos base
+  (formato `[Tema — ]Fuente`, determinista e independiente del proveedor de IA).
+
+### Cuándo es `null`
+
+- `topic` es `null` cuando el origen no permite inferir un tema (ausente, vacío o `'Zyren'`).
+- En ese caso el título se construye solo con la fuente (`Fuente`, sin prefijo `Tema — `).
+- La unicidad del título (ej. sufijo "(2)") se gestiona aparte vía `DeckUniquenessService`,
+  porque depende del estado de la base de datos.
+
+### Por qué `topic` no participa en la identidad del mazo
+
+- La identidad del mazo es su `id`. `topic` es información semántica mutable, no identidad.
+- Cambiar el tema no cambia la identidad del mazo ni rompe referencias (vínculos, sync, backups).
+- `topic` viaja por el Sync Protocol como columna de `flashcard_decks` (Standard Entity Pattern).
+
+### Decisiones de esta iteración
+
+- No se indexa `topic` (sin índice dedicado en `flashcard_decks`).
+- No se agrupa por `topic` en la UI por ahora. Se esperará a que más flujos de consumo justifiquen el agrupado.
+
+---
+
+### Referencias
+
+- [`DeckTitleGenerator.ts`](../../mobile/src/services/domain/DeckTitleGenerator.ts) — construcción determinista del título
+- [`backend/database/schema.js`](../../backend/database/schema.js) — columna `topic TEXT` en `flashcard_decks`
+- [`mobile/src/services/database/migrations.ts`](../../mobile/src/services/database/migrations.ts) — migración v45
 
 ---
 
 **Documento generado:** Mayo 22, 2026  
-**Última actualización:** Mayo 22, 2026  
+**Última actualización:** Agosto 6, 2026  
 **Mantenedor:** Threshold Development Team
 
 ---

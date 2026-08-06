@@ -348,6 +348,17 @@ Una SyncEntity se considera **oficialmente integrada** cuando:
 | `sync_journal` | Infraestructura | Registro de ciclos de sync. No es un dato del dominio. |
 | `sync_debug_logs` | Infraestructura | Trazabilidad interna. No cruza dispositivos. |
 
+### Decisiones de Dominio Congeladas
+
+**Flashcard Deck Topic Support — FROZEN** (2026-08-06)
+
+- `topic` pasa a ser un atributo oficial del dominio `FlashcardDeck`.
+- El nombre del mazo es una representación para el usuario, no la fuente de verdad del tema.
+- `DeckTitleGenerator` es el único componente autorizado para construir títulos base.
+- La unicidad continúa siendo responsabilidad del dominio/backend.
+- `topic` puede ser `null` cuando el origen no permita inferir un tema.
+- No se indexa `topic` ni se agrupa por `topic` en la UI (decisiones de esta iteración).
+
 ---
 
 ## 11. Glosario

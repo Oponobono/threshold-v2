@@ -8,6 +8,10 @@ export interface Flashcard {
   back?: string;
   status?: string;
   direction?: CardDirection;
+  item_type?: string;
+  content_json?: string;
+  hint?: string | null;
+  explanation?: string | null;
   ease_factor?: number;
   interval_days?: number;
   repetitions?: number;

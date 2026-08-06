@@ -584,6 +584,7 @@ const tableSchema = {
         user_id TEXT NOT NULL,
         subject_id TEXT,
         title TEXT NOT NULL,
+        topic TEXT,
         description TEXT,
         is_public BOOLEAN DEFAULT 0,
         total_reviews INTEGER DEFAULT 0,
@@ -602,6 +603,7 @@ const tableSchema = {
         user_id TEXT NOT NULL REFERENCES users(id),
         subject_id TEXT REFERENCES subjects(id) ON DELETE CASCADE,
         title TEXT NOT NULL,
+        topic TEXT,
         description TEXT,
         is_public INTEGER DEFAULT 0,
         total_reviews INTEGER DEFAULT 0,
@@ -612,6 +614,7 @@ const tableSchema = {
       )
     `,
     columns: [
+      { name: 'topic', type: 'TEXT' },
       { name: 'is_public', type: 'BOOLEAN DEFAULT false' },
       { name: 'total_reviews', type: 'INTEGER DEFAULT 0' },
       { name: 'linked_event_id', type: 'TEXT REFERENCES calendar_events(id) ON DELETE SET NULL' },

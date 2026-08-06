@@ -41,7 +41,7 @@ import {
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 import { formatTranscription } from '../../utils/transcriptionFormatter';
 import { summarizeWithFallback } from '../../utils/groqHelpers';
-import { DeckNamingService } from '../../services/domain/DeckNamingService';
+import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
 
 // ---------------------------------------------------------------------------
 // Constants & Directories
@@ -551,8 +551,8 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         }}
         content={summary || transcription || ''}
         contentType="video"
-        title={DeckNamingService.buildBaseDeckTitle({
-          source: DeckNamingService.truncateSource(videoData?.title || 'Video de YouTube', 45),
+        title={DeckTitleGenerator.buildTitle({
+          source: DeckTitleGenerator.truncateSource(videoData?.title || 'Video de YouTube', 45),
         })}
         subjectId={selectedSubjectId || ''}
         userId={currentUserId}

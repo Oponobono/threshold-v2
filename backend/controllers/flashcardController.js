@@ -7,6 +7,7 @@ exports.generateFlashcards = async (req, res) => {
       mode: req.body.mode || 'mixed',
       count: req.body.count || 10,
       title: req.body.title || 'Mazo Generado',
+      topic: req.body.topic,
       subjectId: req.body.subject_id,
       userId: req.user.id,
       provider: req.body.provider || 'groq',

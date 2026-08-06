@@ -161,6 +161,7 @@ export const generateStudyMaterialFromChat = async (params: {
   mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed';
   count: number;
   title: string;
+  topic?: string;
   subjectId: string;
   userId: string;
   provider?: string;
@@ -174,6 +175,7 @@ export const generateStudyMaterialFromChat = async (params: {
         mode: params.mode,
         count: params.count,
         title: params.title,
+        topic: params.topic,
         subject_id: params.subjectId,
         provider: params.provider,
         items: params.items && params.items.length > 0
@@ -191,9 +193,10 @@ export const generateStudyMaterialFromChat = async (params: {
     return {
       id: deck?.id,
       title: deck?.title || params.title,
+      topic: deck?.topic ?? params.topic,
       card_count: deck?.cards?.length ?? 0,
       cards: deck?.cards ?? [],
-    } as { id: string; title: string; card_count: number; cards: any[] };
+    } as { id: string; title: string; topic?: string; card_count: number; cards: any[] };
   } catch (error: any) {
     throw new Error(error.message || 'Error de red al generar material');
   }

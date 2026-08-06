@@ -43,7 +43,7 @@ const TABLE_DEFS = {
   )`,
   flashcard_decks: `CREATE TABLE IF NOT EXISTS flashcard_decks (
     id TEXT PRIMARY KEY, subject_id TEXT, user_id TEXT, title TEXT,
-    description TEXT, linked_event_id TEXT, card_count INTEGER DEFAULT 0,
+    topic TEXT, description TEXT, linked_event_id TEXT, card_count INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     version_number INTEGER DEFAULT 0, sync_version INTEGER DEFAULT 0,

@@ -17,6 +17,7 @@ import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { type Subject } from '../../services/api';
+import { uuidv4 } from '../../utils/uuid';
 
 
 export interface FlashcardImportModalProps {
@@ -348,9 +349,11 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
 
       const importSubjectId = deckData.subject_id ? String(deckData.subject_id) : undefined;
       const importSubject = importSubjectId ? subjects.find(s => s.id === importSubjectId) : undefined;
+      const importedDeckId = uuidv4();
 
       const { flashcardDomainService } = await import('../../services/domain/FlashcardDomainService');
       const savedDeck = await flashcardDomainService.saveGeneratedDeck({
+        id: importedDeckId,
         title: sanitizeText(deckData.title),
         description: sanitizeText(deckData.description),
         subjectId: importSubjectId,
@@ -358,6 +361,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         subjectColor: importSubject?.color,
         subjectIcon: importSubject?.icon,
         cards: cards.map(c => ({
+          id: uuidv4(),
+          deckId: importedDeckId,
           front: (c as any).data?.front || (c as any).front || '',
           back: (c as any).data?.back || (c as any).back || '',
           item_type: (c as any).type || 'flashcard',

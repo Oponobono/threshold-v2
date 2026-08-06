@@ -5,6 +5,7 @@ export interface FlashcardDeck {
   user_id: string;
   subject_id?: string;
   title: string;
+  topic?: string | null;
   description?: string;
   card_count?: number;
   review_count?: number;

@@ -203,7 +203,7 @@ function sanitizeObject(obj) {
 }
 
 exports.createFlashcardDeck = (req, res) => {
-  const { id: clientId, subject_id, title, description, linked_event_id, sync_version: incomingVersion } = req.body;
+  const { id: clientId, subject_id, title, description, topic, linked_event_id, sync_version: incomingVersion } = req.body;
   const userId = req.user.id;
   
   if (!title) return res.status(400).json({ error: 'Faltan campos requeridos (title).' });
@@ -214,16 +214,17 @@ exports.createFlashcardDeck = (req, res) => {
   
   const safeTitle = sanitizeText(title);
   const safeDescription = sanitizeText(description);
+  const safeTopic = topic ? sanitizeText(topic) : null;
 
   const deckId = clientId || uuidv4();
   const hasVersion = incomingVersion !== undefined && incomingVersion !== null;
 
-  const params = [deckId, subject_id || null, userId, safeTitle, safeDescription || '', linked_event_id ?? null];
+  const params = [deckId, subject_id || null, userId, safeTitle, safeDescription || '', safeTopic, linked_event_id ?? null];
   const versionGuard = hasVersion ? ' WHERE flashcard_decks.sync_version IS NULL OR flashcard_decks.sync_version <= ?' : '';
 
   db.run(
-    `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, linked_event_id) VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, title = excluded.title, description = excluded.description, linked_event_id = excluded.linked_event_id${versionGuard}`,
+    `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, topic, linked_event_id) VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, title = excluded.title, description = excluded.description, topic = excluded.topic, linked_event_id = excluded.linked_event_id${versionGuard}`,
     hasVersion ? [...params, incomingVersion] : params,
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
@@ -239,11 +240,11 @@ exports.createFlashcardDeck = (req, res) => {
           if (++inserted === cards.length) {
             if (cardErr) {
               return incrementSyncVersion('flashcard_decks', deckId, () =>
-                res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: cards.length, cardError: cardErr.message })
+                res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', topic: safeTopic, card_count: cards.length, cardError: cardErr.message })
               );
             }
             incrementSyncVersion('flashcard_decks', deckId, () =>
-              res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: cards.length })
+              res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', topic: safeTopic, card_count: cards.length })
             );
           }
         };
@@ -266,7 +267,7 @@ exports.createFlashcardDeck = (req, res) => {
         }
       } else {
         incrementSyncVersion('flashcard_decks', deckId, () =>
-          res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', card_count: 0 })
+          res.status(201).json({ id: deckId, subject_id: subject_id || null, user_id: userId, title, description: description || '', topic: safeTopic, card_count: 0 })
         );
       }
     }
@@ -425,7 +426,7 @@ exports.updateFlashcardDeck = (req, res) => {
   const { deckId } = req.params;
   const userId = req.user.id;
   const { sync_version: incomingVersion } = req.body;
-  let { title, description, subject_id, linked_event_id } = req.body;
+  let { title, description, subject_id, topic, linked_event_id } = req.body;
 
   if (title !== undefined && typeof title === 'string') {
     title = title.trim();
@@ -434,7 +435,7 @@ exports.updateFlashcardDeck = (req, res) => {
     }
   }
 
-  if (!title && description === undefined && subject_id === undefined && linked_event_id === undefined) {
+  if (!title && description === undefined && subject_id === undefined && topic === undefined && linked_event_id === undefined) {
     return res.status(400).json({ error: 'No hay campos para actualizar.' });
   }
 
@@ -466,6 +467,7 @@ exports.updateFlashcardDeck = (req, res) => {
       const values = [];
       if (title !== undefined)       { fields.push('title = ?');       values.push(title); }
       if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+      if (topic !== undefined)       { fields.push('topic = ?');       values.push(topic ? sanitizeText(topic) : null); }
       if (subject_id !== undefined)  { fields.push('subject_id = ?');  values.push(subject_id); }
       if (linked_event_id !== undefined) { fields.push('linked_event_id = ?'); values.push(linked_event_id); }
 
@@ -1153,7 +1155,7 @@ Formato del objeto JSON esperado:
  * Soporta mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed'
  */
 exports.generateDeckFromText = async (req, res) => {
-  const { text, count, title, subject_id, user_id, mode = 'flashcard' } = req.body;
+  const { text, count, title, topic, subject_id, user_id, mode = 'flashcard' } = req.body;
 
   if (!text || !count || !title || !subject_id || !user_id) {
     return res.status(400).json({ error: 'Faltan campos requeridos (text, count, title, subject_id, user_id).' });
@@ -1301,8 +1303,8 @@ exports.generateDeckFromText = async (req, res) => {
         }
 
         db.run(
-          `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
-          [deckId, subject_id, user_id, finalTitle, description],
+          `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, topic) VALUES (?, ?, ?, ?, ?, ?)`,
+          [deckId, subject_id, user_id, finalTitle, description, topic ? sanitizeText(topic) : null],
           function(err) {
             if (err) {
               console.error('[Database] Error al insertar mazo:', err);
@@ -1324,7 +1326,7 @@ exports.generateDeckFromText = async (req, res) => {
  * Soporta mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed'
  */
 exports.generateDeckFromImage = async (req, res) => {
-  const { image_base64, count, title, subject_id, user_id, mode = 'flashcard' } = req.body;
+  const { image_base64, count, title, topic, subject_id, user_id, mode = 'flashcard' } = req.body;
 
   if (!image_base64 || !count || !title || !subject_id || !user_id) {
     return res.status(400).json({ error: 'Faltan campos requeridos (image_base64, count, title, subject_id, user_id).' });
@@ -1424,8 +1426,8 @@ exports.generateDeckFromImage = async (req, res) => {
         }
 
         db.run(
-          `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
-          [deckId, subject_id, user_id, finalTitle, description],
+          `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, topic) VALUES (?, ?, ?, ?, ?, ?)`,
+          [deckId, subject_id, user_id, finalTitle, description, topic ? sanitizeText(topic) : null],
           function(err) {
             if (err) {
               console.error('[Database] Error guardando mazo de imagen:', err);

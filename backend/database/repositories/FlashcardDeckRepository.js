@@ -21,9 +21,9 @@ class FlashcardDeckRepository {
 
         // 1. Insertar deck
         await client.query(
-          `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, sync_version)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [deckId, aggregate.subjectId, aggregate.userId, aggregate.title, aggregate.description, aggregate.syncVersion]
+          `INSERT INTO flashcard_decks (id, subject_id, user_id, title, topic, description, sync_version)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [deckId, aggregate.subjectId, aggregate.userId, aggregate.title, aggregate.topic, aggregate.description, aggregate.syncVersion]
         );
 
         // 2. Insertar cards secuencialmente
@@ -32,7 +32,10 @@ class FlashcardDeckRepository {
           const content = card.data || {};
           const front = itemType === 'flashcard' ? (content.front || '') : '';
           const back = itemType === 'flashcard' ? (content.back || '') : '';
-          const cardId = uuidv4();
+          // IMPORTANTE: preservar el id de la card del aggregate (idempotencia del
+          // Sync Protocol). Si aquí se generara un uuid nuevo, la respuesta al
+          // cliente tendría ids ≠ ids de la BD → el delta sync crearía duplicados.
+          const cardId = card.id || uuidv4();
           const contentStr = JSON.stringify(content);
           const hint = card.hint || null;
           const explanation = card.explanation || null;
@@ -70,9 +73,9 @@ class FlashcardDeckRepository {
 
           // 1. Insertar deck
           db.run(
-            `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, sync_version)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [deckId, aggregate.subjectId, aggregate.userId, aggregate.title, aggregate.description, aggregate.syncVersion],
+            `INSERT INTO flashcard_decks (id, subject_id, user_id, title, topic, description, sync_version)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [deckId, aggregate.subjectId, aggregate.userId, aggregate.title, aggregate.topic, aggregate.description, aggregate.syncVersion],
             function (deckErr) {
               if (deckErr) {
                 failed = true;
@@ -88,7 +91,10 @@ class FlashcardDeckRepository {
             const content = card.data || {};
             const front = itemType === 'flashcard' ? (content.front || '') : '';
             const back = itemType === 'flashcard' ? (content.back || '') : '';
-            const cardId = uuidv4();
+            // IMPORTANTE: preservar el id de la card del aggregate (idempotencia del
+            // Sync Protocol). Si aquí se generara un uuid nuevo, la respuesta al
+            // cliente tendría ids ≠ ids de la BD → el delta sync crearía duplicados.
+            const cardId = card.id || uuidv4();
             const contentStr = JSON.stringify(content);
             const hint = card.hint || null;
             const explanation = card.explanation || null;

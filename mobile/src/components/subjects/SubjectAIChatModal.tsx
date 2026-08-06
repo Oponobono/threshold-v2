@@ -31,7 +31,7 @@ import { sendHybridChatMessage, generateHybridStudyMaterial, getChatHistory, cle
 import { resolveIntent } from '../../services/ai/ConversationIntentResolver';
 import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
-import { DeckNamingService } from '../../services/domain/DeckNamingService';
+import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
@@ -521,7 +521,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     const activeMode = overrideMode || genMode;
     const activeCount = overrideCount || parseInt(genCount) || 10;
     const modeLabels: Record<string, string> = { flashcard: t('subjects.modeFlashcard'), multiple_choice: t('subjects.modeMultipleChoice'), boolean: t('subjects.modeTrueFalse'), mixed: t('subjects.modeMixed') };
-    const deckTitle = DeckNamingService.buildBaseDeckTitle({
+    const deckTitle = DeckTitleGenerator.buildTitle({
+      topic: topic || undefined,
       source: subjectName,
     });
 
@@ -538,6 +539,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         mode: activeMode,
         count: activeCount,
         title: deckTitle,
+        topic: topic || undefined,
         subjectId: currentSubjectId!,
         userId: currentUserId!,
         provider: currentProvider,
@@ -566,8 +568,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
         try {
           const { flashcardDomainService } = await import('../../services/domain/FlashcardDomainService');
           await flashcardDomainService.saveGeneratedDeck({
+            id: deck.id,
             title: deck.title,
             description: '',
+            topic: deck.topic || topic || undefined,
             subjectId: currentSubjectId ?? undefined,
             cards: (deck.cards ?? []).map((card: any) => {
               const content = card.data || {};
@@ -575,12 +579,15 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
               const front = itemType === 'flashcard' ? (content.front || card.front || '') : JSON.stringify(content);
               const back = itemType === 'flashcard' ? (content.back || card.back || '') : '';
               return {
+                id: card.id,
+                deckId: card.deckId,
                 front,
                 back,
                 item_type: itemType,
                 content_json: JSON.stringify(content),
                 hint: card.hint || null,
                 explanation: card.explanation || null,
+                direction: card.direction || undefined,
               };
             }),
           });
