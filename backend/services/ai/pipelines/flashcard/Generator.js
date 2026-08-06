@@ -1,4 +1,5 @@
 const InferenceRouter = require('../../providers/InferenceRouter');
+const FlashcardResponseParser = require('./FlashcardResponseParser');
 
 /**
  * Generator
@@ -48,8 +49,8 @@ REGLAS DE ORO:
 5. FORMATO DE CÓDIGO: Si el tema involucra programación o comandos, usa bloques de código Markdown dentro de los campos.
 
 ${modeInstructions[mode] || modeInstructions.mixed}
-
-Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.`;
+${FlashcardResponseParser.TOPIC_FORMAT_INSTRUCTION}
+${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
 
     const userContent = !knowledgeModel.IsEmpty
       ? `Genera el material de estudio basado en este contenido académico:\n\n${knowledgeModel.truncate(8000)}`
@@ -63,10 +64,8 @@ Responde ÚNICAMENTE con el array JSON, sin texto introductorio ni conclusiones.
       );
 
       let raw = response.content.trim();
-      const arrayMatch = raw.match(/\[[\s\S]*\]/);
-      if (arrayMatch) raw = arrayMatch[0];
 
-      return JSON.parse(raw);
+      return FlashcardResponseParser.parseTopicAndCards(raw);
     } catch (err) {
       console.error('[Generator] Error generando tarjetas:', err.message);
       throw new Error('Fallo la generación del contenido del mazo.');

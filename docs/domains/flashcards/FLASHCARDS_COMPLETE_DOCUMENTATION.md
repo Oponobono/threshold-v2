@@ -1024,13 +1024,14 @@ exports.createEvaluationItem = async (req, res) => {
 |---|---|---|
 | 1.0 | Mayo 2026 | Documentación inicial completa |
 | 1.1 | Agosto 2026 | Sección 12: Flashcard Deck Topic Support — FROZEN (atributo `topic` del dominio FlashcardDeck) |
+| 1.2 | Agosto 2026 | Sección 12: contrato de generación — los motores producen `{ topic, cards }` vía `FlashcardResponseParser` (pieza común); el móvil arma el título final |
 
 ---
 
 ## 12. Flashcard Deck Topic Support — FROZEN
 
 **Status:** `FROZEN`
-**Versión:** 1.0
+**Versión:** 1.2
 **Fecha de congelamiento:** 2026-08-06
 **Aprobado por:** Cristian (Product Owner)
 
@@ -1056,6 +1057,21 @@ quién puede asignarlo, cuándo es `null`, y por qué **no participa en la ident
 - `DeckTitleGenerator` es el **único componente autorizado** para construir títulos base
   (formato `[Tema — ]Fuente`, determinista e independiente del proveedor de IA).
 
+### Contrato de generación: el topic lo produce el motor que comprende
+
+- El `topic` es **dato de dominio** (agrupar, buscar, estadísticas, sync); el `title` es **representación UI**.
+- Por eso el motor que comprende el contenido produce el `topic`, y el título final lo decide el móvil
+  con `DeckTitleGenerator` — jamás se decide el título en el backend.
+- **Contrato interno de todos los motores de generación**: `{ topic, cards }`. Aplica a los dos motores
+  vivos (FlashcardEngine y el flujo Groq de `flashcardsController`) y a la ingesta de apuntes
+  (`/ai/class-flashcards`, que ya emitía `{ topic, cards }`).
+- **Pieza común**: `FlashcardResponseParser` define CÓMO pedir el `topic` al LLM y CÓMO validar/parsear la
+  respuesta (canónico `{ topic, cards }`, compatible con `{ items }`, `{ flashcards }` y array pelado).
+  Ningún motor introduce criterios divergentes de extracción del tema.
+- **Precedencia**: si el cliente envía un `topic` explícito (intención del estudiante, p. ej. una pista en el
+  chat), ese gana. Si no, se usa el generado por el motor. El título final se construye sobre el topic
+  resultante y el mazo converge a ese título vía sync (`updateFlashcardDeck`).
+
 ### Cuándo es `null`
 
 - `topic` es `null` cuando el origen no permite inferir un tema (ausente, vacío o `'Zyren'`).
@@ -1079,6 +1095,9 @@ quién puede asignarlo, cuándo es `null`, y por qué **no participa en la ident
 ### Referencias
 
 - [`DeckTitleGenerator.ts`](../../mobile/src/services/domain/DeckTitleGenerator.ts) — construcción determinista del título
+- [`FlashcardResponseParser.js`](../../backend/services/ai/pipelines/flashcard/FlashcardResponseParser.js) — pieza común: prompt de topic + parse `{ topic, cards }`
+- [`Generator.js`](../../backend/services/ai/pipelines/flashcard/Generator.js) — FlashcardEngine: devuelve `{ topic, cards }`
+- [`flashcardsController.js`](../../backend/controllers/flashcardsController.js) — flujo Groq: pide y persiste el `topic`
 - [`backend/database/schema.js`](../../backend/database/schema.js) — columna `topic TEXT` en `flashcard_decks`
 - [`mobile/src/services/database/migrations.ts`](../../mobile/src/services/database/migrations.ts) — migración v45
 

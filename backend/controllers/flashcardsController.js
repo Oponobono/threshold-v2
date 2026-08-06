@@ -4,6 +4,7 @@ const { db } = require('../db');
 const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, recordDeletions, updateWithVersionGuard, removeDeletion, respondStaleVersion } = require('../helpers/syncVersion');
 const { analyzeCardDensity, fragmentCard } = require('../utils/atomicCardGenerator');
 const { calculateSM2, calculateFSRS } = require('../utils/sm2Algorithm');
+const FlashcardResponseParser = require('../services/ai/pipelines/flashcard/FlashcardResponseParser');
 
 // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1014,7 +1015,7 @@ function insertSingleCard(deckId, front, back, itemType, contentStr, hint, expla
  * Helper: Inserta un array de items en la BD y devuelve el mazo completo
  * Â¡AHORA CON FRAGMENTACIÃ“N ATÃ“MICA AUTOMÃTICA!
  */
-async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items) {
+async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items, topic) {
   try {
     for (const item of items) {
       const itemType = item.type || item.item_type || 'flashcard';
@@ -1057,7 +1058,7 @@ async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, des
     db.all(`SELECT * FROM flashcards WHERE deck_id = ? ORDER BY created_at ASC`, [deckId], (err, cards) => {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({
-        id: deckId, subject_id, user_id, title, description,
+        id: deckId, subject_id, user_id, title, description, topic: topic || null,
         card_count: cards.length,
         cards: cards.map(normalizeCard),
       });
@@ -1086,8 +1087,8 @@ CALIDAD ACADÃ‰MICA Y REGLAS DE ORO:
 5. EXCLUSIVIDAD SEMÃNTICA: En selecciÃ³n mÃºltiple, las 4 opciones deben tener contenido semÃ¡ntico Ãºnico. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.
 6. FORMATO DE CÃ“DIGO (OBLIGATORIO SI APLICA): Si la evaluaciÃ³n involucra programaciÃ³n, algoritmos, HTML, JSON o comandos, USA SIEMPRE bloques de cÃ³digo Markdown (\`\`\`lenguaje ... \`\`\`) dentro del "front", "back", "question", "options" o "explanation" para formatear los fragmentos de cÃ³digo.
 
-IMPORTANTE: Debes responder EXCLUSIVAMENTE con un objeto JSON vÃ¡lido que contenga la clave "items", cuyo valor sea un array de objetos con los Ã­tems generados segÃºn el formato indicado a continuaciÃ³n.
-No agregues ningÃºn texto introductorio ni explicaciones fuera del JSON. La respuesta debe comenzar con { y terminar con }.`;
+IMPORTANTE: Debes responder EXCLUSIVAMENTE con un objeto JSON vÃ¡lido que contenga la clave "topic" (tema central del contenido) y la clave "items", cuyo valor sea un array de objetos con los Ã­tems generados segÃºn el formato indicado a continuaciÃ³n.
+No agregues ningÃºn texto introductorio ni explicaciones fuera del JSON. La respuesta debe comenzar con { y terminar con }.${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
 
   if (mode === 'flashcard') {
     return `${base}
@@ -1255,13 +1256,12 @@ exports.generateDeckFromText = async (req, res) => {
     }
 
     let items;
-    if (Array.isArray(parsed)) {
-      items = parsed;
-    } else if (parsed && Array.isArray(parsed.items)) {
-      items = parsed.items;
-    } else if (parsed && parsed.flashcards) {
-      items = parsed.flashcards.map(c => ({ type: 'flashcard', data: { front: c.question || c.front, back: c.answer || c.back } }));
-    } else {
+    let generatedTopic;
+    try {
+      const result = FlashcardResponseParser.parseTopicAndCards(parsed);
+      items = result.cards;
+      generatedTopic = result.topic;
+    } catch (parseError) {
       console.error('[Groq] Estructura inesperada en JSON:', parsed);
       return res.status(500).json({ error: 'Estructura de respuesta invÃ¡lida en JSON', details: parsed });
     }
@@ -1302,15 +1302,17 @@ exports.generateDeckFromText = async (req, res) => {
           finalTitle = `${title} (${maxSuffix + 1})`;
         }
 
+        const finalTopic = FlashcardResponseParser.normalizeTopic(topic) ?? generatedTopic ?? null;
+
         db.run(
           `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, topic) VALUES (?, ?, ?, ?, ?, ?)`,
-          [deckId, subject_id, user_id, finalTitle, description, topic ? sanitizeText(topic) : null],
+          [deckId, subject_id, user_id, finalTitle, description, finalTopic ? sanitizeText(finalTopic) : null],
           function(err) {
             if (err) {
               console.error('[Database] Error al insertar mazo:', err);
               return res.status(500).json({ error: err.message });
             }
-            insertItemsAndReturn(res, deckId, subject_id, user_id, finalTitle, description, items);
+            insertItemsAndReturn(res, deckId, subject_id, user_id, finalTitle, description, items, finalTopic);
           }
         );
       }
@@ -1384,13 +1386,12 @@ exports.generateDeckFromImage = async (req, res) => {
     }
 
     let items;
-    if (Array.isArray(parsed)) {
-      items = parsed;
-    } else if (parsed && Array.isArray(parsed.items)) {
-      items = parsed.items;
-    } else if (parsed && parsed.flashcards) {
-      items = parsed.flashcards.map(c => ({ type: 'flashcard', data: { front: c.question || c.front, back: c.answer || c.back } }));
-    } else {
+    let generatedTopic;
+    try {
+      const result = FlashcardResponseParser.parseTopicAndCards(parsed);
+      items = result.cards;
+      generatedTopic = result.topic;
+    } catch (parseError) {
       console.error('[Groq Vision] Estructura inesperada en JSON:', parsed);
       return res.status(500).json({ error: 'Estructura de respuesta invÃ¡lida en JSON', details: parsed });
     }
@@ -1425,15 +1426,17 @@ exports.generateDeckFromImage = async (req, res) => {
           finalTitle = `${title} (${maxSuffix + 1})`;
         }
 
+        const finalTopic = FlashcardResponseParser.normalizeTopic(topic) ?? generatedTopic ?? null;
+
         db.run(
           `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description, topic) VALUES (?, ?, ?, ?, ?, ?)`,
-          [deckId, subject_id, user_id, finalTitle, description, topic ? sanitizeText(topic) : null],
+          [deckId, subject_id, user_id, finalTitle, description, finalTopic ? sanitizeText(finalTopic) : null],
           function(err) {
             if (err) {
               console.error('[Database] Error guardando mazo de imagen:', err);
               return res.status(500).json({ error: err.message });
             }
-            insertItemsAndReturn(res, deckId, subject_id, user_id, finalTitle, description, items);
+            insertItemsAndReturn(res, deckId, subject_id, user_id, finalTitle, description, items, finalTopic);
           }
         );
       }

@@ -6,7 +6,7 @@ const DeckBuilder = require('../pipelines/flashcard/DeckBuilder');
 
 class FlashcardEngine {
   static async execute(knowledgeModel, request, syncVersion) {
-    console.log('[FlashcardEngine] Iniciando pipeline de generación');
+    console.log('[FlashcardEngine] Iniciando pipeline de generaciï¿½n');
 
     // 1. Planning
     const deckPlan = await Planner.plan(knowledgeModel, request);
@@ -15,13 +15,13 @@ class FlashcardEngine {
     const evaluationReport = PlanEvaluator.evaluate(deckPlan, knowledgeModel);
 
     // 3. Generation
-    const generatedCards = await Generator.generate(evaluationReport, knowledgeModel, request);
+    const { topic, cards } = await Generator.generate(evaluationReport, knowledgeModel, request);
 
     // 4. Validation
-    const validatedCards = Validator.validate(generatedCards);
+    const validatedCards = Validator.validate(cards);
 
     // 5. Deck Building
-    const aggregate = DeckBuilder.build(request, validatedCards, syncVersion);
+    const aggregate = DeckBuilder.build(request, validatedCards, syncVersion, topic);
 
     console.log('[FlashcardEngine] Pipeline finalizado exitosamente');
     return aggregate;

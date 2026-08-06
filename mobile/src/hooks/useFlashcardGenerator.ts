@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { generateFlashcardsFromText, generateFlashcardsFromImage } from '../services/api/flashcards';
+import { generateFlashcardsFromText, generateFlashcardsFromImage, updateFlashcardDeck } from '../services/api/flashcards';
 import { useTranslation } from 'react-i18next';
 import { StudyMode } from '../services/api/types';
 import { getUserId } from '../services/api/auth';
 import { DeckUniquenessService } from '../services/domain/DeckUniquenessService';
+import { DeckTitleGenerator } from '../services/domain/DeckTitleGenerator';
 
 interface GenerateCardsParams {
   text?: string;
@@ -21,6 +22,7 @@ interface GeneratedDeck {
   user_id: number;
   title: string;
   description: string;
+  topic?: string | null;
   card_count: number;
   cards: {
     id: number;
@@ -98,6 +100,20 @@ export const useFlashcardGenerator = () => {
           user_id: params.userId,
           mode: params.mode || 'flashcard',
         });
+      }
+
+      // El backend produce el topic (dato de dominio). El título final lo
+      // construye el móvil vía DeckTitleGenerator y se converge el mazo.
+      if (result?.topic) {
+        const finalTitle = DeckTitleGenerator.buildTitle({ topic: result.topic, source: params.title });
+        if (finalTitle !== result.title) {
+          try {
+            await updateFlashcardDeck(String(result.id), { title: finalTitle });
+          } catch (e: any) {
+            console.warn('[useFlashcardGenerator] No se pudo actualizar el título del mazo:', e?.message);
+          }
+          result = { ...result, title: finalTitle };
+        }
       }
 
       setGeneratedDeck(result);

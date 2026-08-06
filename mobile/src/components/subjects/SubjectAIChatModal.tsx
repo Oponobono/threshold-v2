@@ -547,19 +547,24 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
       console.log('[AIChatModal] ✅ Respuesta exitosa de generateStudyMaterialFromChat:', deck);
 
+      // El backend produce el topic (dato de dominio). El título final es UI y
+      // lo decide el móvil vía DeckTitleGenerator.
+      const finalTopic = deck.topic || topic || undefined;
+      const finalTitle = DeckTitleGenerator.buildTitle({ topic: finalTopic, source: subjectName });
+
       closeGenPanel();
       const aiMsg: Message = {
         role: 'assistant',
         isSystemMessage: true,
         content: t('ai.deckGeneratedAiMsg', {
-          title: deck.title,
+          title: finalTitle,
           count: deck.card_count,
           mode: modeLabels[activeMode],
-          defaultValue: `✅ **Deck created!** I generated **"${deck.title}"** with **${deck.card_count} items** of type *${modeLabels[activeMode]}*. Find it in the Flashcards section ↓`
+          defaultValue: `✅ **Deck created!** I generated **"${finalTitle}"** with **${deck.card_count} items** of type *${modeLabels[activeMode]}*. Find it in the Flashcards section ↓`
         }),
       };
       setMessages(prev => [...prev, aiMsg]);
-      showToast(t('ai.deckGeneratedToast', { title: deck.title, count: deck.card_count, defaultValue: `Deck "${deck.title}" ready with ${deck.card_count} items ✅` }));
+      showToast(t('ai.deckGeneratedToast', { title: finalTitle, count: deck.card_count, defaultValue: `Deck "${finalTitle}" ready with ${deck.card_count} items ✅` }));
       
       // 💾 Local-First: persistir el deck y sus cards vía FlashcardDomainService.
       // El backend ya los tiene; los grabamos localmente para que la UI los
@@ -569,9 +574,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           const { flashcardDomainService } = await import('../../services/domain/FlashcardDomainService');
           await flashcardDomainService.saveGeneratedDeck({
             id: deck.id,
-            title: deck.title,
+            title: finalTitle,
             description: '',
-            topic: deck.topic || topic || undefined,
+            topic: finalTopic,
             subjectId: currentSubjectId ?? undefined,
             cards: (deck.cards ?? []).map((card: any) => {
               const content = card.data || {};
@@ -597,7 +602,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
         useFlashcardsStore.getState().upsert({
           id: deck.id,
-          title: deck.title,
+          title: finalTitle,
           subject_id: currentSubjectId ?? undefined,
           user_id: currentUserId ?? undefined,
           card_count: deck.card_count,
@@ -606,6 +611,16 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           review_count: 0,
           created_at: new Date().toISOString(),
         } as any);
+
+        // Converger el título en el backend si difiere del provisional
+        if (finalTitle !== deck.title) {
+          try {
+            const { updateFlashcardDeck } = await import('../../services/api/flashcards');
+            await updateFlashcardDeck(deck.id, { title: finalTitle });
+          } catch (titleErr: any) {
+            console.warn('[AIChatModal] ⚠️ No se pudo converger el título del mazo:', titleErr?.message);
+          }
+        }
       }
 
       // 🚀 Sync en background para convergencia (las cards ya están en SQLite)
