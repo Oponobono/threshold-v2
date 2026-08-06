@@ -69,8 +69,8 @@ describe('OperationNotificationController', () => {
     operationProgressBus.emit('progress', { operation });
     expect(mockProvider.showOperationProgress).toHaveBeenCalledTimes(1);
 
-    // Emitimos 100 veces sin avanzar el tiempo
-    for (let i = 2; i <= 101; i++) {
+    // Emitimos 99 veces sin avanzar el tiempo
+    for (let i = 2; i <= 100; i++) {
       operation.progress = { current: i, total: 100, percentage: i, indeterminate: false };
       operationProgressBus.emit('progress', { operation });
     }
@@ -82,7 +82,7 @@ describe('OperationNotificationController', () => {
     jest.advanceTimersByTime(250);
 
     // Emitimos uno nuevo, este si deberia pasar
-    operation.progress = { current: 102, total: 100, percentage: 100, indeterminate: false };
+    operation.progress = { current: 100, total: 100, percentage: 100, indeterminate: false };
     operationProgressBus.emit('progress', { operation });
     expect(mockProvider.showOperationProgress).toHaveBeenCalledTimes(2);
 

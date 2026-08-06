@@ -4,8 +4,6 @@ import { cardLogRepository, syncService } from '../../database';
 import type { CardLog } from '../types';
 import { uuidv4 } from '../../../utils/uuid';
 
-export type { CardLog };
-
 export const getCardLogs = async (): Promise<CardLog[]> => {
   const userId = await getUserId();
   if (!userId) return [];

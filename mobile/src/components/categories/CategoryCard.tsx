@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { AssessmentCategory } from '../../services/api/assessmentCategories';
+import type { AssessmentCategory } from '../../services/api/types';
 import { theme } from '../../styles/theme';
 import { categoriesStyles as styles } from '../../styles/Categories.styles';
 import { accentForIndex } from '../../hooks/useCategories';

@@ -2,8 +2,6 @@ import { useEffect, useRef } from 'react';
 import type { MMKV } from 'react-native-mmkv';
 import type { PredictionResponse } from '../store/useDataStore';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports (moved inside getMMKV)
-
 const PREDICTIONS_CACHE_KEY = 'predictions_cache_v1';
 const PREDICTIONS_SCHEMA_VERSION = 1;
 const POLLING_INTERVAL_MS = 15 * 60 * 1000; // 15 minutos

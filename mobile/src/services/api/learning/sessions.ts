@@ -4,8 +4,6 @@ import { studySessionRepository, syncService } from '../../database';
 import type { StudySession } from '../types';
 import { uuidv4 } from '../../../utils/uuid';
 
-export type { StudySession };
-
 export const getStudySessions = async (): Promise<StudySession[]> => {
   const userId = await getUserId();
   if (!userId) return [];

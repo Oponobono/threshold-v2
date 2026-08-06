@@ -70,14 +70,13 @@ describe('NotificationReconciler', () => {
     expect(provider.cancelCalls[0]).toBe('existing-1');
   });
 
-  // TODO(NOTIF-TEST-001): Test preexistente con bug — triggerDate: new Date() (now) vs
-  // scheduledAt: now+24h causa diff > 1000ms y cancela r1 también. Fix en PR separado.
   it('cancels reminders in provider but not in plan', async () => {
+    const plan = makePlan([makeReminder('r1')]);
+    const r1 = plan.deliverables[0];
     provider.existing = [
-      { identifier: 'r1', title: 'R1', body: '', triggerDate: new Date() },
+      { identifier: 'r1', title: r1.title, body: r1.body, triggerDate: r1.scheduledAt },
       { identifier: 'r2', title: 'R2', body: '', triggerDate: new Date() },
     ];
-    const plan = makePlan([makeReminder('r1')]);
     await reconciler.sync(plan, provider);
     expect(provider.cancelCalls).toEqual(['r2']);
     expect(provider.scheduleCalls.length).toBe(0);

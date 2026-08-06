@@ -70,7 +70,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const seq = buildSequence(registry, factory, 'assessment', entity);
       const r = seq.reminders[0];
 
-      expect(r.scheduledAt.getTime()).toBe(ANCHOR.getTime() - 10080 * 60000);
+      expect(r.scheduledAt.getTime()).toBe(new Date('2026-07-15T10:00:00Z').getTime() - 10080 * 60000);
       expect(r.intent).toBe('prepare_exam');
       expect(r.priority).toBe('high');
       expect(r.ordinal).toBe(0);

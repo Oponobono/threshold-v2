@@ -64,8 +64,8 @@ export class OperationNotificationController {
     const isThrottled = (now - lastMs) < THROTTLE_MS;
     const isSamePercent = currentPct === lastPct && !operation.progress?.indeterminate;
 
-    // Skip if too soon AND percentage hasn't changed as integer
-    if (isThrottled && isSamePercent) return;
+    // Skip if too soon OR percentage hasn't changed as integer
+    if (isThrottled || isSamePercent) return;
 
     this.lastUpdateMs.set(operation.id, now);
     this.lastPercentage.set(operation.id, currentPct);

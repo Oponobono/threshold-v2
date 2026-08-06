@@ -3,8 +3,6 @@ import { assessmentCategoryRepository, syncService } from '../database';
 import type { AssessmentCategory } from './types';
 import { uuidv4 } from '../../utils/uuid';
 
-export type { AssessmentCategory };
-
 export const getCategoriesBySubject = async (subjectId: string): Promise<AssessmentCategory[]> => {
   // 1. Leer localmente primero
   const localData = await assessmentCategoryRepository.getBySubject(subjectId);

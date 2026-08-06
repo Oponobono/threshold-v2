@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import type { AssessmentCategory } from '../services/api/types';
 import {
-  AssessmentCategory,
   deleteCategory,
   getCategoriesBySubject,
 } from '../services/api/assessmentCategories';

@@ -9,7 +9,8 @@ import { updateAssessment, type Subject, Assessment } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
 import { SubjectSelectorModal } from './SubjectSelectorModal';
 import { CategorySelectorModal } from './CategorySelectorModal';
-import { getCategoriesBySubject, type AssessmentCategory } from '../../services/api/assessmentCategories';
+import { getCategoriesBySubject } from '../../services/api/assessmentCategories';
+import type { AssessmentCategory } from '../../services/api/types';
 
 interface EditTaskModalProps {
   visible: boolean;

@@ -18,8 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../../styles/theme';
 import { styles } from '../../styles/CategoryFormModal.styles';
+import type { AssessmentCategory } from '../../services/api/types';
 import {
-  AssessmentCategory,
   createCategory,
   updateCategory,
 } from '../../services/api/assessmentCategories';

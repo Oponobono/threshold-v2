@@ -67,8 +67,8 @@ describe('GradingPolicy', () => {
       expect(exp!.toISOString()).toBe('2026-08-16T12:00:00.000Z');
     });
 
-    it('endDate también funciona', () => {
-      const exp = policy.getExpiration({ endDate: '2026-06-30T00:00:00Z' });
+    it('end_date (columna real de grading_periods) también funciona', () => {
+      const exp = policy.getExpiration({ end_date: '2026-06-30T00:00:00Z' });
       expect(exp!.toISOString()).toBe('2026-07-01T00:00:00.000Z');
     });
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AssessmentCategory } from '../../services/api/assessmentCategories';
+import type { AssessmentCategory } from '../../services/api/types';
 import { theme } from '../../styles/theme';
 import { categoriesStyles as styles } from '../../styles/Categories.styles';
 

@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { InteractionManager } from 'react-native';
 import { useDataStore } from '../store/useDataStore';
 import { getSemesterSummary, SemesterSummary } from '../services/api/analytics';
 import { SCALE_MAX } from '../utils/grades';
@@ -11,7 +10,6 @@ import { audioRepository } from '../services/database/repositories/AudioReposito
 import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
 import { theme } from '../styles/theme';
 import { perfDiagnostics } from '../services/performance';
-import { getLocales } from 'expo-localization';
 
 // Singleton formatter — instanciado una vez a nivel de módulo, reutilizado para todos los items
 const _getDateFormatter = (() => {
@@ -31,7 +29,6 @@ export interface UnifiedActivityItem {
   title: string;
   subtitle: string;
   date: number;
-  dateStr: string;
   subjectId: string;
   subjectName?: string;
   subjectColor?: string;

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { theme } from '../../styles/theme';
-import { type AssessmentCategory } from '../../services/api/assessmentCategories';
+import type { AssessmentCategory } from '../../services/api/types';
 
 interface CategorySelectorModalProps {
   visible: boolean;

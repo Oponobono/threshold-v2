@@ -25,6 +25,8 @@ describe('LRO Consumer Architecture', () => {
 
     files.forEach(file => {
       const content = fs.readFileSync(file, 'utf-8');
+      // Composition root: _layout.tsx instancia y cablea el provider concreto (Notifee).
+      if (file.endsWith('_layout.tsx')) return;
       expect(content).not.toMatch(/from\s+['"].*\/NotificationProvider['"]/);
       expect(content).not.toMatch(/from\s+['"].*\/NotifeeOperationProvider['"]/);
       expect(content).not.toMatch(/import\s+notifee/);

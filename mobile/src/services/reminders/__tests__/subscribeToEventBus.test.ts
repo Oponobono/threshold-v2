@@ -29,7 +29,7 @@ describe('subscribeToEventBus', () => {
       priority: 'NORMAL',
     });
 
-    expect(coordinator.handleEntityChanged).toHaveBeenCalledWith('assessment', 'a1');
+    expect(coordinator.handleEntityChanged).toHaveBeenCalledWith('assessment', 'a1', { id: 'a1' });
   });
 
   it('calls handleEntityChanged on updated events for known entity types', () => {
@@ -42,7 +42,19 @@ describe('subscribeToEventBus', () => {
       priority: 'NORMAL',
     });
 
-    expect(coordinator.handleEntityChanged).toHaveBeenCalledWith('flashcard_deck', 'd1');
+    expect(coordinator.handleEntityChanged).toHaveBeenCalledWith('flashcard_deck', 'd1', { id: 'd1' });
+  });
+
+  it('calls handleEntityChanged with undefined entity when event carries none', () => {
+    eventBus.emit({
+      entityType: 'assessments',
+      eventType: 'updated',
+      entityId: 'a1',
+      timestamp: Date.now(),
+      priority: 'NORMAL',
+    });
+
+    expect(coordinator.handleEntityChanged).toHaveBeenCalledWith('assessment', 'a1', undefined);
   });
 
   it('calls handleEntityDeleted on deleted events', () => {
@@ -76,7 +88,7 @@ describe('subscribeToEventBus', () => {
         timestamp: Date.now(),
         priority: 'NORMAL',
       });
-      expect(coordinator.handleEntityChanged).toHaveBeenCalledWith(engineType, 'x1');
+      expect(coordinator.handleEntityChanged).toHaveBeenCalledWith(engineType, 'x1', { id: 'x1' });
     }
   });
 
