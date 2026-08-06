@@ -28,6 +28,9 @@ import { SearchBar } from './SearchBar';
 import { Ionicons } from '@expo/vector-icons';
 import { createHighlight, getHighlights, deleteHighlight, updateHighlightColor } from './HighlightService';
 import type { DocumentHighlight, HighlightColor } from '../../domain/document/DocumentHighlight';
+import { documentAnchorRepository, type DocumentAnchorRow } from '../database/repositories';
+import { uuidv4 } from '../../utils/uuid';
+import { useDataStore } from '../../store/useDataStore';
 
 const copyUseCase = new ClipboardCopyUseCase();
 const shareUseCase = new SharingTextUseCase();
@@ -40,10 +43,12 @@ interface DocumentWorkspaceProps {
     action: import('../../domain/document/DocumentAction').DocumentAction,
     selection?: DocumentSelection,
   ) => void;
+  initialPage?: number;
 }
 
-export function DocumentWorkspace({ model, rendererRegistry, source }: DocumentWorkspaceProps): ReactNode {
+export function DocumentWorkspace({ model, rendererRegistry, source, initialPage }: DocumentWorkspaceProps): ReactNode {
   const insets = useSafeAreaInsets();
+  const profile = useDataStore(s => s.profile);
   const { showAlert } = useCustomAlert();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -57,8 +62,10 @@ export function DocumentWorkspace({ model, rendererRegistry, source }: DocumentW
   const [searchCurrentIdx, setSearchCurrentIdx] = useState(0);
   const pdfSearchRef = useRef<PdfSearchRef | null>(null);
   const highlightsRef = useRef<PdfHighlightRef | null>(null);
+  const anchorsRef = useRef<import('./NativePdfRenderer').PdfAnchorRef | null>(null);
   const [highlights, setHighlights] = useState<DocumentHighlight[]>([]);
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
+  const [anchors, setAnchors] = useState<DocumentAnchorRow[]>([]);
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardUp(true));
@@ -78,10 +85,24 @@ export function DocumentWorkspace({ model, rendererRegistry, source }: DocumentW
     });
   }, [model.documentId]);
 
+  // Load anchors on mount — Paso 1 Fase 2B
+  useEffect(() => {
+    documentAnchorRepository.findByDocumentId(model.documentId).then(setAnchors);
+  }, [model.documentId]);
+
+  const reloadAnchors = useCallback(() => {
+    documentAnchorRepository.findByDocumentId(model.documentId).then(setAnchors);
+  }, [model.documentId]);
+
   // Push highlights to renderer whenever they change
   useEffect(() => {
     highlightsRef.current?.set(highlights);
   }, [highlights]);
+
+  // Push anchors to renderer whenever they change
+  useEffect(() => {
+    anchorsRef.current?.set(anchors);
+  }, [anchors]);
 
   const scrollToPageRef = useRef<((page: number) => void) | null>(null) as ScrollToPageRef;
 
@@ -94,7 +115,14 @@ export function DocumentWorkspace({ model, rendererRegistry, source }: DocumentW
     if (highlightsRef.current) {
       highlightsRef.current.set(highlights);
     }
-  }, [highlights]);
+    if (anchorsRef.current) {
+      anchorsRef.current.set(anchors);
+    }
+    if (initialPage && initialPage > 0 && initialPage <= total) {
+      // Delay jumping slightly to let renderer layout
+      setTimeout(() => goToPage(initialPage), 100);
+    }
+  }, [highlights, anchors, initialPage]);
 
   const goToPage = useCallback(
     (oneBased: number) => {
@@ -217,6 +245,32 @@ export function DocumentWorkspace({ model, rendererRegistry, source }: DocumentW
     setActiveHighlightId(null);
   }, [activeHighlightId]);
 
+  const handleAnchorTapped = useCallback((id: string) => {
+    // For now, no UI action on anchor tap, but ready for Phase 2B Step 4 if needed.
+  }, []);
+
+  const handleCreateAnchor = useCallback(async () => {
+    if (!currentSelection || !profile?.id) return;
+    
+    // For Phase 2B Step 4: manual creation test
+    const newAnchor: DocumentAnchorRow = {
+      id: uuidv4(),
+      user_id: String(profile.id),
+      document_id: model.documentId,
+      page_index: currentSelection.pageIndex,
+      block_id: 'manual', 
+      char_start: currentSelection.startIndex,
+      char_end: currentSelection.endIndex,
+      target_type: 'summary', // dummy type for testing
+      target_id: 'manual-test',
+    };
+
+    await documentAnchorRepository.create(newAnchor);
+    reloadAnchors();
+    setCurrentSelection(null);
+    showAlert({ title: 'Anclado', message: 'Ancla creada correctamente', type: 'success' });
+  }, [currentSelection, profile, model.documentId, reloadAnchors, showAlert]);
+
   const renderer = rendererRegistry.resolve(model);
   const rendered = renderer.render(
     model,
@@ -233,6 +287,8 @@ export function DocumentWorkspace({ model, rendererRegistry, source }: DocumentW
     highlightsRef,
     handleHighlightTapped,
     source,
+    anchorsRef,
+    handleAnchorTapped,
   );
 
   const knownTotal = totalPages > 0 ? totalPages : model.pages.length || 0;
@@ -262,6 +318,7 @@ export function DocumentWorkspace({ model, rendererRegistry, source }: DocumentW
         onCopy={handleCopy}
         onShare={handleShare}
         onHighlight={handleHighlight}
+        onAnchor={handleCreateAnchor}
         onClose={handleCloseSelection}
         onDelete={handleDeleteHighlight}
         bottomInset={insets.bottom || 0}

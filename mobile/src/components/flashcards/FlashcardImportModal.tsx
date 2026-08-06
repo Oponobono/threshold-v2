@@ -17,9 +17,7 @@ import { theme } from '../../styles/theme';
 import { flashcardImportStyles as s } from '../../styles/FlashcardImportModal.styles';
 import { useCustomAlert } from '../ui/CustomAlert';
 import { type Subject } from '../../services/api';
-import { addLocalCard } from '../../services/localFlashcardService';
-import 'react-native-get-random-values';
-import { v4 as uuidv4 } from 'uuid';
+
 
 export interface FlashcardImportModalProps {
   isVisible: boolean;
@@ -348,77 +346,32 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
         }
       }
 
-      const deckId = uuidv4();
-      const userId = await import('../../services/api').then(m => m.getUserId());
       const importSubjectId = deckData.subject_id ? String(deckData.subject_id) : undefined;
       const importSubject = importSubjectId ? subjects.find(s => s.id === importSubjectId) : undefined;
 
-      const newDeck = {
-        id: deckId,
+      const { flashcardDomainService } = await import('../../services/domain/FlashcardDomainService');
+      const savedDeck = await flashcardDomainService.saveGeneratedDeck({
         title: sanitizeText(deckData.title),
         description: sanitizeText(deckData.description),
-        subject_id: importSubjectId,
-        subject_name: importSubject?.name,
-        subject_color: importSubject?.color,
-        subject_icon: importSubject?.icon,
-        card_count: cards.length,
-        user_id: String(userId || 0),
-        created_at: new Date().toISOString(),
-        review_count: 0,
-        learning_count: 0,
-        new_count: cards.length,
-      };
-
-      const { flashcardDeckRepository } = await import('../../services/database');
-      await flashcardDeckRepository.create(newDeck);
-
-      // OFFLINE-FIRST: Persistir cada tarjeta individualmente en MMKV
-      for (const card of cards) {
-        addLocalCard(deckId, card as any);
-      }
-
-      // OFFLINE-FIRST: Preparar mazo para sincronizar cuando vuelva online
-      try {
-        if (userId) {
-          const { syncService } = await import('../../services/database/SyncService');
-          const cardsKey = `cache:flashcards_by_deck:${deckId}`;
-          let mmkvCards: any[] = [];
-          try {
-            const raw = require('react-native-mmkv').createMMKV().getString(cardsKey);
-            if (raw) {
-              const entry = JSON.parse(raw);
-              mmkvCards = entry.data || entry || [];
-            }
-          } catch {}
-
-          const deckPayload = {
-            id: deckId,
-            title: newDeck.title,
-            description: newDeck.description,
-            subject_id: newDeck.subject_id,
-            cards: mmkvCards.map(c => ({
-              id: c.id,
-              front: c.front || c.content?.front || '',
-              back: c.back || c.content?.back || '',
-              item_type: c.item_type || 'flashcard',
-              content_json: c.content || c.data,
-              hint: c.hint,
-              explanation: c.explanation,
-            })),
-          };
-
-          await syncService.enqueueCreate('flashcard-deck', String(deckId), deckPayload);
-          console.log('[FlashcardImportModal] Mazo importado preparado para sincronizar');
-        }
-      } catch (syncErr) {
-        console.warn('[FlashcardImportModal] Error preparando sync:', syncErr);
-      }
+        subjectId: importSubjectId,
+        subjectName: importSubject?.name,
+        subjectColor: importSubject?.color,
+        subjectIcon: importSubject?.icon,
+        cards: cards.map(c => ({
+          front: (c as any).data?.front || (c as any).front || '',
+          back: (c as any).data?.back || (c as any).back || '',
+          item_type: (c as any).type || 'flashcard',
+          content_json: JSON.stringify((c as any).data || {}),
+          hint: (c as any).hint || null,
+          explanation: (c as any).explanation || null,
+        })),
+      });
 
       setImportedDeck({
-        id: deckId,
-        title: newDeck.title,
-        description: newDeck.description,
-        cardCount: newDeck.card_count,
+        id: savedDeck.id,
+        title: savedDeck.title,
+        description: savedDeck.description,
+        cardCount: cards.length,
       });
 
       setIsProcessing(false);

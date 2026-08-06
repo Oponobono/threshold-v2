@@ -39,6 +39,18 @@ export class FlashcardDeckRepository extends BaseRepository<FlashcardDeck> {
   async getByLinkedEvent(eventId: string): Promise<FlashcardDeck[]> {
     return this.getByField('linked_event_id', eventId);
   }
+
+  async findConflictingTitles(userId: string, baseTitle: string): Promise<string[]> {
+    const db = this.getDb();
+    // Escape LIKE special characters (%, _, \) to avoid wildcard misinterpretation
+    const escaped = baseTitle.replace(/[\\%_]/g, '\\$&');
+    const pattern = `${escaped}%`;
+    const result = await db.getAllAsync<{ title: string }>(
+      `SELECT title FROM ${this.tableName} WHERE user_id = ? AND deleted_at IS NULL AND title LIKE ? ESCAPE '\\'`,
+      [userId, pattern]
+    );
+    return result.map(r => r.title);
+  }
 }
 
 export const flashcardDeckRepository = new FlashcardDeckRepository();

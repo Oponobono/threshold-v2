@@ -161,7 +161,7 @@ function extractRequestedCount(userMessage) {
  * @returns {string} Bloque con formato exacto
  */
 function buildDeckActionBlock(mode, count) {
-  return `%%DECK_ACTION%%{"mode":"${mode}","count":${count}}%%END%%`;
+  return `%%DIRECTIVE%%{"type":"create_deck","mode":"${mode}","count":${count}}%%END%%`;
 }
 
 /**

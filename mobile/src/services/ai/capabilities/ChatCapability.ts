@@ -1,5 +1,6 @@
 import { aiOrchestrator } from '../AIOrchestrator';
 import { getSystemPrompt } from '../prompts/systemPrompts';
+import { AIDirective } from '../providers/AIProvider';
 
 export interface ChatParams {
   message: string;
@@ -15,6 +16,7 @@ export interface ChatResult {
   provider: string;
   model: string;
   latencyMs: number;
+  directives?: AIDirective[];
 }
 
 class ChatCapability {
@@ -51,6 +53,7 @@ class ChatCapability {
       provider: response.provider,
       model: response.model,
       latencyMs: response.latencyMs,
+      ...(response.directives && { directives: response.directives }),
     };
   }
 }

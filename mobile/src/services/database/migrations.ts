@@ -915,5 +915,34 @@ const migrations: Migration[] = [
       `ALTER TABLE flashcards ADD COLUMN explanation TEXT`,
     ],
   },
+  {
+    version: 44,
+    up: [
+      `CREATE TABLE IF NOT EXISTS document_anchors (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        document_id TEXT NOT NULL,
+        page_index INTEGER NOT NULL,
+        block_id TEXT NOT NULL,
+        char_start INTEGER,
+        char_end INTEGER,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        metadata TEXT,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 1,
+        last_modified_by TEXT,
+        deleted_at DATETIME,
+        created_at DATETIME DEFAULT (datetime('now')),
+        updated_at DATETIME DEFAULT (datetime('now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_document_anchors_document_id
+       ON document_anchors(document_id) WHERE deleted_at IS NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_document_anchors_target
+       ON document_anchors(target_type, target_id) WHERE deleted_at IS NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_document_anchors_document_page
+       ON document_anchors(document_id, page_index) WHERE deleted_at IS NULL`,
+    ],
+  },
 ];
 export default migrations;

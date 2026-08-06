@@ -1266,15 +1266,51 @@ exports.generateDeckFromText = async (req, res) => {
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con IA`;
     const deckId = uuidv4();
-    db.run(
-      `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
-      [deckId, subject_id, user_id, title, description],
-      function(err) {
-        if (err) {
-          console.error('[Database] Error al insertar mazo:', err);
-          return res.status(500).json({ error: err.message });
+
+    // Resolve unique title server-side before INSERT.
+    // Strategy: SELECT LIKE (prefix) + regex suffix extraction → max+1.
+    // A UNIQUE constraint is intentionally absent: Threshold's usage pattern
+    // (single user, sequential deck creation) makes a pre-INSERT read sufficient.
+    // If future scenarios introduce high concurrency or multi-process writes for the
+    // same user, this strategy should evolve to a UNIQUE INDEX + SQLITE_CONSTRAINT
+    // retry with automatic suffix recalculation.
+    const escapedTitle = title.replace(/[\\%_]/g, '\\$&');
+    const pattern = `${escapedTitle}%`;
+    db.all(
+      `SELECT title FROM flashcard_decks WHERE user_id = ? AND deleted_at IS NULL AND title LIKE ? ESCAPE '\\'`,
+      [user_id, pattern],
+      (titleErr, existing) => {
+        if (titleErr) {
+          console.error('[Database] Error buscando títulos existentes:', titleErr);
+          return res.status(500).json({ error: titleErr.message });
         }
-        insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items);
+
+        let finalTitle = title;
+        const existingTitles = (existing || []).map(r => r.title);
+        if (existingTitles.includes(title)) {
+          const suffixRegex = new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\((\\d+)\\)$`);
+          let maxSuffix = 1;
+          for (const t of existingTitles) {
+            const m = t.match(suffixRegex);
+            if (m) {
+              const n = parseInt(m[1], 10);
+              if (!isNaN(n) && n > maxSuffix) maxSuffix = n;
+            }
+          }
+          finalTitle = `${title} (${maxSuffix + 1})`;
+        }
+
+        db.run(
+          `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
+          [deckId, subject_id, user_id, finalTitle, description],
+          function(err) {
+            if (err) {
+              console.error('[Database] Error al insertar mazo:', err);
+              return res.status(500).json({ error: err.message });
+            }
+            insertItemsAndReturn(res, deckId, subject_id, user_id, finalTitle, description, items);
+          }
+        );
       }
     );
   } catch (err) {
@@ -1359,15 +1395,45 @@ exports.generateDeckFromImage = async (req, res) => {
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con OCR + IA`;
     const deckId = uuidv4();
-    db.run(
-      `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
-      [deckId, subject_id, user_id, title, description],
-      function(err) {
-        if (err) {
-          console.error('[Database] Error guardando mazo de imagen:', err);
-          return res.status(500).json({ error: err.message });
+
+    // Resolve unique title server-side to prevent race conditions between clients
+    const escapedTitle = title.replace(/[\\%_]/g, '\\$&');
+    const pattern = `${escapedTitle}%`;
+    db.all(
+      `SELECT title FROM flashcard_decks WHERE user_id = ? AND deleted_at IS NULL AND title LIKE ? ESCAPE '\\'`,
+      [user_id, pattern],
+      (titleErr, existing) => {
+        if (titleErr) {
+          console.error('[Database] Error buscando títulos existentes:', titleErr);
+          return res.status(500).json({ error: titleErr.message });
         }
-        insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items);
+
+        let finalTitle = title;
+        const existingTitles = (existing || []).map(r => r.title);
+        if (existingTitles.includes(title)) {
+          const suffixRegex = new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\((\\d+)\\)$`);
+          let maxSuffix = 1;
+          for (const t of existingTitles) {
+            const m = t.match(suffixRegex);
+            if (m) {
+              const n = parseInt(m[1], 10);
+              if (!isNaN(n) && n > maxSuffix) maxSuffix = n;
+            }
+          }
+          finalTitle = `${title} (${maxSuffix + 1})`;
+        }
+
+        db.run(
+          `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
+          [deckId, subject_id, user_id, finalTitle, description],
+          function(err) {
+            if (err) {
+              console.error('[Database] Error guardando mazo de imagen:', err);
+              return res.status(500).json({ error: err.message });
+            }
+            insertItemsAndReturn(res, deckId, subject_id, user_id, finalTitle, description, items);
+          }
+        );
       }
     );
   } catch (err) {

@@ -20,6 +20,10 @@ export interface PdfHighlightRef {
   set: (highlights: readonly DocumentHighlight[]) => void;
 }
 
+export interface PdfAnchorRef {
+  set: (anchors: readonly any[]) => void;
+}
+
 export class NativePdfRenderer implements DocumentRenderer {
   supports(model: DocumentModel): boolean {
     const format = model.pages[0]?.content?.metadata?.format?.toLowerCase() || '';
@@ -38,6 +42,8 @@ export class NativePdfRenderer implements DocumentRenderer {
     highlightsRef?: MutableRefObject<PdfHighlightRef | null>,
     onHighlightTapped?: (id: string) => void,
     _source?: DocumentSource,
+    anchorsRef?: MutableRefObject<PdfAnchorRef | null>,
+    onAnchorTapped?: (id: string) => void,
   ): unknown {
     const fileUri = model.documentId.startsWith('file://')
       ? model.documentId
@@ -54,6 +60,8 @@ export class NativePdfRenderer implements DocumentRenderer {
         onSearchResult={onSearchResult}
         highlightsRef={highlightsRef}
         onHighlightTapped={onHighlightTapped}
+        anchorsRef={anchorsRef}
+        onAnchorTapped={onAnchorTapped}
       />
     );
   }
@@ -69,6 +77,8 @@ interface NativePdfRendererContentProps {
   onSearchResult?: OnSearchResult;
   highlightsRef?: MutableRefObject<PdfHighlightRef | null>;
   onHighlightTapped?: (id: string) => void;
+  anchorsRef?: MutableRefObject<PdfAnchorRef | null>;
+  onAnchorTapped?: (id: string) => void;
 }
 
 export interface PdfSearchRef {
@@ -118,6 +128,12 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
     }
     .highlight.active {
       background: rgba(255, 140, 0, 0.65);
+    }
+    .anchor-marker {
+      position: absolute;
+      border-bottom: 2px solid rgba(0, 0, 0, 0.7);
+      pointer-events: none;
+      z-index: 6;
     }
     .textLayer {
       position: absolute;
@@ -173,6 +189,7 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
     var allMatches = [];
     var currentMatchIndex = -1;
     var currentHighlights = [];
+    var currentAnchors = [];
     var currentSearchTerm = '';
 
     function getCurrentPage() {
@@ -306,6 +323,10 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
           currentHighlights = cmd.highlights;
           renderAllPersistentHighlights(); 
         }
+        else if (cmd.type === 'renderAnchors') {
+          currentAnchors = cmd.anchors;
+          renderAllPersistentAnchors();
+        }
         else if (cmd.type === 'clearSelection') { clearCustomSelection(); }
       } catch(e) {}
     };
@@ -398,6 +419,89 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
         var p = parseInt(pageNum, 10);
         if (pageData[p] && pageData[p].state === 'rendered') {
           renderPersistentHighlightsForPage(p);
+        }
+      });
+    }
+
+    function renderPersistentAnchorsForPage(pageNum) {
+      var wrapper = document.querySelector('.page-wrapper[data-page="' + pageNum + '"]');
+      if (!wrapper) return;
+      wrapper.querySelectorAll('.anchor-marker').forEach(function(el) { el.remove(); });
+      
+      var data = pageData[pageNum];
+      if (!data || data.state !== 'rendered') return;
+      
+      var pageAnchors = currentAnchors.filter(function(a) { return (a.page_index + 1) === pageNum; });
+      if (!pageAnchors.length) return;
+
+      var canvas = wrapper.querySelector('canvas');
+      if (!canvas) return;
+      var rect = canvas.getBoundingClientRect();
+      var actualW = rect.width > 0 ? rect.width : canvas.offsetWidth;
+      var effectiveScale = actualW / data.unscaledW;
+      var pageHeightCSS = data.unscaledH * effectiveScale;
+
+      pageAnchors.forEach(function(a) {
+        var startIdx = a.char_start != null ? a.char_start : 0;
+        var endIdx = a.char_end != null ? a.char_end : 10000;
+        
+        var spanIdx = 0;
+        var lineBlocks = [];
+        var currentBlock = null;
+
+        for (var i = 0; i < data.textItems.length; i++) {
+          var item = data.textItems[i];
+          if (!item.str || !item.str.trim()) continue;
+          
+          if (spanIdx >= startIdx && spanIdx <= endIdx) {
+            var userX = item.transform[4];
+            var userY = item.transform[5];
+            var fontSizeUser = Math.abs(item.transform[3]);
+            var itemWidth = item.width || (item.str.length * fontSizeUser * 0.5);
+
+            if (!currentBlock) {
+               currentBlock = { y: userY, minX: userX, maxX: userX + itemWidth, fontSize: fontSizeUser };
+            } else {
+               if (Math.abs(currentBlock.y - userY) < 5) {
+                  currentBlock.minX = Math.min(currentBlock.minX, userX);
+                  currentBlock.maxX = Math.max(currentBlock.maxX, userX + itemWidth);
+                  currentBlock.fontSize = Math.max(currentBlock.fontSize, fontSizeUser);
+               } else {
+                  lineBlocks.push(currentBlock);
+                  currentBlock = { y: userY, minX: userX, maxX: userX + itemWidth, fontSize: fontSizeUser };
+               }
+            }
+          } else if (spanIdx > endIdx) {
+            break;
+          }
+          spanIdx++;
+        }
+        if (currentBlock) lineBlocks.push(currentBlock);
+
+        lineBlocks.forEach(function(block) {
+          var el = document.createElement('div');
+          el.className = 'anchor-marker';
+          el.setAttribute('data-anchor-id', a.id);
+          
+          var fontSizePx = block.fontSize * effectiveScale;
+          var ascentPx = fontSizePx * 0.8;
+
+          el.style.left = (block.minX * effectiveScale) + 'px';
+          // Place the underline slightly below the text
+          el.style.top = (pageHeightCSS - block.y * effectiveScale) + 'px';
+          el.style.width = ((block.maxX - block.minX) * effectiveScale) + 'px';
+          el.style.height = '2px';
+
+          wrapper.appendChild(el);
+        });
+      });
+    }
+
+    function renderAllPersistentAnchors() {
+      Object.keys(pageData).forEach(function(pageNum) {
+        var p = parseInt(pageNum, 10);
+        if (pageData[p] && pageData[p].state === 'rendered') {
+          renderPersistentAnchorsForPage(p);
         }
       });
     }
@@ -774,6 +878,9 @@ function buildHtmlFromUri(fileUri: string, bgColor: string): string {
          if (currentHighlights && currentHighlights.length) {
             renderPersistentHighlightsForPage(pageNum);
          }
+         if (currentAnchors && currentAnchors.length) {
+            renderPersistentAnchorsForPage(pageNum);
+         }
          if (currentSearchTerm) {
             searchInAllPages(currentSearchTerm);
          }
@@ -800,6 +907,8 @@ function NativePdfRendererContent({
   onSearchResult,
   highlightsRef,
   onHighlightTapped,
+  anchorsRef,
+  onAnchorTapped,
 }: NativePdfRendererContentProps) {
   const [loading, setLoading] = useState(true);
   const [html, setHtml] = useState<string | null>(null);
@@ -841,6 +950,17 @@ function NativePdfRendererContent({
     return () => { if (highlightsRef) highlightsRef.current = null; };
   }, [highlightsRef]);
 
+  // Expose anchors
+  useEffect(() => {
+    if (!anchorsRef) return;
+    anchorsRef.current = {
+      set: (anchors: readonly any[]) => {
+        injectCommand({ type: 'renderAnchors', anchors });
+      },
+    };
+    return () => { if (anchorsRef) anchorsRef.current = null; };
+  }, [anchorsRef]);
+
   useEffect(() => {
     if (Platform.OS !== 'ios') {
       setHtml(buildHtmlFromUri(fileUri, theme.colors.background));
@@ -873,6 +993,10 @@ function NativePdfRendererContent({
       } else if (data.type === 'highlightTapped') {
         if (data.id) {
            onHighlightTapped?.(data.id);
+        }
+      } else if (data.type === 'anchorTapped') {
+        if (data.id) {
+           onAnchorTapped?.(data.id);
         }
       }
     } catch {}

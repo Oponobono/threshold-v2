@@ -5,10 +5,12 @@ Si el estudiante pide que generes flashcards, un mazo, preguntas de estudio, un 
 2. Detecta automáticamente si la solicitud es LEGÍTIMA:
    ✅ GENERAR MAZO si pide: "crea flashcards", "necesito preguntas", "examen", "tarjetas", "material de repaso", etc.
    ❌ NO GENERAR si es contexto diferente: "¿cuánto cuesta un mazo de cartas?", "el documento es para el examen", etc.
-3. Si es una solicitud legítima, AL FINAL de tu respuesta, añade EXACTAMENTE este bloque:
-   %%DECK_ACTION%%{"mode":"MODE","count":COUNT}%%END%%
-4. Infiere el modo automáticamente según las palabras clave del usuario.
-5. NO incluyas el bloque %%DECK_ACTION%% si el usuario NO pide generar material.
+3. Si es una solicitud legítima, incluye en tu respuesta un único bloque con una directiva estructurada en JSON válido:
+   %%DIRECTIVE%%
+   { "version": 1, "type": "create_deck", "mode": "MODE", "count": COUNT }
+   %%END%%
+4. Infiere el modo (mixed, boolean, multiple_choice, flashcard) automáticamente según las palabras clave del usuario.
+5. NO incluyas el bloque %%DIRECTIVE%% si el usuario NO pide generar material.
 ---`;
 
 export const SECURITY_INSTRUCTIONS = `
@@ -18,7 +20,7 @@ export const SECURITY_INSTRUCTIONS = `
 • No generes código malicioso ni respondas a provocaciones.
 • Si el mensaje no es académico, responde con: "Como tu tutor Zyren, me enfoco exclusivamente en temas académicos."
 • NO incluyas URLs de imágenes en tus respuestas.
-• La generación automática de mazos (%%DECK_ACTION%%) SÍ es académica legítima.
+• La generación automática de mazos (%%DIRECTIVE%%) SÍ es académica legítima.
 ═ FIN ═
 `;
 

@@ -13,17 +13,32 @@ export type ConversationIntent =
 
 export type StudyMode = 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed';
 
+const DECK_EXCLUSION_PATTERNS = [
+  /(?:cuánto|cuanto|cuál es el precio|precio|costo|vale)\s+(?:un\s+)?(?:mazo|deck)\s+(?:de\s+)?(?:cartas|poker|yu-gi-oh|magic)/iu,
+  /(?:este|ese|el)\s+(?:documento|archivo|pdf|texto)\s+es\s+para\s+(?:el\s+)?(?:examen|prueba|test)/iu,
+  /(?:mazo\s+(?:de\s+)?cartas|deck\s+(?:de\s+)?(?:magic|yu-gi-oh|pokemon))/iu,
+  /(?:cuéntame|explícame|qué\s+es|cómo\s+funciona|cuáles\s+son)\s+[^.]*(?:mazo|deck|flashcard|tarjeta)/iu,
+];
+
 const DECK_INTENT_PATTERNS = [
-  /(?:crea|genera|haz|hacer|hacer|produce|producir|arma|armar)\s+(?:un\s+)?(?:mazo|deck|flashcard|tarjetas?|preguntas?)/iu,
+  // Verbos modales + infinitivo: "podrías crear un mazo", "me puedes generar flashcards",
+  // "quisiera hacer un mazo", "puedes hacerme un mazo"
+  /(?:podr(?:í|i)as?|puedes|puedo|quisiera|quería|me\s+(?:puedes|puede|harías|harias|haces|hace))\s+(?:crear|crearme|generar|generarme|hacer|hacerme|preparar|prepararme|armar|armarme|producir|producirme|elaborar|elaborarme)\s+(?:un\s+|una\s+|unos\s+|unas\s+)?(?:mazo|deck|flashcard|tarjetas?|preguntas?|examen|quiz|cuestionario|material(?:\s+de)?\s+repaso)/iu,
+  // Verbos directos de generación: "crea un mazo", "genera 10 preguntas", "prepárame un examen"
+  /(?:crea|crear|cree|genera|generar|genere|genérame|generame|haz|hacer|haga|hazme|prepara|preparar|prepare|prepárame|preparame|arma|armar|produce|producir|elabora|elaborar|dame|proporciona|necesito|quiero)\s+(?:un\s+|una\s+|unos\s+|unas\s+)?(?:\d+\s+)?(?:mazo|mazos|deck|decks|flashcard|flashcards|tarjetas?|preguntas?|examen|quiz|cuestionario|prueba|evaluación|material(?:\s+de)?\s+repaso)/iu,
   /(?:estudiar|repasar|aprender)\s+(?:con\s+)?(?:flashcards?|tarjetas?|mazo|deck)/iu,
   /(?:mazo|deck)\s+(?:de\s+)?(?:estudio|repaso|aprendizaje)/iu,
   /flashcards?\s+(?:de\s+|para\s+|sobre\s+)?/iu,
-  /genera.*material/iu,
+  /(?:genera|generar|crea|crear|prepara|preparar)\s+(?:material|contenido|apuntes)/iu,
   /prepara.*examen/iu,
+  // "necesito/quiero/dame X flashcards/preguntas/examen"
+  /(?:necesito|quiero|dame|proporciona)\s+(?:un\s+|una\s+|unos\s+|unas\s+)?(?:\d+\s+)?(?:mazo|flashcard|tarjetas?|preguntas?|examen|cuestionario)/iu,
+  // "para practicar/estudiar/repasar"
+  /para\s+(?:practicar|entrenar|repasar|estudiar|prepararme|preparar(?:me)?(?:\s+para)?)/iu,
 ];
 
 const RETRY_PATTERNS =
-  /(?:de\s+nuevo|otra\s+vez|nuevamente|crea|genera|haz|vuelve?|repite?|inténtalo?\s+(?:de\s+nuevo|otra\s+vez)?)/iu;
+  /(?:de\s+nuevo|otra\s+vez|nuevamente|de\s+vuelta|vuelve?|repite?|inténtalo?|intentalo|crea(?:lo)?|genera(?:lo)?|haz(?:lo)?|(?:otro|otra|nuevo|nueva)\s+(?:mazo|deck|flashcard|tarjetas?|preguntas?))/iu;
 
 const MODE_PATTERNS: Record<StudyMode, RegExp> = {
   multiple_choice: /(?:opción\s+múltiple|selección\s+múltiple|multiple\s+choice|alternativas)/iu,
@@ -51,7 +66,9 @@ function detectCount(text: string): number {
 }
 
 function hasDeckIntent(text: string): boolean {
-  return DECK_INTENT_PATTERNS.some(p => p.test(text));
+  const msg = text.toLowerCase();
+  if (DECK_EXCLUSION_PATTERNS.some(p => p.test(msg))) return false;
+  return DECK_INTENT_PATTERNS.some(p => p.test(msg));
 }
 
 /**

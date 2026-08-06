@@ -15,14 +15,27 @@
 - **Colaboración vs Expansión:** Ningún componente debe crecer resolviendo nuevas responsabilidades; debe crecer colaborando con nuevos componentes.
 
 ## Subdominios Congelados Oficialmente
-- **AI Domain v1.0 (Status: Frozen, 2026-08-04):** Arquitectura estable (Capability Pattern, InferenceRouter, KnowledgeEngine, Engine/Pipeline, Aggregate/Repository). Las nuevas capacidades (Quiz, Summary, StudyPlan) deben construirse sobre esta base reutilizando la infraestructura, sin reescribir ni romper la coherencia (ver `docs/architecture/AI_DOMAIN.md`). Invariantes oficiales de la Constitución:
-  1. Solo una Capability expone un caso de uso.
-  2. Solo un Engine orquesta.
+- **AI Domain v2.0 (Status: Frozen, 2026-08-06):** Arquitectura estable (Capability Pattern, AIOrchestrator, Threshold Directive Protocol, Domain Services). Invariantes oficiales de la Constitución:
+  1. Solo una Capability expone un caso de uso determinístico.
+  2. Solo un Orchestrator orquesta modelos.
   3. Ningún Stage conoce otro Stage.
-  4. Solo un Stage puede hablar con el LLM.
-  5. Ningún Provider es importado fuera del InferenceRouter.
+  4. Solo un Provider puede hablar con el LLM.
+  5. Ningún Provider es importado fuera del Orchestrator.
   6. Ningún Repository conoce IA.
-  7. Ningún Stage devuelve HTTP.
-  8. Los Aggregates son el límite del dominio.
+  7. Ningún Endpoint devuelve HTML o UI.
+  8. Los Domain Services/Aggregates son el límite de persistencia del dominio.
   9. SQLite sigue siendo la única fuente de verdad del cliente.
-  10. Todo cambio debe respetar el patrón Capability.
+  10. Todo cambio determinístico debe respetar el patrón Capability.
+  11. Los modelos de IA nunca producen efectos secundarios; únicamente producen directivas estructuradas o texto.
+  12. La ejecución de directivas (TDP) pertenece exclusivamente a los Coordinators (`AIInteractionCoordinator`) mediante el `DirectiveHandlerRegistry`.
+  13. El TDP (Threshold Directive Protocol) es un protocolo estable para intenciones abiertas.
+  14. **Toda persistencia de mazos generados por IA (o cualquier entidad de dominio compleja) debe pasar obligatoriamente por un Domain Service (ej. `FlashcardDomainService`). La UI JAMÁS debe instanciar IDs, construir entidades parciales, ni invocar Repositories directamente.**
+
+- **Document Domain v2.0 (Status: Frozen, 2026-08-06):** Espacio de Referencias y Lectura Pasiva. Invariantes constitucionales:
+  1. **Inmutabilidad del origen:** DocumentSource, ExtractedDocument y DocumentModel nunca se modifican tras la extracci�n.
+  2. **Desacoplamiento absoluto:** El Document Domain no conoce modelos de IA, providers ni l�gica de aprendizaje (FSRS). Todo sucede fuera de sus fronteras.
+  3. **Propiedad exclusiva de las anclas:** DocumentAnchor es el �nico mecanismo oficial para relacionar un documento con artefactos externos.
+  4. **Artefactos derivados:** Cualquier resumen, conjunto de flashcards, quiz o mapa mental es un artefacto derivado (KnowledgeArtifact externo), referenciado mediante un ArtifactReference. Nunca forma parte estructural del documento.
+  5. **Reproducibilidad:** Todo artefacto derivado debe poder reconstruirse a partir del documento original y sus metadatos; el documento (y sus anclas) permanece como la �nica fuente de verdad inmutable.
+  6. **Agnosticismo de Formato:** Las anclas apuntan siempre a una representaci�n l�gica (DocumentLocation), nunca al parser o renderer original, garantizando su supervivencia si el extractor cambia.
+

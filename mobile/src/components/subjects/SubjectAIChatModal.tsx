@@ -26,10 +26,12 @@ import { flashcardDeckRepository } from '../../services/database/repositories/Fl
 import { flashcardRepository } from '../../services/database/repositories/FlashcardRepository';
 import { syncManager } from '../../services/sync/SyncManager';
 import { useFlashcardsStore } from '../../store/useFlashcardsStore';
+import { aiInteractionCoordinator } from '../../services/ai/AIInteractionCoordinator';
 import { sendHybridChatMessage, generateHybridStudyMaterial, getChatHistory, clearChatHistory, processDocumentUploadHybrid } from '../../services/hybridAIService';
 import { resolveIntent } from '../../services/ai/ConversationIntentResolver';
 import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
+import { DeckNamingService } from '../../services/domain/DeckNamingService';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
@@ -479,8 +481,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   /**
    * Ejecuta la generación del mazo con los parámetros actuales del panel.
    * Usa buildGenerationContext() para obtener el mejor contexto disponible.
+   * @param topicHint - Mensaje del usuario que solicitó el mazo; se usa como tema
+   * cuando no existe contexto de la materia (fallback para "crea un mazo sobre X").
    */
-  const handleGenerateMaterial = useCallback(async (overrideMode?: StudyMode, overrideCount?: number) => {
+  const handleGenerateMaterial = useCallback(async (overrideMode?: StudyMode, overrideCount?: number, topicHint?: string) => {
     const currentUserId = userIdRef.current;
     const currentSubjectId = subjectIdRef.current;
 
@@ -502,7 +506,12 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       preview: ctx ? ctx.substring(0, 150) : 'vacio',
     });
 
-    if (!ctx.trim()) {
+    const topic = topicHint?.trim();
+    const genContext = topic
+      ? (ctx.trim() ? `${ctx}\n\nTema solicitado por el estudiante: ${topic}` : topic)
+      : ctx;
+
+    if (!genContext.trim()) {
       showToast(t('subjects.addContextBeforeGenerate'));
       closeGenPanel();
       return;
@@ -512,7 +521,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
     const activeMode = overrideMode || genMode;
     const activeCount = overrideCount || parseInt(genCount) || 10;
     const modeLabels: Record<string, string> = { flashcard: t('subjects.modeFlashcard'), multiple_choice: t('subjects.modeMultipleChoice'), boolean: t('subjects.modeTrueFalse'), mixed: t('subjects.modeMixed') };
-    const deckTitle = `${modeLabels[activeMode] || t('subjects.material')} — ${subjectName}`;
+    const deckTitle = DeckNamingService.buildBaseDeckTitle({
+      source: subjectName,
+    });
+
     
     try {
       console.log('[AIChatModal] 📡 Enviando petición a generateStudyMaterialFromChat:', {
@@ -522,7 +534,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       });
 
       const deck = await generateStudyMaterialFromChat({
-        contextText: ctx,
+        contextText: genContext,
         mode: activeMode,
         count: activeCount,
         title: deckTitle,
@@ -547,39 +559,31 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       setMessages(prev => [...prev, aiMsg]);
       showToast(t('ai.deckGeneratedToast', { title: deck.title, count: deck.card_count, defaultValue: `Deck "${deck.title}" ready with ${deck.card_count} items ✅` }));
       
-      // 💾 Local-First: persistir el deck y sus cards en SQLite de inmediato.
+      // 💾 Local-First: persistir el deck y sus cards vía FlashcardDomainService.
       // El backend ya los tiene; los grabamos localmente para que la UI los
       // encuentre sin esperar al delta sync (que puede tardar o no traerlos).
       if (deck.id) {
         try {
-          await flashcardDeckRepository.create({
-            id: deck.id,
+          const { flashcardDomainService } = await import('../../services/domain/FlashcardDomainService');
+          await flashcardDomainService.saveGeneratedDeck({
             title: deck.title,
-            subject_id: currentSubjectId ?? undefined,
-            user_id: currentUserId ?? undefined,
-            created_at: new Date().toISOString(),
-          } as any);
-
-          if (deck.cards && deck.cards.length > 0) {
-            for (const card of deck.cards) {
+            description: '',
+            subjectId: currentSubjectId ?? undefined,
+            cards: (deck.cards ?? []).map((card: any) => {
               const content = card.data || {};
               const itemType = card.type || 'flashcard';
               const front = itemType === 'flashcard' ? (content.front || card.front || '') : JSON.stringify(content);
               const back = itemType === 'flashcard' ? (content.back || card.back || '') : '';
-              await flashcardRepository.create({
-                id: card.id || undefined,
-                deck_id: deck.id,
-                user_id: currentUserId ?? undefined,
+              return {
                 front,
                 back,
                 item_type: itemType,
                 content_json: JSON.stringify(content),
                 hint: card.hint || null,
                 explanation: card.explanation || null,
-                status: 'new',
-              } as any);
-            }
-          }
+              };
+            }),
+          });
         } catch (persistErr: any) {
           console.warn('[AIChatModal] ⚠️ Error persistiendo deck localmente (no crítico):', persistErr.message);
         }
@@ -747,7 +751,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
     if (intent.type === 'generate_deck') {
       setIsLoading(false);
-      await handleGenerateMaterial(intent.mode, intent.count);
+      await handleGenerateMaterial(intent.mode, intent.count, text);
       return;
     }
 
@@ -791,6 +795,18 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       cleanReply = cleanReply.replace(/!\[.*?\]\(.*?\)/g, '');
 
       setMessages(prev => [...prev, { role: 'assistant' as const, content: cleanReply }].slice(-6));
+      
+      if (data.directives && data.directives.length > 0) {
+        // Dispatch directives asynchronously so UI unblocks
+        aiInteractionCoordinator.handle(data as any, { 
+          subjectId: subjectId || undefined, 
+          userId: userId || undefined,
+          contextText: combinedContext
+        }).catch(err => {
+          console.warn('[AIChatModal] Error dispatching directives:', err);
+        });
+      }
+
       setIsLoading(false);
       setIsThinking(false);
       setStreamingContent(null);

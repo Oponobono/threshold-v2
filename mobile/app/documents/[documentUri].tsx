@@ -73,10 +73,11 @@ function setCached(key: string, model: DocumentModel) {
 }
 
 export default function DocumentViewerScreen() {
-  const { documentUri, documentTitle, documentId } = useLocalSearchParams<{
+  const { documentUri, documentTitle, documentId, targetPage } = useLocalSearchParams<{
     documentUri: string;
     documentTitle: string;
     documentId?: string;
+    targetPage?: string;
   }>();
   const router = useRouter();
 
@@ -219,6 +220,7 @@ export default function DocumentViewerScreen() {
           model={model}
           rendererRegistry={rendererRegistry}
           source={source ?? undefined}
+          initialPage={targetPage ? parseInt(targetPage, 10) : undefined}
         />
       )}
     </SafeAreaView>

@@ -22,5 +22,7 @@ export interface DocumentRenderer {
     highlightsRef?: MutableRefObject<any>,
     onHighlightTapped?: (id: string) => void,
     source?: DocumentSource,
+    anchorsRef?: MutableRefObject<any>,
+    onAnchorTapped?: (id: string) => void,
   ): unknown;
 }

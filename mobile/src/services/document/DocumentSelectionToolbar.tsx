@@ -11,6 +11,7 @@ interface DocumentSelectionToolbarProps {
   onCopy: () => void;
   onShare: () => void;
   onHighlight: (color: HighlightColor) => void;
+  onAnchor: () => void;
   onClose: () => void;
   onDelete?: () => void;
   bottomInset: number;
@@ -22,6 +23,7 @@ export function DocumentSelectionToolbar({
   onCopy,
   onShare,
   onHighlight,
+  onAnchor,
   onClose,
   onDelete,
   bottomInset,
@@ -69,6 +71,11 @@ export function DocumentSelectionToolbar({
         <TouchableOpacity style={styles.actionBtn} onPress={onShare}>
           <Ionicons name="share-outline" size={18} color={theme.colors.primary} />
           <Text style={styles.actionText}>Compartir</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionBtn} onPress={onAnchor}>
+          <Ionicons name="bookmark-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.actionText}>Anclar</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

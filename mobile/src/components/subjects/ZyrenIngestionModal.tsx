@@ -9,11 +9,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { fetchWithFallback } from '../../services/api/client';
-import { addLocalCard, recalculateLocalDeckCounters } from '../../services/localFlashcardService';
-import { studyNoteRepository } from '../../services/database';
-import 'react-native-get-random-values';
-import { v4 as uuidv4 } from 'uuid';
 import { extractTextFromImageHybrid, generateClassFlashcardsHybrid } from '../../services/hybridAIService';
+import { uuidv4 } from '../../utils/uuid';
+import { studyNoteRepository } from '../../services/database';
+import { DeckNamingService } from '../../services/domain/DeckNamingService';
 import type { CardDirection } from '../../services/api/types';
 import { styles } from '../../styles/ZyrenIngestionModal.styles';
 
@@ -289,37 +288,26 @@ export function ZyrenIngestionModal({
     }
     setStep('saving');
     try {
-      const deckId = uuidv4();
+      const { flashcardDomainService } = await import('../../services/domain/FlashcardDomainService');
       const userId = await import('../../services/api').then(m => m.getUserId());
       
-      const newDeck = {
-        id: deckId,
-        title: `${generatedTopic} — ${subjectName} (${new Date().toLocaleDateString('es')})`,
+      const deck = await flashcardDomainService.saveGeneratedDeck({
+        title: DeckNamingService.buildBaseDeckTitle({
+          topic: generatedTopic,
+          source: subjectName,
+        }),
         description: `Mazo generado por Zyren desde apuntes de clase`,
-        subject_id: subjectId || undefined,
-        subject_name: subjectName,
-        subject_color: subjectColor,
-        subject_icon: subjectIcon,
-        card_count: toSave.length,
-        user_id: String(userId || 0),
-        created_at: new Date().toISOString(),
-        review_count: 0,
-        learning_count: 0,
-        new_count: toSave.length,
-      };
+        subjectId: subjectId || undefined,
+        subjectName,
+        subjectColor,
+        subjectIcon,
+        cards: toSave.map((c: any) => ({
+          ...c,
+          direction, // pass direction if needed (wait, flashcardDomainService needs to handle direction)
+        })),
+      });
 
-      const { flashcardDeckRepository } = await import('../../services/database');
-      await flashcardDeckRepository.create(newDeck);
-
-      for (const card of toSave) {
-        addLocalCard(deckId, {
-          type: 'flashcard',
-          data: { front: card.front || card.question || card.pregunta, back: card.back || card.answer || card.respuesta },
-          direction,
-        });
-      }
-
-      recalculateLocalDeckCounters(deckId);
+      const deckId = deck.id;
 
       try {
         if (userId) {
@@ -336,9 +324,9 @@ export function ZyrenIngestionModal({
 
           const deckPayload = {
             id: deckId,
-            title: newDeck.title,
-            description: newDeck.description,
-            subject_id: newDeck.subject_id,
+            title: deck.title,
+            description: deck.description,
+            subject_id: deck.subject_id,
             cards: mmkvCards.map(c => ({
               id: c.id,
               front: c.front || c.content?.front || c.data?.front || '',

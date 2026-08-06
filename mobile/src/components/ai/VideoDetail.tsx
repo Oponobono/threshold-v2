@@ -36,10 +36,12 @@ import {
   upsertYouTubeTranscript,
   updateYouTubeVideo,
   getYouTubeSubtitles,
+  getUserId,
 } from '../../services/api';
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 import { formatTranscription } from '../../utils/transcriptionFormatter';
 import { summarizeWithFallback } from '../../utils/groqHelpers';
+import { DeckNamingService } from '../../services/domain/DeckNamingService';
 
 // ---------------------------------------------------------------------------
 // Constants & Directories
@@ -142,6 +144,11 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
   const [showFlashcardModal, setShowFlashcardModal] = useState(false);
   const [studyDeck, setStudyDeck] = useState<{ id: string; title: string; cards: any[] } | null>(null);
   const [showStudyScreen, setShowStudyScreen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState('');
+
+  useEffect(() => {
+    getUserId().then(id => setCurrentUserId(String(id))).catch(() => {});
+  }, []);
 
   const videoTitle = videoData?.title || 'Video de YouTube';
   const date = videoData?.created_at
@@ -544,9 +551,11 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         }}
         content={summary || transcription || ''}
         contentType="video"
-        title={videoData?.title || 'Video'}
+        title={DeckNamingService.buildBaseDeckTitle({
+          source: DeckNamingService.truncateSource(videoData?.title || 'Video de YouTube', 45),
+        })}
         subjectId={selectedSubjectId || ''}
-        userId={videoData?.user_id ? String(videoData.user_id) : ''}
+        userId={currentUserId}
       />
 
       {showStudyScreen && studyDeck && (

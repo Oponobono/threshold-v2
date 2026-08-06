@@ -32,6 +32,7 @@ import {
   AudioRecording,
   upsertAudioTranscript,
   updateAudioRecording,
+  getUserId,
 } from '../../services/api';
 
 import { SubjectPickerModal } from '../subjects/SubjectPickerModal';
@@ -39,6 +40,7 @@ import { AnimatedSubjectSelector } from '../animated/AnimatedSubjectSelector';
 import { WaveformBars } from '../audio/WaveformBars';
 import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 import { transcribeWithFallback, summarizeWithFallback } from '../../utils/groqHelpers';
+import { DeckNamingService } from '../../services/domain/DeckNamingService';
 
 import { formatTranscription } from '../../utils/transcriptionFormatter';
 
@@ -100,6 +102,11 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   const [showFlashcardModal, setShowFlashcardModal] = useState(false);
   const [studyDeck, setStudyDeck] = useState<{ id: string; title: string; cards: any[] } | null>(null);
   const [showStudyScreen, setShowStudyScreen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState('');
+
+  useEffect(() => {
+    getUserId().then(id => setCurrentUserId(String(id))).catch(() => {});
+  }, []);
 
   const [audioUri, setAudioUri] = useState<string>('');
 
@@ -637,9 +644,11 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         }}
         content={summary || transcription || ''}
         contentType="recording"
-        title={recordingData?.name || 'Recording'}
+        title={DeckNamingService.buildBaseDeckTitle({
+          source: DeckNamingService.truncateSource(recordingData?.name || recordingTitle, 40),
+        })}
         subjectId={selectedSubjectId || ''}
-        userId={recordingData?.user_id ? String(recordingData.user_id) : ''}
+        userId={currentUserId}
       />
 
       {/* Study Screen Modal */}

@@ -1,6 +1,7 @@
 import { AIProvider, AIRequest, AIResponse } from './AIProvider';
 import { runInference, isReady, loadModel } from '../../localInferenceService';
 import { useLocalAIStore } from '../../../store/useLocalAIStore';
+import { extractDirectives } from '../core/ResponseInterpreter';
 
 export class LocalProvider implements AIProvider {
   readonly name = 'local';
@@ -49,12 +50,16 @@ export class LocalProvider implements AIProvider {
     const latencyMs = Date.now() - startTime;
     const modelLabel = Object.entries(useLocalAIStore.getState().downloadedModels)
       .find(([, v]) => v === modelId)?.[0] || modelId;
+      
+    const rawContent = result.text || '';
+    const { cleanContent, directives } = extractDirectives(rawContent);
 
     return {
-      content: result.text || '',
+      content: cleanContent,
       provider: 'local',
       model: modelLabel,
       latencyMs,
+      ...(directives.length > 0 && { directives }),
     };
   }
 }

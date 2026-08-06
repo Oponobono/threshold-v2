@@ -20,3 +20,4 @@ export { youTubeTranscriptRepository, type YouTubeTranscript } from './YouTubeTr
 export { AiChatRepository, aiChatRepository, type AiChat } from './AiChatRepository';
 export { UserPreferenceRepository, userPreferenceRepository, type UserPreference } from './UserPreferenceRepository';
 export { StudyNoteRepository, studyNoteRepository, type StudyNote } from './StudyNoteRepository';
+export { DocumentAnchorRepository, documentAnchorRepository, type DocumentAnchorRow } from './DocumentAnchorRepository';

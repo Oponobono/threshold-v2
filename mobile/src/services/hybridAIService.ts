@@ -53,7 +53,7 @@ export async function sendHybridChatMessage(
   return {
     reply: { content: result.content },
     model: `${result.provider}:${result.model}`,
-    ...(result.deckAction ? { deck: result.deckAction } : {}),
+    ...(result.directives && { directives: result.directives }),
   };
 }
 

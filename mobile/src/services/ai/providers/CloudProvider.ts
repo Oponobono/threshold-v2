@@ -1,5 +1,6 @@
 import { AIProvider, AIRequest, AIResponse } from './AIProvider';
 import { fetchWithFallback } from '../../api/client';
+import { extractDirectives } from '../core/ResponseInterpreter';
 
 export class CloudProvider implements AIProvider {
   readonly name = 'cloud';
@@ -45,12 +46,16 @@ export class CloudProvider implements AIProvider {
 
     const data = await response.json();
     const latencyMs = Date.now() - startTime;
+    
+    const rawContent = data.response || data.content || '';
+    const { cleanContent, directives } = extractDirectives(rawContent);
 
     return {
-      content: data.response || data.content || '',
+      content: cleanContent,
       provider: 'cloud',
       model: data.model || 'groq',
       latencyMs,
+      ...(directives.length > 0 && { directives }),
     };
   }
 }

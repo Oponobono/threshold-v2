@@ -1662,6 +1662,58 @@ const tableSchema = {
       { name: 'deleted_at', type: 'TEXT' },
     ]
   },
+  document_anchors: {
+    sqlite: `
+      CREATE TABLE IF NOT EXISTS document_anchors (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        document_id TEXT NOT NULL,
+        page_index INTEGER NOT NULL,
+        block_id TEXT NOT NULL,
+        char_start INTEGER,
+        char_end INTEGER,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        metadata TEXT,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 1,
+        last_modified_by TEXT,
+        deleted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    postgres: `
+      CREATE TABLE IF NOT EXISTS document_anchors (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        document_id TEXT NOT NULL,
+        page_index INTEGER NOT NULL,
+        block_id TEXT NOT NULL,
+        char_start INTEGER,
+        char_end INTEGER,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        metadata TEXT,
+        sync_version INTEGER DEFAULT 0,
+        version_number INTEGER DEFAULT 1,
+        last_modified_by TEXT,
+        deleted_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `,
+    columns: [
+      { name: 'char_start', type: 'INTEGER' },
+      { name: 'char_end', type: 'INTEGER' },
+      { name: 'metadata', type: 'TEXT' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'version_number', type: 'INTEGER DEFAULT 1' },
+      { name: 'last_modified_by', type: 'TEXT' },
+      { name: 'deleted_at', type: 'TEXT' },
+    ]
+  },
 };
 
 module.exports = tableSchema;

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { generateFlashcardsFromText, generateFlashcardsFromImage } from '../services/api/flashcards';
 import { useTranslation } from 'react-i18next';
 import { StudyMode } from '../services/api/types';
+import { getUserId } from '../services/api/auth';
+import { DeckUniquenessService } from '../services/domain/DeckUniquenessService';
 
 interface GenerateCardsParams {
   text?: string;
@@ -74,11 +76,15 @@ export const useFlashcardGenerator = () => {
 
       let result;
 
+      // Resolve unique title via the domain service before hitting the API
+      const uid = params.userId || String(await getUserId() || '');
+      const uniqueTitle = await DeckUniquenessService.ensureUniqueTitle(uid, params.title);
+
       if (params.imageBase64) {
         result = await generateFlashcardsFromImage({
           image_base64: params.imageBase64,
           count: params.count,
-          title: params.title,
+          title: uniqueTitle,
           subject_id: params.subjectId,
           user_id: params.userId,
           mode: params.mode || 'flashcard',
@@ -87,7 +93,7 @@ export const useFlashcardGenerator = () => {
         result = await generateFlashcardsFromText({
           text: params.text,
           count: params.count,
-          title: params.title,
+          title: uniqueTitle,
           subject_id: params.subjectId,
           user_id: params.userId,
           mode: params.mode || 'flashcard',

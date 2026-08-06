@@ -467,190 +467,7 @@ ${deckIntent.shouldGenerate ? deckGenerationInstructions : ''}`;
     }
 
     const duration = Date.now() - startTime;
-    console.log(`ðŸ“¡ [${provider.toUpperCase()}Telemetry] Respuesta recibida en ${duration}ms.`);
-    console.log(`âœ… Respuesta exitosa de ${provider.toUpperCase()}`);
-
-    // ðŸ›¡ï¸ Fase 3: Post-filtrar la respuesta en busca de fugas del system prompt
-    const leakCheck = detectSystemPromptLeak(result.reply.content);
-    if (!leakCheck.safe) {
-      console.warn(`[PromptShield] âš ï¸ Posible fuga de system prompt detectada: ${leakCheck.reason}`);
-      result.reply.content = 'Como tu tutor Zyren, me enfoco exclusivamente en temas acadÃ©micos. Â¿En quÃ© materia necesitas ayuda hoy?';
-    }
-    
-    const context_truncated = context_text && context_text.length > MAX_CONTEXT_CHARS;
-
-    // â”€â”€â”€ DETECCIÃ“N DE DECK_ACTION y GENERACIÃ“N AUTOMÃTICA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    let deckData = null;
-    let cleanReplyContent = result.reply.content;
-    // Strip markdown images from response
-    cleanReplyContent = cleanReplyContent.replace(/!\[.*?\]\(.*?\)/g, '');
-    
-    const deckActionPattern = /%+DECK_ACTION%+([\s\S]+?)%+END%+/;
-    const deckMatch = result.reply.content.match(deckActionPattern);
-    
-    if (deckMatch && deckMatch[1]) {
-      try {
-        const deckAction = JSON.parse(deckMatch[1]);
-        console.log(`[DeckGeneration] Generando mazo: modo=${deckAction.mode}, count=${deckAction.count}, provider=${provider}`);
-        
-        // Limpiar la respuesta del bloque DECK_ACTION
-        cleanReplyContent = result.reply.content.replace(deckActionPattern, '').trim();
-        // Strip markdown images from response
-        cleanReplyContent = cleanReplyContent.replace(/!\[.*?\]\(.*?\)/g, '');
-        
-        // Generar el mazo con contexto usando el MISMO PROVIDER del chat
-        const activeContext = context_text || (messages && messages.length > 0 
-          ? messages.map(m => `${m.role === 'user' ? 'Estudiante' : 'Zyren'}: ${m.content}`).join('\n\n')
-          : '');
-
-        if (activeContext && activeContext.trim()) {
-          try {
-            let generatedDeck = [];
-            let deckProvider = provider;
-
-            // INTENTO 1: Usar el provider elegido por el usuario para el chat
-            try {
-              if (provider === 'gemini') {
-                console.log(`[DeckGeneration] Intentando con Gemini (provider elegido en chat)...`);
-                generatedDeck = await geminiService.generateFlashcardsFromText(
-                  activeContext,
-                  deckAction.count || 10
-                );
-              } else {
-                console.log(`[DeckGeneration] Intentando con Groq (provider elegido en chat)...`);
-                generatedDeck = await geminiService.generateFlashcardsWithGroq(
-                  activeContext,
-                  deckAction.count || 10
-                );
-              }
-            } catch (primaryErr) {
-              console.warn(`[DeckGeneration] âš ï¸ ${provider.toUpperCase()} fallÃ³, intentando fallback...`, primaryErr.message);
-              
-              // FALLBACK: Intentar con el otro provider
-              const fallbackProvider = provider === 'gemini' ? 'groq' : 'gemini';
-              try {
-                if (fallbackProvider === 'gemini') {
-                  console.log(`[DeckGeneration] Fallback a Gemini...`);
-                  generatedDeck = await geminiService.generateFlashcardsFromText(
-                    activeContext,
-                    deckAction.count || 10
-                  );
-                } else {
-                  console.log(`[DeckGeneration] Fallback a Groq...`);
-                  generatedDeck = await geminiService.generateFlashcardsWithGroq(
-                    activeContext,
-                    deckAction.count || 10
-                  );
-                }
-                deckProvider = fallbackProvider;
-              } catch (fallbackErr) {
-                console.error(`[DeckGeneration] âŒ Ambos providers fallaron`);
-                throw fallbackErr;
-              }
-            }
-
-            // Obtener user_id y subject_id de la sesiÃ³n para persistir el mazo
-            const { session_id: sessionId } = req.body;
-            let persistedDeck = null;
-            
-            if (sessionId && generatedDeck.length > 0) {
-              try {
-                // Obtener info de la sesiÃ³n
-                const session = await new Promise((resolve, reject) => {
-                  db.get(
-                    'SELECT user_id, subject_id FROM ai_chat_sessions WHERE id = ?',
-                    [sessionId],
-                    (err, row) => err ? reject(err) : resolve(row)
-                  );
-                });
-
-                if (session && session.user_id && session.subject_id) {
-                  // Crear el mazo
-                  const deckTitle = `Mazo ${deckAction.mode === 'mixed' ? 'Mixto' : deckAction.mode} - ${new Date().toLocaleDateString('es-ES')}`;
-                  const deckDesc = `Mazo generado automÃ¡ticamente desde chat con Zyren (${deckProvider})`;
-
-                  const newDeckId = uuidv4();
-                  persistedDeck = await new Promise((resolve, reject) => {
-                    db.run(
-                      `INSERT INTO flashcard_decks (id, subject_id, user_id, title, description) VALUES (?, ?, ?, ?, ?)`,
-                      [newDeckId, session.subject_id, session.user_id, deckTitle, deckDesc],
-                      function(err) {
-                        if (err) reject(err);
-                        else resolve({ id: newDeckId, title: deckTitle, description: deckDesc });
-                      }
-                    );
-                  });
-
-                  // Insertar los Ã­tems generados
-                  const insertPromises = generatedDeck.map(item => {
-                    return new Promise((resolve, reject) => {
-                      const itemType = item.type || 'flashcard';
-                      const content = item.data || {};
-                      const front = itemType === 'flashcard' ? (content.front || '') : '';
-                      const back = itemType === 'flashcard' ? (content.back || '') : '';
-                      const contentStr = JSON.stringify(content);
-                      const hint = item.hint || null;
-                      const explanation = item.explanation || null;
-                      const direction = item.direction || 'forward';
-                      const sourceContextObj = item.source_context || null;
-                      const sourceContextStr = sourceContextObj ? JSON.stringify(sourceContextObj) : null;
-
-                      db.run(
-                        `INSERT INTO flashcards (deck_id, front, back, item_type, content_json, hint, explanation, status, direction, source_context) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)`,
-                        [persistedDeck.id, front, back, itemType, contentStr, hint, explanation, direction, sourceContextStr],
-                        (err) => {
-                          if (err) reject(err);
-                          else resolve();
-                        }
-                      );
-                    });
-                  });
-
-                  await Promise.all(insertPromises);
-                  console.log(`[DeckGeneration] âœ… Mazo guardado con ID=${persistedDeck.id} (${generatedDeck.length} Ã­tems)`);
-                } else {
-                  console.warn('[DeckGeneration] âš ï¸ No se pudo obtener sesiÃ³n para persistencia');
-                }
-              } catch (persistErr) {
-                console.error('[DeckGeneration] Error persistiendo mazo:', persistErr.message);
-              }
-            }
-
-            deckData = {
-              success: true,
-              mode: deckAction.mode,
-              count: deckAction.count,
-              items: generatedDeck,
-              persisted: !!persistedDeck,
-              ...(persistedDeck && { deckId: persistedDeck.id, deckTitle: persistedDeck.title }),
-              generatedAt: new Date().toISOString(),
-              provider: deckProvider,
-              fallbackUsed: deckProvider !== provider,
-              note: persistedDeck 
-                ? `âœ… Mazo creado en la lista (ID: ${persistedDeck.id})`
-                : `âš ï¸ Ãtems generados pero no guardados. Usa "Crear mazo" en el panel.`
-            };
-            
-            console.log(`[DeckGeneration] âœ… ${generatedDeck.length} Ã­tems generados (${deckProvider})`);
-          } catch (deckErr) {
-            console.error(`[DeckGeneration] Error generando mazo:`, deckErr.message);
-            deckData = {
-              success: false,
-              error: 'No se pudo generar el mazo automÃ¡ticamente',
-              details: deckErr.message
-            };
-          }
-        } else {
-          console.warn('[DeckGeneration] No hay contexto disponible para generar mazo');
-          deckData = {
-            success: false,
-            error: 'No hay material disponible para generar el mazo. Proporciona documentos o texto de contexto.'
-          };
-        }
-      } catch (parseErr) {
-        console.warn('[DeckGeneration] Error parseando DECK_ACTION:', parseErr.message);
-      }
-    }
+    console.log(`[${provider.toUpperCase()}Telemetry] Respuesta recibida en ${duration}ms.`);
 
     // Guardar en el historial si se proporciona session_id
     const { session_id } = req.body;
@@ -659,19 +476,14 @@ ${deckIntent.shouldGenerate ? deckGenerationInstructions : ''}`;
       if (lastUserMsg.role === 'user') {
         db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'user', lastUserMsg.content]);
       }
-      db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'assistant', cleanReplyContent]);
+      db.run('INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, ?, ?)', [session_id, 'assistant', result.reply.content]);
     }
 
     res.json({ 
-      reply: {
-        ...result.reply,
-        content: cleanReplyContent
-      },
+      reply: result.reply,
       provider,
       context_truncated,
-      duration,
-      ...(deckData && { deck: deckData }), // Incluir datos del mazo si se generÃ³
-      deckActionSignal: deckMatch ? deckMatch[1] : null
+      duration
     });
   } catch (err) {
     console.error(`ðŸ’¥ Error crÃ­tico en aiChat [${provider}]:`, err);
