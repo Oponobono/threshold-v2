@@ -24,19 +24,36 @@ const _getDateFormatter = (() => {
   };
 })();
 
-export interface UnifiedActivityItem {
+export type UnifiedActivityType =
+  | 'assessment'
+  | 'deck'
+  | 'flashcard'
+  | 'study'
+  | 'calendar'
+  | 'subject'
+  | 'course'
+  | 'youtube'
+  | 'recording'
+  | 'note'
+  | 'document';
+
+export interface UnifiedActivityDraft {
   id: string;
   title: string;
   subtitle: string;
   date: number;
   subjectId: string;
+  type: UnifiedActivityType;
+}
+
+export interface UnifiedActivityItem extends UnifiedActivityDraft {
+  dateStr: string;
   subjectName?: string;
   subjectColor?: string;
-  type: 'assessment' | 'deck' | 'flashcard' | 'study' | 'calendar' | 'subject' | 'course' | 'youtube' | 'recording' | 'note' | 'document';
   relativeTime?: string;
 }
 
-export const ACTIVITY_CONFIG: Record<UnifiedActivityItem['type'], { icon: string; color: string; label: string }> = {
+export const ACTIVITY_CONFIG: Record<UnifiedActivityType, { icon: string; color: string; label: string }> = {
   assessment: { icon: 'clipboard-outline',      color: '#3498db', label: 'Evaluación' },
   deck:       { icon: 'layers-outline',         color: '#e67e22', label: 'Mazo' },
   flashcard:  { icon: 'flash-outline',          color: '#f39c12', label: 'Carta' },
@@ -277,7 +294,7 @@ export function useSubjects(t: any, lang?: string) {
   }, [localCriticalSubjects]);
   const recentActivity = useMemo(() => {
     return perfDiagnostics.measure('subjects.recentActivity', () => {
-      const items: UnifiedActivityItem[] = [];
+      const items: UnifiedActivityDraft[] = [];
       const now = Date.now();
       const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
       const cutoff = now - SEVEN_DAYS_MS;
@@ -469,7 +486,7 @@ export function useSubjects(t: any, lang?: string) {
 
     // Enriquecer con metadata de la materia y ordenar
     const sorted = items
-      .map(item => {
+      .map((item): UnifiedActivityItem => {
         const subject = subjectMap.get(item.subjectId);
         return {
           ...item,
