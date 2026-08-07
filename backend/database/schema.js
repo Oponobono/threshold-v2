@@ -1542,7 +1542,7 @@ const tableSchema = {
         UNIQUE(entity_type, entity_id, user_id)
       )
     `,
-    postgres: `
+      postgres: `
       CREATE TABLE IF NOT EXISTS sync_deletions (
         id SERIAL PRIMARY KEY,
         entity_type TEXT NOT NULL,
@@ -1553,6 +1553,9 @@ const tableSchema = {
         UNIQUE(entity_type, entity_id, user_id)
       )
     `,
+    columns: [
+      { name: 'deletion_version', type: 'INTEGER' },
+    ],
   },
   study_notes: {
     sqlite: `
