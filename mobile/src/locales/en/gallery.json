@@ -61,6 +61,8 @@
   "photoCount_zero": "0 photos",
   "photo": "Photo",
   "linkPhoto": "Link a whiteboard photo to this subject",
+  "saveTo": "Save to",
+  "selectSubject": "Select subject",
   "deletePhotoTitle": "Delete photo",
   "deletePhotoConfirm": "Are you sure you want to permanently delete this photo?",
   "deletePhotoError": "There was an error trying to delete the photo.",

@@ -87,5 +87,7 @@
   "info": "Info",
   "tapToContinue": "Tap to continue",
   "understood": "Got it",
-  "errorRecordingReview": "An error occurred while recording the review."
+  "errorRecordingReview": "An error occurred while recording the review.",
+  "noResults": "No results",
+  "searchPlaceholder": "Search..."
 }

@@ -9,6 +9,7 @@ import { theme } from '../../styles/theme';
 import { AutoScrollText } from '../ui/AutoScrollText';
 import { type Subject } from '../../services/api';
 import { SCALE_MAX } from '../../utils/grades';
+import { toVividAccent } from '../../utils/subjectThresholdHelpers';
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
 
@@ -25,6 +26,9 @@ export const SubjectTile = ({ subject, onEdit, onDelete }: SubjectTileProps) => 
   const rawAvg = typeof subject.avg_score === 'number' ? subject.avg_score : 0;
   const avg = rawAvg > SCALE_MAX * 2 ? (rawAvg / 100) * SCALE_MAX : rawAvg;
   const completion = typeof subject.completion_percent === 'number' ? subject.completion_percent : 0;
+  const isComplete = completion >= 100;
+  const avgLabel = subject.display_label ? `≈ ${subject.display_label}` : avg.toFixed(1);
+  const accentColor = subject.color ? toVividAccent(subject.color) : theme.colors.primary;
 
   return (
     <View style={{ overflow: 'visible' }}>
@@ -33,27 +37,52 @@ export const SubjectTile = ({ subject, onEdit, onDelete }: SubjectTileProps) => 
         activeOpacity={0.7}
         onPress={() => router.push(`/subjects/${subject.id}`)}
       >
-        <TouchableOpacity
-          style={{ position: 'absolute', top: 14, right: 8, zIndex: 10, padding: 4 }}
-          onPress={() => setMenuVisible(true)}
-        >
-          <Ionicons name="ellipsis-vertical" size={14} color={theme.colors.text.secondary} />
-        </TouchableOpacity>
-
-        <View style={[styles.subjectBadge, { backgroundColor: subject.color || '#CCCCCC' }]}>
-          <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />
+        <View style={styles.subjectTileNameRow}>
+          <View style={[styles.subjectBadge, { backgroundColor: accentColor + '20' }]}>
+            <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={accentColor} />
+          </View>
+          <TouchableOpacity
+            style={styles.subjectTileMenuBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => setMenuVisible(true)}
+          >
+            <Ionicons name="ellipsis-vertical" size={14} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
         </View>
-        <View style={globalStyles.flex1}>
-          <Text style={styles.subjectTileName} numberOfLines={1}>
-            {subject.name || ((subject as any)._isPending ? t('common.pending') || 'Pendiente' : t('dashboard.newSubject.title') || 'Materia')}
-          </Text>
-          <Text style={styles.subjectTileMeta} numberOfLines={1}>
-            {subject.professor || t('dashboard.newSubject.noProfessor')}
-          </Text>
-          <Text style={styles.subjectTileStats}>
-            {subject.display_label ? `≈ ${subject.display_label}` : t('dashboard.subjectCardAvg', { avg: avg.toFixed(1) })}
-          </Text>
-          <Text style={styles.subjectTileStats}>{t('dashboard.subjectCardCompletion', { completion: completion.toFixed(0) })}</Text>
+
+        <Text style={styles.subjectTileName} numberOfLines={1}>
+          {subject.name || ((subject as any)._isPending ? t('common.pending') || 'Pendiente' : t('dashboard.newSubject.title') || 'Materia')}
+        </Text>
+        <Text style={styles.subjectTileMeta} numberOfLines={1}>
+          {subject.professor || t('dashboard.newSubject.noProfessor')}
+        </Text>
+
+        <View style={styles.subjectTileBottomRow}>
+          <View style={styles.subjectTileAvg}>
+            <Ionicons name="star" size={11} color={theme.colors.text.secondary} />
+            <Text style={styles.subjectTileAvgText}>{avgLabel}</Text>
+          </View>
+          {isComplete ? (
+            <View style={styles.subjectTileChip}>
+              <Ionicons name="checkmark-circle" size={11} color={theme.colors.success} />
+              <Text style={styles.subjectTileChipText}>
+                {t('dashboard.subjectCardComplete', { defaultValue: 'Completa' })}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.subjectTileChip}>
+              <Text style={styles.subjectTileChipText}>{completion.toFixed(0)}%</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.subjectTileProgressBg}>
+          <View
+            style={[
+              styles.subjectTileProgressFill,
+              { width: `${Math.min(Math.round(completion), 100)}%` as any, backgroundColor: accentColor },
+            ]}
+          />
         </View>
       </TouchableOpacity>
 

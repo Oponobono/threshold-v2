@@ -50,3 +50,54 @@ export const darkenColor = (hex: string, percent: number): string => {
 
   return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
 };
+
+/**
+ * Deriva un acento legible y con identidad de hue a partir de un color de materia.
+ * La paleta de materias guarda pasteles casi-blancos (saturación ~3%), que al usarse
+ * tal cual o al oscurecerse se ven grises e indistinguibles. Este helper fuerza una
+ * saturación viva y una luminosidad legible conservando el hue original del color.
+ * @param hex - Color base en formato #RGB o #RRGGBB.
+ * @returns Acento en #RRGGBB, o un gris neutro si el color no tiene hue distinguible.
+ */
+export const toVividAccent = (hex: string): string => {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return '#666666';
+  let clean = hex.replace('#', '');
+  if (clean.length === 3) clean = clean.split('').map(c => c + c).join('');
+  if (clean.length !== 6) return hex;
+
+  const r = parseInt(clean.substring(0, 2), 16) / 255;
+  const g = parseInt(clean.substring(2, 4), 16) / 255;
+  const b = parseInt(clean.substring(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+
+  if (d !== 0) {
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+
+  if (s < 0.02) return '#666666';
+
+  const targetS = 0.65;
+  const targetL = 0.48;
+  const chroma = (1 - Math.abs(2 * targetL - 1)) * targetS;
+  const x = chroma * (1 - Math.abs((h * 6) % 2 - 1));
+  let rr = 0, gg = 0, bb = 0;
+  const h2 = h * 6;
+  if (h2 < 1) { rr = chroma; gg = x; }
+  else if (h2 < 2) { rr = x; gg = chroma; }
+  else if (h2 < 3) { gg = chroma; bb = x; }
+  else if (h2 < 4) { gg = x; bb = chroma; }
+  else if (h2 < 5) { rr = x; bb = chroma; }
+  else { rr = chroma; bb = x; }
+  const m = targetL - chroma / 2;
+  const toHex = (v: number) => Math.max(0, Math.min(255, Math.round((v + m) * 255))).toString(16).padStart(2, '0');
+  return `#${toHex(rr)}${toHex(gg)}${toHex(bb)}`;
+};

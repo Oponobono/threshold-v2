@@ -55,12 +55,6 @@ export function useGallery(t: any) {
   const hadInitialDataRef = useRef(storePhotos.length > 0);
 
   useEffect(() => {
-    if (storePhotos.length > 0) {
-      setPhotos(enrichPhotos(storePhotos, storeSubjects, t));
-    }
-  }, [storePhotos, storeSubjects, t]);
-
-  useEffect(() => {
     if (storeCourses.length > 0 && courses.length === 0) {
       setCourses(storeCourses as Course[]);
     }

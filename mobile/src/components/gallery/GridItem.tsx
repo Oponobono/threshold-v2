@@ -72,6 +72,25 @@ export const GridItem = memo(function GridItem({
     setActiveIndex(Math.round(index));
   };
 
+  const renderPage = useCallback(
+    ({ item: p }: { item: GalleryPhoto }) => (
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={() => onPress(p, item)}
+        style={{ width: colWidth, height: 96 }}
+      >
+        <PhotoWithFallback
+          uri={p.local_uri}
+          cloudUri={p.cloud_url}
+          style={galleryStyles.gridImageFull}
+          contentFit="cover"
+          transition={200}
+        />
+      </TouchableOpacity>
+    ),
+    [item, colWidth, onPress]
+  );
+
   const showMenu = () => {
     alertRef.show({
       title: firstItem.subject_name || t('common.options'),
@@ -93,35 +112,16 @@ export const GridItem = memo(function GridItem({
           showsHorizontalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          removeClippedSubviews={false}
+          initialNumToRender={item.length}
+          maxToRenderPerBatch={item.length}
+          windowSize={item.length + 2}
           keyExtractor={(p) => p.id?.toString() || Math.random().toString()}
-          renderItem={({ item: p }) => (
-            <TouchableOpacity activeOpacity={0.88} onPress={() => onPress(p, item)} style={{ width: colWidth, height: 110 }}>
-              <PhotoWithFallback
-                uri={p.local_uri}
-                cloudUri={p.cloud_url}
-                style={galleryStyles.gridImageFull}
-                contentFit="cover"
-                transition={200}
-              />
-            </TouchableOpacity>
-          )}
+          renderItem={renderPage}
         />
-        {item.length > 1 && (
-          <View style={galleryStyles.dotsRow}>
-            {item.map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  galleryStyles.dot,
-                  { backgroundColor: i === activeIndex ? theme.colors.white : 'rgba(255,255,255,0.5)' },
-                ]}
-              />
-            ))}
-          </View>
-        )}
         {item[activeIndex]?.ocr_text ? (
           <View style={galleryStyles.ocrOverlay}>
-            <MaterialCommunityIcons name="text-recognition" size={10} color={theme.colors.primary} />
+            <MaterialCommunityIcons name="text-recognition" size={10} color="#fff" />
             <Text style={galleryStyles.ocrOverlayText}>OCR</Text>
           </View>
         ) : null}
@@ -150,6 +150,12 @@ export const GridItem = memo(function GridItem({
         disabled={!item[activeIndex]?.ocr_text}
         activeOpacity={item[activeIndex]?.ocr_text ? 0.7 : 1}
       >
+        <View style={galleryStyles.dotsRow}>
+          {item.length > 1 &&
+            item.map((_, i) => (
+              <View key={i} style={[galleryStyles.dot, i === activeIndex && galleryStyles.dotActive]} />
+            ))}
+        </View>
         <View style={[globalStyles.rowCenter, globalStyles.mb4, { gap: 4 }]}>
           <View style={[galleryStyles.subjectDot, { backgroundColor: firstItem.subject_color || theme.colors.primary }]} />
           <Text style={galleryStyles.gridSubject} numberOfLines={1}>{firstItem.subject_name}</Text>

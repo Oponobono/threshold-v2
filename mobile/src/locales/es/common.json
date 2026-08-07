@@ -86,5 +86,7 @@
   "info": "Info",
   "tapToContinue": "Toca para continuar",
   "understood": "Entendido",
-  "errorRecordingReview": "Ocurrió un error al grabar la revisión."
+  "errorRecordingReview": "Ocurrió un error al grabar la revisión.",
+  "noResults": "Sin resultados",
+  "searchPlaceholder": "Buscar..."
 }

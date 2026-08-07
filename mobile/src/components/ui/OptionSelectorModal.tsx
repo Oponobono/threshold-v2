@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, TouchableWithoutFeedback, StyleSheet, Modal } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, TouchableWithoutFeedback, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
@@ -23,6 +23,9 @@ interface OptionSelectorModalProps {
   allowClear?: boolean;
   clearLabel?: string;
   cancelLabel?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  emptyLabel?: string;
 }
 
 export const OptionSelectorModal: React.FC<OptionSelectorModalProps> = ({
@@ -35,9 +38,23 @@ export const OptionSelectorModal: React.FC<OptionSelectorModalProps> = ({
   allowClear = true,
   clearLabel = 'Quitar selección',
   cancelLabel = 'Cancelar',
+  searchable = false,
+  searchPlaceholder = 'Buscar...',
+  emptyLabel = 'Sin resultados',
 }) => {
   const insets = useSafeAreaInsets();
   const mountTime = React.useRef(0);
+  const [query, setQuery] = React.useState('');
+
+  React.useEffect(() => {
+    if (!visible) setQuery('');
+  }, [visible]);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!searchable || !query.trim()) return options;
+    const q = query.trim().toLowerCase();
+    return options.filter((o) => o.name.toLowerCase().includes(q));
+  }, [options, query, searchable]);
 
   if (visible && mountTime.current === 0) {
     mountTime.current = Date.now();
@@ -78,10 +95,30 @@ export const OptionSelectorModal: React.FC<OptionSelectorModalProps> = ({
             <View style={[styles.sheetContent, { maxHeight: '70%', paddingBottom: Math.max(insets.bottom, 20) }]}>
               <Text style={[styles.sheetTitle, { marginBottom: 16 }]}>{title}</Text>
               
+              {searchable && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.inputBackground, borderRadius: 12, paddingHorizontal: 12, marginBottom: 12, height: 38 }}>
+                  <Feather name="search" size={16} color={theme.colors.text.secondary} style={{ marginRight: 8 }} />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder={searchPlaceholder}
+                    placeholderTextColor={theme.colors.text.secondary}
+                    style={{ flex: 1, fontSize: 14, color: theme.colors.text.primary, paddingVertical: 0 }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              )}
+              
               <FlatList
-                data={options}
+                data={filteredOptions}
                 keyExtractor={(item) => item.id}
                 showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  searchable && filteredOptions.length === 0 ? (
+                    <Text style={{ color: theme.colors.text.secondary, textAlign: 'center', padding: 16 }}>{emptyLabel}</Text>
+                  ) : null
+                }
                 renderItem={({ item }) => {
                   const isSelected = selectedId === item.id;
                   return (

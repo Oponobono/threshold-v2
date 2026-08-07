@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, FlatList, RefreshControl } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { alertRef } from '../../src/components/ui/CustomAlert';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -53,13 +53,14 @@ import { dashboardTelemetry } from '../../src/performance/DashboardTelemetry';
 
 const SUBJECT_LOOP_THRESHOLD = 4;
 const SUBJECT_LOOP_MULTIPLIER = 16;
-const SUBJECT_CARD_WIDTH = 160;
-const SUBJECT_CARD_GAP = 12;
+const SUBJECT_CARD_WIDTH = 144;
+const SUBJECT_CARD_GAP = 10;
 
 
 export default function HybridDashboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   // ── Selectores individuales del store para minimizar re-renders ──
   const subjects = useDataStore(s => s.subjects);
   const assessments = useDataStore(s => s.assessments);
@@ -1131,33 +1132,33 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
       {/* CREATION MENU MODAL */}
       <Modal visible={isCreationMenuVisible} transparent animationType="fade" onRequestClose={() => setIsCreationMenuVisible(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setIsCreationMenuVisible(false)}>
-          <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }} onPress={() => null}>
+          <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 16 + insets.bottom }} onPress={() => null}>
             <View style={{ width: 40, height: 4, backgroundColor: theme.colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
             <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 16 }}>¿Qué deseas crear?</Text>
             
             <TouchableOpacity 
               style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16, marginBottom: 12 }}
-              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsSubjectModalVisible(true), 300); }}
-            >
-              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
-                <Ionicons name="book" size={24} color={theme.colors.primary} />
-              </View>
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
-                <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Para clases individuales de tu Universidad</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16 }}
               onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => { setEditingCourse(null); setIsCourseModalVisible(true); }, 300); }}
             >
               <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#FF950020', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
                 <Ionicons name="layers" size={24} color="#FF9500" />
               </View>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nuevo Curso</Text>
                 <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Agrupa materias de Udemy, Platzi, etc.</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: theme.colors.background, borderRadius: 16 }}
+              onPress={() => { setIsCreationMenuVisible(false); setTimeout(() => setIsSubjectModalVisible(true), 300); }}
+            >
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                <Ionicons name="book" size={24} color={theme.colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginTop: 4 }}>Para clases individuales de tu Universidad</Text>
               </View>
             </TouchableOpacity>
           </Pressable>

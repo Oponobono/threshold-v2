@@ -7,6 +7,7 @@ import { theme } from '../../styles/theme';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
 import { type Subject } from '../../services/api';
 import { SCALE_MAX } from '../../utils/grades';
+import { toVividAccent } from '../../utils/subjectThresholdHelpers';
 
 // ─── SubjectTile ──────────────────────────────────────────────────────────────
 export const SubjectTile = React.memo(({ subject }: { subject: Subject }) => {
@@ -15,6 +16,9 @@ export const SubjectTile = React.memo(({ subject }: { subject: Subject }) => {
   const rawAvg = typeof subject.avg_score === 'number' ? subject.avg_score : 0;
   const avg = rawAvg > SCALE_MAX * 2 ? (rawAvg / 100) * SCALE_MAX : rawAvg;
   const completion = typeof subject.completion_percent === 'number' ? subject.completion_percent : 0;
+  const isComplete = completion >= 100;
+  const avgLabel = subject.display_label ? `≈ ${subject.display_label}` : avg.toFixed(1);
+  const accentColor = subject.color ? toVividAccent(subject.color) : theme.colors.primary;
 
   return (
     <TouchableOpacity
@@ -22,18 +26,42 @@ export const SubjectTile = React.memo(({ subject }: { subject: Subject }) => {
       activeOpacity={0.7}
       onPress={() => router.push(`/subjects/${subject.id}`)}
     >
-      <View style={[styles.subjectBadge, { backgroundColor: subject.color || '#CCCCCC' }]}>
-        <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={theme.colors.text.primary} />
+      <View style={styles.subjectTileNameRow}>
+        <View style={[styles.subjectBadge, { backgroundColor: accentColor + '20' }]}>
+          <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={accentColor} />
+        </View>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.subjectTileName} numberOfLines={1}>{subject.name}</Text>
-        <Text style={styles.subjectTileMeta} numberOfLines={1}>
-          {subject.professor || t('dashboard.newSubject.noProfessor')}
-        </Text>
-        <Text style={styles.subjectTileStats}>
-          {subject.display_label ? `≈ ${subject.display_label}` : t('dashboard.subjectCardAvg', { avg: avg.toFixed(1) })}
-        </Text>
-        <Text style={styles.subjectTileStats}>{t('dashboard.subjectCardCompletion', { completion: completion.toFixed(0) })}</Text>
+      <Text style={styles.subjectTileName} numberOfLines={1}>{subject.name}</Text>
+      <Text style={styles.subjectTileMeta} numberOfLines={1}>
+        {subject.professor || t('dashboard.newSubject.noProfessor')}
+      </Text>
+
+      <View style={styles.subjectTileBottomRow}>
+        <View style={styles.subjectTileAvg}>
+          <Ionicons name="star" size={11} color={theme.colors.text.secondary} />
+          <Text style={styles.subjectTileAvgText}>{avgLabel}</Text>
+        </View>
+        {isComplete ? (
+          <View style={styles.subjectTileChip}>
+            <Ionicons name="checkmark-circle" size={11} color={theme.colors.success} />
+            <Text style={styles.subjectTileChipText}>
+              {t('dashboard.subjectCardComplete', { defaultValue: 'Completa' })}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.subjectTileChip}>
+            <Text style={styles.subjectTileChipText}>{completion.toFixed(0)}%</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.subjectTileProgressBg}>
+        <View
+          style={[
+            styles.subjectTileProgressFill,
+            { width: `${Math.min(Math.round(completion), 100)}%` as any, backgroundColor: accentColor },
+          ]}
+        />
       </View>
     </TouchableOpacity>
   );

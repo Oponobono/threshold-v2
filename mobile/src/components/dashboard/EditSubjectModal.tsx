@@ -12,9 +12,9 @@ import { courseRepository } from '../../services/database/repositories';
 import { Course } from '../../services/api/types';
 
 const SUBJECT_COLORS = [
-  '#E7EDF8', '#DDE7FF', '#EAF4EE', '#FCEFD9', '#F7E9EE', '#ECE8FF',
-  '#E3F2FD', '#F2F5D9', '#F3ECE6', '#DDF3F0', '#EDEDED', '#D7E3FC',
-  '#CDEAC0', '#FFD6BA', '#FFC8DD', '#CDE7F0', '#E8F0D8', '#E6E2D3',
+  '#3B82F6', '#1D4ED8', '#22C55E', '#F59E0B', '#EC4899', '#7C3AED',
+  '#0EA5E9', '#84CC16', '#F97316', '#14B8A6', '#6B7280', '#2563EB',
+  '#10B981', '#FB923C', '#F43F5E', '#06B6D4', '#65A30D', '#D97706',
 ];
 const SUBJECT_ICONS = [
   'book-outline', 'book-open-variant', 'notebook-outline',

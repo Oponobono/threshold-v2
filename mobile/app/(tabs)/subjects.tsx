@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, Pressable, InteractionManager, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -84,6 +84,7 @@ const TimelineItem = React.memo(({ item, index, isLast, config }: any) => {
 export default function SubjectsScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   const g = useSubjects(t, i18n.language);
   const courses = useDataStore(s => s.courses);
@@ -471,7 +472,7 @@ export default function SubjectsScreen() {
 
           <Modal visible={isCreationMenuVisible} transparent animationType="fade" onRequestClose={() => setIsCreationMenuVisible(false)}>
             <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setIsCreationMenuVisible(false)}>
-              <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 }} onPress={() => null}>
+              <Pressable style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 16 + insets.bottom }} onPress={() => null}>
                 <View style={{ width: 36, height: 3, backgroundColor: theme.colors.border, borderRadius: 1.5, alignSelf: 'center', marginBottom: 16 }} />
                 <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 14 }}>¿Qué deseas crear?</Text>
 
@@ -482,7 +483,7 @@ export default function SubjectsScreen() {
                   <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
                     <Ionicons name="book" size={20} color={theme.colors.primary} />
                   </View>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>Nueva Materia / Módulo</Text>
                     <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginTop: 2 }}>Para clases individuales de tu Universidad</Text>
                   </View>

@@ -4,12 +4,15 @@ import { useCustomAlert } from '../ui/CustomAlert';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { dashboardStyles } from '../../styles/Dashboard.styles';
 import { Subject, createPhoto } from '../../services/api';
+import { OptionSelectorModal, SelectorOption } from '../ui/OptionSelectorModal';
 import { styles } from '../../styles/PhotoCaptureModal.styles';
+
+const MAX_PHOTOS = 12;
 
 interface PhotoCaptureModalProps {
   isVisible: boolean;
@@ -42,6 +45,17 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [cameraKey, setCameraKey] = useState(0);
+  const [subjectSelectorVisible, setSubjectSelectorVisible] = useState(false);
+
+  const subjectOptions: SelectorOption[] = subjects.map(s => ({
+    id: String(s.id),
+    name: s.name,
+    icon: (s as any).icon || 'book-outline',
+    color: s.color,
+    subtitle: (s as any).professor,
+  }));
+
+  const selectedSubject = subjects.find(s => String(s.id) === String(selectedSubjectId)) || null;
 
   // Solicitar permiso automáticamente al abrir si no está otorgado
   useEffect(() => {
@@ -73,17 +87,18 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
 
   const pickImage = async () => {
     try {
-      const MAX_PHOTOS = 10;
+      const remaining = MAX_PHOTOS - capturedImages.length;
+      if (remaining <= 0) return;
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: false,
         allowsMultipleSelection: true,
-        selectionLimit: MAX_PHOTOS,
+        selectionLimit: remaining,
         quality: 1,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newImages = result.assets.map(asset => asset.uri);
+        const newImages = result.assets.map(asset => asset.uri).slice(0, remaining);
         const updatedImages = [...capturedImages, ...newImages];
         setCapturedImages(updatedImages);
         setSelectedImageIndex(updatedImages.length - 1);
@@ -187,6 +202,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   }
 
   return (
+    <>
     <Modal visible={isVisible} animationType="slide" onRequestClose={resetAndClose} hardwareAccelerated={true}>
       <View style={styles.container}>
         <View style={styles.header}>
@@ -241,15 +257,17 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
               <View style={{ backgroundColor: theme.colors.inputBackground, padding: 12, borderRadius: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary }}>
-                    {capturedImages.length} {t('common.photos') || 'fotos'}
+                    {capturedImages.length} / {MAX_PHOTOS} {t('common.photos') || 'fotos'}
                   </Text>
-                  <TouchableOpacity 
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                    onPress={pickImage}
-                  >
-                    <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
-                    <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 12 }}>{t('common.add') || 'Agregar'}</Text>
-                  </TouchableOpacity>
+                  {capturedImages.length < MAX_PHOTOS && (
+                    <TouchableOpacity 
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                      onPress={pickImage}
+                    >
+                      <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
+                      <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 12 }}>{t('common.add') || 'Agregar'}</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                   {capturedImages.map((uri, idx) => (
@@ -282,29 +300,17 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
             )}
             
             <View style={[styles.actionSheet, { paddingBottom: Platform.OS === 'ios' ? 44 : 52 }]}>
-              <Text style={styles.sheetTitle}>{t('dashboard.documentScannerModal.save') || 'Guardar'}</Text>
-              
-              <View style={styles.subjectGrid}>
-                {subjects.map(s => (
-                  <TouchableOpacity 
-                    key={s.id} 
-                    style={[
-                      styles.subjectItem, 
-                      String(selectedSubjectId) === String(s.id) && { 
-                        backgroundColor: s.color ? s.color + '30' : theme.colors.primary + '20', 
-                        borderColor: s.color || undefined,
-                        borderWidth: 2
-                      }
-                    ]}
-                    onPress={() => setSelectedSubjectId(String(s.id))}
-                  >
-                    <View style={[dashboardStyles.subjectBadge, { backgroundColor: s.color || '#CCC', marginRight: 0, marginBottom: 4 }]}>
-                      <MaterialCommunityIcons name={(s.icon as any) || 'book-outline'} size={18} color={theme.colors.text.primary} />
-                    </View>
-                    <Text style={styles.subjectName} numberOfLines={1}>{s.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <Text style={styles.sheetLabel}>{t('gallery.saveTo', { defaultValue: 'Guardar en' })}</Text>
+
+              <TouchableOpacity style={styles.subjectSelector} onPress={() => setSubjectSelectorVisible(true)}>
+                <View style={[dashboardStyles.subjectBadge, { backgroundColor: selectedSubject?.color || theme.colors.card, marginRight: 12, marginBottom: 0 }]}>
+                  <MaterialCommunityIcons name={(selectedSubject as any)?.icon || 'book-outline'} size={18} color={selectedSubject ? theme.colors.text.primary : theme.colors.text.secondary} />
+                </View>
+                <Text style={[styles.subjectSelectorText, !selectedSubject && { color: theme.colors.text.secondary }]} numberOfLines={1}>
+                  {selectedSubject ? selectedSubject.name : (t('gallery.selectSubject', { defaultValue: 'Seleccionar materia' }))}
+                </Text>
+                <Feather name="chevron-down" size={20} color={theme.colors.text.secondary} style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
 
               <View style={styles.saveActions}>
                 <TouchableOpacity onPress={() => setCapturedImages([])} style={styles.secondaryBtn}>
@@ -322,6 +328,19 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           </View>
         )}
       </View>
-    </Modal>
+      </Modal>
+      <OptionSelectorModal
+        visible={subjectSelectorVisible}
+        title={t('gallery.selectSubject', { defaultValue: 'Seleccionar materia' })}
+        options={subjectOptions}
+        selectedId={selectedSubjectId}
+        onSelect={(id) => setSelectedSubjectId(id)}
+        onClose={() => setSubjectSelectorVisible(false)}
+        allowClear={false}
+        searchable
+        searchPlaceholder={t('subjects.searchPlaceholder', { defaultValue: 'Buscar materias...' })}
+        emptyLabel={t('common.noResults', { defaultValue: 'Sin resultados' })}
+      />
+    </>
   );
 };

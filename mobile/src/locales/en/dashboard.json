@@ -161,6 +161,7 @@
   "documentScanner": "Scanner",
   "subjectCardAvg": "Average: {{avg}}",
   "subjectCardCompletion": "{{completion}}% completed",
+  "subjectCardComplete": "Complete",
   "openSettings": "Open settings",
   "quickAddMenu": {
     "title": "Quick Add",

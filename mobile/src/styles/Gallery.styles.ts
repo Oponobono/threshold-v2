@@ -74,7 +74,11 @@ export const galleryStyles = StyleSheet.create({
   scroll: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.lg, paddingBottom: 40 },
 
   // Sections
-  section: { marginBottom: theme.spacing.xl },
+  section: {
+    marginTop: -theme.spacing.sm, marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.md,
+    borderBottomWidth: 1, borderBottomColor: theme.colors.border,
+  },
   sectionHeaderRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
   },
@@ -107,13 +111,14 @@ export const galleryStyles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1, borderColor: theme.colors.border, ...globalStyles.shadow,
   },
-  gridImageContainer: { height: 110, position: 'relative' },
+  gridImageContainer: { height: 96, position: 'relative' },
   gridImageFull: { width: '100%', height: '100%' },
   dotsRow: {
-    position: 'absolute', bottom: 6, left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'center', gap: 4,
+    marginTop: 3, marginBottom: 4, height: 6,
   },
-  dot: { width: 5, height: 5, borderRadius: 2.5 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(102,102,102,0.35)' },
+  dotActive: { backgroundColor: theme.colors.text.secondary },
   starOverlayBtn: {
     position: 'absolute', top: 6, left: 6,
     backgroundColor: theme.colors.primaryTransparent.heavy,
@@ -123,11 +128,11 @@ export const galleryStyles = StyleSheet.create({
   ocrOverlay: {
     position: 'absolute', top: 8, right: 38,
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: theme.colors.background + 'ee',
+    backgroundColor: theme.colors.primaryTransparent.heavy,
     paddingHorizontal: 7, paddingVertical: 3,
     borderRadius: theme.borderRadius.full,
   },
-  ocrOverlayText: { fontSize: theme.typography.sizes.xs, fontWeight: '700', color: theme.colors.primary },
+  ocrOverlayText: { fontSize: theme.typography.sizes.xs, fontWeight: '700', color: theme.colors.text.white },
   gridMenuBtn: {
     position: 'absolute',
     top: 6,

@@ -61,6 +61,8 @@
   "photoCount_zero": "0 fotos",
   "photo": "Foto",
   "linkPhoto": "Vincula una foto de pizarra a esta materia",
+  "saveTo": "Guardar en",
+  "selectSubject": "Seleccionar materia",
   "deletePhotoTitle": "Eliminar foto",
   "deletePhotoConfirm": "¿Estás seguro de que deseas eliminar esta foto de forma permanente?",
   "deletePhotoError": "Hubo un error al intentar eliminar la foto.",
