@@ -128,11 +128,11 @@ describe('SequenceFactory', () => {
       expect(seq.reminders[0].intent).toBe('review_cards');
     });
 
-    it('grading_period negativo → submit_work', () => {
+    it('entidad desconocida → follow_up', () => {
       const clock = new FakeClock(ANCHOR);
       const factory = new SequenceFactory(clock, assembler);
       const seq = factory.buildSequence(makeEntity(), 'grading_period', [-1440], STANDARD_PROFILE);
-      expect(seq.reminders[0].intent).toBe('submit_work');
+      expect(seq.reminders[0].intent).toBe('follow_up');
     });
   });
 

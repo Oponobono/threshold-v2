@@ -23,8 +23,7 @@ export class InterruptionPolicy {
   ): DeliveryPlan {
     const now = this.clock.now();
     const all = this._collect(sequences, suppressReview ?? this._activeStudy, now);
-    const resolved = this._resolveCollisions(all);
-    const deliverables = this._applySimultaneousLimit(resolved);
+    const deliverables = this._resolveCollisions(all);
 
     this.planCounter++;
 
@@ -146,11 +145,5 @@ export class InterruptionPolicy {
     }
 
     return result;
-  }
-
-  private _applySimultaneousLimit(
-    reminders: DeliveryReminderDomain[],
-  ): DeliveryReminderDomain[] {
-    return reminders.slice(0, SIMULTANEOUS_LIMIT);
   }
 }

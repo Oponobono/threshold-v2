@@ -22,9 +22,14 @@ describe('ReviewPolicy', () => {
       expect(policy.getOffsets({}, profile)).toEqual([0]);
     });
 
-    it('persistent → [0, 60, 1440]', () => {
+    it('persistent → [0]', () => {
       const profile: ReminderProfile = { name: 'persistent', defaultOffsets: [] };
-      expect(policy.getOffsets({}, profile)).toEqual([0, 60, 1440]);
+      expect(policy.getOffsets({}, profile)).toEqual([0]);
+    });
+
+    it('customOffsets sobrescribe los offsets', () => {
+      const profile: ReminderProfile = { name: 'standard', defaultOffsets: [], customOffsets: [-10] };
+      expect(policy.getOffsets({}, profile)).toEqual([-10]);
     });
   });
 
@@ -42,6 +47,18 @@ describe('ReviewPolicy', () => {
     it('dueCardsCount = null → false', () => {
       expect(policy.shouldCancel(seq(), {})).toBe(false);
     });
+
+    it('card_count > 0 → false', () => {
+      expect(policy.shouldCancel(seq(), { card_count: 12 })).toBe(false);
+    });
+
+    it('card_count = 0 → true', () => {
+      expect(policy.shouldCancel(seq(), { card_count: 0 })).toBe(true);
+    });
+
+    it('card_count tiene prioridad sobre dueCardsCount', () => {
+      expect(policy.shouldCancel(seq(), { card_count: 0, dueCardsCount: 5 })).toBe(true);
+    });
   });
 
   describe('shouldCancelReminder', () => {
@@ -53,6 +70,10 @@ describe('ReviewPolicy', () => {
 
     it('dueCardsCount = 0 → true', () => {
       expect(policy.shouldCancelReminder(r(), { dueCardsCount: 0 })).toBe(true);
+    });
+
+    it('card_count = 0 → true', () => {
+      expect(policy.shouldCancelReminder(r(), { card_count: 0 })).toBe(true);
     });
   });
 

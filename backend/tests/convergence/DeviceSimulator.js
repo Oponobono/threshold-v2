@@ -146,6 +146,7 @@ const TABLE_DEFS = {
     out_of REAL, score REAL, percentage REAL, grade_value REAL,
     normalized_value REAL, is_completed INTEGER DEFAULT 0,
     completed_at TEXT, due_date TEXT, period_id TEXT, grading_date TEXT,
+    starts_at TEXT, ends_at TEXT, due_at TEXT, assessment_type TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
@@ -553,6 +554,7 @@ class DeviceSimulator {
             assessment_categories: 'assessment_categories',
             assessment_files: 'assessment_files',
             schedules: 'schedules',
+            flashcard_decks: 'flashcard_decks',
             flashcards: 'flashcards',
             calendar_events: 'calendar_events', grading_periods: 'grading_periods',
             lms_accounts: 'lms_accounts',

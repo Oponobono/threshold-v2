@@ -70,12 +70,11 @@ describe('subscribeToEventBus', () => {
     expect(coordinator.handleEntityChanged).not.toHaveBeenCalled();
   });
 
-  it('maps all 5 entity types correctly', () => {
+  it('maps all 4 entity types correctly', () => {
     const types: [string, string][] = [
       ['assessments', 'assessment'],
       ['schedules', 'schedule'],
       ['flashcard_decks', 'flashcard_deck'],
-      ['grading_periods', 'grading_period'],
       ['calendar_events', 'calendar_event'],
     ];
 

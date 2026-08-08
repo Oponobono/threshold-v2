@@ -953,5 +953,22 @@ const migrations: Migration[] = [
       `ALTER TABLE flashcard_decks ADD COLUMN topic TEXT`,
     ],
   },
+  {
+    version: 46,
+    up: [
+      // Reminder Semantics v1.1 (amendment S1): el dominio de Assessment provee
+      // el anchor temporal (starts_at/due_at) + assessment_type. `date` queda
+      // solo como representación de calendario; NUNCA se convierte en anchor.
+      // El backfill es determinista y NO inventa medianoche: solo deriva
+      // assessment_type desde `type` (exam→exam, task→deadline). Las filas
+      // legacy sin datetime no generan reminder hasta que el usuario provea hora.
+      `ALTER TABLE assessments ADD COLUMN starts_at TEXT`,
+      `ALTER TABLE assessments ADD COLUMN ends_at TEXT`,
+      `ALTER TABLE assessments ADD COLUMN due_at TEXT`,
+      `ALTER TABLE assessments ADD COLUMN assessment_type TEXT`,
+      `UPDATE assessments SET assessment_type = 'exam' WHERE type = 'exam' AND assessment_type IS NULL`,
+      `UPDATE assessments SET assessment_type = 'deadline' WHERE type = 'task' AND assessment_type IS NULL`,
+    ],
+  },
 ];
 export default migrations;

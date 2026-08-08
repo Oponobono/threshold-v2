@@ -1,4 +1,4 @@
-export type ReminderEntityType = 'assessment' | 'schedule' | 'flashcard_deck' | 'grading_period' | 'calendar_event';
+export type ReminderEntityType = 'assessment' | 'schedule' | 'flashcard_deck' | 'calendar_event';
 
 export interface ReminderNavigationPayload {
   readonly deeplink: string;
@@ -21,7 +21,6 @@ export function getTargetRoute(entityType: ReminderEntityType): '/calendar' | '/
     case 'calendar_event':
       return '/calendar';
     case 'schedule':
-    case 'grading_period':
       return '/';
     case 'flashcard_deck':
       return '/flashcards';
@@ -37,6 +36,5 @@ const URL_PATTERNS: UrlPattern[] = [
   { pattern: /^threshold:\/\/assessments\/([^/?#]+)/, entityType: 'assessment' },
   { pattern: /^threshold:\/\/schedules\/([^/?#]+)/, entityType: 'schedule' },
   { pattern: /^threshold:\/\/decks\/([^/?#]+)/, entityType: 'flashcard_deck' },
-  { pattern: /^threshold:\/\/grades\/([^/?#]+)/, entityType: 'grading_period' },
   { pattern: /^threshold:\/\/events\/([^/?#]+)/, entityType: 'calendar_event' },
 ];

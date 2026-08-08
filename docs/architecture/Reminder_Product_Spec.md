@@ -1,5 +1,7 @@
 # Reminder System — Product Specification
 
+> **⚠️ PARCIALMENTE SUPERSEDED (Ago 2026)**. Las secciones de **perfiles de usuario** (minimal/standard/persistent/custom), **preferencias sincronizables** y **weekly digest** quedan reemplazadas por el contrato congelado: `ReminderPreferences` device-local, sin perfiles expuestos y sin digest. El resto del comportamiento descrito (cuándo reacciona una entidad) se conserva como referencia de producto. Fuente de verdad vigente: `docs/architecture/REMINDER_SYSTEM_V1_CONTRACT.md`.
+
 Este documento define el **comportamiento** del sistema de recordatorios de Threshold desde la perspectiva del usuario. No es un documento técnico. Define qué hace el sistema, cuándo reacciona, cuándo insiste y cuándo deja de insistir.
 
 ---

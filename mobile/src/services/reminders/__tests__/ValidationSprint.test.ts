@@ -3,7 +3,6 @@ import { AssessmentPolicy } from '../policies/AssessmentPolicy';
 import { ClassPolicy } from '../policies/ClassPolicy';
 import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
-import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
 import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { ReminderEngine } from '../ReminderEngine';
@@ -24,7 +23,6 @@ class FakeI18n implements I18nService {
       'entity.schedule': 'Clase',
       'entity.flashcard_deck': 'Mazo',
       'entity.calendar_event': 'Evento',
-      'entity.grading_period': 'Periodo',
       'intentTitle.prepare_exam': 'Preparar {entity}',
       'intentTitle.attend_class': 'Asistir a {entity}',
       'intentTitle.review_cards': 'Repasar {entity}',
@@ -128,7 +126,6 @@ function createEngineComponents(clock = new FakeClock(ANCHOR)) {
   registry.register(new ClassPolicy());
   registry.register(new ReviewPolicy());
   registry.register(new EventPolicy());
-  registry.register(new GradingPolicy());
 
   const assembler = new ReminderSnapshotAssembler();
   const factory = new SequenceFactory(clock, assembler);
@@ -144,14 +141,15 @@ function createEngineComponents(clock = new FakeClock(ANCHOR)) {
 function assessmentEntity(overrides: Record<string, any> = {}): any {
   return {
     id: 'a-1',
-    date: ASSESSMENT_DATE.toISOString(),
+    assessment_type: 'exam',
+    starts_at: ASSESSMENT_DATE.toISOString(),
     title: 'Parcial Álgebra',
     ...overrides,
   };
 }
 
 function emptySnapshot(): ReminderSourceSnapshot {
-  return { assessments: [], schedules: [], flashcard_decks: [], grading_periods: [], calendar_events: [] };
+  return { assessments: [], schedules: [], flashcard_decks: [], calendar_events: [] };
 }
 
 // ── Invariant helpers ─────────────────────────────────────────────
@@ -175,8 +173,7 @@ function expectNoDuplicates(engine: ReminderEngine): void {
 function expectNoOrphans(engine: ReminderEngine, provider: CaptureProvider): void {
   const sequenceIds = new Set(engine.getDesiredSequences().map((s) => s.id));
   for (const r of provider.scheduled) {
-    const parts = r.id.split('::');
-    const seqId = parts.slice(0, -1).join('::');
+    const seqId = r.id.replace(/::(?:offset::\d+|\d+|daily)$/, '');
     expect(sequenceIds.has(seqId)).toBe(true);
   }
 }
@@ -212,7 +209,7 @@ describe('Sprint 6.1.1 — Event Storm', () => {
       await engine.onEntityChanged('assessment', id, assessmentEntity({ id, title: 'v3' }));
       await engine.onEntityChanged('assessment', id, assessmentEntity({ id, title: 'v4' }));
       await engine.onEntityChanged('assessment', id, assessmentEntity({ id, title: 'v5' }));
-      await engine.onEntityChanged('assessment', id, assessmentEntity({ id, title: 'v6', date: ASSESSMENT_DATE.toISOString() }));
+      await engine.onEntityChanged('assessment', id, assessmentEntity({ id, title: 'v6', starts_at: ASSESSMENT_DATE.toISOString() }));
 
       expectConvergence(engine, 'assessment', id);
       expectNoDuplicates(engine);
@@ -354,7 +351,6 @@ describe('Sprint 6.1.1 — Event Storm', () => {
         assessments: [assessmentEntity({ id: 'a-pre' })],
         schedules: [],
         flashcard_decks: [],
-        grading_periods: [],
         calendar_events: [],
       };
 
@@ -379,7 +375,7 @@ describe('Sprint 6.1.1 — Event Storm', () => {
         { type: 'assessment', id: 'ca-1', entity: assessmentEntity({ id: 'ca-1' }) },
         { type: 'schedule', id: 'cs-1', entity: { id: 'cs-1', endTime: new Date('2026-07-10T11:30:00Z').toISOString() } },
         { type: 'flashcard_deck', id: 'cd-1', entity: { id: 'cd-1', dueCardsCount: 10, title: 'Deck' } },
-        { type: 'grading_period', id: 'cg-1', entity: { id: 'cg-1', closeDate: '2026-07-20T23:59:00Z' } },
+        { type: 'calendar_event', id: 'ce-1', entity: { id: 'ce-1', startDate: '2026-07-12T15:00:00Z', endDate: '2026-07-12T16:00:00Z' } },
       ];
 
       await Promise.all(entities.map((e) => engine.onEntityChanged(e.type as any, e.id, e.entity)));

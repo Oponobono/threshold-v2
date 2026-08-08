@@ -1,5 +1,7 @@
 # Auditoría Completa: Sistema de Reminders y Notificaciones
 
+> **⛔ AUDITORÍA HISTÓRICA (Jul 2026) — recomendaciones SUPERSEDED (Ago 2026)**. Esta auditoría documenta el estado defectuoso del sistema (multiplicador de notificaciones, preferencias legacy) y es evidencia valiosa del diagnóstico. Sus **recomendaciones** quedaron reemplazadas por decisiones posteriores: preferencias **device-local en MMKV** (NO sincronizables), sin perfiles expuestos y sin digest. Estado vigente y contrato congelado: `docs/architecture/REMINDER_SYSTEM_V1_CONTRACT.md`.
+
 ## 1. Arquitectura General
 
 El sistema tiene **dos arquitecturas paralelas**:

@@ -1,4 +1,5 @@
 import { ReminderPolicy } from './ReminderPolicy';
+import { resolveAssessmentAnchor } from '../../domain/assessmentTemporal';
 import type { ReminderProfile, ReminderSequence, Reminder } from '../types';
 
 const STANDARD_OFFSETS: readonly number[] = [-10080, -4320, -1440, -60, 0];
@@ -31,25 +32,30 @@ export class AssessmentPolicy implements ReminderPolicy {
 
   shouldCancel(sequence: ReminderSequence, entity: any): boolean {
     const status = entity?.status;
-    return status === 'cancelled' || status === 'completed';
+    return status === 'cancelled' || status === 'completed' || !resolveAssessmentAnchor(entity);
   }
 
   shouldCancelReminder(reminder: Reminder, entity: any): boolean {
     if (entity?.status === 'cancelled' || entity?.status === 'completed') {
       return true;
     }
-    return false;
+    return !resolveAssessmentAnchor(entity);
   }
 
+  /**
+   * S2.1 — el ancla temporal es decisión del DOMINIO (assessmentTemporal.ts),
+   * no de la política. exam → starts_at; deadline → due_at; sin ancla → null.
+   * Sin fallback a `date`/medianoche: un assessment sin ancla no genera recordatorio.
+   */
   getExpiration(entity: any): Date | null {
-    const eventDate = entity?.date ?? entity?.due_date ?? entity?.startDate ?? entity?.dueDate;
-    if (!eventDate) return null;
-    return new Date(new Date(eventDate).getTime() + 3600000);
+    const anchor = resolveAssessmentAnchor(entity);
+    if (!anchor) return null;
+    return new Date(anchor.anchor.getTime() + 3600000);
   }
 
   getEventTime(entity: any): Date | null {
-    const eventDate = entity?.date ?? entity?.due_date ?? entity?.startDate ?? entity?.dueDate;
-    if (!eventDate) return null;
-    return new Date(eventDate);
+    const anchor = resolveAssessmentAnchor(entity);
+    if (!anchor) return null;
+    return anchor.anchor;
   }
 }

@@ -1,5 +1,7 @@
 # Reminder System — Architecture
 
+> **⚠️ PARCIALMENTE SUPERSEDED (Ago 2026)**. Las secciones de **exposición de perfiles** (`ReminderProfile`), **almacenamiento de preferencias** (modelo de claves/AsyncStorage) y **weekly digest** quedan reemplazadas por el contrato congelado: preferencias **device-local en MMKV** (`threshold.reminderPreferences.v1`), sin perfiles expuestos y sin digest. La arquitectura del engine (policies, reconciler, provider), el SessionMerger y el pipeline wired descritos en `REMINDER_SYSTEM_V1_CONTRACT.md` son la fuente de verdad vigente.
+
 Este documento traduce el Domain Model a arquitectura técnica. Define las capas, responsabilidades, interfaces y flujo de datos del subsistema.
 
 ---

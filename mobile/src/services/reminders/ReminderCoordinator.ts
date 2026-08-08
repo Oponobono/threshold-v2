@@ -13,7 +13,6 @@ export const ENTITY_TYPE_MAP: Record<string, string> = {
   assessment: 'assessments',
   schedule: 'schedules',
   flashcard_deck: 'flashcard_decks',
-  grading_period: 'grading_periods',
   calendar_event: 'calendar_events',
 };
 

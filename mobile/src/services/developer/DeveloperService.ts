@@ -9,6 +9,20 @@ import { networkManager } from '../network/NetworkManager';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
 import { formatConsistencyReport } from '../sync/ConsistencyReport';
 import type { ConsistencyReport } from '../sync/ConsistencyReport';
+import {
+  collectReminderDiagnostics,
+  isReminderDeliveryLoggingEnabled,
+  enableReminderDeliveryLogging,
+  disableReminderDeliveryLogging,
+  runOSStressTest,
+  clearOSStressTest,
+  requestExactAlarmPermission,
+  collectExactAlarmCapability,
+} from '../reminders/ReminderDiagnostics';
+import type { OSStressResult, ExactAlarmRequestResult } from '../reminders/ReminderDiagnostics';
+import { formatReminderDiagnostics } from '../reminders/ReminderDiagnosticsCore';
+import { getReminderCoordinator } from '../reminders/reminderCoordinatorInstance';
+import type { ReminderDiagnosticsData } from '../reminders/ReminderDiagnosticsCore';
 
 export interface DeveloperConsoleData {
   // Sync State
@@ -46,9 +60,16 @@ export interface DeveloperConsoleData {
 
   // Consistency Report
   consistencyReport: ConsistencyReport | null;
+
+  // Reminders diagnostics
+  reminders: ReminderDiagnosticsData | null;
+  reminderDeliveryLogging: boolean;
 }
 
 class DeveloperService {
+  private lastReminderDiagnostics: ReminderDiagnosticsData | null = null;
+  private lastExactAlarmGranted: boolean | null = null;
+
   async getData(): Promise<DeveloperConsoleData> {
     const recentSyncs = await syncJournal.getRecent(10);
     const lastSync = recentSyncs.length > 0 ? recentSyncs[0] : null;
@@ -104,7 +125,73 @@ class DeveloperService {
       testResults: null,
       lastTraceId,
       consistencyReport,
+      reminders: this.lastReminderDiagnostics,
+      reminderDeliveryLogging: isReminderDeliveryLoggingEnabled(),
     };
+  }
+
+  async runReminderDiagnostics(): Promise<string> {
+    const data = await collectReminderDiagnostics();
+    this.lastReminderDiagnostics = data;
+    this.lastExactAlarmGranted = data.exactAlarm.canScheduleExactAlarms === true;
+    const report = formatReminderDiagnostics(data);
+    console.log(`[REMINDER-DIAG] START collectedAt=${data.collectedAt} tz=${data.timezone.name} offset=${data.timezone.offsetMinutes} engine=${data.engineAlive ? 'alive' : 'dead'}`);
+    console.log(report);
+    console.log(`[REMINDER-DIAG] END`);
+    return report;
+  }
+
+  getReminderDiagnostics(): ReminderDiagnosticsData | null {
+    return this.lastReminderDiagnostics;
+  }
+
+  async resyncReminders(): Promise<void> {
+    const coordinator = await getReminderCoordinator();
+    await coordinator.resync();
+  }
+
+  toggleReminderDeliveryLogging(): boolean {
+    if (isReminderDeliveryLoggingEnabled()) {
+      disableReminderDeliveryLogging();
+    } else {
+      enableReminderDeliveryLogging();
+    }
+    return isReminderDeliveryLoggingEnabled();
+  }
+
+  async runOSStressTest(count = 150): Promise<OSStressResult> {
+    return runOSStressTest(count);
+  }
+
+  async clearOSStressTest(): Promise<number> {
+    return clearOSStressTest();
+  }
+
+  async requestExactAlarmPermission(): Promise<ExactAlarmRequestResult> {
+    const result = await requestExactAlarmPermission();
+    this.lastExactAlarmGranted = result.capability.canScheduleExactAlarms === true;
+    if (result.resynced) {
+      this.lastReminderDiagnostics = await collectReminderDiagnostics();
+    }
+    return result;
+  }
+
+  async recheckExactAlarmPermission(): Promise<boolean> {
+    const capability = await collectExactAlarmCapability();
+    return capability.canScheduleExactAlarms === true;
+  }
+
+  async recheckExactAlarmOnFocus(): Promise<{ granted: boolean; resynced: boolean }> {
+    const granted = await this.recheckExactAlarmPermission();
+    let resynced = false;
+    if (granted && this.lastExactAlarmGranted === false) {
+      const coordinator = await getReminderCoordinator();
+      await coordinator.resync();
+      this.lastReminderDiagnostics = await collectReminderDiagnostics();
+      resynced = true;
+    }
+    this.lastExactAlarmGranted = granted;
+    return { granted, resynced };
   }
 
   async runInitialSync(): Promise<void> {

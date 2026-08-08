@@ -29,25 +29,29 @@ class TestEnvironment {
         if (params) db.run(sql, params, done);
         else db.run(sql, done);
       };
-      run(`PRAGMA foreign_keys = OFF`);
-      run(`CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY, email TEXT UNIQUE, password_hash TEXT NOT NULL,
-        name TEXT, username TEXT UNIQUE, share_pin VARCHAR(8) UNIQUE,
-        status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now')),
-        last_login TEXT DEFAULT (datetime('now'))
-      )`);
-      run(`CREATE TABLE IF NOT EXISTS sync_version (
-        id INTEGER PRIMARY KEY, version INTEGER DEFAULT 0, updated_at TEXT
-      )`);
-      run(`INSERT OR IGNORE INTO sync_version (id, version, updated_at) VALUES (1, 0, datetime('now'))`);
-      run(`CREATE TABLE IF NOT EXISTS sync_deletions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        entity_type TEXT NOT NULL, entity_id TEXT NOT NULL,
-        user_id TEXT NOT NULL, deleted_at TEXT DEFAULT (datetime('now')),
-        deletion_version INTEGER,
-        UNIQUE(entity_type, entity_id, user_id)
-      )`);
-      for (const sql of Object.values(TABLE_SCHEMAS)) run(sql);
+      db.serialize(() => {
+        run(`PRAGMA foreign_keys = OFF`);
+        run(`CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY, email TEXT UNIQUE, password_hash TEXT NOT NULL,
+          name TEXT, username TEXT UNIQUE, share_pin VARCHAR(8) UNIQUE,
+          status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now')),
+          last_login TEXT DEFAULT (datetime('now'))
+        )`);
+        run(`CREATE TABLE IF NOT EXISTS sync_version (
+          id INTEGER PRIMARY KEY, version INTEGER DEFAULT 0, updated_at TEXT
+        )`);
+        run(`INSERT OR IGNORE INTO sync_version (id, version, updated_at) VALUES (1, 0, datetime('now'))`);
+        run(`CREATE TABLE IF NOT EXISTS sync_deletions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entity_type TEXT NOT NULL, entity_id TEXT NOT NULL,
+          user_id TEXT NOT NULL, deleted_at TEXT DEFAULT (datetime('now')),
+          deletion_version INTEGER,
+          UNIQUE(entity_type, entity_id, user_id)
+        )`);
+        for (const sql of Object.values(TABLE_SCHEMAS)) run(sql);
+        run(`INSERT OR IGNORE INTO grading_systems (id, code, name, type, mode, direction) VALUES (1, 'COL-0-5', 'Escala 0-5', 'numeric', 'points', 'higher')`);
+        run(`INSERT OR IGNORE INTO grading_versions (id, grading_system_id, owner_type, min_value, max_value, passing_value, precision, is_active) VALUES (3, 1, 'system', 0, 5.0, 3.0, 2, 1)`);
+      });
       done();
     });
     // Verify sync_version row exists
@@ -409,6 +413,7 @@ const TABLE_SCHEMAS = {
     out_of REAL, score REAL, percentage REAL, grade_value REAL,
     normalized_value REAL, is_completed INTEGER DEFAULT 0,
     completed_at TEXT, due_date TEXT, period_id TEXT, grading_date TEXT,
+    starts_at TEXT, ends_at TEXT, due_at TEXT, assessment_type TEXT,
     created_at TEXT, updated_at TEXT,
     sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
   )`,
@@ -560,6 +565,46 @@ const TABLE_SCHEMAS = {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     sync_version INTEGER DEFAULT 0, version_number INTEGER DEFAULT 0, deleted_at TEXT,
     FOREIGN KEY (video_id) REFERENCES youtube_videos(id) ON DELETE CASCADE
+  )`,
+  grading_systems: `CREATE TABLE IF NOT EXISTS grading_systems (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    country_code TEXT,
+    is_system_seeded INTEGER DEFAULT 0,
+    is_custom INTEGER DEFAULT 0,
+    created_by_user_id TEXT,
+    based_on_system_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  grading_versions: `CREATE TABLE IF NOT EXISTS grading_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    grading_system_id INTEGER NOT NULL,
+    owner_type TEXT NOT NULL,
+    owner_id TEXT,
+    min_value REAL,
+    max_value REAL,
+    passing_value REAL,
+    precision INTEGER DEFAULT 2,
+    valid_from DATETIME,
+    valid_to DATETIME,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    archived_at DATETIME
+  )`,
+  assessment_results: `CREATE TABLE IF NOT EXISTS assessment_results (
+    id TEXT PRIMARY KEY,
+    assessment_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    raw_value REAL,
+    normalized_value REAL,
+    grading_version_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
   )`,
 };
 

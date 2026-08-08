@@ -27,7 +27,6 @@ function createMockRepos(repoMap?: Record<string, any>) {
     assessment: { getById: jest.fn().mockResolvedValue(null) },
     schedule: { getById: jest.fn().mockResolvedValue(null) },
     flashcard_deck: { getById: jest.fn().mockResolvedValue(null) },
-    grading_period: { getById: jest.fn().mockResolvedValue(null) },
     calendar_event: { getById: jest.fn().mockResolvedValue(null) },
   };
   return { ...defaultRepos, ...repoMap };

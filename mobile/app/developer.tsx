@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { theme } from '../src/styles/theme';
 import { developerService, DeveloperConsoleData } from '../src/services/developer/DeveloperService';
 
-type RunningAction = 'sync' | 'delta' | 'validator' | 'assets' | 'tests' | null;
+type RunningAction = 'sync' | 'delta' | 'validator' | 'assets' | 'tests' | 'reminders' | 'remindersResync' | 'stress' | 'stressClear' | 'exactAlarm' | null;
 
 export default function DeveloperScreen() {
   const { t } = useTranslation();
@@ -17,6 +17,7 @@ export default function DeveloperScreen() {
   const [statusMessage, setStatusMessage] = useState('');
   const [timeline, setTimeline] = useState<any[] | null>(null);
   const [testOutput, setTestOutput] = useState<string | null>(null);
+  const [reminderOutput, setReminderOutput] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const d = await developerService.getData();
@@ -26,7 +27,22 @@ export default function DeveloperScreen() {
   useEffect(() => {
     refresh();
     const interval = setInterval(refresh, 5000);
-    return () => clearInterval(interval);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        refresh();
+        developerService.recheckExactAlarmOnFocus().then((r) => {
+          if (r.resynced) {
+            setStatusMessage('Exact alarms granted — reminders re-scheduled');
+            setReminderOutput(null);
+            refresh();
+          }
+        }).catch(() => {});
+      }
+    });
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+    };
   }, [refresh]);
 
   const runAction = async (action: RunningAction, fn: () => Promise<void>, label: string) => {
@@ -80,6 +96,88 @@ export default function DeveloperScreen() {
     const logs = await developerService.getTimeline(data.lastTraceId);
     setTimeline(logs);
     setStatusMessage(`${logs.length} events loaded`);
+  };
+
+  const handleReminderDiagnostics = async () => {
+    setRunning('reminders');
+    setStatusMessage('Collecting reminders diagnostics...');
+    setReminderOutput(null);
+    try {
+      const report = await developerService.runReminderDiagnostics();
+      setReminderOutput(report);
+      setStatusMessage('Reminders diagnostics complete');
+    } catch (e: any) {
+      setStatusMessage(`Reminders diagnostics FAIL: ${e.message}`);
+    }
+    setRunning(null);
+    refresh();
+  };
+
+  const handleReminderResync = async () => {
+    setRunning('remindersResync');
+    setStatusMessage('Recomputing reminder plan...');
+    try {
+      await developerService.resyncReminders();
+      const report = await developerService.runReminderDiagnostics();
+      setReminderOutput(report);
+      setStatusMessage('Reminder plan recomputed');
+    } catch (e: any) {
+      setStatusMessage(`Reminder resync FAIL: ${e.message}`);
+    }
+    setRunning(null);
+    refresh();
+  };
+
+  const handleDeliveryLogToggle = () => {
+    const enabled = developerService.toggleReminderDeliveryLogging();
+    setStatusMessage(enabled ? 'Delivery logger ON (logcat [DELIVERY])' : 'Delivery logger OFF');
+    refresh();
+  };
+
+  const handleOSStress = async () => {
+    setRunning('stress');
+    setStatusMessage('Scheduling 150 synthetic notifications...');
+    try {
+      const result = await developerService.runOSStressTest(150);
+      setStatusMessage(`Stress: scheduled=${result.scheduled} acceptedByOS=${result.acceptedByOS} limitReachedAt=${result.limitReachedAt ?? 'none'}`);
+      console.log(`[STRESS-DEV] ${JSON.stringify(result)}`);
+    } catch (e: any) {
+      setStatusMessage(`Stress FAIL: ${e.message}`);
+    }
+    setRunning(null);
+    refresh();
+  };
+
+  const handleOSStressClear = async () => {
+    setRunning('stressClear');
+    setStatusMessage('Clearing synthetic notifications...');
+    try {
+      const cleared = await developerService.clearOSStressTest();
+      setStatusMessage(`Cleared ${cleared} synthetic notifications`);
+    } catch (e: any) {
+      setStatusMessage(`Clear FAIL: ${e.message}`);
+    }
+    setRunning(null);
+    refresh();
+  };
+
+  const handleRequestExactAlarm = async () => {
+    setRunning('exactAlarm');
+    setStatusMessage('Opening exact alarm settings...');
+    try {
+      const result = await developerService.requestExactAlarmPermission();
+      setStatusMessage(
+        result.resynced
+          ? `Alarmas exactas activadas — recordatorios reprogramados`
+          : result.grantedAfter === true
+            ? 'Alarmas exactas activadas'
+            : 'Alarmas exactas siguen desactivadas',
+      );
+    } catch (e: any) {
+      setStatusMessage(`Exact alarm request FAIL: ${e.message}`);
+    }
+    setRunning(null);
+    refresh();
   };
 
   if (!data) {
@@ -177,6 +275,48 @@ export default function DeveloperScreen() {
           {statusBadge('Corrupted', String(data.corrupted), data.corrupted === 0 ? '#3fb950' : '#f85149')}
           {statusBadge('Missing', String(data.missing), data.missing === 0 ? '#3fb950' : '#f85149')}
         </View>
+
+        {/* Reminders */}
+        {sectionHeader('Reminders')}
+        <View style={{ backgroundColor: '#161b22', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#30363d' }}>
+          {statusBadge('Delivery logger', data.reminderDeliveryLogging ? 'ON' : 'OFF', data.reminderDeliveryLogging ? '#3fb950' : '#8b949e')}
+          {data.reminders?.exactAlarm && statusBadge(
+            'Alarmas exactas',
+            data.reminders.exactAlarm.canScheduleExactAlarms === null ? 'no detectable' : data.reminders.exactAlarm.canScheduleExactAlarms ? 'activas' : 'desactivadas',
+            data.reminders.exactAlarm.canScheduleExactAlarms ? '#3fb950' : '#f85149',
+          )}
+        </View>
+        {data.reminders?.exactAlarm?.canScheduleExactAlarms === false && (
+          <View style={{ marginTop: 8, backgroundColor: '#3d211f', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#7d4b45' }}>
+            <Text style={{ color: '#ffb3ad', fontSize: 13, fontWeight: '600', marginBottom: 4 }}>
+              Las alarmas exactas están desactivadas
+            </Text>
+            <Text style={{ color: '#e6edf3', fontSize: 12, marginBottom: 8 }}>
+              Threshold agenda recordatorios con precisión de minutos (repasos, clases y evaluaciones). Tu dispositivo las registra como inexactas, por lo que pueden llegar con retraso.
+            </Text>
+            {btn('Activar alarmas exactas', handleRequestExactAlarm, 'alarm-outline', running !== null)}
+            <Text style={{ color: '#8b949e', fontSize: 11, marginTop: 8 }}>
+              Te llevaremos a los permisos de Android. Al volver, los recordatorios se reprograman automáticamente.
+            </Text>
+          </View>
+        )}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          {btn('Reminders Diagnóstico', handleReminderDiagnostics, 'timer-outline', running !== null)}
+          {btn('Recomputar Plan', handleReminderResync, 'refresh-outline', running !== null)}
+          {btn(data.reminderDeliveryLogging ? 'Delivery Log OFF' : 'Delivery Log ON', handleDeliveryLogToggle, 'pulse-outline', running !== null)}
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          {btn('Stress SO (150)', handleOSStress, 'flask-outline', running !== null)}
+          {btn('Limpiar Stress', handleOSStressClear, 'trash-outline', running !== null)}
+        </View>
+
+        {reminderOutput && (
+          <View style={{ marginTop: 8 }}>
+            <View style={{ backgroundColor: '#161b22', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#30363d' }}>
+              <Text style={{ color: '#e6edf3', fontSize: 11, fontFamily: 'monospace' }}>{reminderOutput}</Text>
+            </View>
+          </View>
+        )}
 
         {/* Journal */}
         {sectionHeader('Sync Journal')}

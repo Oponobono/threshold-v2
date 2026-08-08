@@ -46,6 +46,23 @@ export const dashboardStyles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.colors.border,
   },
+  avatarBadgeWrapper: {
+    width: 48,
+    height: 48,
+  },
+  settingsBadge: {
+    position: 'absolute',
+    right: -7,
+    bottom: -7,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: theme.colors.background,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   section: {
     marginBottom: 24,
   },

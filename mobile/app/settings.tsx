@@ -13,9 +13,7 @@ import { useSettingsLogic } from '../src/hooks/useSettingsLogic';
 import { useBackupLogic } from '../src/hooks/useBackupLogic';
 import { useOperationsByType } from '../src/hooks/useLongRunningOperations';
 import { OperationType } from '../src/services/lro/OperationProgress';
-import { useReminderSettings } from '../src/hooks/useReminderSettings';
-import type { ReminderProfileName } from '../src/hooks/useReminderSettings';
-import * as Notifications from 'expo-notifications';
+import { useReminderPreferences } from '../src/hooks/useReminderPreferences';
 import { EditProfileModal } from '../src/components/modals/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/modals/DeleteAccountModal';
@@ -33,7 +31,6 @@ import {
   SendFeedbackModal,
   CreateGroupModal,
   ZyrenInfoModal,
-  ActiveRemindersModal,
   PersonalizeRemindersModal,
 } from '../src/components/settings';
 
@@ -72,7 +69,6 @@ export default function SettingsScreen() {
   const [securityExpanded, setSecurityExpanded] = useState(false);
   const [collaborationExpanded, setCollaborationExpanded] = useState(false);
   const [isZyrenInfoVisible, setIsZyrenInfoVisible] = useState(false);
-  const [isActiveRemindersVisible, setIsActiveRemindersVisible] = useState(false);
   const [isPersonalizeRemindersVisible, setIsPersonalizeRemindersVisible] = useState(false);
   const {
     t,
@@ -176,7 +172,7 @@ export default function SettingsScreen() {
     twoFactorEnabled,
   } = useSettingsLogic();
 
-  const reminderCtx = useReminderSettings();
+  const reminderCtx = useReminderPreferences();
 
   const {
     prefs: backupPrefs,
@@ -548,49 +544,14 @@ export default function SettingsScreen() {
               )}
 
               <SettingRow
-                title={t('reminders.globalProfile', 'Perfil de recordatorios')}
-                desc={reminderCtx.getProfileLabelName(reminderCtx.globalProfile)}
+                title={t('reminders.configure', 'Configuración de recordatorios')}
+                desc={reminderCtx.summaryText}
                 right={
                   <TouchableOpacity style={[styles.outlinePill, { minWidth: 90, justifyContent: 'center' }]} onPress={() => setIsPersonalizeRemindersVisible(true)}>
                     <Text style={[styles.outlinePillText, { textAlign: 'center' }]}>{t('common.manage', 'Gestionar')}</Text>
                   </TouchableOpacity>
                 }
               />
-
-              <SettingRow
-                title={t('reminders.activeReminders', 'Recordatorios activos')}
-                desc={t('reminders.activeCount', { count: reminderCtx.health.scheduledCount })}
-                right={
-                  <TouchableOpacity style={[styles.outlinePill, { minWidth: 90, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' }]} onPress={() => setIsActiveRemindersVisible(true)}>
-                    <Ionicons name="eye-outline" size={14} color={theme.colors.text.secondary} style={{ marginRight: 4 }} />
-                    <Text style={[styles.outlinePillText, { textAlign: 'center' }]} numberOfLines={1}>{t('common.view', 'Ver')}</Text>
-                  </TouchableOpacity>
-                }
-              />
-
-              <TouchableOpacity
-                style={{ marginTop: 8, backgroundColor: theme.colors.primary + '15', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
-                onPress={async () => {
-                  try {
-                    const id = await Notifications.scheduleNotificationAsync({
-                      content: { title: 'Test notification', body: 'Debe sonar en 2 minutos' },
-                      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 120 },
-                    });
-                    const all = await Notifications.getAllScheduledNotificationsAsync();
-                    console.log('[NOTIF-TEST] Scheduled:', id);
-                    console.log('[NOTIF-TEST] All scheduled after:', JSON.stringify(all.map(n => ({ id: n.identifier, trigger: n.trigger })), null, 2));
-                    alertRef.show({ title: 'Notificación programada', message: `ID: ${id}\nTotal programadas: ${all.length}\nDebería sonar en 2 minutos.`, type: 'info' });
-                  } catch (err) {
-                    console.error('[NOTIF-TEST] Failed:', err);
-                    alertRef.show({ title: 'Error', message: String(err), type: 'error' });
-                  }
-                }}
-              >
-                <Ionicons name="flask-outline" size={14} color={theme.colors.primary} style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: '500' }}>
-                  Enviar notificación de prueba (2 min)
-                </Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -1330,15 +1291,10 @@ export default function SettingsScreen() {
         onClose={() => setIsZyrenInfoVisible(false)}
       />
 
-      <ActiveRemindersModal
-        visible={isActiveRemindersVisible}
-        onClose={() => setIsActiveRemindersVisible(false)}
-      />
-
       <PersonalizeRemindersModal
         visible={isPersonalizeRemindersVisible}
         onClose={() => setIsPersonalizeRemindersVisible(false)}
-        reminderCtx={reminderCtx}
+        ctx={reminderCtx}
       />
 
     </SafeAreaView>

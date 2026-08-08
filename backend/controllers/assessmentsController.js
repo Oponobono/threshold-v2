@@ -37,6 +37,10 @@ const denormalizeAssessment = (row, versionRow, scales) => {
     user_id: row.user_id,
     due_date: row.due_date || null,
     grading_date: row.grading_date || null,
+    starts_at: row.starts_at || null,
+    ends_at: row.ends_at || null,
+    due_at: row.due_at || null,
+    assessment_type: row.assessment_type || null,
     created_at: row.created_at || null,
     updated_at: row.updated_at || null
   };
@@ -213,9 +217,9 @@ exports.getAssessmentsByUser = (req, res) => {
  * Agregar una nueva evaluación a una materia
  */
 exports.createAssessment = (req, res) => {
-  const { id: clientId, subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date } = req.body;
+  const { id: clientId, subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date, starts_at, ends_at, due_at, assessment_type } = req.body;
   console.log('[POST] 📝 createAssessment payload:', {
-    subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date
+    subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date, starts_at, ends_at, due_at, assessment_type
   });
 
   // Si se envía grade_value sin out_of, asumir escala 0-5
@@ -233,8 +237,8 @@ exports.createAssessment = (req, res) => {
     const user_id = subject.user_id;
     const newAssessmentId = clientId || uuidv4();
     const query = `
-      INSERT INTO assessments (id, user_id, subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO assessments (id, user_id, subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date, starts_at, ends_at, due_at, assessment_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         user_id = excluded.user_id,
         subject_id = excluded.subject_id,
@@ -249,11 +253,15 @@ exports.createAssessment = (req, res) => {
         is_completed = excluded.is_completed,
         category_id = excluded.category_id,
         due_date = excluded.due_date,
-        grading_date = excluded.grading_date
+        grading_date = excluded.grading_date,
+        starts_at = excluded.starts_at,
+        ends_at = excluded.ends_at,
+        due_at = excluded.due_at,
+        assessment_type = excluded.assessment_type
     `;
     db.run(
       query,
-      [newAssessmentId, user_id, subject_id, name, type, date, weight, finalOutOf, score || null, percentage || null, grade_value ?? null, is_completed ? 1 : 0, category_id || null, due_date || null, grading_date || null],
+      [newAssessmentId, user_id, subject_id, name, type, date, weight, finalOutOf, score || null, percentage || null, grade_value ?? null, is_completed ? 1 : 0, category_id || null, due_date || null, grading_date || null, starts_at || null, ends_at || null, due_at || null, assessment_type || null],
       function(err) {
         if (err) {
           console.error('[POST] ❌ Error insertando assessment:', err.message);
@@ -460,7 +468,7 @@ const fetchAndDenormalizeAssessment = async (assessmentId, userId) => {
  */
 exports.updateAssessment = (req, res) => {
   const { id } = req.params;
-  const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date } = req.body;
+  const { subject_id, name, type, date, weight, out_of, score, percentage, grade_value, is_completed, category_id, due_date, grading_date, starts_at, ends_at, due_at, assessment_type } = req.body;
   console.log(`[AssessmentsController] updateAssessment ID ${id} payload:`, req.body);
 
   // Build dynamic UPDATE query for assessments table
@@ -506,6 +514,22 @@ exports.updateAssessment = (req, res) => {
   if (grading_date !== undefined) {
     updates.push('grading_date = ?');
     values.push(grading_date);
+  }
+  if (starts_at !== undefined) {
+    updates.push('starts_at = ?');
+    values.push(starts_at);
+  }
+  if (ends_at !== undefined) {
+    updates.push('ends_at = ?');
+    values.push(ends_at);
+  }
+  if (due_at !== undefined) {
+    updates.push('due_at = ?');
+    values.push(due_at);
+  }
+  if (assessment_type !== undefined) {
+    updates.push('assessment_type = ?');
+    values.push(assessment_type);
   }
 
   // Permitir actualizaciones si se envían campos para assessment_results

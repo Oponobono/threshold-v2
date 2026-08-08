@@ -37,7 +37,6 @@ export { AssessmentPolicy } from './policies/AssessmentPolicy';
 export { ClassPolicy } from './policies/ClassPolicy';
 export { EventPolicy } from './policies/EventPolicy';
 export { ReviewPolicy } from './policies/ReviewPolicy';
-export { GradingPolicy } from './policies/GradingPolicy';
 
 export { ReminderSnapshotAssembler } from './ReminderSnapshotAssembler';
 export { SequenceFactory } from './SequenceFactory';
@@ -48,6 +47,10 @@ export { ReminderEngine } from './ReminderEngine';
 export { ReminderCoordinator } from './ReminderCoordinator';
 export { ReminderSnapshotBuilder } from './ReminderSnapshotBuilder';
 export { createDefaultReminderCoordinator, createDefaultSnapshotRepos } from './ReminderSystemFactory';
+export { computeDiff, formatDiffReport, formatReminderDiagnostics, formatDeltaMs, formatExactAlarmCapability, computeCanScheduleExactAlarms } from './ReminderDiagnosticsCore';
+export type { DiffStatus, DiffItem, ReminderDiagnosticsData, ExactAlarmCapability } from './ReminderDiagnosticsCore';
+export { collectReminderDiagnostics, isReminderDeliveryLoggingEnabled, enableReminderDeliveryLogging, disableReminderDeliveryLogging, collectExactAlarmCapability, openExactAlarmSettings, requestExactAlarmPermission } from './ReminderDiagnostics';
+export type { OSStressResult, ExactAlarmRequestResult } from './ReminderDiagnostics';
 export type { PerformanceObserver } from './PerformanceObserver';
 export { NullObserver, MetricsCollector } from './PerformanceObserver';
 export type { StageMetricsSummary } from './PerformanceObserver';

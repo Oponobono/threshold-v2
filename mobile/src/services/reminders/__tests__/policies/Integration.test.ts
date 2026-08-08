@@ -3,7 +3,6 @@ import { AssessmentPolicy } from '../../policies/AssessmentPolicy';
 import { ClassPolicy } from '../../policies/ClassPolicy';
 import { EventPolicy } from '../../policies/EventPolicy';
 import { ReviewPolicy } from '../../policies/ReviewPolicy';
-import { GradingPolicy } from '../../policies/GradingPolicy';
 import { SequenceFactory } from '../../SequenceFactory';
 import { ReminderSnapshotAssembler } from '../../ReminderSnapshotAssembler';
 import { FakeClock } from '../../Clock';
@@ -20,7 +19,6 @@ function createRegistry(): PolicyRegistry {
   registry.register(new ClassPolicy());
   registry.register(new EventPolicy());
   registry.register(new ReviewPolicy());
-  registry.register(new GradingPolicy());
   return registry;
 }
 
@@ -51,7 +49,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const registry = createRegistry();
       const factory = new SequenceFactory(clock, assembler);
 
-      const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active', subjectId: 'subj-1' };
+      const entity = { id: 'a-1', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z', status: 'active', subjectId: 'subj-1' };
       const seq = buildSequence(registry, factory, 'assessment', entity);
 
       expect(seq.entityType).toBe('assessment');
@@ -66,7 +64,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const registry = createRegistry();
       const factory = new SequenceFactory(clock, assembler);
 
-      const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active', subjectId: 'subj-1' };
+      const entity = { id: 'a-1', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z', status: 'active', subjectId: 'subj-1' };
       const seq = buildSequence(registry, factory, 'assessment', entity);
       const r = seq.reminders[0];
 
@@ -81,7 +79,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const registry = createRegistry();
       const factory = new SequenceFactory(clock, assembler);
 
-      const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active' };
+      const entity = { id: 'a-1', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'assessment', entity);
 
       expect(seq.expiresAt!.toISOString()).toBe('2026-07-15T11:00:00.000Z');
@@ -92,7 +90,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const registry = createRegistry();
       const factory = new SequenceFactory(clock, assembler);
 
-      const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active' };
+      const entity = { id: 'a-1', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'assessment', entity, 'persistent');
 
       expect(seq.reminders).toHaveLength(7);
@@ -104,7 +102,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const registry = createRegistry();
       const factory = new SequenceFactory(clock, assembler);
 
-      const entity = { id: 'a-1', date: '2026-07-15T10:00:00Z', status: 'active' };
+      const entity = { id: 'a-1', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z', status: 'active' };
       const seq = buildSequence(registry, factory, 'assessment', entity, 'minimal');
 
       expect(seq.reminders).toHaveLength(2);
@@ -165,21 +163,6 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
     });
   });
 
-  describe('cadena completa para GradingPeriod', () => {
-    it('produce secuencia con 3 reminders en standard', () => {
-      const clock = new FakeClock(ANCHOR);
-      const registry = createRegistry();
-      const factory = new SequenceFactory(clock, assembler);
-
-      const entity = { id: 'g-1', closeDate: '2026-08-01T00:00:00Z', status: 'active' };
-      const seq = buildSequence(registry, factory, 'grading_period', entity);
-
-      expect(seq.reminders).toHaveLength(3);
-      expect(seq.reminders[0].intent).toBe('submit_work');
-      expect(seq.expiresAt!.toISOString()).toBe('2026-08-02T00:00:00.000Z');
-    });
-  });
-
   describe('cadena completa para CalendarEvent', () => {
     it('produce secuencia con 2 reminders en standard', () => {
       const clock = new FakeClock(ANCHOR);
@@ -206,17 +189,6 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       };
       expect(policy.shouldCancel(seq, entity)).toBe(true);
     });
-
-    it('GradingPeriod closed → shouldCancel true', () => {
-      const registry = createRegistry();
-      const policy = registry.get('grading_period');
-      const entity = { id: 'g-1', status: 'closed' };
-      const seq: ReminderSequence = {
-        id: 'g-1', entityType: 'grading_period', entityId: 'g-1',
-        reminders: [], createdAt: ANCHOR, expiresAt: null, status: 'active',
-      };
-      expect(policy.shouldCancel(seq, entity)).toBe(true);
-    });
   });
 
   describe('determinismo cross-entity', () => {
@@ -225,7 +197,7 @@ describe('Integration: Registry → Policy → Factory → Sequence', () => {
       const registry = createRegistry();
       const factory = new SequenceFactory(clock, assembler);
 
-      const entity = { id: 'x', date: '2026-07-15T10:00:00Z', status: 'active' };
+      const entity = { id: 'x', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z', status: 'active' };
 
       const s1 = buildSequence(registry, factory, 'assessment', entity);
       const s2 = buildSequence(registry, factory, 'assessment', entity);

@@ -1,5 +1,7 @@
 # Reminder Settings — Design Brief
 
+> **⛔ SUPERSEDED (Ago 2026)**. Este brief prescribe una tabla `reminder_settings` **sincronizable**, perfiles de usuario y weekly digest. El contrato vigente decidió lo contrario: **`ReminderPreferences` es DEVICE-LOCAL (MMKV), no sincronizable**, sin perfiles expuestos y sin digest. Véase `docs/architecture/REMINDER_SYSTEM_V1_CONTRACT.md` (§3). Se conserva como registro histórico del diseño que fue evaluado y descartado.
+
 **Estado**: Design brief. No implementado.
 **Precede a**: Sprint de producto para reemplazar los 3 toggles legacy por la UI del Reminder System v1.0.
 **Dependencias**: Reminder System v1.0 (✅ estable), `notificationService.ts` legacy (por eliminar).

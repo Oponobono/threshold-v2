@@ -58,19 +58,23 @@ export const createSchedule = async (payload: { subject_id: string; day_of_week:
   const schedule: any = { id, user_id: userId, ...payload };
   await scheduleRepository.create(schedule);
 
+  // El backend usa clientId || uuidv4(): si no enviamos el id local,
+  // el servidor genera otro UUID y el pull posterior duplica la fila.
+  const syncPayload = { ...payload, id };
+
   fetchWithFallback('/schedules', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(syncPayload),
   }).then(async (response) => {
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
       await scheduleRepository.update(data.id, data);
     } else {
-      await syncService.enqueueCreate('schedule', id, payload);
+      await syncService.enqueueCreate('schedule', id, syncPayload);
     }
   }).catch(() => {
-    syncService.enqueueCreate('schedule', id, payload);
+    syncService.enqueueCreate('schedule', id, syncPayload);
   });
 
   return schedule;

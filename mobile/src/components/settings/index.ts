@@ -8,5 +8,4 @@ export { FaqModal } from './FaqModal';
 export { SendFeedbackModal } from './SendFeedbackModal';
 export { CreateGroupModal } from './CreateGroupModal';
 export { ZyrenInfoModal } from './ZyrenInfoModal';
-export { ActiveRemindersModal } from './ActiveRemindersModal';
 export { PersonalizeRemindersModal } from './PersonalizeRemindersModal';

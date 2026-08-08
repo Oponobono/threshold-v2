@@ -6,7 +6,6 @@ const TABLE_NAME_TO_ENGINE_TYPE: Record<string, string> = {
   assessments: 'assessment',
   schedules: 'schedule',
   flashcard_decks: 'flashcard_deck',
-  grading_periods: 'grading_period',
   calendar_events: 'calendar_event',
 };
 

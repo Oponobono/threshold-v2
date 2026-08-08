@@ -54,4 +54,29 @@ describe('EventPolicy', () => {
       expect(policy.getExpiration({})).toBeNull();
     });
   });
+
+  describe('getExpiration / getEventTime con fechas DD-MM-YYYY', () => {
+    it('getEventTime con startDate DD-MM-YYYY → fecha válida (día primero)', () => {
+      const t = policy.getEventTime({ start_date: '09-07-2026' });
+      expect(t).not.toBeNull();
+      expect(t!.getFullYear()).toBe(2026);
+      expect(t!.getMonth()).toBe(6);
+      expect(t!.getDate()).toBe(9);
+    });
+
+    it('getExpiration con end_date DD-MM-YYYY → +30 min', () => {
+      const exp = policy.getExpiration({ end_date: '09-07-2026' });
+      expect(exp).not.toBeNull();
+      expect(exp!.getFullYear()).toBe(2026);
+      expect(exp!.getMonth()).toBe(6);
+      expect(exp!.getDate()).toBe(9);
+      expect(exp!.getHours()).toBe(0);
+      expect(exp!.getMinutes()).toBe(30);
+    });
+
+    it('fecha DD-MM-YYYY inválida → null (sin NaN)', () => {
+      expect(policy.getEventTime({ start_date: '32-07-2026' })).toBeNull();
+      expect(policy.getExpiration({ end_date: '32-07-2026' })).toBeNull();
+    });
+  });
 });

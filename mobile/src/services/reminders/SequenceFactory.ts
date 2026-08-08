@@ -36,7 +36,8 @@ export class SequenceFactory {
       const scheduledAt = new Date(baseTime.getTime() + offsetMinutes * 60000);
       const intent = this._determineIntent(entityType, offsetMinutes);
       const priority = this._determinePriority(entityType, entity, offsetMinutes, now);
-      const id = `${entityType}::${entityId}::${i}`;
+      const absOffset = Math.abs(offsetMinutes);
+      const id = `${entityType}::${entityId}::offset::${absOffset}`;
       const subjectId = entity?.subjectId ?? entity?.subject_id ?? undefined;
 
       reminders.push({
@@ -87,8 +88,6 @@ export class SequenceFactory {
         case 'flashcard_deck':
         case 'flashcard':
           return 'review_cards';
-        case 'grading_period':
-          return 'submit_work';
         default:
           return 'follow_up';
       }

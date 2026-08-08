@@ -209,6 +209,36 @@ Cada operación se audita en 4 capas: **UI** (existe interacción), **API** (exi
 | Re-corregir | ❌ | ❌ | ❌ | ❌ |
 | Resetear estadísticas | ❌ | ❌ | ❌ | ❌ |
 
+### 1.6 Reminder System (Notificaciones v1 — 🔒 Congelado Ago 2026)
+
+No es una entidad persistente: es un **sistema de planificación** que traduce entidades de dominio (SQLite) en notificaciones del OS. Contrato vigente: `docs/architecture/REMINDER_SYSTEM_V1_CONTRACT.md`.
+
+#### Entidades consumidas por el engine
+
+| Entidad | Estado en el engine | Supersede a |
+|---------|--------------------|-------------|
+| Schedule (sesiones) | ✅ Sesiones lógicas (SessionMerger: A,A,A → 1 notificación) | ❌ Perfiles (internos al engine) |
+| Assessment | ✅ 1 recordatorio por evento lógico | ❌ Weekly Digest |
+| CalendarEvent | ✅ 1 recordatorio por evento lógico | — |
+| FlashcardDeck | ✅ Repasos (ReviewPolicy, bloque de estudio determinista) | — |
+| GradingPeriod | ✅ 1 recordatorio por evento lógico | — |
+
+#### Preferencias (ReminderPreferences)
+
+| Aspecto | Decisión |
+|---------|----------|
+| Almacenamiento | MMKV device-local — **NO sincronizable**, sin tabla SQLite, sin `sync_version`, sin endpoint backend |
+| Master switch | `notificationsEnabled` → plan vacío + OS a cero |
+| Offset | `category.offset ?? defaultOffset` (por categoría, `null` = hereda el global) |
+| Quiet hours | OMIT (no defer) |
+| Settings UI | Toggle master + 5 categorías + offset por categoría + anticipación global + horario de silencio + reset |
+
+#### Estado del sistema
+
+- 63 suites / 676 PASS + 1 skip (contrato legacy por fila física).
+- Full Regression E2E: 9 escenarios, invariante `OS === desired plan`.
+- Test count no aplica al ciclo de vida CRUD (el sistema no es una entidad).
+
 ---
 
 ## 2. State Machine Matrix
@@ -469,6 +499,15 @@ Cada fase: `pending → running → done | error`
 | ❌ Re-corregir respuesta | CardReview | Corregir rating erroneo |
 | ❌ Cerrar/Reabrir período | GradingPeriod | Estado de período académico |
 
+### Fuera de alcance v1 (decisión de producto, Reminder System)
+
+| Ítem | Estado |
+|------|--------|
+| "Próximos recordatorios" (Agenda/Upcoming) | Futura surface independiente de Settings, si el producto demuestra que aporta confianza |
+| Perfiles (minimal/standard/persistent/custom) | Internos al engine, nunca expuestos |
+| Weekly Digest | No existe en el engine |
+| Diagnóstico en Settings | Developer Console (herramienta interna de desarrollo, no producto)
+
 ---
 
 ## 7. Reglas de Gobierno
@@ -492,7 +531,7 @@ Antes de escribir código, completa:
 
 ---
 
-*Generado: 2026-07-02. Documento vivo — actualizar con cada cambio de modelo de negocio.*
+*Generado: 2026-07-02. Documento vivo — actualizar con cada cambio de modelo de negocio. Última actualización: 2026-08-08 (Reminder System v1 congelado en §1.6).*
 
 
 ---

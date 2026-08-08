@@ -166,6 +166,13 @@ export default function HybridDashboardScreen() {
   const lastFocusRefreshRef = useRef<number>(0);
   const FOCUS_REFRESH_THROTTLE_MS = 5 * 60 * 1000; // 5 min
 
+  // ── Tiempo reactivo para el countdown del Dashboard ─────────────────────
+  const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTimestamp(Date.now()), 30 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // Snooze State
   const snoozeManager = useDueCardSnooze();
   const [isSnoozeModalVisible, setIsSnoozeModalVisible] = useState(false);
@@ -585,7 +592,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
 
   // ── "Lo siguiente": estado de próxima clase (hoy / mañana) ─────────────
   const upNextClass = useMemo(() => {
-    const now = new Date();
+    const now = new Date(nowTimestamp);
     const todayDow = now.getDay();
     const tomorrowDow = (todayDow + 1) % 7;
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -647,7 +654,7 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
       live: false,
       subjectId: undefined,
     };
-  }, [storeSchedules, subjectNamesMap, t]);
+  }, [storeSchedules, subjectNamesMap, t, nowTimestamp]);
 
   // ── "Lo siguiente": próxima tarea (hoy / mañana) ───────────────────────
   const upNextTask = useMemo(() => {
@@ -755,10 +762,15 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
               accessibilityRole="button"
               accessibilityLabel={t('dashboard.openSettings')}
             >
-              <Image 
-                source={{ uri: profileAvatarUri }} 
-                style={styles.avatar} 
-              />
+              <View style={styles.avatarBadgeWrapper}>
+                <Image 
+                  source={{ uri: profileAvatarUri }} 
+                  style={styles.avatar} 
+                />
+                <View style={styles.settingsBadge}>
+                  <Ionicons name="settings" size={15} color={theme.colors.primary} />
+                </View>
+              </View>
             </TouchableOpacity>
           </View>
         </View>

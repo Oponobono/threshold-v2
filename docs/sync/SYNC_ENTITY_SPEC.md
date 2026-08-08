@@ -20,7 +20,9 @@ Esta clasificación **no es reversible sin justificación explícita**.
 | Categoría | Descripción | Ejemplos |
 |-----------|-------------|----------|
 | **Entidad Sincronizable** | Cumple los 10 invariantes. Participa en Initial Sync, Delta Sync y Push. | `subjects`, `flashcards`, `ai_chats`, `assessment_files` |
-| **Entidad Local** | Existe solo en el dispositivo. No tiene identidad global. | Cachés de UI, flags de sesión |
+| **Entidad Local** | Existe solo en el dispositivo. No tiene identidad global. | Cachés de UI, flags de sesión, **`ReminderPreferences` (MMKV)** |
+
+> **Caso decidido (Ago 2026)**: `ReminderPreferences` (preferencias de recordatorios) es **Entidad Local**. No tiene tabla SQLite, no participa en Initial/Delta/Push, no tiene `sync_version` ni endpoint backend. Son metadatos de configuración del dispositivo, no datos de dominio del usuario. Véase `docs/architecture/REMINDER_SYSTEM_V1_CONTRACT.md` §3.1. Cualquier propuesta de sincronizarla debe pasar por la regla de clasificación de arriba.
 | **Infraestructura** | Soporte del protocolo. No representa datos del dominio. | `sync_queue`, `sync_journal`, `sync_debug_logs` |
 | **Legacy / Pendiente de rediseño** | Tabla sin dueño claro, modelo incorrecto, o sin consumidores activos. Excluida del protocolo hasta rediseño formal. | `user_preferences` |
 

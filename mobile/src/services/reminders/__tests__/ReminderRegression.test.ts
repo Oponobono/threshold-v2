@@ -3,7 +3,6 @@ import { AssessmentPolicy } from '../policies/AssessmentPolicy';
 import { ClassPolicy } from '../policies/ClassPolicy';
 import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
-import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
 import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { ReminderEngine } from '../ReminderEngine';
@@ -27,17 +26,14 @@ class FakeI18n implements I18nService {
       'entity.schedule': 'Clase',
       'entity.flashcard_deck': 'Mazo',
       'entity.calendar_event': 'Evento',
-      'entity.grading_period': 'Periodo',
       'intentTitle.prepare_exam': 'Preparar {entity}',
       'intentTitle.attend_class': 'Asistir a {entity}',
       'intentTitle.review_cards': 'Repasar {entity}',
       'intentTitle.follow_up': 'Seguimiento {entity}',
-      'intentTitle.submit_work': 'Entregar {entity}',
       'intentBody.prepare_exam': 'Tu {entity} se acerca.',
       'intentBody.attend_class': 'Tu {entity} comienza pronto.',
       'intentBody.review_cards': 'Tienes tarjetas pendientes de {entity}.',
       'intentBody.follow_up': 'Revisa {entity}.',
-      'intentBody.submit_work': 'Entrega pendiente de {entity}.',
     };
     const template = map[key] ?? key;
     const entityName = params?.entity ?? '';
@@ -97,7 +93,6 @@ class FakeRepos {
   assessments: { getAll: () => Promise<any[]> };
   schedules: { getAll: () => Promise<any[]> };
   flashcard_decks: { getAll: () => Promise<any[]> };
-  grading_periods: { getAll: () => Promise<any[]> };
   calendar_events: { getAll: () => Promise<any[]> };
 
   private _store: Record<string, any[]> = {};
@@ -106,14 +101,13 @@ class FakeRepos {
     this.assessments = { getAll: async () => [] };
     this.schedules = { getAll: async () => [] };
     this.flashcard_decks = { getAll: async () => [] };
-    this.grading_periods = { getAll: async () => [] };
     this.calendar_events = { getAll: async () => [] };
     if (initialData) this.load(initialData);
   }
 
   load(data: Record<string, any[]>): void {
     this._store = {};
-    for (const key of ['assessments', 'schedules', 'flashcard_decks', 'grading_periods', 'calendar_events']) {
+    for (const key of ['assessments', 'schedules', 'flashcard_decks', 'calendar_events']) {
       this._store[key] = [...(data[key] ?? [])];
     }
     this._rebuild();
@@ -123,7 +117,6 @@ class FakeRepos {
     this.assessments = { getAll: async () => [...(this._store.assessments ?? [])] };
     this.schedules = { getAll: async () => [...(this._store.schedules ?? [])] };
     this.flashcard_decks = { getAll: async () => [...(this._store.flashcard_decks ?? [])] };
-    this.grading_periods = { getAll: async () => [...(this._store.grading_periods ?? [])] };
     this.calendar_events = { getAll: async () => [...(this._store.calendar_events ?? [])] };
   }
 }
@@ -145,7 +138,6 @@ function createEngineContext(): EngineContext {
   registry.register(new ClassPolicy());
   registry.register(new ReviewPolicy());
   registry.register(new EventPolicy());
-  registry.register(new GradingPolicy());
 
   const assembler = new ReminderSnapshotAssembler();
   const factory = new SequenceFactory(clock, assembler);
@@ -163,7 +155,6 @@ function emptySnapshot(): ReminderSourceSnapshot {
     assessments: [],
     schedules: [],
     flashcard_decks: [],
-    grading_periods: [],
     calendar_events: [],
   };
 }
@@ -171,7 +162,7 @@ function emptySnapshot(): ReminderSourceSnapshot {
 function assessmentEntity(id: string, overrides: Record<string, any> = {}): any {
   return {
     id,
-    date: new Date('2026-07-15T10:00:00Z').toISOString(),
+    assessment_type: 'exam', starts_at: new Date('2026-07-15T10:00:00Z').toISOString(),
     title: 'Examen',
     ...overrides,
   };
@@ -227,8 +218,8 @@ describe('Reminder System — Regression Suite', () => {
     it('A → logout → B → no state leak between sessions', async () => {
       const ctxA = createEngineContext();
       const reposA = new FakeRepos({
-        assessments: [{ id: 'a-user-a', date: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen A' }],
-        schedules: [], flashcard_decks: [], grading_periods: [], calendar_events: [],
+        assessments: [{ id: 'a-user-a', assessment_type: 'exam', starts_at: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen A' }],
+        schedules: [], flashcard_decks: [], calendar_events: [],
       });
       const builderA = new ReminderSnapshotBuilder(reposA);
       const coordinatorA = new ReminderCoordinator(ctxA.engine, builderA, {});
@@ -240,8 +231,8 @@ describe('Reminder System — Regression Suite', () => {
 
       const ctxB = createEngineContext();
       const reposB = new FakeRepos({
-        assessments: [{ id: 'a-user-b', date: new Date('2026-07-20T10:00:00Z').toISOString(), title: 'Examen B' }],
-        schedules: [], flashcard_decks: [], grading_periods: [], calendar_events: [],
+        assessments: [{ id: 'a-user-b', assessment_type: 'exam', starts_at: new Date('2026-07-20T10:00:00Z').toISOString(), title: 'Examen B' }],
+        schedules: [], flashcard_decks: [], calendar_events: [],
       });
       const builderB = new ReminderSnapshotBuilder(reposB);
       const coordinatorB = new ReminderCoordinator(ctxB.engine, builderB, {});
@@ -294,8 +285,8 @@ describe('Reminder System — Regression Suite', () => {
       await assertConvergence(
         {},
         [
-          { type: 'create', entityType: 'assessment', entity: { id: 'a1', date: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen' } },
-          { type: 'update', entityType: 'assessment', entity: { id: 'a1', date: new Date('2026-07-16T10:00:00Z').toISOString(), title: 'Movido' } },
+          { type: 'create', entityType: 'assessment', entity: { id: 'a1', assessment_type: 'exam', starts_at: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen' } },
+          { type: 'update', entityType: 'assessment', entity: { id: 'a1', assessment_type: 'exam', starts_at: new Date('2026-07-16T10:00:00Z').toISOString(), title: 'Movido' } },
           { type: 'delete', entityType: 'assessment', entityId: 'a1' },
         ],
       );
@@ -307,8 +298,8 @@ describe('Reminder System — Regression Suite', () => {
     it('resync con mismos datos no altera estado', async () => {
       const ctx = createEngineContext();
       const repos = new FakeRepos({
-        assessments: [{ id: 'a1', date: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen' }],
-        schedules: [], flashcard_decks: [], grading_periods: [], calendar_events: [],
+        assessments: [{ id: 'a1', assessment_type: 'exam', starts_at: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen' }],
+        schedules: [], flashcard_decks: [], calendar_events: [],
       });
 
       const snapshot1 = await new ReminderSnapshotBuilder(repos).build();
@@ -328,8 +319,8 @@ describe('Reminder System — Regression Suite', () => {
     it('destroy → create → initialize no retiene estado previo', async () => {
       const ctx1 = createEngineContext();
       const repos1 = new FakeRepos({
-        assessments: [{ id: 'a1', date: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Sesion 1' }],
-        schedules: [], flashcard_decks: [], grading_periods: [], calendar_events: [],
+        assessments: [{ id: 'a1', assessment_type: 'exam', starts_at: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Sesion 1' }],
+        schedules: [], flashcard_decks: [], calendar_events: [],
       });
       const coord1 = new ReminderCoordinator(ctx1.engine, new ReminderSnapshotBuilder(repos1), {});
       await coord1.initialize();
@@ -338,8 +329,8 @@ describe('Reminder System — Regression Suite', () => {
 
       const ctx2 = createEngineContext();
       const repos2 = new FakeRepos({
-        assessments: [{ id: 'a2', date: new Date('2026-07-20T10:00:00Z').toISOString(), title: 'Sesion 2' }],
-        schedules: [], flashcard_decks: [], grading_periods: [], calendar_events: [],
+        assessments: [{ id: 'a2', assessment_type: 'exam', starts_at: new Date('2026-07-20T10:00:00Z').toISOString(), title: 'Sesion 2' }],
+        schedules: [], flashcard_decks: [], calendar_events: [],
       });
       const coord2 = new ReminderCoordinator(ctx2.engine, new ReminderSnapshotBuilder(repos2), {});
       await coord2.initialize();
@@ -354,8 +345,8 @@ describe('Reminder System — Regression Suite', () => {
     it('segundo initialize() es no-op', async () => {
       const ctx = createEngineContext();
       const repos = new FakeRepos({
-        assessments: [{ id: 'a1', date: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen' }],
-        schedules: [], flashcard_decks: [], grading_periods: [], calendar_events: [],
+        assessments: [{ id: 'a1', assessment_type: 'exam', starts_at: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen' }],
+        schedules: [], flashcard_decks: [], calendar_events: [],
       });
       const coordinator = new ReminderCoordinator(ctx.engine, new ReminderSnapshotBuilder(repos), {});
       await coordinator.initialize();

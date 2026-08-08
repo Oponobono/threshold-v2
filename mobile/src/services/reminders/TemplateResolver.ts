@@ -41,7 +41,6 @@ export class TemplateResolver {
     if (reminder.entityType === 'assessment') return 'threshold://assessments/' + reminder.entityId;
     if (reminder.entityType === 'schedule') return 'threshold://schedules/' + reminder.entityId;
     if (reminder.entityType === 'flashcard_deck') return 'threshold://decks/' + reminder.entityId;
-    if (reminder.entityType === 'grading_period') return 'threshold://grades/' + reminder.entityId;
     if (reminder.entityType === 'calendar_event') return 'threshold://events/' + reminder.entityId;
     return undefined;
   }

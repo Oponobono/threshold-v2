@@ -180,7 +180,6 @@ export interface ReminderSourceSnapshot {
   readonly schedules?: readonly any[];
   readonly flashcard_decks?: readonly any[];
   readonly calendar_events?: readonly any[];
-  readonly grading_periods?: readonly any[];
 }
 
 export interface StageTiming {

@@ -3,7 +3,6 @@ import { AssessmentPolicy } from '../policies/AssessmentPolicy';
 import { ClassPolicy } from '../policies/ClassPolicy';
 import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
-import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
 import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { FakeClock } from '../Clock';
@@ -31,7 +30,6 @@ class FakeI18n implements I18nService {
       'entity.schedule': 'Clase',
       'entity.flashcard_deck': 'Mazo',
       'entity.calendar_event': 'Evento',
-      'entity.grading_period': 'Periodo',
       'intentTitle.prepare_exam': 'Preparar {entity}',
       'intentTitle.attend_class': 'Asistir a {entity}',
       'intentTitle.review_cards': 'Repasar {entity}',
@@ -121,7 +119,6 @@ function createRegistry(): PolicyRegistry {
   r.register(new ClassPolicy());
   r.register(new ReviewPolicy());
   r.register(new EventPolicy());
-  r.register(new GradingPolicy());
   return r;
 }
 
@@ -171,13 +168,6 @@ function entityForEntityType(entityType: string): any {
         endDate: '2026-07-10T12:00:00Z',
         status: 'active',
         title: 'Reunión',
-      };
-    case 'grading_period':
-      return {
-        id: 'g-1',
-        closeDate: '2026-07-20T23:59:00Z',
-        status: 'open',
-        title: 'Corte 1',
       };
     default:
       return { id: 'x-1' };

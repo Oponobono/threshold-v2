@@ -3,7 +3,6 @@ import { AssessmentPolicy } from '../policies/AssessmentPolicy';
 import { ClassPolicy } from '../policies/ClassPolicy';
 import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
-import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
 import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { ReminderEngine } from '../ReminderEngine';
@@ -102,7 +101,6 @@ function createSessionContext(): SessionContext {
   registry.register(new ClassPolicy());
   registry.register(new ReviewPolicy());
   registry.register(new EventPolicy());
-  registry.register(new GradingPolicy());
 
   const assembler = new ReminderSnapshotAssembler();
   const factory = new SequenceFactory(clock, assembler);
@@ -120,26 +118,23 @@ function createSessionContext(): SessionContext {
 type UserData = Record<string, any[]>;
 
 const USER_A: UserData = {
-  assessments: [{ id: 'a-user-a', date: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen A' }],
+  assessments: [{ id: 'a-user-a', assessment_type: 'exam', starts_at: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen A' }],
   schedules: [],
   flashcard_decks: [],
-  grading_periods: [],
   calendar_events: [],
 };
 
 const USER_B: UserData = {
-  assessments: [{ id: 'a-user-b', date: new Date('2026-07-20T10:00:00Z').toISOString(), title: 'Examen B' }],
+  assessments: [{ id: 'a-user-b', assessment_type: 'exam', starts_at: new Date('2026-07-20T10:00:00Z').toISOString(), title: 'Examen B' }],
   schedules: [],
   flashcard_decks: [],
-  grading_periods: [],
   calendar_events: [],
 };
 
 const USER_C: UserData = {
-  assessments: [{ id: 'a-user-c', date: new Date('2026-07-25T10:00:00Z').toISOString(), title: 'Examen C' }],
+  assessments: [{ id: 'a-user-c', assessment_type: 'exam', starts_at: new Date('2026-07-25T10:00:00Z').toISOString(), title: 'Examen C' }],
   schedules: [],
   flashcard_decks: [],
-  grading_periods: [],
   calendar_events: [],
 };
 
@@ -147,7 +142,6 @@ const EMPTY_USER: UserData = {
   assessments: [],
   schedules: [],
   flashcard_decks: [],
-  grading_periods: [],
   calendar_events: [],
 };
 
@@ -271,7 +265,7 @@ describe('Sprint 6.1.2 — Session Isolation', () => {
 
       const processing = ctx.engine.onEntityChanged('assessment', 'a-user-a', {
         id: 'a-user-a',
-        date: new Date('2026-07-15T10:00:00Z').toISOString(),
+        assessment_type: 'exam', starts_at: new Date('2026-07-15T10:00:00Z').toISOString(),
         title: 'updated',
       });
 

@@ -277,6 +277,10 @@ const tableSchema = {
         percentage REAL,
         due_date TEXT,
         grading_date TEXT,
+        starts_at TEXT,
+        ends_at TEXT,
+        due_at TEXT,
+        assessment_type TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id),
@@ -300,6 +304,10 @@ const tableSchema = {
         percentage REAL,
         due_date TEXT,
         grading_date TEXT,
+        starts_at TEXT,
+        ends_at TEXT,
+        due_at TEXT,
+        assessment_type TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -316,6 +324,10 @@ const tableSchema = {
       { name: 'percentage', type: 'REAL' },
       { name: 'due_date', type: 'TEXT' },
       { name: 'grading_date', type: 'TEXT' },
+      { name: 'starts_at', type: 'TEXT' },
+      { name: 'ends_at', type: 'TEXT' },
+      { name: 'due_at', type: 'TEXT' },
+      { name: 'assessment_type', type: 'TEXT' },
       { name: 'created_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
       { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }
     ]

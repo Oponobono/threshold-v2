@@ -3,7 +3,6 @@ import { AssessmentPolicy } from '../policies/AssessmentPolicy';
 import { ClassPolicy } from '../policies/ClassPolicy';
 import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
-import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
 import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { ReminderEngine } from '../ReminderEngine';
@@ -86,14 +85,12 @@ class FakeRepos {
   assessments: { getAll: () => Promise<any[]> };
   schedules: { getAll: () => Promise<any[]> };
   flashcard_decks: { getAll: () => Promise<any[]> };
-  grading_periods: { getAll: () => Promise<any[]> };
   calendar_events: { getAll: () => Promise<any[]> };
 
   constructor(initialData?: Record<string, any[]>) {
     this.assessments = { getAll: async () => [] };
     this.schedules = { getAll: async () => [] };
     this.flashcard_decks = { getAll: async () => [] };
-    this.grading_periods = { getAll: async () => [] };
     this.calendar_events = { getAll: async () => [] };
     if (initialData) this.load(initialData);
   }
@@ -102,7 +99,7 @@ class FakeRepos {
 
   load(data: Record<string, any[]>): void {
     this._store = {};
-    for (const key of ['assessments', 'schedules', 'flashcard_decks', 'grading_periods', 'calendar_events']) {
+    for (const key of ['assessments', 'schedules', 'flashcard_decks', 'calendar_events']) {
       this._store[key] = [...(data[key] ?? [])];
     }
     this._rebuild();
@@ -138,7 +135,6 @@ class FakeRepos {
       assessment: 'assessments',
       schedule: 'schedules',
       flashcard_deck: 'flashcard_decks',
-      grading_period: 'grading_periods',
       calendar_event: 'calendar_events',
     };
     return map[entityType] ?? null;
@@ -148,7 +144,6 @@ class FakeRepos {
     this.assessments = { getAll: async () => [...(this._store.assessments ?? [])] };
     this.schedules = { getAll: async () => [...(this._store.schedules ?? [])] };
     this.flashcard_decks = { getAll: async () => [...(this._store.flashcard_decks ?? [])] };
-    this.grading_periods = { getAll: async () => [...(this._store.grading_periods ?? [])] };
     this.calendar_events = { getAll: async () => [...(this._store.calendar_events ?? [])] };
   }
 }
@@ -177,7 +172,6 @@ function createEngineContext(): EngineContext {
   registry.register(new ClassPolicy());
   registry.register(new ReviewPolicy());
   registry.register(new EventPolicy());
-  registry.register(new GradingPolicy());
 
   const assembler = new ReminderSnapshotAssembler();
   const factory = new SequenceFactory(clock, assembler);
@@ -328,7 +322,6 @@ describe('Sprint 6.2 — Delta Sync Convergence', () => {
         [
           { type: 'create', entityType: 'assessment', entity: { id: 'a1', date: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen A' } },
           { type: 'create', entityType: 'schedule', entity: { id: 's1', startTime: new Date('2026-07-11T09:00:00Z').toISOString(), endTime: new Date('2026-07-11T10:30:00Z').toISOString(), title: 'Clase 1' } },
-          { type: 'create', entityType: 'grading_period', entity: { id: 'g1', name: 'Q1', closeDate: new Date('2026-08-01T00:00:00Z').toISOString() } },
           { type: 'create', entityType: 'calendar_event', entity: { id: 'e1', title: 'Evento', startDate: new Date('2026-07-12T15:00:00Z').toISOString(), endDate: new Date('2026-07-12T16:00:00Z').toISOString() } },
           { type: 'update', entityType: 'assessment', entity: { id: 'a1', date: new Date('2026-07-20T10:00:00Z').toISOString(), title: 'Examen A (movido)' } },
           { type: 'delete', entityType: 'schedule', entityId: 's1' },
@@ -374,7 +367,6 @@ describe('Sprint 6.2 — Delta Sync Convergence', () => {
         { type: 'create', entityType: 'calendar_event', entity: { id: 'e1', title: 'Revision', startDate: new Date('2026-07-12T15:00:00Z').toISOString(), endDate: new Date('2026-07-12T16:00:00Z').toISOString() } },
         { type: 'delete', entityType: 'flashcard_deck', entityId: 'd1' },
         { type: 'update', entityType: 'calendar_event', entity: { id: 'e1', title: 'Revision (confirmada)', startDate: new Date('2026-07-13T15:00:00Z').toISOString(), endDate: new Date('2026-07-13T16:00:00Z').toISOString() } },
-        { type: 'create', entityType: 'grading_period', entity: { id: 'g1', name: 'Q2', closeDate: new Date('2026-09-01T00:00:00Z').toISOString() } },
       ];
 
       for (const delta of deltas) {
@@ -425,7 +417,6 @@ describe('Sprint 6.2 — Delta Sync Convergence', () => {
         assessments: [{ id: 'a1', date: new Date('2026-07-15T10:00:00Z').toISOString(), title: 'Examen' }],
         schedules: [],
         flashcard_decks: [{ id: 'd1', name: 'Mazo', dueCardsCount: 10 }],
-        grading_periods: [],
         calendar_events: [],
       });
 

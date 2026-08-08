@@ -407,6 +407,74 @@ async function scenarioAudioTranscriptReplication(env) {
   return a.report();
 }
 
+async function scenarioAssessmentTemporalOffline(env) {
+  const A = await env.createDevice('A');
+  const B = await env.createDevice('B');
+  const { v4: uuidv4 } = require('uuid');
+  const subjId = uuidv4();
+  const examId = uuidv4();
+  const deadlineId = uuidv4();
+
+  // Subject must exist in backend before assessment can reference it
+  await A.op('subject', 'CREATE', subjId, { name: 'Calculus', color: '#FF0000' });
+  await A.sync();
+  await B.sync();
+
+  // A escribe offline (sin sync en medio): exam con datetime, deadline con due_at
+  await A.op('assessment', 'CREATE', examId, {
+    subject_id: subjId,
+    name: 'Examen Parcial',
+    type: 'exam',
+    assessment_type: 'exam',
+    starts_at: '2026-08-20T14:00',
+    ends_at: '2026-08-20T16:00',
+    due_at: null,
+    date: '2026-08-20',
+  });
+  await A.op('assessment', 'CREATE', deadlineId, {
+    subject_id: subjId,
+    name: 'Taller',
+    type: 'task',
+    assessment_type: 'deadline',
+    starts_at: null,
+    due_at: '2026-08-21T23:59',
+    date: '2026-08-21',
+  });
+
+  // Ciclo completo de sync
+  await A.sync();
+  await B.sync();
+  await A.sync();
+
+  const backend = await env.dumpBackend();
+  const dumpA = await A.dumpAll();
+  const dumpB = await B.dumpAll();
+
+  const assert = require('../ConvergenceAssert');
+  const a = new assert('012 — Assessment temporal fields survive offline + sync (sin pérdida)');
+  const examA = dumpA.assessments.find(s => s.id === examId);
+  const examB = dumpB.assessments.find(s => s.id === examId);
+  const examBack = backend.assessments.find(s => s.id === examId);
+  const dlA = dumpA.assessments.find(s => s.id === deadlineId);
+  const dlB = dumpB.assessments.find(s => s.id === deadlineId);
+  const dlBack = backend.assessments.find(s => s.id === deadlineId);
+
+  a.equal(examA?.assessment_type, 'exam', 'A exam assessment_type');
+  a.equal(examA?.starts_at, '2026-08-20T14:00', 'A exam starts_at');
+  a.equal(examA?.ends_at, '2026-08-20T16:00', 'A exam ends_at');
+  a.equal(examB?.starts_at, '2026-08-20T14:00', 'B got exam starts_at');
+  a.equal(examBack?.starts_at, '2026-08-20T14:00', 'Backend got exam starts_at');
+  a.equal(dlA?.assessment_type, 'deadline', 'A deadline assessment_type');
+  a.equal(dlA?.due_at, '2026-08-21T23:59', 'A deadline due_at');
+  a.equal(dlB?.due_at, '2026-08-21T23:59', 'B got deadline due_at');
+  a.equal(dlBack?.due_at, '2026-08-21T23:59', 'Backend got deadline due_at');
+  a.equal(examA?.date, '2026-08-20', 'A exam date (calendario) preservado');
+  a.noQueue(dumpA.sync_queue, 'A');
+  a.noQueue(dumpB.sync_queue, 'B');
+  await A.destroy(); await B.destroy();
+  return a.report();
+}
+
 module.exports = {
   scenarioCreate,
   scenarioUpdate,
@@ -419,4 +487,5 @@ module.exports = {
   scenarioFlashcardDeckWithCards,
   scenarioInitialSync,
   scenarioAudioTranscriptReplication,
+  scenarioAssessmentTemporalOffline,
 };

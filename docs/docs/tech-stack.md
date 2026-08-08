@@ -189,7 +189,7 @@ Threshold es una aplicación fullstack offline-first con tres capas principales.
 | **Render** | Hosting backend Node.js |
 | **Expo EAS Build** | Build nativo APK/IPA |
 | **UploadThing** | CDN para archivos |
-| **GitHub Actions** | CI (Reminder Regression Suite, 275 tests) |
+| **GitHub Actions** | CI del Reminder System (regression rápida + suite completa) |
 | **Docusaurus** 3.10.1 | Sitio de documentación técnica |
 | **Swagger** | Documentación interactiva API REST |
 
@@ -211,7 +211,7 @@ Threshold es una aplicación fullstack offline-first con tres capas principales.
 | **SyncQueueReducer** | `mobile/src/services/sync/reducer/` |
 | **ConflictResolver (4 estrategias)** | `mobile/src/services/sync/ConflictResolver.ts` |
 | **KnowledgeSnapshotBuilder** | `mobile/src/domain/knowledge/` |
-| **Reminder System** | `mobile/src/services/reminders/` (23 suites, 290 tests) |
+| **Reminder System** | `mobile/src/services/reminders/` (dominio puro + wiring MMKV device-local, contrato v1 congelado) |
 | **AssetSyncEngine** | `mobile/src/services/sync/asset/` |
 
 ## Plataformas Soportadas

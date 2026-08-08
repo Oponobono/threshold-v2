@@ -3,7 +3,6 @@ import { AssessmentPolicy } from '../policies/AssessmentPolicy';
 import { ClassPolicy } from '../policies/ClassPolicy';
 import { ReviewPolicy } from '../policies/ReviewPolicy';
 import { EventPolicy } from '../policies/EventPolicy';
-import { GradingPolicy } from '../policies/GradingPolicy';
 import { SequenceFactory } from '../SequenceFactory';
 import { ReminderSnapshotAssembler } from '../ReminderSnapshotAssembler';
 import { FakeClock } from '../Clock';
@@ -104,7 +103,6 @@ function createEngine(clock?: FakeClock): {
   registry.register(new ClassPolicy());
   registry.register(new ReviewPolicy());
   registry.register(new EventPolicy());
-  registry.register(new GradingPolicy());
 
   const provider = new FakeProvider();
   const engine = new ReminderEngine(
@@ -121,7 +119,7 @@ function createEngine(clock?: FakeClock): {
 }
 
 const SNAPSHOT: ReminderSourceSnapshot = {
-  assessments: [{ id: 'a-1', date: ASSESSMENT_DATE.toISOString(), status: 'active' }],
+  assessments: [{ id: 'a-1', assessment_type: 'exam', starts_at: ASSESSMENT_DATE.toISOString(), status: 'active' }],
   schedules: [{ id: 's-1', endTime: SCHEDULE_END.toISOString(), status: 'active' }],
   flashcard_decks: [{ id: 'd-1', dueCardsCount: 5, status: 'active' }],
 };
@@ -166,6 +164,34 @@ describe('ReminderEngine', () => {
       expect(engine.getDesiredSequences()).toHaveLength(0);
       expect(provider.scheduled).toHaveLength(0);
     });
+
+    it('mazo con card_count=0 se cancela via shouldCancel (sin secuencia ni notificación)', async () => {
+      const { engine, provider } = createEngine();
+      await engine.initialize({
+        ...SNAPSHOT,
+        flashcard_decks: [{ id: 'd-empty', card_count: 0, status: 'active' }],
+      });
+
+      const seqs = engine.getDesiredSequences();
+      expect(seqs.map((s) => s.entityType)).not.toContain('flashcard_deck');
+      expect(provider.scheduled.some((r) => r.id.startsWith('flashcard_deck::d-empty'))).toBe(false);
+    });
+
+    it('mazo con card_count>0 se agenda hoy a la hora checkTime (19:00 default, FSRS diario)', async () => {
+      const { engine, provider, clock } = createEngine();
+      const clockTime = new Date(2026, 6, 10, 10, 7, 0, 0);
+      clock.setNow(clockTime);
+
+      await engine.initialize({
+        assessments: [],
+        schedules: [],
+        flashcard_decks: [{ id: 'd-full', card_count: 12, status: 'active' }],
+      });
+
+      const deckReminder = provider.scheduled.find((r) => r.id.startsWith('flashcard_deck::d-full'));
+      expect(deckReminder).toBeDefined();
+      expect(deckReminder!.scheduledAt.getTime()).toBe(new Date(2026, 6, 10, 19, 0, 0, 0).getTime());
+    });
   });
 
   describe('onEntityChanged()', () => {
@@ -175,7 +201,8 @@ describe('ReminderEngine', () => {
 
       await engine.onEntityChanged('assessment', 'a-1', {
         id: 'a-1',
-        date: ASSESSMENT_DATE.toISOString(),
+        assessment_type: 'exam',
+        starts_at: ASSESSMENT_DATE.toISOString(),
         status: 'active',
       });
 
@@ -193,7 +220,8 @@ describe('ReminderEngine', () => {
       const newDate = new Date(ASSESSMENT_DATE.getTime() + 86400000).toISOString();
       await engine.onEntityChanged('assessment', 'a-1', {
         id: 'a-1',
-        date: newDate,
+        assessment_type: 'exam',
+        starts_at: newDate,
         status: 'active',
       });
 
@@ -281,7 +309,7 @@ describe('ReminderEngine', () => {
 
       // Cada await espera a que ese evento especifico se procese
       await engine.onEntityChanged('assessment', 'a-1', {
-        id: 'a-1', date: ASSESSMENT_DATE.toISOString(), status: 'active',
+        id: 'a-1', assessment_type: 'exam', starts_at: ASSESSMENT_DATE.toISOString(), status: 'active',
       });
       expect(engine.getDesiredSequences()).toHaveLength(1);
 
@@ -318,7 +346,7 @@ describe('ReminderEngine', () => {
 
       await expect(
         engine.onEntityChanged('assessment', 'a-1', {
-          id: 'a-1', date: ASSESSMENT_DATE.toISOString(), status: 'active',
+          id: 'a-1', assessment_type: 'exam', starts_at: ASSESSMENT_DATE.toISOString(), status: 'active',
         }),
       ).rejects.toThrow('Engine destroyed');
     });
@@ -362,12 +390,12 @@ describe('ReminderEngine', () => {
       await engine.initialize({});
 
       await engine.onEntityChanged('assessment', 'a-1', {
-        id: 'a-1', date: ASSESSMENT_DATE.toISOString(), status: 'active',
+        id: 'a-1', assessment_type: 'exam', starts_at: ASSESSMENT_DATE.toISOString(), status: 'active',
       });
       const scheduledAfterFirst = provider.scheduled.length;
 
       await engine.onEntityChanged('assessment', 'a-1', {
-        id: 'a-1', date: ASSESSMENT_DATE.toISOString(), status: 'active',
+        id: 'a-1', assessment_type: 'exam', starts_at: ASSESSMENT_DATE.toISOString(), status: 'active',
       });
 
       expect(engine.getDesiredSequences()).toHaveLength(1);
@@ -414,7 +442,7 @@ describe('ReminderEngine', () => {
 
       await Promise.all([
         engine.onEntityChanged('assessment', 'a-1', {
-          id: 'a-1', date: ASSESSMENT_DATE.toISOString(), status: 'active',
+          id: 'a-1', assessment_type: 'exam', starts_at: ASSESSMENT_DATE.toISOString(), status: 'active',
         }),
         engine.onEntityChanged('schedule', 's-1', {
           id: 's-1', endTime: SCHEDULE_END.toISOString(), status: 'active',
@@ -448,7 +476,7 @@ describe('ReminderEngine', () => {
       await engine.initialize({});
 
       await engine.onEntityChanged('assessment', 'a-1', {
-        id: 'a-1', date: ASSESSMENT_DATE.toISOString(), status: 'active',
+        id: 'a-1', assessment_type: 'exam', starts_at: ASSESSMENT_DATE.toISOString(), status: 'active',
       });
       await engine.onEntityDeleted('assessment', 'a-1');
 

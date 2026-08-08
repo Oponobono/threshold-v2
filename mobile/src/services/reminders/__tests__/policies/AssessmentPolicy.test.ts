@@ -57,20 +57,20 @@ describe('AssessmentPolicy', () => {
     const makeSequence = () =>
       ({ id: 'test', entityType: 'assessment', entityId: 'a1', reminders: [], createdAt: new Date(), expiresAt: null, status: 'active' } as any);
 
-    it('status active → false', () => {
-      expect(policy.shouldCancel(makeSequence(), { status: 'active' })).toBe(false);
+    it('exam activo con starts_at → false', () => {
+      expect(policy.shouldCancel(makeSequence(), { status: 'active', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(false);
     });
 
     it('status cancelled → true', () => {
-      expect(policy.shouldCancel(makeSequence(), { status: 'cancelled' })).toBe(true);
+      expect(policy.shouldCancel(makeSequence(), { status: 'cancelled', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(true);
     });
 
     it('status completed → true', () => {
-      expect(policy.shouldCancel(makeSequence(), { status: 'completed' })).toBe(true);
+      expect(policy.shouldCancel(makeSequence(), { status: 'completed', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(true);
     });
 
-    it('sin status → false', () => {
-      expect(policy.shouldCancel(makeSequence(), {})).toBe(false);
+    it('sin ancla temporal (sin assessment_type/starts_at/due_at) → true', () => {
+      expect(policy.shouldCancel(makeSequence(), { status: 'active' })).toBe(true);
     });
   });
 
@@ -78,33 +78,36 @@ describe('AssessmentPolicy', () => {
     const makeReminder = (overrides: Partial<Reminder> = {}): Reminder =>
       ({ id: 'r1', entityType: 'assessment', entityId: 'a1', scheduledAt: new Date(), intent: 'prepare_exam', profile: { name: 'standard', defaultOffsets: [] }, priority: 'high', sequenceId: 's1', ordinal: 0, status: 'pending', snapshot: new ReminderSnapshot({ entity: { id: 'a1', type: 'assessment', name: '' } }), ...overrides });
 
-    it('entidad activa → false', () => {
-      expect(policy.shouldCancelReminder(makeReminder(), { status: 'active' })).toBe(false);
+    it('entidad activa con ancla → false', () => {
+      expect(policy.shouldCancelReminder(makeReminder(), { status: 'active', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(false);
     });
 
     it('entidad cancelled → true', () => {
-      expect(policy.shouldCancelReminder(makeReminder(), { status: 'cancelled' })).toBe(true);
+      expect(policy.shouldCancelReminder(makeReminder(), { status: 'cancelled', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(true);
     });
 
     it('entidad completed → true', () => {
-      expect(policy.shouldCancelReminder(makeReminder(), { status: 'completed' })).toBe(true);
+      expect(policy.shouldCancelReminder(makeReminder(), { status: 'completed', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(true);
+    });
+
+    it('sin ancla temporal → true', () => {
+      expect(policy.shouldCancelReminder(makeReminder(), { status: 'active' })).toBe(true);
     });
   });
 
   describe('getExpiration', () => {
-    it('date → date + 1 hour', () => {
-      const exp = policy.getExpiration({ date: '2026-07-15T10:00:00Z' });
+    it('exam con starts_at → starts_at + 1 hour', () => {
+      const exp = policy.getExpiration({ assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' });
       expect(exp!.toISOString()).toBe('2026-07-15T11:00:00.000Z');
     });
 
-    it('startDate → startDate + 1 hour', () => {
-      const exp = policy.getExpiration({ startDate: '2026-07-20T14:00:00Z' });
-      expect(exp!.toISOString()).toBe('2026-07-20T15:00:00.000Z');
+    it('deadline con due_at → due_at + 1 hour', () => {
+      const exp = policy.getExpiration({ assessment_type: 'deadline', due_at: '2026-07-25T23:59:00Z' });
+      expect(exp!.toISOString()).toBe('2026-07-26T00:59:00.000Z');
     });
 
-    it('dueDate → dueDate + 1 hour', () => {
-      const exp = policy.getExpiration({ dueDate: '2026-07-25T23:59:00Z' });
-      expect(exp!.toISOString()).toBe('2026-07-26T00:59:00.000Z');
+    it('sin ancla (date legacy sin assessment_type) → null', () => {
+      expect(policy.getExpiration({ date: '2026-07-15T10:00:00Z' })).toBeNull();
     });
 
     it('sin fecha → null', () => {

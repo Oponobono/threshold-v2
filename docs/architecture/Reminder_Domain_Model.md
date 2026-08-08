@@ -1,5 +1,7 @@
 # Reminder System — Domain Model
 
+> **⚠️ PARCIALMENTE SUPERSEDED (Ago 2026)**. Las secciones de **perfiles de usuario** y **weekly digest** quedan reemplazadas por el contrato congelado (sin perfiles expuestos, sin digest). La identidad lógica de sesiones y el ciclo de vida de secuencias descritos aquí se conservan. Fuente de verdad vigente: `docs/architecture/REMINDER_SYSTEM_V1_CONTRACT.md`.
+
 Este documento define las **entidades, objetos de valor, estados y relaciones** del dominio de recordatorios. Emergen directamente de la Product Specification. No se refieren a implementación técnica.
 
 ---

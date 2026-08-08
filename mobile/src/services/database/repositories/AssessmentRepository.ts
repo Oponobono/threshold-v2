@@ -19,6 +19,10 @@ export interface Assessment {
   category_id?: string;
   due_date?: string;
   grading_date?: string;
+  starts_at?: string;
+  ends_at?: string;
+  due_at?: string;
+  assessment_type?: string;
   created_at?: string;
   updated_at?: string;
 }

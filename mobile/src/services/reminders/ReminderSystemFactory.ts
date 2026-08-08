@@ -3,7 +3,6 @@ import { AssessmentPolicy } from './policies/AssessmentPolicy';
 import { ClassPolicy } from './policies/ClassPolicy';
 import { ReviewPolicy } from './policies/ReviewPolicy';
 import { EventPolicy } from './policies/EventPolicy';
-import { GradingPolicy } from './policies/GradingPolicy';
 import { SequenceFactory } from './SequenceFactory';
 import { ReminderSnapshotAssembler } from './ReminderSnapshotAssembler';
 import { SystemClock } from './Clock';
@@ -19,6 +18,7 @@ import type { Clock } from './Clock';
 import type { I18nService } from './I18nService';
 import type { NotificationProvider } from './NotificationProvider';
 import type { PerformanceObserver } from './PerformanceObserver';
+import type { ReminderPreferences } from './ReminderPreferences';
 
 export async function createDefaultReminderCoordinator(
   provider?: NotificationProvider,
@@ -30,7 +30,6 @@ export async function createDefaultReminderCoordinator(
   registry.register(new ClassPolicy());
   registry.register(new ReviewPolicy());
   registry.register(new EventPolicy());
-  registry.register(new GradingPolicy());
 
   const assembler = new ReminderSnapshotAssembler();
   const factory = new SequenceFactory(clock, assembler);
@@ -74,6 +73,7 @@ export async function createDefaultReminderCoordinator(
     reconciler,
     resolvedProvider,
     clock,
+    createPreferencesProvider(),
   );
 
   const snapshotRepos = createDefaultSnapshotRepos();
@@ -87,14 +87,12 @@ export function createDefaultSnapshotRepos(): ReminderEntityRepositories {
   const { assessmentRepository } = require('../database/repositories/AssessmentRepository');
   const { scheduleRepository } = require('../database/repositories/ScheduleRepository');
   const { flashcardDeckRepository } = require('../database/repositories/FlashcardDeckRepository');
-  const { gradingPeriodRepository } = require('../database/repositories/GradingPeriodRepository');
   const { calendarEventRepository } = require('../database/repositories/CalendarEventRepository');
   const { subjectRepository } = require('../database/repositories/SubjectRepository');
   return {
     assessments: assessmentRepository,
     schedules: scheduleRepository,
     flashcard_decks: flashcardDeckRepository,
-    grading_periods: gradingPeriodRepository,
     calendar_events: calendarEventRepository,
     subjects: subjectRepository,
   };
@@ -104,13 +102,17 @@ function loadDefaultCoordinatorRepos(): Record<string, EntityRepository> {
   const { assessmentRepository } = require('../database/repositories/AssessmentRepository');
   const { scheduleRepository } = require('../database/repositories/ScheduleRepository');
   const { flashcardDeckRepository } = require('../database/repositories/FlashcardDeckRepository');
-  const { gradingPeriodRepository } = require('../database/repositories/GradingPeriodRepository');
   const { calendarEventRepository } = require('../database/repositories/CalendarEventRepository');
   return {
     assessment: assessmentRepository,
     schedule: scheduleRepository,
     flashcard_deck: flashcardDeckRepository,
-    grading_period: gradingPeriodRepository,
     calendar_event: calendarEventRepository,
   };
+}
+
+function createPreferencesProvider(): () => ReminderPreferences {
+  const { getReminderPreferencesService } = require('./ReminderPreferencesService');
+  const service = getReminderPreferencesService();
+  return () => service.get();
 }

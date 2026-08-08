@@ -204,6 +204,38 @@ describe('InterruptionPolicy', () => {
     })
   });
 
+  describe('no global cap', () => {
+    it('hundreds of reminders across many groups all survive', () => {
+      const r = (id: string, priority: InterruptionPriority, minutes: number) =>
+        reminder({ id, priority, scheduledAt: new Date(ANCHOR.getTime() + minutes * 60000) });
+
+      const count = 200;
+      const rs = Array.from({ length: count }, (_, i) => r('r' + i, 'normal', 60 + i * 10));
+      const plan = policy.resolve([sequence(rs)]);
+
+      expect(plan.deliverables).toHaveLength(count);
+    });
+
+    it('plan is not truncated to the simultaneous limit across groups', () => {
+      const r = (id: string, priority: InterruptionPriority, minutes: number) =>
+        reminder({ id, priority, scheduledAt: new Date(ANCHOR.getTime() + minutes * 60000) });
+      const r1 = r('r1', 'high', 60);
+      const r2 = r('r2', 'high', 120);
+      const r3 = r('r3', 'high', 180);
+      const r4 = r('r4', 'high', 240);
+      const plan = policy.resolve([sequence([r1, r2, r3, r4])]);
+      expect(plan.deliverables).toHaveLength(4);
+    });
+
+    it('per-group cap still applies within a single collision window', () => {
+      const t = ANCHOR.getTime() + 3600000;
+      const r = (id: string, priority: InterruptionPriority) =>
+        reminder({ id, priority, scheduledAt: new Date(t) });
+      const plan = policy.resolve([sequence([r('r1', 'high'), r('r2', 'high'), r('r3', 'high'), r('r4', 'high')])]);
+      expect(plan.deliverables.length).toBeLessThanOrEqual(3);
+    });
+  });
+
   describe('grouping', () => {
     it('reminders within 5 minute window are collapsed', () => {
       const t = ANCHOR.getTime() + 3600000;

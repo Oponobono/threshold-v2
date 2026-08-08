@@ -1,6 +1,7 @@
 # Notification Architecture — Threshold
 
 > Evidencia histórica: `docs/audits/REMINDER_NOTIFICATION.md` (926 líneas, auditoría completa de dominio + infraestructura, Jul 2026).
+> **⚠️ PRE-WIRING (Ago 2026)**. Los bugs de preferencias/agenda aquí descritos se resolvieron con `ReminderPreferences` (MMKV device-local, no sincronizable) y el WIRING del engine a sesiones lógicas. La lista de defectos documentada es historia; el estado vigente está en `docs/architecture/REMINDER_SYSTEM_V1_CONTRACT.md`.
 
 ---
 

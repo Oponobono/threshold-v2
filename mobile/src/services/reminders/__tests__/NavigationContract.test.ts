@@ -28,15 +28,6 @@ describe('parseDeeplink', () => {
     });
   });
 
-  it('parses grading period deeplink', () => {
-    const result = parseDeeplink('threshold://grades/grade-001');
-    expect(result).toEqual({
-      deeplink: 'threshold://grades/grade-001',
-      entityType: 'grading_period',
-      entityId: 'grade-001',
-    });
-  });
-
   it('parses calendar event deeplink', () => {
     const result = parseDeeplink('threshold://events/evt-999');
     expect(result).toEqual({
@@ -87,10 +78,6 @@ describe('getTargetRoute', () => {
 
   it('maps schedule to / (dashboard)', () => {
     expect(getTargetRoute('schedule')).toBe('/');
-  });
-
-  it('maps grading_period to / (dashboard)', () => {
-    expect(getTargetRoute('grading_period')).toBe('/');
   });
 
   it('maps flashcard_deck to /flashcards', () => {
