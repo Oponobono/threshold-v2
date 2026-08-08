@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: 'npm'
           cache-dependency-path: mobile/package-lock.json
 
@@ -41,8 +41,10 @@ jobs:
         run: npx jest --testPathPattern "ReminderRegression" --no-cache
         env:
           CI: true
+          TZ: America/Bogota
 
       - name: Full Reminder Test Suite (275 tests)
         run: npx jest --testPathPattern "services/reminders/__tests__" --no-cache
         env:
           CI: true
+          TZ: America/Bogota
