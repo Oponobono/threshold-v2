@@ -8,6 +8,7 @@ import * as Notifications from 'expo-notifications';
 import { View, Text, LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 
 const originalConsoleError = console.error;
 console.error = (...args) => {
@@ -220,10 +221,7 @@ function RootNavigator() {
     }
 
     console.log('[RootLayout] App está lista, ocultando splash screen');
-    const timer = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    }, 100);
-    return () => clearTimeout(timer);
+    SplashScreen.hideAsync().catch(() => {});
   }, [isDatabaseReady, appIsReady]);
 
   // Mostrar error si BD falla
@@ -257,58 +255,58 @@ function RootNavigator() {
       <SafeAreaProvider>
         <CustomAlertProvider>
           <ThemeProvider value={colorScheme !== 'light' ? DarkTheme : DefaultTheme}>
-            <Stack initialRouteName={initialRoute}>
-              <Stack.Screen 
-                name="welcome" 
-                options={{ 
-                  headerShown: false, 
-                  animation: 'fade',
-                  gestureEnabled: false,
-                }} 
-              />
-              <Stack.Screen 
-                name="login" 
-                options={{ 
-                  headerShown: false, 
-                  animation: 'fade',
-                  gestureEnabled: false,
-                }} 
-              />
-              <Stack.Screen 
-                name="register" 
-                options={{ 
-                  headerShown: false,
-                  gestureEnabled: false,
-                }} 
-              />
-              {/* (tabs) es la pantalla principal - prevenir retroceso */}
-              <Stack.Screen 
-                name="(tabs)" 
-                options={{ 
-                  headerShown: false,
-                  gestureEnabled: false,
-                  animation: 'none',
-                }} 
-              />
-              <Stack.Screen name="settings" options={{ headerShown: false }} />
-              <Stack.Screen name="about" options={{ headerShown: false }} />
-              <Stack.Screen name="developer" options={{ headerShown: false }} />
-              <Stack.Screen 
-                name="documents" 
-                options={{ 
-                  headerShown: false,
-                  animation: 'slide_from_right',
-                }} 
-              />
-              <Stack.Screen 
-                name="documents/[documentUri]" 
-                options={{ 
-                  headerShown: false,
-                  presentation: 'modal',
-                  animation: 'slide_from_bottom',
-                }} 
-              />
-            </Stack>
+              <Stack initialRouteName={initialRoute}>
+                <Stack.Screen 
+                  name="welcome" 
+                  options={{ 
+                    headerShown: false, 
+                    animation: 'fade',
+                    gestureEnabled: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="login" 
+                  options={{ 
+                    headerShown: false, 
+                    animation: 'fade',
+                    gestureEnabled: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="register" 
+                  options={{ 
+                    headerShown: false,
+                    gestureEnabled: false,
+                  }} 
+                />
+                {/* (tabs) es la pantalla principal - prevenir retroceso */}
+                <Stack.Screen 
+                  name="(tabs)" 
+                  options={{ 
+                    headerShown: false,
+                    gestureEnabled: false,
+                    animation: 'none',
+                  }} 
+                />
+                <Stack.Screen name="settings" options={{ headerShown: false }} />
+                <Stack.Screen name="about" options={{ headerShown: false }} />
+                <Stack.Screen name="developer" options={{ headerShown: false }} />
+                <Stack.Screen 
+                  name="documents" 
+                  options={{ 
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                  }} 
+                />
+                <Stack.Screen 
+                  name="documents/[documentUri]" 
+                  options={{ 
+                    headerShown: false,
+                    presentation: 'modal',
+                    animation: 'slide_from_bottom',
+                  }} 
+                />
+              </Stack>
             <FloatingYouTubePlayer />
             <StatusBar style="auto" />
           </ThemeProvider>

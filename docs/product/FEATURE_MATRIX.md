@@ -498,15 +498,14 @@ Cada fase: `pending → running → done | error`
 | ❌ Resetear estadísticas | CardReview | Botón para reiniciar progreso |
 | ❌ Re-corregir respuesta | CardReview | Corregir rating erroneo |
 | ❌ Cerrar/Reabrir período | GradingPeriod | Estado de período académico |
+| ❌ Animación Splash Screen | App | Organizar la transición fluida entre Splash Screen y Dashboard/Login |
+| ❌ Animación Tabs | App | Transición fluida (cross-fade) entre los tabs principales sin parpadeo nativo |
 
 ### Fuera de alcance v1 (decisión de producto, Reminder System)
 
 | Ítem | Estado |
 |------|--------|
 | "Próximos recordatorios" (Agenda/Upcoming) | Futura surface independiente de Settings, si el producto demuestra que aporta confianza |
-| Perfiles (minimal/standard/persistent/custom) | Internos al engine, nunca expuestos |
-| Weekly Digest | No existe en el engine |
-| Diagnóstico en Settings | Developer Console (herramienta interna de desarrollo, no producto)
 
 ---
 
