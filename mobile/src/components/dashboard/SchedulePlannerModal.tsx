@@ -30,6 +30,25 @@ export const SchedulePlannerModal = ({ visible, onClose, subjects, allSchedules,
   const [scheduleDraftKeys, setScheduleDraftKeys] = useState<Set<string>>(new Set());
   const scheduleSheetAnim = useRef(new Animated.Value(500)).current;
 
+  const [activeTooltip, setActiveTooltip] = useState<{
+    x: number;
+    y: number;
+    subjectName: string;
+    timeStr: string;
+    color: string;
+  } | null>(null);
+
+  const daysShort = useMemo(() => {
+    const raw = t('common.daysShort', { returnObjects: true });
+    return Array.isArray(raw) ? raw as string[] : ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  }, [t]);
+
+  const assignedSubjectIds = useMemo(() => {
+    if (!Array.isArray(allSchedules)) return [];
+    const ids = new Set(allSchedules.map(s => s.subject_id));
+    return Array.from(ids);
+  }, [allSchedules]);
+
   const buildScheduleKey = (day: number, startTime: string) => `${day}-${startTime}`;
 
   const selectedScheduleSubject = useMemo(
@@ -219,10 +238,7 @@ export const SchedulePlannerModal = ({ visible, onClose, subjects, allSchedules,
             <View style={[styles.gridContainer, { height: 400, flexShrink: 1 }]}>
               <View style={styles.gridHeader}>
                 <View style={styles.hourColHeader} />
-                {(Array.isArray(t('common.daysShort', { returnObjects: true })) 
-                  ? (t('common.daysShort', { returnObjects: true }) as string[])
-                  : ['L', 'M', 'X', 'J', 'V', 'S', 'D']
-                ).map((d, i) => (
+                {daysShort.map((d, i) => (
                   <View key={`${d}-${i}`} style={styles.dayColHeader}>
                     <Text style={styles.dayHeaderText}>{d}</Text>
                   </View>
@@ -254,8 +270,23 @@ export const SchedulePlannerModal = ({ visible, onClose, subjects, allSchedules,
                         <TouchableOpacity 
                           key={`${day}-${hour}`} 
                           style={styles.gridCell}
-                          onPress={() => {
+                          onPress={(e) => {
                             if (!selectedSubjectId) {
+                              if (matchingEntry) {
+                                // Show tooltip if pressing an assigned slot and no subject is currently being edited
+                                const matchingSubject = Array.isArray(subjects) ? subjects.find(s => s.id === matchingEntry.subject_id) : null;
+                                if (matchingSubject) {
+                                  setActiveTooltip({
+                                    x: e.nativeEvent.pageX,
+                                    y: e.nativeEvent.pageY,
+                                    subjectName: matchingSubject.name,
+                                    timeStr: `${daysShort[day - 1]} ${hour}:00 - ${hour + 1}:00`,
+                                    color: matchingSubject.color || theme.colors.primary,
+                                  });
+                                  setTimeout(() => setActiveTooltip(null), 2500);
+                                }
+                                return;
+                              }
                               setIsSubjectSelectorVisible(true);
                               return;
                             }
@@ -294,12 +325,49 @@ export const SchedulePlannerModal = ({ visible, onClose, subjects, allSchedules,
             </View>
             </Pressable>
           </Animated.View>
+
+          {activeTooltip && (
+            <View 
+              style={{
+                position: 'absolute',
+                top: activeTooltip.y - 70, // 70px above the touch point
+                left: Math.min(Math.max(activeTooltip.x - 100, 20), 1000), // Approximate centering
+                backgroundColor: theme.colors.card,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 12,
+                elevation: 8,
+                zIndex: 9999,
+                minWidth: 200,
+              }}
+              pointerEvents="none"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: activeTooltip.color, marginRight: 8 }} />
+                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text.primary }} numberOfLines={1}>
+                  {activeTooltip.subjectName}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18 }}>
+                <Ionicons name="time-outline" size={12} color={theme.colors.text.secondary} style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                  {activeTooltip.timeStr}
+                </Text>
+              </View>
+            </View>
+          )}
         </Pressable>
       </Modal>
-      
       <SubjectSelectorModal
         visible={isSubjectSelectorVisible}
         subjects={subjects}
+        assignedSubjectIds={assignedSubjectIds}
         selectedSubjectId={selectedSubjectId}
         onSelectSubject={setSelectedSubjectId}
         onClose={() => setIsSubjectSelectorVisible(false)}

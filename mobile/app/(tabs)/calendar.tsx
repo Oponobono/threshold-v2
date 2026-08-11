@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, View, LayoutAnimation, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -11,13 +11,19 @@ import { CreateTaskModal } from '../../src/components/dashboard/CreateTaskModal'
 import { CalendarHeader } from '../../src/components/calendar/CalendarHeader';
 import { CalendarGrid } from '../../src/components/calendar/CalendarGrid';
 import { AgendaList } from '../../src/components/calendar/AgendaList';
+import { SubjectRail } from '../../src/components/calendar/SubjectRail';
+import { CalendarScope } from '../../src/types/calendar';
 import { AddEventMenu } from '../../src/components/calendar/AddEventMenu';
 import { TaskDetailModal } from '../../src/components/calendar/TaskDetailModal';
 import { EventDetailModal } from '../../src/components/calendar/EventDetailModal';
+import { SubjectFilterBar } from '../../src/components/calendar/SubjectFilterBar';
+import { ActiveFilterBanner } from '../../src/components/calendar/ActiveFilterBanner';
+import { EmptyAgendaState } from '../../src/components/calendar/EmptyAgendaState';
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getCalendarEvents } from '../../src/services/api/calendar';
 import { deleteAssessment } from '../../src/services/api';
 import { alertRef } from '../../src/components/ui/CustomAlert';
 import { calendarScreenStyles } from '../../src/styles/CalendarScreen.styles';
+import { useActiveSubjects } from '../../src/hooks/useActiveSubjects';
 
 export default function CalendarScreen() {
   const { t, i18n } = useTranslation();
@@ -42,10 +48,32 @@ export default function CalendarScreen() {
   const [editingEvent, setEditingEvent] = useState<any>(null);
   const [taskCreationVisible, setTaskCreationVisible] = useState(false);
 
-  const selectedDayLabel = new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum)
-    .toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+  const selectedDayLabel = (() => {
+    const d = new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum);
+    const locale = lang === 'en' ? 'en-US' : 'es-ES';
+    const weekday = d.toLocaleString(locale, { weekday: 'long' });
+    const month = d.toLocaleString(locale, { month: 'short' });
+    const capitalMonth = month.charAt(0).toUpperCase() + month.slice(1).replace('.', '');
+    const day = calendar.selectedDayNum;
+    const year = calendar.viewYear;
+    return `${weekday}, ${capitalMonth} ${day} - ${year}`;
+  })();
+
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(true);
+  const [scope, setScope] = useState<CalendarScope>({ kind: 'all' });
 
   const subjects = useDataStore().subjects || [];
+
+  const { activeSubjects, hasGeneralEvents, totalCount } = useActiveSubjects(calendar.filteredEvents, subjects);
+
+  const scopedEvents = useMemo(() => {
+    if (scope.kind === 'all') return calendar.filteredEvents;
+    if (scope.kind === 'general') return calendar.filteredEvents.filter(e => !e.subjectId);
+    return calendar.filteredEvents.filter(e => e.subjectId === scope.subjectId);
+  }, [calendar.filteredEvents, scope]);
+
+  // Reset scope when changing days (optional, but requested behavior based on earlier docs might differ, wait, plan says "el scope persiste al cambiar de dia"). 
+  // Let's keep it persistent.
 
   useFocusEffect(
     useCallback(() => {
@@ -137,11 +165,24 @@ export default function CalendarScreen() {
     });
   };
 
+  const toggleCalendar = () => {
+    LayoutAnimation.configureNext({
+      duration: 280,
+      create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+      update: { type: LayoutAnimation.Types.easeInEaseOut },
+      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+    });
+    setIsCalendarExpanded(!isCalendarExpanded);
+  };
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
       <CalendarHeader
         isViewingCurrentMonth={calendar.isViewingCurrentMonth}
-        onPressToday={calendar.goToToday}
+        onPressToday={() => {
+          calendar.goToToday();
+          setIsCalendarExpanded(true);
+        }}
         onPressAdd={() => setAddMenuVisible(true)}
         t={t}
       />
@@ -157,27 +198,60 @@ export default function CalendarScreen() {
           weekLabels={weekLabels}
           onPrevMonth={calendar.goToPrevMonth}
           onNextMonth={calendar.goToNextMonth}
-          onSelectDay={calendar.setSelectedDayNum}
+          onSelectDay={(day) => {
+            LayoutAnimation.configureNext({
+              duration: 280,
+              create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+              update: { type: LayoutAnimation.Types.easeInEaseOut },
+              delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+            });
+            calendar.setSelectedDayNum(day);
+            setIsCalendarExpanded(false); // Auto-collapse
+          }}
           getActivitySummary={calendar.getActivitySummary}
           isToday={calendar.isToday}
+          isExpanded={isCalendarExpanded}
+          onToggle={toggleCalendar}
+          collapsedLabel={selectedDayLabel}
         />
 
-        <AgendaList
-          selectedDayLabel={selectedDayLabel}
-          events={calendar.filteredEvents}
-          onPressTask={(item) => {
-            setSelectedTask(item);
-            setTaskModalVisible(true);
-          }}
-          onPressEvent={(item) => {
-            setSelectedEvent(item);
-            setEventDetailVisible(true);
-          }}
-          onEditEvent={handleEditEvent}
-          onDeleteEvent={handleDeleteEvent}
-          onDeleteTask={handleDeleteTask}
-          t={t}
+        <SubjectFilterBar
+          scope={scope}
+          onScopeChange={setScope}
+          activeSubjects={activeSubjects}
+          hasGeneralEvents={hasGeneralEvents}
+          totalCount={totalCount}
         />
+
+        <ActiveFilterBanner 
+          scope={scope} 
+          onClear={() => setScope({ kind: 'all' })} 
+          activeSubjects={activeSubjects} 
+        />
+
+        {scopedEvents.length === 0 ? (
+          <EmptyAgendaState 
+            scope={scope} 
+            onClear={() => setScope({ kind: 'all' })} 
+            activeSubjects={activeSubjects} 
+          />
+        ) : (
+          <AgendaList
+            events={scopedEvents}
+            selectedDate={new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum)}
+            scope={scope}
+            onPressTask={(item) => {
+              setSelectedTask(item);
+              setTaskModalVisible(true);
+            }}
+            onPressEvent={(item) => {
+              setSelectedEvent(item);
+              setEventDetailVisible(true);
+            }}
+            onSubjectPress={(id) => setScope({ kind: 'subject', subjectId: id })}
+            t={t}
+          />
+        )}
       </ScrollView>
 
       {calendar.isReady && (

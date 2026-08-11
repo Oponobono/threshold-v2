@@ -6,7 +6,7 @@ export const calendarGridStyles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     borderRadius: 24,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: theme.colors.border,
     elevation: 2,

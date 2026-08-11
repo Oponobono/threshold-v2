@@ -119,6 +119,7 @@ export default function SubjectsScreen() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [courseModalVisible, setCourseModalVisible] = useState(false);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [activityInfoVisible, setActivityInfoVisible] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -400,8 +401,11 @@ export default function SubjectsScreen() {
               {/* ── Actividad reciente ── */}
               {isReady && g.recentActivity.length > 0 && (
                 <View style={styles.timelineSection}>
-                  <View style={styles.timelineHeader}>
+                  <View style={[styles.timelineHeader, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: theme.spacing?.md || 16 }]}>
                     <Text style={styles.timelineTitle}>{t('subjects.recentActivityTitle')}</Text>
+                    <TouchableOpacity onPress={() => setActivityInfoVisible(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Ionicons name="information-circle-outline" size={20} color={theme.colors.text.secondary} />
+                    </TouchableOpacity>
                   </View>
                   <View style={styles.timelineCard}>
                     <ScrollView style={{ maxHeight: 170 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
@@ -518,6 +522,12 @@ export default function SubjectsScreen() {
           <ScheduleModal
             visible={scheduleModalVisible}
             onClose={() => setScheduleModalVisible(false)}
+          />
+          
+          <ExplanationOverlay
+            visible={activityInfoVisible}
+            explanation={t('subjects.recentActivityExplanation', 'Esta sección muestra los eventos, repasos y creación de contenido ocurridos en los últimos 7 días.')}
+            onDismiss={() => setActivityInfoVisible(false)}
           />
           </>
       )}

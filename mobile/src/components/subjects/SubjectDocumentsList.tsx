@@ -547,12 +547,13 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
                 <View style={styles.list}>
                   {filteredDocuments.map((doc, index) => {
                       const docId = doc.id || index;
+                      const uniqueKey = `doc-${docId}-${index}`;
                       const isSelected = selectedIds.has(docId);
                       const isExtracting = ocrInProgress.has(docId);
 
                       return (
                         <SubjectDocumentCard
-                          key={docId}
+                          key={uniqueKey}
                           doc={doc}
                           index={index}
                           isSelected={isSelected}
@@ -628,14 +629,15 @@ export const SubjectDocumentsList: React.FC<SubjectDocumentsListProps> = ({
                 bounces={false}
               >
                 <View style={styles.list}>
-                  {studyNotes.map((note: any) => {
+                  {studyNotes.map((note: any, index: number) => {
+                    const uniqueKey = `note-${note.id || index}-${index}`;
                     const source = note.source || 'manual';
                     const iconInfo = SOURCE_ICONS[source] || SOURCE_ICONS.manual;
                     const mediaCount = note.media_paths ? JSON.parse(note.media_paths).length : 0;
 
                     return (
                       <TouchableOpacity
-                        key={note.id}
+                        key={uniqueKey}
                         style={styles.noteCard}
                         activeOpacity={0.7}
                         onPress={() => {/* TODO: open note detail */}}

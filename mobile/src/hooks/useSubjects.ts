@@ -373,16 +373,73 @@ export function useSubjects(t: any, lang?: string) {
     });
 
     // 5. Flashcards (cartas individuales agregadas/importadas)
+    const recentDeckCreationTimes = new Map<string, number>();
+    flashcardDecks.forEach(deck => {
+      const ts = parseDateOrFail(deck.created_at || '');
+      if (inWindow(ts)) {
+        recentDeckCreationTimes.set(String(deck.id), ts);
+      }
+    });
+
+    const standaloneCards: any[] = [];
     extraItems.flashcards.forEach(card => {
       const ts = parseDateOrFail(card.created_at || '');
       if (inWindow(ts)) {
-        const front = (card.front || '').substring(0, 40);
+        if (card.deck_id) {
+          const deckTs = recentDeckCreationTimes.get(String(card.deck_id));
+          // Ventana de 10 segundos: solo asume que es parte atómica del mazo si se creó en el mismo instante (programático/importación).
+          // Si el usuario crea el mazo y añade cartas manualmente, tomará más de 10s y se registrarán.
+          if (deckTs && Math.abs(ts - deckTs) <= 10000) {
+            return;
+          }
+        }
+        standaloneCards.push(card);
+      }
+    });
+
+    const cardsByDeck = new Map<string, any[]>();
+    standaloneCards.forEach(card => {
+      const key = card.deck_id ? String(card.deck_id) : 'standalone';
+      if (!cardsByDeck.has(key)) cardsByDeck.set(key, []);
+      cardsByDeck.get(key)!.push(card);
+    });
+
+    cardsByDeck.forEach((cards, deckId) => {
+      if (deckId === 'standalone' || cards.length <= 3) {
+        // Individual cards
+        cards.forEach(card => {
+          const ts = parseDateOrFail(card.created_at || '');
+          let frontText = card.front || '';
+          if (frontText.startsWith('{') || frontText.startsWith('[')) {
+            try {
+              const parsed = JSON.parse(frontText);
+              if (parsed && typeof parsed === 'object') {
+                frontText = parsed.question || parsed.text || parsed.front || parsed.q || 'Carta de repaso';
+              }
+            } catch (e) {}
+          }
+          frontText = frontText.replace(/<[^>]*>?/gm, '').replace(/[#*_~`]/g, '').trim();
+          const front = frontText.substring(0, 40);
+          
+          items.push({
+            id: `card-${card.id}`,
+            title: front ? `Carta: "${front}${front.length >= 40 ? '…' : ''}"` : 'Carta agregada',
+            subtitle: 'Flashcard',
+            date: ts,
+            subjectId: '',
+            type: 'flashcard',
+          });
+        });
+      } else {
+        // Summary of > 3 cards
+        const maxTs = Math.max(...cards.map(c => parseDateOrFail(c.created_at || '')));
+        const deck = flashcardDecks.find(d => String(d.id) === deckId);
         items.push({
-          id: `card-${card.id}`,
-          title: front ? `Carta: "${front}${front.length >= 40 ? '…' : ''}"` : 'Carta agregada',
-          subtitle: 'Flashcard',
-          date: ts,
-          subjectId: '',
+          id: `cards-summary-${deckId}-${maxTs}`,
+          title: `Se añadieron ${cards.length} cartas al mazo "${deck?.title || 'Sin título'}"`,
+          subtitle: 'Flashcards añadidas',
+          date: maxTs,
+          subjectId: deck?.subject_id || '',
           type: 'flashcard',
         });
       }

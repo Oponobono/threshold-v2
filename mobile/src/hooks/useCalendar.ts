@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import { useDataStore } from '../store/useDataStore';
 import { getCalendarEvents } from '../services/api/calendar';
-import { ScheduleItem, ActivitySummary } from '../types/calendar';
+import { ScheduleItem, AgendaItem, CalendarEventItem, ActivitySummary } from '../types/calendar';
 
 export const TODAY = new Date();
 
@@ -12,7 +12,7 @@ export function useCalendar(t: any, language: string = 'es-ES') {
   const [selectedDayNum, setSelectedDayNum] = useState(TODAY.getDate());
 
   const storeCalendarEvents = useDataStore(s => s.calendarEvents);
-  const { schedules: allSchedules, assessments: allAssessments, loadAllData } = useDataStore();
+  const { schedules: allSchedules, assessments: allAssessments, subjects, loadAllData } = useDataStore();
 
   const [calendarEvents, setCalendarEvents] = useState<any[]>(storeCalendarEvents);
   const [loadingEvents, setLoadingEvents] = useState(storeCalendarEvents.length === 0);
@@ -97,39 +97,42 @@ export function useCalendar(t: any, language: string = 'es-ES') {
     setSelectedDayNum(TODAY.getDate());
   };
 
-  const getDaySchedule = useCallback((day: number): ScheduleItem[] => {
+  const getDaySchedule = useCallback((day: number): AgendaItem[] => {
     const date = new Date(viewYear, viewMonth, day);
     let dayOfWeek = date.getDay();
     if (dayOfWeek === 0) dayOfWeek = 7;
 
-    const rawClasses = allSchedules.filter(s => s.day_of_week === dayOfWeek).map(s => ({
-      id: s.id,
-      type: 'class' as const,
-      title: (s as any).name || t('calendar.defaultClassTitle'),
-      color: (s as any).color || '#2F80ED',
-      start_time: s.start_time,
-      end_time: s.end_time,
-      subject_id: s.subject_id,
-    }));
+    const rawClasses: AgendaItem[] = allSchedules.filter(s => s.day_of_week === dayOfWeek).map(s => {
+      const subject = subjects?.find((sub: any) => sub.id === s.subject_id);
+      return {
+        id: `class-${s.id}`,
+        kind: 'class',
+        title: subject?.name || (s as any).name || t('calendar.defaultClassTitle'),
+        subjectId: s.subject_id,
+        subject: subject?.name,
+        subjectColor: subject?.color || (s as any).color || '#2F80ED',
+        start: s.start_time || '00:00',
+        end: s.end_time,
+        time_label: `${s.start_time || ''} - ${s.end_time || ''}`,
+        allDay: false
+      };
+    });
 
-    const classMap = new Map<string, any>();
+    const classMap = new Map<string, AgendaItem>();
     rawClasses.forEach(cls => {
-      if (cls.subject_id && classMap.has(cls.subject_id)) {
-        const existing = classMap.get(cls.subject_id)!;
-        const est = existing.start_time ?? cls.start_time;
-        const cst = cls.start_time ?? existing.start_time;
-        const eet = existing.end_time ?? cls.end_time;
-        const cet = cls.end_time ?? existing.end_time;
+      if (cls.subjectId && classMap.has(cls.subjectId)) {
+        const existing = classMap.get(cls.subjectId)!;
+        const est = existing.start;
+        const cst = cls.start;
+        const eet = existing.end;
+        const cet = cls.end;
         const newStartTime = est !== undefined && cst !== undefined && cst < est ? cst : est;
         const newEndTime = eet !== undefined && cet !== undefined && cet > eet ? cet : eet;
-        existing.start_time = newStartTime;
-        existing.end_time = newEndTime;
-        existing.time = `${newStartTime} - ${newEndTime}`;
-      } else if (cls.subject_id) {
-        classMap.set(cls.subject_id, {
-          ...cls,
-          time: `${cls.start_time} - ${cls.end_time}`,
-        });
+        existing.start = newStartTime;
+        existing.end = newEndTime;
+        existing.time_label = `${newStartTime} - ${newEndTime}`;
+      } else if (cls.subjectId) {
+        classMap.set(cls.subjectId, cls);
       }
     });
 
@@ -141,78 +144,79 @@ export function useCalendar(t: any, language: string = 'es-ES') {
     const dateStrDMY = `${dd}-${mm}-${yyyy}`;
     const dateStrISO = `${yyyy}-${mm}-${dd}`;
 
-    const rawTasks = (allAssessments as any[])
+    const tasks: AgendaItem[] = (allAssessments as any[])
       .filter((a: any) => a.date === dateStrDMY || a.date === dateStrISO)
-      .map((a: any) => ({
-        assessmentId: a.id,
-        assessmentData: a,
-        title: a.name,
-        time: a.type === 'task' ? (a.time || t('calendar.allDay')) : (a.type || t('calendar.defaultAssessmentTitle')),
-        color: a.subject_color || '#FF9500',
-        type: 'task' as const,
-        start_time: '23:59',
-        subject_id: a.subject_id,
-      }));
+      .map((a: any) => {
+        const subject = subjects?.find((sub: any) => sub.id === a.subject_id);
+        const isTask = a.type === 'task';
+        const isAllDay = isTask && (!a.time || a.time === '--:--' || a.time === t('calendar.allDay'));
+        return {
+          id: `assessment-${a.id}`,
+          kind: 'assessment',
+          title: a.name,
+          subjectId: a.subject_id,
+          subject: subject?.name,
+          subjectColor: a.subject_color || subject?.color || '#FF9500',
+          start: isAllDay ? '00:00' : (a.time || '23:59'),
+          time_label: isTask ? (a.time || t('calendar.allDay')) : (a.type || t('calendar.defaultAssessmentTitle')),
+          allDay: isAllDay,
+          type: a.type,
+          weight: a.weight,
+          status: {
+            is_completed: a.is_completed
+          }
+        };
+      });
 
-    const taskMap = new Map<string, any>();
-    rawTasks.forEach(task => {
-      if (task.subject_id && taskMap.has(task.subject_id)) {
-        const existing = taskMap.get(task.subject_id)!;
-        existing.count = (existing.count || 1) + 1;
-        if (!existing.allAssessments) {
-          existing.allAssessments = [existing.assessmentData];
-        }
-        existing.allAssessments.push(task.assessmentData);
-      } else if (task.subject_id) {
-        taskMap.set(task.subject_id, {
-          ...task,
-          count: 1,
-          allAssessments: [task.assessmentData],
-        });
-      }
-    });
+    const targetDate = `${dd}-${mm}-${yyyy}`;
 
-    const tasks = Array.from(taskMap.values()).map(task => ({
-      ...task,
-      id: task.assessmentId,
-      title: task.count > 1
-        ? `${task.title} +${task.count - 1}`
-        : task.title,
-    }));
-
-    const dayStr = day.toString().padStart(2, '0');
-    const monthStr = (viewMonth + 1).toString().padStart(2, '0');
-    const yearStr = viewYear.toString();
-    const targetDate = `${dayStr}-${monthStr}-${yearStr}`;
-
-    const calendarDayEvents = (calendarEvents || [])
+    const calendarDayEvents: AgendaItem[] = (calendarEvents || [])
       .filter((event: any) => event.startDate === targetDate || event.start_date === targetDate)
-      .map((event: any) => ({
-        id: `event-${event.id}`,
-        type: 'event' as const,
-        eventType: event.eventType || event.event_type,
-        title: event.title,
-        color: event.subjectColor || event.subject_color || '#A2845E',
-        start_time: event.startTime || event.start_time || '08:00',
-        end_time: event.endTime || event.end_time || '09:00',
-        subject_id: event.subjectId || event.subject_id,
-        description: event.description,
-        allDay: event.allDay || event.all_day,
-        time: event.allDay || event.all_day ? t('calendar.allDay') : `${event.startTime || event.start_time || '08:00'} - ${event.endTime || event.end_time || '09:00'}`,
-        linked_deck_id: event.linked_deck_id || event.deckId,
-      }));
+      .map((event: any) => {
+        const isAllDay = event.allDay || event.all_day;
+        const sTime = event.startTime || event.start_time || '08:00';
+        const eTime = event.endTime || event.end_time || '09:00';
+        return {
+          id: `event-${event.id}`,
+          kind: 'calendar_event',
+          title: event.title,
+          subjectId: event.subjectId || event.subject_id,
+          subjectColor: event.subjectColor || event.subject_color || '#A2845E',
+          start: isAllDay ? '00:00' : sTime,
+          end: isAllDay ? undefined : eTime,
+          time_label: isAllDay ? t('calendar.allDay') : `${sTime} - ${eTime}`,
+          allDay: isAllDay,
+          linked_deck_id: event.linked_deck_id || event.deckId
+        };
+      });
 
-    return [...classes, ...tasks, ...calendarDayEvents].sort((a: any, b: any) =>
-      (a.start_time || '00:00').localeCompare(b.start_time || '00:00')
-    );
-  }, [allSchedules, allAssessments, calendarEvents, viewYear, viewMonth, t]);
+    // Deterministic sort:
+    // 1. All-day events first
+    // 2. Chronological by start
+    // 3. Fallback to kind ('class' > 'assessment' > 'calendar_event')
+    // 4. Fallback to title
+    return [...classes, ...tasks, ...calendarDayEvents].sort((a, b) => {
+      if (a.allDay && !b.allDay) return -1;
+      if (!a.allDay && b.allDay) return 1;
+      
+      const timeCompare = a.start.localeCompare(b.start);
+      if (timeCompare !== 0) return timeCompare;
+
+      if (a.kind !== b.kind) {
+        const kindRank: Record<string, number> = { class: 1, assessment: 2, calendar_event: 3 };
+        return (kindRank[a.kind] || 4) - (kindRank[b.kind] || 4);
+      }
+
+      return a.title.localeCompare(b.title);
+    });
+  }, [allSchedules, allAssessments, calendarEvents, subjects, viewYear, viewMonth, t]);
 
   const getActivitySummary = useCallback((day: number): ActivitySummary => {
     const schedule = getDaySchedule(day);
     return {
-      hasClasses: schedule.some((item: any) => item.type === 'class'),
-      hasTasks: schedule.some((item: any) => item.type === 'task'),
-      hasEvents: schedule.some((item: any) => item.type === 'event'),
+      hasClasses: schedule.some((item: any) => item.kind === 'class'),
+      hasTasks: schedule.some((item: any) => item.kind === 'assessment'),
+      hasEvents: schedule.some((item: any) => item.kind === 'calendar_event'),
     };
   }, [getDaySchedule]);
 
