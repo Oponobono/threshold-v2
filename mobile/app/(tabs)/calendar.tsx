@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { ScrollView, View, LayoutAnimation, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { globalStyles } from '../../src/styles/globalStyles';
 import { useDataStore } from '../../src/store/useDataStore';
@@ -11,23 +11,20 @@ import { CreateTaskModal } from '../../src/components/dashboard/CreateTaskModal'
 import { CalendarHeader } from '../../src/components/calendar/CalendarHeader';
 import { CalendarGrid } from '../../src/components/calendar/CalendarGrid';
 import { AgendaList } from '../../src/components/calendar/AgendaList';
-import { SubjectRail } from '../../src/components/calendar/SubjectRail';
-import { CalendarScope } from '../../src/types/calendar';
+import { CalendarFilterBar } from '../../src/components/calendar/CalendarFilterBar';
 import { AddEventMenu } from '../../src/components/calendar/AddEventMenu';
 import { TaskDetailModal } from '../../src/components/calendar/TaskDetailModal';
 import { EventDetailModal } from '../../src/components/calendar/EventDetailModal';
-import { SubjectFilterBar } from '../../src/components/calendar/SubjectFilterBar';
-import { ActiveFilterBanner } from '../../src/components/calendar/ActiveFilterBanner';
 import { EmptyAgendaState } from '../../src/components/calendar/EmptyAgendaState';
-import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getCalendarEvents } from '../../src/services/api/calendar';
+import { OptionSelectorModal, SelectorOption } from '../../src/components/ui/OptionSelectorModal';
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from '../../src/services/api/calendar';
 import { deleteAssessment } from '../../src/services/api';
 import { alertRef } from '../../src/components/ui/CustomAlert';
 import { calendarScreenStyles } from '../../src/styles/CalendarScreen.styles';
-import { useActiveSubjects } from '../../src/hooks/useActiveSubjects';
 
 export default function CalendarScreen() {
   const { t, i18n } = useTranslation();
-  const router = useRouter();
+
 
   const weekLabels = Array.isArray(t('common.daysShort', { returnObjects: true }))
     ? (t('common.daysShort', { returnObjects: true }) as string[])
@@ -60,20 +57,74 @@ export default function CalendarScreen() {
   })();
 
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(true);
-  const [scope, setScope] = useState<CalendarScope>({ kind: 'all' });
 
-  const subjects = useDataStore().subjects || [];
+  const { subjects, courses } = useDataStore();
 
-  const { activeSubjects, hasGeneralEvents, totalCount } = useActiveSubjects(calendar.filteredEvents, subjects);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [courseModalVisible, setCourseModalVisible] = useState(false);
+  const [subjectModalVisible, setSubjectModalVisible] = useState(false);
+
+  // Courses que tienen al menos un evento en el día seleccionado
+  const activeCourseIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of calendar.filteredEvents) {
+      const subj = subjects.find((s: any) => s.id === e.subjectId);
+      if (subj?.course_id) ids.add(subj.course_id);
+    }
+    return ids;
+  }, [calendar.filteredEvents, subjects]);
+
+  const courseOptions: SelectorOption[] = useMemo(() =>
+    (courses || []).filter((c: any) => activeCourseIds.has(c.id)).map((c: any) => ({ id: c.id, name: c.name })),
+    [courses, activeCourseIds]
+  );
+
+  // Materias filtradas por curso seleccionado, con eventos en el día
+  const activeSubjectIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of calendar.filteredEvents) {
+      if (e.subjectId) ids.add(e.subjectId);
+    }
+    return ids;
+  }, [calendar.filteredEvents]);
+
+  const subjectsForCourse = useMemo(() => {
+    return (subjects || []).filter((s: any) => {
+      if (!activeSubjectIds.has(s.id)) return false;
+      if (selectedCourseId) return s.course_id === selectedCourseId;
+      return true;
+    });
+  }, [subjects, activeSubjectIds, selectedCourseId]);
+
+  const subjectOptions: SelectorOption[] = useMemo(() =>
+    subjectsForCourse.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      icon: s.icon || 'book-outline',
+      color: s.color,
+      subtitle: s.professor,
+    })),
+    [subjectsForCourse]
+  );
+
+  const selectedCourseName = (courses || []).find((c: any) => c.id === selectedCourseId)?.name || null;
+  const selectedSubjectName = (subjects || []).find((s: any) => s.id === selectedSubjectId)?.name || null;
+
+  const showCourseFilter = courseOptions.length > 0;
+  const showSubjectFilter = subjectOptions.length > 0;
 
   const scopedEvents = useMemo(() => {
-    if (scope.kind === 'all') return calendar.filteredEvents;
-    if (scope.kind === 'general') return calendar.filteredEvents.filter(e => !e.subjectId);
-    return calendar.filteredEvents.filter(e => e.subjectId === scope.subjectId);
-  }, [calendar.filteredEvents, scope]);
-
-  // Reset scope when changing days (optional, but requested behavior based on earlier docs might differ, wait, plan says "el scope persiste al cambiar de dia"). 
-  // Let's keep it persistent.
+    if (!selectedCourseId && !selectedSubjectId) return calendar.filteredEvents;
+    return calendar.filteredEvents.filter(e => {
+      if (selectedSubjectId) return e.subjectId === selectedSubjectId;
+      if (selectedCourseId) {
+        const subj = (subjects || []).find((s: any) => s.id === e.subjectId);
+        return subj?.course_id === selectedCourseId;
+      }
+      return true;
+    });
+  }, [calendar.filteredEvents, selectedCourseId, selectedSubjectId, subjects]);
 
   useFocusEffect(
     useCallback(() => {
@@ -215,31 +266,29 @@ export default function CalendarScreen() {
           collapsedLabel={selectedDayLabel}
         />
 
-        <SubjectFilterBar
-          scope={scope}
-          onScopeChange={setScope}
-          activeSubjects={activeSubjects}
-          hasGeneralEvents={hasGeneralEvents}
-          totalCount={totalCount}
-        />
-
-        <ActiveFilterBanner 
-          scope={scope} 
-          onClear={() => setScope({ kind: 'all' })} 
-          activeSubjects={activeSubjects} 
-        />
+        {showCourseFilter && (
+          <CalendarFilterBar
+            selectedCourseName={selectedCourseName}
+            selectedSubjectName={selectedSubjectName}
+            isActiveCourse={!!selectedCourseId}
+            isActiveSubject={!!selectedSubjectId}
+            onPressCourse={() => setCourseModalVisible(true)}
+            onPressSubject={() => setSubjectModalVisible(true)}
+            showSubjectFilter={showSubjectFilter}
+          />
+        )}
 
         {scopedEvents.length === 0 ? (
-          <EmptyAgendaState 
-            scope={scope} 
-            onClear={() => setScope({ kind: 'all' })} 
-            activeSubjects={activeSubjects} 
+          <EmptyAgendaState
+            scope={{ kind: selectedSubjectId ? 'subject' : selectedCourseId ? 'subject' : 'all', subjectId: selectedSubjectId || selectedCourseId || '' } as any}
+            onClear={() => { setSelectedCourseId(null); setSelectedSubjectId(null); }}
+            activeSubjects={[]}
           />
         ) : (
           <AgendaList
             events={scopedEvents}
             selectedDate={new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum)}
-            scope={scope}
+            scope={{ kind: selectedSubjectId ? 'subject' : 'all', subjectId: selectedSubjectId || '' } as any}
             onPressTask={(item) => {
               setSelectedTask(item);
               setTaskModalVisible(true);
@@ -248,7 +297,7 @@ export default function CalendarScreen() {
               setSelectedEvent(item);
               setEventDetailVisible(true);
             }}
-            onSubjectPress={(id) => setScope({ kind: 'subject', subjectId: id })}
+            onSubjectPress={(id) => setSelectedSubjectId(id)}
             t={t}
           />
         )}
@@ -290,6 +339,29 @@ export default function CalendarScreen() {
           setTaskCreationVisible(true);
         }}
         t={t}
+      />
+
+      <OptionSelectorModal
+        visible={courseModalVisible}
+        title="Seleccionar curso"
+        options={courseOptions}
+        selectedId={selectedCourseId}
+        onSelect={(id) => {
+          setSelectedCourseId(id);
+          setSelectedSubjectId(null);
+        }}
+        onClose={() => setCourseModalVisible(false)}
+        clearLabel="Quitar filtro de curso"
+      />
+
+      <OptionSelectorModal
+        visible={subjectModalVisible}
+        title="Seleccionar materia"
+        options={subjectOptions}
+        selectedId={selectedSubjectId}
+        onSelect={setSelectedSubjectId}
+        onClose={() => setSubjectModalVisible(false)}
+        clearLabel="Quitar filtro de materia"
       />
 
       {calendar.isReady && (
