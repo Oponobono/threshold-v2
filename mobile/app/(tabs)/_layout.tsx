@@ -88,6 +88,9 @@ export default function TabLayout() {
       <Tabs
       screenOptions={{
         headerShown: false,
+        animation: 'none',
+        detachInactiveScreens: false,
+        sceneStyle: { backgroundColor: theme.colors.background },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.text.secondary,
         tabBarStyle: {
