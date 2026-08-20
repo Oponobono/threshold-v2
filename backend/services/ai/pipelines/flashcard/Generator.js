@@ -70,7 +70,7 @@ ${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
     } catch (primaryErr) {
       console.error('[Generator] Error con proveedor primario:', primaryErr.message);
 
-      const GeminiProvider = require('../providers/GeminiProvider');
+      const GeminiProvider = require('../../providers/GeminiProvider');
       if (ModelClass !== GeminiProvider) {
         console.warn('[Generator] Intentando fallback a Gemini...');
         try {
