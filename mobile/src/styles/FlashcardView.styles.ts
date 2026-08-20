@@ -11,13 +11,11 @@ export const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,149,0,0.25)',
   },
   hintText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 17 },
-  flipWrapper: { width: '100%', marginBottom: 16 },
-  relativeCard: { position: 'relative' },
-  absoluteCard: { position: 'absolute', top: 0, left: 0, right: 0 },
+  flipWrapper: { width: '100%' },
   card: {
     borderRadius: 24, padding: 20, minHeight: 250, justifyContent: 'center',
-    backfaceVisibility: 'hidden', borderWidth: 1, borderColor: theme.colors.border,
-  } as any,
+    borderWidth: 1, borderColor: theme.colors.border,
+  },
   cardContentWrapper: { width: '100%', paddingTop: 20, paddingBottom: 24 },
   cardFront: {
     backgroundColor: theme.colors.background,

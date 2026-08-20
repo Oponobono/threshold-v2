@@ -37,6 +37,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
     case 'flashcard':
       return (
         <FlashcardView
+          key={item.id}
           item={item}
           onReveal={onReveal}
           onAnswer={(rating) => onAnswer(rating)}
@@ -51,6 +52,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
     case 'multiple_choice':
       return (
         <MultipleChoiceView
+          key={item.id}
           item={item}
           onAnswer={(idx) => onAnswer(idx)}
           onShowExplanation={onShowExplanation}
@@ -64,6 +66,7 @@ export const QuestionRendererFactory: React.FC<Props> = ({
     case 'boolean':
       return (
         <BooleanView
+          key={item.id}
           item={item}
           onAnswer={(val) => onAnswer(val)}
           onShowExplanation={onShowExplanation}

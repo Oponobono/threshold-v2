@@ -1,7 +1,29 @@
-import React, { useRef, useState, useEffect } from 'react';
+/**
+ * FlashcardView.tsx
+ *
+ * Flip animation — técnica de dos fases (industria: Quizlet, Duolingo):
+ *
+ *   Fase 1 (160ms): scaleX 1 → 0   la tarjeta "colapsa" horizontalmente
+ *   Punto medio:    swap de contenido (invisible porque el card tiene 0px de ancho)
+ *   Fase 2 (160ms): scaleX 0 → 1   la tarjeta "se expande" mostrando la nueva cara
+ *
+ * Ventajas vs. rotateY dual-view:
+ *   — Un solo View → cero z-fighting, cero backface-visibility bugs de Android
+ *   — Reanimated UI thread → cero jank, sin cruzar el bridge de JS
+ *   — Sin overshoot → sin spring bounce, sin destellos
+ *   — Funciona idéntico en iOS y Android
+ */
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, Animated, StyleSheet, ScrollView
+  View, Text, TouchableOpacity, StyleSheet, ScrollView,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+  runOnJS,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
@@ -20,53 +42,106 @@ interface Props {
   onNext?: () => void;
 }
 
+const HALF_DURATION = 160; // ms por cada mitad del flip
+
 export const FlashcardView: React.FC<Props> = ({
   item, onReveal, onAnswer, onShowExplanation, onShowContext, isAnswered, selectedRating, onNext
 }) => {
   const { t } = useTranslation();
   const content = item.content as FlashcardContent;
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [hintVisible, setHintVisible] = useState(false);
-  const flipAnim = useRef(new Animated.Value(0)).current;
-  const hintAnim = useRef(new Animated.Value(0)).current;
-  const [activeFace, setActiveFace] = useState<'front' | 'back'>('front');
+
+  const [showBack, setShowBack] = useState(false);
   const [hasRevealed, setHasRevealed] = useState(false);
+  const [hintVisible, setHintVisible] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false);
 
+  // Shared values — corren en el UI thread, nunca tocan el bridge
+  const scaleX = useSharedValue(1);
+  const hintOpacity = useSharedValue(0);
+  const hintTranslateY = useSharedValue(-8);
+
+  // Reset completo al cambiar de tarjeta (nueva key desde QuestionRendererFactory)
   useEffect(() => {
-    setIsFlipped(false);
+    setShowBack(false);
     setHasRevealed(false);
-    setActiveFace('front');
     setHintVisible(false);
-    flipAnim.setValue(0);
-    hintAnim.setValue(0);
-  }, [item.id, flipAnim, hintAnim]);
+    setIsFlipping(false);
+    scaleX.value = 1;
+    hintOpacity.value = 0;
+    hintTranslateY.value = -8;
+  }, [item.id]);
 
-  const handleFlip = () => {
-    if (!isFlipped) {
-      setActiveFace('back');
-      Animated.spring(flipAnim, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start(() => {
-        setIsFlipped(true);
-        if (!hasRevealed) { setHasRevealed(true); onReveal(); }
-      });
-    } else {
-      setActiveFace('front');
-      Animated.spring(flipAnim, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }).start(() => {
-        setIsFlipped(false);
-      });
+  const onFlipDone = useCallback(() => {
+    setIsFlipping(false);
+  }, []);
+
+  /**
+   * onCollapseDone — corre en JS thread cuando scaleX llega a 0.
+   *
+   * 1. setState → React encola el re-render del nuevo contenido.
+   * 2. requestAnimationFrame → espera a que React confirme el commit
+   *    (el contenido ya está en los native views).
+   * 3. Solo ENTONCES se inicia la expansión → scaleX 0 → 1.
+   *
+   * Esto garantiza que cuando la tarjeta se empiece a expandir,
+   * el texto nuevo ya está renderizado. Cero lag perceptible.
+   */
+  const onCollapseDone = useCallback((toBack: boolean) => {
+    // Paso 1: actualizar contenido
+    setShowBack(toBack);
+    if (toBack && !hasRevealed) {
+      setHasRevealed(true);
+      onReveal();
     }
-  };
 
-  const toggleHint = () => {
+    // Paso 2: esperar frame de React, luego expandir
+    requestAnimationFrame(() => {
+      scaleX.value = withTiming(1, {
+        duration: HALF_DURATION,
+        easing: Easing.out(Easing.quad),
+      }, (finished) => {
+        if (finished) runOnJS(onFlipDone)();
+      });
+    });
+  }, [hasRevealed, onReveal, scaleX, onFlipDone]);
+
+  const handleFlip = useCallback(() => {
+    if (isFlipping) return;
+    setIsFlipping(true);
+
+    const toBack = !showBack;
+
+    // Fase 1: colapso (scaleX 1 → 0)
+    // Cuando llega a 0, le pasa el control al JS thread (onCollapseDone)
+    // que esperará el render antes de iniciar la expansión.
+    scaleX.value = withTiming(0, {
+      duration: HALF_DURATION,
+      easing: Easing.in(Easing.quad),
+    }, (finished) => {
+      if (!finished) {
+        runOnJS(onFlipDone)();
+        return;
+      }
+      runOnJS(onCollapseDone)(toBack);
+    });
+  }, [isFlipping, showBack, scaleX, onCollapseDone, onFlipDone]);
+
+  const toggleHint = useCallback(() => {
     const next = !hintVisible;
     setHintVisible(next);
-    Animated.timing(hintAnim, { toValue: next ? 1 : 0, duration: 220, useNativeDriver: true }).start();
-  };
+    hintOpacity.value = withTiming(next ? 1 : 0, { duration: 220 });
+    hintTranslateY.value = withTiming(next ? 0 : -8, { duration: 220 });
+  }, [hintVisible, hintOpacity, hintTranslateY]);
 
-  const frontRotate = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
-  const backRotate  = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] });
-  const frontOpacity = flipAnim.interpolate({ inputRange: [0, 0.5, 0.51, 1], outputRange: [1, 1, 0, 0] });
-  const backOpacity  = flipAnim.interpolate({ inputRange: [0, 0.5, 0.51, 1], outputRange: [0, 0, 1, 1] });
-  const cardScale    = flipAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.94, 1] });
+  // Estilos animados — UI thread only
+  const cardAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: scaleX.value }],
+  }));
+
+  const hintAnimStyle = useAnimatedStyle(() => ({
+    opacity: hintOpacity.value,
+    transform: [{ translateY: hintTranslateY.value }],
+  }));
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} style={s.container} contentContainerStyle={s.scrollContent}>
@@ -74,85 +149,48 @@ export const FlashcardView: React.FC<Props> = ({
 
         {/* Hint banner */}
         {item.hint && hintVisible && (
-          <Animated.View style={[s.hintBanner, {
-            opacity: hintAnim,
-            transform: [{ translateY: hintAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
-          }]}>
+          <Animated.View style={[s.hintBanner, hintAnimStyle]}>
             <Ionicons name="bulb" size={14} color="#FF9500" />
             <Text style={s.hintText}>{item.hint}</Text>
           </Animated.View>
         )}
 
-        {/*
-         * flipWrapper es el contenedor relativo donde viven las dos caras
-         * y los botones flotantes.
-         *
-         * REGLA ANDROID: el ÚLTIMO elemento renderizado dentro de un View
-         * recibe el toque primero si sus áreas se superponen.
-         *
-         * Orden:
-         *  1. Cara frontal (Animated.View + absoluteFill TO adentro)
-         *  2. Cara trasera (Animated.View + absoluteFill TO adentro)
-         *  3. Botón pista  ← ÚLTIMO → siempre gana en su área
-         *  4. Botón explicación ← ÚLTIMO → siempre gana en su área
-         *
-         * REGLA OPACIDAD: opacity:0 en React Native NO desactiva los toques.
-         * Por eso usamos pointerEvents="none" en la cara oculta.
-         */}
-        <View style={s.flipWrapper}>
+        {/* Tarjeta única — sin superponer dos vistas */}
+        <Animated.View style={[
+          s.card,
+          showBack ? s.cardBack : s.cardFront,
+          cardAnimStyle,
+          { marginBottom: 16 },
+        ]}>
+          {/* Label de cara */}
+          <Text style={s.sideLabel}>
+            {showBack ? t('flashcards.answer') : t('flashcards.question')}
+          </Text>
 
-          <Animated.View
-            style={[
-              s.card, s.cardFront,
-              activeFace === 'front' ? s.relativeCard : s.absoluteCard,
-              { opacity: frontOpacity, transform: [{ perspective: 1000 }, { rotateY: frontRotate }, { scale: cardScale }] },
-            ]}
-            pointerEvents={activeFace === 'front' ? 'auto' : 'none'}
-          >
-            <Text style={s.sideLabel}>{t('flashcards.question')}</Text>
-            <View style={s.cardContentWrapper}>
-              <MarkdownWithCode>{content.front}</MarkdownWithCode>
-            </View>
+          {/* Contenido */}
+          <View style={s.cardContentWrapper}>
+            <MarkdownWithCode>
+              {showBack ? content.back : content.front}
+            </MarkdownWithCode>
+          </View>
+
+          {/* Tap hint (cara frontal) */}
+          {!showBack && (
             <View style={s.tapHint}>
               <Ionicons name="sync-outline" size={13} color={theme.colors.text.placeholder} />
               <Text style={s.tapHintText}>{t('flashcards.tapToFlip')}</Text>
             </View>
-            {/* TO para voltear ocupa toda la cara (renderizado al final de la tarjeta) */}
-            <TouchableOpacity
-              activeOpacity={0.92}
-              onPress={handleFlip}
-              style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
-            />
-          </Animated.View>
+          )}
 
-          {/* ── CARA TRASERA ── */}
-          <Animated.View
-            style={[
-              s.card, s.cardBack,
-              activeFace === 'back' ? s.relativeCard : s.absoluteCard,
-              { opacity: backOpacity, transform: [{ perspective: 1000 }, { rotateY: backRotate }, { scale: cardScale }] },
-            ]}
-            pointerEvents={activeFace === 'back' ? 'auto' : 'none'}
-          >
-            <Text style={s.sideLabel}>{t('flashcards.answer')}</Text>
-            <View style={s.cardContentWrapper}>
-              <MarkdownWithCode>{content.back}</MarkdownWithCode>
-            </View>
-            {/* TO para voltear ocupa toda la cara trasera (renderizado al final de la tarjeta) */}
-            <TouchableOpacity
-              activeOpacity={0.92}
-              onPress={handleFlip}
-              style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
-            />
-          </Animated.View>
+          {/* Área táctil de volteo — cubre toda la tarjeta */}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={handleFlip}
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
 
-          {/*
-           * ── BOTONES FLOTANTES ──
-           * Renderizados DESPUÉS de ambas caras → máxima prioridad táctil en Android.
-           * position:'absolute' los ancla a flipWrapper sin ocupar espacio en el flujo.
-           */}
-
-          {item.hint && !isAnswered && activeFace === 'front' && (
+          {/* Botón de pista (cara frontal) */}
+          {item.hint && !isAnswered && !showBack && (
             <TouchableOpacity
               style={[s.hintBtn, hintVisible && s.hintBtnActive]}
               onPress={toggleHint}
@@ -166,6 +204,7 @@ export const FlashcardView: React.FC<Props> = ({
             </TouchableOpacity>
           )}
 
+          {/* Botón de contexto */}
           {item.source_context && (
             <TouchableOpacity
               style={s.contextBtn}
@@ -176,6 +215,7 @@ export const FlashcardView: React.FC<Props> = ({
             </TouchableOpacity>
           )}
 
+          {/* Botón de explicación (solo cuando está respondida) */}
           {item.explanation && isAnswered && (
             <TouchableOpacity
               style={s.explanationBtn}
@@ -185,8 +225,7 @@ export const FlashcardView: React.FC<Props> = ({
               <Ionicons name="help-circle-outline" size={16} color={theme.colors.info} />
             </TouchableOpacity>
           )}
-
-        </View>{/* /flipWrapper */}
+        </Animated.View>
 
         {/* Rating buttons */}
         {hasRevealed && (
@@ -217,7 +256,9 @@ export const FlashcardView: React.FC<Props> = ({
             onPress={onNext}
           >
             <Ionicons name="chevron-forward-outline" size={14} color={theme.colors.text.placeholder} />
-            <Text style={{ fontSize: 12, color: theme.colors.text.placeholder }}>{t('flashcards.tapToContinue')}</Text>
+            <Text style={{ fontSize: 12, color: theme.colors.text.placeholder }}>
+              {t('flashcards.tapToContinue')}
+            </Text>
           </TouchableOpacity>
         )}
 
