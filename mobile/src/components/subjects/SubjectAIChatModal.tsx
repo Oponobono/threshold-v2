@@ -17,7 +17,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView,
   TextInput, Keyboard, StyleSheet,
-  Animated, ActivityIndicator,
+  Animated, ActivityIndicator, ToastAndroid,
  Image as RNImage } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +33,7 @@ import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderMan
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
 import { MarkdownWithCode } from '../ui/MarkdownWithCode';
@@ -196,7 +197,14 @@ const MessageBubble: React.FC<{ msg: Message; onOpenImage: (src: string) => void
   if (msg.isDocument) {
     return (
       <View style={[s.bubbleRow, s.bubbleRowUser]}>
-        <View style={[s.bubble, s.bubbleUser, { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, minWidth: 200 }]}>
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onLongPress={async () => {
+            await Clipboard.setStringAsync(msg.content);
+            ToastAndroid.show(t('common.copiedToClipboard') || 'Copiado al portapapeles', ToastAndroid.SHORT);
+          }}
+          style={[s.bubble, s.bubbleUser, { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, minWidth: 200 }]}
+        >
           <Ionicons name="document-text" size={24} color={PRIMARY} />
           <View style={{ flex: 1 }}>
             <Text style={[s.bubbleText, s.bubbleTextUser, { fontWeight: '600' }]} numberOfLines={1}>
@@ -207,7 +215,7 @@ const MessageBubble: React.FC<{ msg: Message; onOpenImage: (src: string) => void
           {msg.documentStatus === 'loading' && <ActivityIndicator size="small" color={PRIMARY} />}
           {msg.documentStatus === 'success' && <Ionicons name="checkmark-circle" size={20} color={ASK_CLR} />}
           {msg.documentStatus === 'error' && <Ionicons name="close-circle" size={20} color="#FF3B30" />}
-        </View>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -220,7 +228,16 @@ const MessageBubble: React.FC<{ msg: Message; onOpenImage: (src: string) => void
           <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 26, height: 26 }} />
         </View>
       )}
-      <View style={[s.bubble, isUser ? s.bubbleUser : s.bubbleAI]}>
+      <TouchableOpacity 
+        activeOpacity={0.9}
+        onLongPress={async () => {
+          // Extraer el texto a copiar (remover tags <think> si es un mensaje de la IA)
+          const textToCopy = isUser ? msg.content : msg.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+          await Clipboard.setStringAsync(textToCopy);
+          ToastAndroid.show(t('common.copiedToClipboard') || 'Copiado al portapapeles', ToastAndroid.SHORT);
+        }}
+        style={[s.bubble, isUser ? s.bubbleUser : s.bubbleAI]}
+      >
         {!isUser ? (
           <View>
             {(() => {
@@ -312,7 +329,7 @@ const MessageBubble: React.FC<{ msg: Message; onOpenImage: (src: string) => void
             {msg.content}
           </Text>
         )}
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -773,7 +790,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
 
     if (intent.type === 'generate_deck') {
       setIsLoading(false);
-      await handleGenerateMaterial(intent.mode, intent.count, text);
+      await handleGenerateMaterial(intent.mode, intent.count, intent.topic);
       return;
     }
 
@@ -1190,8 +1207,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 </View>
               )}
 
-              {/* Indicador de "pensando..." (modo cloud) */}
-              {isLoading && !isThinking && !streamingContent && <TypingIndicator />}
+              {/* Indicador de "pensando..." (modo cloud o generación de mazo) */}
+              {(isLoading || isGenerating) && !isThinking && !streamingContent && <TypingIndicator />}
             </ScrollView>
 
             {/* Input de texto */}

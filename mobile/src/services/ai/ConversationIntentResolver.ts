@@ -8,7 +8,7 @@
  */
 
 export type ConversationIntent =
-  | { type: 'generate_deck'; mode: StudyMode; count: number }
+  | { type: 'generate_deck'; mode: StudyMode; count: number; topic?: string }
   | { type: 'chat' };
 
 export type StudyMode = 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed';
@@ -72,6 +72,29 @@ function hasDeckIntent(text: string): boolean {
 }
 
 /**
+ * Extrae el tema específico (topic) del mensaje del usuario de forma heurística.
+ * Útil para que el título del mazo no sea el mensaje entero (ej. "crea un mazo sobre X" -> "X").
+ */
+function extractTopic(text: string): string | undefined {
+  // 1. Patrón explícito: "sobre [tema]"
+  let match = text.match(/sobre\s+(.+?)(?:\.|$)/i);
+  if (match) return match[1].trim();
+
+  // 2. Patrón de posesión: "mazo de [tema]", "tarjetas de [tema]"
+  match = text.match(/(?:mazo|deck|flashcards?|tarjetas?|preguntas?|examen|quiz)\s+de\s+(.+?)(?:\.|$)/i);
+  if (match) {
+    let t = match[1].trim();
+    // Evita falsos positivos como "mazo de 10" (cuando el número no fue atrapado por detectCount)
+    if (/^\d+$/.test(t)) return undefined;
+    // Limpia "10 tarjetas de X" si quedó atascado
+    t = t.replace(/^\d+\s+(?:tarjetas?|preguntas?|flashcards?|ítems?)\s+de\s+/i, '');
+    return t.trim();
+  }
+  
+  return undefined;
+}
+
+/**
  * Resuelve la intención de un mensaje dado su historial de conversación.
  */
 export function resolveIntent(
@@ -80,7 +103,12 @@ export function resolveIntent(
 ): ConversationIntent {
   // Intención directa en el mensaje actual
   if (hasDeckIntent(message)) {
-    return { type: 'generate_deck', mode: detectMode(message), count: detectCount(message) };
+    return { 
+      type: 'generate_deck', 
+      mode: detectMode(message), 
+      count: detectCount(message),
+      topic: extractTopic(message)
+    };
   }
 
   // Intención de reintento: el usuario repite/reintenta y en el historial ya había intención de mazo
@@ -88,7 +116,12 @@ export function resolveIntent(
   if (RETRY_PATTERNS.test(message) && prevUserHadDeckIntent) {
     const prevDeckMsg = [...history].reverse().find(m => m.role === 'user' && hasDeckIntent(m.content));
     const src = prevDeckMsg?.content || message;
-    return { type: 'generate_deck', mode: detectMode(src), count: detectCount(src) };
+    return { 
+      type: 'generate_deck', 
+      mode: detectMode(src), 
+      count: detectCount(src),
+      topic: extractTopic(src)
+    };
   }
 
   return { type: 'chat' };
