@@ -1,4 +1,4 @@
-﻿const secrets = require('../../../config/secrets');
+const secrets = require('../../../config/secrets');
 
 class GroqProvider {
   /**
@@ -13,7 +13,7 @@ class GroqProvider {
     const {
       temperature = 0.15,
       max_tokens = 6000,
-      model = 'llama-3.3-70b-versatile',
+      model = 'llama3-70b-8192',
       jsonMode = false
     } = options;
 
