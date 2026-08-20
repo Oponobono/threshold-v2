@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity, ToastAndroid } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { s as styles } from '../../styles/SubjectAIChatModal.styles';
+import * as Clipboard from 'expo-clipboard';
 
 export type ChatMessage = {
   id: string;
@@ -34,11 +35,18 @@ export const ChatMessageBubble: React.FC<{ item: ChatMessage }> = ({ item }) => 
           <MaterialCommunityIcons name="robot-outline" size={16} color={theme.colors.primary} />
         </View>
       )}
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}>
+      <TouchableOpacity 
+        style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}
+        activeOpacity={0.9}
+        onLongPress={async () => {
+          await Clipboard.setStringAsync(displayContent);
+          ToastAndroid.show('Copiado al portapapeles', ToastAndroid.SHORT);
+        }}
+      >
         <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAI]}>
           {displayContent}
         </Text>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };
