@@ -56,19 +56,38 @@ ${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
       ? `Genera el material de estudio basado en este contenido académico:\n\n${knowledgeModel.truncate(8000)}`
       : `Genera el material de estudio sobre el tema solicitado.`;
 
+    const generationOptions = { temperature: 0.15, max_tokens: 8000 };
+
     try {
       const response = await ModelClass.generate(
         [{ role: 'user', content: userContent }],
         systemPrompt,
-        { temperature: 0.15, max_tokens: 6000 }
+        generationOptions
       );
 
-      let raw = response.content.trim();
-
+      const raw = response.content.trim();
       return FlashcardResponseParser.parseTopicAndCards(raw);
-    } catch (err) {
-      console.error('[Generator] Error generando tarjetas:', err.message);
-      throw new Error('Fallo la generación del contenido del mazo.');
+    } catch (primaryErr) {
+      console.error('[Generator] Error con proveedor primario:', primaryErr.message);
+
+      const GeminiProvider = require('../providers/GeminiProvider');
+      if (ModelClass !== GeminiProvider) {
+        console.warn('[Generator] Intentando fallback a Gemini...');
+        try {
+          const fallbackResponse = await GeminiProvider.generate(
+            [{ role: 'user', content: userContent }],
+            systemPrompt,
+            generationOptions
+          );
+          const raw = fallbackResponse.content.trim();
+          return FlashcardResponseParser.parseTopicAndCards(raw);
+        } catch (fallbackErr) {
+          console.error('[Generator] Fallback Gemini también falló:', fallbackErr.message);
+          throw new Error(`Fallo la generación del mazo. Groq: ${primaryErr.message} | Gemini: ${fallbackErr.message}`);
+        }
+      }
+
+      throw new Error(`Fallo la generación del mazo: ${primaryErr.message}`);
     }
   }
 }
