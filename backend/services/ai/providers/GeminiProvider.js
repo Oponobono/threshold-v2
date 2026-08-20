@@ -18,7 +18,7 @@ class GeminiProvider {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3.6-flash',
         systemInstruction: systemPrompt,
         safetySettings: SAFETY_SETTINGS,
         generationConfig: {
@@ -35,7 +35,7 @@ class GeminiProvider {
       return {
         content: responseText,
         provider: 'gemini',
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3.6-flash',
       };
     } catch (error) {
       throw new Error(`[GeminiProvider] ${error.message}`);
