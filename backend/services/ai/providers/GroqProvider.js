@@ -12,7 +12,7 @@ class GroqProvider {
 
     const {
       temperature = 0.15,
-      max_tokens = 6000,
+      max_tokens = 3000,
       model = 'openai/gpt-oss-20b',
       jsonMode = false
     } = options;

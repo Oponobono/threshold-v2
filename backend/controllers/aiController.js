@@ -180,7 +180,7 @@ Responde ÃšNICAMENTE con el array JSON, sin texto introductorio ni conclusione
             { role: 'user', content: `Genera el material de estudio basado en este contenido acadÃ©mico:\n\n${trimmedContext}` },
           ],
           temperature: 0.15,
-          max_tokens: 6000,
+          max_tokens: 3000,
         }),
       });
 

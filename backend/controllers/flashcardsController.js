@@ -1186,7 +1186,7 @@ exports.generateDeckFromText = async (req, res) => {
           { role: 'user', content: `Genera exactamente ${count} Ã­tems basados en este contenido:\n\n${trimmedText}` }
         ],
         temperature: 0.2,
-        max_tokens: 4000,
+        max_tokens: 3000,
       }),
     });
 
@@ -1213,7 +1213,7 @@ exports.generateDeckFromText = async (req, res) => {
             { role: 'user', content: `Genera exactamente ${count} Ã­tems basados en este contenido:\n\n${trimmedText}` }
           ],
           temperature: 0.2,
-          max_tokens: 4000,
+          max_tokens: 3000,
         }),
       });
 
@@ -1358,7 +1358,7 @@ exports.generateDeckFromImage = async (req, res) => {
           ]
         }],
         temperature: 0.2,
-        max_tokens: 4000,
+        max_tokens: 3000,
       }),
     });
 
