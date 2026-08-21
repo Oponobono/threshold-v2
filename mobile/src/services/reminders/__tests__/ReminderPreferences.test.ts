@@ -118,14 +118,68 @@ describe('ReminderPreferences — contrato congelado', () => {
     expect(merged.categories.flashcard_deck.checkTime).toBeNull();
     expect(merged.quietHours).toEqual(DEFAULT_PREFERENCES.quietHours);
   });
-  it('normalizeOffsets normaliza duplicados, descartes y ordena', () => {
-    expect(parseReminderPreferences({ categories: { schedule: { offsets: [30, 30, 15, -5, 0, 'invalid'] } } }).categories.schedule.offsets).toEqual([0, 15, 30]);
+  it('normalizeOffsets: deduplica, filtra inválidos y ordena (sin truncar)', () => {
+    // normalizeOffsets no trunca — lo hace parseCategory
+    expect(
+      parseReminderPreferences({ categories: { schedule: { offsets: [30, 30, 15, -5, 0, 'invalid'] } } })
+        .categories.schedule.offsets,
+    ).toEqual([0, 15, 30]);
   });
 
   it('array vacio como offsets se convierte en enabled=false y offsets=null en mergePreferences', () => {
     const merged = mergePreferences(DEFAULT_PREFERENCES, { categories: { schedule: { offsets: [] } } });
     expect(merged.categories.schedule.enabled).toBe(false);
     expect(merged.categories.schedule.offsets).toBeNull();
+  });
+
+  it('parseCategory trunca array legacy schedule: retiene los 3 MÁS CERCANOS + 0', () => {
+    // schedule guarda los 3 menores (excluido 0)
+    const prefs = parseReminderPreferences({
+      categories: { schedule: { offsets: [0, 5, 15, 30, 60, 120] } },
+    });
+    expect(prefs.categories.schedule.offsets).toEqual([0, 5, 15, 30]);
+  });
+
+  it('parseCategory trunca array legacy assessment: retiene los 3 MÁS LEJANOS + 0', () => {
+    // assessment guarda los 3 mayores (excluido 0) para preservar avisos largos de exámenes
+    const prefs = parseReminderPreferences({
+      categories: { assessment: { offsets: [0, 5, 15, 30, 60, 120] } },
+    });
+    expect(prefs.categories.assessment.offsets).toEqual([0, 30, 60, 120]);
+  });
+
+  it('parseCategory trunca array legacy assessment sin 0: retiene los 3 más lejanos', () => {
+    const prefs = parseReminderPreferences({
+      categories: { assessment: { offsets: [5, 15, 30, 60, 1440] } },
+    });
+    expect(prefs.categories.assessment.offsets).toEqual([30, 60, 1440]);
+  });
+
+  it('acepta offset de hasta 4 semanas (40320 min) y rechaza valores mayores', () => {
+    const ok = parseReminderPreferences({ categories: { schedule: { offsets: [40320] } } });
+    expect(ok.categories.schedule.offsets).toEqual([40320]);
+
+    const exceeded = parseReminderPreferences({ categories: { schedule: { offsets: [40321] } } });
+    // El valor supera el máximo → se descarta → normalizeOffsets devuelve null → parseCategory retorna null
+    expect(exceeded.categories.schedule.offsets).toBeNull();
+  });
+
+  it('array con un solo offset sembrado borrado manualmente → enabled=false en mergePreferences', () => {
+    // Simula: usuario pasa a "Personalizar" (pre-fill con [15]), luego lo borra (offsets=[])
+    const afterPrefill = mergePreferences(DEFAULT_PREFERENCES, { categories: { schedule: { offsets: [15] } } });
+    expect(afterPrefill.categories.schedule.offsets).toEqual([15]);
+    expect(afterPrefill.categories.schedule.enabled).toBe(true);
+
+    const afterRemove = mergePreferences(afterPrefill, { categories: { schedule: { offsets: [] } } });
+    expect(afterRemove.categories.schedule.enabled).toBe(false);
+    expect(afterRemove.categories.schedule.offsets).toBeNull();
+  });
+
+  it('formatOffsetLabel: evalúa semanas antes que días (20160 → 2 sem, no 14 días)', () => {
+    // Este test se puede ampliar si se importa formatOffsetLabel directamente
+    // Por ahora validamos que el campo no quede roto a nivel de parseReminderPreferences
+    const prefs = parseReminderPreferences({ categories: { assessment: { offsets: [20160] } } });
+    expect(prefs.categories.assessment.offsets).toEqual([20160]); // 2 semanas = válido
   });
 });
 

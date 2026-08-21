@@ -21,9 +21,6 @@ export interface TranslateOptions {
 
 export type TranslateFn = (key: string, options?: TranslateOptions) => string;
 
-/** Anticipaciones expuestas en la UI (minutos antes del evento). Incluye 0
- *  ("en el momento"), permitido por el contrato (isOffset admite >= 0). */
-export const OFFSET_PRESETS: readonly number[] = [0, 5, 15, 30, 60, 120, 1440];
 
 export interface CategoryPresentation {
   readonly name: ReminderCategoryName;
@@ -35,14 +32,25 @@ export interface CategoryPresentation {
  *  técnico del contrato se conserva internamente; la UI no lo muestra. */
 export const CATEGORY_PRESENTATION: readonly CategoryPresentation[] = [
   { name: 'schedule', labelKey: 'reminders.category.schedule', icon: 'time-outline' },
-  { name: 'assessment', labelKey: 'reminders.category.assessment', icon: 'calendar-check-outline' },
+  { name: 'assessment', labelKey: 'reminders.category.assessment', icon: 'document-text-outline' },
   { name: 'calendar_event', labelKey: 'reminders.category.calendar_event', icon: 'calendar-outline' },
   { name: 'flashcard_deck', labelKey: 'reminders.category.flashcard_deck', icon: 'layers-outline' },
 ];
 
+/**
+ * Orden de evaluación: semanas → días → horas → minutos.
+ * El orden importa: 20160 (2 semanas) también es divisible por 1440,
+ * por lo que se debe chequear la unidad mayor primero.
+ */
 export function formatOffsetLabel(minutes: number, translate: TranslateFn): string {
   if (minutes === 0) {
-    return translate('reminders.offsetNow', { defaultValue: 'En el momento' });
+    return translate('reminders.offsetNow', { defaultValue: 'Al inicio' });
+  }
+  if (minutes % 10080 === 0) {
+    const weeks = minutes / 10080;
+    return weeks === 1
+      ? translate('reminders.offsetWeek', { defaultValue: '1 sem. antes' })
+      : translate('reminders.offsetWeeks', { count: weeks, defaultValue: '{{count}} sem. antes' });
   }
   if (minutes % 1440 === 0) {
     const days = minutes / 1440;

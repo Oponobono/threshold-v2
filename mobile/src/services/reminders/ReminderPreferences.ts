@@ -111,7 +111,7 @@ export interface TimeOfDay {
   readonly minutes: number;
 }
 
-const MAX_OFFSET_MINUTES = 10080; // 7 días
+const MAX_OFFSET_MINUTES = 40320; // 4 semanas
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const DEFAULT_PREFERENCES: ReminderPreferences = Object.freeze({
@@ -138,6 +138,11 @@ function asObject(v: unknown): Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 }
 
+/**
+ * Valida tipos, rango y deduplica. NO trunca — el límite de 3 custom offsets
+ * lo aplica parseCategory, que conoce el nombre de la categoría.
+ * Es el único punto que toca el array antes de parseCategory.
+ */
 function normalizeOffsets(raw: unknown): number[] | null {
   if (raw === null || raw === undefined) return null;
   if (isOffset(raw)) return [raw]; // Migración simple de config antigua
@@ -147,6 +152,32 @@ function normalizeOffsets(raw: unknown): number[] | null {
     return Array.from(new Set(valid)).sort((a, b) => a - b);
   }
   return null;
+}
+
+/**
+ * Aplica truncado inteligente al resultado de normalizeOffsets:
+ * - Extrae el 0 ("al momento") del array si está presente.
+ * - Separa los offsets custom (> 0) y los limita a 3:
+ *   - 'assessment': retiene los 3 MÁS LEJANOS (mayores) para preservar
+ *     avisos de "1 día antes" de exámenes en migración legacy.
+ *   - resto: retiene los 3 MÁS CERCANOS (menores) al evento.
+ * - Reinserta el 0 al inicio si estaba presente.
+ * - Este es el ÚNICO punto que aplica el límite de 4 ítems.
+ *   Ninguna otra función (normalizeOffsets, import, restore, sync) debe
+ *   truncar offsets directamente — todo debe pasar por parseCategory.
+ */
+function applyOffsetTruncation(offsets: number[], name: ReminderCategoryName): number[] {
+  const hasZero = offsets.includes(0);
+  const custom = offsets.filter(o => o > 0);
+  let truncated: number[];
+  if (name === 'assessment') {
+    // Lejanos primero (desc), tomar los 3 primeros, volver a ordenar asc
+    truncated = [...custom].sort((a, b) => b - a).slice(0, 3).sort((a, b) => a - b);
+  } else {
+    // Cercanos primero (asc ya ordenado), tomar los 3 primeros
+    truncated = custom.slice(0, 3);
+  }
+  return hasZero ? [0, ...truncated] : truncated;
 }
 
 function parseCategory(name: ReminderCategoryName, raw: unknown): ReminderCategoryPreferences {
@@ -159,11 +190,15 @@ function parseCategory(name: ReminderCategoryName, raw: unknown): ReminderCatego
     const checkTime = isHHMM(obj.checkTime) ? obj.checkTime : null;
     return { enabled, checkTime };
   }
-  const offsets = normalizeOffsets(obj.offsets !== undefined ? obj.offsets : obj.offset);
-  // Si explícitamente era un array vacío, lo forzamos a apagado
+  // Si explícitamente era un array vacío, la categoría se desactiva
   if (Array.isArray(obj.offsets) && obj.offsets.length === 0) {
     return { enabled: false, offsets: null };
   }
+  const normalized = normalizeOffsets(obj.offsets !== undefined ? obj.offsets : obj.offset);
+  if (normalized === null) {
+    return { enabled, offsets: null };
+  }
+  const offsets = applyOffsetTruncation(normalized, name);
   return { enabled, offsets };
 }
 

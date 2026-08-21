@@ -86,10 +86,10 @@ export default function TabLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
+      detachInactiveScreens={false}
       screenOptions={{
         headerShown: false,
         animation: 'none',
-        detachInactiveScreens: false,
         sceneStyle: { backgroundColor: theme.colors.background },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.text.secondary,

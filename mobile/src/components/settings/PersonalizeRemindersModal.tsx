@@ -1,25 +1,26 @@
-// â”€â”€ PersonalizeRemindersModal (proyecciÃ³n UI del contrato ReminderPreferences)
-// La UI renderiza directamente el contrato device-local (MMKV) vÃ­a
+// -- PersonalizeRemindersModal (proyección UI del contrato ReminderPreferences)
+// La UI renderiza directamente el contrato device-local (MMKV) vía
 // useReminderPreferences. Cada cambio persiste de inmediato
-// (service.set â†’ MMKV â†’ coordinator.resync â†’ reconcile â†’ OS).
-// No existe capa de traducciÃ³n de perfiles (minimal/standard/persistent/custom).
+// (service.set ? MMKV ? coordinator.resync ? reconcile ? OS).
+// No existe capa de traducción de perfiles (minimal/standard/persistent/custom).
 
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Modal, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Modal } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { SettingsTimePickerModal } from './SettingsTimePickerModal';
+import { DurationPickerModal } from './DurationPickerModal';
 import { theme } from '../../styles/theme';
 import { settingsStyles as styles } from '../../styles/Settings.styles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReminderPreferences } from '../../hooks/useReminderPreferences';
 import type { ReminderCategoryName } from '../../services/reminders/ReminderPreferences';
 import {
-  OFFSET_PRESETS,
   formatOffsetLabel,
 } from '../../services/reminders/ReminderPreferencesPresentation';
 import type { TranslateFn } from '../../services/reminders/ReminderPreferencesPresentation';
 import { alertRef } from '../ui/CustomAlert';
+import { toastRef } from '../ui/Toast';
 
 interface Props {
   visible: boolean;
@@ -27,45 +28,31 @@ interface Props {
   ctx: ReturnType<typeof useReminderPreferences>;
 }
 
+type OffsetCategoryName = 'assessment' | 'schedule' | 'calendar_event';
+
+const OFFSET_CATEGORY_LABELS: Record<OffsetCategoryName, string> = {
+  assessment: 'inicio del examen o entrega',
+  schedule: 'inicio de la clase',
+  calendar_event: 'inicio del evento',
+};
+
 export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, ctx }) => {
   const { t } = useTranslation();
   const translate: TranslateFn = (key, options) => t(key, options);
   const insets = useSafeAreaInsets();
 
   const [expandedCategory, setExpandedCategory] = useState<ReminderCategoryName | null>(null);
-  const [showDefaultOffset, setShowDefaultOffset] = useState(false);
   const [showCheckTime, setShowCheckTime] = useState(false);
   const [showQuietStart, setShowQuietStart] = useState(false);
   const [showQuietEnd, setShowQuietEnd] = useState(false);
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
+  const [durationPickerCategory, setDurationPickerCategory] = useState<OffsetCategoryName | null>(null);
 
   const { prefs, categories } = ctx;
   const masterEnabled = prefs.notificationsEnabled;
 
   const setCategoryEnabled = (name: ReminderCategoryName, enabled: boolean) => {
     ctx.update({ categories: { [name]: { enabled } } });
-  };
-
-  const toggleCategoryOffset = (name: ReminderCategoryName, currentOffsets: number[] | null, offset: number | null) => {
-    if (offset === null) {
-      ctx.update({ categories: { [name]: { offsets: null } } });
-      return;
-    }
-    const current = currentOffsets ?? [];
-    let newOffsets: number[];
-    if (current.includes(offset)) {
-      newOffsets = current.filter(x => x !== offset);
-      if (newOffsets.length === 0) return; // Prevenir deseleccionar el Ãºltimo
-    } else {
-      newOffsets = [...current, offset];
-    }
-    ctx.update({ categories: { [name]: { offsets: newOffsets } } });
-  };
-
-  const setDefaultOffset = (offset: number | null) => {
-    if (offset != null) {
-      ctx.update({ defaultOffset: offset });
-    }
-    setShowDefaultOffset(false);
   };
 
   const setCheckTime = (time: string) => {
@@ -85,7 +72,7 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
       title: t('reminders.resetDefaultsTitle', 'Restaurar valores predeterminados'),
       message: t(
         'reminders.resetDefaultsBody',
-        'Se restaurarÃ¡n las anticipaciones de todas las categorÃ­as y el horario de silencio. Los cambios se aplican de inmediato.',
+        'Se restaurarán las anticipaciones de todas las categorías y el horario de silencio. Los cambios se aplican de inmediato.',
       ),
       type: 'confirm',
       buttons: [
@@ -95,104 +82,210 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
     });
   };
 
-  const renderOffsetChips = (
-    current: number,
-    onSelect: (offset: number) => void,
-  ) => (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-      {OFFSET_PRESETS.map((offset) => {
-        const active = current === offset;
-        return (
-          <TouchableOpacity
-            key={offset}
-            onPress={() => onSelect(offset)}
-            style={{
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: active ? theme.colors.primary : theme.colors.border,
-              backgroundColor: active ? theme.colors.primary : theme.colors.background,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: active ? '600' : '400',
-                color: active ? '#fff' : theme.colors.text.secondary,
-              }}
-            >
-              {formatOffsetLabel(offset, translate)}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
+  // -- Helpers para categorías de offset ----------------------------------
 
-  const renderMultiOffsetChips = (
-    currentOffsets: number[],
-    onToggle: (offset: number | null) => void,
-    defaultActive: boolean,
-  ) => (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-      <TouchableOpacity
-        onPress={() => onToggle(null)}
+  const getCatOffsets = (name: OffsetCategoryName): number[] | null => {
+    const cat = prefs.categories[name];
+    return (cat as { offsets: number[] | null }).offsets;
+  };
+
+  const isCustomMode = (name: OffsetCategoryName): boolean => getCatOffsets(name) !== null;
+
+  const enableCustomMode = (name: OffsetCategoryName) => {
+    ctx.update({ categories: { [name]: { offsets: [prefs.defaultOffset] } } });
+  };
+
+  const disableCustomMode = (name: OffsetCategoryName) => {
+    ctx.update({ categories: { [name]: { offsets: null } } });
+  };
+
+  const toggleAtStart = (name: OffsetCategoryName, currentOffsets: number[]) => {
+    const hasZero = currentOffsets.includes(0);
+    const newOffsets = hasZero
+      ? currentOffsets.filter(o => o !== 0)
+      : [0, ...currentOffsets.filter(o => o > 0)];
+    applyNewOffsets(name, newOffsets);
+  };
+
+  const removeCustomOffset = (name: OffsetCategoryName, offset: number, currentOffsets: number[]) => {
+    applyNewOffsets(name, currentOffsets.filter(o => o !== offset));
+  };
+
+  const addCustomOffset = (name: OffsetCategoryName, minutes: number) => {
+    const current = getCatOffsets(name) ?? [];
+    if (current.includes(minutes)) return;
+    applyNewOffsets(name, [...current, minutes].sort((a, b) => a - b));
+  };
+
+  const applyNewOffsets = (name: OffsetCategoryName, newOffsets: number[]) => {
+    if (newOffsets.length === 0) {
+      ctx.update({ categories: { [name]: { enabled: false, offsets: [] } } });
+      toastRef?.show?.({
+        message: t('reminders.categoryAutoDisabled', 'Categoría desactivada: no quedan recordatorios.'),
+        type: 'info',
+      });
+    } else {
+      ctx.update({ categories: { [name]: { offsets: newOffsets } } });
+    }
+  };
+
+  const openDurationPicker = (name: OffsetCategoryName) => {
+    setDurationPickerCategory(name);
+    setShowDurationPicker(true);
+  };
+
+  // -- Renderizado panel expandido de categoría de offset ------------------
+  const renderOffsetCategoryExpanded = (name: OffsetCategoryName) => {
+    const custom = isCustomMode(name);
+    const currentOffsets = getCatOffsets(name);
+    const effectiveOffsets = currentOffsets ?? [prefs.defaultOffset];
+    const hasZero = effectiveOffsets.includes(0);
+    const customOffsets = effectiveOffsets.filter(o => o > 0);
+    const canAddMore = customOffsets.length < 3;
+    const eventLabel = OFFSET_CATEGORY_LABELS[name];
+
+    return (
+      <View
         style={{
-          paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1,
-          borderColor: defaultActive ? theme.colors.primary : theme.colors.border,
-          backgroundColor: defaultActive ? theme.colors.primary : theme.colors.background,
+          backgroundColor: theme.colors.card,
+          borderWidth: 1,
+          borderColor: theme.colors.primary,
+          borderTopWidth: 0,
+          borderBottomLeftRadius: 12,
+          borderBottomRightRadius: 12,
+          padding: 16,
+          paddingTop: 12,
         }}
       >
-        <Text style={{ fontSize: 12, fontWeight: defaultActive ? '600' : '400', color: defaultActive ? '#fff' : theme.colors.text.secondary }}>
-          {defaultActive ? `âœ“ ${t('reminders.offsetDefault', 'Predeterminado')}` : t('reminders.offsetDefault', 'Predeterminado')}
-        </Text>
-      </TouchableOpacity>
-      
-      {OFFSET_PRESETS.map((offset) => {
-        const active = currentOffsets.includes(offset);
-        return (
+        {/* Predeterminado / Personalizar */}
+        <View style={{ flexDirection: 'row', marginBottom: 14 }}>
           <TouchableOpacity
-            key={offset}
-            onPress={() => onToggle(offset)}
+            onPress={() => disableCustomMode(name)}
             style={{
-              paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1,
-              borderColor: active ? theme.colors.primary : theme.colors.border,
-              backgroundColor: active ? theme.colors.primary : theme.colors.background,
+              flex: 1, paddingVertical: 7, alignItems: 'center',
+              borderRadius: 8, borderWidth: 1, marginRight: 6,
+              borderColor: !custom ? theme.colors.primary : theme.colors.border,
+              backgroundColor: !custom ? theme.colors.primary + '18' : 'transparent',
             }}
           >
-            <Text style={{ fontSize: 12, fontWeight: active ? '600' : '400', color: active ? '#fff' : theme.colors.text.secondary }}>
-              {active ? 'âœ“ ' : ''}{formatOffsetLabel(offset, translate)}
+            <Text style={{ fontSize: 12, fontWeight: !custom ? '700' : '400', color: !custom ? theme.colors.primary : theme.colors.text.secondary }}>
+              {t('reminders.modeDefault', 'Predeterminado')}
             </Text>
           </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
+          <TouchableOpacity
+            onPress={() => !custom && enableCustomMode(name)}
+            style={{
+              flex: 1, paddingVertical: 7, alignItems: 'center',
+              borderRadius: 8, borderWidth: 1,
+              borderColor: custom ? theme.colors.primary : theme.colors.border,
+              backgroundColor: custom ? theme.colors.primary + '18' : 'transparent',
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: custom ? '700' : '400', color: custom ? theme.colors.primary : theme.colors.text.secondary }}>
+              {t('reminders.modeCustom', 'Personalizar')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {!custom ? (
+          <Text style={[styles.settingDesc, { fontSize: 12, textAlign: 'center', marginTop: 4 }]}>
+            {t('reminders.defaultOffsetHint', {
+              value: formatOffsetLabel(prefs.defaultOffset, translate),
+              defaultValue: 'Avisará {{value}} (configuración global)',
+            })}
+          </Text>
+        ) : (
+          <>
+            {/* Toggle "Al inicio" */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.settingTitle, { fontSize: 13 }]}>
+                  {t('reminders.atStartLabel', `Al ${eventLabel}`)}
+                </Text>
+                <Text style={[styles.settingDesc, { fontSize: 11 }]}>
+                  {t('reminders.atStartDesc', 'Aviso en el momento exacto de inicio')}
+                </Text>
+              </View>
+              <Switch
+                value={hasZero}
+                onValueChange={() => toggleAtStart(name, currentOffsets ?? [])}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                thumbColor={theme.colors.white}
+              />
+            </View>
+
+            {/* Pre-avisos custom */}
+            <Text style={[styles.settingDesc, { fontSize: 11, marginBottom: 8 }]}>
+              {t('reminders.customAlertsLabel', 'Pre-avisos')} ({customOffsets.length}/3)
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {customOffsets.map((offset) => (
+                <View
+                  key={offset}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center',
+                    backgroundColor: theme.colors.primary + '15',
+                    borderRadius: 20, borderWidth: 1,
+                    borderColor: theme.colors.primary + '50',
+                    paddingVertical: 5, paddingLeft: 12, paddingRight: 8, gap: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.primary }}>
+                    {formatOffsetLabel(offset, translate)}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => removeCustomOffset(name, offset, currentOffsets ?? [])}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={16} color={theme.colors.primary + 'AA'} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {canAddMore && (
+                <TouchableOpacity
+                  onPress={() => openDurationPicker(name)}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center',
+                    borderRadius: 20, borderWidth: 1,
+                    borderColor: theme.colors.border, borderStyle: 'dashed',
+                    paddingVertical: 5, paddingHorizontal: 12, gap: 4,
+                  }}
+                >
+                  <Ionicons name="add" size={14} color={theme.colors.text.secondary} />
+                  <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                    {t('reminders.addAlert', 'Agregar')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.bottomSheetModalOverlay}>
         <View style={[styles.bottomSheetModalContent, { maxHeight: '90%', paddingBottom: 0, paddingHorizontal: 20 }]}>
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { flex: 1 }]}>{t('reminders.configTitle', 'ConfiguraciÃ³n de recordatorios')}</Text>
+            <Text style={[styles.modalTitle, { flex: 1 }]}>{t('reminders.configTitle', 'Configuración de recordatorios')}</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={theme.colors.text.primary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView 
-            style={[styles.modalBody, { marginBottom: 0 }]} 
+          <ScrollView
+            style={[styles.modalBody, { marginBottom: 0 }]}
             contentContainerStyle={{ paddingBottom: (insets.bottom || 16) + 16 }}
             showsVerticalScrollIndicator={false}
           >
-            {/* â”€â”€ Master switch â”€â”€ */}
+            {/* Master switch */}
             <View style={[styles.settingRow, { marginBottom: 4 }]}>
               <View style={{ flex: 1, paddingRight: 12 }}>
                 <Text style={styles.settingTitle}>{t('reminders.masterSwitch', 'Notificaciones')}</Text>
-                <Text style={styles.settingDesc}>
-                  {t('reminders.masterSwitchDesc', 'Activa o desactiva todos los recordatorios')}
-                </Text>
+                <Text style={styles.settingDesc}>{t('reminders.masterSwitchDesc', 'Activa o desactiva todos los recordatorios')}</Text>
               </View>
               <Switch
                 value={masterEnabled}
@@ -203,41 +296,30 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
             </View>
 
             {!masterEnabled && (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: '#FF950015',
-                  padding: 12,
-                  borderRadius: 8,
-                  marginBottom: 12,
-                }}
-              >
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF950015', padding: 12, borderRadius: 8, marginBottom: 12 }}>
                 <Ionicons name="warning" size={16} color="#FF9500" style={{ marginRight: 8 }} />
                 <Text style={{ flex: 1, fontSize: 12, color: '#FF9500' }}>
-                  {t('reminders.masterOffHint', 'Los recordatorios estÃ¡n desactivados. No se programarÃ¡n avisos.')}
+                  {t('reminders.masterOffHint', 'Los recordatorios están desactivados. No se programarán avisos.')}
                 </Text>
               </View>
             )}
 
             <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 20 }} />
 
-            {/* â”€â”€ CategorÃ­as â”€â”€ */}
-            <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 4 }]}>
-              {t('reminders.categorySection', 'Recordatorios')}
-            </Text>
-            <Text style={[styles.sectionDesc, { marginBottom: 16 }]}>
-              {t('reminders.categorySectionDesc', 'Avisos por tipo de contenido. Cada categorÃ­a tiene su propia anticipaciÃ³n.')}
-            </Text>
+            {/* Categorías */}
+            <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 4 }]}>{t('reminders.categorySection', 'Recordatorios')}</Text>
+            <Text style={[styles.sectionDesc, { marginBottom: 16 }]}>{t('reminders.categorySectionDesc', 'Configura los avisos por tipo de contenido.')}</Text>
 
             {categories.map((cat) => {
               const isExpanded = expandedCategory === cat.name;
+              const isOffsetCategory = cat.name !== 'flashcard_deck';
+
               return (
                 <View key={cat.name} style={{ marginBottom: 12, opacity: masterEnabled ? 1 : 0.5 }}>
                   <View
                     style={{
                       backgroundColor: theme.colors.card,
-                      borderRadius: isExpanded ? 12 : 12,
+                      borderRadius: 12,
                       borderBottomLeftRadius: isExpanded ? 0 : 12,
                       borderBottomRightRadius: isExpanded ? 0 : 12,
                       borderWidth: 1,
@@ -250,7 +332,7 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <TouchableOpacity
                         style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
-                        onPress={() => setExpandedCategory(prev => (prev === cat.name ? null : cat.name))}
+                        onPress={() => setExpandedCategory((prev) => (prev === cat.name ? null : cat.name))}
                         disabled={!masterEnabled}
                       >
                         <Ionicons
@@ -267,23 +349,14 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
                             <Text style={[styles.settingDesc, { fontSize: 11, color: '#FF3B30', marginTop: 2 }]}>
                               {t('reminders.disabled', 'Desactivado')}
                             </Text>
-                          ) : cat.checkTime != null ? (
-                            <Text style={[styles.settingDesc, { fontSize: 11, color: theme.colors.text.secondary, marginTop: 2 }]}>
-                              {t('reminders.dailyReview', { value: cat.offsetLabel, defaultValue: 'Repaso diario a las {{value}}' })}
-                            </Text>
                           ) : (
                             <Text style={[styles.settingDesc, { fontSize: 11, color: theme.colors.text.secondary, marginTop: 2 }]}>
-                              {t('reminders.offsetBefore', { value: cat.offsetLabel, defaultValue: 'Avisar {{value}}' })}
+                              {cat.checkTime != null
+                                ? t('reminders.dailyReview', { value: cat.offsetLabel, defaultValue: 'Repaso diario a las {{value}}' })
+                                : t('reminders.offsetBefore', { value: cat.offsetLabel, defaultValue: '{{value}}' })}
                             </Text>
                           )}
                         </View>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}
-                        onPress={() => setExpandedCategory(prev => (prev === cat.name ? null : cat.name))}
-                        disabled={!masterEnabled}
-                      >
-                        <Text style={[styles.outlinePillText, { fontSize: 12 }]}>{cat.offsetLabel}</Text>
                       </TouchableOpacity>
                       <Switch
                         value={cat.enabled}
@@ -295,28 +368,23 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
                   </View>
 
                   {isExpanded && masterEnabled && (
-                    <View
-                      style={{
-                        backgroundColor: theme.colors.card,
-                        borderWidth: 1,
-                        borderColor: theme.colors.primary,
-                        borderTopWidth: 0,
-                        borderBottomLeftRadius: 12,
-                        borderBottomRightRadius: 12,
-                        padding: 16,
-                        paddingTop: 8,
-                      }}
-                    >
-                      {cat.checkTime != null ? (
-                        <>
-                          <Text style={styles.settingDesc}>
-                            {t('reminders.checkTimeDesc', { defaultValue: 'Recibe un aviso diario cuando tengas repasos pendientes.' })}
-                          </Text>
+                    isOffsetCategory
+                      ? renderOffsetCategoryExpanded(cat.name as OffsetCategoryName)
+                      : (
+                        <View
+                          style={{
+                            backgroundColor: theme.colors.card,
+                            borderWidth: 1, borderColor: theme.colors.primary,
+                            borderTopWidth: 0, borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
+                            padding: 16, paddingTop: 8,
+                          }}
+                        >
+                          <Text style={styles.settingDesc}>{t('reminders.checkTimeDesc', 'Recibe un aviso diario cuando tengas repasos pendientes.')}</Text>
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
                             <Text style={styles.settingTitle}>{t('reminders.checkTimeTitle', 'Hora del aviso')}</Text>
                             <TouchableOpacity
                               style={[styles.outlinePill, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                              onPress={() => setShowCheckTime(prev => !prev)}
+                              onPress={() => setShowCheckTime((prev) => !prev)}
                             >
                               <Ionicons name="time-outline" size={13} color={theme.colors.text.secondary} />
                               <Text style={styles.outlinePillText}>{cat.offsetLabel}</Text>
@@ -329,26 +397,11 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
                               title={t('reminders.checkTimeTitle', 'Hora del aviso')}
                               description={t('reminders.checkTimeDesc', 'Recibe un aviso diario cuando tengas repasos pendientes.')}
                               onClose={() => setShowCheckTime(false)}
-                              onSave={(time) => {
-                                setCheckTime(time);
-                                setShowCheckTime(false);
-                              }}
+                              onSave={(time) => { setCheckTime(time); setShowCheckTime(false); }}
                             />
                           )}
-                        </>
-                      ) : (
-                        <>
-                          <Text style={[styles.subSectionTitle, { marginBottom: 2, fontSize: 13 }]}>
-                            {t('reminders.offsetTitle', 'Â¿CuÃ¡nto antes avisar?')}
-                          </Text>
-                          {renderMultiOffsetChips(
-                            cat.offsets || [],
-                            (offset) => toggleCategoryOffset(cat.name, cat.hasCustomOffsets ? cat.offsets : null, offset),
-                            !cat.hasCustomOffsets,
-                          )}
-                        </>
-                      )}
-                    </View>
+                        </View>
+                      )
                   )}
                 </View>
               );
@@ -356,43 +409,31 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
 
             <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 20 }} />
 
-            {/* â”€â”€ Preferencias â”€â”€ */}
-            <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 4 }]}>
-              {t('reminders.preferencesSection', 'Preferencias')}
-            </Text>
-            <Text style={[styles.sectionDesc, { marginBottom: 16 }]}>
-              {t('reminders.preferencesSectionDesc', 'ConfiguraciÃ³n global de los recordatorios.')}
-            </Text>
+            {/* Anticipación predeterminada */}
+            <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 4 }]}>{t('reminders.preferencesSection', 'Preferencias')}</Text>
+            <Text style={[styles.sectionDesc, { marginBottom: 16 }]}>{t('reminders.preferencesSectionDesc', 'Configuración global aplicada a categorías en modo Predeterminado.')}</Text>
 
-            {/* AnticipaciÃ³n predeterminada */}
-            <View style={[styles.settingRow, { marginBottom: 4 }]}>
+            <View style={[styles.settingRow, { marginBottom: 12 }]}>
               <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={styles.settingTitle}>{t('reminders.defaultOffsetTitle', 'AnticipaciÃ³n predeterminada')}</Text>
-                <Text style={styles.settingDesc}>
-                  {t('reminders.defaultOffsetDesc', 'Se aplica a las categorÃ­as sin anticipaciÃ³n propia')}
-                </Text>
+                <Text style={styles.settingTitle}>{t('reminders.defaultOffsetTitle', 'Anticipación predeterminada')}</Text>
+                <Text style={styles.settingDesc}>{t('reminders.defaultOffsetDesc', 'Se aplica a las categorías sin anticipación propia')}</Text>
               </View>
               <TouchableOpacity
+                onPress={() => { setDurationPickerCategory(null); setShowDurationPicker(true); }}
                 style={[styles.outlinePill, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                onPress={() => setShowDefaultOffset(prev => !prev)}
               >
                 <Ionicons name="time-outline" size={13} color={theme.colors.text.secondary} />
                 <Text style={styles.outlinePillText}>{formatOffsetLabel(prefs.defaultOffset, translate)}</Text>
               </TouchableOpacity>
             </View>
-            {showDefaultOffset && (
-              <View style={{ marginBottom: 16 }}>
-                {renderOffsetChips(prefs.defaultOffset, setDefaultOffset as any)}
-              </View>
-            )}
+
+            <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 4 }} />
 
             {/* Horario de silencio */}
-            <View style={[styles.settingRow, { marginBottom: 4 }]}>
+            <View style={[styles.settingRow, { marginBottom: 4, marginTop: 16 }]}>
               <View style={{ flex: 1, paddingRight: 12 }}>
                 <Text style={styles.settingTitle}>{t('reminders.quietHoursTitle', 'Horario de silencio')}</Text>
-                <Text style={styles.settingDesc}>
-                  {t('reminders.quietHoursDesc', 'No se generan recordatorios dentro de esta ventana')}
-                </Text>
+                <Text style={styles.settingDesc}>{t('reminders.quietHoursDesc', 'No se generan recordatorios dentro de esta ventana')}</Text>
               </View>
               <Switch
                 value={prefs.quietHours.enabled}
@@ -408,7 +449,7 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
                   <Text style={styles.settingTitle}>{t('reminders.quietHoursStart', 'Inicio')}</Text>
                   <TouchableOpacity
                     style={[styles.outlinePill, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                    onPress={() => setShowQuietStart(prev => !prev)}
+                    onPress={() => setShowQuietStart((prev) => !prev)}
                   >
                     <Text style={styles.outlinePillText}>{prefs.quietHours.start}</Text>
                   </TouchableOpacity>
@@ -418,20 +459,16 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
                     visible={showQuietStart}
                     initialTime={prefs.quietHours.start}
                     title={t('reminders.quietHoursStartTitle', 'Inicio del silencio')}
-                    description={t('reminders.quietHoursStartDesc', 'A partir de esta hora no recibirÃ¡s recordatorios.')}
+                    description={t('reminders.quietHoursStartDesc', 'A partir de esta hora no recibirás recordatorios.')}
                     onClose={() => setShowQuietStart(false)}
-                    onSave={(time) => {
-                      setQuietTime('start', time);
-                      setShowQuietStart(false);
-                    }}
+                    onSave={(time) => { setQuietTime('start', time); setShowQuietStart(false); }}
                   />
                 )}
-
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
                   <Text style={styles.settingTitle}>{t('reminders.quietHoursEnd', 'Fin')}</Text>
                   <TouchableOpacity
                     style={[styles.outlinePill, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                    onPress={() => setShowQuietEnd(prev => !prev)}
+                    onPress={() => setShowQuietEnd((prev) => !prev)}
                   >
                     <Text style={styles.outlinePillText}>{prefs.quietHours.end}</Text>
                   </TouchableOpacity>
@@ -441,31 +478,23 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
                     visible={showQuietEnd}
                     initialTime={prefs.quietHours.end}
                     title={t('reminders.quietHoursEndTitle', 'Fin del silencio')}
-                    description={t('reminders.quietHoursEndDesc', 'A partir de esta hora se reanudarÃ¡n los recordatorios.')}
+                    description={t('reminders.quietHoursEndDesc', 'A partir de esta hora se reanudarán los recordatorios.')}
                     onClose={() => setShowQuietEnd(false)}
-                    onSave={(time) => {
-                      setQuietTime('end', time);
-                      setShowQuietEnd(false);
-                    }}
+                    onSave={(time) => { setQuietTime('end', time); setShowQuietEnd(false); }}
                   />
                 )}
               </View>
             )}
 
-            {/* Restaurar valores predeterminados */}
+            {/* Restaurar */}
             <TouchableOpacity
               onPress={handleReset}
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 12,
-                marginTop: 20,
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                paddingVertical: 12, marginTop: 20,
                 backgroundColor: theme.colors.background,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                borderStyle: 'dashed',
+                borderRadius: 8, borderWidth: 1,
+                borderColor: theme.colors.border, borderStyle: 'dashed',
               }}
             >
               <Ionicons name="refresh-outline" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
@@ -476,6 +505,29 @@ export const PersonalizeRemindersModal: React.FC<Props> = ({ visible, onClose, c
           </ScrollView>
         </View>
       </View>
+
+      {/* DurationPickerModal para pre-avisos custom y anticipación predeterminada */}
+      {showDurationPicker && (
+        <DurationPickerModal
+          visible={showDurationPicker}
+          title={
+            durationPickerCategory
+              ? t('reminders.addReminderTitle', 'Nuevo recordatorio')
+              : t('reminders.defaultOffsetTitle', 'Anticipación predeterminada')
+          }
+          existingOffsets={durationPickerCategory ? (getCatOffsets(durationPickerCategory) ?? []) : []}
+          onClose={() => { setShowDurationPicker(false); setDurationPickerCategory(null); }}
+          onSave={(minutes) => {
+            if (durationPickerCategory) {
+              addCustomOffset(durationPickerCategory, minutes);
+            } else {
+              ctx.update({ defaultOffset: minutes });
+            }
+            setShowDurationPicker(false);
+            setDurationPickerCategory(null);
+          }}
+        />
+      )}
     </Modal>
   );
 };
