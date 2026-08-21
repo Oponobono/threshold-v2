@@ -1171,7 +1171,7 @@ exports.generateDeckFromText = async (req, res) => {
     : text;
 
   let response;
-  let modelUsed = 'llama-3.3-70b-versatile';
+  let modelUsed = 'openai/gpt-oss-120b';
 
   try {
     console.log(`[Groq] Intentando generar ${count} Ã­tems usando modelo principal: ${modelUsed}`);

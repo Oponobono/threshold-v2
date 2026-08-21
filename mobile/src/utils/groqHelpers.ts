@@ -45,7 +45,7 @@ export async function transcribeWithWhisper(audioUri: string, apiKey: string): P
 
   try {
     const body = {
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       messages: [
         {
           role: 'system',
@@ -82,7 +82,7 @@ export async function transcribeWithWhisper(audioUri: string, apiKey: string): P
 
 export async function summarizeWithGroq(transcription: string, apiKey: string): Promise<string> {
   const body = {
-    model: 'llama-3.3-70b-versatile',
+    model: 'openai/gpt-oss-120b',
     messages: [
       {
         role: 'system',

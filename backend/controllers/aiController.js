@@ -55,7 +55,7 @@ async function callGroqAPI(messages, systemPrompt) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       messages: apiMessages,
       temperature: 0.15,
       max_tokens: 2048,
@@ -174,7 +174,7 @@ Responde ÃšNICAMENTE con el array JSON, sin texto introductorio ni conclusione
         method: 'POST',
         headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `Genera el material de estudio basado en este contenido acadÃ©mico:\n\n${trimmedContext}` },
@@ -1270,7 +1270,7 @@ exports.chatProxy = async (req, res) => {
     res.json({
       response: result.reply.content,
       provider: result.provider,
-      model: provider === 'gemini' ? 'gemini-3-flash-preview' : 'llama-3.3-70b-versatile',
+      model: provider === 'gemini' ? 'gemini-3-flash-preview' : 'openai/gpt-oss-120b',
       latencyMs: duration,
     });
   } catch (err) {
@@ -1321,7 +1321,7 @@ Formato JSON esperado:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-120b',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `APUNTES DEL ESTUDIANTE:\n${trimmedNotes}` },
