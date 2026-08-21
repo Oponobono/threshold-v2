@@ -1198,7 +1198,7 @@ exports.generateDeckFromText = async (req, res) => {
     console.warn(`[Groq] Modelo principal ${modelUsed} fallÃ³ o superÃ³ lÃ­mites de tasa:`, primaryError.message);
     
     // 2. Fallback de seguridad: usar el modelo veloz con menor uso de recursos
-    modelUsed = 'llama-3.1-8b-instant';
+    modelUsed = 'openai/gpt-oss-20b';
     console.log(`[Groq] Reintentando con modelo secundario de fallback: ${modelUsed}`);
     
     try {

@@ -13,7 +13,7 @@ class GroqProvider {
     const {
       temperature = 0.15,
       max_tokens = 6000,
-      model = 'llama-3.1-8b-instant',
+      model = 'openai/gpt-oss-20b',
       jsonMode = false
     } = options;
 

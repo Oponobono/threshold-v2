@@ -812,7 +812,7 @@ exports.generateFlashcards = async (req, res) => {
       try {
         console.log(`[GenerateFlashcards] Usando Groq con prompts simplificados...`);
         flashcards = await geminiService.generateFlashcardsWithGroq(context_text, count);
-        modelUsed = 'llama-3.1-8b-instant';
+        modelUsed = 'openai/gpt-oss-20b';
         provider = 'groq';
         
         console.log(`[GenerateFlashcards] âœ… Ã‰xito con Groq (${flashcards.length} Ã­tems)`);
@@ -1155,7 +1155,7 @@ exports.generateFlashcardsUpload = async (req, res) => {
         // Convertir buffer a texto para Groq
         const contextText = req.file.buffer.toString('utf-8');
         flashcards = await geminiService.generateFlashcardsWithGroq(contextText, count);
-        modelUsed = 'llama-3.1-8b-instant';
+        modelUsed = 'openai/gpt-oss-20b';
         provider = 'groq';
         
         console.log(`[GenerateFlashcardsUpload] âœ… Ã‰xito con Groq (${flashcards.length} Ã­tems)`);
@@ -1204,7 +1204,7 @@ exports.getModelInfo = async (req, res) => {
   try {
     const groqInfo = {
       provider: 'groq',
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       contextLimit: '12 KB',
       speed: 'Ultra rÃ¡pido (~50ms)',
       costOptimization: 'Muy econÃ³mico',

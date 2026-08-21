@@ -107,7 +107,7 @@ exports.getModelInfo = async (req, res) => {
   try {
     const groqInfo = {
       provider: 'groq',
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       contextLimit: '12 KB',
       speed: 'Ultra rápido (~50ms)',
       costOptimization: 'Muy económico',
