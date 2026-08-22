@@ -154,59 +154,92 @@ interface ProviderSectionProps {
 }
 
 const ProviderSection = ({ provider, label, models, status, preference, onSelect }: ProviderSectionProps) => {
+  const [expanded, setExpanded] = useState(true);
   const providerModels = models.filter(m => m.provider === provider);
+
+  const selectedLabel = preference.mode === 'manual'
+    ? preference.modelId
+    : 'Automático';
 
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text style={styles.subSectionTitle}>{label}</Text>
-
-      {status === 'loading' && (
-        <>
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </>
-      )}
-
-      {status === 'empty' && (
-        <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-          <Ionicons name="cloud-offline-outline" size={20} color={theme.colors.text.secondary} />
-          <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 6, textAlign: 'center' }}>
-            Sin modelos disponibles
-          </Text>
+      <TouchableOpacity
+        onPress={() => setExpanded(prev => !prev)}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: 6,
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+      >
+        <View>
+          <Text style={styles.subSectionTitle}>{label}</Text>
+          {!expanded && (
+            <Text style={{ fontSize: 11, color: theme.colors.text.secondary, marginTop: 1 }}>
+              {selectedLabel}
+            </Text>
+          )}
         </View>
-      )}
+        <Ionicons
+          name={expanded ? 'chevron-up' : 'chevron-down'}
+          size={16}
+          color={theme.colors.text.secondary}
+        />
+      </TouchableOpacity>
 
-      {(status === 'loaded' || status === 'cached') && (
+      {expanded && (
         <>
-          {status === 'cached' && (
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              marginBottom: 6,
-            }}>
-              <Ionicons name="time-outline" size={12} color={theme.colors.text.secondary} />
-              <Text style={{ fontSize: 10, color: theme.colors.text.secondary }}>
-                Datos almacenados
+          {status === 'loading' && (
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
+          )}
+
+          {status === 'empty' && (
+            <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+              <Ionicons name="cloud-offline-outline" size={20} color={theme.colors.text.secondary} />
+              <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 6, textAlign: 'center' }}>
+                Sin modelos disponibles
               </Text>
             </View>
           )}
 
-          <AutoRow
-            isSelected={preference.mode === 'auto'}
-            onSelect={() => onSelect({ mode: 'auto' })}
-          />
+          {(status === 'loaded' || status === 'cached') && (
+            <>
+              {status === 'cached' && (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  marginBottom: 6,
+                }}>
+                  <Ionicons name="time-outline" size={12} color={theme.colors.text.secondary} />
+                  <Text style={{ fontSize: 10, color: theme.colors.text.secondary }}>
+                    Datos almacenados
+                  </Text>
+                </View>
+              )}
 
-          {providerModels.map(model => (
-            <ModelRow
-              key={model.modelId}
-              modelId={model.modelId}
-              capabilities={model.capabilities}
-              isSelected={preference.mode === 'manual' && preference.modelId === model.modelId}
-              onSelect={() => onSelect({ mode: 'manual', modelId: model.modelId })}
-            />
-          ))}
+              <AutoRow
+                isSelected={preference.mode === 'auto'}
+                onSelect={() => onSelect({ mode: 'auto' })}
+              />
+
+              {providerModels.map(model => (
+                <ModelRow
+                  key={model.modelId}
+                  modelId={model.modelId}
+                  capabilities={model.capabilities}
+                  isSelected={preference.mode === 'manual' && preference.modelId === model.modelId}
+                  onSelect={() => onSelect({ mode: 'manual', modelId: model.modelId })}
+                />
+              ))}
+            </>
+          )}
         </>
       )}
     </View>
