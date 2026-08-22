@@ -1,4 +1,5 @@
 const secrets = require('../config/secrets');
+const { MODEL_DEFAULTS, callWithModelFallback } = require('../utils/modelRegistry');
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion, recordDeletions, updateWithVersionGuard, removeDeletion, respondStaleVersion } = require('../helpers/syncVersion');
@@ -1121,7 +1122,7 @@ Genera exactamente ${count} PREGUNTAS DE VERDADERO O FALSO.
 Formato del objeto JSON esperado:
 {
   "items": [
-    { "type": "boolean", "data": { "question": "AfirmaciÃ³n con matiz tÃ©cnico.", "correctAnswer": true }, "hint": "Pista o empujÃ³n cognitivo.", "explanation": "Argumento sÃ³lido que respalde la veracidad o falsedad." }
+    { "type": "boolean", "data": { "question": "Afirmación con matiz técnico.", "correctAnswer": true }, "hint": "Pista o empujón cognitivo.", "explanation": "Argumento sólido que respalde la veracidad o falsedad." }
   ]
 }`;
   }
@@ -1129,20 +1130,20 @@ Formato del objeto JSON esperado:
   if (mode === 'mixed') {
     return `${base}
 
-Genera exactamente ${count} ÃTEMS MIXTOS (40% Flashcards, 40% SelecciÃ³n MÃºltiple, 20% V/F).
+Genera exactamente ${count} ÍTEMS MIXTOS (40% Flashcards, 40% Selección Múltiple, 20% V/F).
 Formato del objeto JSON esperado:
 {
   "items": [
-    { "type": "flashcard", "data": { "front": "Pregunta conceptual...", "back": "Respuesta completa..." }, "hint": "Pista...", "explanation": "ExplicaciÃ³n..." },
-    { "type": "multiple_choice", "data": { "question": "Pregunta...", "options": ["A","B","C","D"], "correctIndex": 0 }, "hint": "Pista...", "explanation": "ExplicaciÃ³n..." },
-    { "type": "boolean", "data": { "question": "AfirmaciÃ³n...", "correctAnswer": true }, "hint": "Pista...", "explanation": "ExplicaciÃ³n..." }
+    { "type": "flashcard", "data": { "front": "Pregunta conceptual...", "back": "Respuesta completa..." }, "hint": "Pista...", "explanation": "Explicación..." },
+    { "type": "multiple_choice", "data": { "question": "Pregunta...", "options": ["A","B","C","D"], "correctIndex": 0 }, "hint": "Pista...", "explanation": "Explicación..." },
+    { "type": "boolean", "data": { "question": "Afirmación...", "correctAnswer": true }, "hint": "Pista...", "explanation": "Explicación..." }
   ]
 }`;
   }
 
   return `${base}
 
-Genera exactamente ${count} Ã­tems de tipo "${mode}".
+Genera exactamente ${count} ítems de tipo "${mode}".
 Formato del objeto JSON esperado:
 {
   "items": [
@@ -1163,54 +1164,26 @@ exports.generateDeckFromText = async (req, res) => {
   }
 
   const groqApiKey = secrets.GROQ_API_KEY;
-  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no estÃ¡ configurada' });
+  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no está configurada' });
 
   // 1. Blindaje de longitud: truncar transcripciones largas para evitar rate limits (TPM)
   const trimmedText = text.length > 8000
-    ? text.substring(0, 8000) + '\n[...texto truncado por lÃ­mite de tamaÃ±o de contexto...]'
+    ? text.substring(0, 8000) + '\n[...texto truncado por límite de tamaño de contexto...]'
     : text;
 
-  let response;
-  let modelUsed = 'openai/gpt-oss-120b';
-
+  let raw;
   try {
-    console.log(`[Groq] Intentando generar ${count} Ã­tems usando modelo principal: ${modelUsed}`);
-    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelUsed,
-        response_format: { type: "json_object" }, // Enforce JSON mode
-        messages: [
-          { role: 'system', content: buildSystemPrompt(mode, count) },
-          { role: 'user', content: `Genera exactamente ${count} Ã­tems basados en este contenido:\n\n${trimmedText}` }
-        ],
-        temperature: 0.2,
-        max_tokens: 3000,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Groq API returned ${response.status}: ${errText}`);
-    }
-  } catch (primaryError) {
-    console.warn(`[Groq] Modelo principal ${modelUsed} fallÃ³ o superÃ³ lÃ­mites de tasa:`, primaryError.message);
-    
-    // 2. Fallback de seguridad: usar el modelo veloz con menor uso de recursos
-    modelUsed = 'openai/gpt-oss-20b';
-    console.log(`[Groq] Reintentando con modelo secundario de fallback: ${modelUsed}`);
-    
-    try {
-      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const groqResult = await callWithModelFallback('groq', MODEL_DEFAULTS.groq, async (model) => {
+      console.log(`[Groq] Intentando generar ${count} ítems usando modelo: ${model}`);
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: modelUsed,
-          response_format: { type: "json_object" }, // Enforce JSON mode
+          model,
+          response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: buildSystemPrompt(mode, count) },
-            { role: 'user', content: `Genera exactamente ${count} Ã­tems basados en este contenido:\n\n${trimmedText}` }
+            { role: 'user', content: `Genera exactamente ${count} ítems basados en este contenido:\n\n${trimmedText}` }
           ],
           temperature: 0.2,
           max_tokens: 3000,
@@ -1218,29 +1191,23 @@ exports.generateDeckFromText = async (req, res) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[Groq] Modelo secundario de fallback tambiÃ©n fallÃ³:', errorData);
-        return res.status(500).json({ 
-          error: 'Error al llamar a Groq API', 
-          details: errorData,
-          primaryError: primaryError.message 
-        });
+        const errData = await response.json().catch(() => ({}));
+        const err = new Error(errData.error?.message || `Groq API returned ${response.status}`);
+        err.status = response.status;
+        err.details = errData;
+        throw err;
       }
-    } catch (fallbackError) {
-      console.error('[Groq] FallÃ³ conexiÃ³n con Groq:', fallbackError);
-      return res.status(500).json({ 
-        error: 'Error de red o conexiÃ³n con Groq API', 
-        details: fallbackError.message,
-        primaryError: primaryError.message
-      });
-    }
+
+      const groqData = await response.json();
+      return groqData.choices[0].message.content.trim();
+    });
+    raw = groqResult;
+  } catch (groqError) {
+    console.error('[Groq] generateDeckFromText agotó todos los modelos:', groqError.message);
+    return res.status(500).json({ error: 'Error al llamar a Groq API', details: groqError.message });
   }
 
   try {
-    const groqData = await response.json();
-    const raw = groqData.choices[0].message.content.trim();
-
-    // Extraer el JSON del contenido de forma ultra robusta
     let jsonString = raw;
     const objectMatch = raw.match(/\{[\s\S]*\}/);
     const arrayMatch = raw.match(/\[[\s\S]*\]/);
@@ -1252,7 +1219,7 @@ exports.generateDeckFromText = async (req, res) => {
       parsed = JSON.parse(jsonString);
     } catch (parseError) {
       console.error('[Groq] Error parseando JSON de Groq. Contenido crudo:', raw);
-      return res.status(500).json({ error: 'Respuesta de Groq no es JSON vÃ¡lido', details: raw });
+      return res.status(500).json({ error: 'Respuesta de Groq no es JSON válido', details: raw });
     }
 
     let items;
@@ -1263,7 +1230,7 @@ exports.generateDeckFromText = async (req, res) => {
       generatedTopic = result.topic;
     } catch (parseError) {
       console.error('[Groq] Estructura inesperada en JSON:', parsed);
-      return res.status(500).json({ error: 'Estructura de respuesta invÃ¡lida en JSON', details: parsed });
+      return res.status(500).json({ error: 'Estructura de respuesta inválida en JSON', details: parsed });
     }
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con IA`;
@@ -1318,8 +1285,8 @@ exports.generateDeckFromText = async (req, res) => {
       }
     );
   } catch (err) {
-    console.error('[Backend] Error procesando generaciÃ³n:', err);
-    res.status(500).json({ error: 'Error al generar Ã­tems', details: err.message });
+    console.error('[Backend] Error procesando generación:', err);
+    res.status(500).json({ error: 'Error al generar ítems', details: err.message });
   }
 };
 
@@ -1335,7 +1302,7 @@ exports.generateDeckFromImage = async (req, res) => {
   }
 
   const groqApiKey = secrets.GROQ_API_KEY;
-  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no estÃ¡ configurada' });
+  if (!groqApiKey) return res.status(500).json({ error: 'Groq API Key no está configurada' });
 
   let formattedBase64 = image_base64;
   if (!image_base64.startsWith('data:image')) {
@@ -1343,7 +1310,7 @@ exports.generateDeckFromImage = async (req, res) => {
   }
 
   try {
-    console.log(`[Groq Vision] Intentando generar ${count} Ã­tems basados en imagen con JSON mode...`);
+    console.log(`[Groq Vision] Intentando generar ${count} ítems basados en imagen con JSON mode...`);
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
@@ -1353,7 +1320,7 @@ exports.generateDeckFromImage = async (req, res) => {
         messages: [{
           role: 'user',
           content: [
-            { type: 'text', text: `Eres un experto en OCR acadÃ©mico y pedagogÃ­a.\n1. Transcribe mentalmente la imagen ignorando ruido visual.\n2. A partir de esa informaciÃ³n, genera Ã­tems de evaluaciÃ³n de NIVEL UNIVERSITARIO.\n\n${buildSystemPrompt(mode, count)}\n\nGenera exactamente ${count} Ã­tems basados en la imagen.` },
+            { type: 'text', text: `Eres un experto en OCR académico y pedagogía.\n1. Transcribe mentalmente la imagen ignorando ruido visual.\n2. A partir de esa información, genera ítems de evaluación de NIVEL UNIVERSITARIO.\n\n${buildSystemPrompt(mode, count)}\n\nGenera exactamente ${count} ítems basados en la imagen.` },
             { type: 'image_url', image_url: { url: formattedBase64 } }
           ]
         }],
@@ -1364,7 +1331,7 @@ exports.generateDeckFromImage = async (req, res) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('[Groq Vision] FallÃ³ peticiÃ³n a API:', errorData);
+      console.error('[Groq Vision] Falló petición a API:', errorData);
       return res.status(500).json({ error: 'Error al llamar a Groq Vision API', details: errorData });
     }
 
@@ -1381,8 +1348,8 @@ exports.generateDeckFromImage = async (req, res) => {
     let parsed;
     try { parsed = JSON.parse(jsonString); }
     catch (_) {
-      console.error('[Groq Vision] JSON invÃ¡lido devuelto por vision:', raw);
-      return res.status(500).json({ error: 'Respuesta de Groq Vision no es JSON vÃ¡lido', details: raw });
+      console.error('[Groq Vision] JSON inválido devuelto por vision:', raw);
+      return res.status(500).json({ error: 'Respuesta de Groq Vision no es JSON válido', details: raw });
     }
 
     let items;
@@ -1393,7 +1360,7 @@ exports.generateDeckFromImage = async (req, res) => {
       generatedTopic = result.topic;
     } catch (parseError) {
       console.error('[Groq Vision] Estructura inesperada en JSON:', parsed);
-      return res.status(500).json({ error: 'Estructura de respuesta invÃ¡lida en JSON', details: parsed });
+      return res.status(500).json({ error: 'Estructura de respuesta inválida en JSON', details: parsed });
     }
 
     const description = `Mazo ${mode === 'mixed' ? 'mixto' : mode} generado con OCR + IA`;
@@ -1443,13 +1410,13 @@ exports.generateDeckFromImage = async (req, res) => {
     );
   } catch (err) {
     console.error('[Backend] Error procesando imagen OCR:', err);
-    res.status(500).json({ error: 'Error al generar Ã­tems con OCR', details: err.message });
+    res.status(500).json({ error: 'Error al generar ítems con OCR', details: err.message });
   }
 };
 
 /**
  * Analiza confusiones en un mazo: detecta tarjetas que frecuentemente generan errores similares
- * Retorna sugerencias de diferenciaciÃ³n entre conceptos
+ * Retorna sugerencias de diferenciación entre conceptos
  */
 exports.analyzeDeckConfusions = (req, res) => {
   const { deckId } = req.params;
@@ -1490,14 +1457,14 @@ exports.analyzeDeckConfusions = (req, res) => {
         return res.json({ confusions: [], message: 'No hay suficientes tarjetas con intentos para analizar confusiones' });
       }
 
-      // Paso 2: Detectar tarjetas problemÃ¡ticas (failure_rate > 0.3)
+      // Paso 2: Detectar tarjetas problemáticas (failure_rate > 0.3)
       const problematicCards = cards.filter(c => c.failure_rate > 0.3);
 
       if (problematicCards.length < 2) {
-        return res.json({ confusions: [], message: 'No hay suficientes tarjetas problemÃ¡ticas' });
+        return res.json({ confusions: [], message: 'No hay suficientes tarjetas problemáticas' });
       }
 
-      // Paso 3: Para cada par de tarjetas problemÃ¡ticas, calcular correlaciÃ³n de errores
+      // Paso 3: Para cada par de tarjetas problemáticas, calcular correlación de errores
       const confusions = [];
 
       for (let i = 0; i < problematicCards.length; i++) {
@@ -1521,7 +1488,7 @@ exports.analyzeDeckConfusions = (req, res) => {
               if (!correlErr && correlation && correlation.length > 0) {
                 const corr = correlation[0];
                 if (corr.errors_card1 >= 2 && corr.errors_card2 >= 2) {
-                  // Hay correlaciÃ³n: este usuario falla en ambas
+                  // Hay correlación: este usuario falla en ambas
                   confusions.push({
                     card1_id: card1.id,
                     card1_preview: card1.front || (card1.content_json ? JSON.parse(card1.content_json).front : ''),
@@ -1539,7 +1506,7 @@ exports.analyzeDeckConfusions = (req, res) => {
         }
       }
 
-      // Enviar respuesta con un pequeÃ±o delay para que las queries correlacionadas se completen
+      // Enviar respuesta con un pequeño delay para que las queries correlacionadas se completen
       setTimeout(() => {
         res.json({
           confusions: confusions.slice(0, 5), // Top 5 confusiones
@@ -1552,7 +1519,7 @@ exports.analyzeDeckConfusions = (req, res) => {
 };
 
 /**
- * Genera una tarjeta de diferenciaciÃ³n entre dos conceptos
+ * Genera una tarjeta de diferenciación entre dos conceptos
  * Requiere Groq API para generar contenido
  */
 exports.generateDifferentiationCard = (req, res) => {
@@ -1589,13 +1556,13 @@ exports.generateDifferentiationCard = (req, res) => {
 
       const groqApiKey = secrets.GROQ_API_KEY;
       if (!groqApiKey) {
-        return res.status(500).json({ error: 'Groq API Key no estÃ¡ configurada' });
+        return res.status(500).json({ error: 'Groq API Key no está configurada' });
       }
 
       try {
-        const prompt = `Eres un experto en pedagogÃ­a y diferenciaciÃ³n conceptual.
+        const prompt = `Eres un experto en pedagogía y diferenciación conceptual.
 
-El usuario estÃ¡ confundiendo dos conceptos en sus estudios:
+El usuario está confundiendo dos conceptos en sus estudios:
 
 **Concepto A:**
 Pregunta: ${content1.front}
@@ -1617,43 +1584,42 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
   "back": "explicaciÃ³n que destaca diferencias"
 }`;
 
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${groqApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'mixtral-8x7b-32768',
-            messages: [{
-              role: 'user',
-              content: prompt,
-            }],
-            temperature: 0.7,
-            max_tokens: 1000,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          return res.status(500).json({
-            error: 'Error al llamar a Groq API',
-            details: errorData,
+        const diffResult = await callWithModelFallback('groq', MODEL_DEFAULTS.groq, async (model) => {
+          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${groqApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.7,
+              max_tokens: 1000,
+            }),
           });
-        }
 
-        const groqData = await response.json();
-        const raw = groqData.choices[0].message.content.trim();
+          if (!response.ok) {
+            const errData = await response.json();
+            const err = new Error(errData.error?.message || 'Groq error');
+            err.status = response.status;
+            err.details = errData;
+            throw err;
+          }
+
+          const groqData = await response.json();
+          return groqData.choices[0].message.content.trim();
+        });
 
         let diffCard;
         try {
-          const jsonMatch = raw.match(/\{[\s\S]*\}/);
-          const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+          const jsonMatch = diffResult.match(/\{[\s\S]*\}/);
+          const jsonStr = jsonMatch ? jsonMatch[0] : diffResult;
           diffCard = JSON.parse(jsonStr);
         } catch (_) {
           return res.status(500).json({
-            error: 'Respuesta de Groq no es JSON vÃ¡lido',
-            details: raw,
+            error: 'Respuesta de Groq no es JSON válido',
+            details: diffResult,
           });
         }
 

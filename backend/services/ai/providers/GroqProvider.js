@@ -1,4 +1,5 @@
 const secrets = require('../../../config/secrets');
+const { MODEL_DEFAULTS } = require('../../../utils/modelRegistry');
 
 class GroqProvider {
   /**
@@ -13,7 +14,7 @@ class GroqProvider {
     const {
       temperature = 0.15,
       max_tokens = 3000,
-      model = 'openai/gpt-oss-20b',
+      model = MODEL_DEFAULTS.groq,
       jsonMode = false
     } = options;
 

@@ -18,6 +18,7 @@ import { storageService } from '../storageService';
 import { detectAvailableBackend, getLastSuccessfulBackendUrl, resetBackendDetectionCache } from './backendDetector';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { useConnectivityStore } from '../../store/useConnectivityStore';
+import { useAISettingsStore } from '../../store/useAISettingsStore';
 
 /** Suppress noisy warnings during first 30s after app start */
 const CLIENT_BOOT_STARTUP_TIME = Date.now();
@@ -344,7 +345,31 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
     headers.set('Expires', '0');
   }
 
-  const customInit = { ...init, headers };
+  // 🛡️ AI Model Preference Interceptor (Fase Mobile 4)
+  // Inyectar preferencias globales si el payload no trae una preferencia específica.
+  let modifiedBody = init?.body;
+  if (method === 'POST' || method === 'PUT') {
+    if (typeof init?.body === 'string') {
+      try {
+        const parsedBody = JSON.parse(init.body);
+        if (typeof parsedBody === 'object' && parsedBody !== null) {
+          if (parsedBody.modelPreference === undefined) {
+            // Feature-specific preference no fue provista. Inyectamos las globales.
+            const globalPrefs = useAISettingsStore.getState().preferences;
+            parsedBody.clientModelPreferences = {
+              groq: globalPrefs.groq,
+              gemini: globalPrefs.gemini,
+            };
+            modifiedBody = JSON.stringify(parsedBody);
+          }
+        }
+      } catch (e) {
+        // Ignorar body que no sea JSON válido
+      }
+    }
+  }
+
+  const customInit = { ...init, headers, body: modifiedBody };
 
   for (const base of candidates) {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;

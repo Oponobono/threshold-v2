@@ -3,6 +3,7 @@
  * 
  * Se agregan al archivo aiController.js
  */
+const { MODEL_DEFAULTS } = require('../utils/modelRegistry');
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ const secrets = require('../config/secrets');
       success: true,
       provider: 'gemini',
       result,
-      model: 'gemini-3-flash-preview',
+      model: MODEL_DEFAULTS.gemini,
     });
   } catch (err) {
     console.error('[ProcessDocument] Error:', err);
@@ -88,8 +89,8 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
       provider: 'gemini',
       flashcards,
       count: flashcards.length,
-      model: 'gemini-3-flash-preview',
-      note: 'Generado con Gemini 3 Flash Preview - Optimizado para documentos grandes',
+      model: MODEL_DEFAULTS.gemini,
+      note: 'Generado con Gemini Flash — Optimizado para documentos grandes',
     });
   } catch (err) {
     console.error('[GenerateFlashcards] Error:', err);
@@ -107,7 +108,7 @@ exports.getModelInfo = async (req, res) => {
   try {
     const groqInfo = {
       provider: 'groq',
-      model: 'openai/gpt-oss-20b',
+      model: MODEL_DEFAULTS.groq,
       contextLimit: '12 KB',
       speed: 'Ultra rápido (~50ms)',
       costOptimization: 'Muy económico',
@@ -116,7 +117,7 @@ exports.getModelInfo = async (req, res) => {
 
     const geminiInfo = {
       provider: 'gemini',
-      model: 'gemini-3-flash-preview',
+      model: MODEL_DEFAULTS.gemini,
       contextLimit: '1,000,000 tokens (~50KB+)',
       speed: 'Rápido (~200-500ms)',
       costOptimization: 'Extremadamente eficiente para PDFs',

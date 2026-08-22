@@ -190,42 +190,52 @@ exports.performOCR = async (req, res) => {
   }
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Extrae con la mayor precisión posible TODO el texto de esta imagen. Responde ÚNICAMENTE con el texto extraído, sin preámbulos, explicaciones ni formato markdown de bloque de código.' },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`,
+    const { resolveAutoModel, callWithModelFallback } = require('../utils/modelRegistry');
+    const initialModel = resolveAutoModel({ provider: 'groq', capability: 'vision' });
+    
+    const extractedText = await callWithModelFallback('groq', initialModel, async (model) => {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Extrae con la mayor precisión posible TODO el texto de esta imagen. Responde ÚNICAMENTE con el texto extraído, sin preámbulos, explicaciones ni formato markdown de bloque de código.' },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${base64Image}`,
+                  },
                 },
-              },
-            ],
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 4096,
-      }),
-    });
+              ],
+            },
+          ],
+          temperature: 0.1,
+          max_tokens: 4096,
+        }),
+      });
 
-    const data = await response.json();
-    if (!response.ok) {
-      const groqMsg = data?.error?.message || JSON.stringify(data?.error) || 'Error desconocido de Groq';
-      return res.status(response.status).json({ error: groqMsg });
-    }
+      const data = await response.json();
+      if (!response.ok) {
+        const groqMsg = data?.error?.message || JSON.stringify(data?.error) || 'Error desconocido de Groq';
+        const err = new Error(groqMsg);
+        err.status = response.status;
+        err.details = data;
+        throw err;
+      }
 
-    const extractedText = data.choices?.[0]?.message?.content || '';
+      return data.choices?.[0]?.message?.content || '';
+    }, { capability: 'vision' });
+
     res.json({ text: extractedText });
   } catch (error) {
+    console.error('[OCR] Error:', error);
     res.status(500).json({ error: `Error interno al comunicarse con Groq: ${error.message}` });
   }
 };

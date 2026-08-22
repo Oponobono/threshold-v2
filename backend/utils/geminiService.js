@@ -34,7 +34,8 @@ const { analyzeCardDensity, fragmentCard } = require('./atomicCardGenerator');
 const { buildAdaptivePrompt, buildSystemPrompt } = require('./academicPromptBuilder');
 
 const genAI = new GoogleGenerativeAI(secrets.GEMINI_API_KEY);
-const MODEL_NAME = "gemini-3-flash-preview"; // Modelo recomendado (May 2026)
+const { MODEL_DEFAULTS, callWithModelFallback, resolveAutoModel, GROQ_PRIORITY_LIST } = require('./modelRegistry');
+const MODEL_NAME = MODEL_DEFAULTS.gemini; // Fuente de verdad centralizada en modelRegistry
 
 // ✅ SAFETY SETTINGS - strings en lugar de objetos HarmCategory
 const SAFETY_SETTINGS = [
@@ -220,17 +221,21 @@ async function processDocumentWithFilesAPI(filePath, mimeType = null, prompt) {
       },
     };
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
-      systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
+    const initialModel = resolveAutoModel({ provider: 'gemini', capability: 'vision' });
+    const responseText = await callWithModelFallback('gemini', initialModel, async (modelId) => {
+      const model = genAI.getGenerativeModel({
+        model: modelId,
+        systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
 Responde en español. Si el documento es muy largo, organiza la respuesta de forma clara y estructurada.
 Utiliza el contexto completo del documento para dar respuestas precisas.`,
-      safetySettings: SAFETY_SETTINGS,
-    });
+        safetySettings: SAFETY_SETTINGS,
+      });
 
-    console.log(`[Gemini Files API] Enviando a modelo ${MODEL_NAME}...`);
-    const result = await model.generateContent([fileData, { text: prompt }]);
-    const responseText = result.response.text();
+      console.log(`[Gemini Files API] Enviando a modelo ${modelId}...`);
+      const res = await model.generateContent([fileData, { text: prompt }]);
+      return res.response.text();
+    }, { capability: 'vision' });
+
     console.log(`[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`);
 
     // Limpieza del archivo en Gemini
@@ -284,15 +289,17 @@ async function processTextInline(text, prompt) {
  * @param {string} contextText - Contexto académico
  * @param {Array} messages - Historial de chat
  * @param {string} systemPrompt - Instrucción del sistema
+ * @param {Object} [options={}] - Opciones (ej. model para override)
  * @returns {Promise<{content: string, model: string}>}
  */
-async function processAcademicChat(contextText, messages, systemPrompt) {
+async function processAcademicChat(contextText, messages, systemPrompt, options = {}) {
   try {
+    const modelToUse = options.model || MODEL_NAME;
     console.log(`[Gemini] Iniciando chat académico con ${messages.length} mensajes`);
-    console.log(`[Gemini] Usando modelo: ${MODEL_NAME}`);
+    console.log(`[Gemini] Usando modelo: ${modelToUse}`);
 
     const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
+      model: modelToUse,
       systemInstruction: systemPrompt,
       safetySettings: SAFETY_SETTINGS,
     });
@@ -327,7 +334,7 @@ async function processAcademicChat(contextText, messages, systemPrompt) {
 
     return {
       content: responseText,
-      model: MODEL_NAME,
+      model: modelToUse,
       provider: "gemini",
     };
   } catch (error) {
@@ -420,17 +427,21 @@ async function processDocumentBuffer(fileBuffer, mimeType, prompt, filename = ''
       },
     };
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
-      systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
+    const initialModel = resolveAutoModel({ provider: 'gemini', capability: 'vision' });
+    const responseText = await callWithModelFallback('gemini', initialModel, async (modelId) => {
+      const model = genAI.getGenerativeModel({
+        model: modelId,
+        systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
 Responde en español. Si el documento es muy largo, organiza la respuesta de forma clara y estructurada.
 Utiliza el contexto completo del documento para dar respuestas precisas.`,
-      safetySettings: SAFETY_SETTINGS,
-    });
+        safetySettings: SAFETY_SETTINGS,
+      });
 
-    console.log(`[Gemini Files API] Enviando buffer a modelo ${MODEL_NAME}...`);
-    const result = await model.generateContent([fileData, { text: prompt }]);
-    const responseText = result.response.text();
+      console.log(`[Gemini Files API] Enviando buffer a modelo ${modelId}...`);
+      const res = await model.generateContent([fileData, { text: prompt }]);
+      return res.response.text();
+    }, { capability: 'vision' });
+
     console.log(`[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`);
 
     // Limpieza
@@ -494,13 +505,17 @@ CERO meta-datos. CERO trivialidades. TODO análisis/síntesis/evaluación.`;
       },
     };
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
-      safetySettings: SAFETY_SETTINGS,
-    });
+    const initialModel = resolveAutoModel({ provider: 'gemini', capability: 'vision' });
+    const response = await callWithModelFallback('gemini', initialModel, async (modelId) => {
+      const model = genAI.getGenerativeModel({
+        model: modelId,
+        safetySettings: SAFETY_SETTINGS,
+      });
 
-    const result = await model.generateContent([fileData, { text: finalPrompt }]);
-    const response = result.response.text();
+      console.log(`[Gemini] Enviando a modelo ${modelId}...`);
+      const result = await model.generateContent([fileData, { text: finalPrompt }]);
+      return result.response.text();
+    }, { capability: 'vision' });
 
     // Limpieza
     try {
@@ -624,20 +639,18 @@ Responde ÚNICAMENTE el array JSON. CERO texto adicional.`;
  */
 async function generateFlashcardsWithGroq(contextText, count = 10) {
   const { buildGroqPrompt } = require('./academicPromptBuilder');
-  
-  try {
-    console.log(`[Groq] Generando ${count} flashcards con prompts académicos simplificados...`);
-    
-    const groqApiKey = secrets.GROQ_API_KEY;
-    if (!groqApiKey) throw new Error('Groq API Key no está configurada');
 
-    const systemPrompt = buildGroqPrompt('mixed', count);
-    
-    // Limitar contexto para Groq
-    const trimmedContext = contextText.length > 8000
-      ? contextText.substring(0, 8000) + '\n[...truncado]'
-      : contextText;
+  const groqApiKey = secrets.GROQ_API_KEY;
+  if (!groqApiKey) throw new Error('Groq API Key no está configurada');
 
+  const systemPrompt = buildGroqPrompt('mixed', count);
+  const trimmedContext = contextText.length > 8000
+    ? contextText.substring(0, 8000) + '\n[...truncado]'
+    : contextText;
+
+  console.log(`[Groq] Generando ${count} flashcards con prompts académicos simplificados...`);
+
+  const result = await callWithModelFallback('groq', MODEL_DEFAULTS.groq, async (model) => {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -645,7 +658,7 @@ async function generateFlashcardsWithGroq(contextText, count = 10) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
+        model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Contexto académico:\n${trimmedContext}` },
@@ -657,27 +670,24 @@ async function generateFlashcardsWithGroq(contextText, count = 10) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(`Groq API error: ${errorData.error?.message || 'Unknown error'}`);
+      const err = new Error(errorData.error?.message || 'Unknown Groq error');
+      err.status = response.status;
+      err.details = errorData;
+      throw err;
     }
 
     const groqData = await response.json();
     const rawContent = groqData.choices?.[0]?.message?.content || '{}';
-
-    // Parsear JSON
     const jsonMatch = rawContent.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('Groq no retornó array JSON válido');
-
     const items = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(items)) throw new Error('Respuesta no es un array');
+    return items;
+  });
 
-    const atomicItems = processAtomicFlashcards(items);
-
-    console.log(`[Groq] ✅ ${atomicItems.length} ítems generados exitosamente (Originales: ${items.length})`);
-    return atomicItems;
-  } catch (error) {
-    console.error(`[Groq] Error generando flashcards:`, error.message);
-    throw error;
-  }
+  const atomicItems = processAtomicFlashcards(result);
+  console.log(`[Groq] ✅ ${atomicItems.length} ítems generados exitosamente (Originales: ${result.length})`);
+  return atomicItems;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

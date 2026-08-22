@@ -18,6 +18,7 @@ import { EditProfileModal } from '../src/components/modals/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/modals/DeleteAccountModal';
 import { LocalAIEngineSection } from '../src/components/settings/LocalAIEngineSection';
+import { CloudAIModelSection } from '../src/components/settings/CloudAIModelSection';
 import { OfflineIndicator } from '../src/components/ui/OfflineIndicator';
 import { useConnectivityStore } from '../src/store/useConnectivityStore';
 import {
@@ -508,6 +509,11 @@ export default function SettingsScreen() {
           </View>
           )}
         </View>
+
+        {/* ─────────────────────────────────────────── */}
+        {/* ── CLOUD AI ENGINE ── */}
+        {/* ─────────────────────────────────────────── */}
+        <CloudAIModelSection />
 
         {/* ─────────────────────────────────────────── */}
         {/* ── LOCAL AI ENGINE ── */}

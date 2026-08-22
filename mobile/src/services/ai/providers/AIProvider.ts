@@ -1,9 +1,12 @@
+import { type AIModelPreference } from '../../../store/useAISettingsStore';
+
 export interface AIRequest {
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
   provider?: string;
+  modelPreference?: AIModelPreference;
   onStreamToken?: (token: string) => void;
 }
 

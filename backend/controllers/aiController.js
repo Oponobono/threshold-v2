@@ -7,6 +7,7 @@ const geminiService = require('../utils/geminiService');
 const { shieldPrompt, detectJailbreak, detectSystemPromptLeak } = require('../utils/promptShield');
 const { detectDeckGenerationIntent, buildDeckActionBlock, extractRequestedCount } = require('../utils/intentionDetector');
 const { incrementSyncCounterOnly } = require('../helpers/syncVersion');
+const { parseGroqModelError, parseGeminiModelError, resolveAutoModel, resolveModelPreferenceFromRequest, callWithModelFallback, MODEL_DEFAULTS } = require('../utils/modelRegistry');
 const {
   processDocumentWithFilesAPI,
   processDocumentBuffer,
@@ -29,17 +30,20 @@ function getLLMProvider(req) {
 
 /**
  * Helper para hacer llamadas a Groq API
+ * @param {Array} messages
+ * @param {string} systemPrompt
+ * @param {string} model - Modelo a usar (ya resuelto por aiChat)
  */
-async function callGroqAPI(messages, systemPrompt) {
+async function callGroqAPI(messages, systemPrompt, model) {
   const groqApiKey = secrets.GROQ_API_KEY;
   if (!groqApiKey) {
-    throw new Error('Groq API Key no estÃ¡ configurada');
+    throw new Error('Groq API Key no está configurada');
   }
 
   // Limitar historial para evitar Rate Limits (TPM excedido en Groq)
   const maxHistoryMessages = 2;
-  let recentMessages = messages.length > maxHistoryMessages 
-    ? messages.slice(-maxHistoryMessages) 
+  let recentMessages = messages.length > maxHistoryMessages
+    ? messages.slice(-maxHistoryMessages)
     : messages;
 
   if (recentMessages.length > 0 && recentMessages[0].role !== 'user') {
@@ -47,7 +51,7 @@ async function callGroqAPI(messages, systemPrompt) {
   }
 
   const apiMessages = [{ role: 'system', content: systemPrompt }, ...recentMessages];
-  
+
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -55,7 +59,7 @@ async function callGroqAPI(messages, systemPrompt) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'openai/gpt-oss-120b',
+      model: model,
       messages: apiMessages,
       temperature: 0.15,
       max_tokens: 2048,
@@ -64,7 +68,10 @@ async function callGroqAPI(messages, systemPrompt) {
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(`Groq API Error: ${JSON.stringify(errorData)}`);
+    const err = new Error(`Groq API Error: ${JSON.stringify(errorData)}`);
+    err.status = response.status;
+    err.details = errorData;
+    throw err;
   }
 
   const data = await response.json();
@@ -72,6 +79,7 @@ async function callGroqAPI(messages, systemPrompt) {
     provider: 'groq',
     reply: data.choices[0].message,
     duration: 0,
+    model: model,
   };
 }
 
@@ -174,7 +182,7 @@ Responde ÃšNICAMENTE con el array JSON, sin texto introductorio ni conclusione
         method: 'POST',
         headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-120b',
+          model: MODEL_DEFAULTS.groq,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `Genera el material de estudio basado en este contenido acadÃ©mico:\n\n${trimmedContext}` },
@@ -282,58 +290,49 @@ Responde ÃšNICAMENTE con el array JSON, sin texto introductorio ni conclusione
             });
           })
           .catch(e => {
-            console.error('[aiController] âŒ Error masivo insertando Ã­tems. Eliminando mazo huÃ©rfano:', deckId);
+            console.error('[aiController] Error masivo insertando ítems. Eliminando mazo huérfano:', deckId);
             db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], () => {});
-            res.status(500).json({ error: 'Error insertando Ã­tems', details: e.message });
+            res.status(500).json({ error: 'Error insertando ítems', details: e.message });
           });
         }
       );
     });
   } catch (err) {
-    console.error('ðŸ’¥ [aiController] Error crÃ­tico en generateStudyMaterial:', err);
+    console.error('[aiController] Error crítico en generateStudyMaterial:', err);
     res.status(500).json({ error: 'Error generando material de estudio con Zyren', details: err.message });
   }
 };
 
-
 /**
  * Helper para hacer llamadas a Google Gemini API (mejorado con Files API)
- * Ahora usa el SDK oficial de Google para mejor manejo de contextos grandes
+ * @param {Array} messages
+ * @param {string} systemPrompt
+ * @param {string} model - Modelo a usar
  */
-async function callGeminiAPI(messages, systemPrompt) {
+async function callGeminiAPI(messages, systemPrompt, model) {
   const geminiApiKey = secrets.GEMINI_API_KEY;
   if (!geminiApiKey) {
-    throw new Error('Gemini API Key no estÃ¡ configurada');
+    throw new Error('Gemini API Key no está configurada');
   }
 
-  try {
-    console.log('[callGeminiAPI] ðŸ¤– Iniciando...');
-    console.log('[callGeminiAPI] Mensajes:', messages.length);
-    console.log('[callGeminiAPI] System prompt length:', systemPrompt?.length || 0);
+  console.log(`[callGeminiAPI] Iniciando con modelo: ${model}`);
+  console.log('[callGeminiAPI] Mensajes:', messages.length);
+  console.log('[callGeminiAPI] System prompt length:', systemPrompt?.length || 0);
 
-    // Usar el nuevo servicio de Gemini con mejor manejo
-    const result = await processAcademicChat(
-      '',  // contextText ya estÃ¡ en systemPrompt
-      messages,
-      systemPrompt
-    );
-    
-    console.log('[callGeminiAPI] âœ… Respuesta exitosa');
+  const result = await geminiService.processAcademicChat(
+    '',  // contextText ya está en systemPrompt
+    messages,
+    systemPrompt,
+    { model: model }
+  );
 
-    return {
-      provider: 'gemini',
-      reply: { role: 'assistant', content: result.content },
-      duration: 0,
-    };
-  } catch (error) {
-    console.error('[callGeminiAPI] âŒ Error detallado:', {
-      message: error.message,
-      code: error.code,
-      status: error.status,
-      fullError: error
-    });
-    throw new Error(`[Gemini] ${error.message}`);
-  }
+  console.log('[callGeminiAPI] Respuesta exitosa');
+  return {
+    provider: 'gemini',
+    reply: { role: 'assistant', content: result.content },
+    duration: 0,
+    model: model,
+  };
 }
 
 /**
@@ -341,9 +340,16 @@ async function callGeminiAPI(messages, systemPrompt) {
  * Soporta tanto Groq (velocidad) como Gemini (mayor capacidad)
  */
 exports.aiChat = async (req, res) => {
-  console.log('--- [DEBUG] PeticiÃ³n recibida en aiChat ---');
+  console.log('--- [DEBUG] Petición recibida en aiChat ---');
   const { context_text, messages } = req.body;
   const provider = getLLMProvider(req);
+
+  // ── Resolución de modelo en 3 caminos ─────────────────────────────────────
+  // 1. Extraer la intención de las preferencias del cliente
+  const modelPreference = resolveModelPreferenceFromRequest(req, provider);
+  const requestedModelId = modelPreference?.mode === 'manual' ? modelPreference.modelId : null;
+  console.log(`[aiChat] provider=${provider} requestedModelId=${requestedModelId || 'auto'}`);
+  // ──────────────────────────────────────────────────────────────────────────
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'Falta el array de mensajes.' });
@@ -459,13 +465,18 @@ ${deckIntent.shouldGenerate ? deckGenerationInstructions : ''}`;
     
     const startTime = Date.now();
     
-    let result;
+    let resultInfo;
     if (provider === 'gemini') {
-      result = await callGeminiAPI(cleanMessages, systemMessage);
+      resultInfo = await callWithModelFallback(provider, requestedModelId, async (modelToUse) => {
+        return await callGeminiAPI(cleanMessages, systemMessage, modelToUse);
+      });
     } else {
-      result = await callGroqAPI(cleanMessages, systemMessage);
+      resultInfo = await callWithModelFallback(provider, requestedModelId, async (modelToUse) => {
+        return await callGroqAPI(cleanMessages, systemMessage, modelToUse);
+      });
     }
 
+    const { result, resolution } = resultInfo;
     const duration = Date.now() - startTime;
     console.log(`[${provider.toUpperCase()}Telemetry] Respuesta recibida en ${duration}ms.`);
 
@@ -482,7 +493,11 @@ ${deckIntent.shouldGenerate ? deckGenerationInstructions : ''}`;
     res.json({ 
       reply: result.reply,
       provider,
-      context_truncated,
+      model: resolution.resolvedModelId, // Backward compatibility
+      resolvedModelId: resolution.resolvedModelId, // Backward compatibility
+      wasFallback: resolution.wasFallback, // Backward compatibility
+      resolution, // Contrato nuevo E2E
+      context_truncated: typeof context_truncated !== 'undefined' ? context_truncated : false,
       duration
     });
   } catch (err) {
@@ -787,7 +802,7 @@ exports.generateFlashcards = async (req, res) => {
       try {
         console.log(`[GenerateFlashcards] Intentando con Gemini...`);
         flashcards = await geminiService.generateFlashcardsFromText(context_text, count);
-        modelUsed = 'gemini-3-flash-preview';
+        modelUsed = MODEL_DEFAULTS.gemini;
         provider = 'gemini';
         
         console.log(`[GenerateFlashcards] âœ… Ã‰xito con Gemini (${flashcards.length} Ã­tems)`);
@@ -812,7 +827,7 @@ exports.generateFlashcards = async (req, res) => {
       try {
         console.log(`[GenerateFlashcards] Usando Groq con prompts simplificados...`);
         flashcards = await geminiService.generateFlashcardsWithGroq(context_text, count);
-        modelUsed = 'openai/gpt-oss-20b';
+        modelUsed = MODEL_DEFAULTS.groq;
         provider = 'groq';
         
         console.log(`[GenerateFlashcards] âœ… Ã‰xito con Groq (${flashcards.length} Ã­tems)`);
@@ -894,7 +909,7 @@ exports.processDocumentWithGemini = async (req, res) => {
     res.json({
       success: true,
       provider: 'gemini',
-      model: 'gemini-3-flash-preview',
+      model: MODEL_DEFAULTS.gemini,
       result: result,
       features: [
         'Sin truncado de contexto',
@@ -955,7 +970,7 @@ exports.generateFlashcardsFromDocument = async (req, res) => {
           mimeType,
           count
         );
-        modelUsed = 'gemini-3-flash-preview';
+        modelUsed = MODEL_DEFAULTS.gemini;
         provider = 'gemini';
         
         console.log(`[GenerateFlashcards] âœ… Ã‰xito con Gemini (${flashcards.length} Ã­tems)`);
@@ -1070,7 +1085,7 @@ exports.processDocumentUpload = async (req, res) => {
     res.json({
       success: true,
       provider: 'gemini',
-      model: 'gemini-3-flash-preview',
+      model: MODEL_DEFAULTS.gemini,
       fileName: req.file.originalname,
       fileSize: `${(req.file.size / 1024 / 1024).toFixed(2)}MB`,
       result: result,
@@ -1128,7 +1143,7 @@ exports.generateFlashcardsUpload = async (req, res) => {
           count,
           req.file.originalname
         );
-        modelUsed = 'gemini-3-flash-preview';
+        modelUsed = MODEL_DEFAULTS.gemini;
         provider = 'gemini';
         
         console.log(`[GenerateFlashcardsUpload] âœ… Ã‰xito con Gemini (${flashcards.length} Ã­tems)`);
@@ -1155,7 +1170,7 @@ exports.generateFlashcardsUpload = async (req, res) => {
         // Convertir buffer a texto para Groq
         const contextText = req.file.buffer.toString('utf-8');
         flashcards = await geminiService.generateFlashcardsWithGroq(contextText, count);
-        modelUsed = 'openai/gpt-oss-20b';
+        modelUsed = MODEL_DEFAULTS.groq;
         provider = 'groq';
         
         console.log(`[GenerateFlashcardsUpload] âœ… Ã‰xito con Groq (${flashcards.length} Ã­tems)`);
@@ -1204,7 +1219,7 @@ exports.getModelInfo = async (req, res) => {
   try {
     const groqInfo = {
       provider: 'groq',
-      model: 'openai/gpt-oss-20b',
+      model: MODEL_DEFAULTS.groq,
       contextLimit: '12 KB',
       speed: 'Ultra rÃ¡pido (~50ms)',
       costOptimization: 'Muy econÃ³mico',
@@ -1213,7 +1228,7 @@ exports.getModelInfo = async (req, res) => {
 
     const geminiInfo = {
       provider: 'gemini',
-      model: 'gemini-3-flash-preview',
+      model: MODEL_DEFAULTS.gemini,
       contextLimit: '1,000,000 tokens (~50KB+)',
       speed: 'RÃ¡pido (~200-500ms)',
       costOptimization: 'Extremadamente eficiente para PDFs',
@@ -1253,24 +1268,36 @@ exports.chatProxy = async (req, res) => {
   const provider = getLLMProvider(req);
   const startTime = Date.now();
 
+  const modelPreference = resolveModelPreferenceFromRequest(req, provider);
+  const requestedModelId = modelPreference?.mode === 'manual' ? modelPreference.modelId : null;
+
   try {
-    let result;
+    let resultInfo;
     if (provider === 'gemini' && secrets.GEMINI_API_KEY) {
-      result = await callGeminiAPI(
-        messages.filter(m => m.role !== 'system'), 
-        messages.find(m => m.role === 'system')?.content || ''
-      );
+      resultInfo = await callWithModelFallback(provider, requestedModelId, async (modelToUse) => {
+        return await callGeminiAPI(
+          messages.filter(m => m.role !== 'system'), 
+          messages.find(m => m.role === 'system')?.content || '',
+          modelToUse
+        );
+      });
     } else {
       const systemMsg = messages.find(m => m.role === 'system');
       const userMsgs = messages.filter(m => m.role !== 'system');
-      result = await callGroqAPI(userMsgs, systemMsg?.content || '');
+      resultInfo = await callWithModelFallback('groq', requestedModelId, async (modelToUse) => {
+        return await callGroqAPI(userMsgs, systemMsg?.content || '', modelToUse);
+      });
     }
 
+    const { result, resolution } = resultInfo;
     const duration = Date.now() - startTime;
     res.json({
       response: result.reply.content,
       provider: result.provider,
-      model: provider === 'gemini' ? 'gemini-3-flash-preview' : 'openai/gpt-oss-120b',
+      model: resolution.resolvedModelId, // Backward compatibility
+      resolvedModelId: resolution.resolvedModelId, // Backward compatibility
+      wasFallback: resolution.wasFallback, // Backward compatibility
+      resolution, // Contrato nuevo E2E
       latencyMs: duration,
     });
   } catch (err) {
@@ -1314,46 +1341,55 @@ Formato JSON esperado:
       ? rawTextFromOCROrNotes.substring(0, 6000) + '\n[...apuntes truncados]'
       : rawTextFromOCROrNotes;
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `APUNTES DEL ESTUDIANTE:\n${trimmedNotes}` },
-        ],
-        temperature: 0.2,
-        max_tokens: 4096,
-      }),
+    const provider = 'groq'; // Hardcoded para flashcards (velocidad)
+    const modelPreference = resolveModelPreferenceFromRequest(req, provider);
+    const requestedModelId = modelPreference?.mode === 'manual' ? modelPreference.modelId : null;
+
+    const { result: raw, resolution } = await callWithModelFallback(provider, requestedModelId, async (model) => {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `APUNTES DEL ESTUDIANTE:\n${trimmedNotes}` },
+          ],
+          temperature: 0.2,
+          max_tokens: 4096,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        const err = new Error(errData.error?.message || 'Groq API error');
+        err.status = response.status;
+        err.details = errData;
+        throw err;
+      }
+
+      const groqData = await response.json();
+      return groqData.choices[0].message.content.trim();
     });
 
-    if (!response.ok) {
-      const err = await response.json();
-      return res.status(500).json({ error: 'Error en Groq API', details: err });
-    }
-
-    const groqData = await response.json();
-    let raw = groqData.choices[0].message.content.trim();
-
     // Limpiar bloque de Markdown si el LLM lo incluye a pesar del contrato
-    raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    let cleanedRaw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
 
     let parsed;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(cleanedRaw);
     } catch (_) {
       // Fallback: intentar extraer el objeto JSON del string
-      const objMatch = raw.match(/\{[\s\S]*\}/);
+      const objMatch = cleanedRaw.match(/\{[\s\S]*\}/);
       if (objMatch) {
         try { parsed = JSON.parse(objMatch[0]); } catch (__) {
-          return res.status(500).json({ error: 'Zyren no retornÃ³ JSON vÃ¡lido', raw: raw.substring(0, 300) });
+          return res.status(500).json({ error: 'Zyren no retornó JSON válido', raw: cleanedRaw.substring(0, 300) });
         }
       } else {
-        return res.status(500).json({ error: 'Zyren no retornÃ³ JSON vÃ¡lido', raw: raw.substring(0, 300) });
+        return res.status(500).json({ error: 'Zyren no retornó JSON válido', raw: cleanedRaw.substring(0, 300) });
       }
     }
 

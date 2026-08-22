@@ -1,6 +1,7 @@
 const geminiService = require('../../../utils/geminiService');
 const secrets = require('../../../config/secrets');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { MODEL_DEFAULTS } = require('../../../utils/modelRegistry');
 
 const SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_HARASSMENT',       threshold: 'BLOCK_NONE' },
@@ -17,8 +18,9 @@ class GeminiProvider {
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
+      const modelName = options.model || MODEL_DEFAULTS.gemini;
       const model = genAI.getGenerativeModel({
-        model: 'gemini-3.6-flash',
+        model: modelName,
         systemInstruction: systemPrompt,
         safetySettings: SAFETY_SETTINGS,
         generationConfig: {
@@ -35,7 +37,7 @@ class GeminiProvider {
       return {
         content: responseText,
         provider: 'gemini',
-        model: 'gemini-3.6-flash',
+        model: modelName,
       };
     } catch (error) {
       throw new Error(`[GeminiProvider] ${error.message}`);

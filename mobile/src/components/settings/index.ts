@@ -9,3 +9,4 @@ export { SendFeedbackModal } from './SendFeedbackModal';
 export { CreateGroupModal } from './CreateGroupModal';
 export { ZyrenInfoModal } from './ZyrenInfoModal';
 export { PersonalizeRemindersModal } from './PersonalizeRemindersModal';
+export { CloudAIModelSection } from './CloudAIModelSection';

@@ -27,6 +27,10 @@ export class CloudProvider implements AIProvider {
       provider: req.provider || 'groq',
     };
 
+    if (req.modelPreference) {
+      body.modelPreference = req.modelPreference;
+    }
+
     if (req.stream) {
       body.stream = true;
     }

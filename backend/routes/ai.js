@@ -381,4 +381,12 @@ router.get('/ai/capabilities/anchor/detect/:deckId', anchorController.detectConf
  */
 router.post('/ai/capabilities/anchor/generate', anchorController.generateAnchor);
 
+const modelRegistry = require('../utils/modelRegistry');
+
+/**
+ * GET /api/ai/models/online
+ * Returns dynamic list of models
+ */
+router.get('/ai/models/online', modelRegistry.getOnlineModels);
+
 module.exports = router;
