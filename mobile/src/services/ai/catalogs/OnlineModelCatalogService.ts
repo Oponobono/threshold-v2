@@ -26,21 +26,41 @@ export class OnlineModelCatalogService {
 
       const data = await response.json();
       
-      // Expected backend response format: { data: [{ provider, modelId, capabilities, isAvailable }, ...] }
-      if (!data || !Array.isArray(data.data)) {
+      // Backend response format: { groq: [...], gemini: [...], lastUpdated }
+      // Each item: { id, object, created, owned_by } (Groq) or { name, ... } (Gemini)
+      const models: OnlineModel[] = [];
+
+      if (Array.isArray(data.groq)) {
+        for (const m of data.groq) {
+          const modelId = m.id ?? m.name ?? String(m);
+          models.push({
+            provider: 'groq',
+            modelId,
+            capabilities: (m.capabilities as string[]) || ['text'],
+            isAvailable: true,
+          });
+        }
+      }
+
+      if (Array.isArray(data.gemini)) {
+        for (const m of data.gemini) {
+          const modelId = m.id ?? m.name ?? String(m);
+          models.push({
+            provider: 'gemini',
+            modelId,
+            capabilities: (m.capabilities as string[]) || ['text'],
+            isAvailable: true,
+          });
+        }
+      }
+
+      if (models.length === 0 && !Array.isArray(data.groq) && !Array.isArray(data.gemini)) {
         throw new Error('Invalid catalog format from backend');
       }
 
-      const models: OnlineModel[] = data.data.map((item: any) => ({
-        provider: item.provider,
-        modelId: item.modelId,
-        capabilities: item.capabilities || ['text'],
-        isAvailable: Boolean(item.isAvailable), // Means discovery availability, NOT feature eligibility
-      }));
-
-      // Actualizamos el store (se persiste automáticamente para offline-first)
+      // Actualizar el store (se persiste automáticamente para offline-first)
       store.setOnlineCatalog(models);
-      console.log(`[CatalogService] Online catalog fetched: ${models.length} models`);
+      console.log(`[CatalogService] Online catalog fetched: ${models.length} models (${data.groq?.length ?? 0} groq, ${data.gemini?.length ?? 0} gemini)`);
       
       return models;
     } catch (error) {

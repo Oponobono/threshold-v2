@@ -47,19 +47,36 @@ export const useAICatalogsStore = create<AICatalogsState>()(
     (set) => ({
       onlineCatalog: [],
       localCatalog: [],
-      onlineCatalogStatus: 'loading',
+      onlineCatalogStatus: 'empty',
       isFetchingOnline: false,
       isFetchingLocal: false,
       lastOnlineFetchAt: null,
       lastLocalFetchAt: null,
 
       setOnlineCatalog: (models) =>
-        set({ onlineCatalog: models, lastOnlineFetchAt: Date.now() }),
+        set({
+          onlineCatalog: models,
+          lastOnlineFetchAt: Date.now(),
+          onlineCatalogStatus: models.length > 0 ? 'loaded' : 'empty',
+        }),
 
       setLocalCatalog: (models) =>
         set({ localCatalog: models, lastLocalFetchAt: Date.now() }),
 
-      setFetchingOnline: (isFetching) => set({ isFetchingOnline: isFetching }),
+      setFetchingOnline: (isFetching) =>
+        set((state) => ({
+          isFetchingOnline: isFetching,
+          // Cuando el fetch termina (isFetching=false) y el catálogo está vacío pero había
+          // datos persistidos previos → status es 'cached'. Si no hay nada → 'empty'.
+          // Si isFetching=true (inicio de fetch) → 'loading'.
+          onlineCatalogStatus: isFetching
+            ? 'loading'
+            : state.onlineCatalogStatus === 'loaded'
+              ? 'loaded'
+              : state.onlineCatalog.length > 0
+                ? 'cached'
+                : 'empty',
+        })),
       setFetchingLocal: (isFetching) => set({ isFetchingLocal: isFetching }),
       setOnlineCatalogStatus: (status) => set({ onlineCatalogStatus: status }),
     }),

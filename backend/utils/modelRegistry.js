@@ -220,15 +220,33 @@ async function refreshModelsCache() {
 }
 
 async function getOnlineModels(req, res) {
-  // If cache is empty for either, try to fetch
+  // If cache is empty for either, try to fetch in background (non-blocking)
   if (cachedModels.groq.length === 0 || cachedModels.gemini.length === 0) {
-    await refreshModelsCache();
+    refreshModelsCache().catch(err => {
+      console.warn('[modelRegistry] Background refresh failed:', err.message);
+    });
   }
-  
+
+  // Build response: use live cache if available, otherwise fall back to static lists
+  const groqModels = cachedModels.groq.length > 0
+    ? cachedModels.groq
+    : GROQ_ALLOW_LIST.map(id => ({ id, name: id, provider: 'groq' }));
+
+  const geminiModels = cachedModels.gemini.length > 0
+    ? cachedModels.gemini
+    : GEMINI_ALLOW_LIST.map(id => ({ id, name: id, provider: 'gemini' }));
+
+  // Enrich with capability metadata
+  const enriched = (models, provider) => models.map(m => ({
+    ...m,
+    capabilities: MODEL_CAPABILITIES[m.id] || ['text'],
+  }));
+
   res.json({
-    groq: cachedModels.groq,
-    gemini: cachedModels.gemini,
-    lastUpdated: cachedModels.lastUpdated
+    groq: enriched(groqModels, 'groq'),
+    gemini: enriched(geminiModels, 'gemini'),
+    lastUpdated: cachedModels.lastUpdated,
+    source: cachedModels.groq.length > 0 ? 'live' : 'static',
   });
 }
 
