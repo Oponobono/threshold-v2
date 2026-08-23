@@ -56,7 +56,11 @@ ${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
       ? `Genera el material de estudio basado en este contenido académico:\n\n${knowledgeModel.truncate(8000)}`
       : `Genera el material de estudio sobre el tema solicitado.`;
 
-    const generationOptions = { temperature: 0.15, max_tokens: 8000 };
+    // Un token = aprox 3-4 caracteres.
+    // Calculamos los tokens de entrada para no exceder el límite duro de 8000 TPM de la API gratuita.
+    const estimatedInputTokens = Math.ceil((userContent.length + systemPrompt.length) / 3.5);
+    const safeMaxTokens = Math.max(1500, 8000 - estimatedInputTokens - 200); // 200 de margen
+    const generationOptions = { temperature: 0.15, max_tokens: safeMaxTokens };
 
     try {
       const response = await ModelClass.generate(
