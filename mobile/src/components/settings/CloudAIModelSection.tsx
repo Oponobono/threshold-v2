@@ -371,45 +371,46 @@ export const CloudAIModelSection = () => {
 
   return (
     <View style={styles.section}>
-      <TouchableOpacity
-        onPress={() => setExpanded(prev => !prev)}
-        style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
-        accessibilityRole="button"
-        accessibilityLabel="Motor de IA en la nube"
-        accessibilityState={{ expanded }}
-      >
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="cloud-outline" size={18} color={theme.colors.primary} />
-            <Text style={styles.sectionTitle}>Motor de IA en la nube</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <TouchableOpacity
+          onPress={() => setExpanded(prev => !prev)}
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+          accessibilityRole="button"
+          accessibilityLabel="Motor de IA en la nube"
+          accessibilityState={{ expanded }}
+        >
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="cloud-outline" size={18} color={theme.colors.primary} />
+              <Text style={styles.sectionTitle}>Motor de IA en la nube</Text>
+            </View>
+            <Text style={styles.sectionDesc}>
+              Selecciona el modelo de Groq o Gemini que prefieras usar
+            </Text>
           </View>
-          <Text style={styles.sectionDesc}>
-            Selecciona el modelo de Groq o Gemini que prefieras usar
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity
-            onPress={handleRefresh}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Actualizar lista de modelos"
-            accessibilityRole="button"
-          >
-            <Animated.View style={{ transform: [{ rotate: spin }] }}>
-              <Ionicons
-                name="refresh-outline"
-                size={17}
-                color={refreshStatus === 'refreshing' ? theme.colors.primary : theme.colors.text.secondary}
-              />
-            </Animated.View>
-          </TouchableOpacity>
           <Ionicons
             name={expanded ? 'chevron-up' : 'chevron-down'}
             size={18}
             color={theme.colors.text.secondary}
             style={{ marginTop: 2 }}
           />
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleRefresh}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ marginLeft: 8, paddingTop: 2 }}
+          accessibilityLabel="Actualizar lista de modelos"
+          accessibilityRole="button"
+        >
+          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+            <Ionicons
+              name="refresh-outline"
+              size={17}
+              color={refreshStatus === 'refreshing' ? theme.colors.primary : theme.colors.text.secondary}
+            />
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
 
       {expanded && (
         <View style={{ marginTop: 16 }}>
