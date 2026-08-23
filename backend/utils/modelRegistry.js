@@ -8,8 +8,7 @@ const GROQ_ALLOW_LIST = [
   'llama-3.3-70b-versatile',
   'llama-3.2-1b-preview',
   'llama-3.2-3b-preview',
-  'mixtral-8x7b-32768',
-  'gemma2-9b-it'
+  'mixtral-8x7b-32768'
 ];
 
 const GEMINI_ALLOW_LIST = [
@@ -41,7 +40,6 @@ const GROQ_PRIORITY_LIST = [
   'llama-3.1-70b-versatile',
   'llama-3.3-70b-versatile',
   'mixtral-8x7b-32768',
-  'gemma2-9b-it',
   'qwen/qwen3.6-27b',      // Modelo de razonamiento — no apto para JSON estructurado directo
 ];
 
