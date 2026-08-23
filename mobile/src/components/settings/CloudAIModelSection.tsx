@@ -325,8 +325,6 @@ const ProviderSection = ({ provider, label, models, dataStatus, refreshStatus, p
 export const CloudAIModelSection = () => {
   const [expanded, setExpanded] = useState(false);
   const [badgeVariant, setBadgeVariant] = useState<BadgeVariant | null>(null);
-  const rotationAnim = useRef(new Animated.Value(0)).current;
-  const rotationLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   const onlineCatalog = useAICatalogsStore(s => s.onlineCatalog);
   const dataStatus = useAICatalogsStore(s => s.onlineDataStatus);
@@ -336,24 +334,10 @@ export const CloudAIModelSection = () => {
   const setPreference = useAISettingsStore(s => s.setPreference);
 
   useEffect(() => {
-    if (refreshStatus === 'refreshing') {
-      rotationAnim.setValue(0);
-      rotationLoop.current = Animated.loop(
-        Animated.timing(rotationAnim, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: true,
-        })
-      );
-      rotationLoop.current.start();
-    } else {
-      rotationLoop.current?.stop();
-      rotationAnim.setValue(0);
-      if (refreshStatus === 'error') {
-        setBadgeVariant('error');
-      } else if (refreshStatus === 'idle' && dataStatus === 'loaded') {
-        setBadgeVariant('success');
-      }
+    if (refreshStatus === 'error') {
+      setBadgeVariant('error');
+    } else if (refreshStatus === 'idle' && dataStatus === 'loaded') {
+      setBadgeVariant('success');
     }
   }, [refreshStatus]);
 
@@ -363,11 +347,6 @@ export const CloudAIModelSection = () => {
     const { OnlineModelCatalogService } = await import('../../services/ai/catalogs/OnlineModelCatalogService');
     await OnlineModelCatalogService.fetchOnlineCatalog();
   }, [refreshStatus]);
-
-  const spin = rotationAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
 
   return (
     <View style={styles.section}>
@@ -401,14 +380,17 @@ export const CloudAIModelSection = () => {
           style={{ marginLeft: 8, paddingTop: 2 }}
           accessibilityLabel="Actualizar lista de modelos"
           accessibilityRole="button"
+          disabled={refreshStatus === 'refreshing'}
         >
-          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+          {refreshStatus === 'refreshing' ? (
+            <ActivityIndicator size="small" color={theme.colors.text.secondary} />
+          ) : (
             <Ionicons
               name="refresh-outline"
               size={17}
-              color={refreshStatus === 'refreshing' ? theme.colors.primary : theme.colors.text.secondary}
+              color={theme.colors.text.secondary}
             />
-          </Animated.View>
+          )}
         </TouchableOpacity>
       </View>
 
