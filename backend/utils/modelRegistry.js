@@ -1,9 +1,10 @@
 const secrets = require('../config/secrets');
 
 // Allow-lists for chat models
+// Nota: contiene los modelos actualmente disponibles en el tier gratuito de Groq.
 const GROQ_ALLOW_LIST = [
-  'llama-3.1-70b-versatile',
   'llama-3.1-8b-instant',
+  'llama-3.1-70b-versatile',
   'llama-3.3-70b-versatile',
   'llama-3.2-1b-preview',
   'llama-3.2-3b-preview',
@@ -33,13 +34,15 @@ const GEMINI_PRIORITY_LIST = [
 
 // Fallback priority lists (first is highest priority)
 // Esto actúa como *Ranking* (nuestra preferencia entre modelos compatibles)
+// Orden de preferencia. El primero de la lista se usa cuando la caché está vacía.
+// llama-3.1-8b-instant es el más confiable y siempre disponible en el tier gratuito.
 const GROQ_PRIORITY_LIST = [
-  'llama-3.3-70b-versatile',
-  'qwen/qwen3.6-27b',      // Añadido como preferencia para visión/texto
-  'llama-3.1-70b-versatile',
   'llama-3.1-8b-instant',
+  'llama-3.1-70b-versatile',
+  'llama-3.3-70b-versatile',
   'mixtral-8x7b-32768',
-  'openai/gpt-oss-120b'
+  'gemma2-9b-it',
+  'qwen/qwen3.6-27b',      // Modelo de razonamiento — no apto para JSON estructurado directo
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -318,10 +321,13 @@ async function callWithModelFallback(provider, requestedModelId, apiCallFn, opti
     if (m !== requestedModelId) modelsToTry.push(m);
   }
   
-  // Fallback de último recurso: si la caché está vacía
+  // Fallback de último recurso: si la caché está vacía, intentar toda la PRIORITY_LIST
   if (modelsToTry.length === 0) {
-    console.warn(`[modelRegistry] No hay modelos elegibles en caché para ${provider} [${capability}]. Usando fallback ciego.`);
-    modelsToTry.push(requestedModelId || (isGroq ? GROQ_PRIORITY_LIST[0] : GEMINI_PRIORITY_LIST[0]));
+    console.warn(`[modelRegistry] No hay modelos elegibles en caché para ${provider} [${capability}]. Usando fallback ciego sobre priority list.`);
+    const fallbackList = isGroq ? GROQ_PRIORITY_LIST : GEMINI_PRIORITY_LIST;
+    for (const m of fallbackList) {
+      if (!modelsToTry.includes(m)) modelsToTry.push(m);
+    }
   }
 
   // 3. Ejecutar la secuencia
