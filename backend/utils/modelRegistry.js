@@ -34,8 +34,8 @@ const GEMINI_PRIORITY_LIST = [
 // Fallback priority lists (first is highest priority)
 // Esto actúa como *Ranking* (nuestra preferencia entre modelos compatibles)
 const GROQ_PRIORITY_LIST = [
-  'qwen/qwen3.6-27b',      // Añadido como preferencia para visión/texto
   'llama-3.3-70b-versatile',
+  'qwen/qwen3.6-27b',      // Añadido como preferencia para visión/texto
   'llama-3.1-70b-versatile',
   'llama-3.1-8b-instant',
   'mixtral-8x7b-32768',
