@@ -230,14 +230,12 @@ export const useSettingsLogic = () => {
 
       // Load dynamic settings data
       try {
-        const [periods, overrides, lms, twoFactor, userSubjects, onlineCat, localCat] = await Promise.all([
+        const [periods, overrides, lms, twoFactor, userSubjects] = await Promise.all([
           getGradingPeriods().catch(() => []),
           getThresholdOverrides().catch(() => []),
           apiGetLmsAccounts().catch(() => []),
           getTwoFactorStatus().catch(() => ({ enabled: false })),
           getSubjects().catch(() => []),
-          OnlineModelCatalogService.fetchOnlineCatalog().catch(() => null),
-          CatalogMergeService.refreshLocalCatalog().catch(() => []),
         ]);
         setGradingPeriods(periods);
         setThresholdOverrides(overrides);

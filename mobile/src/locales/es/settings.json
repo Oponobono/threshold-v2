@@ -149,6 +149,12 @@
     "active": "Modelo activo:",
     "activate": "Activar",
     "delete": "Eliminar",
+    "tinyLabel": "Llama 3.2 (1B) - Tiny",
+    "tinyDesc": "El modelo más básico y compacto. Útil solo para pruebas rápidas o dispositivos muy limitados.",
+    "tinySpeed": "⚡ Súper Rápido",
+    "tinyCap1": "Ultra ligero",
+    "tinyCap2": "Batería muy eficiente",
+    "tinyCap3": "Consultas básicas",
     "essentialLabel": "Llama 3.2 (1B) - Esencial",
     "essentialDesc": "El modelo más rápido y ligero. Ideal para teléfonos con poca memoria, resúmenes cortos y respuestas directas.",
     "essentialSpeed": "⚡ Muy Rápido",
@@ -225,5 +231,10 @@
     "whisperTitle": "Transcripción de Audio Local (Whisper Tiny)",
     "whisperDesc": "Descarga Whisper Tiny (~75 MB) para transcribir grabaciones de audio sin conexión usando el motor de IA local.",
     "whisperDownloadSuccess": "Modelo Whisper descargado"
+  },
+  "cloudAI": {
+    "capabilities": "Modalidades: {{caps}}",
+    "capText": "Análisis de texto",
+    "capVision": "Visión computacional"
   }
 }

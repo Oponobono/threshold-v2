@@ -255,7 +255,7 @@ function RootNavigator() {
       <SafeAreaProvider>
         <CustomAlertProvider>
           <ThemeProvider value={colorScheme !== 'light' ? DarkTheme : DefaultTheme}>
-              <Stack initialRouteName={initialRoute}>
+              <Stack initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
                 <Stack.Screen 
                   name="welcome" 
                   options={{ 

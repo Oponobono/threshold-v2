@@ -149,6 +149,12 @@
     "active": "Active model:",
     "activate": "Activate",
     "delete": "Delete",
+    "tinyLabel": "Llama 3.2 (1B) - Tiny",
+    "tinyDesc": "The most basic and compact model. Useful only for quick tests or very limited devices.",
+    "tinySpeed": "⚡ Super Fast",
+    "tinyCap1": "Ultra lightweight",
+    "tinyCap2": "Highly battery efficient",
+    "tinyCap3": "Basic queries",
     "essentialLabel": "Llama 3.2 (1B) - Essential",
     "essentialDesc": "The fastest and lightest model. Ideal for low-memory phones, short summaries, and direct answers.",
     "essentialSpeed": "⚡ Very Fast",
@@ -225,5 +231,10 @@
     "whisperTitle": "Local Audio Transcription (Whisper Tiny)",
     "whisperDesc": "Download Whisper Tiny (~75 MB) to transcribe audio recordings offline using the on-device AI engine.",
     "whisperDownloadSuccess": "Whisper model downloaded"
+  },
+  "cloudAI": {
+    "capabilities": "Modalities: {{caps}}",
+    "capText": "Text analysis",
+    "capVision": "Computer vision"
   }
 }

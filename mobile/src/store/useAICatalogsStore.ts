@@ -21,15 +21,17 @@ export interface LocalModelCatalogEntry {
   isNewQuantization: boolean; // Pure metadata tag
 }
 
-export type OnlineCatalogStatus = 'loading' | 'loaded' | 'cached' | 'empty';
+export type OnlineDataStatus = 'empty' | 'cached' | 'loaded';
+export type OnlineRefreshStatus = 'idle' | 'refreshing' | 'error';
 
 export interface AICatalogsState {
   onlineCatalog: OnlineModel[];
   localCatalog: LocalModelCatalogEntry[];
-  onlineCatalogStatus: OnlineCatalogStatus;
+  
+  onlineDataStatus: OnlineDataStatus;
+  onlineRefreshStatus: OnlineRefreshStatus;
   
   // Status flags for UI loading states
-  isFetchingOnline: boolean;
   isFetchingLocal: boolean;
   lastOnlineFetchAt: number | null;
   lastLocalFetchAt: number | null;
@@ -37,9 +39,9 @@ export interface AICatalogsState {
   // Actions
   setOnlineCatalog: (models: OnlineModel[]) => void;
   setLocalCatalog: (models: LocalModelCatalogEntry[]) => void;
-  setFetchingOnline: (isFetching: boolean) => void;
+  setOnlineRefreshStatus: (status: OnlineRefreshStatus) => void;
   setFetchingLocal: (isFetching: boolean) => void;
-  setOnlineCatalogStatus: (status: OnlineCatalogStatus) => void;
+  setOnlineDataStatus: (status: OnlineDataStatus) => void;
 }
 
 export const useAICatalogsStore = create<AICatalogsState>()(
@@ -47,8 +49,8 @@ export const useAICatalogsStore = create<AICatalogsState>()(
     (set) => ({
       onlineCatalog: [],
       localCatalog: [],
-      onlineCatalogStatus: 'empty',
-      isFetchingOnline: false,
+      onlineDataStatus: 'empty',
+      onlineRefreshStatus: 'idle',
       isFetchingLocal: false,
       lastOnlineFetchAt: null,
       lastLocalFetchAt: null,
@@ -57,40 +59,37 @@ export const useAICatalogsStore = create<AICatalogsState>()(
         set({
           onlineCatalog: models,
           lastOnlineFetchAt: Date.now(),
-          onlineCatalogStatus: models.length > 0 ? 'loaded' : 'empty',
+          onlineDataStatus: models.length > 0 ? 'loaded' : 'empty',
+          onlineRefreshStatus: 'idle',
         }),
 
       setLocalCatalog: (models) =>
         set({ localCatalog: models, lastLocalFetchAt: Date.now() }),
 
-      setFetchingOnline: (isFetching) =>
-        set((state) => ({
-          isFetchingOnline: isFetching,
-          // Cuando el fetch termina (isFetching=false) y el catálogo está vacío pero había
-          // datos persistidos previos → status es 'cached'. Si no hay nada → 'empty'.
-          // Si isFetching=true (inicio de fetch) → 'loading'.
-          onlineCatalogStatus: isFetching
-            ? 'loading'
-            : state.onlineCatalogStatus === 'loaded'
-              ? 'loaded'
-              : state.onlineCatalog.length > 0
-                ? 'cached'
-                : 'empty',
-        })),
+      setOnlineRefreshStatus: (status) =>
+        set({ onlineRefreshStatus: status }),
+
       setFetchingLocal: (isFetching) => set({ isFetchingLocal: isFetching }),
-      setOnlineCatalogStatus: (status) => set({ onlineCatalogStatus: status }),
+      
+      setOnlineDataStatus: (status) => set({ onlineDataStatus: status }),
     }),
     {
       name: 'ai-catalogs-storage',
       storage: createJSONStorage(() => AsyncStorage),
       version: 1,
-      // Solo persistimos los catálogos en sí para offline-first, ignoramos los flags de isFetching
+      // Solo persistimos los catálogos en sí para offline-first, ignoramos los flags efímeros
       partialize: (state) => ({
         onlineCatalog: state.onlineCatalog,
         localCatalog: state.localCatalog,
         lastOnlineFetchAt: state.lastOnlineFetchAt,
         lastLocalFetchAt: state.lastLocalFetchAt,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.onlineDataStatus = state.onlineCatalog.length > 0 ? 'cached' : 'empty';
+          state.onlineRefreshStatus = 'idle';
+        }
+      },
       migrate: (persistedState: any, version: number) => {
         // En caso de corrupción, garantizamos al menos arrays vacíos
         const state = persistedState as Partial<AICatalogsState>;
@@ -104,3 +103,34 @@ export const useAICatalogsStore = create<AICatalogsState>()(
     }
   )
 );
+
+/**
+ * Espera de manera determinista a que la hidratación local del catálogo termine.
+ * Esto debe llamarse durante el Bootstrap antes del READY.
+ * Incluye un timeout para no bloquear la app indefinidamente si falla el storage.
+ * @returns true si se hidrató correctamente, false si ocurrió un timeout.
+ */
+export async function waitForAICatalogHydration(): Promise<boolean> {
+  if (useAICatalogsStore.persist.hasHydrated()) {
+    return true;
+  }
+  return new Promise((resolve) => {
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.warn('[AICatalogStore] Hydration timeout reached');
+        resolve(false);
+      }
+    }, 2000); // 2 segundos máximo de espera
+
+    const unsub = useAICatalogsStore.persist.onFinishHydration(() => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        resolve(true);
+      }
+      unsub();
+    });
+  });
+}

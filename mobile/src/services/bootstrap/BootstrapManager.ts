@@ -4,6 +4,8 @@ export type BootstrapPhase =
   | 'NETWORK'
   | 'AUTH'
   | 'SYNC'
+  | 'AI_CATALOG'
+  | 'DATASTORE'
   | 'READY';
 
 export type BootstrapStatus = 'pending' | 'running' | 'done' | 'error';
@@ -30,6 +32,7 @@ import { syncManager } from '../sync/SyncManager';
 import { MomentumService } from '../MomentumService';
 import { useDataStore } from '../../store/useDataStore';
 import { flashcardDeckRepository } from '../database/repositories/FlashcardDeckRepository';
+import { waitForAICatalogHydration } from '../../store/useAICatalogsStore';
 
 type BootstrapListener = (state: BootstrapState) => void;
 
@@ -121,9 +124,9 @@ class BootstrapManager {
 
         // Fire-and-forget: no bloqueamos el bootstrap esperando el backend
         initializeApiClient().then(() => {
-          console.log('[BOOT 10z] Network initialized (async)');
+          console.log('[BACKGROUND] Network initialized (async)');
         }).catch((err: any) => {
-          console.warn('[BOOT 10z] Network init failed (non-blocking):', err?.message);
+          console.warn('[BACKGROUND] Network init failed (non-blocking):', err?.message);
         });
         console.log('[BOOT 10a] Network init dispatched (non-blocking)');
       });
@@ -147,14 +150,14 @@ class BootstrapManager {
           if (profile) {
             await userRepository.saveProfile(profile);
             console.log(localProfileExists
-              ? '[BOOT 11z] Profile refreshed from remote'
-              : '[BOOT 11z] Profile fetched from remote (first time)');
+              ? '[BACKGROUND] Profile refreshed from remote'
+              : '[BACKGROUND] Profile fetched from remote (first time)');
           }
         }).catch((err: any) => {
           // Timeout/network: si teníamos perfil local lo conservamos;
           // si es primer inicio, la app arranca sin perfil y muestra Login
           if (localProfileExists) {
-            console.log('[BOOT 11b] Remote fetch failed (keeping local profile):', err?.message);
+            console.log('[BACKGROUND] Remote fetch failed (keeping local profile):', err?.message);
           }
         });
 
@@ -172,32 +175,46 @@ class BootstrapManager {
         // Fire-and-forget: login y sync se ejecutan en background
         // SyncManager es el único punto de entrada para sync
         syncManager.login().then(() => {
-          console.log('[BOOT 12a] Sync login completed (async)');
+          console.log('[BACKGROUND] Sync login completed (async)');
           syncService.getPendingCount().then(pendingCount => {
             if (pendingCount > 0) {
-              console.log(`[BOOT 12d] ${pendingCount} pending operations, syncing...`);
+              console.log(`[BACKGROUND] ${pendingCount} pending operations, syncing...`);
               syncManager.sync().catch(err =>
-                console.warn('[BOOT 12e] Sync on init failed:', err)
+                console.warn('[BACKGROUND] Sync on init failed:', err)
               );
             }
           }).catch(() => {});
         }).catch((err: any) => {
-          console.warn('[BOOT 12a] Sync login failed (non-blocking):', err?.message);
+          console.warn('[BACKGROUND] Sync login failed (non-blocking):', err?.message);
         });
 
         console.log('[BOOT 12z] Sync dispatched (non-blocking)');
       });
 
-      await this._runPhase('READY', async () => {
-        console.log('[BOOT 13] PHASE READY: loading DataStore...');
+      await this._runPhase('AI_CATALOG', async () => {
+        console.log('[BOOT 13] PHASE AI_CATALOG: Waiting for local hydration...');
+        const hydrated = await waitForAICatalogHydration();
+        if (hydrated) {
+          console.log('[BOOT 13a] AI Catalog local hydration completed');
+        } else {
+          console.log('[BOOT 13b] AI Catalog hydration timeout (Continuing)');
+        }
+      });
+
+      await this._runPhase('DATASTORE', async () => {
+        console.log('[BOOT 14] PHASE DATASTORE: hydrating...');
         try {
           const t0 = performance.now();
           await useDataStore.getState().loadAllData();
-          console.log(`[BOOT 13b] loadAllData: ${(performance.now() - t0).toFixed(1)} ms`);
+          console.log(`[BOOT 14a] DataStore hydration completed: ${(performance.now() - t0).toFixed(1)} ms`);
         } catch (err) {
-          console.warn('[BOOT 13a] Pre-load DataStore failed:', err);
+          console.warn('[BOOT 14b] Pre-load DataStore failed:', err);
         }
-        console.log('[BOOT 14] App ready');
+      });
+
+      await this._runPhase('READY', async () => {
+        console.log('[BOOT 15] PHASE READY');
+        console.log('[BOOT 15a] App ready');
       });
 
       // Fire-and-forget: Reminder Coordinator + EventBus + Sync subscription
@@ -216,22 +233,39 @@ class BootstrapManager {
               resyncTimer = setTimeout(() => {
                 resyncTimer = null;
                 coordinator.resync().catch((err: unknown) =>
-                  console.warn('[BOOT 14r] Reminder resync after sync failed:', err)
+                  console.warn('[BACKGROUND] Reminder resync after sync failed:', err)
                 );
               }, 3000);
             }
           });
 
-          console.log('[BOOT 14r] Reminder Coordinator + EventBus + Sync initialized');
+          console.log('[BACKGROUND] Reminder Coordinator + EventBus + Sync initialized');
         } catch (err) {
-          console.warn('[BOOT 14r] Reminder init failed (non-blocking):', err);
+          console.warn('[BACKGROUND] Reminder init failed (non-blocking):', err);
         }
       })();
 
       // Fire-and-forget: MomentumService no debe competir con queries del bootstrap
       MomentumService.updateAllMomentumScores().catch(err =>
-        console.warn('[BOOT 14a] Momentum recalculation error:', err)
+        console.warn('[BACKGROUND] Momentum recalculation error:', err)
       );
+
+      // Fire-and-forget: AI catalogs refresh
+      (async () => {
+        try {
+          console.log('[BACKGROUND] Refreshing AI catalogs...');
+          const { OnlineModelCatalogService } = await import('../ai/catalogs/OnlineModelCatalogService');
+          const { CatalogMergeService } = await import('../ai/catalogs/CatalogMergeService');
+          
+          await Promise.all([
+            OnlineModelCatalogService.fetchOnlineCatalog().catch(() => null),
+            CatalogMergeService.refreshLocalCatalog().catch(() => []),
+          ]);
+          console.log('[BACKGROUND] AI catalogs refresh completed');
+        } catch (err) {
+          console.warn('[BACKGROUND] AI catalogs refresh failed:', err);
+        }
+      })();
 
       this._started = true;
       this._status = 'done';

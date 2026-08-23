@@ -12,12 +12,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { settingsStyles as styles } from '../../styles/Settings.styles';
 import { theme } from '../../styles/theme';
 import {
   useAICatalogsStore,
   type OnlineModel,
-  type OnlineCatalogStatus,
+  type OnlineDataStatus,
+  type OnlineRefreshStatus,
 } from '../../store/useAICatalogsStore';
 import {
   useAISettingsStore,
@@ -43,62 +45,72 @@ interface ModelRowProps {
   onSelect: () => void;
 }
 
-const ModelRow = ({ modelId, capabilities, isSelected, isNewFamily, isNewQuantization, onSelect }: ModelRowProps) => (
-  <TouchableOpacity
-    onPress={onSelect}
-    style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: 4,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border + '60',
-      gap: 10,
-    }}
-    accessibilityRole="radio"
-    accessibilityState={{ checked: isSelected }}
-  >
-    <Ionicons
-      name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-      size={18}
-      color={isSelected ? theme.colors.primary : theme.colors.text.secondary}
-    />
-    <View style={{ flex: 1 }}>
-      <Text style={{
-        fontSize: theme.typography.sizes.sm,
-        fontWeight: isSelected ? '700' : '500',
-        color: isSelected ? theme.colors.text.primary : theme.colors.text.secondary,
-      }}>
-        {modelId}
-      </Text>
-      {capabilities.length > 0 && (
-        <Text style={{ fontSize: 10, color: theme.colors.text.secondary, marginTop: 1 }}>
-          {capabilities.join(' · ')}
+const ModelRow = ({ modelId, capabilities, isSelected, isNewFamily, isNewQuantization, onSelect }: ModelRowProps) => {
+  const { t } = useTranslation();
+
+  const formattedCaps = capabilities.map(cap => {
+    if (cap === 'text') return t('settings.cloudAI.capText', 'Texto');
+    if (cap === 'vision') return t('settings.cloudAI.capVision', 'Visión');
+    return cap;
+  }).join(' · ');
+
+  return (
+    <TouchableOpacity
+      onPress={onSelect}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border + '60',
+        gap: 10,
+      }}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: isSelected }}
+    >
+      <Ionicons
+        name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+        size={18}
+        color={isSelected ? theme.colors.primary : theme.colors.text.secondary}
+      />
+      <View style={{ flex: 1 }}>
+        <Text style={{
+          fontSize: theme.typography.sizes.sm,
+          fontWeight: isSelected ? '700' : '500',
+          color: isSelected ? theme.colors.text.primary : theme.colors.text.secondary,
+        }}>
+          {modelId}
         </Text>
+        {capabilities.length > 0 && (
+          <Text style={{ fontSize: 10, color: theme.colors.text.secondary, marginTop: 1 }}>
+            {t('settings.cloudAI.capabilities', 'Apto para: {{caps}}', { caps: formattedCaps })}
+          </Text>
+        )}
+      </View>
+      {isNewFamily && (
+        <View style={{
+          backgroundColor: theme.colors.primary + '20',
+          borderRadius: 4,
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+        }}>
+          <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: '700' }}>Nuevo</Text>
+        </View>
       )}
-    </View>
-    {isNewFamily && (
-      <View style={{
-        backgroundColor: theme.colors.primary + '20',
-        borderRadius: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-      }}>
-        <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: '700' }}>Nuevo</Text>
-      </View>
-    )}
-    {!isNewFamily && isNewQuantization && (
-      <View style={{
-        backgroundColor: theme.colors.border,
-        borderRadius: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-      }}>
-        <Text style={{ fontSize: 10, color: theme.colors.text.secondary, fontWeight: '600' }}>Nueva variante</Text>
-      </View>
-    )}
-  </TouchableOpacity>
-);
+      {!isNewFamily && isNewQuantization && (
+        <View style={{
+          backgroundColor: theme.colors.border,
+          borderRadius: 4,
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+        }}>
+          <Text style={{ fontSize: 10, color: theme.colors.text.secondary, fontWeight: '600' }}>Nueva variante</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
 
 interface AutoRowProps {
   isSelected: boolean;
@@ -148,18 +160,24 @@ interface ProviderSectionProps {
   provider: CloudProvider;
   label: string;
   models: OnlineModel[];
-  status: OnlineCatalogStatus;
+  dataStatus: OnlineDataStatus;
+  refreshStatus: OnlineRefreshStatus;
   preference: AIModelPreference;
   onSelect: (pref: AIModelPreference) => void;
 }
 
-const ProviderSection = ({ provider, label, models, status, preference, onSelect }: ProviderSectionProps) => {
+const ProviderSection = ({ provider, label, models, dataStatus, refreshStatus, preference, onSelect }: ProviderSectionProps) => {
   const [expanded, setExpanded] = useState(true);
   const providerModels = models.filter(m => m.provider === provider);
 
   const selectedLabel = preference.mode === 'manual'
     ? preference.modelId
     : 'Automático';
+    
+  const isLoadingSkeletons = dataStatus === 'empty' && refreshStatus === 'refreshing';
+  const isEmptyView = dataStatus === 'empty' && refreshStatus === 'idle';
+  const isErrorView = dataStatus === 'empty' && refreshStatus === 'error';
+  const hasModelsToRender = dataStatus === 'cached' || dataStatus === 'loaded';
 
   return (
     <View style={{ marginBottom: 16 }}>
@@ -191,7 +209,7 @@ const ProviderSection = ({ provider, label, models, status, preference, onSelect
 
       {expanded && (
         <>
-          {status === 'loading' && (
+          {isLoadingSkeletons && (
             <>
               <SkeletonRow />
               <SkeletonRow />
@@ -199,27 +217,46 @@ const ProviderSection = ({ provider, label, models, status, preference, onSelect
             </>
           )}
 
-          {status === 'empty' && (
+          {isEmptyView && (
             <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-              <Ionicons name="cloud-offline-outline" size={20} color={theme.colors.text.secondary} />
+              <Ionicons name="server-outline" size={20} color={theme.colors.text.secondary} />
               <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 6, textAlign: 'center' }}>
                 Sin modelos disponibles
               </Text>
             </View>
           )}
 
-          {(status === 'loaded' || status === 'cached') && (
+          {isErrorView && (
+            <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+              <Ionicons name="cloud-offline-outline" size={20} color={theme.colors.text.secondary} />
+              <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 6, textAlign: 'center' }}>
+                No se pudo obtener el catálogo
+              </Text>
+            </View>
+          )}
+
+          {hasModelsToRender && (
             <>
-              {status === 'cached' && (
+              {(dataStatus === 'cached' || refreshStatus !== 'idle') && (
                 <View style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 4,
                   marginBottom: 6,
                 }}>
-                  <Ionicons name="time-outline" size={12} color={theme.colors.text.secondary} />
+                  {refreshStatus === 'refreshing' ? (
+                    <ActivityIndicator size={12} color={theme.colors.text.secondary} />
+                  ) : refreshStatus === 'error' ? (
+                    <Ionicons name="warning-outline" size={12} color={theme.colors.text.secondary} />
+                  ) : (
+                    <Ionicons name="time-outline" size={12} color={theme.colors.text.secondary} />
+                  )}
                   <Text style={{ fontSize: 10, color: theme.colors.text.secondary }}>
-                    Datos almacenados
+                    {refreshStatus === 'refreshing' 
+                      ? 'Actualizando catálogo...' 
+                      : refreshStatus === 'error'
+                        ? 'No se pudo actualizar el catálogo'
+                        : 'Datos almacenados'}
                   </Text>
                 </View>
               )}
@@ -252,7 +289,8 @@ export const CloudAIModelSection = () => {
   const [expanded, setExpanded] = useState(false);
 
   const onlineCatalog = useAICatalogsStore(s => s.onlineCatalog);
-  const onlineCatalogStatus = useAICatalogsStore(s => s.onlineCatalogStatus);
+  const dataStatus = useAICatalogsStore(s => s.onlineDataStatus);
+  const refreshStatus = useAICatalogsStore(s => s.onlineRefreshStatus);
 
   const preferences = useAISettingsStore(s => s.preferences);
   const setPreference = useAISettingsStore(s => s.setPreference);
@@ -275,7 +313,7 @@ export const CloudAIModelSection = () => {
             Selecciona el modelo de Groq o Gemini que prefieras usar
           </Text>
         </View>
-        {onlineCatalogStatus === 'loading' ? (
+        {refreshStatus === 'refreshing' ? (
           <ActivityIndicator size="small" color={theme.colors.text.secondary} />
         ) : (
           <Ionicons
@@ -293,7 +331,8 @@ export const CloudAIModelSection = () => {
             provider="groq"
             label="Groq"
             models={onlineCatalog}
-            status={onlineCatalogStatus}
+            dataStatus={dataStatus}
+            refreshStatus={refreshStatus}
             preference={preferences.groq}
             onSelect={pref => setPreference('groq', pref)}
           />
@@ -301,7 +340,8 @@ export const CloudAIModelSection = () => {
             provider="gemini"
             label="Gemini"
             models={onlineCatalog}
-            status={onlineCatalogStatus}
+            dataStatus={dataStatus}
+            refreshStatus={refreshStatus}
             preference={preferences.gemini}
             onSelect={pref => setPreference('gemini', pref)}
           />

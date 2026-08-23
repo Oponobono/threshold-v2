@@ -31,7 +31,7 @@ export class OnlineModelCatalogService {
    */
   static async fetchOnlineCatalog(): Promise<OnlineModel[] | null> {
     const store = useAICatalogsStore.getState();
-    store.setFetchingOnline(true);
+    store.setOnlineRefreshStatus('refreshing');
     
     try {
       const response = await fetchCatalogRaw();
@@ -74,15 +74,15 @@ export class OnlineModelCatalogService {
       }
 
       // Actualizar el store (se persiste automáticamente para offline-first)
+      // setOnlineCatalog ya setea onlineRefreshStatus a 'idle'
       store.setOnlineCatalog(models);
       console.log(`[CatalogService] Online catalog fetched: ${models.length} models (${data.groq?.length ?? 0} groq, ${data.gemini?.length ?? 0} gemini)`);
       
       return models;
     } catch (error) {
       console.warn('[CatalogService] Failed to fetch online catalog. Retaining previous state if available.', error);
+      store.setOnlineRefreshStatus('error');
       return null;
-    } finally {
-      store.setFetchingOnline(false);
     }
   }
 }
