@@ -63,25 +63,50 @@ function hasNestedCardArray(parsed) {
     && (Array.isArray(parsed.cards) || Array.isArray(parsed.items) || Array.isArray(parsed.flashcards));
 }
 
+function extractJsonFromMarkdown(text) {
+  // Busca un bloque de código markdown (con o sin etiqueta 'json')
+  const blockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (blockMatch) {
+    return blockMatch[1].trim();
+  }
+  return text.trim();
+}
+
 function parseTopicAndCards(raw) {
   let parsed = null;
 
   if (raw && typeof raw === 'object') {
     parsed = raw;
   } else if (typeof raw === 'string') {
-    const objectMatch = raw.match(/\{[\s\S]*\}/);
-    const arrayMatch = raw.match(/\[[\s\S]*\]/);
-    const parsedObject = objectMatch ? tryParse(objectMatch[0]) : undefined;
-    const parsedArray = arrayMatch ? tryParse(arrayMatch[0]) : undefined;
+    // 1. Limpiar bloques markdown primero para descartar texto conversacional exterior
+    const cleanedRaw = extractJsonFromMarkdown(raw);
 
-    // Canónico: objeto con cards/items/flashcards (conserva el topic).
-    // Nunca se fuerza el objeto sobre un array pelado: el regex de objeto
-    // captura "{"a":1},{"a":2}" (JSON inválido) y "{"a":1}" (JSON válido
-    // pero no es el mazo), por eso solo se acepta si tiene un array interno.
-    if (hasNestedCardArray(parsedObject)) {
-      parsed = parsedObject;
-    } else if (parsedArray && Array.isArray(parsedArray)) {
-      parsed = parsedArray;
+    // 2. Intentar parsear el string limpio completo
+    parsed = tryParse(cleanedRaw);
+
+    // 3. Si falla, intentar extraer el primer/último bracket u objeto (fallback histórico)
+    if (!parsed) {
+      const firstBrace = cleanedRaw.indexOf('{');
+      const lastBrace = cleanedRaw.lastIndexOf('}');
+      const objectCandidate = (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) 
+        ? cleanedRaw.substring(firstBrace, lastBrace + 1) 
+        : null;
+
+      const firstBracket = cleanedRaw.indexOf('[');
+      const lastBracket = cleanedRaw.lastIndexOf(']');
+      const arrayCandidate = (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket)
+        ? cleanedRaw.substring(firstBracket, lastBracket + 1)
+        : null;
+
+      const parsedObject = objectCandidate ? tryParse(objectCandidate) : undefined;
+      const parsedArray = arrayCandidate ? tryParse(arrayCandidate) : undefined;
+
+      // Canónico: objeto con cards/items/flashcards (conserva el topic).
+      if (hasNestedCardArray(parsedObject)) {
+        parsed = parsedObject;
+      } else if (parsedArray && Array.isArray(parsedArray)) {
+        parsed = parsedArray;
+      }
     }
   }
 
