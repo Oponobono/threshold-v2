@@ -8,10 +8,10 @@ const PRODUCTION_CATALOG_URL = process.env.EXPO_PUBLIC_API_URL
   ? `${process.env.EXPO_PUBLIC_API_URL}/ai/models/online`
   : 'https://threshold-v2-d7vs.onrender.com/api/ai/models/online';
 
-// Timeout para la llamada en producción. Render free tier puede tardar hasta
-// 50s en cold start, pero si no responde en FETCH_TIMEOUT_MS consideramos que
-// está hibernando y dejamos el catálogo cacheado intacto.
-const FETCH_TIMEOUT_MS = 15_000;
+// Timeout por intento en producción.
+// Nota: AbortController + signal no es confiable en React Native Hermes release builds.
+// Usamos Promise.race() que funciona en cualquier entorno JS.
+const FETCH_TIMEOUT_MS = 12_000;
 
 // Si la primera llamada falla, reintentamos una vez tras RETRY_DELAY_MS.
 // Cubre el caso de cold start de Render: el primer request lo despierta;
@@ -19,16 +19,19 @@ const FETCH_TIMEOUT_MS = 15_000;
 const RETRY_DELAY_MS = 4_000;
 const MAX_RETRIES = 1;
 
+function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  return Promise.race([
+    fetch(url),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout: el servidor no respondió en ${timeoutMs / 1000}s`)), timeoutMs)
+    ),
+  ]);
+}
+
 async function fetchCatalogRaw(): Promise<Response> {
   if (!__DEV__) {
     // En producción: llamada directa a la URL de Render con timeout controlado.
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      return await fetch(PRODUCTION_CATALOG_URL, { signal: controller.signal });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    return fetchWithTimeout(PRODUCTION_CATALOG_URL, FETCH_TIMEOUT_MS);
   }
   return fetchWithFallback('/ai/models/online');
 }

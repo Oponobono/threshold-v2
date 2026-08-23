@@ -228,7 +228,7 @@ interface ProviderSectionProps {
 }
 
 const ProviderSection = ({ provider, label, models, dataStatus, refreshStatus, preference, onSelect }: ProviderSectionProps) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const providerModels = models.filter(m => m.provider === provider);
 
   const selectedLabel = preference.mode === 'manual'
