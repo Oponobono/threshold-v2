@@ -119,6 +119,10 @@ app.use('/api', authRoutes);
 const gradingController = require('./controllers/gradingController');
 app.get('/api/grading-systems', gradingController.getGradingSystems);
 
+// Ruta pública para el catálogo de modelos de IA (usado pre-login y en background sin auth)
+const modelRegistry = require('./utils/modelRegistry');
+app.get('/api/ai/models/online', modelRegistry.getOnlineModels);
+
 // 🛡️ Fase 1: Escudo de Autenticación JWT
 // A partir de esta línea, TODAS las rutas requerirán un token válido
 const { authenticateToken } = require('./middlewares/authMiddleware');
