@@ -54,15 +54,13 @@ class GroqProvider {
       return body;
     };
 
-    // Construir secuencia: modelo solicitado primero, luego el resto de la priority list.
-    // Si allowReasoningModels=false, excluir modelos que generan <think> para evitar
-    // que rompan el parsing de JSON estructurado cuando se truncan mid-thought.
-    const priorityFallbacks = GROQ_PRIORITY_LIST.filter(m => {
-      if (m === model) return false; // ya se intenta primero
-      if (!allowReasoningModels && REASONING_MODELS.has(m)) return false;
-      return true;
-    });
-    const toTry = [model, ...priorityFallbacks];
+    // Construir secuencia: modelo solicitado primero, luego modelos estándar, luego
+    // modelos de razonamiento como último recurso (generan <think> pero son mejores que fallar).
+    const standardFallbacks = GROQ_PRIORITY_LIST.filter(m => m !== model && !REASONING_MODELS.has(m));
+    const reasoningFallbacks = allowReasoningModels
+      ? []
+      : GROQ_PRIORITY_LIST.filter(m => m !== model && REASONING_MODELS.has(m));
+    const toTry = [model, ...standardFallbacks, ...reasoningFallbacks];
 
     let lastError = null;
     for (const candidate of toTry) {
