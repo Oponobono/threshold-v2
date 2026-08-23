@@ -112,7 +112,7 @@ function parseTopicAndCards(raw) {
 
   const cards = extractCards(parsed);
   if (!Array.isArray(cards)) {
-    throw new Error('No se pudo extraer el array de tarjetas de la respuesta del modelo.');
+    throw new Error(`No se pudo extraer el array de tarjetas de la respuesta del modelo. Respuesta cruda: ${raw.substring(0, 500)}...`);
   }
 
   const topic = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
