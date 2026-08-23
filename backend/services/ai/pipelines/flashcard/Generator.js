@@ -56,7 +56,7 @@ ${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
       ? `Genera el material de estudio basado en este contenido académico:\n\n${knowledgeModel.truncate(8000)}`
       : `Genera el material de estudio sobre el tema solicitado.`;
 
-    const generationOptions = { temperature: 0.15, max_tokens: 3000 };
+    const generationOptions = { temperature: 0.15, max_tokens: 8000 };
 
     try {
       const response = await ModelClass.generate(
