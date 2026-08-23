@@ -65,7 +65,14 @@ function hasNestedCardArray(parsed) {
 
 function extractJsonFromMarkdown(text) {
   // Eliminar bloques <think>...</think> de modelos de razonamiento (DeepSeek, Qwen)
-  const withoutThink = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  let withoutThink = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+  // Bloque <think> sin cerrar: el modelo fue truncado a mitad del razonamiento.
+  // No hay JSON tras un bloque incompleto — descartar todo a partir de <think>.
+  const unclosedIdx = withoutThink.indexOf('<think>');
+  if (unclosedIdx !== -1) {
+    withoutThink = withoutThink.substring(0, unclosedIdx).trim();
+  }
 
   // Busca un bloque de código markdown (con o sin etiqueta 'json')
   const blockMatch = withoutThink.match(/```(?:json)?\s*([\s\S]*?)\s*```/);

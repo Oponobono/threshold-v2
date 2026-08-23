@@ -3,6 +3,14 @@ const { MODEL_DEFAULTS, GROQ_PRIORITY_LIST } = require('../../../utils/modelRegi
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// Modelos de razonamiento: generan bloques <think> que rompen el parsing de JSON estructurado.
+// Excluidos del ciclo de retry para tareas de generación de contenido estructurado.
+const REASONING_MODELS = new Set([
+  'qwen/qwen3.6-27b',
+  'deepseek-r1-distill-llama-70b',
+  'deepseek-r1-distill-qwen-32b',
+]);
+
 function isModelNotFoundError(errorData) {
   const msg = errorData?.error?.message || '';
   return errorData?.error?.code === 'model_not_found'
@@ -15,6 +23,9 @@ class GroqProvider {
   /**
    * Ejecuta una inferencia estructurada usando Groq.
    * Si el modelo solicitado no existe, hace retry sobre GROQ_PRIORITY_LIST.
+   * @param {Object} options
+   * @param {boolean} [options.allowReasoningModels=false] - Si es false, excluye modelos de razonamiento
+   *   (qwen, deepseek-r1, etc.) del ciclo de retry. Actívalo solo si la tarea puede procesar <think>.
    */
   static async generate(messages, systemPrompt, options = {}) {
     const groqApiKey = secrets.GROQ_API_KEY;
@@ -26,7 +37,8 @@ class GroqProvider {
       temperature = 0.15,
       max_tokens = 3000,
       model = MODEL_DEFAULTS.groq,
-      jsonMode = false
+      jsonMode = false,
+      allowReasoningModels = false,
     } = options;
 
     const apiMessages = [{ role: 'system', content: systemPrompt }, ...messages];
@@ -42,8 +54,15 @@ class GroqProvider {
       return body;
     };
 
-    // Construir secuencia: modelo solicitado primero, luego el resto de la priority list
-    const toTry = [model, ...GROQ_PRIORITY_LIST.filter(m => m !== model)];
+    // Construir secuencia: modelo solicitado primero, luego el resto de la priority list.
+    // Si allowReasoningModels=false, excluir modelos que generan <think> para evitar
+    // que rompan el parsing de JSON estructurado cuando se truncan mid-thought.
+    const priorityFallbacks = GROQ_PRIORITY_LIST.filter(m => {
+      if (m === model) return false; // ya se intenta primero
+      if (!allowReasoningModels && REASONING_MODELS.has(m)) return false;
+      return true;
+    });
+    const toTry = [model, ...priorityFallbacks];
 
     let lastError = null;
     for (const candidate of toTry) {
@@ -74,10 +93,14 @@ class GroqProvider {
           model: candidate,
         };
       } catch (err) {
-        // Si ya fue lanzado por nosotros o es un error de red real, propagarlo
-        if (err.message?.startsWith('Groq API Error') && isModelNotFoundError(JSON.parse(err.message.replace('Groq API Error: ', '') || '{}'))) {
-          lastError = err;
-          continue;
+        if (err.message?.startsWith('Groq API Error')) {
+          try {
+            const parsed = JSON.parse(err.message.replace('Groq API Error: ', ''));
+            if (isModelNotFoundError(parsed)) {
+              lastError = err;
+              continue;
+            }
+          } catch (_) { /* no es JSON parseable, propagar */ }
         }
         throw err;
       }
