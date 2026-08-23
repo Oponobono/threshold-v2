@@ -9,8 +9,8 @@
  *   - No ejecuta resolución, HTTP, fallback ni modificaciones al catálogo.
  *   - La preferencia expresada representa la intención del usuario, no el resultado resuelto.
  */
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { settingsStyles as styles } from '../../styles/Settings.styles';
@@ -35,6 +35,67 @@ const SkeletonRow = () => (
     marginBottom: 6,
   }} />
 );
+
+type BadgeVariant = 'success' | 'error';
+
+interface RefreshBadgeProps {
+  variant: BadgeVariant;
+  onDismiss: () => void;
+}
+
+const RefreshBadge = ({ variant, onDismiss }: RefreshBadgeProps) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(6)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(opacity, { toValue: 1, useNativeDriver: true, speed: 20 }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 20 }),
+    ]).start();
+
+    const dismiss = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: -4, duration: 400, useNativeDriver: true }),
+      ]).start(onDismiss);
+    }, 3000);
+
+    return () => clearTimeout(dismiss);
+  }, []);
+
+  const isSuccess = variant === 'success';
+  const bgColor = isSuccess ? '#1a3a2a' : '#3a1a1a';
+  const borderColor = isSuccess ? '#2d6e4a' : '#6e2d2d';
+  const iconName = isSuccess ? 'checkmark-circle-outline' : 'alert-circle-outline';
+  const iconColor = isSuccess ? '#5ecb8a' : '#e07070';
+  const label = isSuccess ? 'Catálogo actualizado' : 'No se pudo actualizar el catálogo';
+
+  return (
+    <Animated.View
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          alignSelf: 'flex-start',
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 20,
+          borderWidth: 1,
+          backgroundColor: bgColor,
+          borderColor,
+          marginTop: 8,
+        },
+        { opacity, transform: [{ translateY }] },
+      ]}
+    >
+      <Ionicons name={iconName as any} size={13} color={iconColor} />
+      <Text style={{ fontSize: 11, color: iconColor, fontWeight: '600', letterSpacing: 0.2 }}>
+        {label}
+      </Text>
+    </Animated.View>
+  );
+};
 
 interface ModelRowProps {
   modelId: string;
@@ -237,30 +298,6 @@ const ProviderSection = ({ provider, label, models, dataStatus, refreshStatus, p
 
           {hasModelsToRender && (
             <>
-              {(dataStatus === 'cached' || refreshStatus !== 'idle') && (
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                  marginBottom: 6,
-                }}>
-                  {refreshStatus === 'refreshing' ? (
-                    <ActivityIndicator size={12} color={theme.colors.text.secondary} />
-                  ) : refreshStatus === 'error' ? (
-                    <Ionicons name="warning-outline" size={12} color={theme.colors.text.secondary} />
-                  ) : (
-                    <Ionicons name="time-outline" size={12} color={theme.colors.text.secondary} />
-                  )}
-                  <Text style={{ fontSize: 10, color: theme.colors.text.secondary }}>
-                    {refreshStatus === 'refreshing' 
-                      ? 'Actualizando catálogo...' 
-                      : refreshStatus === 'error'
-                        ? 'No se pudo actualizar el catálogo'
-                        : 'Datos almacenados'}
-                  </Text>
-                </View>
-              )}
-
               <AutoRow
                 isSelected={preference.mode === 'auto'}
                 onSelect={() => onSelect({ mode: 'auto' })}
@@ -287,6 +324,9 @@ const ProviderSection = ({ provider, label, models, dataStatus, refreshStatus, p
 
 export const CloudAIModelSection = () => {
   const [expanded, setExpanded] = useState(false);
+  const [badgeVariant, setBadgeVariant] = useState<BadgeVariant | null>(null);
+  const rotationAnim = useRef(new Animated.Value(0)).current;
+  const rotationLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   const onlineCatalog = useAICatalogsStore(s => s.onlineCatalog);
   const dataStatus = useAICatalogsStore(s => s.onlineDataStatus);
@@ -294,6 +334,40 @@ export const CloudAIModelSection = () => {
 
   const preferences = useAISettingsStore(s => s.preferences);
   const setPreference = useAISettingsStore(s => s.setPreference);
+
+  useEffect(() => {
+    if (refreshStatus === 'refreshing') {
+      rotationAnim.setValue(0);
+      rotationLoop.current = Animated.loop(
+        Animated.timing(rotationAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        })
+      );
+      rotationLoop.current.start();
+    } else {
+      rotationLoop.current?.stop();
+      rotationAnim.setValue(0);
+      if (refreshStatus === 'error') {
+        setBadgeVariant('error');
+      } else if (refreshStatus === 'idle' && dataStatus === 'loaded') {
+        setBadgeVariant('success');
+      }
+    }
+  }, [refreshStatus]);
+
+  const handleRefresh = useCallback(async () => {
+    if (refreshStatus === 'refreshing') return;
+    setBadgeVariant(null);
+    const { OnlineModelCatalogService } = await import('../../services/ai/catalogs/OnlineModelCatalogService');
+    await OnlineModelCatalogService.fetchOnlineCatalog();
+  }, [refreshStatus]);
+
+  const spin = rotationAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   return (
     <View style={styles.section}>
@@ -313,16 +387,28 @@ export const CloudAIModelSection = () => {
             Selecciona el modelo de Groq o Gemini que prefieras usar
           </Text>
         </View>
-        {refreshStatus === 'refreshing' ? (
-          <ActivityIndicator size="small" color={theme.colors.text.secondary} />
-        ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={handleRefresh}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Actualizar lista de modelos"
+            accessibilityRole="button"
+          >
+            <Animated.View style={{ transform: [{ rotate: spin }] }}>
+              <Ionicons
+                name="refresh-outline"
+                size={17}
+                color={refreshStatus === 'refreshing' ? theme.colors.primary : theme.colors.text.secondary}
+              />
+            </Animated.View>
+          </TouchableOpacity>
           <Ionicons
             name={expanded ? 'chevron-up' : 'chevron-down'}
             size={18}
             color={theme.colors.text.secondary}
             style={{ marginTop: 2 }}
           />
-        )}
+        </View>
       </TouchableOpacity>
 
       {expanded && (
@@ -346,6 +432,14 @@ export const CloudAIModelSection = () => {
             onSelect={pref => setPreference('gemini', pref)}
           />
         </View>
+      )}
+
+      {badgeVariant !== null && (
+        <RefreshBadge
+          key={String(badgeVariant) + String(Date.now())}
+          variant={badgeVariant}
+          onDismiss={() => setBadgeVariant(null)}
+        />
       )}
     </View>
   );
