@@ -1,6 +1,22 @@
 import { fetchWithFallback } from '../../api/client';
 import { useAICatalogsStore, type OnlineModel } from '../../../store/useAICatalogsStore';
 
+// URL directa al backend de producción para el catálogo de modelos.
+// Este endpoint es público (sin auth) y siempre debe apuntar a la nube.
+// En dev, usamos fetchWithFallback para poder probar con el servidor local.
+const PRODUCTION_CATALOG_URL = process.env.EXPO_PUBLIC_API_URL
+  ? `${process.env.EXPO_PUBLIC_API_URL}/ai/models/online`
+  : 'https://threshold-v2-d7vs.onrender.com/api/ai/models/online';
+
+async function fetchCatalogRaw(): Promise<Response> {
+  if (!__DEV__) {
+    // En producción: llamada directa a la URL de Render, sin depender del
+    // cliente API que puede estar en proceso de detección del backend local.
+    return fetch(PRODUCTION_CATALOG_URL);
+  }
+  return fetchWithFallback('/ai/models/online');
+}
+
 /**
  * OnlineModelCatalogService
  * 
@@ -18,8 +34,7 @@ export class OnlineModelCatalogService {
     store.setFetchingOnline(true);
     
     try {
-      // Llamada al nuevo endpoint del backend que provee la lista consolidada
-      const response = await fetchWithFallback('/ai/models/online');
+      const response = await fetchCatalogRaw();
       if (!response.ok) {
         throw new Error(`Error fetching online models: ${response.status}`);
       }
