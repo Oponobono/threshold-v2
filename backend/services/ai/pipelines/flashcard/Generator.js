@@ -71,27 +71,9 @@ ${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
 
       const raw = response.content.trim();
       return FlashcardResponseParser.parseTopicAndCards(raw);
-    } catch (primaryErr) {
-      console.error('[Generator] Error con proveedor primario:', primaryErr.message);
-
-      const GeminiProvider = require('../../providers/GeminiProvider');
-      if (ModelClass !== GeminiProvider) {
-        console.warn('[Generator] Intentando fallback a Gemini...');
-        try {
-          const fallbackResponse = await GeminiProvider.generate(
-            [{ role: 'user', content: userContent }],
-            systemPrompt,
-            generationOptions
-          );
-          const raw = fallbackResponse.content.trim();
-          return FlashcardResponseParser.parseTopicAndCards(raw);
-        } catch (fallbackErr) {
-          console.error('[Generator] Fallback Gemini también falló:', fallbackErr.message);
-          throw new Error(`Fallo la generación del mazo. Groq: ${primaryErr.message} | Gemini: ${fallbackErr.message}`);
-        }
-      }
-
-      throw new Error(`Fallo la generación del mazo: ${primaryErr.message}`);
+    } catch (err) {
+      console.error('[Generator] Error con proveedor:', err.message);
+      throw err;
     }
   }
 }
