@@ -236,6 +236,18 @@ class BootstrapManager {
         }
       })();
 
+      // Fire-and-forget: Re-hidrata el DataStore completo tras cada ciclo de sync exitoso.
+      // Necesario porque la fase DATASTORE corre antes de que el Initial Sync
+      // termine de escribir en SQLite (sync es fire-and-forget). Sin esto,
+      // la UI queda con datos obsoletos hasta que el usuario recarga manualmente.
+      syncManager.subscribe((event) => {
+        if (event.type === 'complete' && event.result?.success) {
+          useDataStore.getState().loadAllData(true).catch((err: unknown) =>
+            console.warn('[BACKGROUND] Post-sync DataStore refresh failed:', err)
+          );
+        }
+      });
+
       // Fire-and-forget: MomentumService no debe competir con queries del bootstrap
       MomentumService.updateAllMomentumScores().catch(err =>
         console.warn('[BACKGROUND] Momentum recalculation error:', err)
