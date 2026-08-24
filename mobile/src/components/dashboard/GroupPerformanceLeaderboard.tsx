@@ -4,8 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { globalStyles } from '../../styles/globalStyles';
 import { dashboardStyles as styles } from '../../styles/Dashboard.styles';
-import { getGroupLeaderboard } from '../../services/api/learning/groups';
-import type { LeaderboardEntry } from '../../services/api/learning/groups';
+import { groupLeaderboardCache, LeaderboardState, LeaderboardEntry } from '../../services/domain/GroupLeaderboardCache';
 
 interface Props {
   groupPinId: string;
@@ -28,26 +27,16 @@ function getAvatarUri(entry: LeaderboardEntry): string {
 
 export const GroupPerformanceLeaderboard: React.FC<Props> = ({ groupPinId, currentUserId }) => {
   const { t } = useTranslation();
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadLeaderboard = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getGroupLeaderboard(groupPinId);
-      setEntries(data);
-    } catch {
-      setEntries([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [groupPinId]);
+  const [state, setState] = useState<LeaderboardState>({ status: 'idle' });
 
   useEffect(() => {
-    loadLeaderboard();
-  }, [loadLeaderboard]);
+    // Cache-first: carga snapshot inmediatamente
+    groupLeaderboardCache.load(groupPinId).then(setState);
+    // Background refresh sin bloquear render
+    groupLeaderboardCache.refresh(groupPinId).then(setState);
+  }, [groupPinId]);
 
-  if (loading) {
+  if (state.status === 'idle' || state.status === 'loading') {
     return (
       <View style={styles.section}>
         <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
@@ -58,7 +47,32 @@ export const GroupPerformanceLeaderboard: React.FC<Props> = ({ groupPinId, curre
     );
   }
 
-  if (entries.length === 0) return null;
+  if (state.status === 'unavailable') {
+    return (
+      <View style={styles.section}>
+        <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
+          <Text style={styles.sectionTitle}>{t('dashboard.performance')}</Text>
+        </View>
+        <Text style={{ color: '#888', fontStyle: 'italic' }}>
+          No hay datos disponibles del grupo.
+        </Text>
+      </View>
+    );
+  }
+
+  const { snapshot } = state;
+  if (snapshot.entries.length === 0) {
+    return (
+      <View style={styles.section}>
+        <View style={[globalStyles.rowBetweenCenter, globalStyles.mb12]}>
+          <Text style={styles.sectionTitle}>{t('dashboard.performance')}</Text>
+        </View>
+        <Text style={{ color: '#888', fontStyle: 'italic' }}>
+          El grupo no tiene miembros o no se ha reportado rendimiento.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.section}>
@@ -68,19 +82,24 @@ export const GroupPerformanceLeaderboard: React.FC<Props> = ({ groupPinId, curre
       </View>
 
       <View style={styles.perfContainer}>
-        {entries.map((entry, index) => {
+        {snapshot.entries.map((entry, index) => {
           const rank = index + 1;
-          const isYou = entry.userId === currentUserId;
+          const isYou = (entry.userId || entry.user_id) === currentUserId;
           const icon = RANK_ICONS[rank] || { name: 'footsteps', color: '#888' };
 
           return (
-            <View key={entry.userId} style={[styles.perfRow, isYou && styles.perfRowYou]}>
+            <View key={entry.userId || entry.user_id} style={[styles.perfRow, isYou && styles.perfRowYou]}>
               <Text style={styles.perfRank}>#{rank}</Text>
               <View style={styles.perfUser}>
                 <Ionicons name={icon.name as any} size={20} color={icon.color} style={{ marginRight: 8 }} />
-                <Text style={[styles.perfName, isYou && { fontWeight: '600' }]}>
-                  {entry.displayName || entry.username}
-                </Text>
+                <View>
+                  <Text style={[styles.perfName, isYou && { fontWeight: '600' }]}>
+                    {entry.displayName || entry.username}
+                  </Text>
+                  {state.status === 'stale' && isYou && (
+                    <Text style={{ fontSize: 10, color: '#aaa' }}>{t('offline')}</Text>
+                  )}
+                </View>
               </View>
               <Text style={styles.perfGpa}>{t('dashboard.gpa').substring(0, 4)} {entry.gpa.toFixed(2)}</Text>
               <Image

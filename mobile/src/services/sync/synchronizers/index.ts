@@ -21,3 +21,5 @@ export { StudyNoteSynchronizer } from './StudyNoteSynchronizer';
 export { DocumentHighlightSynchronizer } from './DocumentHighlightSynchronizer';
 export { AudioTranscriptSynchronizer } from './AudioTranscriptSynchronizer';
 export { YouTubeTranscriptSynchronizer } from './YouTubeTranscriptSynchronizer';
+export { GroupSynchronizer } from './GroupSynchronizer';
+export { GroupMembershipSynchronizer } from './GroupMembershipSynchronizer';

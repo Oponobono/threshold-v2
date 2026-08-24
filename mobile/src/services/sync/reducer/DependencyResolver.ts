@@ -1,6 +1,8 @@
 import type { ReducedOperation } from './OperationReducer';
 
 const ENTITY_RANK: Record<string, number> = {
+  groups: -1,
+  group_memberships: 0,
   course: 1,
   subject: 2,
   'flashcard-deck': 3,

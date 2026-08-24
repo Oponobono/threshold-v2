@@ -970,5 +970,33 @@ const migrations: Migration[] = [
       `UPDATE assessments SET assessment_type = 'deadline' WHERE type = 'task' AND assessment_type IS NULL`,
     ],
   },
+  {
+    version: 47,
+    up: [
+      `CREATE TABLE IF NOT EXISTS groups (
+        id TEXT PRIMARY KEY,
+        group_pin_id TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        creator_user_id TEXT,
+        is_public INTEGER DEFAULT 1,
+        created_at TEXT,
+        sync_version INTEGER NOT NULL DEFAULT 0,
+        deleted_at TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS group_memberships (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        group_pin_id TEXT NOT NULL,
+        role TEXT DEFAULT 'member',
+        joined_at TEXT,
+        sync_version INTEGER NOT NULL DEFAULT 0,
+        deleted_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (group_pin_id) REFERENCES groups(group_pin_id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_group_memberships_user ON group_memberships(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_group_memberships_pin ON group_memberships(group_pin_id)`
+    ],
+  },
 ];
 export default migrations;

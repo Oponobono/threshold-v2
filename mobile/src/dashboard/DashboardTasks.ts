@@ -21,19 +21,6 @@ type StoreActions = {
 export function buildDashboardTasks(store: StoreActions): DashboardTask[] {
   return [
     {
-      id: 'schedule',
-      priority: DashboardPriority.P1,
-      execute: async (signal) => {
-        if (signal.aborted) return;
-        const end = dashboardTelemetry.startPhase('schedule');
-        try {
-          await store.syncTodaySchedules();
-        } finally {
-          end();
-        }
-      },
-    },
-    {
       id: 'gpa',
       priority: DashboardPriority.P2,
       execute: async (signal) => {

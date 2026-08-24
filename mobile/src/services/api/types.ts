@@ -203,6 +203,23 @@ export interface EvaluationResult {
 
 export type StudyMode = 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed';
 
+export interface Group {
+  id: string;
+  group_pin_id: string;
+  name: string;
+  creator_user_id?: string;
+  is_public: number | boolean;
+  created_at?: string;
+}
+
+export interface GroupMembership {
+  id: string;
+  user_id: string;
+  group_pin_id: string;
+  role: string;
+  joined_at?: string;
+}
+
 export interface AudioRecording {
   id: string;
   user_id: string;

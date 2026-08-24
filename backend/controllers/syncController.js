@@ -38,6 +38,8 @@ exports.initialSync = (req, res) => {
     assessmentFiles: `SELECT af.* FROM assessment_files af JOIN assessments a ON af.assessment_id = a.id JOIN subjects s ON a.subject_id = s.id WHERE s.user_id = ?`,
     studyNotes: `SELECT * FROM study_notes WHERE user_id = ?`,
     documentHighlights: `SELECT dh.* FROM document_highlights dh JOIN scanned_documents sd ON dh.document_id = sd.id WHERE sd.user_id = ? AND dh.deleted_at IS NULL`,
+    groupMemberships: `SELECT * FROM group_memberships WHERE user_id = ? AND deleted_at IS NULL`,
+    groups: `SELECT g.* FROM groups g WHERE g.group_pin_id IN (SELECT group_pin_id FROM group_memberships WHERE user_id = ?) AND g.deleted_at IS NULL`,
   };
 
   const runQuery = (sql) => {
@@ -82,9 +84,11 @@ exports.initialSync = (req, res) => {
     runQuery(queries.assessmentFiles),
     runQuery(queries.studyNotes),
     runQuery(queries.documentHighlights),
+    runQuery(queries.groupMemberships),
+    runQuery(queries.groups),
     getCurrentSyncVersion(),
   ])
-    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, flashcards, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, youtubeVideos, youtubeTranscripts, aiChats, assessmentFiles, studyNotes, documentHighlights, syncVersion]) => {
+    .then(async ([user, courses, subjects, assessments, assessmentCategories, schedules, flashcardDecks, flashcards, calendarEvents, gradingPeriods, lmsAccounts, thresholdOverrides, studySessions, photos, audioRecordings, audioTranscripts, scannedDocuments, youtubeVideos, youtubeTranscripts, aiChats, assessmentFiles, studyNotes, documentHighlights, groupMemberships, groups, syncVersion]) => {
       if (traceId) console.log(`[SyncController][${traceId}] initialSync completed — ${Object.keys(queries).length} entities, version ${syncVersion}`);
 
       res.json({
@@ -115,6 +119,8 @@ exports.initialSync = (req, res) => {
           assessment_files: assessmentFiles,
           study_notes: studyNotes,
           document_highlights: documentHighlights,
+          group_memberships: groupMemberships,
+          groups: groups,
         },
       });
     })
@@ -138,6 +144,7 @@ exports.deltaSync = (req, res) => {
     audio_transcripts: `SELECT at.* FROM audio_transcripts at JOIN audio_recordings ar ON at.recording_id = ar.id WHERE ar.user_id = ? AND at.sync_version > ?`,
     youtube_transcripts: `SELECT yt.* FROM youtube_transcripts yt JOIN youtube_videos yv ON yt.video_id = yv.id WHERE yv.user_id = ? AND yt.sync_version > ?`,
     document_highlights: `SELECT dh.* FROM document_highlights dh JOIN scanned_documents sd ON dh.document_id = sd.id WHERE sd.user_id = ? AND dh.sync_version > ?`,
+    group_memberships: `SELECT * FROM group_memberships WHERE user_id = ? AND sync_version > ?`,
   };
 
   const allTableKeys = [...regularTables, ...Object.keys(specialTableQueries)];
@@ -145,7 +152,8 @@ exports.deltaSync = (req, res) => {
   const deleted = [];
   let completed = 0;
   let _syncVersion = 0;
-  const total = allTableKeys.length + 2;
+  // +1 for deletions, +1 for version, +1 for groups
+  const total = allTableKeys.length + 3;
   let responded = false;
 
   regularTables.forEach((table) => {
@@ -171,6 +179,28 @@ exports.deltaSync = (req, res) => {
       }
       if (++completed >= total && !responded) respond();
     });
+  });
+
+  // Custom logic for groups scoped sync (updated + newly accessible)
+  const groupsQuery = `
+    SELECT g.* FROM groups g
+    WHERE g.group_pin_id IN (
+      SELECT group_pin_id FROM group_memberships WHERE user_id = ?
+    ) AND g.sync_version > ?
+    UNION
+    SELECT g.* FROM groups g
+    WHERE g.group_pin_id IN (
+      SELECT group_pin_id FROM group_memberships WHERE user_id = ? AND sync_version > ?
+    )
+  `;
+  db.all(groupsQuery, [userId, version, userId, version], (err, rows) => {
+    if (err) {
+      console.error(`[SyncController] Error en deltaSync para groups:`, err);
+      updated['groups'] = [];
+    } else {
+      updated['groups'] = rows || [];
+    }
+    if (++completed >= total && !responded) respond();
   });
 
   const delQuery = `SELECT entity_type, entity_id, deleted_at, deletion_version FROM sync_deletions WHERE user_id = ? AND COALESCE(deletion_version, 0) > ?`;

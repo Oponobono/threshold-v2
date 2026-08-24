@@ -4,6 +4,7 @@ const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 
 const SYNCABLE_TABLES = [
+  'groups', 'group_memberships',
   'subjects', 'courses', 'flashcard_decks', 'flashcards',
   'assessments', 'assessment_categories', 'assessment_files',
   'schedules', 'calendar_events', 'grading_periods', 'lms_accounts',
@@ -224,6 +225,21 @@ const TABLE_DEFS = {
     sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0,
     FOREIGN KEY (document_id) REFERENCES scanned_documents(id) ON DELETE CASCADE
   )`,
+  groups: `CREATE TABLE IF NOT EXISTS groups (
+    id TEXT PRIMARY KEY, group_pin_id TEXT UNIQUE NOT NULL,
+    name TEXT, description TEXT, is_public INTEGER DEFAULT 1,
+    creator_user_id TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  group_memberships: `CREATE TABLE IF NOT EXISTS group_memberships (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, group_pin_id TEXT NOT NULL,
+    role TEXT DEFAULT 'member',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
 };
 
 const QUEUE_SCHEMA = `CREATE TABLE IF NOT EXISTS sync_queue (
@@ -239,6 +255,8 @@ const QUEUE_SCHEMA = `CREATE TABLE IF NOT EXISTS sync_queue (
 )`;
 
 const ENTITY_MAP = {
+  groups: { table: 'groups', path: '/learning/groups' },
+  group_memberships: { table: 'group_memberships', path: '/learning/groups/join' },
   subject: { table: 'subjects', path: '/subjects' },
   course: { table: 'courses', path: '/courses' },
   'flashcard-deck': { table: 'flashcard_decks', path: '/flashcard-decks' },
@@ -480,10 +498,13 @@ class DeviceSimulator {
           continue;
         }
         const responseBody = (item.operation !== 'DELETE') ? await resp.json().catch(() => ({})) : {};
-        if (responseBody.sync_version && responseBody.sync_version > this.lastSyncVersion) {
+        // DO NOT advance lastSyncVersion during push! Real mobile app doesn't do this.
+        // Advancing it here causes delta sync to miss side-effects (like groups becoming accessible)
+        // that happen at the same sync_version.
+        /* if (responseBody.sync_version && responseBody.sync_version > this.lastSyncVersion) {
           console.log(`[${this.name}] sync_version advanced: ${this.lastSyncVersion} -> ${responseBody.sync_version}`);
           this.lastSyncVersion = responseBody.sync_version;
-        }
+        } */
         if (item.operation === 'CREATE' && responseBody.sync_version) {
           const entityMap = ENTITY_MAP[item.entity_type];
           if (entityMap && responseBody.id) {
@@ -550,6 +571,7 @@ class DeviceSimulator {
             continue;
           }
           const table = {
+            groups: 'groups', group_memberships: 'group_memberships',
             courses: 'courses', subjects: 'subjects', assessments: 'assessments',
             assessment_categories: 'assessment_categories',
             assessment_files: 'assessment_files',
@@ -580,6 +602,7 @@ class DeviceSimulator {
       if (Array.isArray(data.deleted)) {
         for (const d of data.deleted) {
           const t = {
+            groups: 'groups', group_memberships: 'group_memberships',
             subjects: 'subjects', courses: 'courses', assessments: 'assessments',
             assessment_categories: 'assessment_categories',
             assessment_files: 'assessment_files',

@@ -146,20 +146,8 @@ class BootstrapManager {
         }
 
         // Caso 2: Refrescar/cargar perfil remoto en background (fire-and-forget)
-        getCurrentUserProfile().then(async (profile) => {
-          if (profile) {
-            await userRepository.saveProfile(profile);
-            console.log(localProfileExists
-              ? '[BACKGROUND] Profile refreshed from remote'
-              : '[BACKGROUND] Profile fetched from remote (first time)');
-          }
-        }).catch((err: any) => {
-          // Timeout/network: si teníamos perfil local lo conservamos;
-          // si es primer inicio, la app arranca sin perfil y muestra Login
-          if (localProfileExists) {
-            console.log('[BACKGROUND] Remote fetch failed (keeping local profile):', err?.message);
-          }
-        });
+        // MOVIDO: Para no interferir con el LOCAL_READY, el fetch de red 
+        // se ha desplazado a la fase de BACKGROUND posterior al arranque local.
 
         console.log('[BOOT 11z] Auth ready');
       });
@@ -211,6 +199,9 @@ class BootstrapManager {
           console.warn('[BOOT 14b] Pre-load DataStore failed:', err);
         }
       });
+
+      console.log(`[BOOT 14c] 🟢 LOCAL_READY reached at ${Date.now()}`);
+      (globalThis as any).__isLocalReady = true;
 
       await this._runPhase('READY', async () => {
         console.log('[BOOT 15] PHASE READY');
@@ -264,6 +255,19 @@ class BootstrapManager {
           console.log('[BACKGROUND] AI catalogs refresh completed');
         } catch (err) {
           console.warn('[BACKGROUND] AI catalogs refresh failed:', err);
+        }
+      })();
+
+      // Fire-and-forget: Refrescar perfil remoto
+      (async () => {
+        try {
+          const profile = await getCurrentUserProfile();
+          if (profile) {
+            await userRepository.saveProfile(profile);
+            console.log('[BACKGROUND] Profile refreshed from remote');
+          }
+        } catch (err: any) {
+          console.log('[BACKGROUND] Remote profile fetch failed:', err?.message);
         }
       })();
 

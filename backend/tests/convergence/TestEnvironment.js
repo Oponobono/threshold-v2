@@ -205,6 +205,73 @@ class TestEnvironment {
     // Health
     app.get('/health', (req, res) => res.sendStatus(200));
 
+    // Groups routes (minimal inline for test environment)
+    const _groupsRoute = (req, res) => {
+      const userId = req.user.id;
+      const { id: clientId, group_pin_id, name, description, is_public, creator_user_id } = req.body;
+      const groupId = clientId || require('uuid').v4();
+      const pin = group_pin_id || groupId.substring(0, 8).toUpperCase();
+      reqDb.get(`SELECT * FROM sync_version WHERE id = 1`, [], (err, sv) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const newVersion = (sv?.version || 0) + 1;
+        reqDb.run(`UPDATE sync_version SET version = ?, updated_at = datetime('now') WHERE id = 1`, [newVersion], (err2) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          reqDb.run(
+            `INSERT OR REPLACE INTO groups (id, group_pin_id, name, description, is_public, creator_user_id, sync_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+            [groupId, pin, name || '', description || '', is_public ?? 1, creator_user_id || userId, newVersion],
+            function(err3) {
+              if (err3) return res.status(500).json({ error: err3.message });
+              res.status(201).json({ id: groupId, sync_version: newVersion });
+            }
+          );
+        });
+      });
+    };
+    app.post('/api/learning/groups', authMw, _groupsRoute);
+
+    const _membershipsRoute = (req, res) => {
+      const userId = req.user.id;
+      const { id: clientId, group_pin_id, role } = req.body;
+      const memberId = clientId || require('uuid').v4();
+      reqDb.get(`SELECT * FROM sync_version WHERE id = 1`, [], (err, sv) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const newVersion = (sv?.version || 0) + 1;
+        reqDb.run(`UPDATE sync_version SET version = ?, updated_at = datetime('now') WHERE id = 1`, [newVersion], (err2) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          reqDb.run(
+            `INSERT OR REPLACE INTO group_memberships (id, user_id, group_pin_id, role, sync_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+            [memberId, userId, group_pin_id || '', role || 'member', newVersion],
+            function(err3) {
+              if (err3) return res.status(500).json({ error: err3.message });
+              res.status(201).json({ id: memberId, sync_version: newVersion });
+            }
+          );
+        });
+      });
+    };
+    app.post('/api/learning/groups/join', authMw, _membershipsRoute);
+    app.delete('/api/learning/groups/join/:id', authMw, (req, res) => {
+      const userId = req.user.id;
+      const { id } = req.params;
+      reqDb.get(`SELECT * FROM sync_version WHERE id = 1`, [], (err, sv) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const newVersion = (sv?.version || 0) + 1;
+        reqDb.run(`UPDATE sync_version SET version = ?, updated_at = datetime('now') WHERE id = 1`, [newVersion], (err2) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          reqDb.run(`UPDATE group_memberships SET deleted_at = datetime('now'), sync_version = ? WHERE id = ? AND user_id = ?`,
+            [newVersion, id, userId], function(err3) {
+              if (err3) return res.status(500).json({ error: err3.message });
+              if (this.changes === 0) return res.status(404).json({ error: 'Not found' });
+              reqDb.run(`INSERT OR IGNORE INTO sync_deletions (entity_type, entity_id, user_id, deletion_version) VALUES ('group_memberships', ?, ?, ?)`,
+                [id, userId, newVersion], () => {
+                  res.json({ id, sync_version: newVersion });
+                });
+            }
+          );
+        });
+      });
+    });
+
     const port = await new Promise((resolve) => {
       const srv = app.listen(0, '127.0.0.1', () => {
         resolve(srv.address().port);
@@ -322,6 +389,70 @@ class TestEnvironment {
     app.post('/api/backup/restore-local-uri', authMw, backupController.restoreLocalUri);
     app.get('/health', (req, res) => res.sendStatus(200));
 
+    // Groups routes (minimal inline for test environment)
+    app.post('/api/learning/groups', authMw, (req, res) => {
+      const userId = req.user.id;
+      const { id: clientId, group_pin_id, name, description, is_public, creator_user_id } = req.body;
+      const groupId = clientId || require('uuid').v4();
+      const pin = group_pin_id || groupId.substring(0, 8).toUpperCase();
+      reqDb.get(`SELECT * FROM sync_version WHERE id = 1`, [], (err, sv) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const newVersion = (sv?.version || 0) + 1;
+        reqDb.run(`UPDATE sync_version SET version = ?, updated_at = datetime('now') WHERE id = 1`, [newVersion], (err2) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          reqDb.run(
+            `INSERT OR REPLACE INTO groups (id, group_pin_id, name, description, is_public, creator_user_id, sync_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+            [groupId, pin, name || '', description || '', is_public ?? 1, creator_user_id || userId, newVersion],
+            function(err3) {
+              if (err3) return res.status(500).json({ error: err3.message });
+              res.status(201).json({ id: groupId, sync_version: newVersion });
+            }
+          );
+        });
+      });
+    });
+    app.post('/api/learning/groups/join', authMw, (req, res) => {
+      const userId = req.user.id;
+      const { id: clientId, group_pin_id, role } = req.body;
+      const memberId = clientId || require('uuid').v4();
+      reqDb.get(`SELECT * FROM sync_version WHERE id = 1`, [], (err, sv) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const newVersion = (sv?.version || 0) + 1;
+        reqDb.run(`UPDATE sync_version SET version = ?, updated_at = datetime('now') WHERE id = 1`, [newVersion], (err2) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          reqDb.run(
+            `INSERT OR REPLACE INTO group_memberships (id, user_id, group_pin_id, role, sync_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+            [memberId, userId, group_pin_id || '', role || 'member', newVersion],
+            function(err3) {
+              if (err3) return res.status(500).json({ error: err3.message });
+              res.status(201).json({ id: memberId, sync_version: newVersion });
+            }
+          );
+        });
+      });
+    });
+    app.delete('/api/learning/groups/join/:id', authMw, (req, res) => {
+      const userId = req.user.id;
+      const { id } = req.params;
+      reqDb.get(`SELECT * FROM sync_version WHERE id = 1`, [], (err, sv) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const newVersion = (sv?.version || 0) + 1;
+        reqDb.run(`UPDATE sync_version SET version = ?, updated_at = datetime('now') WHERE id = 1`, [newVersion], (err2) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          reqDb.run(`UPDATE group_memberships SET deleted_at = datetime('now'), sync_version = ? WHERE id = ? AND user_id = ?`,
+            [newVersion, id, userId], function(err3) {
+              if (err3) return res.status(500).json({ error: err3.message });
+              if (this.changes === 0) return res.status(404).json({ error: 'Not found' });
+              reqDb.run(`INSERT OR IGNORE INTO sync_deletions (entity_type, entity_id, user_id, deletion_version) VALUES ('group_memberships', ?, ?, ?)`,
+                [id, userId, newVersion], () => {
+                  res.json({ id, sync_version: newVersion });
+                });
+            }
+          );
+        });
+      });
+    });
+
     const port = await new Promise((resolve) => {
       const srv = app.listen(0, '127.0.0.1', () => {
         resolve(srv.address().port);
@@ -346,6 +477,7 @@ class TestEnvironment {
 
   async dumpBackend() {
     const tables = [
+      'groups', 'group_memberships',
       'subjects', 'courses', 'flashcard_decks', 'flashcards',
       'assessments', 'assessment_categories', 'assessment_files',
       'schedules', 'calendar_events',
@@ -605,6 +737,21 @@ const TABLE_SCHEMAS = {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+  )`,
+  groups: `CREATE TABLE IF NOT EXISTS groups (
+    id TEXT PRIMARY KEY, group_pin_id TEXT UNIQUE NOT NULL,
+    name TEXT, description TEXT, is_public INTEGER DEFAULT 1,
+    creator_user_id TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+  )`,
+  group_memberships: `CREATE TABLE IF NOT EXISTS group_memberships (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, group_pin_id TEXT NOT NULL,
+    role TEXT DEFAULT 'member',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
   )`,
 };
 

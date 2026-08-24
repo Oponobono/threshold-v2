@@ -216,7 +216,11 @@ const tableSchema = {
       { name: 'external_url', type: 'TEXT' },
       { name: 'total_lessons', type: 'INTEGER DEFAULT 0' },
       { name: 'completed_lessons', type: 'INTEGER DEFAULT 0' },
-      { name: 'next_micro_milestone', type: 'TEXT' }
+      { name: 'next_micro_milestone', type: 'TEXT' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'deleted_at', type: 'DATETIME' },
+      { name: 'created_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'updated_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' }
     ]
   },
   photos: {
@@ -329,7 +333,9 @@ const tableSchema = {
       { name: 'due_at', type: 'TEXT' },
       { name: 'assessment_type', type: 'TEXT' },
       { name: 'created_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
-      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
+      { name: 'deleted_at', type: 'DATETIME' }
     ]
   },
   gallery_items: {
@@ -1082,6 +1088,8 @@ const tableSchema = {
         group_pin_id TEXT NOT NULL,
         role VARCHAR(20) DEFAULT 'member',
         joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER NOT NULL DEFAULT 0,
+        deleted_at DATETIME,
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `,
@@ -1091,9 +1099,15 @@ const tableSchema = {
         user_id TEXT NOT NULL REFERENCES users(id),
         group_pin_id TEXT NOT NULL,
         role VARCHAR(20) DEFAULT 'member',
-        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER NOT NULL DEFAULT 0,
+        deleted_at TIMESTAMP
       )
-    `
+    `,
+    columns: [
+      { name: 'sync_version', type: 'INTEGER NOT NULL DEFAULT 0' },
+      { name: 'deleted_at', type: 'DATETIME' }
+    ]
   },
 
   groups: {
@@ -1106,6 +1120,8 @@ const tableSchema = {
         is_public INTEGER DEFAULT 1,
         password TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER NOT NULL DEFAULT 0,
+        deleted_at DATETIME,
         FOREIGN KEY (creator_user_id) REFERENCES users(id)
       )
     `,
@@ -1117,11 +1133,16 @@ const tableSchema = {
         creator_user_id TEXT NOT NULL REFERENCES users(id),
         is_public BOOLEAN DEFAULT TRUE,
         password TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sync_version INTEGER NOT NULL DEFAULT 0,
+        deleted_at TIMESTAMP
       )
-    `
+    `,
+    columns: [
+      { name: 'sync_version', type: 'INTEGER NOT NULL DEFAULT 0' },
+      { name: 'deleted_at', type: 'DATETIME' }
+    ]
   },
-
   shared_decks: {
     sqlite: `
       CREATE TABLE IF NOT EXISTS shared_decks (

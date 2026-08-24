@@ -22,12 +22,8 @@ import {
   enrollBiometric,
   requestAccountDeletion,
   getDeletionDataCount,
-  joinGroup,
-  getUserGroups,
-  leaveGroup,
-  createGroup,
-  type GroupMembership
 } from '../services/api';
+import { getUserGroups, joinGroup, createGroup, leaveGroup, GroupMembershipResponse } from '../services/api/learning/groups';
 import {
   enrollBiometricToken,
   revokeBiometricToken,
@@ -78,7 +74,7 @@ export const useSettingsLogic = () => {
   const [notifEmail, setNotifEmail] = useState(false);
   const [biometric, setBiometric] = useState(false);
   const [calendarSync, setCalendarSync] = useState(false);
-  const [userGroups, setUserGroups] = useState<GroupMembership[]>([]);
+  const [userGroups, setUserGroups] = useState<GroupMembershipResponse[]>([]);
   const [appLanguage, setAppLanguage] = useState<string>(i18n.language);
 
   // Modals Visibility

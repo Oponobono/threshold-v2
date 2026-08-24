@@ -71,22 +71,37 @@ export async function getKnowledgeAggregation(
   const _t = Date.now();
   const now = new Date();
 
+  // ── Pre-fetch global subject count ────────────────────────────
+  const _tSubjectCount = Date.now();
+  let globalSubjectCount = 0;
+  try {
+    const db = databaseService.getDb();
+    const res: any = await db.getFirstAsync(
+      `SELECT COUNT(*) as count FROM subjects WHERE user_id = ? AND deleted_at IS NULL`,
+      [userId]
+    );
+    globalSubjectCount = res?.count || 0;
+  } catch (e) {
+    console.warn('[KnowledgeAggregation] Failed to get global subject count:', e);
+  }
+
   // ── SQL query ────────────────────────────────────────────────
-  const _tQuery = Date.now();
-  const rows = await databaseService.getAllTracked<CardRow & { global_subject_count: number }>(
-    `SELECT
+  const queryStr = `SELECT
        fc.id, fc.deck_id, fc.status,
        fc.next_review_date, fc.last_review_timestamp,
        fc.fsrs_stability, fc.fsrs_difficulty, fc.fsrs_repetitions,
        fd.subject_id,
-       COALESCE(s.name, '') as subject_name,
-       (SELECT COUNT(*) FROM subjects WHERE user_id = ? AND deleted_at IS NULL) as global_subject_count
+       COALESCE(s.name, '') as subject_name
      FROM flashcards fc
      JOIN flashcard_decks fd ON fc.deck_id = fd.id
      LEFT JOIN subjects s ON fd.subject_id = s.id AND s.deleted_at IS NULL
      WHERE fd.user_id = ?
      AND fc.deleted_at IS NULL
-     AND fd.deleted_at IS NULL`,
+     AND fd.deleted_at IS NULL`;
+
+  const _tQuery = Date.now();
+  const rows = await databaseService.getAllTracked<CardRow>(
+    queryStr,
     [userId, userId],
     'Knowledge aggregation query'
   );
@@ -208,7 +223,6 @@ export async function getKnowledgeAggregation(
     : 999;
 
   // Count real subjects (incl. those sin flashcards)
-  const globalSubjectCount = rows.length > 0 ? rows[0].global_subject_count : 0;
   const totalSubjectCount = Math.max(globalSubjectCount, subjects.length);
 
   const result: KnowledgeAggregation = {

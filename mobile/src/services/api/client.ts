@@ -291,6 +291,11 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
   const faultResponse = faultInjector.intercept(path, init);
   if (faultResponse) return faultResponse;
 
+  // 🕵️ INSTRUMENTATION: Detect HTTP requests before LOCAL_READY
+  if (!(globalThis as any).__isLocalReady) {
+    console.error(`[OFFLINE-WARM-START][NETWORK] UNEXPECTED REQUEST BEFORE LOCAL_READY: ${method} ${path}`);
+  }
+
   // 🛡️ Circuit breaker rápido: si hace <10s TODAS las URLs fallaron,
   //      ni intentamos — fallamos al instante.
   if (lastFullCircuitFailureAt > 0 && Date.now() - lastFullCircuitFailureAt < FULL_CIRCUIT_TTL_MS) {

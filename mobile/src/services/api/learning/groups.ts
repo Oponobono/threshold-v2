@@ -3,7 +3,7 @@ import { getUserId } from '../auth';
 import { syncService } from '../../database';
 import { uuidv4 } from '../../../utils/uuid';
 
-export interface GroupMembership {
+export interface GroupMembershipResponse {
   id?: string;
   user_id?: string;
   group_pin_id: string;
@@ -21,7 +21,7 @@ export interface CreateGroupParams {
   password?: string;
 }
 
-export const getUserGroups = async (): Promise<GroupMembership[]> => {
+export const getUserGroups = async (): Promise<GroupMembershipResponse[]> => {
   try {
     const userId = await getUserId();
     if (!userId) return [];

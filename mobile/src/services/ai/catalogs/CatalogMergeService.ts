@@ -59,7 +59,11 @@ export class CatalogMergeService {
           installedFileNames.delete(expectedFilename);
         }
       } else {
-        // Offline or fetch failed: retain previous remotely listed models from the store
+        // Offline or fetch failed (e.g. 404 Not Found)
+        // Failure-safe mechanism: retain previous remotely listed models from the store
+        // to prevent converting a valid local catalog into an empty one.
+        console.error('[CatalogMergeService] DIAGNOSTIC: Remote catalog fetch failed (likely 404). Retaining local state.');
+        
         for (const prev of previousCatalog) {
           if (prev.isListedRemotely) {
             const expectedFilename = prev.downloadUrl ? prev.downloadUrl.split('/').pop() : prev.modelId + '.gguf';

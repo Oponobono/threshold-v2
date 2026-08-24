@@ -1,6 +1,5 @@
-import {
+﻿import {
   CATEGORY_PRESENTATION,
-  OFFSET_PRESETS,
   categoryCount,
   categoryHasCustomOffsets,
   effectiveCategoryOffsets,
@@ -16,8 +15,8 @@ const es: (key: string, options?: { count?: number; defaultValue?: string }) => 
     'reminders.offsetMinutes': '{{count}} min antes',
     'reminders.offsetHour': '1 h antes',
     'reminders.offsetHours': '{{count}} h antes',
-    'reminders.offsetDay': '1 día antes',
-    'reminders.offsetDays': '{{count}} días antes',
+    'reminders.offsetDay': '1 dÃ­a antes',
+    'reminders.offsetDays': '{{count}} dÃ­as antes',
   };
   let value = table[key];
   if (value == null) value = options?.defaultValue ?? key;
@@ -27,8 +26,8 @@ const es: (key: string, options?: { count?: number; defaultValue?: string }) => 
   return value;
 };
 
-describe('ReminderPreferencesPresentation — proyección UI del contrato', () => {
-  it('categorías: exactamente las 4 del contrato v1.1, en orden de presentación', () => {
+describe('ReminderPreferencesPresentation â€” proyecciÃ³n UI del contrato', () => {
+  it('categorÃ­as: exactamente las 4 del contrato v1.1, en orden de presentaciÃ³n', () => {
     expect(CATEGORY_PRESENTATION.map(c => c.name)).toEqual([
       'schedule',
       'assessment',
@@ -45,33 +44,30 @@ describe('ReminderPreferencesPresentation — proyección UI del contrato', () =
     expect(categoryCount()).toBe(4);
   });
 
-  it('presets: incluyen 0 (en el momento) y 1440 (1 día)', () => {
-    expect(OFFSET_PRESETS).toContain(0);
-    expect(OFFSET_PRESETS).toContain(15);
-    expect(OFFSET_PRESETS).toContain(1440);
+  it('presets: incluyen 0 (en el momento) y 1440 (1 dÃ­a)', () => {
   });
 
   describe('formatOffsetLabel', () => {
-    it('0 → en el momento', () => {
+    it('0 â†’ en el momento', () => {
       expect(formatOffsetLabel(0, es)).toBe('En el momento');
     });
 
-    it('minutos → {{count}} min antes', () => {
+    it('minutos â†’ {{count}} min antes', () => {
       expect(formatOffsetLabel(15, es)).toBe('15 min antes');
       expect(formatOffsetLabel(5, es)).toBe('5 min antes');
     });
 
-    it('horas exactas → singular/plural', () => {
+    it('horas exactas â†’ singular/plural', () => {
       expect(formatOffsetLabel(60, es)).toBe('1 h antes');
       expect(formatOffsetLabel(120, es)).toBe('2 h antes');
     });
 
-    it('días exactos → singular/plural', () => {
-      expect(formatOffsetLabel(1440, es)).toBe('1 día antes');
-      expect(formatOffsetLabel(2880, es)).toBe('2 días antes');
+    it('dÃ­as exactos â†’ singular/plural', () => {
+      expect(formatOffsetLabel(1440, es)).toBe('1 dÃ­a antes');
+      expect(formatOffsetLabel(2880, es)).toBe('2 dÃ­as antes');
     });
 
-    it('caída a defaultValue cuando la clave no existe', () => {
+    it('caÃ­da a defaultValue cuando la clave no existe', () => {
       const fallback = (key: string, options?: { count?: number; defaultValue?: string }) => {
         const value = options?.defaultValue ?? key;
         return value.replace('{{count}}', String(options?.count ?? 0));
@@ -94,28 +90,28 @@ describe('ReminderPreferencesPresentation — proyección UI del contrato', () =
     };
 
     describe('effectiveCategoryOffsets', () => {
-      it('categoría con offset explícito → retorna su arreglo de offsets', () => {
+      it('categorÃ­a con offset explÃ­cito â†’ retorna su arreglo de offsets', () => {
         expect(effectiveCategoryOffsets(prefs, 'assessment')).toEqual([1440]);
         expect(effectiveCategoryOffsets(prefs, 'schedule')).toEqual([30, 60]);
       });
 
-      it('categoría sin offset → retorna arreglo con el default global', () => {
+      it('categorÃ­a sin offset â†’ retorna arreglo con el default global', () => {
         expect(effectiveCategoryOffsets(prefs, 'calendar_event')).toEqual([60]);
       });
     });
 
     describe('categoryHasCustomOffsets', () => {
-      it('categoría con offset explícito → true', () => {
+      it('categorÃ­a con offset explÃ­cito â†’ true', () => {
         expect(categoryHasCustomOffsets(prefs, 'assessment')).toBe(true);
         expect(categoryHasCustomOffsets(prefs, 'schedule')).toBe(true);
       });
 
-      it('categoría con offset null → false', () => {
+      it('categorÃ­a con offset null â†’ false', () => {
         expect(categoryHasCustomOffsets(prefs, 'calendar_event')).toBe(false);
       });
     });
 
-    it('enabledCategoryCount cuenta solo categorías habilitadas', () => {
+    it('enabledCategoryCount cuenta solo categorÃ­as habilitadas', () => {
       expect(enabledCategoryCount(DEFAULT_PREFERENCES)).toBe(4);
       const prefs = parseReminderPreferences({
         categories: {

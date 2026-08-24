@@ -123,6 +123,63 @@ app.get('/api/grading-systems', gradingController.getGradingSystems);
 const modelRegistry = require('./utils/modelRegistry');
 app.get('/api/ai/models/online', modelRegistry.getOnlineModels);
 
+// Ruta pública para el catálogo GGUF on-device (mismo patrón que /online: sin JWT para acceso en prod)
+app.get('/api/ai/models/gguf_catalog', (_req, res) => {
+  res.json({
+    data: [
+      {
+        modelId: 'tiny',
+        familyId: 'llama-3.2',
+        quantization: 'Q2_K',
+        downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q2_K.gguf',
+        capabilities: ['text'],
+      },
+      {
+        modelId: 'essential',
+        familyId: 'llama-3.2',
+        quantization: 'Q4_K_M',
+        downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
+        capabilities: ['text'],
+      },
+      {
+        modelId: 'advanced',
+        familyId: 'llama-3.2',
+        quantization: 'Q4_K_M',
+        downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+        capabilities: ['text'],
+      },
+      {
+        modelId: 'qwen_1_5b',
+        familyId: 'qwen-2.5',
+        quantization: 'Q4_K_M',
+        downloadUrl: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+        capabilities: ['text'],
+      },
+      {
+        modelId: 'qwen_3b',
+        familyId: 'qwen-2.5',
+        quantization: 'Q4_K_M',
+        downloadUrl: 'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf',
+        capabilities: ['text'],
+      },
+      {
+        modelId: 'phi3_5',
+        familyId: 'phi-3.5',
+        quantization: 'Q4_K_M',
+        downloadUrl: 'https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf',
+        capabilities: ['text'],
+      },
+      {
+        modelId: 'gemma2_2b',
+        familyId: 'gemma-2',
+        quantization: 'Q4_K_M',
+        downloadUrl: 'https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf',
+        capabilities: ['text'],
+      },
+    ],
+  });
+});
+
 // 🛡️ Fase 1: Escudo de Autenticación JWT
 // A partir de esta línea, TODAS las rutas requerirán un token válido
 const { authenticateToken } = require('./middlewares/authMiddleware');

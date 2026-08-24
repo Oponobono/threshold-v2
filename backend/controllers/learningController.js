@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const bcrypt = require('bcrypt');
 const { computeUserGPA } = require('./analyticsController');
+const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
 
 /**
  * Obtener sesiones de estudio de un usuario
@@ -201,24 +202,28 @@ exports.createGroup = (req, res) => {
     const isPublicVal = is_public !== false;
     const pwd = password ? bcrypt.hashSync(password, 10) : null;
 
+    const groupId = uuidv4();
     db.run(
-      `INSERT INTO groups (group_pin_id, name, creator_user_id, is_public, password) VALUES (?, ?, ?, ?, ?)`,
-      [group_pin_id, name, creator_user_id, isPublicVal, pwd],
+      `INSERT INTO groups (id, group_pin_id, name, creator_user_id, is_public, password, sync_version) VALUES (?, ?, ?, ?, ?, ?, (SELECT version FROM sync_version WHERE id = 1))`,
+      [groupId, group_pin_id, name, creator_user_id, isPublicVal, pwd],
       function(insertErr) {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
 
         // Auto-inscribir al creador como miembro con rol 'creator'
         const membershipId = clientId || uuidv4();
         db.run(
-          `INSERT INTO group_memberships (id, user_id, group_pin_id, role) VALUES (?, ?, ?, 'creator')`,
+          `INSERT INTO group_memberships (id, user_id, group_pin_id, role, sync_version) VALUES (?, ?, ?, 'creator', (SELECT version FROM sync_version WHERE id = 1))`,
           [membershipId, creator_user_id, group_pin_id],
           function(memberErr) {
             if (memberErr) return res.status(500).json({ error: memberErr.message });
-            res.status(201).json({
-              id: membershipId,
-              group_pin_id,
-              name,
-              message: 'Grupo creado exitosamente.',
+            
+            incrementSyncCounterOnly(() => {
+              res.status(201).json({
+                id: membershipId,
+                group_pin_id,
+                name,
+                message: 'Grupo creado exitosamente.',
+              });
             });
           }
         );
@@ -255,15 +260,18 @@ exports.joinGroup = (req, res) => {
 
       const membershipId = clientId || uuidv4();
       db.run(
-        `INSERT INTO group_memberships (id, user_id, group_pin_id, role) VALUES (?, ?, ?, 'member')`,
+        `INSERT INTO group_memberships (id, user_id, group_pin_id, role, sync_version) VALUES (?, ?, ?, 'member', (SELECT version FROM sync_version WHERE id = 1))`,
         [membershipId, user_id, group_pin_id],
         function(insertErr) {
           if (insertErr) return res.status(500).json({ error: insertErr.message });
-          res.status(201).json({
-            id: membershipId,
-            group_pin_id,
-            name: group.name,
-            message: `Te has unido exitosamente al grupo "${group.name}".`,
+          
+          incrementSyncCounterOnly(() => {
+            res.status(201).json({
+              id: membershipId,
+              group_pin_id,
+              name: group.name,
+              message: `Te has unido exitosamente al grupo "${group.name}".`,
+            });
           });
         }
       );
@@ -281,12 +289,24 @@ exports.leaveGroup = (req, res) => {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id, group_pin_id).' });
   }
 
-  const query = `DELETE FROM group_memberships WHERE user_id = ? AND group_pin_id = ?`;
-
-  db.run(query, [user_id, group_pin_id], function(err) {
+  db.get('SELECT id FROM group_memberships WHERE user_id = ? AND group_pin_id = ?', [user_id, group_pin_id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ error: 'No se encontró la membresía del grupo.' });
-    res.json({ message: 'Has salido del grupo exitosamente.' });
+    if (!row) return res.status(404).json({ error: 'No se encontró la membresía del grupo.' });
+
+    const membershipId = row.id;
+
+    recordDeletion('group_memberships', membershipId, user_id, () => {
+      incrementSyncCounterOnly(() => {
+        db.run(
+          `UPDATE group_memberships SET deleted_at = CURRENT_TIMESTAMP, sync_version = (SELECT version FROM sync_version WHERE id = 1) WHERE id = ?`,
+          [membershipId],
+          function(err2) {
+            if (err2) return res.status(500).json({ error: err2.message });
+            res.json({ message: 'Has salido del grupo exitosamente.' });
+          }
+        );
+      });
+    });
   });
 };
 

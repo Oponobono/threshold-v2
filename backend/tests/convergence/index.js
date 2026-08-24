@@ -29,6 +29,7 @@ async function main() {
       require('./scenarios/verification'),
       require('./scenarios/backup'),
       require('./scenarios/restoreValidation'),
+      require('./scenarios/groups'),
     ];
 
     let totalPassed = 0;

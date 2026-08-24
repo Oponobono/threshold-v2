@@ -13,6 +13,7 @@ import { useSettingsLogic } from '../src/hooks/useSettingsLogic';
 import { useBackupLogic } from '../src/hooks/useBackupLogic';
 import { useOperationsByType } from '../src/hooks/useLongRunningOperations';
 import { OperationType } from '../src/services/lro/OperationProgress';
+import { GroupMembershipResponse } from '../src/services/api';
 import { useReminderPreferences } from '../src/hooks/useReminderPreferences';
 import { EditProfileModal } from '../src/components/modals/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModal';
@@ -1036,7 +1037,7 @@ export default function SettingsScreen() {
           {userGroups.length > 0 && (
             <>
               <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>{t('settings.myGroups')} ({userGroups.length})</Text>
-              {userGroups.map((group, i) => (
+              {userGroups.map((group: GroupMembershipResponse, i) => (
                 <View key={i} style={styles.lmsRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.settingTitle}>{group.name || group.group_pin_id}</Text>

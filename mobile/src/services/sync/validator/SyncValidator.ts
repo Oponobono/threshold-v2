@@ -7,7 +7,9 @@ const SKIP_FIELDS = new Set([
   'cloud_url', 'local_uri', 'thumbnail_uri',
 ]);
 
-const ENTITY_TABLES: { entityType: string; tableName: string; idField: string; userIdField: string }[] = [
+const ENTITY_TABLES: { entityType: string; tableName: string; idField: string; userIdField?: string; customQuery?: string }[] = [
+  { entityType: 'groups', tableName: 'groups', idField: 'id', customQuery: 'SELECT g.* FROM groups g JOIN group_memberships gm ON g.group_pin_id = gm.group_pin_id WHERE gm.user_id = ? AND gm.deleted_at IS NULL ORDER BY g.id' },
+  { entityType: 'group_memberships', tableName: 'group_memberships', idField: 'id', userIdField: 'user_id' },
   { entityType: 'subjects', tableName: 'subjects', idField: 'id', userIdField: 'user_id' },
   { entityType: 'courses', tableName: 'courses', idField: 'id', userIdField: 'user_id' },
   { entityType: 'assessments', tableName: 'assessments', idField: 'id', userIdField: 'user_id' },
@@ -42,8 +44,8 @@ async function computeChecksum(records: any[]): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, json);
 }
 
-async function validateEntity(
-  config: { entityType: string; tableName: string; idField: string; userIdField: string },
+  async function validateEntity(
+  config: { entityType: string; tableName: string; idField: string; userIdField?: string; customQuery?: string },
   userId: string,
 ): Promise<EntityValidationResult> {
   const result: EntityValidationResult = {
@@ -63,10 +65,12 @@ async function validateEntity(
   try {
     const db = databaseService.getDb();
 
-    const localRows: any[] = await db.getAllAsync(
-      `SELECT * FROM ${config.tableName} WHERE ${config.userIdField} = ? ORDER BY ${config.idField}`,
-      userId,
-    );
+    let query = config.customQuery;
+    if (!query) {
+      query = `SELECT * FROM ${config.tableName} WHERE ${config.userIdField} = ? ORDER BY ${config.idField}`;
+    }
+
+    const localRows: any[] = await db.getAllAsync(query, userId);
 
     const activeLocal = localRows.filter((r: any) => !r.deleted_at);
     const deletedLocal = localRows.filter((r: any) => r.deleted_at);
