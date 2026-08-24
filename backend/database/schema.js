@@ -218,9 +218,9 @@ const tableSchema = {
       { name: 'completed_lessons', type: 'INTEGER DEFAULT 0' },
       { name: 'next_micro_milestone', type: 'TEXT' },
       { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
-      { name: 'deleted_at', type: 'DATETIME' },
-      { name: 'created_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
-      { name: 'updated_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' }
+      { name: 'deleted_at', type: 'TIMESTAMP' },
+      { name: 'created_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }
     ]
   },
   photos: {
@@ -335,7 +335,7 @@ const tableSchema = {
       { name: 'created_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
       { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
       { name: 'sync_version', type: 'INTEGER DEFAULT 0' },
-      { name: 'deleted_at', type: 'DATETIME' }
+      { name: 'deleted_at', type: 'TIMESTAMP' }
     ]
   },
   gallery_items: {
@@ -1106,7 +1106,7 @@ const tableSchema = {
     `,
     columns: [
       { name: 'sync_version', type: 'INTEGER NOT NULL DEFAULT 0' },
-      { name: 'deleted_at', type: 'DATETIME' }
+      { name: 'deleted_at', type: 'TIMESTAMP' }
     ]
   },
 
@@ -1140,7 +1140,7 @@ const tableSchema = {
     `,
     columns: [
       { name: 'sync_version', type: 'INTEGER NOT NULL DEFAULT 0' },
-      { name: 'deleted_at', type: 'DATETIME' }
+      { name: 'deleted_at', type: 'TIMESTAMP' }
     ]
   },
   shared_decks: {
