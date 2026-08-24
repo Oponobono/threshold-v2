@@ -1,6 +1,8 @@
 import { useAICatalogsStore, type LocalModelCatalogEntry } from '../../../store/useAICatalogsStore';
 import { RemoteGGUFCatalogService, type RemoteLocalModel } from './RemoteGGUFCatalogService';
 import { InstalledModelCatalogService, type InstalledModel } from './InstalledModelCatalogService';
+import { useConnectivityStore } from '../../../store/useConnectivityStore';
+import { useLocalAIStore } from '../../../store/useLocalAIStore';
 
 /**
  * CatalogMergeService
@@ -59,10 +61,16 @@ export class CatalogMergeService {
           installedFileNames.delete(expectedFilename);
         }
       } else {
-        // Offline or fetch failed (e.g. 404 Not Found)
-        // Failure-safe mechanism: retain previous remotely listed models from the store
-        // to prevent converting a valid local catalog into an empty one.
-        console.error('[CatalogMergeService] DIAGNOSTIC: Remote catalog fetch failed (likely 404). Retaining local state.');
+        // Offline or fetch failed
+        // Check if this was an expected offline scenario
+        const isOffline = !useConnectivityStore.getState().isOnline || useLocalAIStore.getState().forceOfflineMode;
+        
+        if (isOffline) {
+          console.log('[CatalogMergeService] Catalog refresh skipped (expected in offline mode). Retaining local state.');
+        } else {
+          // Only throw a red screen ERROR if we are online and it STILL failed
+          console.error('[CatalogMergeService] DIAGNOSTIC: Remote catalog fetch failed (likely 404). Retaining local state.');
+        }
         
         for (const prev of previousCatalog) {
           if (prev.isListedRemotely) {
