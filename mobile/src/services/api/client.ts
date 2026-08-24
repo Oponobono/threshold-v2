@@ -304,8 +304,10 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
     throw buildApiError('Sin conexión al servidor (circuit breaker activo)');
   }
 
-  // 🛡️ Si el modo offline forzado está activo, no hacer llamadas de red
-  const forceOffline = useLocalAIStore.getState().forceOfflineMode;
+  // 🛡️ Si el modo offline forzado está activo, no hacer llamadas de red (EXCEPTO auth)
+  // Las rutas de auth siempre evalúan la red real para evitar soft-locks en el login
+  const isAuthRoute = path.startsWith('/auth/');
+  const forceOffline = !isAuthRoute && useLocalAIStore.getState().forceOfflineMode;
   const isGloballyOffline = !useConnectivityStore.getState().isOnline;
   
   if (forceOffline || isGloballyOffline) {
