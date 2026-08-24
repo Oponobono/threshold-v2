@@ -307,11 +307,16 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
   // 🛡️ Si el modo offline forzado está activo, no hacer llamadas de red
   const forceOffline = useLocalAIStore.getState().forceOfflineMode;
   const isGloballyOffline = !useConnectivityStore.getState().isOnline;
-  const isOffline = forceOffline || isGloballyOffline;
-  if (isOffline) {
+  
+  if (forceOffline || isGloballyOffline) {
     const cacheResult = await tryServeFromCache(path, method);
     if (cacheResult) return cacheResult;
-    throw buildApiError('Modo offline forzado — no hay conexión al servidor.');
+    
+    const errorMsg = forceOffline
+      ? 'Modo sin conexión forzado activo. Cambia esta configuración en Ajustes para continuar.'
+      : 'No hay conexión a internet. Verifica tu red para iniciar sesión o sincronizar.';
+      
+    throw buildApiError(errorMsg);
   }
   
   // 🛡️ Rutas excluidas de cache (IA, OCR, etc.)
