@@ -207,36 +207,56 @@ export default function LoginScreen() {
       {isSyncLoading && (
         <View style={{
           ...StyleSheet.absoluteFillObject,
-          backgroundColor: 'rgba(249,249,247,0.97)',
+          backgroundColor: 'rgba(249, 249, 247, 0.85)',
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 1000,
+          padding: 24,
         }}>
-          <ActivityIndicator size="large" color="#C5A059" />
-          <Text style={{
-            marginTop: 20,
-            fontSize: 17,
-            fontWeight: '600',
-            color: '#1A1A1A',
+          <View style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 24,
+            padding: 32,
+            width: '100%',
+            maxWidth: 340,
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.08,
+            shadowRadius: 24,
+            elevation: 8,
           }}>
-            {syncProgress?.label || 'Preparando tu cuenta...'}
-          </Text>
-          {syncProgress && syncProgress.total > 0 && (
+            <ActivityIndicator size="large" color="#C5A059" />
             <Text style={{
-              marginTop: 8,
-              fontSize: 14,
-              color: '#8A8A8E',
+              marginTop: 24,
+              fontSize: 18,
+              fontWeight: '600',
+              color: '#1A1A1A',
+              textAlign: 'center',
+              lineHeight: 26,
             }}>
-              Paso {syncProgress.current + 1} de {syncProgress.total}
+              {syncProgress?.label || 'Preparando tu cuenta...'}
             </Text>
-          )}
-          <Text style={{
-            marginTop: 4,
-            fontSize: 12,
-            color: '#B0B0B0',
-          }}>
-            Esto solo ocurre una vez
-          </Text>
+            {syncProgress && syncProgress.total > 0 && (
+              <Text style={{
+                marginTop: 8,
+                fontSize: 14,
+                color: '#8A8A8E',
+                textAlign: 'center',
+              }}>
+                Paso {syncProgress.current + 1} de {syncProgress.total}
+              </Text>
+            )}
+            <Text style={{
+              marginTop: 16,
+              fontSize: 13,
+              color: '#B0B0B0',
+              textAlign: 'center',
+              fontStyle: 'italic'
+            }}>
+              Esto solo ocurre una vez
+            </Text>
+          </View>
         </View>
       )}
     </SafeAreaView>
