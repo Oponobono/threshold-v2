@@ -13,14 +13,21 @@ const initializePostgresDb = async (pool) => {
   // Si el pool no puede conectarse (IPv6, DNS, credenciales),
   // el servidor DEBE fallar — no tiene sentido operar sin DB.
   try {
-    const client = await pool.connect();
+    // Usamos Promise.race para forzar un timeout explícito, ya que a veces
+    // a nivel de OS (DNS o firewall TCP Drop) el cuelgue no respeta el connectionTimeoutMillis
+    const connectPromise = pool.connect();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('TIMEOUT: No se pudo establecer conexión TCP con Supabase en 15s. (¿DATABASE_URL incorrecta o usando db.xxx en lugar de pooler.xxx?)')), 15000)
+    );
+    
+    const client = await Promise.race([connectPromise, timeoutPromise]);
     await client.query('SELECT 1 AS connection_ok');
     client.release();
     console.log('✓ Conexión PostgreSQL verificada (SELECT 1 ok).');
   } catch (connErr) {
     console.error('❌ No se puede conectar a PostgreSQL:', connErr.message);
-    console.error('   El servidor NO arrancará hasta que la DB esté accesible.');
-    throw connErr;
+    console.error('   Verifica que tu DATABASE_URL usa "pooler.supabase.com" (IPv4) y NO "db.xxx.supabase.co" (IPv6 only).');
+    process.exit(1); // Forzar salida inmediata en lugar de quedarse colgado
   }
 
   try {
