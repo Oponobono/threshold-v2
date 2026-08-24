@@ -314,9 +314,10 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
     const cacheResult = await tryServeFromCache(path, method);
     if (cacheResult) return cacheResult;
     
-    const errorMsg = forceOffline
-      ? 'Modo sin conexión forzado activo. Cambia esta configuración en Ajustes para continuar.'
-      : 'No hay conexión a internet. Verifica tu red para iniciar sesión o sincronizar.';
+    // Prioridad 1: Si realmente no hay internet, avisar de eso (incluso si forceOffline está activo por auto-fallback)
+    const errorMsg = isGloballyOffline
+      ? 'No hay conexión a internet. Verifica tu red para iniciar sesión o sincronizar.'
+      : 'Modo sin conexión forzado activo. Cambia esta configuración en Ajustes para continuar.';
       
     throw buildApiError(errorMsg);
   }
