@@ -8,6 +8,7 @@ import { SyncState, SyncPhase, SyncProgress, SyncResult, SyncEvent, SyncListener
 import { EntitySynchronizer } from './EntitySynchronizer';
 import { syncJournal } from './SyncJournal';
 import { syncDebugger, generateTraceId } from './SyncDebugger';
+import { repositoryEventBus } from '../events/RepositoryEventBus';
 import { getLocalPredictions } from '../localMasteryService';
 import {
   UserSynchronizer,
@@ -235,9 +236,14 @@ class SyncManager {
       syncDebugger.timeStart(traceId, 'initial_repo');
       syncDebugger.log(traceId, null, null, 'REPOSITORY_WRITE', 'Saving entities to SQLite', { entityCount: Object.keys(payload).length });
 
-      await databaseService.runInTransaction(async () => {
-        entitiesSynced = await this._saveAllEntities(payload);
-      });
+      repositoryEventBus.suspend();
+      try {
+        await databaseService.runInTransaction(async () => {
+          entitiesSynced = await this._saveAllEntities(payload);
+        });
+      } finally {
+        repositoryEventBus.resume();
+      }
       syncDebugger.timeEnd(traceId, 'initial_repo', 'REPOSITORY_WRITE', `Saved ${entitiesSynced} entities to SQLite`, { entitiesSynced });
 
       this._lastInitialSyncAt = Date.now();
@@ -412,32 +418,40 @@ class SyncManager {
       });
       this._lastSyncVersion = remoteSyncVersion;
 
-      if (body.updated) {
-        if (traceId) { syncDebugger.timeStart(traceId, 'delta_repo'); syncDebugger.log(traceId, null, null, 'REPOSITORY_WRITE', 'Saving delta updates to SQLite', { entityCount: Object.keys(body.updated).length }); }
-        const _txStart = Date.now();
-        await databaseService.runInTransaction(async () => {
-          const _wStart = Date.now();
-          await this._saveAllEntities(body.updated as Record<string, any>);
-          console.log(`[DeltaSync] Inside transaction (write phase): ${Date.now() - _wStart}ms`);
-        });
-        const _txEnd = Date.now() - _txStart;
-        console.log(`[DeltaSync] Transaction (BEGIN→COMMIT): ${_txEnd}ms`);
-        if (traceId) syncDebugger.timeEnd(traceId, 'delta_repo', 'REPOSITORY_WRITE', 'Delta updates saved');
-      }
-
-      if (Array.isArray(body.deleted)) {
-        if (traceId) syncDebugger.log(traceId, null, null, 'ENTITY_DELETE', `Processing ${body.deleted.length} deletes`, { count: body.deleted.length });
-        for (const del of body.deleted) {
-          const synchronizer = this._synchronizers.get(del.entityType);
-          if (synchronizer) {
-            try {
-              await synchronizer.deleteItem(del.entityId);
-              if (traceId) syncDebugger.log(traceId, null, null, 'ENTITY_DELETE', `Deleted ${del.entityType}/${del.entityId}`, { entityType: del.entityType, entityId: del.entityId });
-            } catch (err: any) {
-              errors.push(`Failed to delete ${del.entityType}/${del.entityId}: ${err.message}`);
-              if (traceId) syncDebugger.logError(traceId, null, 'ENTITY_DELETE', `Failed to delete ${del.entityType}/${del.entityId}`, err);
-            }
+      if (body.updated || Array.isArray(body.deleted)) {
+        repositoryEventBus.suspend();
+        try {
+          if (body.updated) {
+            if (traceId) { syncDebugger.timeStart(traceId, 'delta_repo'); syncDebugger.log(traceId, null, null, 'REPOSITORY_WRITE', 'Saving delta updates to SQLite', { entityCount: Object.keys(body.updated).length }); }
+            const _txStart = Date.now();
+            await databaseService.runInTransaction(async () => {
+              const _wStart = Date.now();
+              await this._saveAllEntities(body.updated as Record<string, any>);
+              console.log(`[DeltaSync] Inside transaction (write phase): ${Date.now() - _wStart}ms`);
+            });
+            const _txEnd = Date.now() - _txStart;
+            console.log(`[DeltaSync] Transaction (BEGIN→COMMIT): ${_txEnd}ms`);
+            if (traceId) syncDebugger.timeEnd(traceId, 'delta_repo', 'REPOSITORY_WRITE', 'Delta updates saved');
           }
+
+          if (Array.isArray(body.deleted)) {
+            if (traceId) syncDebugger.log(traceId, null, null, 'ENTITY_DELETE', `Processing ${body.deleted.length} deletes`, { count: body.deleted.length });
+            for (const del of body.deleted) {
+              const synchronizer = this._synchronizers.get(del.entityType);
+              if (synchronizer) {
+                try {
+                  await synchronizer.deleteItem(del.entityId);
+                  if (traceId) syncDebugger.log(traceId, null, null, 'ENTITY_DELETE', `Deleted ${del.entityType}/${del.entityId}`, { entityType: del.entityType, entityId: del.entityId });
+                } catch (err: any) {
+                  errors.push(`Failed to delete ${del.entityType}/${del.entityId}: ${err.message}`);
+                  if (traceId) syncDebugger.logError(traceId, null, 'ENTITY_DELETE', `Failed to delete ${del.entityType}/${del.entityId}`, err);
+                }
+              }
+            }
+            if (traceId) syncDebugger.log(traceId, null, null, 'ENTITY_DELETE', 'Finished deletes');
+          }
+        } finally {
+          repositoryEventBus.resume();
         }
       }
     } catch (err: any) {

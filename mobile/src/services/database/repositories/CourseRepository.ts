@@ -2,7 +2,6 @@ import { databaseService } from '../DatabaseService';
 import { Course } from '../../api/types';
 import { SessionBoundRepository } from '../SessionBoundRepository';
 import { SessionBoundContext } from '../../api/auth/SessionIdentity';
-import { syncService } from '../SyncService';
 import { MomentumService } from '../../MomentumService';
 
 export type { Course } from '../../api/types';
@@ -67,7 +66,7 @@ export class CourseRepository extends SessionBoundRepository<Course> {
       `UPDATE courses SET completed_classes = ?, status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`,
       [nextCompleted, newStatus, courseId, this.context.userId]
     );
-    await syncService.enqueueUpdate('course', courseId, { completed_classes: nextCompleted, status: newStatus });
+    require('../SyncService').syncService.enqueueUpdate('course', courseId, { completed_classes: nextCompleted, status: newStatus });
     if (newStatus === 'completed' && course.status !== 'completed') {
       MomentumService.boostMomentum(courseId).catch(console.warn);
     }
@@ -84,7 +83,7 @@ export class CourseRepository extends SessionBoundRepository<Course> {
       `UPDATE courses SET completed_classes = ?, status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`,
       [prevCompleted, newStatus || 'active', courseId, this.context.userId]
     );
-    await syncService.enqueueUpdate('course', courseId, { completed_classes: prevCompleted, status: newStatus || 'active' });
+    require('../SyncService').syncService.enqueueUpdate('course', courseId, { completed_classes: prevCompleted, status: newStatus || 'active' });
   }
 }
 

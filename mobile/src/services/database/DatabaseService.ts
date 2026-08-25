@@ -69,44 +69,21 @@ class DatabaseService {
     const id = ++this.queryCounter;
     const enqueueTime = performance.now();
     if (!this.t0) this.t0 = enqueueTime;
-    const queueDepth = this.pendingCount;
     this.pendingCount++;
-    const caller = __DEV__ ? this._getCaller() : '';
-    const ms = (enqueueTime - this.t0).toFixed(0);
-    // console.log(`[Queue] #${id} "${label}" → enq +${ms}ms depth=${queueDepth}${caller ? ` caller=${caller}` : ''}`);
 
-    const turno = this.lastOp.catch(() => {});
-    const miOp = turno.then(async () => {
-      const startTime = performance.now();
-      const waitMs = startTime - enqueueTime;
-      if (waitMs > 2) {
-        // console.log(`[Queue] #${id} "${label}" ◆ start +${(startTime - this.t0).toFixed(0)}ms waited=${waitMs.toFixed(0)}ms`);
-      }
-      let bridgeMs = 0;
-      let createMs = 0;
-      try {
-        const tCreate = performance.now();
-        const promise = fn();
-        createMs = performance.now() - tCreate;
-        const tBridge = performance.now();
-        const result = await promise;
-        bridgeMs = performance.now() - tBridge;
-        const now = performance.now();
-        if (bridgeMs > 2) {
-          // console.log(`[Queue] #${id} "${label}" ◆ sql_ok +${(now - this.t0).toFixed(0)}ms create=${createMs.toFixed(2)}ms bridge=${bridgeMs.toFixed(0)}ms`);
-        }
-        return result;
-      } finally {
-        const doneTime = performance.now();
-        this.pendingCount--;
-        const totalMs = doneTime - enqueueTime;
-        const restMs = totalMs - waitMs - createMs - bridgeMs;
-        // console.log(`[Queue] #${id} "${label}" ← done +${(doneTime - this.t0).toFixed(0)}ms total=${totalMs.toFixed(0)}ms bridge=${bridgeMs.toFixed(0)}ms create=${createMs.toFixed(2)}ms wait=${waitMs.toFixed(0)}ms rest=${restMs.toFixed(0)}ms`);
-      }
-    });
-    this.lastOp = miOp.then(() => {}, () => {});
-
-    return miOp;
+    let bridgeMs = 0;
+    let createMs = 0;
+    try {
+      const tCreate = performance.now();
+      const promise = fn();
+      createMs = performance.now() - tCreate;
+      const tBridge = performance.now();
+      const result = await promise;
+      bridgeMs = performance.now() - tBridge;
+      return result;
+    } finally {
+      this.pendingCount--;
+    }
   }
 
   private async _measure(db: SQLite.SQLiteDatabase, sql: string): Promise<number> {

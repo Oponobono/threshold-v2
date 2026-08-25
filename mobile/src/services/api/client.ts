@@ -293,7 +293,7 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
 
   // 🕵️ INSTRUMENTATION: Detect HTTP requests before LOCAL_READY
   if (!(globalThis as any).__isLocalReady) {
-    console.error(`[OFFLINE-WARM-START][NETWORK] UNEXPECTED REQUEST BEFORE LOCAL_READY: ${method} ${path}`);
+    console.warn(`[OFFLINE-WARM-START][NETWORK] request before LOCAL_READY: ${method} ${path}`);
   }
 
   // 🛡️ Circuit breaker rápido: si hace <10s TODAS las URLs fallaron,

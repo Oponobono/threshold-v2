@@ -95,16 +95,19 @@ class BootstrapManager {
       console.log('[BOOT] start() aborted: no active session generation');
       return;
     }
-    
-    if (this._startedForSession === currentGeneration) { 
-      console.log('[BOOT] start() already called for this session, skipping'); 
-      return; 
+
+    if (this._startedForSession === currentGeneration) {
+      console.log('[BOOT] start() already called for this session, skipping');
+      return;
     }
-    
+
     // Clear status if we're starting a new session
     if (this._startedForSession !== currentGeneration && this._startedForSession !== null) {
       this._status = 'pending';
       this._currentPhase = 'DATABASE';
+      // Reset the LOCAL_READY flag so network instrumentation
+      // correctly detects premature requests during the new bootstrap.
+      (globalThis as any).__isLocalReady = false;
     }
 
     if (this._status === 'running') { console.log('[BOOT] start() already running, skipping'); return; }
@@ -163,7 +166,7 @@ class BootstrapManager {
         }
 
         // Caso 2: Refrescar/cargar perfil remoto en background (fire-and-forget)
-        // MOVIDO: Para no interferir con el LOCAL_READY, el fetch de red 
+        // MOVIDO: Para no interferir con el LOCAL_READY, el fetch de red
         // se ha desplazado a la fase de BACKGROUND posterior al arranque local.
 
         console.log('[BOOT 11z] Auth ready');
@@ -215,7 +218,7 @@ class BootstrapManager {
         try {
           await syncManager.login();
           console.log('[BACKGROUND] Sync login completed (async)');
-          
+
           const { syncService } = await import('../database/SyncService');
           const pendingCount = await syncService.getPendingCount();
           if (pendingCount > 0) {
@@ -280,7 +283,7 @@ class BootstrapManager {
           console.log('[BACKGROUND] Refreshing AI catalogs...');
           const { OnlineModelCatalogService } = await import('../ai/catalogs/OnlineModelCatalogService');
           const { CatalogMergeService } = await import('../ai/catalogs/CatalogMergeService');
-          
+
           await Promise.all([
             OnlineModelCatalogService.fetchOnlineCatalog().catch(() => null),
             CatalogMergeService.refreshLocalCatalog().catch(() => []),
@@ -526,7 +529,7 @@ class BootstrapManager {
 
       // Capture generation before await
       const currentGeneration = sessionIdentity.currentGeneration;
-      
+
       const response = await fetchWithFallback(path, options);
 
       // Validate generation after await

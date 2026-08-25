@@ -30,11 +30,32 @@ export class RepositoryEventBus {
 
   private _batchWindowMs = 50;
 
+  private _isSuspended = false;
+  private _suspendedEvents: EntityEvent[] = [];
+
   setBatchWindow(ms: number): void {
     this._batchWindowMs = ms;
   }
 
+  suspend(): void {
+    this._isSuspended = true;
+  }
+
+  resume(): void {
+    this._isSuspended = false;
+    const events = [...this._suspendedEvents];
+    this._suspendedEvents = [];
+    for (const event of events) {
+      this.emit(event);
+    }
+  }
+
   emit(event: EntityEvent): void {
+    if (this._isSuspended) {
+      this._suspendedEvents.push(event);
+      return;
+    }
+
     const entityListeners = this._listeners.get(event.entityType);
     if (entityListeners) {
       entityListeners.forEach(fn => {

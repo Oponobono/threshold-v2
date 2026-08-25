@@ -16,7 +16,6 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearAllMediaProgress } from '../services/media/mediaProgress';
-import { useDataStore } from '../store/useDataStore';
 
 // Prefijos y claves MMKV que son globales al dispositivo (sin userId)
 // y deben borrarse al cambiar de sesión.
@@ -119,7 +118,7 @@ async function clearAsyncStorageUserData(): Promise<void> {
 export async function clearAllUserData(): Promise<void> {
   // Clear Zustand Store
   try {
-    useDataStore.getState().resetStore();
+    require('../store/useDataStore').useDataStore.getState().resetStore();
   } catch (err) {
     console.warn('[SessionClear] Failed to reset DataStore:', err);
   }

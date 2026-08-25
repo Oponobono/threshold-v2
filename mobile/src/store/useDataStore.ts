@@ -234,34 +234,52 @@ export const useDataStore = create<DataState>((set, get) => {
       const now = Date.now();
       const timestamps = get().entityTimestamps;
 
+      const promises: Promise<void>[] = [];
+
       if (forceRefresh || shouldRefreshEntity('courses', timestamps.courses ?? 0)) {
-        const dbCourses = await perfDiagnostics.measureAsync('sqlite.courses.getAll', () => RepositoryFactory.courses().getAll());
-        const _hT = __DEV__ ? performance.now() : 0;
-        set({ courses: dbCourses || [], entityTimestamps: { ...get().entityTimestamps, courses: now } });
-        if (__DEV__) _entityTimings['courses'] = performance.now() - _hT;
+        promises.push(
+          perfDiagnostics.measureAsync('sqlite.courses.getAll', () => RepositoryFactory.courses().getAll())
+            .then(dbCourses => {
+              const _hT = __DEV__ ? performance.now() : 0;
+              set({ courses: dbCourses || [], entityTimestamps: { ...get().entityTimestamps, courses: now } });
+              if (__DEV__) _entityTimings['courses'] = performance.now() - _hT;
+            })
+        );
       }
 
       if (forceRefresh || shouldRefreshEntity('subjects', timestamps.subjects ?? 0)) {
-        const dbSubjects = await perfDiagnostics.measureAsync('sqlite.subjects.getAll', () => RepositoryFactory.subjects().getAll());
-        const _hTS = __DEV__ ? performance.now() : 0;
-        set({ subjects: dbSubjects || [], entityTimestamps: { ...get().entityTimestamps, subjects: now } });
-        if (__DEV__) _entityTimings['subjects'] = performance.now() - _hTS;
+        promises.push(
+          perfDiagnostics.measureAsync('sqlite.subjects.getAll', () => RepositoryFactory.subjects().getAll())
+            .then(dbSubjects => {
+              const _hTS = __DEV__ ? performance.now() : 0;
+              set({ subjects: dbSubjects || [], entityTimestamps: { ...get().entityTimestamps, subjects: now } });
+              if (__DEV__) _entityTimings['subjects'] = performance.now() - _hTS;
+            })
+        );
       }
 
       if (forceRefresh || shouldRefreshEntity('assessments', timestamps.assessments ?? 0)) {
-        const dbAssessments = await perfDiagnostics.measureAsync('sqlite.assessments.getAll', () => RepositoryFactory.assessments().getAll());
-        set({ assessments: dbAssessments || [], entityTimestamps: { ...get().entityTimestamps, assessments: now } });
+        promises.push(
+          perfDiagnostics.measureAsync('sqlite.assessments.getAll', () => RepositoryFactory.assessments().getAll())
+            .then(dbAssessments => set({ assessments: dbAssessments || [], entityTimestamps: { ...get().entityTimestamps, assessments: now } }))
+        );
       }
 
       if (forceRefresh || shouldRefreshEntity('schedules', timestamps.schedules ?? 0)) {
-        const dbSchedules = await perfDiagnostics.measureAsync('sqlite.schedules.getAll', () => RepositoryFactory.schedules().getAll());
-        set({ schedules: dbSchedules || [], entityTimestamps: { ...get().entityTimestamps, schedules: now } });
+        promises.push(
+          perfDiagnostics.measureAsync('sqlite.schedules.getAll', () => RepositoryFactory.schedules().getAll())
+            .then(dbSchedules => set({ schedules: dbSchedules || [], entityTimestamps: { ...get().entityTimestamps, schedules: now } }))
+        );
       }
 
       if (forceRefresh || shouldRefreshEntity('calendar_events', timestamps.calendar_events ?? 0)) {
-        const dbCalendarEvents = await perfDiagnostics.measureAsync('sqlite.calendarEvents.getAll', () => RepositoryFactory.calendarEvents().getAll());
-        set({ calendarEvents: dbCalendarEvents || [], entityTimestamps: { ...get().entityTimestamps, calendar_events: now } });
+        promises.push(
+          perfDiagnostics.measureAsync('sqlite.calendarEvents.getAll', () => RepositoryFactory.calendarEvents().getAll())
+            .then(dbCalendarEvents => set({ calendarEvents: dbCalendarEvents || [], entityTimestamps: { ...get().entityTimestamps, calendar_events: now } }))
+        );
       }
+
+      await Promise.all(promises);
 
       const currentUser = await RepositoryFactory.users().getCurrentUser();
       if (currentUser) {
@@ -319,15 +337,23 @@ export const useDataStore = create<DataState>((set, get) => {
       devLog('[DataStore] loadSecondaryData() start');
       const _t0 = __DEV__ ? performance.now() : 0;
 
+      const promises: Promise<void>[] = [];
+
       if (shouldRefreshEntity('flashcard_decks', timestamps.flashcard_decks ?? 0)) {
-        const decks = await RepositoryFactory.flashcardDecks().getAll();
-        set({ flashcardDecks: decks || [], entityTimestamps: { ...get().entityTimestamps, flashcard_decks: now } });
+        promises.push(
+          RepositoryFactory.flashcardDecks().getAll()
+            .then(decks => set({ flashcardDecks: decks || [], entityTimestamps: { ...get().entityTimestamps, flashcard_decks: now } }))
+        );
       }
 
       if (shouldRefreshEntity('photos', timestamps.photos ?? 0)) {
-        const photos = await RepositoryFactory.photos().getMetadata();
-        set({ photos: photos || [], entityTimestamps: { ...get().entityTimestamps, photos: now } });
+        promises.push(
+          RepositoryFactory.photos().getMetadata()
+            .then(photos => set({ photos: photos || [], entityTimestamps: { ...get().entityTimestamps, photos: now } }))
+        );
       }
+
+      await Promise.all(promises);
 
       if (__DEV__) {
         console.log(`[HYDRATION] loadSecondaryData TOTAL=${(performance.now() - _t0).toFixed(0)}ms`);

@@ -3,8 +3,6 @@ import { syncService } from '../../services/database/SyncService';
 
 import { RepositoryFactory } from '../database/RepositoryFactory';
 
-const repo = RepositoryFactory.highlights();
-
 function generateId(): string {
   return `hl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -19,6 +17,7 @@ export interface CreateHighlightInput {
 }
 
 export async function createHighlight(input: CreateHighlightInput): Promise<DocumentHighlight> {
+  const repo = RepositoryFactory.highlights();
   const highlight: DocumentHighlight = {
     id: generateId(),
     documentId: input.documentId,
@@ -36,17 +35,17 @@ export async function createHighlight(input: CreateHighlightInput): Promise<Docu
 }
 
 export async function getHighlights(documentId: string): Promise<DocumentHighlight[]> {
-  return repo.getByDocument(documentId);
+  return RepositoryFactory.highlights().getByDocument(documentId);
 }
 
 export async function deleteHighlight(id: string): Promise<void> {
-  await repo.deleteById(id);
+  await RepositoryFactory.highlights().deleteById(id);
   await syncService.enqueueDelete('document_highlights', id);
 }
 
 export async function updateHighlightColor(highlight: DocumentHighlight, newColor: HighlightColor): Promise<DocumentHighlight> {
   const updated = { ...highlight, color: newColor };
-  await repo.save(updated);
+  await RepositoryFactory.highlights().save(updated);
   await syncService.enqueueUpdate('document_highlights', updated.id, updated);
   return updated;
 }
