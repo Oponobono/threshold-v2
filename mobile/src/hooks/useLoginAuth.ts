@@ -24,6 +24,7 @@ import { storageService } from '../services/storageService';
 import { preloadAllUserData, PreloadProgress } from '../services/dataPreloader';
 import { syncManager } from '../services/sync/SyncManager';
 import { sessionIdentity } from '../services/api/auth/SessionIdentity';
+import { bootstrapManager } from '../services/bootstrap/BootstrapManager';
 
 /**
  * Hook personalizado que maneja toda la lógica de autenticación de la pantalla de Login.
@@ -100,6 +101,12 @@ export const useLoginAuth = () => {
     const run = async () => {
       setSyncProgress({ phase: 'profile', label: 'Sincronizando con el servidor...', current: 0, total: 3 });
       try {
+        // Garantizar que la BD esté abierta antes del Initial Sync.
+        // En fresh-install, bootstrapManager.start() abortó al inicio porque no
+        // había app_user_id en storage (sessionIdentity.currentGeneration era null).
+        // Ahora que loginUser() llamó sessionIdentity.startSession(), el manager
+        // detecta la nueva generation y ejecuta DATABASE → DATASTORE completo.
+        await bootstrapManager.start();
         await syncManager.login();
         await syncManager.requestInitialSync(true);
         console.log('[Login] Initial Sync completado — SQLite poblado');
