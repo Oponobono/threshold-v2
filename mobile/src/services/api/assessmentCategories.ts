@@ -5,23 +5,7 @@ import type { AssessmentCategory } from './types';
 import { uuidv4 } from '../../utils/uuid';
 
 export const getCategoriesBySubject = async (subjectId: string): Promise<AssessmentCategory[]> => {
-  // 1. Leer localmente primero
-  const localData = await RepositoryFactory.assessmentCategories().getByField('subject_id', subjectId);
-
-  // 2. Sincronizar en background
-  (async () => {
-    try {
-      const response = await fetchWithFallback(`/subjects/${subjectId}/categories`);
-      if (response.ok) {
-        const data = await parseJsonSafely(response);
-        if (Array.isArray(data)) {
-          for (const c of data) await RepositoryFactory.assessmentCategories().upsert(c);
-        }
-      }
-    } catch {}
-  })();
-
-  return localData || [];
+  return (await RepositoryFactory.assessmentCategories().getByField('subject_id', subjectId)) || [];
 };
 
 export const createCategory = async (subjectId: string, data: Partial<AssessmentCategory>): Promise<AssessmentCategory> => {

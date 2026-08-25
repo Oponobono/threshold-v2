@@ -129,6 +129,38 @@ export const fetchGradingSystems = async (): Promise<GradingSystem[]> => {
 };
 
 /**
+ * Persiste los parámetros del sistema de calificación activo del usuario en SQLite.
+ * Permite al cálculo offline de Semester Summary reproducir la denormalización del backend.
+ */
+export async function persistActiveGradingConfig(
+  systems: GradingSystem[],
+  activeVersionId: string | null | undefined,
+): Promise<void> {
+  if (!systems.length) return;
+
+  let activeSystem: GradingSystem | undefined;
+  if (activeVersionId) {
+    activeSystem = systems.find(s => String(s.active_version_id) === activeVersionId);
+  }
+  if (!activeSystem) {
+    activeSystem = systems[0];
+  }
+
+  const { RepositoryFactory } = await import('../database/RepositoryFactory');
+  await RepositoryFactory.localGradingConfig().saveActive({
+    grading_system_id: activeSystem.id,
+    grading_version_id: activeSystem.active_version_id,
+    min_value: activeSystem.min_value,
+    max_value: activeSystem.max_value,
+    direction: activeSystem.direction,
+    precision: activeSystem.precision,
+    passing_value: activeSystem.passing_value,
+    code: activeSystem.code,
+    name: activeSystem.name,
+  });
+}
+
+/**
  * Genera escalas sintéticas locales para un sistema cuando no hay red.
  * Produce 3 rangos: reprobado / aprobado / excelente, usando los parámetros del sistema.
  */

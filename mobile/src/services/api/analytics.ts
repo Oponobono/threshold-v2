@@ -3,7 +3,8 @@ import { fetchWithFallback, parseJsonSafely, activeBaseUrl } from './client';
 import { storageService } from '../storageService';
 import { syncService } from '../database';
 import { getLocalGlobalGPA, getLocalPredictions, getLocalDeckStats, getLocalProgressTrends, getLocalMasteryData, getLocalSemesterSummary } from '../localMasteryService';
-import { queuePendingReview } from '../localFlashcardService';
+import { queuePendingReview, getLocalDecksForCurrentUser } from '../localFlashcardService';
+import { uuidv4 } from '../../utils/uuid';
 import { ExamSchedulerService } from '../ExamSchedulerService';
 import { getUserId } from './auth';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -121,6 +122,20 @@ export const recordCardReview = async (
         message: 'Revisión guardada localmente como pendiente',
         _isPending: true,
       } as CardReviewResponse & { _isPending?: boolean };
+    }
+
+    // Write card_log to local SQLite so mastery calculation works offline.
+    // card_logs is local audit only (Sync Protocol: excluded from sync).
+    try {
+      await RepositoryFactory.cardLogs().create({
+        id: uuidv4(),
+        card_id: String(cardId),
+        user_id: String(userId),
+        result,
+        response_time_ms: responseTimeMs,
+      } as any);
+    } catch (e) {
+      console.warn('[Analytics] Failed to write local card_log:', e);
     }
 
     const response = await fetchWithFallback(`/flashcards/${cardId}/review`, {

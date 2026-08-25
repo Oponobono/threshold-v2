@@ -25,20 +25,17 @@ export function useCategories() {
   const { showAlert } = useCustomAlert();
 
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<AssessmentCategory | null>(null);
 
   const load = useCallback(async () => {
     if (!subjectId) return;
-    setIsLoading(true);
     try {
       const data = await getCategoriesBySubject(subjectId);
       setCategories(data);
     } catch (e: any) {
       showAlert({ title: t('common.error'), message: e.message, type: 'error' });
-    } finally {
-      setIsLoading(false);
     }
   }, [subjectId]);
 

@@ -33,6 +33,8 @@ Estas reglas no son tareas ni roadmap. Son invariantes arquitectónicos. Cualqui
 6. **El dominio solo crece cuando un consumidor real lo justifica.** No se agregan propiedades al Snapshot por anticipación ("podría necesitarse"). El flujo es: consumidor real → necesidad demostrada → ampliación → tests → documentación.
 7. **La red actualiza el estado local; nunca habilita el arranque.** El flujo es: Servidor → Sincronización → SQLite → Repository → UI. Nunca: Servidor → UI.
 8. **La UI nunca depende del resultado de un refresh remoto.** Perfil local → UI → refresh remoto → SQLite → UI se actualiza reactivamente. Si el refresh falla, la UI ya tiene datos locales.
+9. **Mastery = FSRS-derived current knowledge state (INVARIANT M1).** Toda métrica de dominio (MasteryRadar, Dashboard cognitivo) consume `KnowledgeSnapshot.retrievability`. `card_logs` NO redefinie el estado de conocimiento autoritativo.
+10. **Historical review performance must not redefine knowledge state (INVARIANT M2).** `card_logs` puede usarse para analítica histórica, auditoría y diagnóstico, pero no constituye la fuente de verdad de conocimiento. La distinción: retrievability = cuánto se puede recuperar ahora; card_logs = qué pasó antes.
 
 ## Constraints & Preferences
 - Test framework must simulate two devices (A, B) syncing through a real backend.

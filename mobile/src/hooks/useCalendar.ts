@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { InteractionManager } from 'react-native';
 import { useDataStore } from '../store/useDataStore';
-import { getCalendarEvents } from '../services/api/calendar';
-import { ScheduleItem, AgendaItem, CalendarEventItem, ActivitySummary } from '../types/calendar';
+import { AgendaItem, ActivitySummary } from '../types/calendar';
 
 export const TODAY = new Date();
 
@@ -15,9 +14,7 @@ export function useCalendar(t: any, language: string = 'es-ES') {
   const { schedules: allSchedules, assessments: allAssessments, subjects, loadAllData } = useDataStore();
 
   const [calendarEvents, setCalendarEvents] = useState<any[]>(storeCalendarEvents);
-  const [loadingEvents, setLoadingEvents] = useState(storeCalendarEvents.length === 0);
   const [isReady, setIsReady] = useState(false);
-  const hadInitialDataRef = useRef(storeCalendarEvents.length > 0);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -26,34 +23,6 @@ export function useCalendar(t: any, language: string = 'es-ES') {
     });
     return () => task.cancel();
   }, [loadAllData]);
-
-  useEffect(() => {
-    let mounted = true;
-    const task = InteractionManager.runAfterInteractions(() => {
-      if (!mounted) return;
-      const loadEventsForMonth = async () => {
-        try {
-          if (!hadInitialDataRef.current) setLoadingEvents(true);
-          hadInitialDataRef.current = false;
-          const firstDay = new Date(viewYear, viewMonth, 1);
-          const lastDay = new Date(viewYear, viewMonth + 1, 0);
-          const startDateStr = formatDateStr(firstDay);
-          const endDateStr = formatDateStr(lastDay);
-          const events = await getCalendarEvents(startDateStr, endDateStr);
-          if (mounted) setCalendarEvents(events || []);
-        } catch (error) {
-          console.warn('Error cargando eventos del calendario:', error);
-        } finally {
-          if (mounted) setLoadingEvents(false);
-        }
-      };
-      loadEventsForMonth();
-    });
-    return () => {
-      mounted = false;
-      task.cancel();
-    };
-  }, [viewYear, viewMonth]);
 
   useEffect(() => {
     if (storeCalendarEvents.length > 0) {
@@ -228,25 +197,15 @@ export function useCalendar(t: any, language: string = 'es-ES') {
   const isToday = (day: number) =>
     isViewingCurrentMonth && day === TODAY.getDate();
 
-  const reloadEventsForMonth = useCallback(async () => {
-    try {
-      const firstDay = new Date(viewYear, viewMonth, 1);
-      const lastDay = new Date(viewYear, viewMonth + 1, 0);
-      const startDateStr = formatDateStr(firstDay);
-      const endDateStr = formatDateStr(lastDay);
-      const updatedEvents = await getCalendarEvents(startDateStr, endDateStr);
-      setCalendarEvents(updatedEvents || []);
-    } catch (error) {
-      console.warn('Error reloading events:', error);
-    }
-  }, [viewYear, viewMonth]);
+  const reloadEventsForMonth = useCallback(() => {
+    setCalendarEvents(useDataStore.getState().calendarEvents);
+  }, []);
 
   return {
     viewMonth, setViewMonth,
     viewYear, setViewYear,
     selectedDayNum, setSelectedDayNum,
     calendarEvents, setCalendarEvents,
-    loadingEvents,
     isReady,
     daysInMonth,
     startOffset,
@@ -264,11 +223,4 @@ export function useCalendar(t: any, language: string = 'es-ES') {
     allSchedules,
     allAssessments,
   };
-}
-
-function formatDateStr(date: Date): string {
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}-${month}-${year}`;
 }

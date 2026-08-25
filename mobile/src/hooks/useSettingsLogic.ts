@@ -8,7 +8,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { alertRef } from '../components/ui/CustomAlert';
 import { uploadFileToUploadthing } from '../services/uploadthing/storage';
 import { downloadProfileImage, getLocalProfileImageUri } from '../services/profileImageCache';
-import { fetchGradingSystems, type GradingSystem } from '../services/api/grading';
+import { fetchGradingSystems, persistActiveGradingConfig, type GradingSystem } from '../services/api/grading';
 import { DEFAULT_GRADING_SYSTEMS } from '../services/api/gradingDefaults';
 import {
   getCurrentUserProfile,
@@ -139,47 +139,100 @@ export const useSettingsLogic = () => {
   // LMS accounts now come from API (lmsAccounts state, loaded in useEffect)
 
   useEffect(() => {
+    let mounted = true;
+
     const loadProfile = async () => {
+      // 1. MMKV cache → instant render (no network)
       const cached = await getCurrentUserProfileSync();
-      if (cached) {
+      if (cached && mounted) {
         setProfile(cached);
         if (cached.approval_threshold !== null && cached.approval_threshold !== undefined) {
           setThreshold(String(cached.approval_threshold));
         }
         if (cached.profile_image) {
           downloadProfileImage(cached.profile_image).then(localUri => {
-            if (localUri) setLocalProfileImageUri(localUri);
+            if (localUri && mounted) setLocalProfileImageUri(localUri);
           });
         }
-      }
 
-      const userProfile = await getCurrentUserProfile();
-      setProfile(userProfile);
+        // Derive grading system from cached profile
+        const defaultIds = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.id));
+        const allSystems = [...DEFAULT_GRADING_SYSTEMS];
+        const usedCodes = new Set(allSystems.map(s => s.code));
+        setGradingSystems(allSystems);
+        setIsLoadingSystems(false);
 
-      if (userProfile?.profile_image) {
-        const localUri = await downloadProfileImage(userProfile.profile_image);
-        if (localUri) {
-          setLocalProfileImageUri(localUri);
+        let currentSystemId: number | null = null;
+        if (cached.active_grading_version_id) {
+          const sys = allSystems.find(s => String(s.active_version_id) === cached.active_grading_version_id);
+          if (sys) currentSystemId = sys.id;
         }
-      } else {
-        setLocalProfileImageUri(null);
+        if (!currentSystemId && cached.grading_scale) {
+          const scaleMap: Record<string, string> = {
+            '0-5.0': 'COL_0_5',
+            '0-10': 'ES_0_10',
+            '0-100': '0_100_PCT',
+            'A-F': 'US_LETTER',
+          };
+          const mappedCode = scaleMap[cached.grading_scale];
+          if (mappedCode) {
+            const sys = allSystems.find(s => s.code === mappedCode);
+            if (sys) currentSystemId = sys.id;
+          }
+        }
+        if (currentSystemId) {
+          setSelectedSystemId(currentSystemId);
+        } else if (allSystems.length > 0) {
+          setSelectedSystemId(allSystems[0].id);
+        }
+      } else if (!cached && mounted) {
+        setIsLoadingSystems(false);
       }
 
+      // 2. Biometric status (MMKV local — no network)
       const hasBiometric = await hasBiometricTokenStored();
-      setBiometric(hasBiometric);
+      if (mounted) setBiometric(hasBiometric);
 
-      if (userProfile?.approval_threshold !== null && userProfile?.approval_threshold !== undefined) {
-        setThreshold(String(userProfile.approval_threshold));
+      // 3. Persisted language (SecureStore — no network)
+      const savedLanguage = await getItemAsync('app_language');
+      if (mounted && (savedLanguage === 'es' || savedLanguage === 'en')) {
+        setAppLanguage(savedLanguage);
       }
 
-      // Grading Systems – defaults instantáneos, personalizadas en background
-      const defaultIds = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.id));
-      const allSystems = [...DEFAULT_GRADING_SYSTEMS];
-      const usedCodes = new Set(allSystems.map(s => s.code));
-      setGradingSystems(allSystems);
-      setIsLoadingSystems(false);
+      // 4. Background HTTP refreshes (fire-and-forget, non-blocking)
+      getCurrentUserProfile().then(userProfile => {
+        if (!mounted || !userProfile) return;
+        setProfile(userProfile);
+        if (userProfile.profile_image) {
+          downloadProfileImage(userProfile.profile_image).then(localUri => {
+            if (localUri) setLocalProfileImageUri(localUri);
+          });
+        } else {
+          setLocalProfileImageUri(null);
+        }
+        if (userProfile.approval_threshold !== null && userProfile.approval_threshold !== undefined) {
+          setThreshold(String(userProfile.approval_threshold));
+        }
+
+        // Refresh grading system selection from fresh profile
+        const defaultIds2 = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.id));
+        const sysId = userProfile.active_grading_version_id
+          ? [...DEFAULT_GRADING_SYSTEMS].find(s => String(s.active_version_id) === userProfile.active_grading_version_id)?.id ?? null
+          : null;
+        const scaleCode = userProfile.grading_scale
+          ? { '0-5.0': 'COL_0_5', '0-10': 'ES_0_10', '0-100': '0_100_PCT', 'A-F': 'US_LETTER' }[userProfile.grading_scale]
+          : undefined;
+        const fallbackId = scaleCode
+          ? [...DEFAULT_GRADING_SYSTEMS].find(s => s.code === scaleCode)?.id ?? null
+          : null;
+        if (sysId) setSelectedSystemId(sysId);
+        else if (fallbackId) setSelectedSystemId(fallbackId);
+      }).catch(() => {});
 
       fetchGradingSystems().then(apiSystems => {
+        if (!mounted) return;
+        const defaultIds = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.id));
+        const usedCodes = new Set(DEFAULT_GRADING_SYSTEMS.map(s => s.code));
         const customSystems = (apiSystems || []).filter(s => {
           if (!s.is_custom) return false;
           if (usedCodes.has(s.code)) return false;
@@ -190,66 +243,32 @@ export const useSettingsLogic = () => {
           const remapped = customSystems.map(s => defaultIds.has(s.id) ? { ...s, id: nextId++ } : s);
           setGradingSystems(prev => [...prev, ...remapped]);
         }
-      }).catch(err => {
-        console.warn('[useSettingsLogic] No se pudieron cargar escalas personalizadas:', err);
-      });
+        persistActiveGradingConfig(apiSystems || [], cached?.active_grading_version_id).catch(() => {});
+      }).catch(() => {});
 
-      let currentSystemId: number | null = null;
-      if (userProfile?.active_grading_version_id) {
-        const sys = allSystems.find(s => String(s.active_version_id) === userProfile.active_grading_version_id);
-        if (sys) currentSystemId = sys.id;
-      }
+      getUserGroups().then(groups => {
+        if (mounted) setUserGroups(groups || []);
+      }).catch(() => {});
 
-      if (!currentSystemId && userProfile?.grading_scale) {
-        const scaleMap: Record<string, string> = {
-          '0-5.0': 'COL_0_5',
-          '0-10': 'ES_0_10',
-          '0-100': '0_100_PCT',
-          'A-F': 'US_LETTER',
-        };
-        const mappedCode = scaleMap[userProfile.grading_scale];
-        if (mappedCode) {
-          const sys = allSystems.find(s => s.code === mappedCode);
-          if (sys) currentSystemId = sys.id;
-        }
-      }
-
-      if (currentSystemId) {
-        setSelectedSystemId(currentSystemId);
-      } else if (allSystems.length > 0) {
-        setSelectedSystemId(allSystems[0].id);
-      }
-
-
-      const groups = await getUserGroups();
-      setUserGroups(groups || []);
-
-      // Load dynamic settings data
-      try {
-        const [periods, overrides, lms, twoFactor, userSubjects] = await Promise.all([
-          getGradingPeriods().catch(() => []),
-          getThresholdOverrides().catch(() => []),
-          apiGetLmsAccounts().catch(() => []),
-          getTwoFactorStatus().catch(() => ({ enabled: false })),
-          getSubjects().catch(() => []),
-        ]);
+      Promise.all([
+        getGradingPeriods().catch(() => []),
+        getThresholdOverrides().catch(() => []),
+        apiGetLmsAccounts().catch(() => []),
+        getTwoFactorStatus().catch(() => ({ enabled: false })),
+        getSubjects().catch(() => []),
+      ]).then(([periods, overrides, lms, twoFactor, userSubjects]) => {
+        if (!mounted) return;
         setGradingPeriods(periods);
         setThresholdOverrides(overrides);
         setLmsAccounts(lms);
         setTwoFactorEnabled((twoFactor as any)?.enabled || false);
         setSubjects(userSubjects || []);
-      } catch (e) {
-        console.warn('Failed to load some settings data', e);
-      }
-
-      // Load persisted language
-      const savedLanguage = await getItemAsync('app_language');
-      if (savedLanguage === 'es' || savedLanguage === 'en') {
-        setAppLanguage(savedLanguage);
-      }
+      }).catch(() => {});
     };
 
     loadProfile();
+
+    return () => { mounted = false; };
   }, [t, i18n]);
 
   /**
@@ -447,8 +466,8 @@ export const useSettingsLogic = () => {
       });
       setIsEditProfileVisible(false);
       alertRef.show({ title: t('common.success'), message: t('account.profileUpdated'), type: 'success' });
-      const userProfile = await getCurrentUserProfile();
-      setProfile(userProfile);
+      const userProfile = await getCurrentUserProfileSync();
+      if (userProfile) setProfile(userProfile);
     } catch (error: any) {
       alertRef.show({ title: t('common.error'), message: error.message || t('settings.errors.profileUpdateFailed'), type: 'error' });
     }
@@ -473,8 +492,8 @@ export const useSettingsLogic = () => {
 
       await updateUserProfile(payload);
       
-      const userProfile = await getCurrentUserProfile();
-      setProfile(userProfile);
+      const userProfile = await getCurrentUserProfileSync();
+      if (userProfile) setProfile(userProfile);
       
       alertRef.show({ title: t('common.success'), message: t('settings.configSaved'), type: 'success' });
     } catch (error: any) {

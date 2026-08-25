@@ -44,6 +44,7 @@ import { GroupRepository } from './repositories/GroupRepository';
 import { GroupMembershipRepository } from './repositories/GroupMembershipRepository';
 import { LmsAccountRepository } from './repositories/LmsAccountRepository';
 import { ThresholdOverrideRepository } from './repositories/ThresholdOverrideRepository';
+import { LocalGradingConfigRepository } from './repositories/LocalGradingConfigRepository';
 
 function ctx() {
   return sessionIdentity.getBoundContext();
@@ -81,6 +82,7 @@ export const RepositoryFactory = {
   groupMemberships: () => new GroupMembershipRepository(),
   lmsAccounts: () => new LmsAccountRepository(),
   thresholdOverrides: () => new ThresholdOverrideRepository(),
+  localGradingConfig: () => new LocalGradingConfigRepository(),
 };
 
 export type RepositoryFactoryKey = keyof typeof RepositoryFactory;

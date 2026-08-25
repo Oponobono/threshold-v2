@@ -137,42 +137,39 @@ export const deleteAssessment = async (id: string) => {
 };
 
 export const getProjectionAnalytics = async (subjectId: string) => {
+  // 1. Calcular localmente primero (siempre disponible)
+  try {
+    const localAssessments = await RepositoryFactory.assessments().getBySubject(subjectId) as Assessment[];
+    if (localAssessments && localAssessments.length > 0) {
+      const gradedCount = localAssessments.filter(
+        a => a.score != null || a.grade_value != null || a.normalized_value != null
+      ).length;
+      if (gradedCount > 0) {
+        const result = calculateProjection(localAssessments, null, null);
+        return {
+          currentAverage: result.currentAverage,
+          currentEMA: result.currentEMA,
+          projectedGrade: result.projectedGrade,
+          delta: result.delta,
+          evaluatedWeight: result.evaluatedWeight,
+          remainingWeight: result.remainingWeight,
+          assessmentCount: gradedCount,
+          maxScale: 5,
+          _isLocal: true,
+        };
+      }
+    }
+  } catch (localErr) {
+    console.warn('[getProjectionAnalytics] Cálculo local falló:', localErr);
+  }
+
+  // 2. Intentar API como refresh en background (solo si hay red)
   try {
     const response = await fetchWithFallback(`/assessments/analytics/subject/${subjectId}/projection`);
     const data = await parseJsonSafely(response);
     if (response.ok && data && data.assessmentCount > 0) return data;
-    // API returned empty data — fall through to local calculation
-    throw new Error('empty_response');
-  } catch {
-    // ── Fallback: calcular proyección 100% local desde SQLite ──
-    try {
-      const localAssessments = await RepositoryFactory.assessments().getBySubject(subjectId) as Assessment[];
-      if (!localAssessments || localAssessments.length === 0) return null;
+  } catch {}
 
-      const result = calculateProjection(localAssessments, null, null);
-
-      const gradedCount = localAssessments.filter(
-        a => a.score != null || a.grade_value != null || a.normalized_value != null
-      ).length;
-
-      if (gradedCount === 0) return null;
-
-      console.log(`[getProjectionAnalytics] ✅ Proyección local calculada offline para materia ${subjectId}`);
-      return {
-        currentAverage: result.currentAverage,
-        currentEMA: result.currentEMA,
-        projectedGrade: result.projectedGrade,
-        delta: result.delta,
-        evaluatedWeight: result.evaluatedWeight,
-        remainingWeight: result.remainingWeight,
-        assessmentCount: gradedCount,
-        maxScale: 5, // SCALE_MAX
-        _isLocal: true,
-      };
-    } catch (localErr) {
-      console.warn('[getProjectionAnalytics] Cálculo local falló:', localErr);
-      return null;
-    }
-  }
+  return null;
 };
 

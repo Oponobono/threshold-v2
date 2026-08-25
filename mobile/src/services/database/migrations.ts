@@ -999,5 +999,23 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_group_memberships_pin ON group_memberships(group_pin_id)`
     ],
   },
+  {
+    version: 48,
+    up: [
+      `CREATE TABLE IF NOT EXISTS local_grading_config (
+        id TEXT PRIMARY KEY DEFAULT 'active',
+        grading_system_id INTEGER,
+        grading_version_id INTEGER,
+        min_value REAL DEFAULT 0,
+        max_value REAL DEFAULT 5,
+        direction TEXT DEFAULT 'ascending',
+        precision INTEGER DEFAULT 2,
+        passing_value REAL DEFAULT 3.0,
+        code TEXT,
+        name TEXT,
+        updated_at TEXT DEFAULT (datetime('now'))
+      )`,
+    ],
+  },
 ];
 export default migrations;

@@ -2,7 +2,9 @@ import React, { useState, useEffect, Component, ReactNode } from 'react';
 import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { VictoryPolarAxis, VictoryChart, VictoryTheme, VictoryArea } from 'victory-native';
 import { theme } from '../../styles/theme';
-import { getMasteryAnalytics } from '../../services/api/analytics';
+import { KnowledgeProjection } from '../../domain/knowledge/KnowledgeProjection';
+import { snapshotToRadarData } from '../../domain/knowledge/masteryRadarAdapter';
+import { SnapshotBuildReason } from '../../domain/knowledge/SnapshotTelemetryTypes';
 import { useTranslation } from 'react-i18next';
 
 class VictoryErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
@@ -31,7 +33,9 @@ export const MasteryRadar: React.FC<MasteryRadarProps> = ({ userId, subjectId, o
     const fetchMastery = async () => {
       try {
         setLoading(true);
-        const data = await getMasteryAnalytics(userId, subjectId);
+        const projection = new KnowledgeProjection();
+        const snapshot = await projection.buildSnapshot(userId, SnapshotBuildReason.MANUAL_REFRESH);
+        const data = snapshotToRadarData(snapshot, subjectId);
         setMasteryData(data);
       } catch (err) {
         console.warn('Error fetching mastery:', err);

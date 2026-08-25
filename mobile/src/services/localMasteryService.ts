@@ -1,5 +1,5 @@
 import { databaseService } from './database/DatabaseService';
-import { getPendingReviews } from './localFlashcardService';
+import { getPendingReviews, getLocalDecksForCurrentUser } from './localFlashcardService';
 import type { MasteryRadarData, MasteryRadarItem, GlobalGPAAnalytics, PredictionResponse, PredictionItem } from './api/analytics';
 
 interface SubjectAgg {
@@ -70,6 +70,14 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
     deckToSubject[d.id] = d.subject_id ?? null;
   }
 
+  // Include MMKV-only decks (not yet migrated to SQLite) in the mapping
+  const mmkvDecks = getLocalDecksForCurrentUser(userId);
+  for (const d of mmkvDecks) {
+    if (!(d.id in deckToSubject)) {
+      deckToSubject[d.id] = d.subject_id ?? null;
+    }
+  }
+
   // 3. Inicializar stats por subject
   const stats: Record<string, SubjectAgg> = {};
   for (const s of filteredSubjects) {
@@ -116,15 +124,16 @@ export async function getLocalMasteryData(userId: string, subjectId: string | 'a
   // 5. Procesar pending reviews (cartas locales en MMKV)
   const pendingReviews = getPendingReviews();
   if (pendingReviews.length > 0) {
-    // Construir mapa cardId → subjectId escaneando mazos locales
+    // Construir mapa cardId → subjectId escaneando mazos locales (SQLite + MMKV)
     const mmkv = require('react-native-mmkv').createMMKV();
     const cardToSubject: Record<number, string | null> = {};
 
-    for (const localDeck of sqliteDecks) {
-      const sid = localDeck.subject_id !== null ? String(localDeck.subject_id) : null;
+    const allDeckIds = Object.keys(deckToSubject);
+    for (const deckId of allDeckIds) {
+      const sid = deckToSubject[deckId] ?? null;
       if (subjectId !== 'all' && sid !== subjectId) continue;
 
-      const raw = mmkv.getString(`cache:flashcards_by_deck:${localDeck.id}`);
+      const raw = mmkv.getString(`cache:flashcards_by_deck:${deckId}`);
       if (raw) {
         const entry = JSON.parse(raw);
         const cards: any[] = entry.data || entry || [];
@@ -406,64 +415,105 @@ export async function getLocalProgressTrends(userId: number, days: number = 30):
 
 export async function getLocalSemesterSummary(userId: string): Promise<any> {
   const db = databaseService.getDb();
-  
-  const subjects = await db.getAllAsync(`SELECT * FROM subjects WHERE user_id = ? AND deleted_at IS NULL`, userId) as any[];
-  const gpaData = await getLocalGlobalGPA(userId);
-  
-  const criticalSubjects: any[] = [];
-  let approvedCount = 0;
-  let atRiskCount = 0;
-  
-  for (const sub of subjects) {
-    const subGpa = sub.avg_score || sub.gpa_equivalent || 0;
-    const target = sub.target_grade || 3.0;
-    
-    if (subGpa >= target) approvedCount++;
-    else if (subGpa > 0) atRiskCount++;
-    
-    if (subGpa > 0 && subGpa < target) {
-      criticalSubjects.push({
-        id: sub.id,
-        name: sub.name,
-        avgScore: parseFloat(subGpa.toFixed(2)),
-        delta: parseFloat((subGpa - target).toFixed(2)),
-        color: sub.color || '#3B82F6',
-        targetGrade: target,
-        icon: sub.icon || 'book',
-      });
-    }
-  }
-  
-  criticalSubjects.sort((a, b) => a.delta - b.delta);
-  
-  // Recent activity
-  const recentLogs = await db.getAllAsync(
-    `SELECT a.id, a.name, a.subject_id, s.name as subjectName, s.color as subjectColor, a.created_at as date
-     FROM assessments a
-     JOIN subjects s ON a.subject_id = s.id
-     WHERE s.user_id = ?
-     AND a.deleted_at IS NULL
-     AND s.deleted_at IS NULL
-     ORDER BY a.created_at DESC LIMIT 5`,
+
+  const subjects = await db.getAllAsync(
+    `SELECT * FROM subjects WHERE user_id = ? AND deleted_at IS NULL`,
     userId
   ) as any[];
-  
-  const recentActivity = recentLogs.map(r => ({
-    id: r.id,
-    name: r.name,
-    subjectId: r.subject_id,
-    subjectName: r.subjectName,
-    subjectColor: r.subjectColor,
-    date: r.date,
-  }));
-  
+
+  if (subjects.length === 0) {
+    return {
+      overallGpa: 0, totalCredits: 0, subjectCount: 0,
+      approvedCount: 0, atRiskCount: 0,
+      criticalSubjects: [], recentActivity: [],
+    };
+  }
+
+  const subjectIds = subjects.map((s: any) => s.id);
+  const ph = subjectIds.map(() => '?').join(',');
+
+  const [categories, assessmentsRaw] = await Promise.all([
+    db.getAllAsync(
+      `SELECT * FROM assessment_categories WHERE subject_id IN (${ph})`,
+      subjectIds
+    ) as Promise<any[]>,
+    db.getAllAsync(
+      `SELECT a.id, a.subject_id, a.category_id, a.weight, a.is_completed, a.normalized_value
+       FROM assessments a
+       WHERE a.subject_id IN (${ph}) AND a.deleted_at IS NULL`,
+      subjectIds
+    ) as Promise<any[]>,
+  ]);
+
+  const { calculateSubjectGrade, denormalizeGrade } = await import('../domain/grading/gradingEngine');
+  const { RepositoryFactory } = await import('./database/RepositoryFactory');
+  const gradeParams = await RepositoryFactory.localGradingConfig().getGradeVersionParams();
+
+  const catsBySub: Record<string, any[]> = {};
+  const astsBySub: Record<string, any[]> = {};
+  subjectIds.forEach((sid: string) => { catsBySub[sid] = []; astsBySub[sid] = []; });
+  categories.forEach((c: any) => catsBySub[c.subject_id]?.push(c));
+  assessmentsRaw.forEach((a: any) => {
+    let w = 0;
+    if (a.weight) w = parseFloat(String(a.weight).replace('%', ''));
+    a.weight = w;
+    astsBySub[a.subject_id]?.push(a);
+  });
+
+  for (const row of subjects) {
+    const { normalized_avg_score } = calculateSubjectGrade(
+      catsBySub[row.id] || [], astsBySub[row.id] || []
+    );
+    row.normalized_avg_score = normalized_avg_score || 0;
+    row.avg_score = denormalizeGrade(row.normalized_avg_score, gradeParams);
+  }
+
+  const overallGpa = subjects.length > 0
+    ? subjects.reduce((s: number, r: any) => s + (r.avg_score || 0), 0) / subjects.length
+    : 0;
+  const totalCredits = subjects.reduce((s: number, r: any) => s + (r.credits || 0), 0);
+  const approvedCount = subjects.filter((r: any) => (r.avg_score || 0) >= 3.0).length;
+  const atRiskCount = subjects.length - approvedCount;
+
+  const criticalSubjects = subjects
+    .filter((r: any) => (r.avg_score || 0) < 3.0)
+    .sort((a: any, b: any) => (a.avg_score || 0) - (b.avg_score || 0))
+    .slice(0, 3)
+    .map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      avgScore: parseFloat((r.avg_score || 0).toFixed(2)),
+      delta: parseFloat(((r.avg_score || 0) - (r.target_grade || 3.0)).toFixed(2)),
+      color: r.color || '#FF2D55',
+      targetGrade: r.target_grade || 3.0,
+      icon: r.icon || 'book-outline',
+    }));
+
+  const recentLogs = await db.getAllAsync(
+    `SELECT a.id, a.name, a.subject_id, a.date,
+            s.name as subject_name, s.color as subject_color
+     FROM assessments a
+     JOIN subjects s ON a.subject_id = s.id
+     WHERE s.user_id = ? AND a.date IS NOT NULL
+     AND a.deleted_at IS NULL AND s.deleted_at IS NULL
+     ORDER BY a.date DESC LIMIT 5`,
+    userId
+  ) as any[];
+
   return {
-    overallGpa: gpaData.currentAverage,
-    totalCredits: subjects.reduce((sum, s) => sum + (s.credits || 0), 0),
+    overallGpa: parseFloat(overallGpa.toFixed(2)),
+    totalCredits,
     subjectCount: subjects.length,
     approvedCount,
     atRiskCount,
-    criticalSubjects: criticalSubjects.slice(0, 3),
-    recentActivity,
+    criticalSubjects,
+    recentActivity: recentLogs.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      subjectId: r.subject_id,
+      subjectName: r.subject_name,
+      subjectColor: r.subject_color,
+      date: r.date,
+    })),
   };
 }

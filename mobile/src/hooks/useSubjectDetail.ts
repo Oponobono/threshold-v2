@@ -5,12 +5,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useTranslation } from 'react-i18next';
 import {
   getAssessments,
-  getSubjectById,
   getPhotosBySubject,
-  getCurrentUserProfile,
+  getCurrentUserProfileSync,
   getSchedulesBySubject,
   getAudioRecordings,
-  getYouTubeVideos,
   getScannedDocumentsBySubject,
   deleteYouTubeVideo,
   deleteSubject,
@@ -121,19 +119,8 @@ export function useSubjectDetail() {
       const isOnline = useConnectivityStore.getState().isOnline;
 
       try {
-        const pProfile = getCurrentUserProfile().then(p => {
+        const pProfile = getCurrentUserProfileSync().then(p => {
           if (mounted && p) setProfile(p);
-        });
-
-        const pSubject = getSubjectById(subjectId).then(s => {
-          if (mounted && s) {
-            const existsInStore = useDataStore.getState().subjects.some(storeSub => String(storeSub.id) === String(s.id));
-            if (existsInStore) {
-              setSelectedSubject(s as DetailSubject);
-            } else {
-              console.warn(`[useSubjectDetail] Materia ${s.id} ignorada — ya no existe en el store`);
-            }
-          }
         });
 
         const pPhotos = getPhotosBySubject(subjectId)
@@ -168,27 +155,15 @@ export function useSubjectDetail() {
 
         const pAudio = getAudioRecordings();
 
-        const pVideos = getYouTubeVideos()
-          .then(v => {
+        const pVideos = RepositoryFactory.youtube().getByField('subject_id', String(subjectId))
+          .then((v: any) => {
             if (mounted && v) {
-              const videoList = Array.isArray(v) ? v : [];
-              const filtered = videoList.filter(vid => vid.subject_id == subjectId);
+              const filtered = v.filter((vid: any) => String(vid.subject_id) === String(subjectId));
               setAllSubjectVideos(filtered);
               setRecentVideos(filtered.slice(0, 3));
             }
           })
-          .catch(async () => {
-            if (!isOnline && mounted) {
-              const cached = await RepositoryFactory.youtube().getByField('subject_id', String(subjectId));
-              if (cached.length > 0 && mounted) {
-                const filtered = cached.filter((vid: any) => vid.subject_id === subjectId);
-                if (filtered.length > 0) {
-                  setAllSubjectVideos(filtered);
-                  setRecentVideos(filtered.slice(0, 3));
-                }
-              }
-            }
-          });
+          .catch(() => {});
 
         const pNotes = RepositoryFactory.studyNotes().getByField('subject_id', subjectId)
           .then((n: any) => { if (mounted && n) setStudyNotes(n); })
@@ -196,7 +171,6 @@ export function useSubjectDetail() {
 
         await Promise.allSettled([
           pProfile,
-          pSubject,
           pPhotos,
           pDocs,
           pAssessments,
