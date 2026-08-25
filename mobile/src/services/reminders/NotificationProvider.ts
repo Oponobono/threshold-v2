@@ -116,8 +116,8 @@ export class ExpoNotificationProvider implements NotificationProvider {
     if (prefix) {
       const scheduled = await ExpoNotifications.getAllScheduledNotificationsAsync();
       const toCancel = scheduled
-        .filter((n) => n.identifier.startsWith(prefix))
-        .map((n) => n.identifier);
+        .filter((n: any) => n.identifier.startsWith(prefix))
+        .map((n: any) => n.identifier);
 
       await Promise.all(toCancel.map((id) => ExpoNotifications.cancelScheduledNotificationAsync(id)));
     } else {
@@ -127,7 +127,7 @@ export class ExpoNotificationProvider implements NotificationProvider {
 
   async getAll(): Promise<ScheduledNotificationInfo[]> {
     const scheduled = await ExpoNotifications.getAllScheduledNotificationsAsync();
-    return scheduled.map((n) => ({
+    return scheduled.map((n: any) => ({
       identifier: n.identifier,
       title: n.content.title ?? '',
       body: n.content.body ?? '',

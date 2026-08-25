@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 /**
  * FlashcardStudyScreen.tsx
  * 
@@ -27,7 +28,6 @@ import { ExplanationOverlay } from '../evaluation/ExplanationOverlay';
 import { SnoozeModal } from '../modals/SnoozeModal';
 import { useDueCardSnooze, SnoozeOption } from '../../hooks/useDueCardSnooze';
 import { ContextBottomSheet } from '../evaluation/ContextBottomSheet';
-import { flashcardRepository } from '../../services/database';
 
 interface Props {
   activeDeck: FlashcardDeck | null;
@@ -403,7 +403,7 @@ export const FlashcardStudyScreen: React.FC<Props> = ({
       // repositoryEventBus emite 'created' → el store actualiza reactivamente.
       // El Sync converge con el backend en el siguiente ciclo.
       if (anchorResponse?.id && anchorResponse?.front) {
-        await flashcardRepository.create({
+        await RepositoryFactory.flashcards().create({
           id: anchorResponse.id,
           deck_id: String(activeDeck.id),
           front: anchorResponse.front,

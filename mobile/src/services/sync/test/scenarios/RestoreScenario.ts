@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import type { SyncScenario, ScenarioResult, FaultRule } from '../types';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { reduce } from '../../reducer/index';
 import { syncDebugger } from '../../SyncDebugger';
 
@@ -9,7 +9,7 @@ export class RestoreScenario implements SyncScenario {
   description = 'Verifica que la secuencia DELETE+CREATE del mismo ID produce RESTORE en lugar de CREATE';
 
   async setup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 
   async execute(): Promise<string> {
@@ -17,14 +17,14 @@ export class RestoreScenario implements SyncScenario {
     const entityId = 'restore-entity-001';
 
     // DELETE seguido de CREATE = restauración
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: 'subject',
       entity_id: entityId,
       operation: 'DELETE',
       trace_id: traceId,
     });
 
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: 'subject',
       entity_id: entityId,
       operation: 'CREATE',
@@ -37,7 +37,7 @@ export class RestoreScenario implements SyncScenario {
   }
 
   async validate(): Promise<ScenarioResult> {
-    const pending = await syncQueueRepository.getPending();
+    const pending = await RepositoryFactory.syncQueues().getPending();
     const { operations, report } = reduce(pending);
 
     const hasRestore = operations.some(o => o.operation === 'RESTORE');
@@ -66,6 +66,6 @@ export class RestoreScenario implements SyncScenario {
   }
 
   async cleanup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 }

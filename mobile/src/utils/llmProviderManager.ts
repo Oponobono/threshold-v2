@@ -18,7 +18,7 @@ const DEFAULT_PROVIDER: LLMProvider = 'groq';
 export async function getPreferredLLMProvider(): Promise<LLMProvider> {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored === 'groq' || stored === 'gemini') {
+    if (stored === 'groq' || stored === 'gemini' || stored === 'local') {
       return stored;
     }
     return DEFAULT_PROVIDER;

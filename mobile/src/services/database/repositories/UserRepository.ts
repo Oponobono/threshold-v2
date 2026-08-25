@@ -55,9 +55,9 @@ export class UserRepository extends BaseRepository<User> {
   }
 
   async updateToken(userId: string, token: string, refreshToken?: string): Promise<void> {
-    await this.update(userId, { 
-      token, 
-      refresh_token: refreshToken 
+    await this.update(userId, {
+      token,
+      refresh_token: refreshToken
     });
   }
 
@@ -103,5 +103,3 @@ export class UserRepository extends BaseRepository<User> {
     }
   }
 }
-
-export const userRepository = UserRepository.getInstance();

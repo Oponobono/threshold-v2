@@ -1,4 +1,4 @@
-import { flashcardDeckRepository } from '../database/repositories/FlashcardDeckRepository';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 
 export class DeckUniquenessService {
   /**
@@ -7,7 +7,7 @@ export class DeckUniquenessService {
    * Si ya existen "Lógica", "Lógica (2)" y "Lógica (5)", retorna "Lógica (6)".
    */
   static async ensureUniqueTitle(userId: string, baseTitle: string): Promise<string> {
-    const existingTitles = await flashcardDeckRepository.findConflictingTitles(userId, baseTitle);
+    const existingTitles = await RepositoryFactory.flashcardDecks().findConflictingTitles(baseTitle);
 
     if (existingTitles.length === 0) {
       return baseTitle;

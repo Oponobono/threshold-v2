@@ -1,40 +1,62 @@
 import { databaseService } from '../DatabaseService';
 import { Course } from '../../api/types';
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 import { syncService } from '../SyncService';
 import { MomentumService } from '../../MomentumService';
 
 export type { Course } from '../../api/types';
 
-export class CourseRepository extends BaseRepository<Course> {
-  constructor() {
-    super('courses');
+export class CourseRepository extends SessionBoundRepository<Course> {
+  constructor(context: SessionBoundContext) {
+    super('courses', context);
+  }
+
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
+  }
+
+  protected enforceCreateOwnership(data: Partial<Course>): void {
+    if (data.user_id !== undefined && data.user_id !== this.context.userId) {
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    }
+    data.user_id = this.context.userId;
   }
 
   async getAll(): Promise<Course[]> {
+    this.requireValidSession();
     return databaseService.getAllTracked<Course>(
-      'SELECT * FROM courses WHERE deleted_at IS NULL ORDER BY last_studied_at DESC',
-      undefined,
+      `SELECT * FROM courses WHERE ${this.buildActiveWhereClause()} ORDER BY last_studied_at DESC`,
+      this.getOwnershipParams(),
       'CourseRepo.getAll'
     );
   }
 
   async getById(id: string): Promise<Course | null> {
-    const db = databaseService.getDb();
+    this.requireValidSession();
+    const db = this.getDb();
     if (!db) return null;
-    return db.getFirstAsync<Course>('SELECT * FROM courses WHERE id = ? AND deleted_at IS NULL', [id]);
+    return db.getFirstAsync<Course>(
+      `SELECT * FROM courses WHERE ${this.buildActiveWhereClause('id = ?')}`, 
+      [...this.getOwnershipParams(), id]
+    );
   }
 
   async isFlatCourse(courseId: string): Promise<boolean> {
-    const db = databaseService.getDb();
+    this.requireValidSession();
+    const db = this.getDb();
     if (!db) return true;
     const row = await db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM subjects WHERE course_id = ?', [courseId]
+      // Wait, subjects is indirect? Or direct? subjects has user_id.
+      // We should check course ownership first, but since courseId is filtered...
+      `SELECT COUNT(*) as count FROM subjects WHERE course_id = ? AND user_id = ?`, 
+      [courseId, this.context.userId]
     );
     return (row?.count ?? 0) === 0;
   }
 
   async incrementClass(courseId: string): Promise<void> {
+    this.requireValidSession();
     const db = databaseService.getDb();
     if (!db) return;
     const course = await this.getById(courseId);
@@ -42,8 +64,8 @@ export class CourseRepository extends BaseRepository<Course> {
     const nextCompleted = Math.min((course.completed_classes ?? 0) + 1, course.total_classes ?? Infinity);
     const newStatus = course.total_classes && nextCompleted >= course.total_classes ? 'completed' : course.status || 'active';
     await db.runAsync(
-      'UPDATE courses SET completed_classes = ?, status = ?, updated_at = datetime(\'now\') WHERE id = ?',
-      [nextCompleted, newStatus, courseId]
+      `UPDATE courses SET completed_classes = ?, status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`,
+      [nextCompleted, newStatus, courseId, this.context.userId]
     );
     await syncService.enqueueUpdate('course', courseId, { completed_classes: nextCompleted, status: newStatus });
     if (newStatus === 'completed' && course.status !== 'completed') {
@@ -59,11 +81,12 @@ export class CourseRepository extends BaseRepository<Course> {
     const prevCompleted = Math.max((course.completed_classes ?? 0) - 1, 0);
     const newStatus = course.status === 'completed' && prevCompleted < (course.total_classes ?? 0) ? 'active' : course.status;
     await db.runAsync(
-      'UPDATE courses SET completed_classes = ?, status = ?, updated_at = datetime(\'now\') WHERE id = ?',
-      [prevCompleted, newStatus || 'active', courseId]
+      `UPDATE courses SET completed_classes = ?, status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`,
+      [prevCompleted, newStatus || 'active', courseId, this.context.userId]
     );
     await syncService.enqueueUpdate('course', courseId, { completed_classes: prevCompleted, status: newStatus || 'active' });
   }
 }
 
-export const courseRepository = new CourseRepository();
+// Remove singleton export to force context instantiation:
+// export const courseRepository = new CourseRepository();

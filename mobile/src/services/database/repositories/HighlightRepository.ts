@@ -1,4 +1,5 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 import type { DocumentHighlight, HighlightColor } from '../../../domain/document/DocumentHighlight';
 
 export interface DocumentHighlightRecord {
@@ -17,22 +18,37 @@ export interface DocumentHighlightRecord {
   deleted_at?: string;
 }
 
-export class HighlightRepository extends BaseRepository<DocumentHighlightRecord> {
-  constructor() {
-    super('document_highlights');
+export class HighlightRepository extends SessionBoundRepository<DocumentHighlightRecord> {
+  constructor(context: SessionBoundContext) {
+    super('document_highlights', context);
+  }
+
+  // user_id is optional in schema but we enforce it for new records
+  protected buildOwnershipWhereClause(): string {
+    return '(user_id = ? OR user_id IS NULL)';
+  }
+
+  protected enforceCreateOwnership(data: Partial<DocumentHighlightRecord>): void {
+    if (data.user_id !== undefined && data.user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    data.user_id = this.context.userId;
   }
 
   async getByDocument(documentId: string): Promise<DocumentHighlight[]> {
+    this.requireValidSession();
     const db = this.getDb();
+    if (!db) return [];
     const rows = await db.getAllAsync<DocumentHighlightRecord>(
-      'SELECT * FROM document_highlights WHERE document_id = ? AND deleted_at IS NULL ORDER BY page_index, anchor_offset',
-      [documentId],
+      'SELECT * FROM document_highlights WHERE document_id = ? AND (user_id = ? OR user_id IS NULL) AND deleted_at IS NULL ORDER BY page_index, anchor_offset',
+      [documentId, this.context.userId],
     );
     return rows.map(r => this._toHighlight(r));
   }
 
-  async save(highlight: DocumentHighlight, userId?: string): Promise<void> {
+  async save(highlight: DocumentHighlight): Promise<void> {
+    this.requireValidSession();
     const db = this.getDb();
+    if (!db) return;
     await db.runAsync(
       `INSERT INTO document_highlights
          (id, document_id, page_index, text, color, anchor_offset, focus_offset, created_at, user_id,
@@ -56,7 +72,7 @@ export class HighlightRepository extends BaseRepository<DocumentHighlightRecord>
         highlight.anchorOffset,
         highlight.focusOffset,
         highlight.createdAt.toISOString(),
-        userId ?? null,
+        this.context.userId,
         highlight.id,
         highlight.id,
       ],
@@ -68,10 +84,12 @@ export class HighlightRepository extends BaseRepository<DocumentHighlightRecord>
   }
 
   async deleteByDocument(documentId: string): Promise<void> {
+    this.requireValidSession();
     const db = this.getDb();
+    if (!db) return;
     await db.runAsync(
-      `UPDATE document_highlights SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE document_id = ?`,
-      [documentId],
+      `UPDATE document_highlights SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE document_id = ? AND (user_id = ? OR user_id IS NULL)`,
+      [documentId, this.context.userId],
     );
   }
 
@@ -89,4 +107,4 @@ export class HighlightRepository extends BaseRepository<DocumentHighlightRecord>
   }
 }
 
-export const highlightRepository = new HighlightRepository();
+// export const highlightRepository = new HighlightRepository();

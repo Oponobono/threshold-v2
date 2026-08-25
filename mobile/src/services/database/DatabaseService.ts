@@ -377,14 +377,20 @@ class DatabaseService {
     const db = this.db;
     if (!db) return;
     const tables = [
-      'subjects', 'assessments', 'assessment_categories', 'schedules',
-      'flashcard_decks', 'flashcards', 'card_logs', 'study_sessions',
-      'photos', 'audio_recordings', 'youtube_videos', 'scanned_documents',
-      'calendar_events', 'grading_periods', 'lms_accounts', 'subject_threshold_overrides', 'sync_queue',
+      'group_memberships', 'groups', 'document_anchors', 'study_notes',
+      'document_highlights', 'subject_threshold_overrides', 'lms_accounts',
+      'grading_periods', 'sync_debug_logs', 'sync_journal', 'sync_deletions',
+      'user_preferences', 'ai_chats', 'youtube_transcripts', 'audio_transcripts',
+      'courses', 'grade_history', 'assessment_files', 'sync_queue',
+      'calendar_events', 'scanned_documents', 'youtube_videos', 'audio_recordings',
+      'photos', 'study_sessions', 'card_logs', 'flashcards', 'flashcard_decks',
+      'schedules', 'assessment_categories', 'assessments', 'subjects', 'users'
     ];
+    try { await db.execAsync('PRAGMA foreign_keys = OFF;'); } catch {}
     for (const table of tables) {
       try { await db.execAsync(`DELETE FROM ${table}`); } catch {}
     }
+    try { await db.execAsync('PRAGMA foreign_keys = ON;'); } catch {}
     try { await db.execAsync('VACUUM'); } catch {}
   }
 }

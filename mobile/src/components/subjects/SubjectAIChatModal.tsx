@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 /**
  * SubjectAIChatModal.tsx
  *
@@ -22,14 +23,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { generateStudyMaterialFromChat } from '../../services/api/ai';
-import { flashcardDeckRepository } from '../../services/database/repositories/FlashcardDeckRepository';
-import { flashcardRepository } from '../../services/database/repositories/FlashcardRepository';
 import { syncManager } from '../../services/sync/SyncManager';
 import { useFlashcardsStore } from '../../store/useFlashcardsStore';
 import { aiInteractionCoordinator } from '../../services/ai/AIInteractionCoordinator';
 import { sendHybridChatMessage, generateHybridStudyMaterial, getChatHistory, clearChatHistory, processDocumentUploadHybrid } from '../../services/hybridAIService';
 import { resolveIntent } from '../../services/ai/ConversationIntentResolver';
-import { LLMProvider, getPreferredLLMProvider } from '../../utils/llmProviderManager';
+import { LLMProvider, getPreferredLLMProvider, setPreferredLLMProvider } from '../../utils/llmProviderManager';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
 import * as DocumentPicker from 'expo-document-picker';
@@ -737,13 +736,17 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   }, [forceOfflineMode]);
 
   /** Scroll automático al último mensaje */
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  const scrollToBottom = useCallback((animated = true) => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated }), animated ? 100 : 0);
   }, []);
 
   useEffect(() => {
-    if (messages.length > 0) scrollToBottom();
+    if (messages.length > 0) scrollToBottom(true);
   }, [messages, isLoading, scrollToBottom]);
+
+  useEffect(() => {
+    if (streamingContent) scrollToBottom(false);
+  }, [streamingContent, scrollToBottom]);
 
   // ── Persistir historial a MMKV tras cada intercambio ──
   // Sin esto, al cerrar y reabrir el modal (o si la nube no está disponible)
@@ -1047,7 +1050,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 <View style={s.providerSelector}>
                   <TouchableOpacity
                     style={[s.providerOption, currentProvider === 'groq' && s.providerOptionActive, forceOfflineMode && s.providerOptionDisabled]}
-                    onPress={() => !forceOfflineMode && setCurrentProvider('groq')}
+                    onPress={() => { if (!forceOfflineMode) { setCurrentProvider('groq'); setPreferredLLMProvider('groq').catch(() => {}); } }}
                     activeOpacity={0.7}
                     disabled={forceOfflineMode}
                   >
@@ -1057,7 +1060,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[s.providerOption, currentProvider === 'gemini' && s.providerOptionActive, forceOfflineMode && s.providerOptionDisabled]}
-                    onPress={() => !forceOfflineMode && setCurrentProvider('gemini')}
+                    onPress={() => { if (!forceOfflineMode) { setCurrentProvider('gemini'); setPreferredLLMProvider('gemini').catch(() => {}); } }}
                     activeOpacity={0.7}
                     disabled={forceOfflineMode}
                   >
@@ -1067,7 +1070,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[s.providerOption, currentProvider === 'local' && s.providerOptionActive]}
-                    onPress={() => setCurrentProvider('local')}
+                    onPress={() => { setCurrentProvider('local'); setPreferredLLMProvider('local').catch(() => {}); }}
                     activeOpacity={0.7}
                   >
                     <Text style={[s.providerLabel, currentProvider === 'local' && s.providerLabelActive]}>
@@ -1214,7 +1217,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
             {/* Input de texto */}
             <View style={s.inputRow}>
               <TextInput
-                style={s.input}
+                style={[s.input, isLoading && { opacity: 0.5 }]}
                 placeholder={t('subjects.chatPlaceholder')}
                 placeholderTextColor={TXT_SEC}
                 value={inputText}
@@ -1223,7 +1226,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
                 maxLength={1000}
                 returnKeyType="send"
                 blurOnSubmit
-                onSubmitEditing={handleSend}
+                editable={!isLoading && !isFetchingHistory}
+                onSubmitEditing={() => { if (!isLoading && !isFetchingHistory) handleSend(); }}
               />
               <TouchableOpacity
                 style={[s.sendBtn, (!inputText.trim() || isLoading || isFetchingHistory) && s.sendBtnDisabled]}

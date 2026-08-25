@@ -1,4 +1,5 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 import type { CardDirection } from '../../api/types';
 
 export interface Flashcard {
@@ -23,14 +24,26 @@ export interface Flashcard {
   updated_at?: string;
 }
 
-export class FlashcardRepository extends BaseRepository<Flashcard> {
-  constructor() {
-    super('flashcards');
+export class FlashcardRepository extends SessionBoundRepository<Flashcard> {
+  constructor(context: SessionBoundContext) {
+    super('flashcards', context);
   }
 
-  async getByDeck(deckId: string): Promise<Flashcard[]> {
-    return this.getByField('deck_id', deckId);
+  // Flashcards are owned indirectly via deck → user_id
+  protected buildOwnershipWhereClause(): string {
+    return 'EXISTS (SELECT 1 FROM flashcard_decks WHERE flashcard_decks.id = flashcards.deck_id AND flashcard_decks.user_id = ?)';
+  }
+
+  protected async enforceCreateOwnership(data: Partial<Flashcard>): Promise<void> {
+    if (!data.deck_id) throw new Error('ILLEGAL_CREATE: deck_id is required');
+    const db = this.getDb();
+    if (!db) return;
+    const row = await db.getFirstAsync<{user_id: string}>(
+      'SELECT user_id FROM flashcard_decks WHERE id = ?', [data.deck_id]
+    );
+    if (!row || row.user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: deck_id does not belong to current user');
   }
 }
 
-export const flashcardRepository = new FlashcardRepository();
+// export const flashcardRepository = new FlashcardRepository();

@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 export interface Migration {
   version: number;
   up: string[];
@@ -907,7 +908,7 @@ const migrations: Migration[] = [
     version: 43,
     up: [
       // content_json e item_type nunca fueron agregados al schema local.
-      // Sin ellas, BaseRepository.create() los filtra de los INSERT →
+      // Sin ellas, RepositoryFactory.Bases().create() los filtra de los INSERT →
       // los cards de tipo multiple_choice/boolean se guardaban sin contenido.
       `ALTER TABLE flashcards ADD COLUMN item_type TEXT NOT NULL DEFAULT 'flashcard'`,
       `ALTER TABLE flashcards ADD COLUMN content_json TEXT`,

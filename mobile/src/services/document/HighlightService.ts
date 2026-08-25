@@ -1,8 +1,9 @@
 import type { DocumentHighlight, HighlightColor } from '../../domain/document/DocumentHighlight';
-import { HighlightRepository } from '../../services/database/repositories/HighlightRepository';
 import { syncService } from '../../services/database/SyncService';
 
-const repo = new HighlightRepository();
+import { RepositoryFactory } from '../database/RepositoryFactory';
+
+const repo = RepositoryFactory.highlights();
 
 function generateId(): string {
   return `hl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

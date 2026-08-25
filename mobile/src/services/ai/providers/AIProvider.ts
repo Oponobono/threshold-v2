@@ -7,7 +7,7 @@ export interface AIRequest {
   stream?: boolean;
   provider?: string;
   modelPreference?: AIModelPreference;
-  onStreamToken?: (token: string) => void;
+  onStreamToken?: (token: string, accumulated?: string, reasoning?: string) => void;
 }
 
 export type AIDirective = {

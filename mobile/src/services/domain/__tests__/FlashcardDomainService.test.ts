@@ -1,6 +1,4 @@
 import { FlashcardDomainService } from '../FlashcardDomainService';
-import { flashcardDeckRepository } from '../../database/repositories/FlashcardDeckRepository';
-import { flashcardRepository } from '../../database/repositories/FlashcardRepository';
 
 const mockGetUserId = jest.fn().mockResolvedValue('user-1');
 
@@ -24,8 +22,9 @@ jest.mock('../../database/repositories/FlashcardRepository', () => ({
   },
 }));
 
-const deckRepo = flashcardDeckRepository as any;
-const cardRepo = flashcardRepository as any;
+import { RepositoryFactory } from '../../database/RepositoryFactory';
+const deckRepo = RepositoryFactory.flashcardDecks() as any;
+const cardRepo = RepositoryFactory.flashcards() as any;
 const service = new FlashcardDomainService();
 
 const validDeck = {

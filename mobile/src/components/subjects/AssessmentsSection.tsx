@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -5,7 +6,6 @@ import { theme } from '../../styles/theme';
 
 import { subjectsStyles } from '../../styles/Subjects.styles';
 import { normalizeGrade, SCALE_MAX } from '../../utils/grades';
-import { assessmentFileRepository } from '../../services/database';
 import { ImageViewerModal } from '../modals/ImageViewerModal';
 import { alertRef } from '../ui/CustomAlert';
 
@@ -45,7 +45,7 @@ export const AssessmentsSection: React.FC<AssessmentsSectionProps> = ({ subject,
       for (const a of assessments) {
         if (a.id) {
           try {
-            const files = await assessmentFileRepository.getByAssessment(a.id);
+            const files = await RepositoryFactory.assessmentFiles().getByField('assessment_id', a.id);
             if (files && files.length > 0) {
               newMap[a.id] = files;
             }

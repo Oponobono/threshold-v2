@@ -1,4 +1,6 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
+import { databaseService } from '../DatabaseService';
 
 export interface CalendarEvent {
   id: string;
@@ -16,32 +18,33 @@ export interface CalendarEvent {
   updated_at?: string;
 }
 
-export class CalendarEventRepository extends BaseRepository<CalendarEvent> {
-  constructor() {
-    super('calendar_events');
+export class CalendarEventRepository extends SessionBoundRepository<CalendarEvent> {
+  constructor(context: SessionBoundContext) {
+    super('calendar_events', context);
   }
 
-  async getAll(): Promise<CalendarEvent[]> {
-    const db = await this.getDb();
-    const rows = await db.getAllAsync(`
-      SELECT ce.*, s.name as subject_name 
-      FROM calendar_events ce
-      LEFT JOIN subjects s ON ce.subject_id = s.id AND s.deleted_at IS NULL
-      WHERE ce.deleted_at IS NULL
-    `);
-    return (rows as any[]).map(row => this.mapRow(row));
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
   }
 
-  async getByUser(userId: string): Promise<CalendarEvent[]> {
-    const db = await this.getDb();
-    const rows = await db.getAllAsync(`
-      SELECT ce.*, s.name as subject_name 
-      FROM calendar_events ce
-      LEFT JOIN subjects s ON ce.subject_id = s.id AND s.deleted_at IS NULL
-      WHERE ce.user_id = ? AND ce.deleted_at IS NULL
-    `, userId);
+  protected enforceCreateOwnership(data: Partial<CalendarEvent>): void {
+    if (data.user_id !== undefined && data.user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    data.user_id = this.context.userId;
+  }
+
+  async getAllWithSubjects(): Promise<CalendarEvent[]> {
+    this.requireValidSession();
+    const rows = await databaseService.getAllTracked(
+      `SELECT ce.*, s.name as subject_name 
+       FROM calendar_events ce
+       LEFT JOIN subjects s ON ce.subject_id = s.id AND s.deleted_at IS NULL
+       WHERE ce.deleted_at IS NULL AND ce.user_id = ?`,
+      [this.context.userId],
+      'CalendarEventRepo.getAllWithSubjects'
+    );
     return (rows as any[]).map(row => this.mapRow(row));
   }
 }
 
-export const calendarEventRepository = new CalendarEventRepository();
+// export const calendarEventRepository = new CalendarEventRepository();

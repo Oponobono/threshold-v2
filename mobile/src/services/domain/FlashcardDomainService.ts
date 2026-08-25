@@ -1,5 +1,4 @@
-import { flashcardDeckRepository } from '../database/repositories/FlashcardDeckRepository';
-import { flashcardRepository } from '../database/repositories/FlashcardRepository';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from '../api/auth';
 import type { GeneratedCard } from '../ai/capabilities/FlashcardCapability';
 
@@ -65,7 +64,7 @@ export class FlashcardDomainService {
     const userId = await getUserId();
     const user = String(userId || 0);
 
-    const existingDeck = await flashcardDeckRepository.getByIdIncludingDeleted(params.id);
+    const existingDeck = await RepositoryFactory.flashcardDecks().getByIdIncludingDeleted(params.id);
     const deckData = {
       title: params.title,
       description: params.description,
@@ -79,9 +78,9 @@ export class FlashcardDomainService {
     };
 
     if (existingDeck) {
-      await flashcardDeckRepository.update(params.id, deckData);
+      await RepositoryFactory.flashcardDecks().update(params.id, deckData);
     } else {
-      await flashcardDeckRepository.create({
+      await RepositoryFactory.flashcardDecks().create({
         id: params.id,
         ...deckData,
         created_at: new Date().toISOString(),
@@ -108,11 +107,11 @@ export class FlashcardDomainService {
         source_context: c.source_context ?? undefined,
       };
 
-      const existingCard = await flashcardRepository.getByIdIncludingDeleted(c.id);
+      const existingCard = await RepositoryFactory.flashcards().getByIdIncludingDeleted(c.id);
       if (existingCard) {
-        await flashcardRepository.update(c.id, cardData as any);
+        await RepositoryFactory.flashcards().update(c.id, cardData as any);
       } else {
-        await flashcardRepository.create({ id: c.id, ...cardData } as any);
+        await RepositoryFactory.flashcards().create({ id: c.id, ...cardData } as any);
       }
     }
 

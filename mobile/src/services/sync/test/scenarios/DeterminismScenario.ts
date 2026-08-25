@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import type { SyncScenario, ScenarioResult, FaultRule } from '../types';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { reduce } from '../../reducer/index';
 import { syncDebugger } from '../../SyncDebugger';
 
@@ -9,7 +9,7 @@ export class DeterminismScenario implements SyncScenario {
   description = 'Verifica que el reducer es determinista (misma entrada → misma salida) e idempotente (aplicar dos veces no cambia el resultado)';
 
   async setup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 
   async execute(): Promise<string> {
@@ -26,7 +26,7 @@ export class DeterminismScenario implements SyncScenario {
     for (let p = 0; p < patterns.length; p++) {
       const entityId = `det-entity-${p}`;
       for (const op of patterns[p]) {
-        await syncQueueRepository.enqueue({
+        await RepositoryFactory.syncQueues().enqueue({
           entity_type: 'subject',
           entity_id: entityId,
           operation: op as 'CREATE' | 'UPDATE' | 'DELETE',
@@ -41,7 +41,7 @@ export class DeterminismScenario implements SyncScenario {
   }
 
   async validate(): Promise<ScenarioResult> {
-    const pending = await syncQueueRepository.getPending();
+    const pending = await RepositoryFactory.syncQueues().getPending();
 
     // First reduction
     const firstPass = reduce(pending);
@@ -101,6 +101,6 @@ export class DeterminismScenario implements SyncScenario {
   }
 
   async cleanup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 }

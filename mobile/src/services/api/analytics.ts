@@ -1,8 +1,8 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { fetchWithFallback, parseJsonSafely, activeBaseUrl } from './client';
 import { storageService } from '../storageService';
 import { syncService } from '../database';
 import { getLocalGlobalGPA, getLocalPredictions, getLocalDeckStats, getLocalProgressTrends, getLocalMasteryData, getLocalSemesterSummary } from '../localMasteryService';
-import { flashcardRepository } from '../database/repositories/FlashcardRepository';
 import { queuePendingReview } from '../localFlashcardService';
 import { ExamSchedulerService } from '../ExamSchedulerService';
 import { getUserId } from './auth';
@@ -98,7 +98,7 @@ export const recordCardReview = async (
 ): Promise<CardReviewResponse> => {
   try {
     // Check if card is local-only (exists in MMKV but not SQLite) by trying the repository first
-    const sqliteCard = await flashcardRepository.getById(cardId);
+    const sqliteCard = await RepositoryFactory.flashcards().getById(cardId);
     if (!sqliteCard) {
       await queuePendingReview({
         cardId,

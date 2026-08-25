@@ -1,8 +1,8 @@
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { useEffect, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { useDataStore } from '../store/useDataStore';
 import { useConnectivityStore } from '../store/useConnectivityStore';
-import { syncQueueRepository } from '../services/database';
 import { useLocalAIStore } from '../store/useLocalAIStore';
 import { performCleanup } from '../services/cacheCleanupService';
 
@@ -78,7 +78,7 @@ export const useAutoSync = () => {
   }, [syncPendingOperations, loadAllData, setOnline]);
 
   return {
-    getPendingCount: async () => syncQueueRepository.countPending(),
+    getPendingCount: async () => RepositoryFactory.syncQueues().countPending(),
     manualSync: () => syncPendingOperations(),
   };
 };

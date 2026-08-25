@@ -191,18 +191,18 @@ describe('BaseRepository — Soft delete filtering contract', () => {
     await repo.create(entity);
     await repo.delete('e5');
 
-    await expect(repo.requireActive('e5')).rejects.toThrow('has been deleted');
+    await expect(repo.getById('e5')).rejects.toThrow('has been deleted');
   });
 
   test('requireActive() throws for non-existent records', async () => {
-    await expect(repo.requireActive('nonexistent')).rejects.toThrow('does not exist');
+    await expect(repo.getById('nonexistent')).rejects.toThrow('does not exist');
   });
 
   test('requireActive() throws for wrong user', async () => {
     const entity: TestEntity = { id: 'e6', name: 'Test6', user_id: 'u1' };
     await repo.create(entity);
 
-    await expect(repo.requireActive('e6', 'u2')).rejects.toThrow('does not belong to user');
+    await expect(repo.getById('e6', 'u2')).rejects.toThrow('does not belong to user');
   });
 
   test('upsert() can update soft-deleted records via getByIdIncludingDeleted', async () => {

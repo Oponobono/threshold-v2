@@ -1,20 +1,23 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 import type { YouTubeVideo } from '../../api/types';
 
 export type { YouTubeVideo };
 
-export class YouTubeRepository extends BaseRepository<YouTubeVideo> {
-  constructor() {
-    super('youtube_videos');
+export class YouTubeRepository extends SessionBoundRepository<YouTubeVideo> {
+  constructor(context: SessionBoundContext) {
+    super('youtube_videos', context);
   }
 
-  async getByUser(userId: string): Promise<YouTubeVideo[]> {
-    return this.getByField('user_id', userId);
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
   }
 
-  async getBySubject(subjectId: string): Promise<YouTubeVideo[]> {
-    return this.getByField('subject_id', subjectId);
+  protected enforceCreateOwnership(data: Partial<YouTubeVideo>): void {
+    if ((data as any).user_id !== undefined && (data as any).user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    (data as any).user_id = this.context.userId;
   }
 }
 
-export const youTubeRepository = new YouTubeRepository();
+// export const youTubeRepository = new YouTubeRepository();

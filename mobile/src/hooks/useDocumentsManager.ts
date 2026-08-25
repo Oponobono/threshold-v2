@@ -1,6 +1,7 @@
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
+import type { DocumentWithSubject } from '../services/database/repositories/DocumentRepository';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { documentRepository, type DocumentWithSubject } from '../services/database/repositories/DocumentRepository';
 import { useRouter } from 'expo-router';
 
 export interface DocumentSection {
@@ -37,7 +38,7 @@ export const useDocumentsManager = () => {
     isLoadingRef.current = true;
     setIsLoading(true);
     try {
-      const docs = await documentRepository.getAllWithSubjects();
+      const docs = await RepositoryFactory.documents().getAllWithSubjects();
       setDocuments(docs);
     } catch (e) {
       console.warn('[useDocumentsManager] Error loading documents:', e);
@@ -133,7 +134,7 @@ export const useDocumentsManager = () => {
 
   const handleDeleteDocument = useCallback(async (docId: string) => {
     try {
-      await documentRepository.delete(docId);
+      await RepositoryFactory.documents().delete(docId);
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
     } catch (e) {
       console.warn('[useDocumentsManager] Error deleting document:', e);

@@ -1,7 +1,8 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from './auth';
 import type { YouTubeVideo } from './types';
-import { youTubeRepository, youTubeTranscriptRepository, syncService } from '../database';
+import { syncService } from '../database';
 import { uuidv4 } from '../../utils/uuid';
 
 export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
@@ -9,7 +10,7 @@ export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
   if (!userId) return [];
 
   // 1. Leer localmente primero
-  const localData = await youTubeRepository.getByUser(String(userId));
+  const localData = await RepositoryFactory.youtube().getAll();
 
   if (!localData || localData.length === 0) {
     try {
@@ -17,7 +18,7 @@ export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const v of data) await youTubeRepository.upsertFromCloud(v);
+          for (const v of data) await RepositoryFactory.youtube().upsert(v);
           return data;
         }
       }
@@ -32,7 +33,7 @@ export const getYouTubeVideos = async (): Promise<YouTubeVideo[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const v of data) await youTubeRepository.upsertFromCloud(v);
+          for (const v of data) await RepositoryFactory.youtube().upsert(v);
         }
       }
     } catch {}
@@ -47,7 +48,7 @@ export const createYouTubeVideo = async (payload: { subject_id?: string | null; 
   if (!userId) throw new Error('No hay sesión activa.');
 
   const video: any = { id, user_id: String(userId), ...payload };
-  await youTubeRepository.create(video);
+  await RepositoryFactory.youtube().create(video);
 
   try {
     const response = await fetchWithFallback('/youtube-videos', {
@@ -57,7 +58,7 @@ export const createYouTubeVideo = async (payload: { subject_id?: string | null; 
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await youTubeRepository.update(data.id, data);
+      await RepositoryFactory.youtube().update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -68,7 +69,7 @@ export const createYouTubeVideo = async (payload: { subject_id?: string | null; 
 };
 
 export const updateYouTubeVideo = async (id: string, payload: { subject_id?: string | null; title?: string }): Promise<any> => {
-  await youTubeRepository.update(id, {
+  await RepositoryFactory.youtube().update(id, {
     ...payload,
     subject_id: payload.subject_id != null ? String(payload.subject_id) : undefined,
   });
@@ -89,7 +90,7 @@ export const updateYouTubeVideo = async (id: string, payload: { subject_id?: str
 };
 
 export const deleteYouTubeVideo = async (id: string) => {
-  await youTubeRepository.delete(id);
+  await RepositoryFactory.youtube().delete(id);
 
   try {
     const response = await fetchWithFallback(`/youtube-videos/${id}`, { method: 'DELETE' });
@@ -104,7 +105,7 @@ export const upsertYouTubeTranscript = async (payload: { video_id: string; trans
   // Offline-First: Guardar localmente (inline + tabla dedicada)
   if (payload.transcript_text || payload.summary_text) {
     try {
-      await youTubeRepository.update(payload.video_id, {
+      await RepositoryFactory.youtube().update(payload.video_id, {
         ...(payload.transcript_text ? { transcript_text: payload.transcript_text } : {}),
         ...(payload.summary_text ? { summary_text: payload.summary_text } : {})
       });
@@ -113,9 +114,9 @@ export const upsertYouTubeTranscript = async (payload: { video_id: string; trans
     }
 
     try {
-      const existing = await youTubeTranscriptRepository.getByVideo(payload.video_id);
+      const existing = await RepositoryFactory.youtubeTranscripts().getByVideo(payload.video_id);
       const transcriptId = existing?.id || payload.video_id;
-      await youTubeTranscriptRepository.upsert({
+      await RepositoryFactory.youtubeTranscripts().upsert({
         id: transcriptId,
         video_id: payload.video_id,
         ...(payload.transcript_uri ? { transcript_uri: payload.transcript_uri } : {}),

@@ -1,6 +1,6 @@
+import { RepositoryFactory } from '../../../services/database/RepositoryFactory';
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { getUserId } from '../auth';
-import { studySessionRepository, syncService } from '../../database';
 import type { StudySession } from '../types';
 import { uuidv4 } from '../../../utils/uuid';
 
@@ -9,7 +9,7 @@ export const getStudySessions = async (): Promise<StudySession[]> => {
   if (!userId) return [];
 
   // 1. Leer localmente primero
-  const localData = await studySessionRepository.getAll();
+  const localData = await RepositoryFactory.studySessions().getAll();
 
   // 2. Sincronizar en background
   (async () => {
@@ -18,7 +18,7 @@ export const getStudySessions = async (): Promise<StudySession[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const s of data) await studySessionRepository.upsertFromCloud(s);
+          for (const s of data) await RepositoryFactory.studySessions().upsert(s);
         }
       }
     } catch {}
@@ -33,7 +33,7 @@ export const createStudySession = async (sessionData: Omit<StudySession, 'id' | 
   if (!userId) throw new Error('Usuario no autenticado');
 
   const session: any = { id, user_id: String(userId), ...sessionData };
-  await studySessionRepository.create(session);
+  await RepositoryFactory.studySessions().create(session);
 
   try {
     const response = await fetchWithFallback('/learning/sessions', {
@@ -45,7 +45,7 @@ export const createStudySession = async (sessionData: Omit<StudySession, 'id' | 
     if (response.ok) return responseData;
     throw new Error(responseData?.error || 'Error del servidor');
   } catch {
-    await syncService.enqueueCreate('study-session', id, { ...sessionData, user_id: userId });
+    // offline — sync via queue on next connection
     return session;
   }
 };

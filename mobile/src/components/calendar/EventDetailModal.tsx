@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal, Animated, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -114,7 +115,7 @@ const LinkedDecksSection = ({ eventId }: { eventId: string }) => {
 
   React.useEffect(() => {
     if (!eventId) return;
-    import('../../services/database').then(m => m.flashcardDeckRepository.getByLinkedEvent(eventId))
+    import('../../services/database/RepositoryFactory').then(m => m.RepositoryFactory.flashcardDecks().getByField('linked_event_id', eventId))
       .then(sqliteDecks => {
         const mapped = (sqliteDecks || []).map((d: any) => ({ id: String(d.id), title: d.title }));
         setDecks(mapped);

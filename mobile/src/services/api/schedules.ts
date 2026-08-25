@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from './auth';
-import { scheduleRepository, syncService } from '../database';
+import { syncService } from '../database';
 import { requireActiveSubject } from '../domain/invariants';
 import { uuidv4 } from '../../utils/uuid';
 
@@ -22,7 +23,7 @@ export const getTodaySchedules = async (): Promise<any[]> => {
   const userId = await getUserIdNumber();
   
   // 1. Leer localmente primero
-  const allLocal = await scheduleRepository.getByUser(userId);
+  const allLocal = await RepositoryFactory.schedules().getAll();
   const today = new Date().getDay();
   const localToday = allLocal.filter(s => s.day_of_week === today);
 
@@ -38,7 +39,7 @@ export const getTodaySchedules = async (): Promise<any[]> => {
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             const mapped = data.map(s => ({ ...s, user_id: userId }));
-            for (const s of mapped) await scheduleRepository.upsertFromCloud(s);
+            for (const s of mapped) await RepositoryFactory.schedules().upsert(s);
           }
         }
       } catch {}
@@ -56,7 +57,7 @@ export const createSchedule = async (payload: { subject_id: string; day_of_week:
   await requireActiveSubject(payload.subject_id);
 
   const schedule: any = { id, user_id: userId, ...payload };
-  await scheduleRepository.create(schedule);
+  await RepositoryFactory.schedules().create(schedule);
 
   // El backend usa clientId || uuidv4(): si no enviamos el id local,
   // el servidor genera otro UUID y el pull posterior duplica la fila.
@@ -69,7 +70,7 @@ export const createSchedule = async (payload: { subject_id: string; day_of_week:
   }).then(async (response) => {
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await scheduleRepository.update(data.id, data);
+      await RepositoryFactory.schedules().update(data.id, data);
     } else {
       await syncService.enqueueCreate('schedule', id, syncPayload);
     }
@@ -81,7 +82,7 @@ export const createSchedule = async (payload: { subject_id: string; day_of_week:
 };
 
 export const deleteSchedule = async (id: string) => {
-  await scheduleRepository.delete(id);
+  await RepositoryFactory.schedules().delete(id);
 
   fetchWithFallback(`/schedules/${id}`, { method: 'DELETE' })
     .then((response) => parseJsonSafely(response))
@@ -94,7 +95,7 @@ export const getSchedulesBySubject = async (subjectId: string): Promise<any[]> =
   const userId = await getUserIdNumber();
   
   // 1. Leer localmente primero
-  const localData = await scheduleRepository.getBySubject(subjectId);
+  const localData = await RepositoryFactory.schedules().getByField('subject_id', subjectId);
 
   // 2. Sincronizar en background con throttling (solo crea registros nuevos, nunca sobreescribe)
   const now = Date.now();
@@ -108,7 +109,7 @@ export const getSchedulesBySubject = async (subjectId: string): Promise<any[]> =
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             const mapped = data.map(s => ({ ...s, user_id: userId }));
-            for (const s of mapped) await scheduleRepository.upsertFromCloud(s);
+            for (const s of mapped) await RepositoryFactory.schedules().upsert(s);
           }
         }
       } catch {}
@@ -123,7 +124,7 @@ export const getAllSchedules = async (): Promise<any[]> => {
   const userId = await getUserIdNumber();
   
   // 1. Leer localmente primero
-  const localData = await scheduleRepository.getByUser(userId);
+  const localData = await RepositoryFactory.schedules().getAll();
 
   if (!localData || localData.length === 0) {
     try {
@@ -132,7 +133,7 @@ export const getAllSchedules = async (): Promise<any[]> => {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
           const mapped = data.map(s => ({ ...s, user_id: userId }));
-          for (const s of mapped) await scheduleRepository.upsertFromCloud(s);
+          for (const s of mapped) await RepositoryFactory.schedules().upsert(s);
           return mapped;
         }
       }
@@ -152,7 +153,7 @@ export const getAllSchedules = async (): Promise<any[]> => {
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             const mapped = data.map(s => ({ ...s, user_id: userId }));
-            for (const s of mapped) await scheduleRepository.upsertFromCloud(s);
+            for (const s of mapped) await RepositoryFactory.schedules().upsert(s);
           }
         }
       } catch {}

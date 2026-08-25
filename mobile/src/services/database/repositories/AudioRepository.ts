@@ -1,20 +1,23 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 import type { AudioRecording } from '../../api/types';
 
 export type { AudioRecording };
 
-export class AudioRepository extends BaseRepository<AudioRecording> {
-  constructor() {
-    super('audio_recordings');
+export class AudioRepository extends SessionBoundRepository<AudioRecording> {
+  constructor(context: SessionBoundContext) {
+    super('audio_recordings', context);
   }
 
-  async getByUser(userId: string): Promise<AudioRecording[]> {
-    return this.getByField('user_id', userId);
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
   }
 
-  async getBySubject(subjectId: string): Promise<AudioRecording[]> {
-    return this.getByField('subject_id', subjectId);
+  protected enforceCreateOwnership(data: Partial<AudioRecording>): void {
+    if ((data as any).user_id !== undefined && (data as any).user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    (data as any).user_id = this.context.userId;
   }
 }
 
-export const audioRepository = new AudioRepository();
+// export const audioRepository = new AudioRepository();

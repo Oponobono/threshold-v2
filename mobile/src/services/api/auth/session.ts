@@ -3,6 +3,7 @@ import { fetchWithFallback, parseJsonSafely } from '../client';
 import { databaseService } from '../../database/DatabaseService';
 import { clearProfileImageCache } from '../../profileImageCache';
 import { clearAllUserData } from '../../sessionClearService';
+import { sessionIdentity } from './SessionIdentity';
 
 /**
  * Obtiene el ID del usuario actual almacenado localmente
@@ -45,6 +46,9 @@ export const registerUser = async (userData: {
     await storageService.saveSecure('app_user_email', userData.email);
     await storageService.saveSecure('app_user_id', data.userId.toString());
 
+    // Iniciar token de generación de sesión
+    sessionIdentity.startSession(data.userId.toString());
+
     return data;
   } catch (error: any) {
     throw new Error(error.message || 'Error de red al intentar registrar');
@@ -74,6 +78,9 @@ export const loginUser = async (email: string, password: string) => {
     await storageService.saveSecure('jwt_token', token);
     await storageService.saveSecure('app_user_email', email);
     await storageService.saveSecure('app_user_id', data.user.id.toString());
+
+    // Iniciar token de generación de sesión
+    sessionIdentity.startSession(data.user.id.toString());
 
     return data;
   } catch (error: any) {
@@ -116,6 +123,9 @@ export const signOut = async (): Promise<void> => {
     await storageService.removeSecure('jwt_token');
     await storageService.removeSecure('app_user_email');
     await storageService.removeSecure('app_user_id');
+    
+    // Invalidar token de generación de sesión inmediatamente
+    sessionIdentity.clearSession();
     
     // Limpiar SQLite
     await databaseService.clearAll();

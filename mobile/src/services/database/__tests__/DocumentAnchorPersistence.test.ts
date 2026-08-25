@@ -66,7 +66,7 @@ describe('DocumentAnchorRepository — Persistencia', () => {
   let repo: DocumentAnchorRepository;
 
   beforeEach(() => {
-    repo = new DocumentAnchorRepository();
+    repo = new DocumentAnchorRepository({ userId: 'test-user', sessionGeneration: 'gen-1' });
     mockRows.length = 0;
     jest.clearAllMocks();
   });

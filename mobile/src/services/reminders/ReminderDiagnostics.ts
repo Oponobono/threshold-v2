@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import * as ExpoNotifications from 'expo-notifications';
 import { PermissionsAndroid, Platform } from 'react-native';
 import * as Device from 'expo-device';
@@ -7,10 +8,6 @@ import ThresholdExactAlarm from '../../../modules/threshold-exact-alarm/src';
 import { getReminderCoordinator } from './reminderCoordinatorInstance';
 import { ReminderSnapshotBuilder } from './ReminderSnapshotBuilder';
 import { createDefaultSnapshotRepos } from './ReminderSystemFactory';
-import { scheduleRepository } from '../database/repositories/ScheduleRepository';
-import { assessmentRepository } from '../database/repositories/AssessmentRepository';
-import { calendarEventRepository } from '../database/repositories/CalendarEventRepository';
-import { flashcardDeckRepository } from '../database/repositories/FlashcardDeckRepository';
 import type {
   ReminderDiagnosticsData,
   ExpectedPlanItem,
@@ -128,10 +125,10 @@ export async function collectReminderDiagnostics(): Promise<ReminderDiagnosticsD
   const plan = await engine.computeCurrentPlan(snapshot);
 
   const [schedules, assessments, events, decks] = await Promise.all([
-    scheduleRepository.getAll().catch(() => []),
-    assessmentRepository.getAll().catch(() => []),
-    calendarEventRepository.getAll().catch(() => []),
-    flashcardDeckRepository.getAll().catch(() => []),
+    RepositoryFactory.schedules().getAll().catch(() => []),
+    RepositoryFactory.assessments().getAll().catch(() => []),
+    RepositoryFactory.calendarEvents().getAll().catch(() => []),
+    RepositoryFactory.flashcardDecks().getAll().catch(() => []),
   ]);
 
   const expected: ExpectedPlanItem[] = plan.deliverables.map((d) => ({
@@ -148,13 +145,13 @@ export async function collectReminderDiagnostics(): Promise<ReminderDiagnosticsD
   let osRaw: { identifier: string; triggerDate: Date | null }[] = [];
   try {
     const scheduled = await ExpoNotifications.getAllScheduledNotificationsAsync();
-    osScheduled = scheduled.map((n) => ({
+    osScheduled = scheduled.map((n: any) => ({
       identifier: n.identifier,
       title: n.content.title ?? '',
       body: n.content.body ?? '',
       triggerDate: triggerDateOf(n.trigger)?.toISOString() ?? null,
     }));
-    osRaw = scheduled.map((n) => ({
+    osRaw = scheduled.map((n: any) => ({
       identifier: n.identifier,
       triggerDate: triggerDateOf(n.trigger),
     }));
@@ -244,7 +241,7 @@ export async function runOSStressTest(count: number): Promise<OSStressResult> {
   }
 
   const all = await ExpoNotifications.getAllScheduledNotificationsAsync().catch(() => []);
-  acceptedByOS = all.filter((n) => n.identifier.startsWith(STRESS_PREFIX)).length;
+  acceptedByOS = all.filter((n: any) => n.identifier.startsWith(STRESS_PREFIX)).length;
 
   const result: OSStressResult = {
     attempted: count,
@@ -258,7 +255,7 @@ export async function runOSStressTest(count: number): Promise<OSStressResult> {
 
 export async function clearOSStressTest(): Promise<number> {
   const all = await ExpoNotifications.getAllScheduledNotificationsAsync().catch(() => []);
-  const toCancel = all.filter((n) => n.identifier.startsWith(STRESS_PREFIX)).map((n) => n.identifier);
+  const toCancel = all.filter((n: any) => n.identifier.startsWith(STRESS_PREFIX)).map((n: any) => n.identifier);
   await Promise.all(toCancel.map((id) => ExpoNotifications.cancelScheduledNotificationAsync(id).catch(() => {})));
   console.log(`[STRESS] cleared ${toCancel.length} synthetic notifications`);
   return toCancel.length;
@@ -266,7 +263,7 @@ export async function clearOSStressTest(): Promise<number> {
 
 export function enableReminderDeliveryLogging(): void {
   if (deliverySubscription) return;
-  deliverySubscription = ExpoNotifications.addNotificationReceivedListener((n) => {
+  deliverySubscription = ExpoNotifications.addNotificationReceivedListener((n: any) => {
     const id = n.request.identifier;
     const title = n.request.content.title ?? '';
     const body = n.request.content.body ?? '';

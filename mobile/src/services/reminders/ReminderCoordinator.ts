@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { ReminderEngine } from './ReminderEngine';
 import { ReminderSnapshotBuilder } from './ReminderSnapshotBuilder';
 import type { EnvironmentContext } from './types';
@@ -103,7 +104,7 @@ export class ReminderCoordinator {
       if (entityType === 'schedule' && entity.subject_id && !entity.subject_name) {
         try {
           const { subjectRepository } = require('../database/repositories/SubjectRepository');
-          const subject = await subjectRepository.getById(entity.subject_id);
+          const subject = await RepositoryFactory.subjects().getById(entity.subject_id);
           if (subject) {
             entity.subject_name = subject.name;
           }

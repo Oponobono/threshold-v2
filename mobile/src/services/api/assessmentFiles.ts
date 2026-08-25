@@ -1,5 +1,6 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
-import { assessmentFileRepository, syncService } from '../database';
+import { RepositoryFactory } from '../database/RepositoryFactory';
+import { syncService } from '../database';
 import { uuidv4 } from '../../utils/uuid';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -55,7 +56,7 @@ export const uploadAssessmentFile = async (
   };
 
   // Guardar en SQLite
-  await assessmentFileRepository.create(localFile);
+  await RepositoryFactory.assessmentFiles().create(localFile);
 
   // Encolar para subida en background
   await syncService.enqueueCreate('assessment_files', localFile.id, localFile);
@@ -72,7 +73,7 @@ export const uploadAssessmentFile = async (
  */
 export const getAssessmentFiles = async (assessmentId: string): Promise<AssessmentFile[]> => {
   // 1. Mostrar lo que tenemos localmente de inmediato (UI optimista)
-  const localFiles = await assessmentFileRepository.getByAssessment(assessmentId);
+  const localFiles = await RepositoryFactory.assessmentFiles().getByField('assessment_id', assessmentId);
 
   // 2. Intentar traer actualizaciones del backend
   fetchWithFallback(`/assessments/${assessmentId}/files`, { method: 'GET' })
@@ -81,9 +82,9 @@ export const getAssessmentFiles = async (assessmentId: string): Promise<Assessme
       const serverFiles = await parseJsonSafely(response);
       if (Array.isArray(serverFiles)) {
         for (const sf of serverFiles) {
-          const existing = localFiles.find(lf => lf.id === sf.id);
+          const existing = localFiles.find((lf: any) => lf.id === sf.id);
           if (!existing) {
-            await assessmentFileRepository.create({
+            await RepositoryFactory.assessmentFiles().create({
               ...sf,
               is_backed_up: 1
             });
@@ -104,7 +105,7 @@ export const getAssessmentFiles = async (assessmentId: string): Promise<Assessme
  */
 export const deleteAssessmentFile = async (assessmentId: string, fileId: string): Promise<void> => {
   // Borrar de la DB local primero
-  await assessmentFileRepository.delete(fileId);
+  await RepositoryFactory.assessmentFiles().delete(fileId);
 
   // Encolar el borrado
   await syncService.enqueueDelete('assessment_files', fileId);

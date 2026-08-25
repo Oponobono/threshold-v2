@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { syncService } from '../database';
 import { uuidv4 } from '../../utils/uuid';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 
 export interface GradingPeriod {
   id: string;
@@ -37,12 +38,11 @@ export interface TwoFactorStatus {
 }
 
 async function _repo() {
-  const [g, l, t] = await Promise.all([
-    import('../database/repositories/GradingPeriodRepository'),
-    import('../database/repositories/LmsAccountRepository'),
-    import('../database/repositories/ThresholdOverrideRepository'),
-  ]);
-  return { gradingPeriodRepo: g.gradingPeriodRepository, lmsAccountRepo: l.lmsAccountRepository, thresholdOverrideRepo: t.thresholdOverrideRepository };
+  return { 
+    gradingPeriodRepo: RepositoryFactory.gradingPeriods(), 
+    lmsAccountRepo: RepositoryFactory.lmsAccounts(), 
+    thresholdOverrideRepo: RepositoryFactory.thresholdOverrides() 
+  };
 }
 
 function _cache() {

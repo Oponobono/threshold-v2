@@ -1,8 +1,8 @@
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { updatePhoto } from '../services/api';
-import { photoRepository } from '../services/database';
 import { useDataStore } from '../store/useDataStore';
 import { GalleryPhoto, FilterTab } from '../types/gallery';
 import type { Course } from '../services/api/types';
@@ -64,7 +64,7 @@ export function useGallery(t: any) {
     if (refreshing) setIsRefreshing(true);
     else setIsLoading(true);
     try {
-      const list = await photoRepository.getAll();
+      const list = await RepositoryFactory.photos().getAll();
       const enriched = enrichPhotos(list as any[], subjects, t);
       setPhotos(enriched);
     } catch (err) {

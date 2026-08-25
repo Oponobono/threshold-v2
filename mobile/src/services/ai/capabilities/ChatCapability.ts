@@ -8,7 +8,7 @@ export interface ChatParams {
   subjectContext?: string;
   temperature?: number;
   provider?: string;
-  onStreamToken?: (token: string) => void;
+  onStreamToken?: (token: string, accumulated?: string, reasoning?: string) => void;
 }
 
 export interface ChatResult {

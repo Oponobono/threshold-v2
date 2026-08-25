@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 import React, { useState } from 'react';
 import {
   View,
@@ -419,9 +420,8 @@ export const FlashcardImportModal: React.FC<FlashcardImportModalProps> = ({
       // Si se seleccionó materia, actualizarla
       if (selectedSubjectId) {
         const sub = subjects.find(s => s.id === String(selectedSubjectId));
-        const { flashcardDeckRepository } = await import('../../services/database');
         const { syncService } = await import('../../services/database/SyncService');
-        await flashcardDeckRepository.update(importedDeck.id, {
+        await RepositoryFactory.flashcardDecks().update(importedDeck.id, {
           subject_id: String(selectedSubjectId),
           subject_name: sub?.name,
           subject_color: sub?.color,

@@ -1,4 +1,5 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 
 export interface FlashcardDeck {
   id: string;
@@ -24,34 +25,33 @@ export interface FlashcardDeck {
   updated_at?: string;
 }
 
-export class FlashcardDeckRepository extends BaseRepository<FlashcardDeck> {
-  constructor() {
-    super('flashcard_decks');
+export class FlashcardDeckRepository extends SessionBoundRepository<FlashcardDeck> {
+  constructor(context: SessionBoundContext) {
+    super('flashcard_decks', context);
   }
 
-  async getByUser(userId: string): Promise<FlashcardDeck[]> {
-    return this.getByField('user_id', userId);
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
   }
 
-  async getBySubject(subjectId: string): Promise<FlashcardDeck[]> {
-    return this.getByField('subject_id', subjectId);
+  protected enforceCreateOwnership(data: Partial<FlashcardDeck>): void {
+    if (data.user_id !== undefined && data.user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    data.user_id = this.context.userId;
   }
 
-  async getByLinkedEvent(eventId: string): Promise<FlashcardDeck[]> {
-    return this.getByField('linked_event_id', eventId);
-  }
-
-  async findConflictingTitles(userId: string, baseTitle: string): Promise<string[]> {
+  async findConflictingTitles(baseTitle: string): Promise<string[]> {
+    this.requireValidSession();
     const db = this.getDb();
-    // Escape LIKE special characters (%, _, \) to avoid wildcard misinterpretation
+    if (!db) return [];
     const escaped = baseTitle.replace(/[\\%_]/g, '\\$&');
     const pattern = `${escaped}%`;
     const result = await db.getAllAsync<{ title: string }>(
       `SELECT title FROM ${this.tableName} WHERE user_id = ? AND deleted_at IS NULL AND title LIKE ? ESCAPE '\\'`,
-      [userId, pattern]
+      [this.context.userId, pattern]
     );
     return result.map(r => r.title);
   }
 }
 
-export const flashcardDeckRepository = new FlashcardDeckRepository();
+// export const flashcardDeckRepository = new FlashcardDeckRepository();

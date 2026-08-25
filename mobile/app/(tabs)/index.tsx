@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../src/services/database/RepositoryFactory';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, FlatList, RefreshControl } from 'react-native';
 import LottieView from 'lottie-react-native';
@@ -14,7 +15,6 @@ import type { UserProfile } from '../../src/services/api/types';
 import type { Subject, Assessment, Schedule } from '../../src/services/database/repositories';
 import { calculateProjection } from '../../src/utils/projectionEngine';
 import { useDataStore } from '../../src/store/useDataStore';
-import { courseRepository } from '../../src/services/database/repositories';
 import type { Course } from '../../src/services/api/types';
 import { usePredictionPolling } from '../../src/hooks/usePredictionPolling';
 
@@ -367,8 +367,8 @@ export default function HybridDashboardScreen() {
   const handleIncrementClass = useCallback(async () => {
     if (!selectedCourse) return;
     try {
-      await courseRepository.incrementClass(selectedCourse.id);
-      const updated = await courseRepository.getById(selectedCourse.id);
+      await RepositoryFactory.courses().incrementClass(selectedCourse.id);
+      const updated = await RepositoryFactory.courses().getById(selectedCourse.id);
       if (updated) {
         useDataStore.setState(state => ({
           courses: state.courses.map(c => c.id === updated.id ? updated as any : c)
@@ -382,8 +382,8 @@ export default function HybridDashboardScreen() {
   const handleDecrementClass = useCallback(async () => {
     if (!selectedCourse) return;
     try {
-      await courseRepository.decrementClass(selectedCourse.id);
-      const updated = await courseRepository.getById(selectedCourse.id);
+      await RepositoryFactory.courses().decrementClass(selectedCourse.id);
+      const updated = await RepositoryFactory.courses().getById(selectedCourse.id);
       if (updated) {
         useDataStore.setState(state => ({
           courses: state.courses.map(c => c.id === updated.id ? updated as any : c)

@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import type { SyncScenario, ScenarioResult, FaultRule } from '../types';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { syncService } from '../../../database/SyncService';
 import { faultInjector } from '../FaultInjector';
 import { syncDebugger } from '../../SyncDebugger';
@@ -13,7 +13,7 @@ export class FaultToleranceScenario implements SyncScenario {
   description = 'Verifica que el sistema maneja fallos HTTP sin corrupción de datos';
 
   async setup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 
   async execute(faults?: FaultRule[]): Promise<string> {
@@ -26,7 +26,7 @@ export class FaultToleranceScenario implements SyncScenario {
     faultInjector.enable(effectiveFaults);
 
     for (let i = 1; i <= 5; i++) {
-      await syncQueueRepository.enqueue({
+      await RepositoryFactory.syncQueues().enqueue({
         entity_type: 'subject',
         entity_id: `fault-test-${i}`,
         operation: 'CREATE',
@@ -48,7 +48,7 @@ export class FaultToleranceScenario implements SyncScenario {
   }
 
   async validate(): Promise<ScenarioResult> {
-    const pending = await syncQueueRepository.getPending();
+    const pending = await RepositoryFactory.syncQueues().getPending();
 
     const status = pending.length >= 5 ? 'PASS' : 'FAIL';
 
@@ -73,6 +73,6 @@ export class FaultToleranceScenario implements SyncScenario {
 
   async cleanup(): Promise<void> {
     faultInjector.disable();
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 }

@@ -1,15 +1,15 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
-import { flashcardDeckRepository } from '../../database/repositories/FlashcardDeckRepository';
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 
 export class FlashcardDeckSynchronizer implements EntitySynchronizer {
   readonly entityType = 'flashcard_decks';
 
   async saveAll(items: any[]): Promise<number> {
-    await flashcardDeckRepository.upsertMany(items);
+    await RepositoryFactory.flashcardDecks().upsertMany(items);
     return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {
-    await flashcardDeckRepository.delete(id);
+    await RepositoryFactory.flashcardDecks().delete(id);
   }
 }

@@ -1,15 +1,15 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
-import { assessmentCategoryRepository } from '../../database/repositories/AssessmentCategoryRepository';
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 
 export class AssessmentCategorySynchronizer implements EntitySynchronizer {
   readonly entityType = 'assessment_categories';
 
   async saveAll(items: any[]): Promise<number> {
-    await assessmentCategoryRepository.upsertMany(items);
+    await RepositoryFactory.assessmentCategories().upsertMany(items);
     return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {
-    await assessmentCategoryRepository.delete(id);
+    await RepositoryFactory.assessmentCategories().delete(id);
   }
 }

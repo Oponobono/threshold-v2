@@ -3,6 +3,7 @@ import { databaseService } from '../database/DatabaseService';
 import { syncService } from '../database/SyncService';
 import { fetchWithFallback } from '../api/client';
 import { useConnectivityStore } from '../../store/useConnectivityStore';
+import { sessionIdentity } from '../api/auth/SessionIdentity';
 import { SyncState, SyncPhase, SyncProgress, SyncResult, SyncEvent, SyncListener } from './types';
 import { EntitySynchronizer } from './EntitySynchronizer';
 import { syncJournal } from './SyncJournal';
@@ -178,6 +179,11 @@ class SyncManager {
   }
 
   async requestInitialSync(force = false): Promise<SyncResult> {
+    const currentGeneration = sessionIdentity.currentGeneration;
+    if (!currentGeneration) {
+      return { success: false, phase: 'initial', entitiesSynced: 0, errors: ['No active session'], durationMs: 0 };
+    }
+
     if (this._state === 'INITIAL_SYNC' || this._isSyncing) {
       return { success: false, phase: 'initial', entitiesSynced: 0, errors: ['Sync already in progress'], durationMs: 0 };
     }
@@ -209,6 +215,10 @@ class SyncManager {
         method: 'GET',
         headers: { 'X-Trace-Id': traceId },
       });
+
+      if (!sessionIdentity.isValidGeneration(currentGeneration)) {
+        throw new Error('SYNC_ABORTED: Session generation changed mid-sync');
+      }
 
       syncDebugger.timeEnd(traceId, 'initial_http', 'HTTP_RESPONSE', `HTTP ${response.status}`, { status: response.status });
 
@@ -268,6 +278,11 @@ class SyncManager {
   }
 
   async sync(): Promise<SyncResult> {
+    const currentGeneration = sessionIdentity.currentGeneration;
+    if (!currentGeneration) {
+      return { success: false, phase: 'push', entitiesSynced: 0, errors: ['No active session'], durationMs: 0 };
+    }
+
     if (this._isSyncing) {
       return { success: false, phase: 'push', entitiesSynced: 0, errors: ['Sync already in progress'], durationMs: 0 };
     }
@@ -296,7 +311,7 @@ class SyncManager {
       await syncJournal.startEntry('delta', 'pull');
       this._setState('PULLING');
       this._emitProgress('pull', 0, 1, 'Pulling remote changes...');
-      const pullErrors = await this._pullDeltaSync(traceId);
+      const pullErrors = await this._pullDeltaSync(traceId, currentGeneration);
 
       errors.push(...pullErrors);
       const entitiesSynced = pushResult.success + (pullErrors.length === 0 ? 1 : 0);
@@ -366,7 +381,7 @@ class SyncManager {
     return count;
   }
 
-  private async _pullDeltaSync(traceId?: string): Promise<string[]> {
+  private async _pullDeltaSync(traceId?: string, currentGeneration?: string): Promise<string[]> {
     const errors: string[] = [];
 
     try {
@@ -377,6 +392,10 @@ class SyncManager {
         method: 'GET',
         headers: traceId ? { 'X-Trace-Id': traceId } : undefined,
       });
+
+      if (currentGeneration && !sessionIdentity.isValidGeneration(currentGeneration)) {
+        throw new Error('SYNC_ABORTED: Session generation changed mid-sync');
+      }
 
       if (traceId) syncDebugger.timeEnd(traceId, 'delta_http', 'HTTP_RESPONSE', `Delta HTTP ${response.status}`, { status: response.status });
 

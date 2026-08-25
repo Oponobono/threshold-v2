@@ -1,7 +1,8 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { AudioRecording } from './types';
-import { audioRepository, audioTranscriptRepository, syncService } from '../database';
+import { RepositoryFactory } from '../database/RepositoryFactory';
+import { syncService } from '../database/SyncService';
 import { requireActiveSubject, requireActiveAudio } from '../domain/invariants';
 import { getBackupPreferences } from '../backup/backupService';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
@@ -12,7 +13,7 @@ export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
   if (!userId) return [];
 
   // Retornar datos locales inmediatamente
-  const localData = await audioRepository.getByUser(String(userId));
+  const localData = await RepositoryFactory.audio().getAll();
 
   if (!localData || localData.length === 0) {
     try {
@@ -22,7 +23,7 @@ export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await audioRepository.upsertFromCloud(a);
+          for (const a of data) await RepositoryFactory.audio().upsert(a);
           return data;
         }
       }
@@ -39,7 +40,7 @@ export const getAudioRecordings = async (): Promise<AudioRecording[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await audioRepository.upsertFromCloud(a);
+          for (const a of data) await RepositoryFactory.audio().upsert(a);
         }
       }
     } catch {}
@@ -59,7 +60,7 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
 
   // 1. Guardar SIEMPRE en SQLite local primero — las grabaciones funcionan sin red
   const recording: any = { id, user_id: String(userId), ...payload };
-  await audioRepository.create(recording);
+  await RepositoryFactory.audio().create(recording);
 
   // Schedule file upload via asset pipeline (background, with retry + progress)
   assetSyncEngine.scheduleUpload('audio-recording', id, payload.local_uri, 'audio/m4a', `${id}.m4a`);
@@ -76,7 +77,7 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
       });
       const data = await parseJsonSafely(response);
       if (response.ok && data) {
-        await audioRepository.update(data.id, data);
+        await RepositoryFactory.audio().update(data.id, data);
       } else {
         throw new Error(data?.error || 'Error del servidor');
       }
@@ -92,7 +93,7 @@ export const createAudioRecording = async (payload: { subject_id?: string | null
 
 export const updateAudioRecording = async (id: string, payload: { subject_id?: string | null; name?: string }): Promise<any> => {
   // 1. Actualizar localmente de forma inmediata
-  await audioRepository.update(id, {
+  await RepositoryFactory.audio().update(id, {
     ...payload,
     subject_id: payload.subject_id != null ? String(payload.subject_id) : undefined,
   });
@@ -123,7 +124,7 @@ export const updateAudioRecording = async (id: string, payload: { subject_id?: s
 
 export const deleteAudioRecording = async (id: string) => {
   // 1. Borrar localmente de forma inmediata
-  await audioRepository.delete(id);
+  await RepositoryFactory.audio().delete(id);
 
   // 2. Sincronizar la eliminación en background
   (async () => {
@@ -151,7 +152,7 @@ export const upsertAudioTranscript = async (payload: { recording_id: string; tra
   // Offline-First: Guardar localmente (inline + tabla dedicada)
   if (payload.transcript_text || payload.summary_text) {
     try {
-      await audioRepository.update(payload.recording_id, {
+      await RepositoryFactory.audio().update(payload.recording_id, {
         ...(payload.transcript_text ? { transcript_text: payload.transcript_text } : {}),
         ...(payload.summary_text ? { summary_text: payload.summary_text } : {})
       });
@@ -160,9 +161,9 @@ export const upsertAudioTranscript = async (payload: { recording_id: string; tra
     }
 
     try {
-      const existing = await audioTranscriptRepository.getByRecording(payload.recording_id);
+      const existing = await RepositoryFactory.audioTranscripts().getByRecording(payload.recording_id);
       const transcriptId = existing?.id || payload.recording_id;
-      await audioTranscriptRepository.upsert({
+      await RepositoryFactory.audioTranscripts().upsert({
         id: transcriptId,
         recording_id: payload.recording_id,
         ...(payload.transcript_uri ? { transcript_uri: payload.transcript_uri } : {}),

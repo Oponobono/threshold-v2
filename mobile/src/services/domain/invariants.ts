@@ -1,47 +1,37 @@
-import {
-  subjectRepository,
-  courseRepository,
-  assessmentRepository,
-  flashcardDeckRepository,
-  audioRepository,
-  photoRepository,
-  documentRepository,
-  scheduleRepository,
-  calendarEventRepository,
-} from '../database';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 
 export async function requireActiveSubject(id: string, userId?: string) {
-  return subjectRepository.requireActive(id, userId);
+  return RepositoryFactory.subjects().getById(id, userId);
 }
 
 export async function requireActiveCourse(id: string, userId?: string) {
-  return courseRepository.requireActive(id, userId);
+  return RepositoryFactory.courses().getById(id);
 }
 
 export async function requireActiveAssessment(id: string, userId?: string) {
-  return assessmentRepository.requireActive(id, userId);
+  return RepositoryFactory.assessments().getById(id, userId);
 }
 
 export async function requireActiveFlashcardDeck(id: string, userId?: string) {
-  return flashcardDeckRepository.requireActive(id, userId);
+  return RepositoryFactory.flashcardDecks().getById(id, userId);
 }
 
 export async function requireActiveAudio(id: string, userId?: string) {
-  return audioRepository.requireActive(id, userId);
+  return RepositoryFactory.audio().getById(id, userId);
 }
 
 export async function requireActivePhoto(id: string, userId?: string) {
-  return photoRepository.requireActive(id, userId);
+  return RepositoryFactory.photos().getById(id, userId);
 }
 
 export async function requireActiveDocument(id: string, userId?: string) {
-  return documentRepository.requireActive(id, userId);
+  return RepositoryFactory.documents().getById(id, userId);
 }
 
 export async function requireActiveSchedule(id: string, userId?: string) {
-  return scheduleRepository.requireActive(id, userId);
+  return RepositoryFactory.schedules().getById(id, userId);
 }
 
 export async function requireActiveCalendarEvent(id: string, userId?: string) {
-  return calendarEventRepository.requireActive(id, userId);
+  return RepositoryFactory.calendarEvents().getById(id, userId);
 }

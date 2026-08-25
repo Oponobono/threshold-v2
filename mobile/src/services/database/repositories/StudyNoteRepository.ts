@@ -1,4 +1,5 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 import { databaseService } from '../DatabaseService';
 
 const AI_SUMMARY_MAX_LENGTH = 1000;
@@ -35,40 +36,49 @@ export interface StudyNoteWithSubject extends StudyNote {
   subject_color?: string;
 }
 
-export class StudyNoteRepository extends BaseRepository<StudyNote> {
-  constructor() {
-    super('study_notes');
+export class StudyNoteRepository extends SessionBoundRepository<StudyNote> {
+  constructor(context: SessionBoundContext) {
+    super('study_notes', context);
   }
 
-  async getBySubject(subjectId: string): Promise<StudyNote[]> {
-    return this.getByField('subject_id', subjectId);
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
+  }
+
+  protected enforceCreateOwnership(data: Partial<StudyNote>): void {
+    if (data.user_id !== undefined && data.user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    data.user_id = this.context.userId;
   }
 
   async getAllWithSubjects(): Promise<StudyNoteWithSubject[]> {
+    this.requireValidSession();
     return databaseService.getAllTracked<StudyNoteWithSubject>(
       `SELECT n.*, s.name as subject_name, s.color as subject_color
        FROM study_notes n
        LEFT JOIN subjects s ON n.subject_id = s.id
-       WHERE n.deleted_at IS NULL
+       WHERE n.deleted_at IS NULL AND n.user_id = ?
        ORDER BY n.created_at DESC`,
-      undefined,
+      [this.context.userId],
       'StudyNoteRepo.getAllWithSubjects'
     );
   }
 
   async markOpened(noteId: string): Promise<void> {
+    this.requireValidSession();
     const db = databaseService.getDb();
     await db.runAsync(
-      `UPDATE study_notes SET last_opened_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-      [noteId]
+      `UPDATE study_notes SET last_opened_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND user_id = ?`,
+      [noteId, this.context.userId]
     );
   }
 
   async setProcessingState(noteId: string, state: string): Promise<void> {
+    this.requireValidSession();
     const db = databaseService.getDb();
     await db.runAsync(
-      `UPDATE study_notes SET processing_state = ?, updated_at = datetime('now') WHERE id = ?`,
-      [state, noteId]
+      `UPDATE study_notes SET processing_state = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`,
+      [state, noteId, this.context.userId]
     );
   }
 
@@ -93,4 +103,4 @@ export class StudyNoteRepository extends BaseRepository<StudyNote> {
   }
 }
 
-export const studyNoteRepository = new StudyNoteRepository();
+// export const studyNoteRepository = new StudyNoteRepository();

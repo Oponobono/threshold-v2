@@ -1,7 +1,8 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from './auth';
 import type { Photo } from './types';
-import { photoRepository, syncService } from '../database';
+import { syncService } from '../database';
 import { requireActiveSubject, requireActivePhoto } from '../domain/invariants';
 import { getBackupPreferences } from '../backup/backupService';
 import { assetSyncEngine } from '../sync/asset/AssetSyncEngine';
@@ -12,7 +13,7 @@ export const getGalleryItems = async () => {
   if (!userId) return [];
   
   // 1. Leer localmente primero
-  const localData = await photoRepository.getAll();
+  const localData = await RepositoryFactory.photos().getAll();
 
   if (!localData || localData.length === 0) {
     try {
@@ -22,7 +23,7 @@ export const getGalleryItems = async () => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const p of data) await photoRepository.upsertFromCloud(p);
+          for (const p of data) await RepositoryFactory.photos().upsert(p);
           return data;
         }
       }
@@ -39,7 +40,7 @@ export const getGalleryItems = async () => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const p of data) await photoRepository.upsertFromCloud(p);
+          for (const p of data) await RepositoryFactory.photos().upsert(p);
         }
       }
     } catch {}
@@ -63,7 +64,7 @@ export const createPhoto = async (photoData: {
 
   // 1. Guardar SIEMPRE en SQLite local primero — la galería funciona sin red
   const photo: any = { id, ...photoData };
-  await photoRepository.create(photo);
+  await RepositoryFactory.photos().create(photo);
 
   // Schedule file upload via asset pipeline (background, with retry + progress)
   assetSyncEngine.scheduleUpload('photo', id, photoData.local_uri, 'image/jpeg', `${id}.jpg`);
@@ -80,7 +81,7 @@ export const createPhoto = async (photoData: {
       });
       const data = await parseJsonSafely(response);
       if (response.ok && data) {
-        await photoRepository.update(data.id, data);
+        await RepositoryFactory.photos().update(data.id, data);
       } else {
         throw new Error(data?.error || 'Error del servidor');
       }
@@ -95,7 +96,7 @@ export const createPhoto = async (photoData: {
 
 export const getPhotosBySubject = async (subjectId: string): Promise<Photo[]> => {
   // Siempre retorna datos locales inmediatamente
-  const localData = await photoRepository.getBySubject(subjectId) as Photo[];
+  const localData = await RepositoryFactory.photos().getByField('subject_id', subjectId) as Photo[];
   
   // Actualizar desde la nube en background si auto-upload activo
   (async () => {
@@ -105,7 +106,7 @@ export const getPhotosBySubject = async (subjectId: string): Promise<Photo[]> =>
       const response = await fetchWithFallback(`/photos/${subjectId}`);
       const data = await parseJsonSafely(response);
       if (response.ok && Array.isArray(data)) {
-        for (const p of data) await photoRepository.upsertFromCloud(p);
+        for (const p of data) await RepositoryFactory.photos().upsert(p);
       }
     } catch {}
   })();
@@ -115,7 +116,7 @@ export const getPhotosBySubject = async (subjectId: string): Promise<Photo[]> =>
 
 export const deletePhoto = async (photoId: string) => {
   // 1. Borrar localmente de forma inmediata
-  await photoRepository.delete(photoId);
+  await RepositoryFactory.photos().delete(photoId);
 
   // 2. Sincronizar la eliminación en background
   (async () => {
@@ -142,7 +143,7 @@ export const updatePhoto = async (photoId: string, data: { ocr_text?: string; ta
   await requireActivePhoto(photoId);
 
   // 1. Actualizar localmente de forma inmediata (optimistic update garantizado)
-  await photoRepository.update(photoId, data as any);
+  await RepositoryFactory.photos().update(photoId, data as any);
 
   // 2. Sincronizar con la nube en background si auto-upload activo
   (async () => {
@@ -175,7 +176,7 @@ export const updatePhoto = async (photoId: string, data: { ocr_text?: string; ta
 export const searchPhotosByTag = async (subjectId: string, tag: string): Promise<Photo[]> => {
   // 1. Búsqueda local en SQLite (tags + ocr_text) — funciona 100% offline
   try {
-    const localResults = await photoRepository.searchByTagOrOcr(subjectId, tag);
+    const localResults = await RepositoryFactory.photos().searchByTagOrOcr(subjectId, tag);
     if (localResults.length > 0) {
       // Sincronizar en background para tener resultados de la nube también
       (async () => {
@@ -183,7 +184,7 @@ export const searchPhotosByTag = async (subjectId: string, tag: string): Promise
           const response = await fetchWithFallback(`/photos/${subjectId}/search?tag=${encodeURIComponent(tag)}`);
           const data = await parseJsonSafely(response);
           if (response.ok && Array.isArray(data)) {
-            for (const p of data) await photoRepository.upsertFromCloud(p);
+            for (const p of data) await RepositoryFactory.photos().upsert(p);
           }
         } catch {}
       })();
@@ -200,7 +201,7 @@ export const searchPhotosByTag = async (subjectId: string, tag: string): Promise
     if (response.ok && Array.isArray(data)) {
       // Persistir resultados para futuras búsquedas offline (solo registros nuevos)
       for (const p of data) {
-        try { await photoRepository.upsertFromCloud(p); } catch {}
+        try { await RepositoryFactory.photos().upsert(p); } catch {}
       }
       return data;
     }

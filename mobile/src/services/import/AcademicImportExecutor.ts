@@ -1,7 +1,5 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { databaseService } from '../database/DatabaseService';
-import { courseRepository } from '../database/repositories/CourseRepository';
-import { subjectRepository } from '../database/repositories/SubjectRepository';
-import { assessmentRepository } from '../database/repositories/AssessmentRepository';
 import { syncService } from '../database/SyncService';
 import { uuidv4 } from '../../utils/uuid';
 import { Course, Subject, Assessment } from '../api/types';
@@ -39,8 +37,8 @@ export class AcademicImportExecutor {
 
     await databaseService.runInTransaction(async () => {
       // 1. Obtener datos existentes
-      const existingCourses = await courseRepository.getAll();
-      const existingSubjects = await subjectRepository.getAll();
+      const existingCourses = await RepositoryFactory.courses().getAll();
+      const existingSubjects = await RepositoryFactory.subjects().getAll();
       
       const courseNameToId = new Map<string, string>();
       for (const c of existingCourses) {
@@ -75,7 +73,7 @@ export class AcademicImportExecutor {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
-          await courseRepository.create(newCourse);
+          await RepositoryFactory.courses().create(newCourse);
           await syncService.enqueueCreate('course', courseId, newCourse);
           courseNameToId.set(normCourseName, courseId);
           existingCourses.push(newCourse); 
@@ -102,7 +100,7 @@ export class AcademicImportExecutor {
               color: SUBJECT_COLORS[colorIndex % SUBJECT_COLORS.length],
               icon: 'book-outline',
             };
-            await subjectRepository.create(newSubject);
+            await RepositoryFactory.subjects().create(newSubject);
             await syncService.enqueueCreate('subject', subjectId, newSubject);
             subjectKeyToId.set(subjectKey, subjectId);
             existingSubjects.push(newSubject);
@@ -144,7 +142,7 @@ export class AcademicImportExecutor {
               is_completed: 1,
               date: validDate,
             };
-            await assessmentRepository.create(newAssessment);
+            await RepositoryFactory.assessments().create(newAssessment);
             await syncService.enqueueCreate('assessment', assessmentId, newAssessment);
             assessmentsCreated++;
           }

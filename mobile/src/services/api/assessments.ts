@@ -1,7 +1,8 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from './auth';
 import { Assessment } from './types';
-import { assessmentRepository, syncService } from '../database';
+import { syncService } from '../database';
 import { requireActiveSubject } from '../domain/invariants';
 import { uuidv4 } from '../../utils/uuid';
 import { calculateProjection } from '../../utils/projectionEngine';
@@ -14,7 +15,7 @@ const getUserIdNumber = async (): Promise<string> => {
 
 export const getAssessments = async (subjectId: string): Promise<Assessment[]> => {
   // 1. Leer localmente primero
-  const localData = await assessmentRepository.getBySubject(subjectId) as Assessment[];
+  const localData = await RepositoryFactory.assessments().getBySubject(subjectId) as Assessment[];
 
   // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
   (async () => {
@@ -23,7 +24,7 @@ export const getAssessments = async (subjectId: string): Promise<Assessment[]> =
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await assessmentRepository.upsertFromCloud(a);
+          for (const a of data) await RepositoryFactory.assessments().upsert(a);
         }
       }
     } catch {}
@@ -36,7 +37,7 @@ export const getAllAssessments = async (): Promise<Assessment[]> => {
   const userId = await getUserIdNumber();
   
   // 1. Leer localmente primero
-  const localData = await assessmentRepository.getAll() as Assessment[];
+  const localData = await RepositoryFactory.assessments().getAll() as Assessment[];
 
   if (!localData || localData.length === 0) {
     try {
@@ -44,7 +45,7 @@ export const getAllAssessments = async (): Promise<Assessment[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await assessmentRepository.upsertFromCloud(a);
+          for (const a of data) await RepositoryFactory.assessments().upsert(a);
           return data;
         }
       }
@@ -59,7 +60,7 @@ export const getAllAssessments = async (): Promise<Assessment[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const a of data) await assessmentRepository.upsertFromCloud(a);
+          for (const a of data) await RepositoryFactory.assessments().upsert(a);
         }
       }
     } catch {}
@@ -82,7 +83,7 @@ export const createAssessment = async (payload: Assessment): Promise<Assessment>
     is_completed: payload.is_completed ?? 0,
   } as Assessment;
 
-  await assessmentRepository.create(assessment);
+  await RepositoryFactory.assessments().create(assessment);
 
   try {
     const response = await fetchWithFallback('/assessments', {
@@ -92,7 +93,7 @@ export const createAssessment = async (payload: Assessment): Promise<Assessment>
     });
     const data = await parseJsonSafely(response);
     if (data?.id) {
-      await assessmentRepository.update(data.id, data);
+      await RepositoryFactory.assessments().update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -103,7 +104,7 @@ export const createAssessment = async (payload: Assessment): Promise<Assessment>
 };
 
 export const updateAssessment = async (id: string, payload: Partial<Assessment>): Promise<any> => {
-  await assessmentRepository.update(id, payload);
+  await RepositoryFactory.assessments().update(id, payload);
 
   try {
     const response = await fetchWithFallback(`/assessments/${id}`, {
@@ -113,7 +114,7 @@ export const updateAssessment = async (id: string, payload: Partial<Assessment>)
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data?.id) {
-      await assessmentRepository.update(data.id, data);
+      await RepositoryFactory.assessments().update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -124,7 +125,7 @@ export const updateAssessment = async (id: string, payload: Partial<Assessment>)
 };
 
 export const deleteAssessment = async (id: string) => {
-  await assessmentRepository.delete(id);
+  await RepositoryFactory.assessments().delete(id);
 
   try {
     const response = await fetchWithFallback(`/assessments/${id}`, { method: 'DELETE' });
@@ -145,7 +146,7 @@ export const getProjectionAnalytics = async (subjectId: string) => {
   } catch {
     // ── Fallback: calcular proyección 100% local desde SQLite ──
     try {
-      const localAssessments = await assessmentRepository.getBySubject(subjectId) as Assessment[];
+      const localAssessments = await RepositoryFactory.assessments().getBySubject(subjectId) as Assessment[];
       if (!localAssessments || localAssessments.length === 0) return null;
 
       const result = calculateProjection(localAssessments, null, null);

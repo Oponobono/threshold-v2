@@ -1,4 +1,5 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 
 export interface Assessment {
   id: string;
@@ -27,9 +28,25 @@ export interface Assessment {
   updated_at?: string;
 }
 
-export class AssessmentRepository extends BaseRepository<Assessment> {
-  constructor() {
-    super('assessments');
+export class AssessmentRepository extends SessionBoundRepository<Assessment> {
+  constructor(context: SessionBoundContext) {
+    super('assessments', context);
+  }
+
+  protected buildOwnershipWhereClause(): string {
+    return 'EXISTS (SELECT 1 FROM subjects WHERE subjects.id = assessments.subject_id AND subjects.user_id = ?)';
+  }
+
+  protected async enforceCreateOwnership(data: Partial<Assessment>): Promise<void> {
+    if (!data.subject_id) {
+      throw new Error('ILLEGAL_CREATE: subject_id is required to create an assessment');
+    }
+    const db = this.getDb();
+    if (!db) return;
+    const row = await db.getFirstAsync<{user_id: string}>('SELECT user_id FROM subjects WHERE id = ?', [data.subject_id]);
+    if (!row || row.user_id !== this.context.userId) {
+      throw new Error('ILLEGAL_CREATE: The provided subject_id does not belong to the current user');
+    }
   }
 
   async getBySubject(subjectId: string): Promise<Assessment[]> {
@@ -66,4 +83,4 @@ export class AssessmentRepository extends BaseRepository<Assessment> {
   }
 }
 
-export const assessmentRepository = new AssessmentRepository();
+// export const assessmentRepository = new AssessmentRepository();

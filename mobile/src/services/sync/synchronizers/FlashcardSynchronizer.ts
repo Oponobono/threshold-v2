@@ -1,6 +1,5 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
-import { flashcardDeckRepository } from '../../database/repositories/FlashcardDeckRepository';
-import { flashcardRepository } from '../../database/repositories/FlashcardRepository';
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 
 export class FlashcardSynchronizer implements EntitySynchronizer {
   readonly entityType = 'flashcards';
@@ -8,12 +7,12 @@ export class FlashcardSynchronizer implements EntitySynchronizer {
   async saveAll(items: any[]): Promise<number> {
     const validItems = items.filter(item => item.id && item.deck_id);
     if (validItems.length > 0) {
-      await flashcardRepository.upsertMany(validItems);
+      await RepositoryFactory.flashcards().upsertMany(validItems);
     }
     return validItems.length;
   }
 
   async deleteItem(id: string): Promise<void> {
-    await flashcardRepository.delete(id);
+    await RepositoryFactory.flashcards().delete(id);
   }
 }

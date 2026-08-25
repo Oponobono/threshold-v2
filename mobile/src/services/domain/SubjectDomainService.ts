@@ -21,7 +21,7 @@ const SUBJECT_CHILDREN: ChildEntity[] = [
   { table: 'assessment_categories', entityType: 'category' },
   { table: 'schedules', entityType: 'schedule', eventType: 'schedules' },
   { table: 'study_sessions', entityType: 'study-session' },
-  { table: 'threshold_overrides', entityType: 'threshold-overrides' },
+  { table: 'subject_threshold_overrides', entityType: 'threshold-overrides' },
   { table: 'photos', entityType: 'photo' },
   {
     table: 'audio_recordings',

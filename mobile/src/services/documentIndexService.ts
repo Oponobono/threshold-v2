@@ -1,3 +1,4 @@
+import { RepositoryFactory } from './database/RepositoryFactory';
 import type { ExtractedDocument } from '../domain/document/ExtractedDocument';
 
 /**
@@ -22,8 +23,7 @@ export async function persistDocumentIndex(
   if (text.length === 0) return;
 
   try {
-    const { documentRepository } = await import('./database/repositories/DocumentRepository');
-    const doc = await documentRepository.getById(documentId);
+    const doc = await RepositoryFactory.documents().getById(documentId);
     if (!doc) return;
     if (doc.ocr_text && doc.ocr_text.length > 0) return;
 

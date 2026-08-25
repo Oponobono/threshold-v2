@@ -1,15 +1,15 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
-import { gradingPeriodRepository } from '../../database/repositories/GradingPeriodRepository';
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 
 export class GradingPeriodSynchronizer implements EntitySynchronizer {
   readonly entityType = 'grading_periods';
 
   async saveAll(items: any[]): Promise<number> {
-    await gradingPeriodRepository.upsertMany(items);
+    await RepositoryFactory.gradingPeriods().upsertMany(items);
     return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {
-    await gradingPeriodRepository.delete(id);
+    await RepositoryFactory.gradingPeriods().delete(id);
   }
 }

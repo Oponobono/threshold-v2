@@ -1,7 +1,5 @@
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 import { AcademicImportModel, ImportError, ImportErrorCode } from '../types';
-import { courseRepository } from '../../database/repositories/CourseRepository';
-import { subjectRepository } from '../../database/repositories/SubjectRepository';
-import { assessmentRepository } from '../../database/repositories/AssessmentRepository';
 
 export class DuplicateValidator {
   /**
@@ -9,9 +7,9 @@ export class DuplicateValidator {
    * Retorna un arreglo de ImportError.
    */
   public static async validate(model: AcademicImportModel): Promise<ImportError[]> {
-    const existingCourses = await courseRepository.getAll();
-    const existingSubjects = await subjectRepository.getAll();
-    const existingAssessments = await assessmentRepository.getAll();
+    const existingCourses = await RepositoryFactory.courses().getAll();
+    const existingSubjects = await RepositoryFactory.subjects().getAll();
+    const existingAssessments = await RepositoryFactory.assessments().getAll();
 
     const assessmentSignatures = new Set<string>();
     for (const a of existingAssessments) {

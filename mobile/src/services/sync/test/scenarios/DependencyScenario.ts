@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import type { SyncScenario, ScenarioResult, FaultRule } from '../types';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { reduce } from '../../reducer/index';
 import { resolveDependencies } from '../../reducer/DependencyResolver';
 import { syncDebugger } from '../../SyncDebugger';
@@ -10,14 +10,14 @@ export class DependencyScenario implements SyncScenario {
   description = 'Verifica que el DependencyResolver ordena Course antes que Subject antes que Assessment';
 
   async setup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 
   async execute(): Promise<string> {
     const traceId = `test_dep_${Date.now()}`;
 
     // Enqueue in reverse order to test sorting
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: 'assessment',
       entity_id: 'assess-001',
       operation: 'CREATE',
@@ -25,7 +25,7 @@ export class DependencyScenario implements SyncScenario {
       trace_id: traceId,
     });
 
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: 'subject',
       entity_id: 'subj-001',
       operation: 'CREATE',
@@ -33,7 +33,7 @@ export class DependencyScenario implements SyncScenario {
       trace_id: traceId,
     });
 
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: 'course',
       entity_id: 'course-001',
       operation: 'CREATE',
@@ -46,7 +46,7 @@ export class DependencyScenario implements SyncScenario {
   }
 
   async validate(): Promise<ScenarioResult> {
-    const pending = await syncQueueRepository.getPending();
+    const pending = await RepositoryFactory.syncQueues().getPending();
     const { operations } = reduce(pending);
     const sorted = resolveDependencies(operations);
 
@@ -80,6 +80,6 @@ export class DependencyScenario implements SyncScenario {
   }
 
   async cleanup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 }

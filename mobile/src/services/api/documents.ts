@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from './auth';
-import { documentRepository, syncService } from '../database';
+import { syncService } from '../database';
 import { requireActiveSubject, requireActiveDocument } from '../domain/invariants';
 import { extractTextFromPdfLocal } from '../localPDFService';
 import { getBackupPreferences } from '../backup/backupService';
@@ -38,7 +39,7 @@ function extFromMime(mime: string, fallbackName?: string): string {
 
 export const getScannedDocumentsBySubject = async (subjectId: string): Promise<ScannedDocument[]> => {
   // Retornar datos locales inmediatamente
-  const localData = await documentRepository.getBySubject(subjectId);
+  const localData = await RepositoryFactory.documents().getByField('subject_id', subjectId);
 
   // Sincronizar desde la nube en background solo si auto-upload activo
   (async () => {
@@ -48,7 +49,7 @@ export const getScannedDocumentsBySubject = async (subjectId: string): Promise<S
       const response = await fetchWithFallback(`/scanned_documents/subject/${subjectId}`);
       const data = await parseJsonSafely(response);
       if (response.ok && Array.isArray(data)) {
-        for (const d of data) await documentRepository.upsertFromCloud(d);
+        for (const d of data) await RepositoryFactory.documents().upsert(d);
       }
     } catch {}
   })();
@@ -67,7 +68,7 @@ export const createScannedDocument = async (data: { subject_id?: string; name?: 
 
   // 1. Guardar SIEMPRE en SQLite local primero — los documentos funcionan sin red
   const doc: any = { id, user_id: String(userId), ...data };
-  await documentRepository.create(doc);
+  await RepositoryFactory.documents().create(doc);
 
   const mimeType = data.mime_type ?? 'application/pdf';
   const fileExt = extFromMime(mimeType, data.name);
@@ -86,7 +87,7 @@ export const createScannedDocument = async (data: { subject_id?: string; name?: 
       });
       const responseData = await parseJsonSafely(response);
       if (response.ok) {
-        await documentRepository.update(responseData.id, responseData);
+        await RepositoryFactory.documents().update(responseData.id, responseData);
       } else {
         throw new Error(responseData?.error || 'Error del servidor');
       }
@@ -100,7 +101,7 @@ export const createScannedDocument = async (data: { subject_id?: string; name?: 
 
 export const deleteScannedDocument = async (documentId: string) => {
   // 1. Borrar localmente de forma inmediata
-  await documentRepository.delete(documentId);
+  await RepositoryFactory.documents().delete(documentId);
 
   // 2. Sincronizar la eliminación en background
   (async () => {
@@ -126,7 +127,7 @@ export const updateScannedDocument = async (documentId: string, data: Partial<Sc
   await requireActiveDocument(documentId);
 
   // 1. Actualizar localmente de forma inmediata
-  await documentRepository.update(documentId, data as any);
+  await RepositoryFactory.documents().update(documentId, data as any);
 
   // 2. Sincronizar en background si auto-upload activo
   (async () => {

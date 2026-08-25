@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { flashcardDeckRepository, calendarEventRepository, subjectRepository, flashcardRepository } from '../services/database';
-import { getFlashcardDecksWithMetrics, type FlashcardDeck } from '../services/api';
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { repositoryEventBus } from '../services/events/RepositoryEventBus';
+import { create } from 'zustand';
+import { getFlashcardDecksWithMetrics, type FlashcardDeck } from '../services/api';
 import { databaseService } from '../services/database/DatabaseService';
 
 export enum FlashcardsStoreState {
@@ -25,8 +25,8 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
   try {
     if (decks.length === 0) return decks;
     
-    const allEvents = await calendarEventRepository.getAll();
-    const allSubjects = await subjectRepository.getAll();
+    const allEvents = await RepositoryFactory.calendarEvents().getAll();
+    const allSubjects = await RepositoryFactory.subjects().getAll();
     
     const deckIds = decks.map(d => String(d.id));
     const placeholders = deckIds.map(() => '?').join(',');
@@ -94,7 +94,7 @@ async function enrichWithLocalMetrics(decks: FlashcardDeck[]): Promise<Flashcard
       } else {
         const examFromEvent = deckToExam.get(String(d.id));
         if (examFromEvent) {
-          flashcardDeckRepository.update(String(d.id), { linked_event_id: examFromEvent.id } as any).catch(() => {});
+          RepositoryFactory.flashcardDecks().update(String(d.id), { linked_event_id: examFromEvent.id } as any).catch(() => {});
           enrichedDeck.linked_event_id = examFromEvent.id;
           enrichedDeck.linked_exam_title = examFromEvent.title;
           enrichedDeck.linked_exam_date = examFromEvent.start_date;
@@ -118,7 +118,7 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
     set({ status: FlashcardsStoreState.INITIALIZING });
     const t0 = Date.now();
     try {
-      const sqliteDecks = await flashcardDeckRepository.getAll();
+      const sqliteDecks = await RepositoryFactory.flashcardDecks().getAll();
       const enriched = await enrichWithLocalMetrics(sqliteDecks as unknown as FlashcardDeck[]);
       set({ decks: enriched, status: FlashcardsStoreState.READY });
       console.log(`[FlashcardsStore] ✅ initialize() READY — ${enriched.length} decks in ${Date.now() - t0}ms`);
@@ -132,7 +132,7 @@ export const useFlashcardsStore = create<FlashcardsStore>((set, get) => ({
     if (refreshInProgress) return refreshInProgress;
     refreshInProgress = (async () => {
       try {
-        const sqliteDecks = await flashcardDeckRepository.getAll();
+        const sqliteDecks = await RepositoryFactory.flashcardDecks().getAll();
         const enriched = await enrichWithLocalMetrics(sqliteDecks as unknown as FlashcardDeck[]);
         set({ decks: enriched });
       } catch (e) {

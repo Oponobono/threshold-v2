@@ -1,20 +1,23 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 import type { StudySession } from '../../api/types';
 
 export type { StudySession };
 
-export class StudySessionRepository extends BaseRepository<StudySession> {
-  constructor() {
-    super('study_sessions');
+export class StudySessionRepository extends SessionBoundRepository<StudySession> {
+  constructor(context: SessionBoundContext) {
+    super('study_sessions', context);
   }
 
-  async getByUser(userId: string): Promise<StudySession[]> {
-    return this.getByField('user_id', userId);
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
   }
 
-  async getByDeck(deckId: string): Promise<StudySession[]> {
-    return this.getByField('deck_id', deckId);
+  protected enforceCreateOwnership(data: Partial<StudySession>): void {
+    if ((data as any).user_id !== undefined && (data as any).user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    (data as any).user_id = this.context.userId;
   }
 }
 
-export const studySessionRepository = new StudySessionRepository();
+// export const studySessionRepository = new StudySessionRepository();

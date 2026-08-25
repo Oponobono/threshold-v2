@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { getUserId } from './session';
 import { storageService } from '../../storageService';
+import { sessionIdentity } from './SessionIdentity';
 
 /**
  * Registra el token biométrico del dispositivo en el backend para un usuario autenticado.
@@ -42,6 +43,8 @@ export const biometricLogin = async (biometricToken: string) => {
   await storageService.saveSecure('jwt_token', token);
   await storageService.saveSecure('app_user_email', data.user.email);
   await storageService.saveSecure('app_user_id', data.user.id.toString());
+
+  sessionIdentity.startSession(data.user.id.toString());
 
   return data;
 };

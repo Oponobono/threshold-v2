@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { syncQueueRepository } from './repositories/SyncQueueRepository';
 import { databaseService } from './DatabaseService';
 import { mediaSyncService } from './MediaSyncService';
@@ -29,7 +30,7 @@ export class SyncService {
   }
 
   async enqueueCreate(entityType: string, entityId: string | undefined, payload: any, traceId?: string): Promise<void> {
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: entityType,
       entity_id: entityId,
       operation: 'CREATE',
@@ -41,7 +42,7 @@ export class SyncService {
   }
 
   async enqueueUpdate(entityType: string, entityId: string, payload: any, traceId?: string): Promise<void> {
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: entityType,
       entity_id: entityId,
       operation: 'UPDATE',
@@ -53,15 +54,15 @@ export class SyncService {
   }
 
   async enqueueDelete(entityType: string, entityId: string, traceId?: string): Promise<void> {
-    const pendingOps = await syncQueueRepository.getPendingOperations(entityType, entityId);
+    const pendingOps = await RepositoryFactory.syncQueues().getPendingOperations(entityType, entityId);
     const isCreatePending = pendingOps.some(op => op.operation === 'CREATE');
 
     if (pendingOps.length > 0) {
-      await syncQueueRepository.cancelPendingOperations(entityType, entityId);
+      await RepositoryFactory.syncQueues().cancelPendingOperations(entityType, entityId);
     }
 
     if (!isCreatePending) {
-      await syncQueueRepository.enqueue({
+      await RepositoryFactory.syncQueues().enqueue({
         entity_type: entityType,
         entity_id: entityId,
         operation: 'DELETE',
@@ -73,7 +74,7 @@ export class SyncService {
   }
 
   async getPendingCount(): Promise<number> {
-    return syncQueueRepository.countPending();
+    return RepositoryFactory.syncQueues().countPending();
   }
 
   async enqueueLegacyUnsyncedData(): Promise<number> {
@@ -120,7 +121,7 @@ export class SyncService {
               performance_rating: row.performance_rating ?? (typeof row.rating === 'number' ? row.rating : null),
             };
           }
-          chunk.push(syncQueueRepository.enqueue({
+          chunk.push(RepositoryFactory.syncQueues().enqueue({
             entity_type: table.type,
             entity_id: row.id,
             operation: 'CREATE',
@@ -203,7 +204,7 @@ export class SyncService {
 
       // 🛠️ FASE 2: JSON Payload Sync
       syncDebugger.timeStart(tid, 'queue_read');
-      let items = await syncQueueRepository.getPending(true);
+      let items = await RepositoryFactory.syncQueues().getPending(true);
       syncDebugger.timeEnd(tid, 'queue_read', 'QUEUE_READ', `Read ${items.length} pending operations`, { count: items.length });
 
       // Descartar operaciones que excedieron el límite de reintentos
@@ -211,7 +212,7 @@ export class SyncService {
       if (staleItems.length > 0) {
         console.log(`[SyncService] Descartando ${staleItems.length} operaciones con ${MAX_RETRIES}+ reintentos`);
         syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', `Discarding ${staleItems.length} stale operations (≥${MAX_RETRIES} retries)`, { count: staleItems.length });
-        await syncQueueRepository.markCompletedBatch(staleItems.map(i => i.id!));
+        await RepositoryFactory.syncQueues().markCompletedBatch(staleItems.map(i => i.id!));
       }
       items = items.filter(i => i.retries < MAX_RETRIES);
 
@@ -236,7 +237,7 @@ export class SyncService {
       if (droppedIds && droppedIds.length > 0) {
         console.log(`[SyncService] Limpiando ${droppedIds.length} operaciones canceladas/NOOP de la base de datos.`);
         syncDebugger.log(tid, null, null, 'QUEUE_PROCESS', `Deleted ${droppedIds.length} no-op operations`, { count: droppedIds.length });
-        await syncQueueRepository.markCompletedBatch(droppedIds);
+        await RepositoryFactory.syncQueues().markCompletedBatch(droppedIds);
       }
 
       const operations = reduced;
@@ -297,7 +298,7 @@ export class SyncService {
           });
 
           syncDebugger.timeEnd(tid, `op_handler_${operationId}`, 'QUEUE_PROCESS', `Completed ${entityTag}`, undefined, operationId, op.entity_type, op.entity_id);
-          await syncQueueRepository.markCompletedBatch(op.originalIds);
+          await RepositoryFactory.syncQueues().markCompletedBatch(op.originalIds);
           success++;
           
           console.log(`[SyncService] ✅ ${entityTag} sincronizado`);
@@ -305,17 +306,17 @@ export class SyncService {
           if (error.message?.includes('ORPHAN_DROP')) {
             console.log(`[SyncService] ℹ️ Abortando sync huérfano (padre eliminado): ${entityTag}`);
             syncDebugger.log(tid, operationId, null, 'QUEUE_PROCESS', `Orphan dropped: ${entityTag}`, { reason: 'parent_deleted' }, op.entity_type, op.entity_id);
-            await syncQueueRepository.markCompletedBatch(op.originalIds);
+            await RepositoryFactory.syncQueues().markCompletedBatch(op.originalIds);
             success++;
           } else {
             console.error(`[SyncService] ❌ Error sincronizando ${entityTag}:`, error.message);
             syncDebugger.logError(tid, operationId, 'QUEUE_PROCESS', `Failed ${entityTag}`, error, op.entity_type, op.entity_id);
             for (const id of op.originalIds) {
-              const retryCount = await syncQueueRepository.markFailed(id, error.message);
+              const retryCount = await RepositoryFactory.syncQueues().markFailed(id, error.message);
               // Errores 4xx son permanentes (no van a resolverse con reintentos)
               if (retryCount >= MAX_RETRIES || error.message?.includes('Faltan campos') || error.message?.includes('HTTP 400') || error.message?.includes('HTTP 404')) {
                 console.log(`[SyncService] Descartando operación ${entityTag} permanentemente (${retryCount} retries, error: ${error.message})`);
-                await syncQueueRepository.markCompleted(id);
+                await RepositoryFactory.syncQueues().markCompleted(id);
               }
             }
             failed++;
@@ -336,7 +337,7 @@ export class SyncService {
       this.isSyncing = false;
     }
 
-    const pending = await syncQueueRepository.countPending();
+    const pending = await RepositoryFactory.syncQueues().countPending();
 
     if (failed === 0) {
       operationProgressBus.emit('completed', { operation: lroOperation, result: { success, pending } });

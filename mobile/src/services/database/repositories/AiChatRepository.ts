@@ -1,4 +1,5 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 
 export interface AiChat {
   id: string;
@@ -16,36 +17,42 @@ export interface AiChat {
   deleted_at?: string;
 }
 
-export class AiChatRepository extends BaseRepository<AiChat> {
-  constructor() {
-    super('ai_chats');
+export class AiChatRepository extends SessionBoundRepository<AiChat> {
+  constructor(context: SessionBoundContext) {
+    super('ai_chats', context);
   }
 
-  async getByUser(userId: string): Promise<AiChat[]> {
-    return this.getByField('user_id', userId);
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
   }
 
-  async getBySubject(subjectId: string): Promise<AiChat[]> {
-    return this.getByField('subject_id', subjectId);
+  protected enforceCreateOwnership(data: Partial<AiChat>): void {
+    if (data.user_id !== undefined && data.user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    data.user_id = this.context.userId;
   }
 
-  async getRecentByUser(userId: string, limit: number = 50): Promise<AiChat[]> {
+  async getRecentByUser(limit: number = 50): Promise<AiChat[]> {
+    this.requireValidSession();
     const db = this.getDb();
+    if (!db) return [];
     const rows = await db.getAllAsync(
-      `SELECT * FROM ${this.tableName} WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`,
-      [userId, limit]
+      `SELECT * FROM ai_chats WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ?`,
+      [this.context.userId, limit]
     );
     return rows as AiChat[];
   }
 
-  async getPendingBackup(userId: string): Promise<AiChat[]> {
+  async getPendingBackup(): Promise<AiChat[]> {
+    this.requireValidSession();
     const db = this.getDb();
+    if (!db) return [];
     const rows = await db.getAllAsync(
-      `SELECT * FROM ${this.tableName} WHERE user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0) AND content IS NOT NULL AND content != '' ORDER BY created_at ASC`,
-      [userId]
+      `SELECT * FROM ai_chats WHERE user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0) AND content IS NOT NULL AND content != '' ORDER BY created_at ASC`,
+      [this.context.userId]
     );
     return rows as AiChat[];
   }
 }
 
-export const aiChatRepository = new AiChatRepository();
+// export const aiChatRepository = new AiChatRepository();

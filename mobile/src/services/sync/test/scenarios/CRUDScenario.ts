@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import type { SyncScenario, ScenarioResult, FaultRule } from '../types';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { reduce } from '../../reducer/index';
 import { syncDebugger } from '../../SyncDebugger';
 
@@ -9,14 +9,14 @@ export class CRUDScenario implements SyncScenario {
   description = 'Verifica que la secuencia CREATE+UPDATE+DELETE del mismo ID resulta en no-op tras reducir';
 
   async setup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 
   async execute(): Promise<string> {
     const traceId = `test_crud_${Date.now()}`;
     const entityId = 'test-entity-001';
 
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: 'subject',
       entity_id: entityId,
       operation: 'CREATE',
@@ -25,7 +25,7 @@ export class CRUDScenario implements SyncScenario {
     });
     syncDebugger.log(traceId, null, null, 'TEST', 'CREATE enqueued', undefined, 'subject', entityId);
 
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: 'subject',
       entity_id: entityId,
       operation: 'UPDATE',
@@ -34,7 +34,7 @@ export class CRUDScenario implements SyncScenario {
     });
     syncDebugger.log(traceId, null, null, 'TEST', 'UPDATE enqueued', undefined, 'subject', entityId);
 
-    await syncQueueRepository.enqueue({
+    await RepositoryFactory.syncQueues().enqueue({
       entity_type: 'subject',
       entity_id: entityId,
       operation: 'DELETE',
@@ -46,7 +46,7 @@ export class CRUDScenario implements SyncScenario {
   }
 
   async validate(): Promise<ScenarioResult> {
-    const pending = await syncQueueRepository.getPending();
+    const pending = await RepositoryFactory.syncQueues().getPending();
     const { operations, report } = reduce(pending);
 
     const status = operations.length === 0 && report.removed === 3 && report.noop === 1 ? 'PASS' : 'FAIL';
@@ -74,6 +74,6 @@ export class CRUDScenario implements SyncScenario {
   }
 
   async cleanup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 }

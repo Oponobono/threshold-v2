@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import type { DocumentImporter, ImportResult } from '../../domain/document/DocumentImporter';
 import type { DocumentSource } from '../../domain/document/DocumentSource';
 import type { DocumentExtractor } from '../../domain/document/DocumentExtractor';

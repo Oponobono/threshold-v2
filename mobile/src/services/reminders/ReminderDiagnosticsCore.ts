@@ -300,7 +300,7 @@ export function buildLayerTrace(input: {
 }): LayerTrace {
   const { audit, plan, osScheduled, diff } = input;
   const scheduleDesired = plan.filter((p) => p.entityType === 'schedule').length;
-  const scheduleOs = osScheduled.filter((n) => n.identifier.startsWith('schedule::')).length;
+  const scheduleOs = osScheduled.filter((n: any) => n.identifier.startsWith('schedule::')).length;
   const missing = diff.filter((d) => d.status === 'missing').length;
   const orphan = diff.filter((d) => d.status === 'orphan').length;
   const drifted = diff.filter((d) => d.status === 'drifted').length;
@@ -395,7 +395,7 @@ export function formatReminderDiagnostics(d: ReminderDiagnosticsData): string {
     `  PLAN ${toLocalTime(p.scheduledAt)} ${p.entityType}::${p.entityId} [${p.intent}/${p.priority}] | ${p.title}`,
   );
 
-  const os = d.osScheduled.map((n) =>
+  const os = d.osScheduled.map((n: any) =>
     `  OS   ${toLocalTime(n.triggerDate)} ${n.identifier} | ${n.title}`,
   );
 

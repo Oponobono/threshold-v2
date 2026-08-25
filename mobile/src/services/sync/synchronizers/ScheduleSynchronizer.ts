@@ -1,15 +1,15 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
-import { scheduleRepository } from '../../database/repositories/ScheduleRepository';
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 
 export class ScheduleSynchronizer implements EntitySynchronizer {
   readonly entityType = 'schedules';
 
   async saveAll(items: any[]): Promise<number> {
-    await scheduleRepository.upsertMany(items);
+    await RepositoryFactory.schedules().upsertMany(items);
     return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {
-    await scheduleRepository.delete(id);
+    await RepositoryFactory.schedules().delete(id);
   }
 }

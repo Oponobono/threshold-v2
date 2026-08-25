@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,8 +8,7 @@ import { theme } from '../../styles/theme';
 import { alertRef } from '../ui/CustomAlert';
 import { createSubject } from '../../services/api';
 import { useDataStore } from '../../store/useDataStore';
-import { courseRepository } from '../../services/database/repositories';
-import { Course } from '../../services/api/types';
+import type { Course } from '../../services/api/types';
 
 const SUBJECT_COLORS = [
   '#3B82F6', '#1D4ED8', '#22C55E', '#F59E0B', '#EC4899', '#7C3AED',
@@ -44,7 +44,7 @@ export const CreateSubjectModal = ({ visible, onClose }: CreateSubjectModalProps
 
   React.useEffect(() => {
     if (visible) {
-      courseRepository.getAll().then(setCourses).catch(console.error);
+      RepositoryFactory.courses().getAll().then(setCourses).catch(console.error);
     }
   }, [visible]);
 

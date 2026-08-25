@@ -1,7 +1,8 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from './auth';
 import type { Course } from './types';
-import { courseRepository, syncService } from '../database';
+import { syncService } from '../database';
 import { uuidv4 } from '../../utils/uuid';
 
 const getUserIdNumber = async (): Promise<string> => {
@@ -17,7 +18,7 @@ const SYNC_THROTTLE_MS = 30000;
 
 export const getCourses = async (): Promise<Course[]> => {
   // 1. Leer localmente primero
-  const localData = await courseRepository.getAll();
+  const localData = await RepositoryFactory.courses().getAll();
 
   // Si no hay datos locales, esperar red obligatoriamente
   if (!localData || localData.length === 0) {
@@ -31,7 +32,7 @@ export const getCourses = async (): Promise<Course[]> => {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
           for (const c of data) {
-            await courseRepository.upsertFromCloud(c);
+            await RepositoryFactory.courses().upsert(c);
           }
           return data;
         }
@@ -54,7 +55,7 @@ export const getCourses = async (): Promise<Course[]> => {
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             for (const c of data) {
-              await courseRepository.upsertFromCloud(c);
+              await RepositoryFactory.courses().upsert(c);
             }
           }
         }
@@ -99,7 +100,7 @@ export const createCourse = async (payload: {
     momentum_score: 1.0,
   };
 
-  await courseRepository.create(course);
+  await RepositoryFactory.courses().create(course);
 
   try {
     const response = await fetchWithFallback('/courses', {
@@ -109,7 +110,7 @@ export const createCourse = async (payload: {
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await courseRepository.update(data.id, data);
+      await RepositoryFactory.courses().update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor al crear curso');
@@ -121,7 +122,7 @@ export const createCourse = async (payload: {
 
 export const updateCourse = async (id: string, payload: Partial<Course>): Promise<void> => {
   const userId = await getUserIdNumber();
-  await courseRepository.update(id, payload);
+  await RepositoryFactory.courses().update(id, payload);
 
   try {
     const response = await fetchWithFallback(`/courses/${id}`, {
@@ -139,7 +140,7 @@ export const updateCourse = async (id: string, payload: Partial<Course>): Promis
 };
 
 export const deleteCourse = async (id: string): Promise<void> => {
-  await courseRepository.delete(id);
+  await RepositoryFactory.courses().delete(id);
 
   try {
     const response = await fetchWithFallback(`/courses/${id}`, {

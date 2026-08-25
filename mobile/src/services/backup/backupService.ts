@@ -280,18 +280,22 @@ export const getBackupStats = async (): Promise<BackupStats> => {
 };
 
 async function getLocalBackupStats(): Promise<BackupStats> {
+  const userId = await getUserId();
+  if (!userId) {
+    return { photos: { total: 0, backed: 0 }, audio: { total: 0, backed: 0 }, docs: { total: 0, backed: 0 }, transcripts: { total: 0, backed: 0 }, assessmentFiles: { total: 0, backed: 0 }, flashcardDecks: { total: 0, backed: 0 }, aiChats: { total: 0, backed: 0 } };
+  }
   try {
     const db = databaseService.getDb();
 
     const [photoRow, audioRow, docRow, audioTransRow, ytTransRow, assessFileRow, deckRow, aiChatRow] = await Promise.all([
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_transcripts WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM youtube_transcripts WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM assessment_files WHERE deleted_at IS NULL AND local_uri IS NOT NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM flashcard_decks WHERE deleted_at IS NULL`) as Promise<{ total: number; backed: number | null } | undefined>,
-      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM ai_chats`) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM photos WHERE deleted_at IS NULL AND user_id = ?`, [userId]) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_recordings WHERE deleted_at IS NULL AND user_id = ?`, [userId]) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM scanned_documents WHERE deleted_at IS NULL AND user_id = ?`, [userId]) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM audio_transcripts WHERE deleted_at IS NULL AND user_id = ?`, [userId]) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM youtube_transcripts WHERE deleted_at IS NULL AND user_id = ?`, [userId]) as Promise<{ total: number; backed: number } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM assessment_files af JOIN assessments a ON af.assessment_id = a.id JOIN subjects s ON a.subject_id = s.id WHERE af.deleted_at IS NULL AND af.local_uri IS NOT NULL AND s.user_id = ?`, [userId]) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM flashcard_decks WHERE deleted_at IS NULL AND user_id = ?`, [userId]) as Promise<{ total: number; backed: number | null } | undefined>,
+      db.getFirstAsync(`SELECT COUNT(*) as total, SUM(CASE WHEN is_backed_up = 1 THEN 1 ELSE 0 END) as backed FROM ai_chats WHERE user_id = ?`, [userId]) as Promise<{ total: number; backed: number | null } | undefined>,
     ]);
 
     const photoTotal = (photoRow as { total: number; backed: number | null } | undefined)?.total ?? 0;
@@ -329,7 +333,7 @@ async function getLocalBackupStats(): Promise<BackupStats> {
  * Obtiene items NO respaldados directamente desde SQLite local.
  * Fuente de verdad para el proceso de backup (is_backed_up = 0).
  */
-export async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Promise<{
+export async function getPendingItemsFromLocalDB(prefs: BackupPreferences, userId: string): Promise<{
   photos: { id: string; uri: string; subject_id?: string }[];
   audio: { id: string; local_uri: string; name: string; subject_id?: string }[];
   docs: { id: string; local_uri: string; name?: string; subject_id?: string }[];
@@ -358,31 +362,31 @@ export async function getPendingItemsFromLocalDB(prefs: BackupPreferences): Prom
     const queries = [];
     
     // 0: Fotos
-    queries.push(prefs.includePhotos ? db.getAllAsync(`SELECT id, local_uri, subject_id FROM photos WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`) : Promise.resolve([]));
+    queries.push(prefs.includePhotos ? db.getAllAsync(`SELECT id, local_uri, subject_id FROM photos WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`, [userId]) : Promise.resolve([]));
     
     // 1: Audio
-    queries.push(prefs.includeAudio ? db.getAllAsync(`SELECT id, local_uri, name, subject_id FROM audio_recordings WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`) : Promise.resolve([]));
+    queries.push(prefs.includeAudio ? db.getAllAsync(`SELECT id, local_uri, name, subject_id FROM audio_recordings WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`, [userId]) : Promise.resolve([]));
     
     // 2: Docs
-    queries.push(prefs.includeDocs ? db.getAllAsync(`SELECT id, local_uri, subject_id FROM scanned_documents WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`) : Promise.resolve([]));
+    queries.push(prefs.includeDocs ? db.getAllAsync(`SELECT id, local_uri, subject_id FROM scanned_documents WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`, [userId]) : Promise.resolve([]));
     
     // 3: Audio Transcripts
-    queries.push(prefs.includeTranscripts ? db.getAllAsync(`SELECT id, recording_id, transcript_text FROM audio_transcripts WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`) : Promise.resolve([]));
+    queries.push(prefs.includeTranscripts ? db.getAllAsync(`SELECT id, recording_id, transcript_text FROM audio_transcripts WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`, [userId]) : Promise.resolve([]));
     
     // 4: YouTube Transcripts
-    queries.push(prefs.includeTranscripts ? db.getAllAsync(`SELECT id, video_id, transcript_text FROM youtube_transcripts WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`) : Promise.resolve([]));
+    queries.push(prefs.includeTranscripts ? db.getAllAsync(`SELECT id, video_id, transcript_text FROM youtube_transcripts WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0) AND transcript_text IS NOT NULL AND transcript_text != ''`, [userId]) : Promise.resolve([]));
     
     // 5: Assessment Files
-    queries.push(prefs.includeAssessmentFiles ? db.getAllAsync(`SELECT id, local_uri, file_name, file_type, assessment_id FROM assessment_files WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0) AND local_uri IS NOT NULL AND local_uri != ''`) : Promise.resolve([]));
+    queries.push(prefs.includeAssessmentFiles ? db.getAllAsync(`SELECT af.id, af.local_uri, af.file_name, af.file_type, af.assessment_id FROM assessment_files af JOIN assessments a ON af.assessment_id = a.id JOIN subjects s ON a.subject_id = s.id WHERE af.deleted_at IS NULL AND s.user_id = ? AND (af.is_backed_up IS NULL OR af.is_backed_up = 0) AND af.local_uri IS NOT NULL AND af.local_uri != ''`, [userId]) : Promise.resolve([]));
     
     // 6: AI Chats
-    queries.push(db.getAllAsync(`SELECT ac.id, ac.user_id, ac.subject_id, ac.role, ac.content FROM ai_chats ac WHERE (ac.is_backed_up IS NULL OR ac.is_backed_up = 0) AND ac.content IS NOT NULL AND ac.content != '' ORDER BY ac.created_at ASC`));
+    queries.push(db.getAllAsync(`SELECT ac.id, ac.user_id, ac.subject_id, ac.role, ac.content FROM ai_chats ac WHERE ac.user_id = ? AND (ac.is_backed_up IS NULL OR ac.is_backed_up = 0) AND ac.content IS NOT NULL AND ac.content != '' ORDER BY ac.created_at ASC`, [userId]));
     
-    // 7: User Prefs
+    // 7: User Prefs — tabla sin user_id (configuración global del dispositivo, no se filtra)
     queries.push(db.getAllAsync(`SELECT up.key, up.value FROM user_preferences up WHERE (up.is_backed_up IS NULL OR up.is_backed_up = 0)`));
     
     // 8: Decks
-    queries.push(db.getAllAsync(`SELECT id, user_id, subject_id, title, description, linked_event_id, avg_ease_factor, total_reviews, last_reviewed_at FROM flashcard_decks WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`));
+    queries.push(db.getAllAsync(`SELECT id, user_id, subject_id, title, description, linked_event_id, avg_ease_factor, total_reviews, last_reviewed_at FROM flashcard_decks WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0)`, [userId]));
 
     const [photos, audio, docs, audioTranscripts, ytTranscripts, assessFiles, unbackedChats, unbackedPrefs, unbackedDecks] = await Promise.all(queries);
 
@@ -494,13 +498,16 @@ export const resetStuckBackupFlags = async (): Promise<{
   aiChats: number;
   userPreferences: number;
 }> => {
+  const userId = await getUserId();
+  if (!userId) return { photos: 0, audio: 0, docs: 0, audioTranscripts: 0, ytTranscripts: 0, aiChats: 0, userPreferences: 0 };
   const db = databaseService.getDb();
   const result = { photos: 0, audio: 0, docs: 0, audioTranscripts: 0, ytTranscripts: 0, aiChats: 0, userPreferences: 0 };
 
   try {
     const { changes: photoChanges } = await db.runAsync(
       `UPDATE photos SET is_backed_up = 0, cloud_url = NULL
-       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+       WHERE user_id = ? AND is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`,
+      [userId]
     );
     result.photos = photoChanges ?? 0;
   } catch (e) {
@@ -510,7 +517,8 @@ export const resetStuckBackupFlags = async (): Promise<{
   try {
     const { changes: audioChanges } = await db.runAsync(
       `UPDATE audio_recordings SET is_backed_up = 0, cloud_url = NULL
-       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+       WHERE user_id = ? AND is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`,
+      [userId]
     );
     result.audio = audioChanges ?? 0;
   } catch (e) {
@@ -520,7 +528,8 @@ export const resetStuckBackupFlags = async (): Promise<{
   try {
     const { changes: docChanges } = await db.runAsync(
       `UPDATE scanned_documents SET is_backed_up = 0, cloud_url = NULL
-       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+       WHERE user_id = ? AND is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`,
+      [userId]
     );
     result.docs = docChanges ?? 0;
   } catch (e) {
@@ -530,7 +539,8 @@ export const resetStuckBackupFlags = async (): Promise<{
   try {
     const { changes: audioTransChanges } = await db.runAsync(
       `UPDATE audio_transcripts SET is_backed_up = 0, cloud_url = NULL
-       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+       WHERE user_id = ? AND is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`,
+      [userId]
     );
     result.audioTranscripts = audioTransChanges ?? 0;
   } catch (e) {
@@ -540,7 +550,8 @@ export const resetStuckBackupFlags = async (): Promise<{
   try {
     const { changes: ytTransChanges } = await db.runAsync(
       `UPDATE youtube_transcripts SET is_backed_up = 0, cloud_url = NULL
-       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+       WHERE user_id = ? AND is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`,
+      [userId]
     );
     result.ytTranscripts = ytTransChanges ?? 0;
   } catch (e) {
@@ -550,7 +561,8 @@ export const resetStuckBackupFlags = async (): Promise<{
   try {
     const { changes: aiChatChanges } = await db.runAsync(
       `UPDATE ai_chats SET is_backed_up = 0, cloud_url = NULL
-       WHERE is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`
+       WHERE user_id = ? AND is_backed_up = 1 AND (cloud_url IS NULL OR cloud_url = '' OR cloud_url = 'ghost_file')`,
+      [userId]
     );
     result.aiChats = aiChatChanges ?? 0;
   } catch (e) {
@@ -657,7 +669,8 @@ export const runBackup = async (
         const localOnlyPhotos: any[] = await db.getAllAsync(
           `SELECT id, subject_id, local_uri, es_favorita, ocr_text, group_id
            FROM photos
-           WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0)`,
+          [userId]
         );
         console.log(`[BackupService] Fase 0a: ${localOnlyPhotos.length} foto(s) sin registro en backend.`);
         await runParallel(localOnlyPhotos, async (photo) => {
@@ -678,7 +691,8 @@ export const runBackup = async (
         const localOnlyAudio: any[] = await db.getAllAsync(
           `SELECT id, user_id, subject_id, name, local_uri, duration
            FROM audio_recordings
-           WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0)`,
+          [userId]
         );
         console.log(`[BackupService] Fase 0b: ${localOnlyAudio.length} grabación(es) sin registro en backend.`);
         await runParallel(localOnlyAudio, async (rec) => {
@@ -699,7 +713,8 @@ export const runBackup = async (
         const localOnlyDocs: any[] = await db.getAllAsync(
           `SELECT id, user_id, subject_id, local_uri, ocr_text
            FROM scanned_documents
-           WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
+           WHERE deleted_at IS NULL AND user_id = ? AND (is_backed_up IS NULL OR is_backed_up = 0)`,
+          [userId]
         );
         console.log(`[BackupService] Fase 0c: ${localOnlyDocs.length} documento(s) sin registro en backend.`);
         await runParallel(localOnlyDocs, async (doc) => {
@@ -718,8 +733,12 @@ export const runBackup = async (
     if (prefs.includeAssessmentFiles) {
       try {
         const localOnlyFiles: any[] = await db.getAllAsync(
-          `SELECT id, assessment_id, file_name, file_type, local_uri, file_size FROM assessment_files
-           WHERE deleted_at IS NULL AND (is_backed_up IS NULL OR is_backed_up = 0)`
+          `SELECT af.id, af.assessment_id, af.file_name, af.file_type, af.local_uri, af.file_size
+           FROM assessment_files af
+           JOIN assessments a ON af.assessment_id = a.id
+           JOIN subjects s ON a.subject_id = s.id
+           WHERE af.deleted_at IS NULL AND s.user_id = ? AND (af.is_backed_up IS NULL OR af.is_backed_up = 0)`,
+          [userId]
         );
         console.log(`[BackupService] Fase 0d: ${localOnlyFiles.length} soporte(s) de evaluación sin registro en backend.`);
         await runParallel(localOnlyFiles, async (f) => {
@@ -740,7 +759,7 @@ export const runBackup = async (
   // FASE 1: Obtener ítems pendientes desde SQLite local y subirlos
   // Siempre usa la BD local como fuente de verdad (is_backed_up = 0).
   // ──────────────────────────────────────────────────────────────────
-  const pending = await getPendingItemsFromLocalDB(prefs);
+  const pending = await getPendingItemsFromLocalDB(prefs, userId);
   const pendingCount = pending.photos.length + pending.audio.length + pending.docs.length + pending.transcripts.length + pending.assessmentFiles.length + pending.aiChats.length + (pending.flashcardDecks?.length || 0) + (pending.flashcards?.length || 0);
   console.log(`[BackupService] Fase 1: ${pendingCount} item(s) pendientes desde BD local`);
 

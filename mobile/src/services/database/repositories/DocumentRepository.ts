@@ -1,4 +1,5 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 import { databaseService } from '../DatabaseService';
 
 export interface ScannedDocument {
@@ -23,27 +24,34 @@ export interface DocumentWithSubject extends ScannedDocument {
   course_name?: string | null;
 }
 
-export class DocumentRepository extends BaseRepository<ScannedDocument> {
-  constructor() {
-    super('scanned_documents');
+export class DocumentRepository extends SessionBoundRepository<ScannedDocument> {
+  constructor(context: SessionBoundContext) {
+    super('scanned_documents', context);
   }
 
-  async getBySubject(subjectId: string): Promise<ScannedDocument[]> {
-    return this.getByField('subject_id', subjectId);
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
+  }
+
+  protected enforceCreateOwnership(data: Partial<ScannedDocument>): void {
+    if (data.user_id !== undefined && data.user_id !== this.context.userId)
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    data.user_id = this.context.userId;
   }
 
   async getAllWithSubjects(): Promise<DocumentWithSubject[]> {
+    this.requireValidSession();
     return databaseService.getAllTracked<DocumentWithSubject>(
       `SELECT d.*, s.name as subject_name, s.color as subject_color, s.course_id, c.name as course_name
        FROM scanned_documents d
        LEFT JOIN subjects s ON d.subject_id = s.id
        LEFT JOIN courses c ON s.course_id = c.id
-       WHERE d.deleted_at IS NULL
+       WHERE d.deleted_at IS NULL AND d.user_id = ?
        ORDER BY d.created_at DESC`,
-      undefined,
+      [this.context.userId],
       'DocumentRepo.getAllWithSubjects'
     );
   }
 }
 
-export const documentRepository = new DocumentRepository();
+// export const documentRepository = new DocumentRepository();

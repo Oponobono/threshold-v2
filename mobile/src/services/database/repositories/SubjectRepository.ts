@@ -1,4 +1,5 @@
-import { BaseRepository } from '../BaseRepository';
+import { SessionBoundRepository } from '../SessionBoundRepository';
+import { SessionBoundContext } from '../../api/auth/SessionIdentity';
 
 export interface Subject {
   id: string;
@@ -25,14 +26,26 @@ export interface Subject {
   next_micro_milestone?: string | null;
 }
 
-export class SubjectRepository extends BaseRepository<Subject> {
-  constructor() {
-    super('subjects');
+export class SubjectRepository extends SessionBoundRepository<Subject> {
+  constructor(context: SessionBoundContext) {
+    super('subjects', context);
   }
 
-  async getByUser(userId: string): Promise<Subject[]> {
-    return this.getByField('user_id', userId);
+  protected buildOwnershipWhereClause(): string {
+    return 'user_id = ?';
   }
+
+  protected enforceCreateOwnership(data: Partial<Subject>): void {
+    if (data.user_id !== undefined && data.user_id !== this.context.userId) {
+      throw new Error('ILLEGAL_CREATE: user_id cannot be set by caller');
+    }
+    data.user_id = this.context.userId;
+  }
+
+  // Not needed anymore since getAll handles ownership implicitly:
+  // async getByUser(userId: string): Promise<Subject[]> {
+  //   return this.getByField('user_id', userId);
+  // }
 }
 
-export const subjectRepository = new SubjectRepository();
+// export const subjectRepository = new SubjectRepository();

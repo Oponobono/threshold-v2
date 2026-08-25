@@ -1,7 +1,8 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { syncService } from '../database/SyncService';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from './auth';
 import type { FlashcardDeck, Flashcard, CardDirection } from './types';
-import { flashcardDeckRepository, flashcardRepository, syncService } from '../database';
 import { requireActiveSubject, requireActiveFlashcardDeck } from '../domain/invariants';
 import { uuidv4 } from '../../utils/uuid';
 import { databaseService } from '../database/DatabaseService';
@@ -9,7 +10,7 @@ import { deleteLocalDeck } from '../localFlashcardService';
 
 export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
   // 1. Leer localmente primero
-  const localData = await flashcardDeckRepository.getAll();
+  const localData = await RepositoryFactory.flashcardDecks().getAll();
 
   if (!localData || localData.length === 0) {
     try {
@@ -18,7 +19,7 @@ export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const d of data) await flashcardDeckRepository.upsertFromCloud(d);
+          for (const d of data) await RepositoryFactory.flashcardDecks().upsert(d);
           return data;
         }
       }
@@ -34,7 +35,7 @@ export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const d of data) await flashcardDeckRepository.upsertFromCloud(d);
+          for (const d of data) await RepositoryFactory.flashcardDecks().upsert(d);
         }
       }
     } catch {}
@@ -45,7 +46,7 @@ export const getFlashcardDecks = async (): Promise<FlashcardDeck[]> => {
 
 export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> => {
   // 1. Leer localmente primero
-  const localData = await flashcardDeckRepository.getAll();
+  const localData = await RepositoryFactory.flashcardDecks().getAll();
 
   if (!localData || localData.length === 0) {
     try {
@@ -54,7 +55,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const d of data) await flashcardDeckRepository.upsertFromCloud(d);
+          for (const d of data) await RepositoryFactory.flashcardDecks().upsert(d);
           return data;
         }
       }
@@ -80,7 +81,7 @@ export const getFlashcardDecksWithMetrics = async (): Promise<FlashcardDeck[]> =
           } catch (e) {
             console.warn('[Flashcards API] Error actualizando métricas:', e);
           }
-          await flashcardDeckRepository.upsertFromCloud(d);
+          await RepositoryFactory.flashcardDecks().upsert(d);
         }
         const remoteIds = new Set(data.map(d => String(d.id)));
         const localOnly = localData.filter(ld => !remoteIds.has(String(ld.id)));
@@ -101,7 +102,7 @@ export const createFlashcardDeck = async (payload: { subject_id?: string; title:
   }
 
   const deck: any = { id, user_id: userId, ...payload, card_count: payload.card_count ?? 0, created_at: new Date().toISOString() };
-  await flashcardDeckRepository.create(deck);
+  await RepositoryFactory.flashcardDecks().create(deck);
 
   try {
     const response = await fetchWithFallback('/flashcard-decks', {
@@ -112,7 +113,7 @@ export const createFlashcardDeck = async (payload: { subject_id?: string; title:
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
       const merged = await mergeDeckWithLocal(data);
-      await flashcardDeckRepository.update(data.id, merged);
+      await RepositoryFactory.flashcardDecks().update(data.id, merged);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -123,7 +124,7 @@ export const createFlashcardDeck = async (payload: { subject_id?: string; title:
 };
 
 const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
-  const localRecord = await flashcardDeckRepository.getById(serverDeck.id);
+  const localRecord = await RepositoryFactory.flashcardDecks().getById(serverDeck.id);
   const merged = { ...serverDeck };
 
   if (localRecord) {
@@ -165,7 +166,7 @@ const mergeDeckWithLocal = async (serverDeck: any): Promise<any> => {
 };
 
 export const updateFlashcardDeck = async (deckId: string, payload: any): Promise<any> => {
-  await flashcardDeckRepository.update(deckId, { ...payload, is_backed_up: 0 });
+  await RepositoryFactory.flashcardDecks().update(deckId, { ...payload, is_backed_up: 0 });
 
   syncService.enqueueUpdate('flashcard-deck', deckId, payload).catch(() => {});
   return { ...payload, id: deckId, _isPending: true };
@@ -191,7 +192,7 @@ function mergeCards(database: any[], mmkv: any[]): any[] {
 
 export const getFlashcards = async (deckId: string): Promise<Flashcard[]> => {
   // 1. Leer localmente primero (SQLite + MMKV)
-  const sqliteCards = await flashcardRepository.getByDeck(deckId);
+  const sqliteCards = await RepositoryFactory.flashcards().getByField('deck_id', deckId);
   const mmkvCards = getLocalCardsFromMMKV(deckId);
   const localData = mergeCards(sqliteCards || [], mmkvCards);
 
@@ -202,7 +203,7 @@ export const getFlashcards = async (deckId: string): Promise<Flashcard[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const c of data) await flashcardRepository.upsertFromCloud(c);
+          for (const c of data) await RepositoryFactory.flashcards().upsert(c);
         }
       }
     } catch {}
@@ -213,7 +214,7 @@ export const getFlashcards = async (deckId: string): Promise<Flashcard[]> => {
 
 export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcard[]> => {
   // 1. Leer localmente primero (SQLite + MMKV)
-  const sqliteCards = await flashcardRepository.getByDeck(deckId);
+  const sqliteCards = await RepositoryFactory.flashcards().getByField('deck_id', deckId);
   const mmkvCards = getLocalCardsFromMMKV(deckId);
   const localData = mergeCards(sqliteCards || [], mmkvCards);
 
@@ -242,7 +243,7 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
           for (const c of data) {
             // Normalizar content_json antes de persistir en SQLite
             const contentJson = toContentJson(c);
-            await flashcardRepository.upsertFromCloud({ ...c, content_json: contentJson } as any);
+            await RepositoryFactory.flashcards().upsert({ ...c, content_json: contentJson } as any);
           }
           return mergeCards(data, mmkvCards);
         }
@@ -252,7 +253,7 @@ export const getFlashcardsPrioritized = async (deckId: string): Promise<Flashcar
   }
 
   // 3. Si hay cards locales: sync en background (no bloquea).
-  // IMPORTANTE: usar SQL crudo en lugar de flashcardRepository.update() para
+  // IMPORTANTE: usar SQL crudo en lugar de RepositoryFactory.flashcards().update() para
   // evitar emitir eventos al repositoryEventBus que causarían re-renders
   // del study screen durante la sesión activa (content offset + flash).
   // El backend devuelve `content` (objeto), no `content_json` — se serializa aquí.
@@ -309,7 +310,7 @@ function searchCardInMMKV(cardId: string): any | null {
 
 export const getCardById = async (cardId: string): Promise<Flashcard | null> => {
   // 1. Leer localmente primero (SQLite)
-  const localCard = await flashcardRepository.getById(cardId);
+  const localCard = await RepositoryFactory.flashcards().getById(cardId);
   if (localCard) {
     // 2. Sincronizar en background (solo crea registros nuevos, nunca sobreescribe)
     (async () => {
@@ -317,7 +318,7 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
         const response = await fetchWithFallback(`/flashcards/${cardId}`);
         if (response.ok) {
           const data = await parseJsonSafely(response);
-          if (data) await flashcardRepository.upsertFromCloud(data);
+          if (data) await RepositoryFactory.flashcards().upsert(data);
         }
       } catch {}
     })();
@@ -333,7 +334,7 @@ export const getCardById = async (cardId: string): Promise<Flashcard | null> => 
     const response = await fetchWithFallback(`/flashcards/${cardId}`);
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardRepository.create(data);
+      await RepositoryFactory.flashcards().create(data);
       return data;
     }
     throw new Error(data?.error || 'Error al obtener tarjeta');
@@ -349,7 +350,7 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
 
   const card: any = { id, ...payload, status: 'new', created_at: new Date().toISOString() };
 
-  await flashcardRepository.create(card);
+  await RepositoryFactory.flashcards().create(card);
 
   try {
     await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = card_count + 1 WHERE id = ?', [payload.deck_id]);
@@ -365,7 +366,7 @@ export const createFlashcard = async (payload: { deck_id: string; front: string;
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardRepository.update(data.id, data);
+      await RepositoryFactory.flashcards().update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error al crear tarjeta');
@@ -382,7 +383,7 @@ export const createEvaluationItem = async (payload: { deck_id: string; item_type
 
   const item: any = { id, status: 'new', created_at: new Date().toISOString(), ...payload };
 
-  await flashcardRepository.create(item);
+  await RepositoryFactory.flashcards().create(item);
 
   try {
     await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = card_count + 1 WHERE id = ?', [payload.deck_id]);
@@ -398,7 +399,7 @@ export const createEvaluationItem = async (payload: { deck_id: string; item_type
     });
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
-      await flashcardRepository.update(data.id, data);
+      await RepositoryFactory.flashcards().update(data.id, data);
       return data;
     }
     throw new Error(data?.error || 'Error al crear ítem');
@@ -409,7 +410,7 @@ export const createEvaluationItem = async (payload: { deck_id: string; item_type
 };
 
 export const updateFlashcardStatus = async (cardId: string, status: string) => {
-  await flashcardRepository.update(cardId, { status } as any);
+  await RepositoryFactory.flashcards().update(cardId, { status } as any);
 
   try {
     const response = await fetchWithFallback(`/flashcards/${cardId}`, {
@@ -474,7 +475,7 @@ export const removeDeckFromGroup = async (deckId: string, groupPinId: string): P
 };
 
 export const deleteFlashcardDeck = async (deckId: string) => {
-  await flashcardDeckRepository.delete(deckId);
+  await RepositoryFactory.flashcardDecks().delete(deckId);
 
   // Try deleting from local MMKV if it's a local-only deck
   try {
@@ -542,7 +543,7 @@ export const getSnoozeStatus = async (cardId: string): Promise<SnoozeStatus> => 
 
 export const getCardsNotSnoozed = async (deckId: string): Promise<Flashcard[]> => {
   // 1. Leer localmente primero (SQLite + MMKV)
-  const sqliteCards = await flashcardRepository.getByDeck(deckId);
+  const sqliteCards = await RepositoryFactory.flashcards().getByField('deck_id', deckId);
   const mmkvCards = getLocalCardsFromMMKV(deckId);
   const localData = mergeCards(sqliteCards || [], mmkvCards);
 
@@ -554,7 +555,7 @@ export const getCardsNotSnoozed = async (deckId: string): Promise<Flashcard[]> =
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const c of data) await flashcardRepository.upsertFromCloud(c);
+          for (const c of data) await RepositoryFactory.flashcards().upsert(c);
         }
       }
     } catch {}
@@ -577,7 +578,7 @@ export const autoUnsnoozeExpired = async (): Promise<any> => {
 
 export const deleteFlashcard = async (cardId: string) => {
   try {
-    const card = await flashcardRepository.getById(cardId);
+    const card = await RepositoryFactory.flashcards().getById(cardId);
     if (card && card.deck_id) {
       await databaseService.getDb().runAsync('UPDATE flashcard_decks SET card_count = MAX(0, card_count - 1) WHERE id = ?', [card.deck_id]);
     }
@@ -585,7 +586,7 @@ export const deleteFlashcard = async (cardId: string) => {
     console.warn('[Flashcards API] Error decrementing card_count:', e);
   }
 
-  await flashcardRepository.delete(cardId);
+  await RepositoryFactory.flashcards().delete(cardId);
 
   try {
     const response = await fetchWithFallback(`/flashcards/${cardId}`, { method: 'DELETE' });

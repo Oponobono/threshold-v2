@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { useState, useCallback, useRef } from 'react';
-import { photoRepository, audioRepository, youTubeRepository, flashcardDeckRepository } from '../services/database';
 
 export interface CachePreloadedData {
   galleryItems: any[] | null;
@@ -37,10 +37,10 @@ export const useCachePreload = () => {
     setIsPreloading(true);
     try {
       const [galleryItems, audioRecordings, youTubeVideos, flashcardDecks] = await Promise.all([
-        photoRepository.getMetadata().catch(() => []),   // lightweight: excludes ocr_text
-        audioRepository.getAll().catch(() => []),
-        youTubeRepository.getAll().catch(() => []),
-        flashcardDeckRepository.getAll().catch(() => []),
+        RepositoryFactory.photos().getMetadata().catch(() => []),   // lightweight: excludes ocr_text
+        RepositoryFactory.audio().getAll().catch(() => []),
+        RepositoryFactory.youtube().getAll().catch(() => []),
+        RepositoryFactory.flashcardDecks().getAll().catch(() => []),
       ]);
 
       if (__DEV__) {

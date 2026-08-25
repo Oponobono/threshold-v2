@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import type { SyncScenario, ScenarioResult, ScenarioMetrics, FaultRule } from '../types';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { syncDebugger } from '../../SyncDebugger';
 import { faultInjector } from '../FaultInjector';
 import type { AssetTestContext, StepResult, AssetTestStep } from './types';
@@ -25,7 +25,7 @@ export abstract class AssetScenarioBase implements SyncScenario {
   abstract steps: AssetTestStepWithExpect[];
 
   async setup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
     faultInjector.disable();
   }
 
@@ -96,7 +96,7 @@ export abstract class AssetScenarioBase implements SyncScenario {
   }
 
   async cleanup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
     faultInjector.disable();
     this._context = null;
   }

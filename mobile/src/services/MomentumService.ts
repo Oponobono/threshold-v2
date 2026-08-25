@@ -1,7 +1,8 @@
+import { RepositoryFactory } from './database/RepositoryFactory';
 import { databaseService } from './database/DatabaseService';
 // Dynamic import for courseRepository to avoid circular dependency:
 // CourseRepository → MomentumService → CourseRepository
-const getCourseRepository = () => import('./database/repositories/CourseRepository').then(m => m.courseRepository);
+const getCourseRepository = () => import('./database/RepositoryFactory').then(m => m.RepositoryFactory.courses());
 
 export class MomentumService {
   /**

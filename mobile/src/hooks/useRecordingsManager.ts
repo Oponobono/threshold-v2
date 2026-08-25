@@ -1,10 +1,10 @@
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { InteractionManager } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { getYouTubeVideos, createYouTubeVideo, deleteYouTubeVideo, YouTubeVideo } from '../services/api';
 import { useAudioRecorder } from './useAudioRecorder';
 import { SubjectSection } from '../components/recordings/RecordingsGrid';
-import { youTubeRepository } from '../services/database';
 import { databaseService } from '../services/database/DatabaseService';
 import { useDataStore } from '../store/useDataStore';
 
@@ -37,7 +37,7 @@ export const useRecordingsManager = () => {
 
     // Fase 1: Cache-first — mostrar datos instantáneos desde SQLite
     try {
-      const cached = await youTubeRepository.getAll();
+      const cached = await RepositoryFactory.youtube().getAll();
       if (cached.length > 0) {
         setYouTubeVideos(cached);
       }
@@ -60,7 +60,7 @@ export const useRecordingsManager = () => {
     } catch (e) {
       console.warn('[useRecordingsManager] ⚠️ Error loading YouTube videos:', e);
       try {
-        const cachedVideos = await youTubeRepository.getAll();
+        const cachedVideos = await RepositoryFactory.youtube().getAll();
         if (cachedVideos.length > 0) {
           setYouTubeVideos(cachedVideos);
         }

@@ -1,8 +1,9 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
+import { syncService } from '../../services/database/SyncService';
 import { calculateElapsedDays } from './calculateElapsedDays';
 import { calculateFSRS } from './calculateFSRS';
 import { getActiveReviewPolicy } from './ReviewSchedulingPolicy';
 import { ReviewInput, ReviewQuality } from './types';
-import { flashcardRepository, syncService, cardLogRepository } from '../../services/database';
 import { getUserId } from '../../services/api/auth/session';
 import { uuidv4 } from '../../utils/uuid';
 
@@ -80,7 +81,7 @@ export class FlashcardDomainService {
       view_count: (card.view_count || 0) + 1,
     };
 
-    await flashcardRepository.update(String(card.id), updatedFields as any);
+    await RepositoryFactory.flashcards().update(String(card.id), updatedFields as any);
     await syncService.enqueueUpdate('flashcard', String(card.id), updatedFields);
 
     const logId = uuidv4();
@@ -98,7 +99,7 @@ export class FlashcardDomainService {
     };
 
     // card_logs es auditoría local — nunca se sincroniza (política Sync Protocol)
-    await cardLogRepository.create(logData as any);
+    await RepositoryFactory.cardLogs().create(logData as any);
 
     if (card.deck_id) {
       try {

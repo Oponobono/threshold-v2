@@ -1,11 +1,16 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
 import { getUserId } from './auth';
 import type { Subject } from './types';
-import { subjectRepository, syncService } from '../database';
+import { syncService } from '../database';
 import { storageService } from '../storageService';
 import { deleteSubject as domainDeleteSubject } from '../domain/SubjectDomainService';
 import { uuidv4 } from '../../utils/uuid';
-import { courseRepository } from '../database/repositories/CourseRepository';
+import { RepositoryFactory } from '../database/RepositoryFactory';
+
+const R = () => ({
+  subjects: RepositoryFactory.subjects(),
+  courses: RepositoryFactory.courses(),
+});
 
 const getUserIdNumber = async (): Promise<string> => {
   const uid = await getUserId();
@@ -28,7 +33,7 @@ const SUBJECT_BY_ID_THROTTLE_MS = 30000;
 
 export const getSubjectById = async (subjectId: string): Promise<Subject | null> => {
   // 1. Leer localmente primero
-  const localData = await subjectRepository.getById(subjectId);
+  const localData = await R().subjects.getById(subjectId);
 
   // 2. Sincronizar en background con throttling separado del de getSubjects
   //    y con debounce por materia para evitar llamadas redundantes.
@@ -48,7 +53,7 @@ export const getSubjectById = async (subjectId: string): Promise<Subject | null>
         if (response.ok) {
           const data = await parseJsonSafely(response);
           if (data) {
-            await subjectRepository.upsertFromCloud(data);
+            await R().subjects.upsert(data);
           }
         }
       } catch {}
@@ -69,7 +74,7 @@ export const getSubjectById = async (subjectId: string): Promise<Subject | null>
  * lo que indica una condición de carrera temporal (el curso aún no sincronizó).
  */
 const mergeWithLocal = async (serverSubject: Subject): Promise<Subject> => {
-  const localRecord = await subjectRepository.getById(serverSubject.id);
+  const localRecord = await R().subjects.getById(serverSubject.id);
   if (!localRecord) return serverSubject;
   return {
     ...serverSubject,
@@ -94,7 +99,7 @@ export const getSubjects = async (): Promise<Subject[]> => {
   const userId = await getUserIdNumber();
   
   // 1. Leer localmente primero
-  const localData = await subjectRepository.getByUser(userId);
+  const localData = await R().subjects.getAll();
 
   // Si no hay datos locales (primer inicio o caché limpia), esperar la red obligatoriamente
   if (!localData || localData.length === 0) {
@@ -108,7 +113,7 @@ export const getSubjects = async (): Promise<Subject[]> => {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
           for (const s of data) {
-            await subjectRepository.upsertFromCloud(s);
+            await R().subjects.upsert(s);
           }
           return data;
         }
@@ -131,7 +136,7 @@ export const getSubjects = async (): Promise<Subject[]> => {
           const data = await parseJsonSafely(response);
           if (Array.isArray(data)) {
             for (const s of data) {
-              await subjectRepository.upsertFromCloud(s);
+              await R().subjects.upsert(s);
             }
           }
         }
@@ -172,7 +177,7 @@ export const createSubject = async (payload: {
     completion_percent: 0,
   };
 
-  await subjectRepository.create(subject);
+  await R().subjects.create(subject);
   await updateCourseCounters(subject.course_id);
 
   try {
@@ -184,7 +189,7 @@ export const createSubject = async (payload: {
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
       const merged = await mergeWithLocal(data);
-      await subjectRepository.update(data.id, merged);
+      await R().subjects.update(data.id, merged);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -197,14 +202,14 @@ export const createSubject = async (payload: {
 export const updateCourseCounters = async (courseId: string | null | undefined): Promise<void> => {
   if (!courseId) return;
   try {
-    const linked = await subjectRepository.getByField('course_id', courseId);
+    const linked = await R().subjects.getByField('course_id', courseId);
     const total = linked.reduce((sum, s) => sum + ((s as any).total_lessons ?? 0), 0);
     const completed = linked.reduce((sum, s) => sum + ((s as any).completed_lessons ?? 0), 0);
     // Solo sobrescribir si hay materias vinculadas (cursos planos preservan su valor manual)
     if (linked.length > 0) {
-      const course = await courseRepository.getById(courseId);
+      const course = await R().courses.getById(courseId);
       const newTotalClasses = course?.total_classes ? course.total_classes : total;
-      await courseRepository.update(courseId, {
+      await R().courses.update(courseId, {
         total_classes: newTotalClasses as any,
         completed_classes: completed as any,
       } as any);
@@ -216,10 +221,10 @@ export const updateCourseCounters = async (courseId: string | null | undefined):
 
 export const updateSubject = async (subjectId: string, payload: Partial<Subject>): Promise<any> => {
   // 1. Leer subject actual para detectar cambio de course_id
-  const prev = await subjectRepository.getById(subjectId);
+  const prev = await R().subjects.getById(subjectId);
 
   // 2. Persistir localmente primero (offline-first)
-  await subjectRepository.update(subjectId, payload);
+  await R().subjects.update(subjectId, payload);
 
   // 3. Actualizar contadores del curso anterior y nuevo si cambió course_id
   if (prev?.course_id !== payload.course_id) {
@@ -239,11 +244,11 @@ export const updateSubject = async (subjectId: string, payload: Partial<Subject>
       // antigua {success: true} — en ese caso usar el payload local como fuente de verdad.
       if (data?.id) {
         const merged = await mergeWithLocal(data);
-        await subjectRepository.update(data.id, merged);
+        await R().subjects.update(data.id, merged);
         return merged;
       }
       // Respuesta sin id (backend antiguo): enriquecer localmente desde SQLite
-      const fresh = await subjectRepository.getById(subjectId);
+      const fresh = await R().subjects.getById(subjectId);
       return fresh ?? payload;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -286,14 +291,14 @@ export const deleteSubject = async (subjectId: string) => {
  */
 export const repairSubjectCourseLinks = async (): Promise<void> => {
   try {
-    const subjects = await subjectRepository.getAll();
-    const courses = await courseRepository.getAll();
+    const subjects = await R().subjects.getAll();
+    const courses = await R().courses.getAll();
     const courseIds = new Set(courses.map(c => c.id));
 
     // Desvincular materias cuyo curso fue eliminado
     for (const sub of subjects) {
       if (sub.course_id && !courseIds.has(sub.course_id)) {
-        await subjectRepository.update(sub.id, { course_id: null });
+        await R().subjects.update(sub.id, { course_id: null });
       }
     }
 
@@ -307,7 +312,7 @@ export const repairSubjectCourseLinks = async (): Promise<void> => {
       const newTotalClasses = course.total_classes ? course.total_classes : total;
       
       if (course.total_classes !== newTotalClasses || course.completed_classes !== completed) {
-        await courseRepository.update(course.id, {
+        await R().courses.update(course.id, {
           total_classes: newTotalClasses,
           completed_classes: completed,
         });

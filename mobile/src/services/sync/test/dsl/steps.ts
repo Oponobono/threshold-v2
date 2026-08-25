@@ -1,6 +1,6 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import * as FileSystem from 'expo-file-system/legacy';
 import { databaseService } from '../../../database/DatabaseService';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { syncService } from '../../../database/SyncService';
 import { persistentLocalAssetStore, PersistentLocalAssetStore } from '../../asset/PersistentLocalAssetStore';
 import { assetSyncEngine } from '../../asset/AssetSyncEngine';
@@ -83,7 +83,7 @@ export function reduceQueue(expectedOps?: number): (ctx: AssetTestContext) => Pr
   return async () => {
     const start = Date.now();
     try {
-      const items = await syncQueueRepository.getPending();
+      const items = await RepositoryFactory.syncQueues().getPending();
       const { operations, report } = reduce(items);
       const ok = expectedOps === undefined ? true : operations.length === expectedOps;
       return {
@@ -183,7 +183,7 @@ export function validateQueueEmpty(): (ctx: AssetTestContext) => Promise<StepRes
   return async () => {
     const start = Date.now();
     try {
-      const pending = await syncQueueRepository.getPending();
+      const pending = await RepositoryFactory.syncQueues().getPending();
       const ok = pending.length === 0;
       return {
         step: 'validateQueueEmpty', status: ok ? 'PASS' : 'FAIL',
@@ -202,7 +202,7 @@ export function validateQueueCount(expected: number): (ctx: AssetTestContext) =>
   return async () => {
     const start = Date.now();
     try {
-      const pending = await syncQueueRepository.getPending();
+      const pending = await RepositoryFactory.syncQueues().getPending();
       const ok = pending.length === expected;
       return {
         step: 'validateQueueCount', status: ok ? 'PASS' : 'FAIL',

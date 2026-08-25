@@ -23,7 +23,7 @@ import { useSubjectGrades } from './useSubjectGrades';
 import { useAudioRecorder } from './useAudioRecorder';
 import { useDataStore } from '../store/useDataStore';
 import { useConnectivityStore } from '../store/useConnectivityStore';
-import { photoRepository, documentRepository, youTubeRepository, studyNoteRepository } from '../services/database';
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { useCustomAlert, alertRef } from '../components/ui/CustomAlert';
 import { generatePdfFromImages } from '../utils/pdfGenerator';
 
@@ -140,8 +140,8 @@ export function useSubjectDetail() {
           .then(p => { if (mounted && p) setPhotos(p); })
           .catch(async () => {
             if (!isOnline && mounted) {
-              const cached = await photoRepository.getBySubject(subjectId);
-              if (cached.length > 0 && mounted) setPhotos(cached);
+              const cached = await RepositoryFactory.photos().getByField('subject_id', subjectId);
+              if (cached.length > 0 && mounted) setPhotos(cached as any);
             }
           });
 
@@ -149,8 +149,8 @@ export function useSubjectDetail() {
           .then(d => { if (mounted && d) setScannedDocuments(d); })
           .catch(async () => {
             if (!isOnline && mounted) {
-              const cached = await documentRepository.getBySubject(subjectId);
-              if (cached.length > 0 && mounted) setScannedDocuments(cached);
+              const cached = await RepositoryFactory.documents().getByField('subject_id', subjectId);
+              if (cached.length > 0 && mounted) setScannedDocuments(cached as any);
             }
           });
 
@@ -179,9 +179,9 @@ export function useSubjectDetail() {
           })
           .catch(async () => {
             if (!isOnline && mounted) {
-              const cached = await youTubeRepository.getBySubject(String(subjectId));
+              const cached = await RepositoryFactory.youtube().getByField('subject_id', String(subjectId));
               if (cached.length > 0 && mounted) {
-                const filtered = cached.filter(vid => vid.subject_id === subjectId);
+                const filtered = cached.filter((vid: any) => vid.subject_id === subjectId);
                 if (filtered.length > 0) {
                   setAllSubjectVideos(filtered);
                   setRecentVideos(filtered.slice(0, 3));
@@ -190,8 +190,8 @@ export function useSubjectDetail() {
             }
           });
 
-        const pNotes = studyNoteRepository.getBySubject(subjectId)
-          .then(n => { if (mounted && n) setStudyNotes(n); })
+        const pNotes = RepositoryFactory.studyNotes().getByField('subject_id', subjectId)
+          .then((n: any) => { if (mounted && n) setStudyNotes(n); })
           .catch(() => {});
 
         await Promise.allSettled([

@@ -7,25 +7,17 @@ import type {
   Photo,
 } from '../services/database/repositories';
 import {
-  courseRepository,
-  subjectRepository,
-  assessmentRepository,
-  scheduleRepository,
-  calendarEventRepository,
-  photoRepository,
   databaseService,
 } from '../services/database';
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { syncManager } from '../services/sync/SyncManager';
 import { repositoryEventBus } from '../services/events/RepositoryEventBus';
-import { userRepository } from '../services/database/repositories/UserRepository';
 import { storageService } from '../services/storageService';
 import { getCurrentUserProfile } from '../services/api/auth/profile';
 import { getUserGroups } from '../services/api/learning/groups';
 import { getLocalGlobalGPA, getLocalPredictions } from '../services/localMasteryService';
 import { loadPredictionsFromCache, savePredictionsToCache } from '../hooks/usePredictionPolling';
 import { getTodaySchedules } from '../services/api/schedules';
-import { flashcardDeckRepository } from '../services/database/repositories/FlashcardDeckRepository';
-import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
 import type { UserProfile } from '../services/api/types';
 import { cachePolicy } from '../services/cache/CachePolicy';
 import { perfDiagnostics } from '../services/performance';
@@ -87,7 +79,8 @@ interface DataState {
 
   isInitialLoading: boolean;
   isRefreshing: boolean;
-  hasLoadedOnce: boolean;
+  loadedForSessionGeneration: string | null;
+  loadedForUserId: string | null;
   lastLoadTimestamp: number;
   isSyncing: boolean;
   syncStatusMessage: string;
@@ -110,6 +103,7 @@ interface DataState {
   preloadOfflineCache: () => Promise<void>;
   syncPendingOperations: () => Promise<{ success: number; failed: number; pending: number }>;
   getDuedeckIds: () => Set<string>;
+  resetStore: () => void;
 }
 
 function shouldRefreshEntity(entity: string, lastLoaded: number): boolean {
@@ -122,6 +116,8 @@ function shouldRefreshEntity(entity: string, lastLoaded: number): boolean {
 }
 
 export const useDataStore = create<DataState>((set, get) => {
+  const { sessionIdentity } = require('../services/api/auth/SessionIdentity');
+
   repositoryEventBus.onBatch('courses', () => {
     get().refreshCourses();
   });
@@ -166,24 +162,63 @@ export const useDataStore = create<DataState>((set, get) => {
 
   isInitialLoading: false,
   isRefreshing: false,
-  hasLoadedOnce: false,
+  loadedForSessionGeneration: null,
+  loadedForUserId: null,
   lastLoadTimestamp: 0,
   isSyncing: false,
   syncStatusMessage: '',
   syncState: 'UNAUTHENTICATED',
 
+  resetStore: () => {
+    set({
+      courses: [],
+      subjects: [],
+      assessments: [],
+      schedules: [],
+      predictions: null,
+      predictionsSource: 'none',
+      calendarEvents: [],
+      photos: [],
+      flashcardDecks: [],
+      userStats: null,
+      profile: null,
+      userGroups: [],
+      overallGpa: null,
+      entityTimestamps: {},
+      isInitialLoading: false,
+      isRefreshing: false,
+      loadedForSessionGeneration: null,
+      loadedForUserId: null,
+      lastLoadTimestamp: 0,
+      isSyncing: false,
+      syncStatusMessage: '',
+      syncState: 'UNAUTHENTICATED',
+    });
+  },
+
   loadAllData: async (forceRefresh = false) => {
     const state = get();
+    const currentGeneration = sessionIdentity.currentGeneration;
+    const currentUserId = sessionIdentity.currentUserId;
 
-    if (state.hasLoadedOnce && forceRefresh && Date.now() - state.lastLoadTimestamp < 1000) {
+    if (!currentGeneration || !currentUserId) {
+      devLog('[DataStore] loadAllData aborted: no active session generation');
+      return;
+    }
+
+    if (state.loadedForSessionGeneration === currentGeneration && forceRefresh && Date.now() - state.lastLoadTimestamp < 1000) {
       devLog('[DataStore] loadAllData(true) skipped — loaded recently');
       return;
     }
 
     if (state.isInitialLoading && !forceRefresh) return;
-    if (state.hasLoadedOnce && !forceRefresh) return;
+    if (state.loadedForSessionGeneration === currentGeneration && !forceRefresh) return;
 
-    if (!state.hasLoadedOnce) {
+    if (state.loadedForSessionGeneration !== currentGeneration) {
+      // Clear data if we're loading for a new session generation
+      if (state.loadedForSessionGeneration !== null) {
+          get().resetStore();
+      }
       set({ isInitialLoading: true });
     } else {
       set({ isRefreshing: true });
@@ -200,35 +235,35 @@ export const useDataStore = create<DataState>((set, get) => {
       const timestamps = get().entityTimestamps;
 
       if (forceRefresh || shouldRefreshEntity('courses', timestamps.courses ?? 0)) {
-        const dbCourses = await perfDiagnostics.measureAsync('sqlite.courses.getAll', () => courseRepository.getAll());
+        const dbCourses = await perfDiagnostics.measureAsync('sqlite.courses.getAll', () => RepositoryFactory.courses().getAll());
         const _hT = __DEV__ ? performance.now() : 0;
         set({ courses: dbCourses || [], entityTimestamps: { ...get().entityTimestamps, courses: now } });
         if (__DEV__) _entityTimings['courses'] = performance.now() - _hT;
       }
 
       if (forceRefresh || shouldRefreshEntity('subjects', timestamps.subjects ?? 0)) {
-        const dbSubjects = await perfDiagnostics.measureAsync('sqlite.subjects.getAll', () => subjectRepository.getAll());
+        const dbSubjects = await perfDiagnostics.measureAsync('sqlite.subjects.getAll', () => RepositoryFactory.subjects().getAll());
         const _hTS = __DEV__ ? performance.now() : 0;
         set({ subjects: dbSubjects || [], entityTimestamps: { ...get().entityTimestamps, subjects: now } });
         if (__DEV__) _entityTimings['subjects'] = performance.now() - _hTS;
       }
 
       if (forceRefresh || shouldRefreshEntity('assessments', timestamps.assessments ?? 0)) {
-        const dbAssessments = await perfDiagnostics.measureAsync('sqlite.assessments.getAll', () => assessmentRepository.getAll());
+        const dbAssessments = await perfDiagnostics.measureAsync('sqlite.assessments.getAll', () => RepositoryFactory.assessments().getAll());
         set({ assessments: dbAssessments || [], entityTimestamps: { ...get().entityTimestamps, assessments: now } });
       }
 
       if (forceRefresh || shouldRefreshEntity('schedules', timestamps.schedules ?? 0)) {
-        const dbSchedules = await perfDiagnostics.measureAsync('sqlite.schedules.getAll', () => scheduleRepository.getAll());
+        const dbSchedules = await perfDiagnostics.measureAsync('sqlite.schedules.getAll', () => RepositoryFactory.schedules().getAll());
         set({ schedules: dbSchedules || [], entityTimestamps: { ...get().entityTimestamps, schedules: now } });
       }
 
       if (forceRefresh || shouldRefreshEntity('calendar_events', timestamps.calendar_events ?? 0)) {
-        const dbCalendarEvents = await perfDiagnostics.measureAsync('sqlite.calendarEvents.getAll', () => calendarEventRepository.getAll());
+        const dbCalendarEvents = await perfDiagnostics.measureAsync('sqlite.calendarEvents.getAll', () => RepositoryFactory.calendarEvents().getAll());
         set({ calendarEvents: dbCalendarEvents || [], entityTimestamps: { ...get().entityTimestamps, calendar_events: now } });
       }
 
-      const currentUser = await userRepository.getCurrentUser();
+      const currentUser = await RepositoryFactory.users().getCurrentUser();
       if (currentUser) {
         set({ profile: currentUser as any });
         // Hidratar Boot Presentation Cache de predicciones ahora que tenemos userId.
@@ -253,7 +288,12 @@ export const useDataStore = create<DataState>((set, get) => {
         } catch {}
       }
 
-      set({ hasLoadedOnce: true, lastLoadTimestamp: Date.now(), isInitialLoading: false });
+      set({ 
+        loadedForSessionGeneration: currentGeneration, 
+        loadedForUserId: currentUserId,
+        lastLoadTimestamp: Date.now(), 
+        isInitialLoading: false 
+      });
       if (__DEV__) {
         const totalMs = (performance.now() - _auditT0).toFixed(0);
         const hydrationSummary = Object.entries(_entityTimings).map(([k, v]) => `${k}:${v.toFixed(1)}ms`).join(' ');
@@ -266,7 +306,7 @@ export const useDataStore = create<DataState>((set, get) => {
       });
     } catch (error) {
       console.error('[DataStore] Error in loadAllData:', error);
-      set({ hasLoadedOnce: true, lastLoadTimestamp: Date.now() });
+      set({ lastLoadTimestamp: Date.now() });
     } finally {
       set({ isInitialLoading: false, isRefreshing: false, isSyncing: false, syncStatusMessage: '' });
     }
@@ -280,12 +320,12 @@ export const useDataStore = create<DataState>((set, get) => {
       const _t0 = __DEV__ ? performance.now() : 0;
 
       if (shouldRefreshEntity('flashcard_decks', timestamps.flashcard_decks ?? 0)) {
-        const decks = await flashcardDeckRepository.getAll();
+        const decks = await RepositoryFactory.flashcardDecks().getAll();
         set({ flashcardDecks: decks || [], entityTimestamps: { ...get().entityTimestamps, flashcard_decks: now } });
       }
 
       if (shouldRefreshEntity('photos', timestamps.photos ?? 0)) {
-        const photos = await photoRepository.getMetadata();
+        const photos = await RepositoryFactory.photos().getMetadata();
         set({ photos: photos || [], entityTimestamps: { ...get().entityTimestamps, photos: now } });
       }
 
@@ -299,7 +339,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshCourses: async () => {
     try {
-      const dbCourses = await courseRepository.getAll();
+      const dbCourses = await RepositoryFactory.courses().getAll();
       set({ courses: dbCourses || [] });
     } catch (error) {
       console.error('[DataStore] refreshCourses error:', error);
@@ -308,7 +348,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshSubjects: async () => {
     try {
-      const dbSubjects = await subjectRepository.getAll();
+      const dbSubjects = await RepositoryFactory.subjects().getAll();
       set({ subjects: dbSubjects || [] });
     } catch (error) {
       console.error('[DataStore] refreshSubjects error:', error);
@@ -317,7 +357,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshAssessments: async () => {
     try {
-      const dbAssessments = await assessmentRepository.getAll();
+      const dbAssessments = await RepositoryFactory.assessments().getAll();
       set({ assessments: dbAssessments || [] });
     } catch (error) {
       console.error('[DataStore] refreshAssessments error:', error);
@@ -326,7 +366,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshSchedules: async () => {
     try {
-      const dbSchedules = await scheduleRepository.getAll();
+      const dbSchedules = await RepositoryFactory.schedules().getAll();
       set({ schedules: dbSchedules || [] });
     } catch (error) {
       console.error('[DataStore] refreshSchedules error:', error);
@@ -335,7 +375,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshFlashcardDecks: async () => {
     try {
-      const dbDecks = await flashcardDeckRepository.getAll();
+      const dbDecks = await RepositoryFactory.flashcardDecks().getAll();
       set({ flashcardDecks: dbDecks || [] });
     } catch (error) {
       console.error('[DataStore] refreshFlashcardDecks error:', error);
@@ -344,7 +384,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshCalendarEvents: async () => {
     try {
-      const dbEvents = await calendarEventRepository.getAll();
+      const dbEvents = await RepositoryFactory.calendarEvents().getAll();
       set({ calendarEvents: dbEvents || [] });
     } catch (error) {
       console.error('[DataStore] refreshCalendarEvents error:', error);
@@ -353,7 +393,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
   refreshPhotos: async () => {
     try {
-      const dbPhotos = await photoRepository.getMetadata();
+      const dbPhotos = await RepositoryFactory.photos().getMetadata();
       set({ photos: dbPhotos || [] });
     } catch (error) {
       console.error('[DataStore] refreshPhotos error:', error);
@@ -364,7 +404,7 @@ export const useDataStore = create<DataState>((set, get) => {
     try {
       const fresh = await getCurrentUserProfile();
       if (fresh) {
-        await userRepository.saveProfile(fresh);
+        await RepositoryFactory.users().saveProfile(fresh);
         set({ profile: fresh });
       }
     } catch {}
@@ -420,11 +460,11 @@ export const useDataStore = create<DataState>((set, get) => {
 
   preloadOfflineCache: async () => {
     try {
-      const decks = await flashcardDeckRepository.getAll();
+      const decks = await RepositoryFactory.flashcardDecks().getAll();
       if (Array.isArray(decks) && decks.length > 0) set({ flashcardDecks: decks });
       if (Array.isArray(decks) && decks.length > 0) {
         await Promise.all(decks.map(async (d: any) => {
-          await flashcardRepository.getByField('deck_id', d.id).catch(() => []);
+          await RepositoryFactory.flashcards().getByField('deck_id', d.id).catch(() => []);
         }));
       }
     } catch (error) {

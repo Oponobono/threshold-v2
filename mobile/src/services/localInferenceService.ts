@@ -7,6 +7,7 @@ let llamaContext: any = null;
 let currentModelPath: string | null = null;
 let onTokenCallback: ((token: string, accumulated: string, reasoning: string) => void) | null = null;
 let streamBuffer = '';
+let totalAccumulated = '';
 let streamFlushTimer: ReturnType<typeof setTimeout> | null = null;
 const STREAM_INTERVAL_MS = 16;
 
@@ -119,7 +120,7 @@ function flushStreamBuffer(): void {
     streamFlushTimer = null;
   }
   if (streamBuffer && onTokenCallback) {
-    onTokenCallback('', streamBuffer, '');
+    onTokenCallback('', totalAccumulated, '');
     streamBuffer = '';
   }
 }
@@ -158,6 +159,9 @@ export async function runInference(
     onTokenCallback = streamCallbacks.onToken;
   }
 
+  streamBuffer = '';
+  totalAccumulated = '';
+
   const grammar = options.grammarType ? getGrammar(options.grammarType) : '';
   const modelInfo = store.activeModelId ? MODELS[store.activeModelId] : null;
 
@@ -168,12 +172,13 @@ export async function runInference(
         grammar: grammar || undefined,
         n_predict: options.maxTokens || 512,
         temperature: options.temperature ?? 0.7,
-        stop: options.stop || ['</s>', '<|end|>', '<|eot_id|>'],
+        stop: options.stop || ['<|eot_id|>', '<|end_of_text|>', '</s>', '<|end|>', '<|im_end|>', '<end_of_turn>'],
       },
       onTokenCallback
         ? (data: any) => {
             if (data?.token) {
               streamBuffer += data.token;
+              totalAccumulated += data.token;
               if (!streamFlushTimer) {
                 streamFlushTimer = setTimeout(() => flushStreamBuffer(), STREAM_INTERVAL_MS);
               }

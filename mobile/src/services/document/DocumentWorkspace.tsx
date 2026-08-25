@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import {
   View,
@@ -28,7 +29,7 @@ import { SearchBar } from './SearchBar';
 import { Ionicons } from '@expo/vector-icons';
 import { createHighlight, getHighlights, deleteHighlight, updateHighlightColor } from './HighlightService';
 import type { DocumentHighlight, HighlightColor } from '../../domain/document/DocumentHighlight';
-import { documentAnchorRepository, type DocumentAnchorRow } from '../database/repositories';
+import type { DocumentAnchorRow } from '../database/repositories/DocumentAnchorRepository';
 import { uuidv4 } from '../../utils/uuid';
 import { useDataStore } from '../../store/useDataStore';
 
@@ -87,11 +88,11 @@ export function DocumentWorkspace({ model, rendererRegistry, source, initialPage
 
   // Load anchors on mount — Paso 1 Fase 2B
   useEffect(() => {
-    documentAnchorRepository.findByDocumentId(model.documentId).then(setAnchors);
+    RepositoryFactory.documentAnchors().findByDocumentId(model.documentId).then(setAnchors);
   }, [model.documentId]);
 
   const reloadAnchors = useCallback(() => {
-    documentAnchorRepository.findByDocumentId(model.documentId).then(setAnchors);
+    RepositoryFactory.documentAnchors().findByDocumentId(model.documentId).then(setAnchors);
   }, [model.documentId]);
 
   // Push highlights to renderer whenever they change
@@ -265,7 +266,7 @@ export function DocumentWorkspace({ model, rendererRegistry, source, initialPage
       target_id: 'manual-test',
     };
 
-    await documentAnchorRepository.create(newAnchor);
+    await RepositoryFactory.documentAnchors().create(newAnchor);
     reloadAnchors();
     setCurrentSelection(null);
     showAlert({ title: 'Anclado', message: 'Ancla creada correctamente', type: 'success' });

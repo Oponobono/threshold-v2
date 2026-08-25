@@ -1,15 +1,15 @@
 import { EntitySynchronizer } from '../EntitySynchronizer';
-import { studyNoteRepository } from '../../database/repositories/StudyNoteRepository';
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 
 export class StudyNoteSynchronizer implements EntitySynchronizer {
   readonly entityType = 'study_notes';
 
   async saveAll(items: any[]): Promise<number> {
-    await studyNoteRepository.upsertMany(items);
+    await RepositoryFactory.studyNotes().upsertMany(items);
     return items.length;
   }
 
   async deleteItem(id: string): Promise<void> {
-    await studyNoteRepository.delete(id);
+    await RepositoryFactory.studyNotes().delete(id);
   }
 }

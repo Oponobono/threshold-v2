@@ -1,13 +1,9 @@
+import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDataStore } from '../store/useDataStore';
 import { getSemesterSummary, SemesterSummary } from '../services/api/analytics';
 import { SCALE_MAX } from '../utils/grades';
 import { calculateProjection } from '../utils/projectionEngine';
-import { studyNoteRepository } from '../services/database/repositories/StudyNoteRepository';
-import { documentRepository } from '../services/database/repositories/DocumentRepository';
-import { youTubeRepository } from '../services/database/repositories/YouTubeRepository';
-import { audioRepository } from '../services/database/repositories/AudioRepository';
-import { flashcardRepository } from '../services/database/repositories/FlashcardRepository';
 import { theme } from '../styles/theme';
 import { perfDiagnostics } from '../services/performance';
 
@@ -164,11 +160,11 @@ export function useSubjects(t: any, lang?: string) {
   const loadActivityFeed = useCallback(async () => {
     try {
       const [notes, docs, videos, recordings, flashcards] = await Promise.all([
-        studyNoteRepository.getAll().catch(() => []),
-        documentRepository.getAll().catch(() => []),
-        youTubeRepository.getAll().catch(() => []),
-        audioRepository.getAll().catch(() => []),
-        flashcardRepository.getAll().catch(() => []),
+        RepositoryFactory.studyNotes().getAll().catch(() => []),
+        RepositoryFactory.documents().getAll().catch(() => []),
+        RepositoryFactory.youtube().getAll().catch(() => []),
+        RepositoryFactory.audio().getAll().catch(() => []),
+        RepositoryFactory.flashcards().getAll().catch(() => []),
       ]);
       setExtraItems({ notes, docs, videos, recordings, flashcards });
     } catch (err) {

@@ -1,7 +1,7 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { createMMKV } from 'react-native-mmkv';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import { flashcardDeckRepository } from '../database/repositories/FlashcardDeckRepository';
 
 export interface MigrationAudit {
   totalDecks: number;
@@ -69,10 +69,10 @@ export async function migrateFlashcardsFromMMKV(): Promise<MigrationReport | nul
       const safeId = isNegative ? uuidv4() : String(deck.id);
       if (isNegative) reassignedIds++;
 
-      await flashcardDeckRepository.upsert({ ...deck, id: safeId });
+      await RepositoryFactory.flashcardDecks().upsert({ ...deck, id: safeId });
 
       // Verificación de integridad de contenido (no solo existencia)
-      const stored = await flashcardDeckRepository.getById(safeId);
+      const stored = await RepositoryFactory.flashcardDecks().getById(safeId);
       if (!stored || stored.title !== deck.title || String(stored.user_id) !== String(deck.user_id)) {
         throw new Error(`Integrity check failed for deck ${safeId}`);
       }

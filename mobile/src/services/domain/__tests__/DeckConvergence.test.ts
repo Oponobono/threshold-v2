@@ -1,6 +1,5 @@
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 import { FlashcardDomainService } from '../FlashcardDomainService';
-import { flashcardDeckRepository } from '../../database/repositories/FlashcardDeckRepository';
-import { flashcardRepository } from '../../database/repositories/FlashcardRepository';
 
 /**
  * Test de convergencia: ruta de persistencia inmediata (saveGeneratedDeck)
@@ -156,10 +155,10 @@ describe('Convergencia: saveGeneratedDeck (inmediato) vs upsertMany (Delta Sync)
     const deckRow = tableRows('flashcard_decks').filter((r: any) => r.id === 'deck-back-1');
     expect(deckRow).toHaveLength(1);
 
-    await flashcardDeckRepository.upsertMany([
+    await RepositoryFactory.flashcardDecks().upsertMany([
       { id: 'deck-back-1', user_id: 'user-1', title: deckPayload.title, topic: deckPayload.topic, version_number: 2 },
     ] as any);
-    await flashcardRepository.upsertMany(deckPayload.cards.map((c) => ({
+    await RepositoryFactory.flashcards().upsertMany(deckPayload.cards.map((c) => ({
       id: c.id,
       deck_id: c.deckId,
       front: c.front,
@@ -174,10 +173,10 @@ describe('Convergencia: saveGeneratedDeck (inmediato) vs upsertMany (Delta Sync)
   });
 
   it('B: upsertMany primero (otro dispositivo), luego saveGeneratedDeck → sin duplicar', async () => {
-    await flashcardDeckRepository.upsertMany([
+    await RepositoryFactory.flashcardDecks().upsertMany([
       { id: 'deck-back-1', user_id: 'user-1', title: deckPayload.title, topic: deckPayload.topic, version_number: 1 },
     ] as any);
-    await flashcardRepository.upsertMany(deckPayload.cards.map((c) => ({
+    await RepositoryFactory.flashcards().upsertMany(deckPayload.cards.map((c) => ({
       id: c.id,
       deck_id: c.deckId,
       front: c.front,
@@ -196,10 +195,10 @@ describe('Convergencia: saveGeneratedDeck (inmediato) vs upsertMany (Delta Sync)
     await service.saveGeneratedDeck(deckPayload);
 
     for (let i = 0; i < 2; i++) {
-      await flashcardDeckRepository.upsertMany([
+      await RepositoryFactory.flashcardDecks().upsertMany([
         { id: 'deck-back-1', user_id: 'user-1', title: deckPayload.title, topic: deckPayload.topic, version_number: 2 },
       ] as any);
-      await flashcardRepository.upsertMany(deckPayload.cards.map((c) => ({
+      await RepositoryFactory.flashcards().upsertMany(deckPayload.cards.map((c) => ({
         id: c.id,
         deck_id: c.deckId,
         front: c.front,
@@ -216,7 +215,7 @@ describe('Convergencia: saveGeneratedDeck (inmediato) vs upsertMany (Delta Sync)
   it('el título y el topic convergen al valor del backend (payload autoritativo)', async () => {
     await service.saveGeneratedDeck({ ...deckPayload, title: 'Título local provisional' });
 
-    await flashcardDeckRepository.upsertMany([
+    await RepositoryFactory.flashcardDecks().upsertMany([
       { id: 'deck-back-1', user_id: 'user-1', title: 'Expo en React — Programación', topic: 'Expo en React', version_number: 2 },
     ] as any);
 

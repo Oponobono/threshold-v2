@@ -23,6 +23,7 @@ import { downloadCloudItems } from '../services/backup/downloadService';
 import { storageService } from '../services/storageService';
 import { preloadAllUserData, PreloadProgress } from '../services/dataPreloader';
 import { syncManager } from '../services/sync/SyncManager';
+import { sessionIdentity } from '../services/api/auth/SessionIdentity';
 
 /**
  * Hook personalizado que maneja toda la lógica de autenticación de la pantalla de Login.
@@ -165,6 +166,7 @@ export const useLoginAuth = () => {
                   await storageService.saveSecure('jwt_token', sessionToken);
                   await storageService.saveSecure('app_user_email', email);
                   await storageService.saveSecure('app_user_id', loginData.user.id.toString());
+                  sessionIdentity.startSession(loginData.user.id.toString());
                   alertRef.show({ title: t('common.success'), message: t('login.accountRecovered'), type: 'success' });
                   navigateAfterSync();
                 } catch (error: any) {

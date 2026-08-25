@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import type { SyncScenario, ScenarioResult, FaultRule } from '../types';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { reduce } from '../../reducer/index';
 import { syncDebugger } from '../../SyncDebugger';
 
@@ -12,7 +12,7 @@ export class StressScenario implements SyncScenario {
   description = `Inserta ${TOTAL_OPS} operaciones de ${ENTITY_COUNT} entidades y verifica que el reducer las procesa sin errores`;
 
   async setup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 
   async execute(): Promise<string> {
@@ -37,7 +37,7 @@ export class StressScenario implements SyncScenario {
       }
 
       for (const op of ops) {
-        await syncQueueRepository.enqueue(op);
+        await RepositoryFactory.syncQueues().enqueue(op);
       }
     }
 
@@ -46,7 +46,7 @@ export class StressScenario implements SyncScenario {
   }
 
   async validate(): Promise<ScenarioResult> {
-    const pending = await syncQueueRepository.getPending();
+    const pending = await RepositoryFactory.syncQueues().getPending();
 
     let durationMs = 0;
     let reducedCount = 0;
@@ -100,6 +100,6 @@ export class StressScenario implements SyncScenario {
   }
 
   async cleanup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 }

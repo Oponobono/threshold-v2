@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 /**
  * LinkExamModal.tsx
  *
@@ -30,7 +31,6 @@ import {
   CalendarEvent,
   updateCalendarEvent,
 } from '../../services/api/calendar';
-import { calendarEventRepository, flashcardDeckRepository } from '../../services/database';
 import { updateFlashcardDeck } from '../../services/api/flashcards';
 import { alertRef } from '../ui/CustomAlert';
 
@@ -115,7 +115,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
     setCurrentLinkedExam(null);
     setLoading(true);
 
-    calendarEventRepository.getAll()
+    RepositoryFactory.calendarEvents().getAll()
       .then(async (all) => {
         const deckId = String(deck?.id ?? '');
         const linkedEventId = (deck as any)?.linked_event_id;
@@ -126,7 +126,7 @@ export const LinkExamModal: React.FC<Props> = ({ visible, deck, onClose, onLinke
           const rawId = String(linkedEventId).split(',')[0].trim();
           linked = (all as any[]).find(e => String(e.id) === rawId) ?? null;
           if (!linked) {
-            linked = await calendarEventRepository.getById(rawId).catch(() => null);
+            linked = await RepositoryFactory.calendarEvents().getById(rawId).catch(() => null);
           }
         }
 

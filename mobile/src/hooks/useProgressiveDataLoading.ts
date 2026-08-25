@@ -15,20 +15,14 @@ import { useDataStore } from '../store/useDataStore';
  * ```
  */
 export const useProgressiveDataLoading = () => {
-  const { loadAllData, hasLoadedOnce } = useDataStore();
+  const { loadAllData } = useDataStore();
 
   const loadDataProgressive = useCallback(async () => {
-    if (hasLoadedOnce) {
-      // Bootstrap ya cargó los datos. El sync engine actualiza el store reactivamente.
-      // No necesitamos re-leer SQLite completo aquí.
-      return;
-    }
-
     console.log('[ProgressiveDataLoading] 🚀 Iniciando carga progresiva...');
     loadAllData().catch((err) => {
       console.warn('[ProgressiveDataLoading] Error actualizando:', err);
     });
-  }, [loadAllData, hasLoadedOnce]);
+  }, [loadAllData]);
 
   useEffect(() => {
     loadDataProgressive();

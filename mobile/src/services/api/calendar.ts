@@ -1,6 +1,7 @@
 import { fetchWithFallback, parseJsonSafely } from './client';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 import { getUserId } from './auth';
-import { calendarEventRepository, syncService } from '../database';
+import { syncService } from '../database';
 import { uuidv4 } from '../../utils/uuid';
 
 export interface CalendarEventData {
@@ -45,7 +46,7 @@ export const createCalendarEvent = async (event: CalendarEventData): Promise<Cal
   if (!userId) throw new Error('No hay sesión activa.');
 
   const evt: any = { id, user_id: String(userId), title: event.title, event_type: event.eventType, subject_id: event.subjectId, linked_deck_id: event.deckId, start_date: event.startDate, end_date: event.endDate, all_day: event.allDay ? 1 : 0, description: event.description, study_plan_flag: event.createStudyPlan ? 1 : 0 };
-  await calendarEventRepository.create(evt);
+  await RepositoryFactory.calendarEvents().create(evt);
 
   try {
     const response = await fetchWithFallback('/calendar/events', {
@@ -56,7 +57,7 @@ export const createCalendarEvent = async (event: CalendarEventData): Promise<Cal
     const data = await parseJsonSafely(response);
     if (response.ok && data) {
       const normalized = normalizeEventForLocal(data, String(userId));
-      await calendarEventRepository.update(normalized.id, normalized);
+      await RepositoryFactory.calendarEvents().update(normalized.id, normalized);
       return data;
     }
     throw new Error(data?.error || 'Error del servidor');
@@ -71,7 +72,7 @@ export const getCalendarEvents = async (startDate?: string, endDate?: string): P
   if (!userId) throw new Error('No hay sesión activa.');
 
   // 1. Leer localmente primero
-  const localData = await calendarEventRepository.getByUser(String(userId));
+  const localData = await RepositoryFactory.calendarEvents().getAll();
 
   // 2. Sincronizar en background
   (async () => {
@@ -85,7 +86,7 @@ export const getCalendarEvents = async (startDate?: string, endDate?: string): P
         const events = Array.isArray(data) ? data : [];
         for (const e of events) {
           const normalized = normalizeEventForLocal(e, String(userId));
-          if (normalized.user_id) await calendarEventRepository.upsertFromCloud(normalized);
+          if (normalized.user_id) await RepositoryFactory.calendarEvents().upsert(normalized);
         }
       }
     } catch {}
@@ -100,7 +101,7 @@ export const getCalendarEventById = async (eventId: string): Promise<CalendarEve
   if (!userId) throw new Error('No hay sesión activa.');
 
   // 1. Leer localmente primero
-  const localData = await calendarEventRepository.getById(eventId);
+  const localData = await RepositoryFactory.calendarEvents().getById(eventId);
 
   // 2. Sincronizar en background
   (async () => {
@@ -108,7 +109,7 @@ export const getCalendarEventById = async (eventId: string): Promise<CalendarEve
       const response = await fetchWithFallback(`/calendar/events/${eventId}?user_id=${userId}`);
       if (response.ok) {
         const data = await parseJsonSafely(response);
-        if (data) await calendarEventRepository.upsertFromCloud(normalizeEventForLocal(data, String(userId)));
+        if (data) await RepositoryFactory.calendarEvents().upsert(normalizeEventForLocal(data, String(userId)));
       }
     } catch {}
   })();
@@ -128,14 +129,14 @@ export const updateCalendarEvent = async (eventId: string, updates: Partial<Cale
   if (updates.allDay !== undefined) data.all_day = updates.allDay ? 1 : 0;
   if (updates.createStudyPlan !== undefined) data.study_plan_flag = updates.createStudyPlan ? 1 : 0;
 
-  await calendarEventRepository.update(eventId, data);
+  await RepositoryFactory.calendarEvents().update(eventId, data);
 
   syncService.enqueueUpdate('calendar-event', eventId, updates).catch(() => {});
   return { ...data, _isPending: true };
 };
 
 export const deleteCalendarEvent = async (eventId: string): Promise<void> => {
-  await calendarEventRepository.delete(eventId);
+  await RepositoryFactory.calendarEvents().delete(eventId);
 
   try {
     const userId = await getUserId();

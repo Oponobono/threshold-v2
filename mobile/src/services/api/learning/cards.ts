@@ -1,6 +1,6 @@
+import { RepositoryFactory } from '../../database/RepositoryFactory';
 import { fetchWithFallback, parseJsonSafely } from '../client';
 import { getUserId } from '../auth';
-import { cardLogRepository, syncService } from '../../database';
 import type { CardLog } from '../types';
 import { uuidv4 } from '../../../utils/uuid';
 
@@ -9,7 +9,7 @@ export const getCardLogs = async (): Promise<CardLog[]> => {
   if (!userId) return [];
 
   // 1. Leer localmente primero
-  const localData = await cardLogRepository.getAll();
+  const localData = await RepositoryFactory.cardLogs().getAll();
 
   // 2. Sincronizar en background
   (async () => {
@@ -18,7 +18,7 @@ export const getCardLogs = async (): Promise<CardLog[]> => {
       if (response.ok) {
         const data = await parseJsonSafely(response);
         if (Array.isArray(data)) {
-          for (const l of data) await cardLogRepository.upsertFromCloud(l);
+          for (const l of data) await RepositoryFactory.cardLogs().upsert(l);
         }
       }
     } catch {}
@@ -39,7 +39,7 @@ export const createCardLog = async (logData: Omit<CardLog, 'id' | 'timestamp' | 
   if (!userId) throw new Error('Usuario no autenticado');
 
   const log: any = { id, user_id: String(userId), ...logData };
-  await cardLogRepository.create(log);
+  await RepositoryFactory.cardLogs().create(log);
 
   try {
     const response = await fetchWithFallback('/learning/card_logs', {

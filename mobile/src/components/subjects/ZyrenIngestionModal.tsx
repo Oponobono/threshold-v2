@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Modal,
@@ -11,7 +12,6 @@ import { theme } from '../../styles/theme';
 import { fetchWithFallback } from '../../services/api/client';
 import { extractTextFromImageHybrid, generateClassFlashcardsHybrid } from '../../services/hybridAIService';
 import { uuidv4 } from '../../utils/uuid';
-import { studyNoteRepository } from '../../services/database';
 import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
 import type { CardDirection } from '../../services/api/types';
 import { styles } from '../../styles/ZyrenIngestionModal.styles';
@@ -163,7 +163,7 @@ export function ZyrenIngestionModal({
         processing_state: 'completed',
       };
 
-      await studyNoteRepository.create(notePayload);
+      await RepositoryFactory.studyNotes().create(notePayload);
 
       try {
         if (userId) {

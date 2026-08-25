@@ -1,10 +1,10 @@
+import { RepositoryFactory } from '../../services/database/RepositoryFactory';
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../../styles/theme';
 import { flashcardsScreenStyles as styles } from '../../styles/FlashcardsScreen.styles';
-import { syncQueueRepository } from '../../services/database';
 
 interface Props {
   showSearch: boolean;
@@ -17,7 +17,7 @@ export const FlashcardHeader: React.FC<Props> = ({ showSearch, onToggleSearch, o
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    syncQueueRepository.countPending().then(setPendingCount);
+    RepositoryFactory.syncQueues().countPending().then(setPendingCount);
   }, []);
 
   return (

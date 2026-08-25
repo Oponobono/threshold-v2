@@ -1,5 +1,5 @@
+import { RepositoryFactory } from '../../../database/RepositoryFactory';
 import type { SyncScenario, ScenarioResult, FaultRule } from '../types';
-import { syncQueueRepository } from '../../../database/repositories/SyncQueueRepository';
 import { reduce } from '../../reducer/index';
 import { syncDebugger } from '../../SyncDebugger';
 import { databaseService } from '../../../database/DatabaseService';
@@ -10,7 +10,7 @@ export class QueueReductionScenario implements SyncScenario {
   description = 'Verifica que múltiples UPDATEs del mismo ID se colapsan a una sola operación';
 
   async setup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 
   async execute(): Promise<string> {
@@ -19,7 +19,7 @@ export class QueueReductionScenario implements SyncScenario {
     for (let i = 1; i <= 10; i++) {
       const entityId = `reduce-test-${String(i).padStart(3, '0')}`;
 
-      await syncQueueRepository.enqueue({
+      await RepositoryFactory.syncQueues().enqueue({
         entity_type: 'subject',
         entity_id: entityId,
         operation: 'CREATE',
@@ -27,7 +27,7 @@ export class QueueReductionScenario implements SyncScenario {
         trace_id: traceId,
       });
 
-      await syncQueueRepository.enqueue({
+      await RepositoryFactory.syncQueues().enqueue({
         entity_type: 'subject',
         entity_id: entityId,
         operation: 'UPDATE',
@@ -35,7 +35,7 @@ export class QueueReductionScenario implements SyncScenario {
         trace_id: traceId,
       });
 
-      await syncQueueRepository.enqueue({
+      await RepositoryFactory.syncQueues().enqueue({
         entity_type: 'subject',
         entity_id: entityId,
         operation: 'UPDATE',
@@ -49,7 +49,7 @@ export class QueueReductionScenario implements SyncScenario {
   }
 
   async validate(): Promise<ScenarioResult> {
-    const pending = await syncQueueRepository.getPending();
+    const pending = await RepositoryFactory.syncQueues().getPending();
     const { operations, report } = reduce(pending);
 
     const expectedOps = 10;
@@ -79,6 +79,6 @@ export class QueueReductionScenario implements SyncScenario {
   }
 
   async cleanup(): Promise<void> {
-    await syncQueueRepository.clearAll();
+    await RepositoryFactory.syncQueues().clearAll();
   }
 }

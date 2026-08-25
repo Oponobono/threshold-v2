@@ -1,3 +1,4 @@
+import { RepositoryFactory } from '../database/RepositoryFactory';
 export type BootstrapPhase =
   | 'DATABASE'
   | 'STORAGE'
@@ -22,8 +23,8 @@ import { migrateFlashcardsFromMMKV } from '../migration/migrateFlashcardsFromMMK
 import { networkManager } from '../network/NetworkManager';
 import { useConnectivityStore } from '../../store/useConnectivityStore';
 import { initializeApiClient, fetchWithFallback } from '../api/client';
-import { userRepository } from '../database/repositories/UserRepository';
 import { getCurrentUserProfile, getUserId } from '../api/auth';
+import { sessionIdentity } from '../api/auth/SessionIdentity';
 import { KnowledgeProjection } from '../../domain/knowledge/KnowledgeProjection';
 import { SnapshotBuildReason } from '../../domain/knowledge/SnapshotTelemetryTypes';
 import { syncManager } from '../sync/SyncManager';
@@ -31,7 +32,6 @@ import { syncManager } from '../sync/SyncManager';
 // circular dependency: BootstrapManager → useDataStore → barrel → CourseRepository → SyncService
 import { MomentumService } from '../MomentumService';
 import { useDataStore } from '../../store/useDataStore';
-import { flashcardDeckRepository } from '../database/repositories/FlashcardDeckRepository';
 import { waitForAICatalogHydration } from '../../store/useAICatalogsStore';
 
 type BootstrapListener = (state: BootstrapState) => void;
@@ -40,7 +40,7 @@ class BootstrapManager {
   private _currentPhase: BootstrapPhase = 'DATABASE';
   private _status: BootstrapStatus = 'pending';
   private _listeners: Set<BootstrapListener> = new Set();
-  private _started = false;
+  private _startedForSession: string | null = null;
 
   get currentPhase(): BootstrapPhase {
     return this._currentPhase;
@@ -90,9 +90,26 @@ class BootstrapManager {
   private _error?: string;
 
   async start(): Promise<void> {
-    if (this._started) { console.log('[BOOT] start() already called, skipping'); return; }
+    const currentGeneration = sessionIdentity.currentGeneration;
+    if (!currentGeneration) {
+      console.log('[BOOT] start() aborted: no active session generation');
+      return;
+    }
+    
+    if (this._startedForSession === currentGeneration) { 
+      console.log('[BOOT] start() already called for this session, skipping'); 
+      return; 
+    }
+    
+    // Clear status if we're starting a new session
+    if (this._startedForSession !== currentGeneration && this._startedForSession !== null) {
+      this._status = 'pending';
+      this._currentPhase = 'DATABASE';
+    }
+
     if (this._status === 'running') { console.log('[BOOT] start() already running, skipping'); return; }
     this._status = 'running';
+    this._startedForSession = currentGeneration;
     this._emit();
     console.log('[BOOT 06] BootstrapManager.start() begins');
 
@@ -137,7 +154,7 @@ class BootstrapManager {
         // Caso 1: Cargar perfil desde SQLite (local, rápido, sin red)
         let localProfileExists = false;
         try {
-          localProfileExists = !!(await userRepository.getCurrentUser());
+          localProfileExists = !!(await RepositoryFactory.users().getCurrentUser());
           console.log(localProfileExists
             ? '[BOOT 11a] Profile loaded from local DB'
             : '[BOOT 11b] No local profile (first install)');
@@ -160,23 +177,7 @@ class BootstrapManager {
         const { syncService } = await import('../database/SyncService');
         this._registerSyncHandlers(syncService);
 
-        // Fire-and-forget: login y sync se ejecutan en background
-        // SyncManager es el único punto de entrada para sync
-        syncManager.login().then(() => {
-          console.log('[BACKGROUND] Sync login completed (async)');
-          syncService.getPendingCount().then(pendingCount => {
-            if (pendingCount > 0) {
-              console.log(`[BACKGROUND] ${pendingCount} pending operations, syncing...`);
-              syncManager.sync().catch(err =>
-                console.warn('[BACKGROUND] Sync on init failed:', err)
-              );
-            }
-          }).catch(() => {});
-        }).catch((err: any) => {
-          console.warn('[BACKGROUND] Sync login failed (non-blocking):', err?.message);
-        });
-
-        console.log('[BOOT 12z] Sync dispatched (non-blocking)');
+        console.log('[BOOT 12z] Sync handlers registered');
       });
 
       await this._runPhase('AI_CATALOG', async () => {
@@ -207,6 +208,26 @@ class BootstrapManager {
         console.log('[BOOT 15] PHASE READY');
         console.log('[BOOT 15a] App ready');
       });
+
+      // Fire-and-forget: Sync Login & Pending Sync
+      // Desplazado POST-LOCAL_READY para evitar peticiones de red (ej. delta sync) antes de la hidratación
+      (async () => {
+        try {
+          await syncManager.login();
+          console.log('[BACKGROUND] Sync login completed (async)');
+          
+          const { syncService } = await import('../database/SyncService');
+          const pendingCount = await syncService.getPendingCount();
+          if (pendingCount > 0) {
+            console.log(`[BACKGROUND] ${pendingCount} pending operations, syncing...`);
+            syncManager.sync().catch(err =>
+              console.warn('[BACKGROUND] Sync on init failed:', err)
+            );
+          }
+        } catch (err: any) {
+          console.warn('[BACKGROUND] Sync login failed (non-blocking):', err?.message);
+        }
+      })();
 
       // Fire-and-forget: Reminder Coordinator + EventBus + Sync subscription
       (async () => {
@@ -275,7 +296,7 @@ class BootstrapManager {
         try {
           const profile = await getCurrentUserProfile();
           if (profile) {
-            await userRepository.saveProfile(profile);
+            await RepositoryFactory.users().saveProfile(profile);
             console.log('[BACKGROUND] Profile refreshed from remote');
           }
         } catch (err: any) {
@@ -283,7 +304,6 @@ class BootstrapManager {
         }
       })();
 
-      this._started = true;
       this._status = 'done';
       this._emit();
       console.log('[BOOT 15] BootstrapManager.start() completed successfully');
@@ -492,6 +512,10 @@ class BootstrapManager {
         payload.sync_version = payload.version_number;
       }
 
+      if (operation === 'CREATE' && entity_id && payload && !payload.id) {
+        payload.id = entity_id;
+      }
+
       const options: RequestInit = {
         method: operation === 'CREATE' ? 'POST' : operation === 'UPDATE' ? 'PUT' : 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -500,7 +524,16 @@ class BootstrapManager {
         options.body = JSON.stringify(payload);
       }
 
+      // Capture generation before await
+      const currentGeneration = sessionIdentity.currentGeneration;
+      
       const response = await fetchWithFallback(path, options);
+
+      // Validate generation after await
+      if (currentGeneration && !sessionIdentity.isValidGeneration(currentGeneration)) {
+        throw new Error('SYNC_ABORTED: Session generation changed during push operation');
+      }
+
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData?.error || `HTTP ${response.status}`);
@@ -510,7 +543,7 @@ class BootstrapManager {
         try {
           const body = await response.json().catch(() => null);
           if (body?.id) {
-              await flashcardDeckRepository.upsert({
+              await RepositoryFactory.flashcardDecks().upsert({
               id: body.id,
               user_id: body.user_id || payload?.user_id || '',
               title: body.title || payload?.title || '',
