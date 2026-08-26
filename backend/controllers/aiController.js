@@ -25,6 +25,7 @@ const {
  */
 function getLLMProvider(req) {
   const provider = req.query?.provider || req.body?.provider || 'groq';
+  if (provider === 'local') return 'local';
   return (provider === 'gemini' || provider === 'groq') ? provider : 'groq';
 }
 
@@ -1266,6 +1267,11 @@ exports.chatProxy = async (req, res) => {
   }
 
   const provider = getLLMProvider(req);
+
+  if (provider === 'local') {
+    return res.status(400).json({ error: 'El proveedor local se ejecuta en el dispositivo. No se puede resolver en el servidor.' });
+  }
+
   const startTime = Date.now();
 
   const modelPreference = resolveModelPreferenceFromRequest(req, provider);

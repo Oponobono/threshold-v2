@@ -7,8 +7,7 @@ const GROQ_ALLOW_LIST = [
   'llama-3.1-70b-versatile',
   'llama-3.3-70b-versatile',
   'llama-3.2-1b-preview',
-  'llama-3.2-3b-preview',
-  'mixtral-8x7b-32768'
+  'llama-3.2-3b-preview'
 ];
 
 const GEMINI_ALLOW_LIST = [
@@ -39,7 +38,6 @@ const GROQ_PRIORITY_LIST = [
   'llama-3.1-8b-instant',
   'llama-3.1-70b-versatile',
   'llama-3.3-70b-versatile',
-  'mixtral-8x7b-32768',
   'qwen/qwen3.6-27b',      // Modelo de razonamiento — no apto para JSON estructurado directo
 ];
 
@@ -107,17 +105,27 @@ function getEligibleModels(provider, capability = 'text') {
 
 // Error parsers
 function parseGroqModelError(error) {
+  const errorBody = error?.details || error?.message || '';
+  const msgToCheck = (typeof errorBody === 'string')
+    ? errorBody
+    : (errorBody?.error?.message || error?.message || '');
+
+  const lower = msgToCheck.toLowerCase();
+
+  // Verificar por HTTP status (error directo de la API)
   if (error?.status === 400 || error?.status === 404) {
-    const errorBody = error.details || error.message;
-    const msgToCheck = (typeof errorBody === 'string') 
-      ? errorBody 
-      : (errorBody?.error?.message || error.message || '');
-      
-    const lower = msgToCheck.toLowerCase();
     if (lower.includes('model') && (lower.includes('does not exist') || lower.includes('not found') || lower.includes('decommissioned'))) {
       return true;
     }
   }
+
+  // Verificar por mensaje (Error genérico de GroqProvider o error envuelto)
+  if (lower.includes('decommissioned') || lower.includes('model_not_found')
+    || (lower.includes('model') && lower.includes('not found'))
+    || (lower.includes('model') && lower.includes('does not exist'))) {
+    return true;
+  }
+
   return false;
 }
 

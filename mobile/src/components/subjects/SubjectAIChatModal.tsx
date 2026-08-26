@@ -31,6 +31,7 @@ import { resolveIntent } from '../../services/ai/ConversationIntentResolver';
 import { LLMProvider, getPreferredLLMProvider, setPreferredLLMProvider } from '../../utils/llmProviderManager';
 import { useLocalAIStore } from '../../store/useLocalAIStore';
 import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
+import { uuidv4 } from '../../utils/uuid';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -588,8 +589,9 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
       if (deck.id) {
         try {
           const { flashcardDomainService } = await import('../../services/domain/FlashcardDomainService');
+          const resolvedDeckId = deck.id;
           await flashcardDomainService.saveGeneratedDeck({
-            id: deck.id,
+            id: resolvedDeckId,
             title: finalTitle,
             description: '',
             topic: finalTopic,
@@ -600,8 +602,8 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
               const front = itemType === 'flashcard' ? (content.front || card.front || '') : JSON.stringify(content);
               const back = itemType === 'flashcard' ? (content.back || card.back || '') : '';
               return {
-                id: card.id,
-                deckId: card.deckId,
+                id: card.id || uuidv4(),
+                deckId: card.deckId || resolvedDeckId,
                 front,
                 back,
                 item_type: itemType,

@@ -10,7 +10,7 @@ class FlashcardDeckAggregate {
     this.mode = mode;
     this.description = description || 'Mazo generado autom�ticamente por Zyren';
     this.syncVersion = syncVersion;
-    this.cards = cards.map(c => ({ id: uuidv4(), deckId: this.id, ...c }));
+    this.cards = cards.map(c => ({ id: c.id || uuidv4(), deckId: this.id, ...c }));
   }
 }
 

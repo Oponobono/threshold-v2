@@ -49,9 +49,20 @@ class AIOrchestrator {
     const ctx = this._buildContext();
     const decision = aiExecutionPolicy.resolve(ctx);
 
-    const provider = decision.provider === 'cloud'
-      ? this._cloudProvider
-      : this._localProvider;
+    // Respetar selección explícita del usuario: 'local' → LocalProvider,
+    // 'groq'/'gemini' → CloudProvider. Solo usar AIExecutionPolicy cuando
+    // no hay preferencia explícita (req.provider undefined/null).
+    const explicitProvider = req.provider === 'local'
+      ? this._localProvider
+      : req.provider === 'groq' || req.provider === 'gemini'
+        ? this._cloudProvider
+        : undefined;
+
+    const provider = explicitProvider ?? (
+      decision.provider === 'cloud'
+        ? this._cloudProvider
+        : this._localProvider
+    );
 
     try {
       const result = await provider.chat(req);
@@ -59,19 +70,23 @@ class AIOrchestrator {
         await semanticCache.set(queryText, result.content, result.model);
       }
       return result;
-    } catch (cloudErr: any) {
-      if (decision.provider === 'cloud') {
-        console.warn(`[AIOrchestrator] Cloud failed (${cloudErr.message}), trying local...`);
-        const localAvailable = await this._localProvider.isAvailable();
-        if (localAvailable) {
-          const result = await this._localProvider.chat(req);
+    } catch (primaryErr: any) {
+      // Solo intentar fallback si la selección fue automática (sin preferencia explícita)
+      if (!explicitProvider) {
+        const fallback = provider === this._cloudProvider
+          ? this._localProvider
+          : this._cloudProvider;
+        console.warn(`[AIOrchestrator] ${provider.name} failed (${primaryErr.message}), trying ${fallback.name}...`);
+        const fallbackAvailable = await fallback.isAvailable();
+        if (fallbackAvailable) {
+          const result = await fallback.chat(req);
           if (result.content.length > 20) {
             await semanticCache.set(queryText, result.content, result.model);
           }
           return result;
         }
       }
-      throw cloudErr;
+      throw primaryErr;
     }
   }
 }

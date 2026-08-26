@@ -57,10 +57,18 @@ ${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
       : `Genera el material de estudio sobre el tema solicitado.`;
 
     // Un token = aprox 3-4 caracteres.
-    // Calculamos los tokens de entrada para no exceder el límite duro de 8000 TPM de la API gratuita.
+    // Calculamos los tokens de entrada para no exceder el límite del contexto.
+    // Groq free tier: 8192 context (llama-3.1-8b). Modelos mayores: 32k+.
+    // Usamos 8192 como denominator conservador y dejamos al menos 4096 para output.
     const estimatedInputTokens = Math.ceil((userContent.length + systemPrompt.length) / 3.5);
-    const safeMaxTokens = Math.max(1500, 8000 - estimatedInputTokens - 200); // 200 de margen
+    const contextBudget = 8192;
+    const safeMaxTokens = Math.max(4096, contextBudget - estimatedInputTokens - 200);
     const generationOptions = { temperature: 0.15, max_tokens: safeMaxTokens, allowReasoningModels: false };
+
+    // Aplicar preferencia de modelo específica si el usuario eligió uno manualmente
+    if (request.modelPreference?.mode === 'manual' && request.modelPreference.modelId) {
+      generationOptions.model = request.modelPreference.modelId;
+    }
 
     try {
       const response = await ModelClass.generate(

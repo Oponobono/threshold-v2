@@ -1,8 +1,17 @@
 const FlashcardCapability = require('../services/ai/capabilities/FlashcardCapability');
 const GenerateFlashcardsRequest = require('../services/ai/contracts/GenerateFlashcardsRequest');
+const { resolveModelPreferenceFromRequest } = require('../utils/modelRegistry');
 
 exports.generateFlashcards = async (req, res) => {
   try {
+    const provider = req.body.provider || 'groq';
+
+    if (provider === 'local') {
+      return res.status(400).json({ error: 'El proveedor local se ejecuta en el dispositivo. No se puede resolver en el servidor.' });
+    }
+
+    const modelPreference = resolveModelPreferenceFromRequest(req, provider);
+
     const request = new GenerateFlashcardsRequest({
       mode: req.body.mode || 'mixed',
       count: req.body.count || 10,
@@ -10,7 +19,8 @@ exports.generateFlashcards = async (req, res) => {
       topic: req.body.topic,
       subjectId: req.body.subject_id,
       userId: req.user.id,
-      provider: req.body.provider || 'groq',
+      provider,
+      modelPreference,
       items: req.body.items || []
     });
 
