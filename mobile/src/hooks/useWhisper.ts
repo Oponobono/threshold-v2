@@ -57,7 +57,10 @@ export function useWhisper() {
       const downloadResumable = FileSystem.createDownloadResumable(
         MODEL_URLS[type],
         path,
-        {},
+        {
+          'User-Agent': 'Threshold/1.0 (React Native; expo-file-system)',
+          'Accept-Encoding': 'identity',
+        },
         (downloadProgress) => {
           const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
           setDownloadProgress(progress);

@@ -169,7 +169,10 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
         await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       }
 
-      const download = FileSystem.createDownloadResumable(WHISPER_TINY_URL, modelPath, {});
+      const download = FileSystem.createDownloadResumable(WHISPER_TINY_URL, modelPath, {
+        'User-Agent': 'Threshold/1.0 (React Native; expo-file-system)',
+        'Accept-Encoding': 'identity',
+      });
       const result = await download.downloadAsync();
       if (!result?.uri) {
         throw new Error('No se pudo descargar el modelo Whisper. Verifica tu conexión a internet.');

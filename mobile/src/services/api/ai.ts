@@ -144,17 +144,78 @@ export const buildAIContext = async (items: { id: string | number; type: string;
   }
 };
 
-/**
+async function generateLocalStudyMaterial(params: {
+  contextText: string;
+  mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed';
+  count: number;
+  title: string;
+  topic?: string;
+  subjectId: string;
+  userId: string;
+}): Promise<{ id: string; title: string; topic?: string; card_count: number; cards: any[] }> {
+  const { LocalProvider } = await import('../ai/providers/LocalProvider');
+  const provider = new LocalProvider();
 
+  if (!(await provider.isAvailable())) {
+    throw new Error('No hay modelo local disponible. Descarga y activa uno en Configuracion > Motor de IA local.');
+  }
+
+  const modeLabels: Record<string, string> = {
+    flashcard: 'tarjetas de estudio (front/back)',
+    multiple_choice: 'preguntas de seleccion multiple',
+    boolean: 'preguntas de verdadero/falso',
+    mixed: 'mezcla de tarjetas, seleccion multiple y verdadero/falso',
+  };
+
+  const systemPrompt =
+    'Eres un generador de material de estudio academico. ' +
+    'Genera exactamente ' + params.count + ' elementos en formato "' + (params.mode || 'flashcard') + '" (' + (modeLabels[params.mode] || 'tarjetas') + '). ' +
+    'Cada elemento debe tener "type" ("flashcard", "multiple_choice" o "true_false") y sus campos correspondientes. ' +
+    'Para flashcard: front y back. Para multiple_choice: question, options (array de 4 strings), correct (string exacto de una opcion). ' +
+    'Para true_false: statement y answer (boolean). ' +
+    'Responde SOLO con un JSON valido con la estructura: {"title":"...","items":[...]}. Nada mas. Sin markdown. Sin explicaciones.';
+
+  const result = await provider.chat({
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: params.contextText || params.topic || params.title },
+    ],
+    temperature: 0.3,
+    maxTokens: 4096,
+  });
+
+  let parsed: any;
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : result.content);
+  } catch {
+    throw new Error('El modelo local no pudo generar un JSON valido. Intenta con otro modelo o menos tarjetas.');
+  }
+
+  const rawItems: any[] = Array.isArray(parsed.items) ? parsed.items : Array.isArray(parsed) ? parsed : [];
+  const cards = rawItems.map((item: any) => {
+    const type = item.type || 'flashcard';
+    if (type === 'multiple_choice') {
+      return { type: 'multiple_choice', data: { question: item.question, options: item.options || [], correctIndex: typeof item.correct === 'number' ? item.correct : (item.options || []).indexOf(item.correct) }, hint: item.hint || null, explanation: item.explanation || null, direction: 'forward' };
+    }
+    if (type === 'true_false') {
+      return { type: 'boolean', data: { question: item.statement || item.question, correctAnswer: item.answer }, hint: item.hint || null, explanation: item.explanation || null, direction: 'forward' };
+    }
+    return { type: 'flashcard', data: { front: item.front || '', back: item.back || '' }, hint: item.hint || null, explanation: item.explanation || null, direction: item.direction || 'bidirectional' };
+  });
+
+  return {
+    id: 'local-' + Date.now(),
+    title: params.title,
+    topic: params.topic,
+    card_count: cards.length,
+    cards,
+  };
+}
+
+/**
  * Solicita a Zyren que genere un mazo de material de estudio directamente desde el chat.
  * Crea el mazo en la BD y lo devuelve listo para aparecer en la lista de mazos.
- *
- * @param contextText - Contexto académico de la materia
- * @param mode - Tipo de material: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed'
- * @param count - Número de ítems a generar
- * @param title - Título del mazo
- * @param subjectId - ID de la materia
- * @param userId - ID del usuario
  */
 export const generateStudyMaterialFromChat = async (params: {
   contextText: string;
@@ -167,6 +228,9 @@ export const generateStudyMaterialFromChat = async (params: {
   provider?: string;
   items?: Array<{ id: string; type: string; label: string; ocr_text?: string; extracted_text?: string }>;
 }) => {
+  if (params.provider === 'local') {
+    return generateLocalStudyMaterial(params);
+  }
   try {
     const response = await fetchWithFallback('/ai/capabilities/flashcards', {
       method: 'POST',

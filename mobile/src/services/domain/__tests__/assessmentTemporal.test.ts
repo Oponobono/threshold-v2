@@ -1,5 +1,6 @@
 import {
   parseDatetimeOrNull,
+  parseDateOrNull,
   resolveAssessmentAnchor,
   deriveAssessmentType,
 } from '../assessmentTemporal';
@@ -42,6 +43,34 @@ describe('parseDatetimeOrNull — solo datetime es anchor válido', () => {
   });
 });
 
+describe('parseDateOrNull — fallback para assessments legacy con date-only', () => {
+  test('YYYY-MM-DD → medianoche local', () => {
+    const d = parseDateOrNull('2026-08-20');
+    expect(d).not.toBeNull();
+    expect(d!.getFullYear()).toBe(2026);
+    expect(d!.getMonth()).toBe(7);
+    expect(d!.getDate()).toBe(20);
+    expect(d!.getHours()).toBe(0);
+    expect(d!.getMinutes()).toBe(0);
+  });
+
+  test('datetime ISO → se delega a parseDatetimeOrNull', () => {
+    const d = parseDateOrNull('2026-08-20T14:00');
+    expect(d).not.toBeNull();
+    expect(d!.getHours()).toBe(14);
+  });
+
+  test('string inválido → null', () => {
+    expect(parseDateOrNull('no-es-fecha')).toBeNull();
+  });
+
+  test('empty / null / undefined → null', () => {
+    expect(parseDateOrNull('')).toBeNull();
+    expect(parseDateOrNull(null)).toBeNull();
+    expect(parseDateOrNull(undefined)).toBeNull();
+  });
+});
+
 describe('resolveAssessmentAnchor — el dominio decide el anchor, no la policy', () => {
   test('exam con starts_at válido → anchor starts_at', () => {
     const r = resolveAssessmentAnchor({
@@ -67,16 +96,28 @@ describe('resolveAssessmentAnchor — el dominio decide el anchor, no la policy'
     expect(r!.kind).toBe('starts_at');
   });
 
-  test('exam sin starts_at (aunque tenga due_at) → null (anchor requerido ausente)', () => {
+  test('exam sin starts_at pero con date → fallback a date (medianoche local)', () => {
     const r = resolveAssessmentAnchor({
       assessment_type: 'exam',
       starts_at: null,
-      due_at: '2026-08-20T23:59',
+      date: '2026-08-20',
+    });
+    expect(r).not.toBeNull();
+    expect(r!.kind).toBe('due_at');
+    expect(r!.source).toBe('date');
+    expect(r!.anchor.getHours()).toBe(0);
+    expect(r!.anchor.getDate()).toBe(20);
+  });
+
+  test('exam sin starts_at ni date → null', () => {
+    const r = resolveAssessmentAnchor({
+      assessment_type: 'exam',
+      starts_at: null,
     });
     expect(r).toBeNull();
   });
 
-  test('exam con starts_at date-only → null (no se inventa medianoche)', () => {
+  test('exam con starts_at date-only → null (no se inventa medianoche para datetime)', () => {
     const r = resolveAssessmentAnchor({
       assessment_type: 'exam',
       starts_at: '2026-08-20',
@@ -94,24 +135,27 @@ describe('resolveAssessmentAnchor — el dominio decide el anchor, no la policy'
     expect(r!.source).toBe('due_at');
   });
 
-  test('deadline sin due_at → null', () => {
-    const r = resolveAssessmentAnchor({
-      assessment_type: 'deadline',
-      due_at: null,
-    });
-    expect(r).toBeNull();
-  });
-
-  test('deadline con date presente pero sin due_at → null (date nunca es anchor)', () => {
+  test('deadline sin due_at pero con date → fallback a date (medianoche local)', () => {
     const r = resolveAssessmentAnchor({
       assessment_type: 'deadline',
       date: '2026-08-20',
       due_at: null,
     });
+    expect(r).not.toBeNull();
+    expect(r!.kind).toBe('due_at');
+    expect(r!.source).toBe('date');
+    expect(r!.anchor.getHours()).toBe(0);
+  });
+
+  test('deadline sin due_at ni date → null', () => {
+    const r = resolveAssessmentAnchor({
+      assessment_type: 'deadline',
+      due_at: null,
+    });
     expect(r).toBeNull();
   });
 
-  test('sin assessment_type → null', () => {
+  test('sin assessment_type → null (sin tipo no hay fallback)', () => {
     const r = resolveAssessmentAnchor({
       starts_at: '2026-08-20T14:00',
       due_at: '2026-08-20T23:59',

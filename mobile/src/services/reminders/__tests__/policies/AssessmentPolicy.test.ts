@@ -61,6 +61,14 @@ describe('AssessmentPolicy', () => {
       expect(policy.shouldCancel(makeSequence(), { status: 'active', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(false);
     });
 
+    it('exam activo sin starts_at pero con date → false (fallback a date)', () => {
+      expect(policy.shouldCancel(makeSequence(), { status: 'active', assessment_type: 'exam', date: '2026-07-15' })).toBe(false);
+    });
+
+    it('deadline activo sin due_at pero con date → false (fallback a date)', () => {
+      expect(policy.shouldCancel(makeSequence(), { status: 'active', assessment_type: 'deadline', date: '2026-07-15' })).toBe(false);
+    });
+
     it('status cancelled → true', () => {
       expect(policy.shouldCancel(makeSequence(), { status: 'cancelled', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(true);
     });
@@ -69,8 +77,12 @@ describe('AssessmentPolicy', () => {
       expect(policy.shouldCancel(makeSequence(), { status: 'completed', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(true);
     });
 
-    it('sin ancla temporal (sin assessment_type/starts_at/due_at) → true', () => {
+    it('sin ancla temporal ni date (sin assessment_type) → true', () => {
       expect(policy.shouldCancel(makeSequence(), { status: 'active' })).toBe(true);
+    });
+
+    it('assessment_type sin campo temporal ni date → true', () => {
+      expect(policy.shouldCancel(makeSequence(), { status: 'active', assessment_type: 'exam' })).toBe(true);
     });
   });
 
@@ -82,6 +94,10 @@ describe('AssessmentPolicy', () => {
       expect(policy.shouldCancelReminder(makeReminder(), { status: 'active', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(false);
     });
 
+    it('entidad activa sin starts_at pero con date → false (fallback)', () => {
+      expect(policy.shouldCancelReminder(makeReminder(), { status: 'active', assessment_type: 'exam', date: '2026-07-15' })).toBe(false);
+    });
+
     it('entidad cancelled → true', () => {
       expect(policy.shouldCancelReminder(makeReminder(), { status: 'cancelled', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(true);
     });
@@ -90,7 +106,7 @@ describe('AssessmentPolicy', () => {
       expect(policy.shouldCancelReminder(makeReminder(), { status: 'completed', assessment_type: 'exam', starts_at: '2026-07-15T10:00:00Z' })).toBe(true);
     });
 
-    it('sin ancla temporal → true', () => {
+    it('sin ancla temporal ni date → true', () => {
       expect(policy.shouldCancelReminder(makeReminder(), { status: 'active' })).toBe(true);
     });
   });
@@ -106,11 +122,13 @@ describe('AssessmentPolicy', () => {
       expect(exp!.toISOString()).toBe('2026-07-26T00:59:00.000Z');
     });
 
-    it('sin ancla (date legacy sin assessment_type) → null', () => {
-      expect(policy.getExpiration({ date: '2026-07-15T10:00:00Z' })).toBeNull();
+    it('sin starts_at pero con date → date + 1 hour (fallback)', () => {
+      const exp = policy.getExpiration({ assessment_type: 'exam', date: '2026-07-15' });
+      expect(exp).not.toBeNull();
+      expect(exp!.getDate()).toBe(15);
     });
 
-    it('sin fecha → null', () => {
+    it('sin ancla ni date → null', () => {
       expect(policy.getExpiration({})).toBeNull();
     });
   });

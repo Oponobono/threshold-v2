@@ -27,6 +27,11 @@ import {
   cancelDownloadNotification,
 } from '../../services/notificationService';
 
+const MODEL_DOWNLOAD_HEADERS = {
+  'User-Agent': 'Threshold/1.0 (React Native; expo-file-system)',
+  'Accept-Encoding': 'identity',
+};
+
 const SettingRow = ({ title, desc, right }: { title: string; desc?: string; right: React.ReactNode }) => (
   <View style={styles.settingRow}>
     <View style={{ flex: 1, paddingRight: 12 }}>
@@ -174,7 +179,7 @@ export const LocalAIEngineSection = () => {
       const downloadResumable = FileSystem.createDownloadResumable(
         model.downloadUrl,
         filePath,
-        {},
+        MODEL_DOWNLOAD_HEADERS,
         async (progress) => {
           const pct = Math.round(progress.totalBytesExpectedToWrite > 0
             ? (progress.totalBytesWritten / progress.totalBytesExpectedToWrite) * 100
@@ -354,7 +359,7 @@ export const LocalAIEngineSection = () => {
       const downloadResumable = FileSystem.createDownloadResumable(
         WHISPER_MODEL.downloadUrl,
         filePath,
-        {},
+        MODEL_DOWNLOAD_HEADERS,
         async (progress) => {
           const pct = Math.round(progress.totalBytesExpectedToWrite > 0
             ? (progress.totalBytesWritten / progress.totalBytesExpectedToWrite) * 100

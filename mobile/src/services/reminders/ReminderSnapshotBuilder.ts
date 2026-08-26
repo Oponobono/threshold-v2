@@ -7,7 +7,7 @@ import type { CalendarEvent } from '../database/repositories/CalendarEventReposi
 export interface ReminderEntityRepositories {
   assessments: { getAll(): Promise<Assessment[]> };
   schedules: { getAll(): Promise<Schedule[]> };
-  flashcard_decks: { getAll(): Promise<FlashcardDeck[]> };
+  flashcard_decks: { getAll(): Promise<FlashcardDeck[]>; getDueCardCounts?(): Promise<Map<string, number>> };
   calendar_events: { getAll(): Promise<CalendarEvent[]> };
   subjects?: { getAll(): Promise<{ id: string; name: string }[]> };
 }
@@ -44,10 +44,24 @@ export class ReminderSnapshotBuilder {
       subject_name: subjectMap.get(String(sched.subject_id)) ?? '',
     }));
 
+    let enrichedDecks = flashcardDecks as readonly any[];
+    try {
+      const getDueCardCounts = this.repos.flashcard_decks.getDueCardCounts;
+      if (getDueCardCounts) {
+        const dueMap = await getDueCardCounts();
+        enrichedDecks = enrichedDecks.map((deck) => ({
+          ...deck,
+          dueCardsCount: dueMap.get(String(deck.id)) ?? 0,
+        }));
+      }
+    } catch {
+      // Si falla la consulta de dueCards, el snapshot usa card_count como fallback
+    }
+
     return {
       assessments: assessments as readonly any[],
       schedules: enrichedSchedules as readonly any[],
-      flashcard_decks: flashcardDecks as readonly any[],
+      flashcard_decks: enrichedDecks,
       calendar_events: calendarEvents as readonly any[],
     };
   }

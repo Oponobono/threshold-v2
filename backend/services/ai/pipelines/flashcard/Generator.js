@@ -60,7 +60,7 @@ ${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
     // Calculamos los tokens de entrada para no exceder el límite duro de 8000 TPM de la API gratuita.
     const estimatedInputTokens = Math.ceil((userContent.length + systemPrompt.length) / 3.5);
     const safeMaxTokens = Math.max(1500, 8000 - estimatedInputTokens - 200); // 200 de margen
-    const generationOptions = { temperature: 0.15, max_tokens: safeMaxTokens };
+    const generationOptions = { temperature: 0.15, max_tokens: safeMaxTokens, allowReasoningModels: false };
 
     try {
       const response = await ModelClass.generate(
@@ -70,7 +70,12 @@ ${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
       );
 
       const raw = response.content.trim();
-      return FlashcardResponseParser.parseTopicAndCards(raw);
+      try {
+        return FlashcardResponseParser.parseTopicAndCards(raw);
+      } catch (parseErr) {
+        console.error(`[Generator] Parse falló (model=${response.model}, provider=${response.provider}, tokens=${safeMaxTokens}): ${parseErr.message}`);
+        throw parseErr;
+      }
     } catch (err) {
       console.error('[Generator] Error con proveedor:', err.message);
       throw err;

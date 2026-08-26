@@ -15,6 +15,7 @@ export interface AssessmentAnchor {
 }
 
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function parseDatetimeOrNull(value?: string | null): Date | null {
   if (!value) return null;
@@ -24,15 +25,35 @@ export function parseDatetimeOrNull(value?: string | null): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * Parsea date-only (YYYY-MM-DD) como medianoche LOCAL (no UTC).
+ * Strings con hora se delegan a parseDatetimeOrNull.
+ * Usado como fallback para assessments legacy que solo tienen `date`.
+ */
+export function parseDateOrNull(value?: string | null): Date | null {
+  if (!value) return null;
+  const v = value.trim();
+  if (DATE_ONLY_RE.test(v)) {
+    const [year, month, day] = v.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return parseDatetimeOrNull(v);
+}
+
 export function resolveAssessmentAnchor(entity: AssessmentTemporalFields | null | undefined): AssessmentAnchor | null {
   if (!entity) return null;
   if (entity.assessment_type === 'deadline') {
     const anchor = parseDatetimeOrNull(entity.due_at);
-    return anchor ? { kind: 'due_at', anchor, source: 'due_at' } : null;
+    if (anchor) return { kind: 'due_at', anchor, source: 'due_at' };
+    const fallback = parseDateOrNull(entity.date);
+    return fallback ? { kind: 'due_at', anchor: fallback, source: 'date' } : null;
   }
   if (entity.assessment_type === 'exam') {
     const anchor = parseDatetimeOrNull(entity.starts_at);
-    return anchor ? { kind: 'starts_at', anchor, source: 'starts_at' } : null;
+    if (anchor) return { kind: 'starts_at', anchor, source: 'starts_at' };
+    const fallback = parseDateOrNull(entity.date);
+    return fallback ? { kind: 'due_at', anchor: fallback, source: 'date' } : null;
   }
   return null;
 }
