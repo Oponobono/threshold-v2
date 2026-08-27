@@ -131,8 +131,8 @@ describe('formatReminderDiagnostics', () => {
     expect(report).toContain('manufacturer             = xiaomi M2102J20SG');
     expect(report).toContain('SDK (API level)          = 34');
     expect(report).toContain('SCHED sch1 day=4 06:00→07:00');
-    expect(report).toContain('ASMT  as1 date=10-08-2026 done=0');
-    expect(report).toContain('DECK  dk1 cards=12');
+    expect(report).toContain('ASMT  as1 type=? starts_at=? due_at=? date=10-08-2026 done=0');
+    expect(report).toContain('DECK  dk1 cards=12 due=?');
     expect(report).toContain('PLAN');
     expect(report).toContain('OS   ');
     expect(report).toContain('[OK]');

@@ -19,6 +19,7 @@ import type { I18nService } from './I18nService';
 import type { NotificationProvider } from './NotificationProvider';
 import type { PerformanceObserver } from './PerformanceObserver';
 import type { ReminderPreferences } from './ReminderPreferences';
+import { RepositoryFactory } from '../database/RepositoryFactory';
 
 export async function createDefaultReminderCoordinator(
   provider?: NotificationProvider,
@@ -84,30 +85,24 @@ export async function createDefaultReminderCoordinator(
 }
 
 export function createDefaultSnapshotRepos(): ReminderEntityRepositories {
-  const { assessmentRepository } = require('../database/repositories/AssessmentRepository');
-  const { scheduleRepository } = require('../database/repositories/ScheduleRepository');
-  const { flashcardDeckRepository } = require('../database/repositories/FlashcardDeckRepository');
-  const { calendarEventRepository } = require('../database/repositories/CalendarEventRepository');
-  const { subjectRepository } = require('../database/repositories/SubjectRepository');
   return {
-    assessments: assessmentRepository,
-    schedules: scheduleRepository,
-    flashcard_decks: flashcardDeckRepository,
-    calendar_events: calendarEventRepository,
-    subjects: subjectRepository,
+    assessments: { getAll: () => RepositoryFactory.assessments().getAll() },
+    schedules: { getAll: () => RepositoryFactory.schedules().getAll() },
+    flashcard_decks: {
+      getAll: () => RepositoryFactory.flashcardDecks().getAll(),
+      getDueCardCounts: () => RepositoryFactory.flashcardDecks().getDueCardCounts(),
+    },
+    calendar_events: { getAll: () => RepositoryFactory.calendarEvents().getAll() },
+    subjects: { getAll: () => RepositoryFactory.subjects().getAll() },
   };
 }
 
 function loadDefaultCoordinatorRepos(): Record<string, EntityRepository> {
-  const { assessmentRepository } = require('../database/repositories/AssessmentRepository');
-  const { scheduleRepository } = require('../database/repositories/ScheduleRepository');
-  const { flashcardDeckRepository } = require('../database/repositories/FlashcardDeckRepository');
-  const { calendarEventRepository } = require('../database/repositories/CalendarEventRepository');
   return {
-    assessment: assessmentRepository,
-    schedule: scheduleRepository,
-    flashcard_deck: flashcardDeckRepository,
-    calendar_event: calendarEventRepository,
+    assessment: { getById: (id: string) => RepositoryFactory.assessments().getById(id) },
+    schedule: { getById: (id: string) => RepositoryFactory.schedules().getById(id) },
+    flashcard_deck: { getById: (id: string) => RepositoryFactory.flashcardDecks().getById(id) },
+    calendar_event: { getById: (id: string) => RepositoryFactory.calendarEvents().getById(id) },
   };
 }
 

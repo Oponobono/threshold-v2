@@ -119,6 +119,7 @@ export async function requestExactAlarmPermission(): Promise<ExactAlarmRequestRe
 
 export async function collectReminderDiagnostics(): Promise<ReminderDiagnosticsData> {
   const coordinator = await getReminderCoordinator();
+  await coordinator.resync();
   const engine = coordinator.getEngine();
 
   const snapshot = await new ReminderSnapshotBuilder(createDefaultSnapshotRepos()).build();
@@ -184,6 +185,9 @@ export async function collectReminderDiagnostics(): Promise<ReminderDiagnosticsD
       assessments: assessments.map((a: any) => ({
         id: String(a.id),
         name: a.name ?? '',
+        assessment_type: a.assessment_type ?? null,
+        starts_at: a.starts_at ?? null,
+        due_at: a.due_at ?? null,
         date: a.date ?? null,
         due_date: a.due_date ?? null,
         is_completed: a.is_completed ?? null,
@@ -195,10 +199,11 @@ export async function collectReminderDiagnostics(): Promise<ReminderDiagnosticsD
         end_date: e.end_date ?? null,
         all_day: e.all_day ?? null,
       })),
-      flashcard_decks: decks.map((fk: any) => ({
+      flashcard_decks: (snapshot.flashcard_decks ?? decks).map((fk: any) => ({
         id: String(fk.id),
         title: fk.title ?? '',
         card_count: fk.card_count ?? null,
+        dueCardsCount: fk.dueCardsCount ?? null,
       })),
     },
     plan: expected,

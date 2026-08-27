@@ -2,7 +2,6 @@ import { useState } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
  
 import { initWhisper, WhisperContext } from 'whisper.rn';
-import { useTranslation } from 'react-i18next';
 
 export type WhisperModelType = 'tiny' | 'base';
 
@@ -58,8 +57,10 @@ export function useWhisper() {
         MODEL_URLS[type],
         path,
         {
-          'User-Agent': 'Threshold/1.0 (React Native; expo-file-system)',
-          'Accept-Encoding': 'identity',
+          headers: {
+            'User-Agent': 'Threshold/1.0 (React Native; expo-file-system)',
+            'Accept-Encoding': 'identity',
+          },
         },
         (downloadProgress) => {
           const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;

@@ -15,6 +15,7 @@ import { useOperationsByType } from '../src/hooks/useLongRunningOperations';
 import { OperationType } from '../src/services/lro/OperationProgress';
 import { GroupMembershipResponse } from '../src/services/api';
 import { useReminderPreferences } from '../src/hooks/useReminderPreferences';
+
 import { EditProfileModal } from '../src/components/modals/EditProfileModal';
 import { ChangePasswordModal } from '../src/components/modals/ChangePasswordModal';
 import { DeleteAccountModal } from '../src/components/modals/DeleteAccountModal';
@@ -72,6 +73,7 @@ export default function SettingsScreen() {
   const [collaborationExpanded, setCollaborationExpanded] = useState(false);
   const [isZyrenInfoVisible, setIsZyrenInfoVisible] = useState(false);
   const [isPersonalizeRemindersVisible, setIsPersonalizeRemindersVisible] = useState(false);
+
   const {
     t,
     router,
@@ -175,6 +177,7 @@ export default function SettingsScreen() {
   } = useSettingsLogic();
 
   const reminderCtx = useReminderPreferences();
+
 
   const {
     prefs: backupPrefs,
@@ -559,6 +562,7 @@ export default function SettingsScreen() {
                   </TouchableOpacity>
                 }
               />
+
             </View>
           )}
         </View>

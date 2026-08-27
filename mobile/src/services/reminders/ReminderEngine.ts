@@ -12,7 +12,7 @@ import { buildScheduleSequences } from './SchedulePlanBuilder';
 import type { ScheduleBuildOutcome, SchedulePlanBuilderDeps } from './SchedulePlanBuilder';
 import { buildReviewDueSequence, buildReviewDueSequences } from './ReviewDuePlanBuilder';
 import type { ReviewBuildOutcome, ReviewDuePlanBuilderDeps } from './ReviewDuePlanBuilder';
-import { DEFAULT_PREFERENCES, getCategoryOffsets, isCategoryEnabled } from './ReminderPreferences';
+import { DEFAULT_PREFERENCES, isCategoryEnabled } from './ReminderPreferences';
 import type { ReminderPreferences } from './ReminderPreferences';
 import type {
   ReminderSequence,
@@ -495,9 +495,9 @@ export class ReminderEngine {
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(
         d.getHours(),
       ).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    // console.log(
-    //   `[PIPELINE] schedule::${session.id} | policy=SchedulePlanBuilder | eventTime=${eventTime ? fmt(eventTime) : 'none'} | offset=${offset ?? 0} | scheduledAt=${scheduledAt ? fmt(scheduledAt) : 'none'} | outcome=${outcome}`,
-    // );
+    console.log(
+      `[PIPELINE] schedule::${session.id} | policy=SchedulePlanBuilder | eventTime=${eventTime ? fmt(eventTime) : 'none'} | offset=${offset ?? 0} | scheduledAt=${scheduledAt ? fmt(scheduledAt) : 'none'} | outcome=${outcome}`,
+    );
   }
 
   private _upsertScheduleRow(row: any): void {
@@ -538,9 +538,9 @@ export class ReminderEngine {
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(
         d.getHours(),
       ).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    // console.log(
-    //   `[PIPELINE] flashcard_deck::${deck?.id ?? ''}::daily | policy=ReviewDuePlanBuilder | checkTime=${checkTime ?? 'none'} | scheduledAt=${scheduledAt ? fmt(scheduledAt) : 'none'} | outcome=${outcome}`,
-    // );
+    console.log(
+      `[PIPELINE] flashcard_deck::${deck?.id ?? ''}::daily | policy=ReviewDuePlanBuilder | checkTime=${checkTime ?? 'none'} | scheduledAt=${scheduledAt ? fmt(scheduledAt) : 'none'} | outcome=${outcome}`,
+    );
   }
 
   private _removeScheduleRow(id: string): void {

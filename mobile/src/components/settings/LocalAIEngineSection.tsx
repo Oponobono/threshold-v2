@@ -32,6 +32,10 @@ const MODEL_DOWNLOAD_HEADERS = {
   'Accept-Encoding': 'identity',
 };
 
+const MODEL_DOWNLOAD_OPTIONS = {
+  headers: MODEL_DOWNLOAD_HEADERS,
+};
+
 const SettingRow = ({ title, desc, right }: { title: string; desc?: string; right: React.ReactNode }) => (
   <View style={styles.settingRow}>
     <View style={{ flex: 1, paddingRight: 12 }}>
@@ -179,7 +183,7 @@ export const LocalAIEngineSection = () => {
       const downloadResumable = FileSystem.createDownloadResumable(
         model.downloadUrl,
         filePath,
-        MODEL_DOWNLOAD_HEADERS,
+        MODEL_DOWNLOAD_OPTIONS,
         async (progress) => {
           const pct = Math.round(progress.totalBytesExpectedToWrite > 0
             ? (progress.totalBytesWritten / progress.totalBytesExpectedToWrite) * 100
@@ -298,7 +302,7 @@ export const LocalAIEngineSection = () => {
     if (resumable) {
       try {
         await resumable.pauseAsync();
-      } catch (_e) {}
+      } catch {}
       delete downloadResumables.current[modelId];
     }
     setDownloadProgress(modelId, 0, 'none');
@@ -359,7 +363,7 @@ export const LocalAIEngineSection = () => {
       const downloadResumable = FileSystem.createDownloadResumable(
         WHISPER_MODEL.downloadUrl,
         filePath,
-        MODEL_DOWNLOAD_HEADERS,
+        MODEL_DOWNLOAD_OPTIONS,
         async (progress) => {
           const pct = Math.round(progress.totalBytesExpectedToWrite > 0
             ? (progress.totalBytesWritten / progress.totalBytesExpectedToWrite) * 100

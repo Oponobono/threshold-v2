@@ -29,6 +29,85 @@ function toExpoWeekday(apiDayOfWeek: number): number {
 // ── Download progress notifications ──────────────────────────────────────────────
 
 const DOWNLOAD_NOTIF_ID = 'model_download';
+const DIAGNOSTIC_IMMEDIATE_ID = 'notification_diagnostic_immediate';
+const DIAGNOSTIC_SCHEDULED_ID = 'notification_diagnostic_scheduled';
+
+export interface NotificationDiagnosticTestResult {
+  permissionGranted: boolean;
+  immediateId?: string;
+  scheduledId?: string;
+  scheduledFor?: string;
+  scheduledCount?: number;
+}
+
+async function setupReminderChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('reminders', {
+    name: i18n.t('notifications.channelName'),
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 200, 100, 200],
+    sound: 'default',
+  });
+}
+
+export async function runNotificationDiagnosticTest(): Promise<NotificationDiagnosticTestResult> {
+  const granted = await requestPermissions();
+  if (!granted) {
+    console.log('[NOTIF-TEST] permission denied');
+    return { permissionGranted: false };
+  }
+
+  await setupReminderChannel();
+
+  const scheduledFor = new Date(Date.now() + 10_000);
+  const baseContent = {
+    title: 'Prueba de notificaciones',
+    sound: true,
+    ...(Platform.OS === 'android'
+      ? {
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          channelId: 'reminders',
+        }
+      : {}),
+  };
+
+  const immediateId = await Notifications.scheduleNotificationAsync({
+    identifier: DIAGNOSTIC_IMMEDIATE_ID,
+    content: {
+      ...baseContent,
+      body: 'Notificación directa desde Configuración.',
+      data: { type: 'notification_diagnostic', mode: 'immediate' },
+    },
+    trigger: null,
+  });
+
+  const scheduledId = await Notifications.scheduleNotificationAsync({
+    identifier: DIAGNOSTIC_SCHEDULED_ID,
+    content: {
+      ...baseContent,
+      body: 'Notificación agendada a 10 segundos.',
+      data: { type: 'notification_diagnostic', mode: 'scheduled' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: scheduledFor,
+      channelId: 'reminders',
+    },
+  });
+
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  console.log(
+    `[NOTIF-TEST] immediate=${immediateId} scheduled=${scheduledId} scheduledFor=${scheduledFor.toISOString()} scheduledCount=${scheduled.length}`,
+  );
+
+  return {
+    permissionGranted: true,
+    immediateId,
+    scheduledId,
+    scheduledFor: scheduledFor.toISOString(),
+    scheduledCount: scheduled.length,
+  };
+}
 
 export async function showDownloadProgressNotification(title: string, progress: number): Promise<void> {
   const granted = await requestPermissions();

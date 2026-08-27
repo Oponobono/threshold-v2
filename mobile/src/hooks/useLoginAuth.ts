@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Animated, Easing, Platform } from 'react-native';
+import { Animated, Easing } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { setItemAsync, getItemAsync, deleteItemAsync } from 'expo-secure-store';
@@ -110,6 +110,14 @@ export const useLoginAuth = () => {
         await syncManager.login();
         await syncManager.requestInitialSync(true);
         console.log('[Login] Initial Sync completado — SQLite poblado');
+        try {
+          const { getReminderCoordinator } = await import('../services/reminders/reminderCoordinatorInstance');
+          const coordinator = await getReminderCoordinator();
+          await coordinator.resync();
+          console.log('[Login] Reminder plan recomputado después del Initial Sync');
+        } catch (reminderErr) {
+          console.warn('[Login] Reminder resync post Initial Sync fallido (continuando):', reminderErr);
+        }
       } catch (err) {
         console.warn('[Login] Initial Sync fallido (continuando):', err);
       }

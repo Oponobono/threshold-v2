@@ -11,6 +11,9 @@ export interface RawScheduleDiag {
 export interface RawAssessmentDiag {
   readonly id: string;
   readonly name: string;
+  readonly assessment_type?: string | null;
+  readonly starts_at?: string | null;
+  readonly due_at?: string | null;
   readonly date: string | null;
   readonly due_date?: string | null;
   readonly is_completed?: number | null;
@@ -28,6 +31,7 @@ export interface RawDeckDiag {
   readonly id: string;
   readonly title: string;
   readonly card_count?: number;
+  readonly dueCardsCount?: number;
 }
 
 export interface ExpectedPlanItem {
@@ -380,7 +384,7 @@ export function formatReminderDiagnostics(d: ReminderDiagnosticsData): string {
   );
 
   const assessments = d.raw.assessments.map((a) =>
-    `  ASMT  ${a.id} date=${a.date ?? '?'} done=${a.is_completed ?? '?'} | ${a.name}`,
+    `  ASMT  ${a.id} type=${a.assessment_type ?? '?'} starts_at=${a.starts_at ?? '?'} due_at=${a.due_at ?? '?'} date=${a.date ?? '?'} done=${a.is_completed ?? '?'} | ${a.name}`,
   );
 
   const events = d.raw.calendar_events.map((e) =>
@@ -388,7 +392,7 @@ export function formatReminderDiagnostics(d: ReminderDiagnosticsData): string {
   );
 
   const decks = d.raw.flashcard_decks.map((fk) =>
-    `  DECK  ${fk.id} cards=${fk.card_count ?? '?'} | ${fk.title}`,
+    `  DECK  ${fk.id} cards=${fk.card_count ?? '?'} due=${fk.dueCardsCount ?? '?'} | ${fk.title}`,
   );
 
   const plan = d.plan.map((p) =>

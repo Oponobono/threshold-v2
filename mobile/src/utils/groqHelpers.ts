@@ -170,8 +170,10 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
       }
 
       const download = FileSystem.createDownloadResumable(WHISPER_TINY_URL, modelPath, {
-        'User-Agent': 'Threshold/1.0 (React Native; expo-file-system)',
-        'Accept-Encoding': 'identity',
+        headers: {
+          'User-Agent': 'Threshold/1.0 (React Native; expo-file-system)',
+          'Accept-Encoding': 'identity',
+        },
       });
       const result = await download.downloadAsync();
       if (!result?.uri) {
@@ -223,7 +225,7 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
     if (wavUri !== audioUri) {
       try {
         await FileSystem.deleteAsync(wavUri, { idempotent: true });
-      } catch (_e) {}
+      } catch {}
     }
   }
 }
@@ -307,8 +309,8 @@ export async function summarizeWithFallback(
 }
 
 async function summarizeWithLocalLLM(transcription: string): Promise<string> {
-  const { runInference, loadModel } = require('../services/localInferenceService');
-  const { useLocalAIStore } = require('../store/useLocalAIStore');
+  const { runInference, loadModel } = await import('../services/localInferenceService');
+  const { useLocalAIStore } = await import('../store/useLocalAIStore');
   const store = useLocalAIStore.getState();
 
   if (!store.activeModelId) {

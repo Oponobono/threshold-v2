@@ -57,7 +57,7 @@ export class ClassPolicy implements ReminderPolicy {
   getEventTime(entity: any, now?: Date): Date | null {
     const dayOfWeek = entity?.day_of_week;
     const startTime = entity?.start_time;
-    if (!dayOfWeek || !startTime) return null;
+    if (dayOfWeek == null || !startTime) return null;
 
     const [hour, minute] = startTime.split(':').map(Number);
     if (isNaN(hour) || isNaN(minute)) return null;

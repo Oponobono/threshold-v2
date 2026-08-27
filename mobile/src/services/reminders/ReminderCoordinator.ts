@@ -5,6 +5,7 @@ import type { EnvironmentContext } from './types';
 import type { RepositoryEventBus } from '../events/RepositoryEventBus';
 import type { PerformanceObserver } from './PerformanceObserver';
 import { NullObserver } from './PerformanceObserver';
+import { subscribeToEventBus as doSubscribe } from './subscribeToEventBus';
 
 export interface EntityRepository {
   getById(id: string): Promise<any | null>;
@@ -75,7 +76,6 @@ export class ReminderCoordinator {
   private observer: PerformanceObserver;
 
   subscribeToEventBus(eventBus?: RepositoryEventBus): void {
-    const { subscribeToEventBus: doSubscribe } = require('./subscribeToEventBus');
     if (this.unsubscribeBus) {
       this.unsubscribeBus();
       this.unsubscribeBus = null;
@@ -103,7 +103,6 @@ export class ReminderCoordinator {
     if (entity) {
       if (entityType === 'schedule' && entity.subject_id && !entity.subject_name) {
         try {
-          const { subjectRepository } = require('../database/repositories/SubjectRepository');
           const subject = await RepositoryFactory.subjects().getById(entity.subject_id);
           if (subject) {
             entity.subject_name = subject.name;

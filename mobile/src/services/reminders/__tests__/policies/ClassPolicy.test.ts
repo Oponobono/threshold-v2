@@ -1,5 +1,5 @@
 import { ClassPolicy } from '../../policies/ClassPolicy';
-import type { ReminderProfile, Reminder } from '../../types';
+import type { ReminderProfile } from '../../types';
 
 describe('ClassPolicy', () => {
   const policy = new ClassPolicy();
@@ -62,6 +62,14 @@ describe('ClassPolicy', () => {
 
     it('sin day_of_week → null', () => {
       expect(policy.getEventTime!({ start_time: '06:00' })).toBeNull();
+    });
+
+    it('day_of_week 0 (domingo) es válido', () => {
+      const now = new Date('2026-08-24T12:00:00.000Z');
+      const result = policy.getEventTime!({ day_of_week: 0, start_time: '06:00' }, now);
+      expect(result).not.toBeNull();
+      expect(result!.getDay()).toBe(0);
+      expect(result!.getHours()).toBe(6);
     });
 
     it('sin start_time → null', () => {
