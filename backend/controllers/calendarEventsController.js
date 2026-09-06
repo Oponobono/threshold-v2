@@ -19,7 +19,7 @@ const { incrementSyncVersion, recordDeletion } = require('../helpers/syncVersion
  * }
  */
 exports.createCalendarEvent = (req, res) => {
-  const userId = req.user?.id || req.body.user_id;
+  const userId = req.user.id;
   
   if (!userId) {
     return res.status(401).json({ error: 'Usuario no autenticado' });
@@ -181,7 +181,7 @@ exports.createCalendarEvent = (req, res) => {
  * GET /api/calendar/events?user_id=X&startDate=DD-MM-YYYY&endDate=DD-MM-YYYY
  */
 exports.getUserCalendarEvents = (req, res) => {
-  const userId = req.user?.id || req.query.user_id;
+  const userId = req.user.id;
   const { startDate, endDate } = req.query;
 
   if (!userId) {
@@ -246,7 +246,7 @@ exports.getUserCalendarEvents = (req, res) => {
  */
 exports.getCalendarEvent = (req, res) => {
   const { eventId } = req.params;
-  const userId = req.user?.id || req.query.user_id;
+  const userId = req.user.id;
 
   if (!userId) {
     return res.status(401).json({ error: 'Usuario no autenticado' });
@@ -300,7 +300,7 @@ exports.getCalendarEvent = (req, res) => {
  */
 exports.updateCalendarEvent = (req, res) => {
   const { eventId } = req.params;
-  const userId = req.user?.id || req.body.user_id;
+  const userId = req.user.id;
   
   if (!userId) {
     return res.status(401).json({ error: 'Usuario no autenticado' });
@@ -461,7 +461,7 @@ exports.updateCalendarEvent = (req, res) => {
  */
 exports.deleteCalendarEvent = (req, res) => {
   const { eventId } = req.params;
-  const userId = req.user?.id || req.query.user_id;
+  const userId = req.user.id;
 
   if (!userId) {
     return res.status(401).json({ error: 'Usuario no autenticado' });

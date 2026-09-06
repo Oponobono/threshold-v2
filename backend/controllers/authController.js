@@ -167,10 +167,11 @@ exports.loginUser = async (req, res) => {
  * Asocia un token biométrico a un usuario
  */
 exports.enrollBiometric = (req, res) => {
-  const { userId, biometric_token } = req.body;
+  const userId = req.user.id;
+  const { biometric_token } = req.body;
 
-  if (!userId || !biometric_token) {
-    return res.status(400).json({ error: 'Se requiere userId y biometric_token.' });
+  if (!biometric_token) {
+    return res.status(400).json({ error: 'Se requiere biometric_token.' });
   }
 
   if (typeof biometric_token !== 'string' || biometric_token.length < 32) {
