@@ -378,7 +378,7 @@ exports.aiChat = async (req, res) => {
   const trimmedContext = contextLength > MAX_CONTEXT_CHARS
     ? context_text.substring(0, MAX_CONTEXT_CHARS) + '\n\n[...Contexto truncado por lÃ­mite de tokens...]'
     : context_text;
-  
+  const context_truncated = contextLength > MAX_CONTEXT_CHARS;
   console.log(`[${provider.toUpperCase()}] Context truncado: ${contextLength} -> ${trimmedContext.length} chars`);
 
   console.log(`[${provider.toUpperCase()}Telemetry] Context size: ${contextLength} chars -> Trimmed to: ${trimmedContext.length}`);

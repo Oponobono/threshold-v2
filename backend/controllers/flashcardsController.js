@@ -881,12 +881,28 @@ exports.recordCardReview = (req, res) => {
 exports.updateCardStatus = (req, res) => {
   const { cardId } = req.params;
   const { status } = req.body;
-  db.run(
-    `UPDATE flashcards SET status = ? WHERE id = ?`,
-    [status, cardId],
-    function (err) {
+  const userId = req.user.id;
+
+  db.get(
+    `SELECT fd.user_id FROM flashcards fc
+     JOIN flashcard_decks fd ON fc.deck_id = fd.id
+     WHERE fc.id = ?`,
+    [cardId],
+    (err, row) => {
       if (err) return res.status(500).json({ error: err.message });
-      incrementSyncVersion('flashcards', cardId, () => res.json({ success: true }));
+      if (!row) return res.status(404).json({ error: 'Tarjeta no encontrada.' });
+      if (String(row.user_id) !== String(userId)) {
+        return res.status(403).json({ error: 'Acceso denegado.' });
+      }
+
+      db.run(
+        `UPDATE flashcards SET status = ? WHERE id = ?`,
+        [status, cardId],
+        function (err2) {
+          if (err2) return res.status(500).json({ error: err2.message });
+          incrementSyncVersion('flashcards', cardId, () => res.json({ success: true }));
+        }
+      );
     }
   );
 };
@@ -1033,7 +1049,7 @@ async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, des
           console.log(`[Atomic] Fragmentando tarjeta densa: ${front.substring(0, 30)}...`);
           const parentContentStr = JSON.stringify(content);
           // Insertar padre (contenedor)
-          const parentId = await insertSingleCard(deckId, front, back, itemType, parentContentStr, hint, explanation, 0, null, density.wordCount, userId);
+          const parentId = await insertSingleCard(deckId, front, back, itemType, parentContentStr, hint, explanation, 0, null, density.wordCount, user_id);
           
           // Generar e insertar hijas
           const atomicCards = fragmentCard({ front, back });
@@ -1042,17 +1058,17 @@ async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, des
             const childContentStr = JSON.stringify({ front: atomic.front, back: atomic.back });
             const childWordCount = atomic.back.split(/\s+/).length;
             // Se asume is_atomic = 1
-            await insertSingleCard(deckId, atomic.front, atomic.back, itemType, childContentStr, hint, explanation, 1, parentId, childWordCount, userId);
+            await insertSingleCard(deckId, atomic.front, atomic.back, itemType, childContentStr, hint, explanation, 1, parentId, childWordCount, user_id);
           }
         } else {
           // Tarjeta normal
           const contentStr = JSON.stringify(content);
-          await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, density.wordCount, userId);
+          await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, density.wordCount, user_id);
         }
       } else {
         // multiple_choice o boolean, no las fragmentamos por ahora
         const contentStr = JSON.stringify(content);
-        await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, 20, userId);
+        await insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, 1, null, 20, user_id);
       }
     }
 

@@ -4,6 +4,8 @@
  * Se agregan al archivo aiController.js
  */
 const { MODEL_DEFAULTS } = require('../utils/modelRegistry');
+const secrets = require('../config/secrets');
+const { processDocumentWithFilesAPI, generateFlashcardsFromDocument } = require('../utils/geminiService');
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -34,7 +36,6 @@ exports.processDocumentWithGemini = async (req, res) => {
     
     // Validar que el archivo existe
     const fileExists = await new Promise(resolve => {
-const secrets = require('../config/secrets');
       require('fs').access(documentPath, require('fs').constants.F_OK, err => resolve(!err));
     });
 

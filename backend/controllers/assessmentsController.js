@@ -684,7 +684,7 @@ function handleAssessmentResultsUpdate(assessmentId, score, percentage, grade_va
               db.run(`
                 INSERT INTO assessment_results (id, assessment_id, user_id, raw_value, normalized_value, grading_version_id)
                 VALUES (?, ?, ?, ?, ?, ?)
-              `, [uuidv4(), assessmentId, userId, rawValue, normalized, gradingVersionId], (err) => {
+              `, [uuidv4(), assessmentId, subject.user_id, rawValue, normalized, gradingVersionId], (err) => {
                 if (err) {
                   console.error('[AssessmentsController] ❌ Error INSERT assessment_results:', err.message);
                   reject(err);
