@@ -1,11 +1,26 @@
+import type { Request, Response } from 'express';
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
 const { incrementSyncVersion, incrementSyncCounterOnly, recordDeletion } = require('../helpers/syncVersion');
 
+interface AuthRequest extends Request {
+  user: {
+    id: string;
+  };
+}
+
+interface CreateScheduleDTO {
+  id?: string;
+  subject_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
 /**
  * Predecir materia actual por horario
  */
-exports.getCurrentSubjectPrediction = (req, res) => {
+exports.getCurrentSubjectPrediction = (req: AuthRequest, res: Response) => {
   const { userId } = req.params;
   const now = new Date();
 
@@ -29,7 +44,7 @@ exports.getCurrentSubjectPrediction = (req, res) => {
     LIMIT 1
   `;
 
-  db.get(query, [userId, dayOfWeek, currentTime], (err, row) => {
+  db.get(query, [userId, dayOfWeek, currentTime], (err: Error | null, row: unknown) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(row || null);
   });
@@ -38,7 +53,7 @@ exports.getCurrentSubjectPrediction = (req, res) => {
 /**
  * Obtener todos los horarios de hoy para un usuario
  */
-exports.getTodaySchedules = (req, res) => {
+exports.getTodaySchedules = (req: AuthRequest, res: Response) => {
   const { userId } = req.params;
   const now = new Date();
   let dayOfWeek = now.getDay();
@@ -52,7 +67,7 @@ exports.getTodaySchedules = (req, res) => {
     ORDER BY s.start_time ASC
   `;
 
-  db.all(query, [userId, dayOfWeek], (err, rows) => {
+  db.all(query, [userId, dayOfWeek], (err: Error | null, rows: unknown[]) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
@@ -61,8 +76,8 @@ exports.getTodaySchedules = (req, res) => {
 /**
  * Agregar un horario a una materia
  */
-exports.createSchedule = (req, res) => {
-  const { id: clientId, subject_id, day_of_week, start_time, end_time } = req.body;
+exports.createSchedule = (req: AuthRequest, res: Response) => {
+  const { id: clientId, subject_id, day_of_week, start_time, end_time } = req.body as CreateScheduleDTO;
   if (!subject_id || !day_of_week || !start_time || !end_time) {
     return res.status(400).json({ error: 'Faltan campos requeridos.' });
   }
@@ -70,7 +85,8 @@ exports.createSchedule = (req, res) => {
   const scheduleId = clientId || uuidv4();
   const userId = req.user.id;
   const query = `INSERT INTO schedules (id, user_id, subject_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET subject_id = excluded.subject_id, day_of_week = excluded.day_of_week, start_time = excluded.start_time, end_time = excluded.end_time`;
-  db.run(query, [scheduleId, userId, subject_id, day_of_week, start_time, end_time], function(err) {
+  
+  db.run(query, [scheduleId, userId, subject_id, day_of_week, start_time, end_time], function(this: any, err: Error | null) {
     if (err) return res.status(500).json({ error: err.message });
     incrementSyncVersion('schedules', scheduleId, () => {
       res.status(201).json({ id: scheduleId, message: 'Horario agregado' });
@@ -81,10 +97,11 @@ exports.createSchedule = (req, res) => {
 /**
  * Eliminar un horario
  */
-exports.deleteSchedule = (req, res) => {
+exports.deleteSchedule = (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user.id;
-  db.run(`DELETE FROM schedules WHERE id = ? AND user_id = ?`, [id, userId], function(err) {
+  
+  db.run(`DELETE FROM schedules WHERE id = ? AND user_id = ?`, [id, userId], function(this: any, err: Error | null) {
     if (err) return res.status(500).json({ error: err.message });
     if (this.changes === 0) return res.status(404).json({ error: 'Not found or access denied' });
     recordDeletion('schedules', id, userId, () => {
@@ -98,9 +115,9 @@ exports.deleteSchedule = (req, res) => {
 /**
  * Obtener horarios por materia
  */
-exports.getSchedulesBySubject = (req, res) => {
+exports.getSchedulesBySubject = (req: AuthRequest, res: Response) => {
   const { subjectId } = req.params;
-  db.all(`SELECT * FROM schedules WHERE subject_id = ? ORDER BY day_of_week, start_time`, [subjectId], (err, rows) => {
+  db.all(`SELECT * FROM schedules WHERE subject_id = ? ORDER BY day_of_week, start_time`, [subjectId], (err: Error | null, rows: unknown[]) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
@@ -109,7 +126,7 @@ exports.getSchedulesBySubject = (req, res) => {
 /**
  * Obtener todos los horarios semanales de un usuario
  */
-exports.getSchedulesByUser = (req, res) => {
+exports.getSchedulesByUser = (req: AuthRequest, res: Response) => {
   const { userId } = req.params;
   const query = `
     SELECT s.id, s.subject_id, s.day_of_week, s.start_time, s.end_time, sub.name, sub.icon, sub.color
@@ -119,7 +136,7 @@ exports.getSchedulesByUser = (req, res) => {
     ORDER BY s.day_of_week, s.start_time ASC
   `;
 
-  db.all(query, [userId], (err, rows) => {
+  db.all(query, [userId], (err: Error | null, rows: unknown[]) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });

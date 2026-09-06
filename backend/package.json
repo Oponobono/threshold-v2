@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node --dns-result-order=ipv4first server.js",
-    "dev": "node --dns-result-order=ipv4first server.js",
+    "start": "tsx --dns-result-order=ipv4first server.js",
+    "dev": "tsx --dns-result-order=ipv4first server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "typecheck": "tsc --noEmit",
     "lint": "eslint controllers/ routes/ middlewares/ server.js"
@@ -38,6 +38,7 @@
     "sqlite3": "^6.0.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "tsx": "^4.23.13",
     "uploadthing": "^7.7.4",
     "uuid": "^9.0.1",
     "youtube-transcript": "^1.3.1",
