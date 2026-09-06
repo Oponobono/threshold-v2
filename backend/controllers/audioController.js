@@ -88,7 +88,7 @@ exports.updateAudioRecording = (req, res) => {
   const fields = req.body;
   const userId = req.user.id;
 
-  const allowed = ['subject_id', 'name', 'cloud_url', 'is_backed_up', 'duration', 'local_uri', 'user_id'];
+  const allowed = ['subject_id', 'name', 'cloud_url', 'is_backed_up', 'duration', 'local_uri'];
   const toUpdate = {};
   for (const key of Object.keys(fields)) {
     if (allowed.includes(key)) toUpdate[key] = fields[key];
@@ -103,8 +103,8 @@ exports.updateAudioRecording = (req, res) => {
   const values = [...Object.values(toUpdate), id, userId];
 
   db.run(
-    `UPDATE audio_recordings SET ${columns} WHERE id = ?`,
-    [...Object.values(toUpdate), id],
+    `UPDATE audio_recordings SET ${columns} WHERE id = ? AND user_id = ?`,
+    [...Object.values(toUpdate), id, userId],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
 
@@ -112,34 +112,9 @@ exports.updateAudioRecording = (req, res) => {
         return res.json({ success: true, changes: this.changes });
       }
 
-      // No rows matched — the recording doesn't exist in this DB yet.
-      // UPSERT: insert it so transcripts (child records) can sync afterward.
-      const insertUserId = fields.user_id || userId;
-      const local_uri   = fields.local_uri || `offline://${id}`;
-      db.run(
-        `INSERT INTO audio_recordings (id, user_id, subject_id, name, local_uri, duration, cloud_url, is_backed_up)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id) DO UPDATE SET
-           user_id      = EXCLUDED.user_id,
-           subject_id   = COALESCE(EXCLUDED.subject_id, audio_recordings.subject_id),
-           name         = COALESCE(EXCLUDED.name, audio_recordings.name),
-           cloud_url    = COALESCE(EXCLUDED.cloud_url, audio_recordings.cloud_url),
-           is_backed_up = COALESCE(EXCLUDED.is_backed_up, audio_recordings.is_backed_up)`,
-        [
-          id,
-          insertUserId,
-          fields.subject_id || null,
-          fields.name || null,
-          local_uri,
-          fields.duration || 0,
-          fields.cloud_url || null,
-          fields.is_backed_up || 0,
-        ],
-        function(upsertErr) {
-          if (upsertErr) return res.status(500).json({ error: upsertErr.message });
-          res.json({ success: true, changes: 1, upserted: true });
-        }
-      );
+      // 0 changes: the row either doesn't exist or belongs to a different user.
+      // Do NOT upsert — that would allow cross-tenant ownership hijack.
+      return res.status(404).json({ error: 'Not found or access denied', changes: 0 });
     }
   );
 };

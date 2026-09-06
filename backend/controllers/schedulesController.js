@@ -83,9 +83,11 @@ exports.createSchedule = (req, res) => {
  */
 exports.deleteSchedule = (req, res) => {
   const { id } = req.params;
-  db.run(`DELETE FROM schedules WHERE id = ?`, [id], function(err) {
+  const userId = req.user.id;
+  db.run(`DELETE FROM schedules WHERE id = ? AND user_id = ?`, [id, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    recordDeletion('schedules', id, req.user.id, () => {
+    if (this.changes === 0) return res.status(404).json({ error: 'Not found or access denied' });
+    recordDeletion('schedules', id, userId, () => {
       incrementSyncCounterOnly(() => {
         res.json({ message: 'Horario eliminado' });
       });

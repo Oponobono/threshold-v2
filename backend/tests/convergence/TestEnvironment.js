@@ -33,8 +33,12 @@ class TestEnvironment {
         run(`PRAGMA foreign_keys = OFF`);
         run(`CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY, email TEXT UNIQUE, password_hash TEXT NOT NULL,
-          name TEXT, username TEXT UNIQUE, share_pin VARCHAR(8) UNIQUE,
+          name TEXT, lastname TEXT, username TEXT UNIQUE, share_pin VARCHAR(8) UNIQUE,
+          major TEXT, university TEXT, semester INTEGER,
+          study_goal TEXT, reference_language TEXT, profile_image TEXT,
+          active_grading_version_id INTEGER,
           status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
           last_login TEXT DEFAULT (datetime('now'))
         )`);
         run(`CREATE TABLE IF NOT EXISTS sync_version (
@@ -139,6 +143,9 @@ class TestEnvironment {
     const scannedDocumentsController = require('../../controllers/scannedDocumentsController');
     const assessmentsController = require('../../controllers/assessmentsController');
     const backupController = require('../../controllers/backupController');
+    const schedulesController = require('../../controllers/schedulesController');
+    const calendarEventsController = require('../../controllers/calendarEventsController');
+
     app.post('/api/subjects', authMw, subjectsController.createSubject);
     app.put('/api/subjects/:subjectId', authMw, subjectsController.updateSubject);
     app.delete('/api/subjects/:subjectId', authMw, subjectsController.deleteSubject);
@@ -159,6 +166,15 @@ class TestEnvironment {
     app.post('/api/assessments', authMw, assessmentsController.createAssessment);
     app.put('/api/assessments/:assessmentId', authMw, assessmentsController.updateAssessment);
     app.delete('/api/assessments/:assessmentId', authMw, assessmentsController.deleteAssessment);
+
+    // Schedule routes
+    app.post('/api/schedules', authMw, schedulesController.createSchedule);
+    app.delete('/api/schedules/:id', authMw, schedulesController.deleteSchedule);
+
+    // Calendar routes
+    app.get('/api/calendar/events/:id', authMw, calendarEventsController.getCalendarEvent);
+    app.put('/api/calendar/events/:id', authMw, calendarEventsController.updateCalendarEvent);
+    app.delete('/api/calendar/events/:id', authMw, calendarEventsController.deleteCalendarEvent);
 
     // Study notes route (minimal upsert for sync testing)
     app.post('/api/study-notes', authMw, (req, res) => {
@@ -562,10 +578,24 @@ const TABLE_SCHEMAS = {
     sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
   )`,
   calendar_events: `CREATE TABLE IF NOT EXISTS calendar_events (
-    id TEXT PRIMARY KEY, user_id TEXT, title TEXT, description TEXT,
-    start_date TEXT, end_date TEXT, all_day INTEGER DEFAULT 0,
-    created_at TEXT, updated_at TEXT,
-    sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    subject_id TEXT,
+    linked_deck_id TEXT,
+    title TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    description TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    start_time TEXT,
+    end_time TEXT,
+    all_day INTEGER DEFAULT 0,
+    create_study_plan INTEGER DEFAULT 0,
+    sync_version INTEGER DEFAULT 0,
+    deleted_at TEXT,
+    version_number INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
   )`,
   grading_periods: `CREATE TABLE IF NOT EXISTS grading_periods (
     id TEXT PRIMARY KEY, user_id TEXT, name TEXT,
@@ -752,7 +782,7 @@ const TABLE_SCHEMAS = {
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     sync_version INTEGER DEFAULT 0, deleted_at TEXT, version_number INTEGER DEFAULT 0
-  )`,
+  )`
 };
 
 module.exports = TestEnvironment;
