@@ -146,6 +146,13 @@ class TestEnvironment {
     const schedulesController = require('../../controllers/schedulesController');
     const calendarEventsController = require('../../controllers/calendarEventsController');
 
+    // Trust proxy to allow X-Forwarded-For spoofing in rate limit tests
+    app.set('trust proxy', 1);
+
+    // Mount Auth Router (which includes rateLimiters) for Rate Limiting tests
+    const authRouter = require('../../routes/auth');
+    app.use('/api', authRouter);
+
     app.post('/api/subjects', authMw, subjectsController.createSubject);
     app.put('/api/subjects/:subjectId', authMw, subjectsController.updateSubject);
     app.delete('/api/subjects/:subjectId', authMw, subjectsController.deleteSubject);

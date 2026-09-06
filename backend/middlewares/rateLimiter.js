@@ -1,53 +1,102 @@
-const rateLimit = require('express-rate-limit');
+const { rateLimit } = require('express-rate-limit');
 
 /**
- * Límite Global: Protege a tu servidor de ataques de fuerza bruta o DDoS.
- * Se aplicará a casi todas las rutas de la aplicación.
+ * Rate Limiting v1 — in-process store
+ *
+ * Store: MemoryStore (default). Sufficient for a single-process deployment.
+ * Limitation: in a horizontally-scaled setup each process has its own counter,
+ * making the per-IP limit effectively `max × replicas`. If Threshold ever runs
+ * multiple replicas, migrate to a shared store (e.g. `rate-limit-redis`).
+ * The contract (windowMs, max, key) is defined here and decoupled from the
+ * middleware; swapping the store does not require changing any route file.
  */
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Global — baseline protection against volumetric abuse
+// ─────────────────────────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // Ventana de 15 minutos
-    max: 1000, // Máximo 1000 peticiones por IP en esos 15 minutos (100 era muy poco para una app moderna)
-    message: { error: 'Demasiadas peticiones desde esta IP, por favor intenta de nuevo en 15 minutos.' },
-    standardHeaders: true, // Informa a los clientes sobre su límite en las cabeceras HTTP
-    legacyHeaders: false,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
 });
 
-/**
- * Límite Estricto para IA: Protege tu bolsillo y tu cuota en Groq/Gemini.
- * Evita que un script agote el saldo generando miles de flashcards.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// AI — protect Groq/Gemini quota
+// ─────────────────────────────────────────────────────────────────────────────
 const aiLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // Ventana de 1 hora
-    max: 200, // DEV: 200 req/hora por IP — bajar a 30-50 antes de producción
-              // Groq free: ~1,800/h · Gemini Flash free: ~900/h → 200 es seguro para ambos
-    standardHeaders: true,
-    legacyHeaders: false,
-    // Handler personalizado para enviar Retry-After con el tiempo exacto en segundos
-    handler: (req, res, next, options) => {
-        const resetTimeMs = req.rateLimit?.resetTime?.getTime?.() ?? (Date.now() + options.windowMs);
-        const retryAfterSeconds = Math.ceil((resetTimeMs - Date.now()) / 1000);
-        res.setHeader('Retry-After', retryAfterSeconds);
-        res.status(options.statusCode).json({
-            error: 'Has superado el límite de uso de la Inteligencia Artificial por hora. Intenta más tarde.',
-            retryAfter: retryAfterSeconds,
-        });
-    },
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, _next, options) => {
+    const resetTimeMs = req.rateLimit?.resetTime?.getTime?.() ?? (Date.now() + options.windowMs);
+    const retryAfterSeconds = Math.ceil((resetTimeMs - Date.now()) / 1000);
+    res.setHeader('Retry-After', retryAfterSeconds);
+    res.status(options.statusCode).json({
+      error: 'AI usage limit exceeded. Please try again later.',
+      retryAfter: retryAfterSeconds,
+    });
+  },
 });
 
-/**
- * Límite para Login/Registro: Previene ataques de fuerza bruta adivinando contraseñas.
- */
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // Ventana de 15 minutos
-    max: 10, // Máximo 10 intentos por IP en 15 minutos
-    message: { error: 'Demasiados intentos de inicio de sesión. Tu cuenta está temporalmente bloqueada.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    skipSuccessfulRequests: true, // ¡Clave! Solo cuenta los intentos fallidos
+// ─────────────────────────────────────────────────────────────────────────────
+// Login — password authentication
+//
+// Policy decisions (v1):
+//   - Key: IP only. Combined IP+account requires reading req.body at middleware
+//     level before validation; adds complexity without material gain in v1.
+//     Documented as a known limitation.
+//   - skipSuccessfulRequests: false — every attempt (success or failure)
+//     consumes quota. This prevents an attacker from making N-1 failures and
+//     one success in a sliding window indefinitely.
+//   - Message: neutral — does not reveal whether the block is by IP or account.
+//   - 10 attempts per 15-minute window per IP.
+// ─────────────────────────────────────────────────────────────────────────────
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  skipSuccessfulRequests: false,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res, _next, options) => {
+    res.status(options.statusCode).json({
+      error: 'Too many authentication attempts. Please try again later.',
+    });
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Biometric login — independent bucket from password login
+//
+// Policy decisions (v1):
+//   - Separate limiter: does NOT share the counter with loginRateLimiter.
+//     An attacker cannot exhaust the biometric bucket via the password endpoint
+//     or vice versa.
+//   - Tighter window (5 attempts / 15 min): biometric tokens are device-bound
+//     secrets; a lower threshold is appropriate.
+//   - Message: same neutral phrasing as loginRateLimiter.
+// ─────────────────────────────────────────────────────────────────────────────
+const biometricRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  skipSuccessfulRequests: false,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res, _next, options) => {
+    res.status(options.statusCode).json({
+      error: 'Too many authentication attempts. Please try again later.',
+    });
+  },
 });
 
 module.exports = {
-    globalLimiter,
-    aiLimiter,
-    authLimiter
+  globalLimiter,
+  aiLimiter,
+  // Preserved for backwards compat with any route that still references it.
+  // Prefer loginRateLimiter / biometricRateLimiter for auth routes.
+  authLimiter: loginRateLimiter,
+  loginRateLimiter,
+  biometricRateLimiter,
 };

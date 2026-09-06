@@ -30,6 +30,8 @@ async function main() {
       require('./scenarios/backup'),
       require('./scenarios/restoreValidation'),
       require('./scenarios/groups'),
+      require('./scenarios/security'),
+      require('./scenarios/rateLimiting'),
     ];
 
     let totalPassed = 0;

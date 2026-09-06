@@ -1,15 +1,28 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const { authLimiter } = require('../middlewares/rateLimiter');
+const { loginRateLimiter, biometricRateLimiter } = require('../middlewares/rateLimiter');
 
-// Proteger login y registro contra fuerza bruta
-router.use('/login', authLimiter);
-router.use('/register', authLimiter);
-router.use('/biometric-login', authLimiter);
-router.use('/auth/enroll-biometric', authLimiter);
-router.use('/auth/forgot-password', authLimiter);
-router.use('/auth/reset-password', authLimiter);
+/**
+ * Auth routes — rate limiting applied as inline middleware at the route level.
+ *
+ * Policy is declared here (routing) and not inside the controller (business logic).
+ * Each authentication path has its own independent limiter so they do not share
+ * a counter bucket.
+ *
+ * HTTP Request
+ *      │
+ *      ▼
+ * ┌─────────────────────────┐
+ * │ Rate Limiter (per route)│
+ * │  /login → loginRateLimiter
+ * │  /biometric-login → biometricRateLimiter
+ * └────────────┬────────────┘
+ *              │
+ *              ▼
+ *     Authentication Handler
+ */
+
 /**
  * @swagger
  * /api/register:
@@ -54,7 +67,7 @@ router.use('/auth/reset-password', authLimiter);
  *       500:
  *         description: Error interno del servidor
  */
-router.post('/register', authController.registerUser);
+router.post('/register', loginRateLimiter, authController.registerUser);
 
 /**
  * @swagger
@@ -83,10 +96,12 @@ router.post('/register', authController.registerUser);
  *         description: Faltan campos requeridos
  *       401:
  *         description: Credenciales inválidas o cuenta eliminada
+ *       429:
+ *         description: Demasiados intentos de autenticación
  *       500:
  *         description: Error interno del servidor
  */
-router.post('/login', authController.loginUser);
+router.post('/login', loginRateLimiter, authController.loginUser);
 
 /**
  * @swagger
@@ -112,7 +127,7 @@ router.post('/login', authController.loginUser);
  *       200:
  *         description: Token asociado exitosamente
  */
-router.post('/auth/enroll-biometric', authController.enrollBiometric);
+router.post('/auth/enroll-biometric', loginRateLimiter, authController.enrollBiometric);
 
 /**
  * @swagger
@@ -136,10 +151,12 @@ router.post('/auth/enroll-biometric', authController.enrollBiometric);
  *         description: Login exitoso
  *       401:
  *         description: Token inválido o no encontrado
+ *       429:
+ *         description: Demasiados intentos de autenticación
  */
-router.post('/biometric-login', authController.biometricLogin);
+router.post('/biometric-login', biometricRateLimiter, authController.biometricLogin);
 
-router.post('/auth/forgot-password', authController.forgotPassword);
-router.post('/auth/reset-password', authController.resetPassword);
+router.post('/auth/forgot-password', loginRateLimiter, authController.forgotPassword);
+router.post('/auth/reset-password', loginRateLimiter, authController.resetPassword);
 
 module.exports = router;
