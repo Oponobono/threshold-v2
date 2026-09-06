@@ -1,29 +1,44 @@
 const libre = require('libreoffice-convert');
 const { promisify } = require('util');
-const { execSync } = require('child_process');
 const path = require('path');
 
-const convertAsync = promisify(libre.convert);
+const convertWithOptionsAsync = promisify(libre.convertWithOptions);
 
-// Log LibreOffice availability on module load
-try {
-  const loPath = execSync('which soffice', { encoding: 'utf8' }).trim();
-  console.log('[ConvertController] LibreOffice found at:', loPath);
-  const loVersion = execSync('soffice --version', { encoding: 'utf8' }).trim();
-  console.log('[ConvertController]', loVersion);
-} catch (e) {
-  console.warn('[ConvertController] WARNING: soffice not found in PATH. PPT conversion will return 503.');
+// Allowlist of environment variables required by LibreOffice to function across platforms
+// Explicitly strips all application secrets (JWT_SECRET, DATABASE_URL, etc.)
+const SAFE_ENV_VARS = [
+  'PATH',
+  'HOME',
+  'TMPDIR',
+  'USERPROFILE',
+  'SystemRoot',
+  'SystemDrive',
+  'TEMP',
+  'TMP',
+  'APPDATA',
+  'LOCALAPPDATA'
+];
+
+function getSafeEnv() {
+  const safeEnv = {};
+  for (const key of SAFE_ENV_VARS) {
+    if (process.env[key] !== undefined) {
+      safeEnv[key] = process.env[key];
+    }
+  }
+  return safeEnv;
 }
 
 /**
  * POST /api/convert/presentation
  *
- * Recibe un archivo de presentación (PPTX, PPT) como multipart/form-data
+ * Recibe un archivo de presentación (PPTX, PPT, ODP) como multipart/form-data
  * y devuelve el PDF resultante como binary stream.
  *
- * Requiere LibreOffice instalado en el sistema.
- * En Render.com, añadir al Build Command:
- *   apt-get install -y libreoffice --no-install-recommends && npm install
+ * Emplea process hardening:
+ * - Timeout de 60 segundos (mitiga DoS)
+ * - Entorno restringido (mitiga exposición de secretos ante RCE)
+ * - Flags no interactivos
  */
 async function convertPresentation(req, res) {
   try {
@@ -39,7 +54,21 @@ async function convertPresentation(req, res) {
       });
     }
 
-    const pdfBuffer = await convertAsync(req.file.buffer, '.pdf', undefined);
+    const options = {
+      execOptions: {
+        env: getSafeEnv(),
+        timeout: 60000, // 60 segundos
+      },
+      sofficeAdditionalArgs: [
+        '--nologo',
+        '--nodefault',
+        '--norestore',
+        '--invisible',
+        '--nofirststartwizard',
+      ],
+    };
+
+    const pdfBuffer = await convertWithOptionsAsync(req.file.buffer, '.pdf', undefined, options);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -52,10 +81,17 @@ async function convertPresentation(req, res) {
     console.error('[ConvertController] Error al convertir presentación:', err.message);
 
     const msg = (err.message || '').toLowerCase();
-    if (msg.includes('soffice') || msg.includes('libreoffice') || msg.includes('enoent')) {
+    if (msg.includes('soffice') || msg.includes('libreoffice') || msg.includes('enoent') || msg.includes('could not find soffice binary')) {
       return res.status(503).json({
         error: 'El servicio de conversión no está disponible. LibreOffice no está instalado en el servidor.',
         code: 'LIBREOFFICE_UNAVAILABLE',
+      });
+    }
+
+    if (msg.includes('timeout') || err.killed) {
+      return res.status(408).json({
+        error: 'El procesamiento del documento excedió el tiempo límite (60s).',
+        code: 'CONVERSION_TIMEOUT',
       });
     }
 
@@ -63,4 +99,5 @@ async function convertPresentation(req, res) {
   }
 }
 
-module.exports = { convertPresentation };
+module.exports = { convertPresentation, getSafeEnv };
+
