@@ -23,8 +23,6 @@ export const s = StyleSheet.create({
     overflow: 'hidden',
     height: '92%',
     paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
   },
   handle: {
     width: 38, height: 4, borderRadius: 2,

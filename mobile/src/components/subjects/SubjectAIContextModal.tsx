@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+﻿import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   Animated, StyleSheet,
@@ -25,8 +25,10 @@ const FILTER_TYPE_MAP: Partial<Record<FilterKey, AIContextItemType>> = {
 };
 
 const ITEMS_PER_PAGE = 10;
+/** Maximo de items por categoria en la vista "Todos" (preview). */
+const MAX_PER_CATEGORY_IN_ALL = 3;
 
-// ─── Props ────────────────────────────────────────────────────────────────────
+// Props
 export interface SubjectAIContextModalProps {
   isVisible: boolean;
   onClose: () => void;
@@ -39,13 +41,6 @@ export interface SubjectAIContextModalProps {
   onAskQuestions?: (selected: AIContextItemData[]) => void;
 }
 
-/**
- * SubjectAIContextModal — Selector de contexto Zyren con búsqueda.
- *
- * Bottom Sheet con barra de búsqueda (OCR/transcripción), chips de categoría
- * horizontal, lista compacta de archivos (10 por página), "Ver más" y
- * barra de acción inferior.
- */
 export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   isVisible, onClose, subjectName,
   recordings = [], photos = [], documents = [], videos = [],
@@ -64,7 +59,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   const loadingOpacity = useRef(new Animated.Value(1)).current;
   const loadingSpin = useRef(new Animated.Value(0)).current;
 
-  // ── Toast de advertencia ────────────────────────────────────────────────────
   const [toastMsg, setToastMsg] = useState('');
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -77,7 +71,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     ]).start();
   }, [toastOpacity]);
 
-  // Map raw data to unified format
   const allItems = useMemo<AIContextItemData[]>(() => [
     ...mapDocuments(documents),
     ...mapPhotos(photos),
@@ -85,7 +78,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     ...mapVideos(videos),
   ], [documents, photos, recordings, videos]);
 
-  // Sincronizar selectedIds con los items actuales
   useEffect(() => {
     setSelectedIds(prev => {
       const validIds = new Set(allItems.map(item => item.id));
@@ -94,9 +86,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     });
   }, [allItems]);
 
-  // ── Loading state ───────────────────────────────────────────────────────────
-  // Cuando el modal se abre, algunas props pueden llegar vacías el primer render
-  // mientras el padre termina de cargar. Mostramos un indicador breve.
   useEffect(() => {
     if (isVisible) {
       setInitialLoading(true);
@@ -106,10 +95,12 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
   }, [isVisible]);
 
   useEffect(() => {
-    if (allItems.length > 0) setInitialLoading(false);
+    if (allItems.length > 0) {
+      setInitialLoading(false);
+      setShowContent(true);
+    }
   }, [allItems]);
 
-  // Pulsing animation for loading indicator
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
@@ -130,7 +121,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     outputRange: ['0deg', '360deg'],
   });
 
-  // Category counts
   const categoryCounts = useMemo(() => ({
     all: allItems.length,
     docs: allItems.filter(i => i.type === 'document').length,
@@ -139,7 +129,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     videos: allItems.filter(i => i.type === 'video').length,
   }), [allItems]);
 
-  // Search matching
   const searchFiltered = useMemo(() => {
     if (!searchQuery.trim()) return allItems;
     const q = searchQuery.toLowerCase().trim();
@@ -149,7 +138,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     );
   }, [allItems, searchQuery]);
 
-  // Category filter applied on top of search
   const displayedItems = useMemo(() => {
     const source = searchQuery.trim() ? searchFiltered : allItems;
     if (activeFilter === 'all') return source;
@@ -157,7 +145,20 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     return source.filter(i => i.type === type);
   }, [searchFiltered, allItems, activeFilter, searchQuery]);
 
-  const visibleItems = useMemo(() => displayedItems.slice(0, visibleCount), [displayedItems, visibleCount]);
+  const visibleItems = useMemo(() => {
+    if (activeFilter !== 'all') return displayedItems.slice(0, visibleCount);
+    const counts: Partial<Record<string, number>> = {};
+    const result: typeof displayedItems = [];
+    for (const item of displayedItems) {
+      const c = counts[item.type] ?? 0;
+      if (c < MAX_PER_CATEGORY_IN_ALL) {
+        result.push(item);
+        counts[item.type] = c + 1;
+      }
+    }
+    return result;
+  }, [displayedItems, visibleCount, activeFilter]);
+
   const totalMatching = displayedItems.length;
   const totalSelected = selectedIds.size;
   const hasContent = allItems.length > 0;
@@ -169,25 +170,21 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     ]).start();
   }, [badgeScale]);
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
-
   const handleToggle = useCallback((id: string) => {
     const item = allItems.find(i => i.id === id);
     if (!item) return;
-
     if (!item.hasText) {
       if (item.type === 'photo') {
-        showToast(t('ai.missingOCRPhoto', 'Esta fotografía aún no ha sido procesada. Por favor, extrae el texto mediante OCR para proporcionarle contexto adicional a Zyren.'));
+        showToast(t('ai.missingOCRPhoto', 'Esta fotografia aun no ha sido procesada. Por favor, extrae el texto mediante OCR para proporcionarle contexto adicional a Zyren.'));
       } else if (item.type === 'document') {
-        showToast(t('ai.missingOCRDocument', 'Este documento aún no ha sido analizado. Por favor, realiza un escaneo de texto (OCR) para proporcionar contexto inteligente a tu asistente.'));
+        showToast(t('ai.missingOCRDocument', 'Este documento aun no ha sido analizado. Por favor, realiza un escaneo de texto (OCR) para proporcionar contexto inteligente a tu asistente.'));
       } else if (item.type === 'recording') {
-        showToast(t('ai.missingTranscriptRecording', 'Esta grabación requiere una transcripción. Por favor, transcribe el audio para que Zyren pueda utilizarlo como base de conocimiento.'));
+        showToast(t('ai.missingTranscriptRecording', 'Esta grabacion requiere una transcripcion. Por favor, transcribe el audio para que Zyren pueda utilizarlo como base de conocimiento.'));
       } else if (item.type === 'video') {
-        showToast(t('ai.missingTranscriptVideo', 'Este video necesita ser transcrito. Por favor, genera una transcripción o resumen para enriquecer tu sesión de estudio.'));
+        showToast(t('ai.missingTranscriptVideo', 'Este video necesita ser transcrito. Por favor, genera una transcripcion o resumen para enriquecer tu sesion de estudio.'));
       }
       return;
     }
-
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); } else { next.add(id); }
@@ -239,16 +236,16 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     const hasAudioVideo = items.some(i => i.type === 'recording' || i.type === 'video');
     const hasDocPhoto   = items.some(i => i.type === 'document'  || i.type === 'photo');
     if (hasAudioVideo && hasDocPhoto)
-      return t('ai.toastMediaAndDoc', '⚠️ Transcribe los audios/videos y analiza con OCR los documentos/fotos antes de continuar.');
+      return t('ai.toastMediaAndDoc', 'Transcribe los audios/videos y analiza con OCR los documentos/fotos antes de continuar.');
     if (hasAudioVideo)
-      return t('ai.toastMedia', '⚠️ Primero debes transcribir los archivos de audio o video antes de usarlos como contexto.');
-    return t('ai.toastDoc', '⚠️ Primero debes analizar los documentos o fotos con OCR antes de usarlos como contexto.');
+      return t('ai.toastMedia', 'Primero debes transcribir los archivos de audio o video antes de usarlos como contexto.');
+    return t('ai.toastDoc', 'Primero debes analizar los documentos o fotos con OCR antes de usarlos como contexto.');
   }, [t]);
 
   const handleAsk = useCallback(() => {
     const selected = allItems.filter(i => selectedIds.has(i.id));
     if (selected.length === 0) {
-      showToast(t('ai.chatOpenFree', '💬 Abriendo chat libre. Puedes hacer preguntas sin contexto.'));
+      showToast(t('ai.chatOpenFree', 'Abriendo chat libre. Puedes hacer preguntas sin contexto.'));
       onAskQuestions?.(selected);
       return;
     }
@@ -271,8 +268,6 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     if (status === 'some_empty') showToast(getToastMessage(items));
     onGenerateFlashcards?.(selected);
   }, [allItems, selectedIds, onGenerateFlashcards, checkTextReadiness, getToastMessage, showToast]);
-
-  // ── UI builders ─────────────────────────────────────────────────────────────
 
   const filterChips = useMemo(() => {
     const labels: Record<FilterKey, string> = {
@@ -305,11 +300,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
     <View style={StyleSheet.absoluteFill}>
       <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={handleClose} />
       <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-
-        {/* Handle */}
         <View style={s.handle} />
-
-        {/* Header */}
         <View style={s.header}>
           <View style={s.aiIconWrap}>
             <LottieView source={zyrenOrbAnimation} autoPlay loop style={{ width: 34, height: 34 }} />
@@ -317,15 +308,13 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
           <View style={{ flex: 1 }}>
             <Text style={s.title}>Zyren</Text>
             <Text style={s.subtitle} numberOfLines={1}>
-              {t('ai.addContext', 'Añade contexto a tu sesión')}
+              {t('ai.addContext', 'Anade contexto a tu sesion')}
             </Text>
           </View>
           <TouchableOpacity onPress={handleClose} style={s.closeBtn}>
             <Ionicons name="close" size={18} color={TXT_PRI} />
           </TouchableOpacity>
         </View>
-
-        {/* 🔍 Search bar */}
         <View style={s.searchContainer}>
           <Ionicons name="search" size={16} color={TXT_SEC} style={{ marginRight: 8 }} />
           <TextInput
@@ -343,21 +332,9 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Category pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.filterRow}
-          style={{ flexGrow: 0 }}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow} style={{ flexGrow: 0 }}>
           {filterChips.map(f => (
-            <TouchableOpacity
-              key={f.key}
-              onPress={() => handleFilterPress(f.key)}
-              style={[s.chip, f.active && s.chipActive]}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity key={f.key} onPress={() => handleFilterPress(f.key)} style={[s.chip, f.active && s.chipActive]} activeOpacity={0.7}>
               <Text style={[s.chipText, f.active && s.chipTextActive]}>{f.label}</Text>
               {f.count > 0 && (
                 <View style={[s.chipBadge, f.active && s.chipBadgeActive]}>
@@ -367,13 +344,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             </TouchableOpacity>
           ))}
         </ScrollView>
-
-        {/* Content area */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={s.listContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
           {isInitialLoading ? (
             <View style={s.emptyState}>
               <Animated.View style={{ transform: [{ rotate: spinInterpolation }] }}>
@@ -394,7 +365,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
           ) : !showContent ? (
             <View style={s.emptyState}>
               <MaterialCommunityIcons name="file-find-outline" size={42} color="rgba(255,255,255,0.1)" />
-              <Text style={s.emptyTitle}>{t('ai.searchPrompt', 'Busca o selecciona una categoría para comenzar')}</Text>
+              <Text style={s.emptyTitle}>{t('ai.searchPrompt', 'Busca o selecciona una categoria para comenzar')}</Text>
             </View>
           ) : visibleItems.length === 0 ? (
             <View style={s.emptyState}>
@@ -421,7 +392,7 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
                       <Text numberOfLines={1} style={s.listLabel}>{item.label}</Text>
                       <Text style={s.listMeta}>
                         {m.label}
-                        {item.hasText ? ` • ${t('ai.ready', 'Listo')}` : ` • ${t('ai.noText', 'Sin texto')}`}
+                        {item.hasText ? ` - ${t('ai.ready', 'Listo')}` : ` - ${t('ai.noText', 'Sin texto')}`}
                       </Text>
                     </View>
                     <View style={[s.listCheck, isSelected && s.listCheckActive]}>
@@ -430,18 +401,21 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
                   </TouchableOpacity>
                 );
               })}
-              {totalMatching > visibleCount && (
+              {activeFilter !== 'all' && totalMatching > visibleCount && (
                 <TouchableOpacity onPress={showMore} style={s.seeMoreBtn} activeOpacity={0.7}>
                   <Text style={s.seeMoreText}>
-                    {t('ai.seeMore', { count: totalMatching - visibleCount, defaultValue: `Ver más (${totalMatching - visibleCount} más)` })}
+                    {t('ai.seeMore', { count: totalMatching - visibleCount, defaultValue: `Ver mas (${totalMatching - visibleCount} mas)` })}
                   </Text>
                 </TouchableOpacity>
+              )}
+              {activeFilter === 'all' && totalMatching > visibleItems.length && (
+                <Text style={[s.seeMoreText, { textAlign: 'center', paddingVertical: 8, opacity: 0.5 }]}>
+                  {t('ai.filterHint', 'Selecciona una categoria para ver todos')}
+                </Text>
               )}
             </>
           )}
         </ScrollView>
-
-        {/* Bottom action bar */}
         <View style={s.actionBar}>
           {totalSelected > 0 && (
             <Animated.View style={[s.counterBadge, { transform: [{ scale: badgeScale }] }]}>
@@ -451,25 +425,16 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
               </Text>
             </Animated.View>
           )}
-
           <View style={s.btnRow}>
-            <TouchableOpacity
-              onPress={handleAsk}
-              activeOpacity={0.82}
-              style={[s.btn, s.btnPrimary]}
-            >
+            <TouchableOpacity onPress={handleAsk} activeOpacity={0.82} style={[s.btn, s.btnPrimary]}>
               <MaterialCommunityIcons name="chat-processing-outline" size={18} color="#fff" />
               <Text style={s.btnPrimaryText}>{t('ai.talkWithZyren', 'Habla con Zyren')}</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               onPress={handleFlashcards}
               disabled={totalSelected === 0}
               activeOpacity={0.82}
-              style={[
-                s.btn, s.btnSecondary,
-                totalSelected === 0 && s.btnDisabled,
-              ]}
+              style={[s.btn, s.btnSecondary, totalSelected === 0 && s.btnDisabled]}
             >
               <MaterialCommunityIcons name="cards-outline" size={18} color={totalSelected > 0 ? TXT_PRI : TXT_SEC} />
               <Text style={[s.btnSecondaryText, totalSelected === 0 && { color: TXT_SEC }]}>
@@ -478,12 +443,9 @@ export const SubjectAIContextModal: React.FC<SubjectAIContextModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Toast */}
         <Animated.View style={[s.toast, { opacity: toastOpacity }]} pointerEvents="none">
           <Text style={s.toastText}>{toastMsg}</Text>
         </Animated.View>
-
       </View>
     </View>
   );

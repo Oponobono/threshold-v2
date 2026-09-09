@@ -308,6 +308,17 @@ export class SyncService {
             syncDebugger.log(tid, operationId, null, 'QUEUE_PROCESS', `Orphan dropped: ${entityTag}`, { reason: 'parent_deleted' }, op.entity_type, op.entity_id);
             await RepositoryFactory.syncQueues().markCompletedBatch(op.originalIds);
             success++;
+          } else if (
+            // El registro ya existe en el servidor (CREATE llegó pero respuesta se perdió).
+            // Tratar como éxito idempotente para no reintentar indefinidamente.
+            error.message?.includes('UNIQUE constraint failed') ||
+            error.message?.includes('HTTP 409') ||
+            error.message?.includes('already exists')
+          ) {
+            console.log(`[SyncService] ℹ️ ${entityTag} ya existe en el servidor (idempotente) — marcando como completado`);
+            syncDebugger.log(tid, operationId, null, 'QUEUE_PROCESS', `Idempotent: ${entityTag} already exists on server`, { reason: 'unique_conflict' }, op.entity_type, op.entity_id);
+            await RepositoryFactory.syncQueues().markCompletedBatch(op.originalIds);
+            success++;
           } else {
             console.error(`[SyncService] ❌ Error sincronizando ${entityTag}:`, error.message);
             syncDebugger.logError(tid, operationId, 'QUEUE_PROCESS', `Failed ${entityTag}`, error, op.entity_type, op.entity_id);

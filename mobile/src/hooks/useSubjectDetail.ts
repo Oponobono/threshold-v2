@@ -222,7 +222,15 @@ export function useSubjectDetail() {
   const imagePhotos = useMemo(() => photos.filter(p => !p.local_uri?.endsWith('.pdf')), [photos]);
   const pdfDocuments = useMemo(() => {
     const oldPdfs = photos.filter(p => p.local_uri?.endsWith('.pdf')).map(p => ({ ...p, is_legacy_photo: true }));
-    return [...scannedDocuments, ...oldPdfs];
+    const combined = [...scannedDocuments, ...oldPdfs];
+    // Deduplicar por id: un doc escaneado puede estar en scannedDocuments Y en photos
+    // (misma URI .pdf), generando claves React duplicadas en el modal de Zyren.
+    const seen = new Set<string>();
+    return combined.filter(d => {
+      if (!d.id || seen.has(String(d.id))) return false;
+      seen.add(String(d.id));
+      return true;
+    });
   }, [photos, scannedDocuments]);
 
   const subjectSubtitle = selectedSubject?.professor || profile?.major || t('subjects.defaultSubtitle');

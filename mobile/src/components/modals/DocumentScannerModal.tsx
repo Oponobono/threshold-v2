@@ -8,7 +8,8 @@ import { documentScannerStyles as localStyles } from '../../styles/DocumentScann
 import { Subject, createPhoto, createScannedDocument } from '../../services/api';
 import { extractTextFromImageHybrid } from '../../services/hybridAIService';
 import { AdvancedImageEnhancer, AdvancedImageEnhancerRef } from '../ai/AdvancedImageEnhancer';
-import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system/legacy';
+import { PDFDocument } from 'pdf-lib';
 import * as Clipboard from 'expo-clipboard';
 import * as ImageManipulator from 'expo-image-manipulator';
 
@@ -158,45 +159,41 @@ export const DocumentScannerModal: React.FC<DocumentScannerModalProps> = ({
       }
 
       if (exportFormat === 'pdf') {
-        // ── Ruta PDF (genera archivo local con expo-print) ──
-        const imgSrc = base64Img ? `data:image/jpeg;base64,${base64Img}` : finalImageUri;
-        // Leer dimensiones de la imagen para un PDF exacto sin márgenes blancos
-        let pageWidth = 794; // Fallback A4
-        let pageHeight = 1123;
-        try {
-          const info = await ImageManipulator.manipulateAsync(finalImageUri, []);
-          if (info.width && info.height) {
-            pageWidth = info.width;
-            pageHeight = info.height;
-          }
-        } catch (err) {
-          console.warn('[Scanner] Falló al obtener dimensiones, usando A4', err);
-        }
+        // ── Ruta PDF (pdf-lib: página exactamente del tamaño de la imagen, sin márgenes) ──
+        // expo-print agrega márgenes del sistema que no se pueden eliminar con CSS ni con
+        // la opción `margins`; pdf-lib incrusta la imagen directamente en (0,0) a tamaño completo.
+        const saveFormat = (ImageManipulator as any).SaveFormat?.JPEG || 'jpeg';
+        const compressed = await ImageManipulator.manipulateAsync(
+          finalImageUri,
+          [],
+          { compress: 0.7, format: saveFormat }
+        );
 
-        const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    @page { size: ${pageWidth}px ${pageHeight}px; margin: 0; }
-    html, body { margin: 0; padding: 0; width: ${pageWidth}px; height: ${pageHeight}px; background: white; }
-    img { width: 100%; height: 100%; display: block; object-fit: cover; }
-  </style>
-</head>
-<body><img src="${imgSrc}" /></body>
-</html>`;
+        if (!compressed?.uri) throw new Error('No se pudo comprimir la imagen para el PDF.');
+
+        const fileResponse = await fetch(compressed.uri);
+        if (!fileResponse.ok) throw new Error('No se pudo leer la imagen comprimida.');
+        const arrayBuffer = await fileResponse.arrayBuffer();
+
+        const pdfDoc = await PDFDocument.create();
+        const embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
+
+        const page = pdfDoc.addPage([compressed.width, compressed.height]);
+        page.drawImage(embeddedImage, {
+          x: 0,
+          y: 0,
+          width: compressed.width,
+          height: compressed.height,
+        });
 
         let pdfUri: string;
         try {
-          const { uri } = await Print.printToFileAsync({ 
-            html,
-            width: pageWidth,
-            height: pageHeight,
-            margins: { top: 0, left: 0, right: 0, bottom: 0 }
-          });
-          pdfUri = uri;
+          const pdfBase64 = await pdfDoc.saveAsBase64({ dataUri: false });
+          pdfUri = `${FileSystem.cacheDirectory}Documento_${Date.now()}.pdf`;
+          await FileSystem.writeAsStringAsync(pdfUri, pdfBase64, { encoding: FileSystem.EncodingType.Base64 });
+          console.log('[Scanner] PDF generado sin márgenes en:', pdfUri);
         } catch (pdfErr) {
-          console.error('[Scanner] Print.printToFileAsync falló:', pdfErr);
+          console.error('[Scanner] pdf-lib falló al guardar:', pdfErr);
           throw new Error('No se pudo generar el PDF.');
         }
 

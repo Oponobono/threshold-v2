@@ -18,7 +18,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView,
   TextInput, Keyboard, StyleSheet,
-  Animated, ActivityIndicator, ToastAndroid,
+  Animated, ActivityIndicator, ToastAndroid, Modal,
  Image as RNImage } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1005,9 +1005,10 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
   if (!isVisible) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <Modal visible={isVisible} transparent animationType="fade" onRequestClose={handleClose} statusBarTranslucent>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.65)' }]}>
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose} />
-      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight, backgroundColor: 'transparent' }}>
           <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}>
 
             {/* Asa de arrastre */}
@@ -1308,6 +1309,7 @@ export const SubjectAIChatModal: React.FC<SubjectAIChatModalProps> = ({
           </TouchableOpacity>
         )}
     </View>
+    </Modal>
   );
 };
 
