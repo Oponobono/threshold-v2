@@ -63,7 +63,16 @@ async function transcribeYouTubeWithWhisper(videoId: string, apiKey?: string): P
     if (apiKey && rawCaptions.length > 50) {
       console.log('Usando Groq para estructurar la transcripción semánticamente...');
       const body = {
-        model: 'llama-3.3-70b-versatile',
+        // DEUDA CONOCIDA: este ID sigue cableado y la llamada va directo a
+        // Groq desde el movil con EXPO_PUBLIC_GROQ_API_KEY (que viaja dentro
+        // del bundle). La migracion al backend, que ya tiene el catalogo y la
+        // clave en el servidor, es el arreglo de fondo. Se cambia solo el
+        // ID de aqui mientras tanto.
+        //
+        // Antes era 'llama-3.3-70b-versatile', retirado por Groq: pedia un
+        // modelo muerto desde una ruta que nadie miraba. La fuente de verdad
+        // para el resto del proyecto es backend/config/aiModels.js.
+        model: 'openai/gpt-oss-120b',
         messages: [
           {
             role: 'system',
