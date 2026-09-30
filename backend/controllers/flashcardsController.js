@@ -7,7 +7,7 @@ const { analyzeCardDensity, fragmentCard } = require('../utils/atomicCardGenerat
 const { calculateSM2, calculateFSRS } = require('../utils/sm2Algorithm');
 const FlashcardResponseParser = require('../services/ai/pipelines/flashcard/FlashcardResponseParser');
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
  * Normaliza una fila de la BD al formato EvaluationItem que espera el frontend.
@@ -51,7 +51,7 @@ function normalizeCard(row) {
   };
 }
 
-// â”€â”€â”€ Deck CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Deck CRUD ────────────────────────────────────────────────────────────────
 
 /**
  * Obtener todos los mazos de flashcards del usuario (propios y compartidos)
@@ -104,7 +104,7 @@ exports.getFlashcardDecks = (req, res) => {
 };
 
 /**
- * Obtiene mazos con mÃ©tricas de prioridad (tarjetas vencidas, promedio dominio)
+ * Obtiene mazos con métricas de prioridad (tarjetas vencidas, promedio dominio)
  * Retorna mazos ordenados por urgencia
  */
 exports.getFlashcardDecksWithMetrics = (req, res) => {
@@ -115,7 +115,7 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
   }
   if (!userId) return res.status(400).json({ error: 'Se requiere user_id' });
 
-  // NOTA: Todas las mÃ©tricas de conteo se calculan como subconsultas escalares
+  // NOTA: Todas las métricas de conteo se calculan como subconsultas escalares
   // para evitar conflictos de GROUP BY con el LEFT JOIN de learning_analytics.
   // COALESCE(MAX(...)) en ORDER BY fue reemplazado por el alias 'deck_mastery'
   // ya calculado en el SELECT para evitar que SQLite descarte filas silenciosamente.
@@ -172,7 +172,7 @@ exports.getFlashcardDecksWithMetrics = (req, res) => {
       console.error('[FlashcardMetrics] Error:', err);
       return res.status(500).json({ error: err.message });
     }
-    console.log(`[FlashcardMetrics] userId=${userId} â†’ ${(rows || []).length} mazos devueltos`);
+    console.log(`[FlashcardMetrics] userId=${userId} → ${(rows || []).length} mazos devueltos`);
     res.json(rows || []);
   });
 };
@@ -408,7 +408,7 @@ exports.deleteDeck = (req, res) => {
         function(errUnshare) {
           if (errUnshare) return res.status(500).json({ error: errUnshare.message });
           if (this.changes === 0) {
-            return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo o no estÃ¡ compartido contigo.' });
+            return res.status(403).json({ error: 'No tienes permiso para eliminar este mazo o no está compartido contigo.' });
           }
           recordDeletion('shared_decks', deckId, user_id, () => {
             incrementSyncCounterOnly(() =>
@@ -558,7 +558,7 @@ exports.shareDeck = (req, res) => {
     return res.status(400).json({ error: 'Faltan campos requeridos (user_id).' });
   }
 
-  // â”€â”€ Compartir con un grupo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Compartir con un grupo ──────────────────────────────────────────────
   if (group_pin_id) {
     db.get(`SELECT id FROM group_memberships WHERE user_id = ? AND group_pin_id = ?`,
       [user_id, group_pin_id],
@@ -590,14 +590,14 @@ exports.shareDeck = (req, res) => {
     return;
   }
 
-  // â”€â”€ Compartir con un usuario por PIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Compartir con un usuario por PIN ────────────────────────────────────
   if (!recipient_pin) {
     return res.status(400).json({ error: 'Faltan campos requeridos (recipient_pin o group_pin_id).' });
   }
 
   db.get(`SELECT id, username, name FROM users WHERE share_pin = ?`, [recipient_pin.trim().toUpperCase()], (err, recipient) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (!recipient) return res.status(404).json({ error: 'No se encontrÃ³ ningÃºn usuario con ese PIN.' });
+    if (!recipient) return res.status(404).json({ error: 'No se encontró ningún usuario con ese PIN.' });
     if (String(recipient.id) === String(user_id)) return res.status(400).json({ error: 'No puedes compartir un mazo contigo mismo.' });
 
     db.get(`SELECT id, title FROM flashcard_decks WHERE id = ? AND user_id = ?`, [deckId, user_id], (err2, deck) => {
@@ -766,10 +766,10 @@ exports.createEvaluationItem = (req, res) => {
   const contentStr = typeof content_json === 'string' ? content_json : JSON.stringify(content_json);
   let parsed;
   try { parsed = JSON.parse(contentStr); } catch (_) {
-    return res.status(400).json({ error: 'content_json no es JSON vÃ¡lido.' });
+    return res.status(400).json({ error: 'content_json no es JSON válido.' });
   }
 
-  // SanitizaciÃ³n contra inyecciones
+  // Sanitización contra inyecciones
   const safeParsed = sanitizeObject(parsed);
   const safeContentStr = JSON.stringify(safeParsed);
   const safeHint = hint ? sanitizeText(hint) : null;
@@ -779,7 +779,7 @@ exports.createEvaluationItem = (req, res) => {
   const front = item_type === 'flashcard' ? (safeParsed.front || '') : '';
   const back = item_type === 'flashcard' ? (safeParsed.back || '') : '';
 
-  // ── Calcular next_review_date: 7 dÃ­as desde hoy ─────────────────────────
+  // ── Calcular next_review_date: 7 días desde hoy ─────────────────────────
   const nextReviewDate = new Date();
   nextReviewDate.setDate(nextReviewDate.getDate() + 7);
   const nextReviewDateStr = nextReviewDate.toISOString();
@@ -1009,10 +1009,10 @@ exports.shareDeck = (req, res) => {
   });
 };
 
-// ─── AI Generation  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── AI Generation  ────────────────────────────────────────────────────────────
 
 /**
- * Helper: Inserta un card en la BD de forma asÃ­ncrona
+ * Helper: Inserta un card en la BD de forma asíncrona
  */
 function insertSingleCard(deckId, front, back, itemType, contentStr, hint, explanation, is_atomic, parent_card_id, word_count, userId) {
   const cardId = uuidv4();
@@ -1030,7 +1030,7 @@ function insertSingleCard(deckId, front, back, itemType, contentStr, hint, expla
 
 /**
  * Helper: Inserta un array de items en la BD y devuelve el mazo completo
- * Â¡AHORA CON FRAGMENTACIÃ“N ATÃ“MICA AUTOMÃTICA!
+ * ¡AHORA CON FRAGMENTACIÓN ATÓMICA AUTOMÁTICA!
  */
 async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, description, items, topic) {
   try {
@@ -1083,29 +1083,29 @@ async function insertItemsAndReturn(res, deckId, subject_id, user_id, title, des
 
   } catch (err) {
     db.run(`DELETE FROM flashcard_decks WHERE id = ?`, [deckId], () => {
-      res.status(500).json({ error: 'Error al insertar Ã­tems, mazo revertido', details: err.message });
+      res.status(500).json({ error: 'Error al insertar ítems, mazo revertido', details: err.message });
     });
   }
 }
 
 /**
- * Construye el system prompt del LLM segÃºn el modo de generaciÃ³n.
+ * Construye el system prompt del LLM según el modo de generación.
  * mode: 'flashcard' | 'multiple_choice' | 'boolean' | 'mixed'
  */
 function buildSystemPrompt(mode, count) {
-  const base = `ActÃºa como un experto en pedagogÃ­a universitaria y diseÃ±o instruccional.
-Paso Previo: Analiza el texto, extrae los conceptos tÃ©cnicos clave y descarta informaciÃ³n irrelevante.
+  const base = `Actúa como un experto en pedagogía universitaria y diseño instruccional.
+Paso Previo: Analiza el texto, extrae los conceptos técnicos clave y descarta información irrelevante.
 
-CALIDAD ACADÃ‰MICA Y REGLAS DE ORO:
-1. RIGOR: Usa terminologÃ­a tÃ©cnica precisa del texto. Si detectas que el usuario solicita temas relacionados (ej: "incluye hantavirus" cuando el texto trata sobre coronavirus), PUEDES incorporarlos como temas complementarios que enriquecen el aprendizaje acadÃ©mico.
-2. NO CIRCULARIDAD: La explicaciÃ³n JAMÃS debe ser una parÃ¡frasis de la pregunta o respuesta. Debe aportar el "por quÃ©" conceptual o un ejemplo de aplicaciÃ³n.
+CALIDAD ACADÉMICA Y REGLAS DE ORO:
+1. RIGOR: Usa terminología técnica precisa del texto. Si detectas que el usuario solicita temas relacionados (ej: "incluye hantavirus" cuando el texto trata sobre coronavirus), PUEDES incorporarlos como temas complementarios que enriquecen el aprendizaje académico.
+2. NO CIRCULARIDAD: La explicación JAMÁS debe ser una paráfrasis de la pregunta o respuesta. Debe aportar el "por qué" conceptual o un ejemplo de aplicación.
 3. PISTAS (HINTS): Debe ser un andamiaje cognitivo (sugerir una ruta de pensamiento), no una respuesta parcial ni letras iniciales.
-4. DISTRACTORES DE CALIDAD: Cada opciÃ³n incorrecta debe nacer de un error de razonamiento especÃ­fico (ej. mala aplicaciÃ³n de una fÃ³rmula, confusiÃ³n de conceptos similares o generalizaciÃ³n excesiva). No rellenes con opciones aleatorias.
-5. EXCLUSIVIDAD SEMÃNTICA: En selecciÃ³n mÃºltiple, las 4 opciones deben tener contenido semÃ¡ntico Ãºnico. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.
-6. FORMATO DE CÃ“DIGO (OBLIGATORIO SI APLICA): Si la evaluaciÃ³n involucra programaciÃ³n, algoritmos, HTML, JSON o comandos, USA SIEMPRE bloques de cÃ³digo Markdown (\`\`\`lenguaje ... \`\`\`) dentro del "front", "back", "question", "options" o "explanation" para formatear los fragmentos de cÃ³digo.
+4. DISTRACTORES DE CALIDAD: Cada opción incorrecta debe nacer de un error de razonamiento específico (ej. mala aplicación de una fórmula, confusión de conceptos similares o generalización excesiva). No rellenes con opciones aleatorias.
+5. EXCLUSIVIDAD SEMÁNTICA: En selección múltiple, las 4 opciones deben tener contenido semántico único. Estrictamente PROHIBIDO que dos opciones representen el mismo concepto o respuesta, incluso con palabras distintas.
+6. FORMATO DE CÓDIGO (OBLIGATORIO SI APLICA): Si la evaluación involucra programación, algoritmos, HTML, JSON o comandos, USA SIEMPRE bloques de código Markdown (\`\`\`lenguaje ... \`\`\`) dentro del "front", "back", "question", "options" o "explanation" para formatear los fragmentos de código.
 
-IMPORTANTE: Debes responder EXCLUSIVAMENTE con un objeto JSON vÃ¡lido que contenga la clave "topic" (tema central del contenido) y la clave "items", cuyo valor sea un array de objetos con los Ã­tems generados segÃºn el formato indicado a continuaciÃ³n.
-No agregues ningÃºn texto introductorio ni explicaciones fuera del JSON. La respuesta debe comenzar con { y terminar con }.${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
+IMPORTANTE: Debes responder EXCLUSIVAMENTE con un objeto JSON válido que contenga la clave "topic" (tema central del contenido) y la clave "items", cuyo valor sea un array de objetos con los ítems generados según el formato indicado a continuación.
+No agregues ningún texto introductorio ni explicaciones fuera del JSON. La respuesta debe comenzar con { y terminar con }.${FlashcardResponseParser.TOPIC_PROMPT_INSTRUCTION}`;
 
   if (mode === 'flashcard') {
     return `${base}
@@ -1114,7 +1114,7 @@ Genera exactamente ${count} FLASHCARDS.
 Formato del objeto JSON esperado:
 {
   "items": [
-    { "type": "flashcard", "data": { "front": "Pregunta conceptual que obligue a pensar.", "back": "Respuesta tÃ©cnica y completa en mÃ¡ximo 3 oraciones." }, "hint": "Pista o andamiaje cognitivo.", "explanation": "ProfundizaciÃ³n teÃ³rica o ejemplo de aplicaciÃ³n." }
+    { "type": "flashcard", "data": { "front": "Pregunta conceptual que obligue a pensar.", "back": "Respuesta técnica y completa en máximo 3 oraciones." }, "hint": "Pista o andamiaje cognitivo.", "explanation": "Profundización teórica o ejemplo de aplicación." }
   ]
 }`;
   }
@@ -1122,11 +1122,11 @@ Formato del objeto JSON esperado:
   if (mode === 'multiple_choice') {
     return `${base}
 
-Genera exactamente ${count} PREGUNTAS DE SELECCIÃ“N MÃšLTIPLE (estilo ECAES/SABER PRO).
+Genera exactamente ${count} PREGUNTAS DE SELECCIÓN MÚLTIPLE (estilo ECAES/SABER PRO).
 Formato del objeto JSON esperado:
 {
   "items": [
-    { "type": "multiple_choice", "data": { "question": "Pregunta del problema.", "options": ["OpciÃ³n A","OpciÃ³n B","OpciÃ³n C","OpciÃ³n D"], "correctIndex": 0 }, "hint": "Pista para razonar.", "explanation": "JustificaciÃ³n de por quÃ© la opciÃ³n correcta lo es y por quÃ© las otras no." }
+    { "type": "multiple_choice", "data": { "question": "Pregunta del problema.", "options": ["Opción A","Opción B","Opción C","Opción D"], "correctIndex": 0 }, "hint": "Pista para razonar.", "explanation": "Justificación de por qué la opción correcta lo es y por qué las otras no." }
   ]
 }`;
   }
@@ -1609,16 +1609,16 @@ Respuesta: ${content1.back}
 Pregunta: ${content2.front}
 Respuesta: ${content2.back}
 
-Genera UNA tarjeta de diferenciaciÃ³n clara que ayude al usuario a distinguir estos dos conceptos.
+Genera UNA tarjeta de diferenciación clara que ayude al usuario a distinguir estos dos conceptos.
 La tarjeta debe:
 1. Resaltar las diferencias clave
 2. Usar ejemplos contrastantes
 3. Ser memorable y concisa
 
-Responde SOLO con un JSON vÃ¡lido en este formato:
+Responde SOLO con un JSON válido en este formato:
 {
-  "front": "pregunta de diferenciaciÃ³n",
-  "back": "explicaciÃ³n que destaca diferencias"
+  "front": "pregunta de diferenciación",
+  "back": "explicación que destaca diferencias"
 }`;
 
         const diffResult = await callWithModelFallback('groq', MODEL_DEFAULTS.groq, async (model) => {
@@ -1664,7 +1664,7 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
           return res.status(500).json({ error: 'Tarjeta generada incompleta' });
         }
 
-        // Crear la tarjeta de diferenciaciÃ³n en el mazo
+        // Crear la tarjeta de diferenciación en el mazo
         db.get(
           `SELECT deck_id FROM flashcards WHERE id = ?`,
           [card1_id],
@@ -1672,7 +1672,7 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
             if (getErr) return res.status(500).json({ error: getErr.message });
 
             const nextReviewDate = new Date();
-            nextReviewDate.setDate(nextReviewDate.getDate() + 3); // RevisiÃ³n en 3 dÃ­as
+            nextReviewDate.setDate(nextReviewDate.getDate() + 3); // Revisión en 3 días
             const nextReviewDateStr = nextReviewDate.toISOString();
 
             const contentJson = JSON.stringify(diffCard);
@@ -1690,7 +1690,7 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
                 diffCard.front,
                 diffCard.back,
                 contentJson,
-                `DiferenciaciÃ³n entre tarjetas ${card1_id} y ${card2_id}`,
+                `Diferenciación entre tarjetas ${card1_id} y ${card2_id}`,
                 'Estudia esta tarjeta para evitar confundir estos conceptos',
                 nextReviewDateStr,
               ],
@@ -1704,7 +1704,7 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
                   newCardId: diffCardId,
                   front: diffCard.front,
                   back: diffCard.back,
-                  message: 'Tarjeta de diferenciaciÃ³n creada exitosamente',
+                  message: 'Tarjeta de diferenciación creada exitosamente',
                 });
               }
             );
@@ -1712,7 +1712,7 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
         );
       } catch (err) {
         res.status(500).json({
-          error: 'Error generando tarjeta de diferenciaciÃ³n',
+          error: 'Error generando tarjeta de diferenciación',
           details: err.message,
         });
       }
@@ -1720,7 +1720,7 @@ Responde SOLO con un JSON vÃ¡lido en este formato:
   );
 };
 
-// â”€â”€â”€ Snooze Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Snooze Management ─────────────────────────────────────────────────────────
 
 /**
  * POST /api/flashcards/:cardId/snooze
@@ -1918,7 +1918,7 @@ exports.autoUnsnoozeExpired = (req, res) => {
       }
       res.json({
         success: true,
-        message: `${this.changes} tarjetas snoozed han sido reanudadas automÃ¡ticamente`,
+        message: `${this.changes} tarjetas snoozed han sido reanudadas automáticamente`,
         resumedCount: this.changes,
       });
     }
