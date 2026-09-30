@@ -152,14 +152,149 @@ exports.deleteYoutubeVideo = (req, res) => {
   });
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Supadata
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SUPADATA_BASE = 'https://api.supadata.ai/v1';
+const SUPADATA_POLL_INTERVAL_MS = 1000;
+const SUPADATA_POLL_MAX_ATTEMPTS = 55;
+
+async function supadataGet(path, apiKey) {
+  const res = await fetch(`${SUPADATA_BASE}${path}`, {
+    headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+  });
+  const body = await res.json().catch(() => ({}));
+  return { status: res.status, ok: res.ok, body };
+}
+
+/** Normaliza las tres formas que devuelve Supadata el texto. */
+function extractCaptions(data) {
+  if (typeof data.content === 'string') return data.content.trim();
+  if (Array.isArray(data.content)) return data.content.map((c) => c.text || '').join(' ').trim();
+  if (Array.isArray(data.transcript)) return data.transcript.map((c) => c.text || '').join(' ').trim();
+  return '';
+}
+
+/**
+ * Consulta un job asíncrono hasta que termine.
+ *
+ * Este flujo antes no existía. GET /youtube/transcript solo documentaba 200 y
+ * 206, pero los videos de más de ~20 minutos se procesan fuera de banda y
+ * contestan 202 con un jobId. Como el código solo miraba response.ok, el 202
+ * contaba como éxito, se leía data.content (inexistente) y la respuesta era un
+ * 404 "subtítulos vacíos" en lugar de una transcripción.
+ */
+async function pollTranscriptJob(jobId, apiKey) {
+  for (let attempt = 1; attempt <= SUPADATA_POLL_MAX_ATTEMPTS; attempt += 1) {
+    const { status, body } = await supadataGet(`/transcript/${encodeURIComponent(jobId)}`, apiKey);
+
+    if (status === 404) {
+      return { ok: false, reason: 'job_no_encontrado', retryable: false };
+    }
+    if (body.status === 'completed') {
+      return { ok: true, data: body };
+    }
+    if (body.status === 'failed') {
+      const { code, message } = readSupadataError(body);
+      return {
+        ok: false,
+        reason: code || 'job_fallido',
+        message: message || 'Supadata no pudo generar la transcripción.',
+        // Reintentar con otro idioma crearia otro job, y cada uno se cobra.
+        retryable: false,
+      };
+    }
+    // queued / active: seguir esperando.
+    await new Promise((r) => setTimeout(r, SUPADATA_POLL_INTERVAL_MS));
+  }
+  return {
+    ok: false,
+    reason: 'timeout',
+    message: `Supadata no terminó en ${SUPADATA_POLL_MAX_ATTEMPTS}s.`,
+    // El job sigue vivo del lado de Supadata: relanzar crearia otro.
+    retryable: false,
+  };
+}
+
+/**
+ * Supadata usa dos formas distintas para el mismo concepto de error:
+ * en una respuesta directa (4xx / 206) `error` es el código como string
+ * ("transcript-unavailable"), y en el resultado de un job fallido `error` es el
+ * objeto Error completo. Se normalizan aqui para no ramificar en cada sitio.
+ */
+function readSupadataError(body) {
+  const raw = body?.error;
+  if (typeof raw === 'string') {
+    return { code: raw, message: body?.message || body?.details || null };
+  }
+  if (raw && typeof raw === 'object') {
+    return { code: raw.error || 'error', message: raw.message || raw.details || body?.message || null };
+  }
+  return { code: null, message: body?.message || body?.details || null };
+}
+
+/**
+ * Pide la transcripción y resuelve tanto la vía síncrona como la asíncrona.
+ * `mode` native solo busca subtítulos existentes; auto (default) cae a
+ * generación por IA cuando no los hay.
+ */
+async function requestSupadataTranscript(videoId, language, mode, apiKey) {
+  const params = new URLSearchParams({
+    url: `https://www.youtube.com/watch?v=${videoId}`,
+    text: 'true',
+  });
+  if (language) params.set('lang', language);
+  if (mode) params.set('mode', mode);
+
+  const { status, body } = await supadataGet(`/transcript?${params.toString()}`, apiKey);
+
+  if (status === 202 && body.jobId) {
+    return { ...(await pollTranscriptJob(body.jobId, apiKey)), async: true };
+  }
+  if (status === 206) {
+    // 206 "transcript unavailable" pertenece al contrato del endpoint DEPRECADO
+    // /youtube/transcript. En el endpoint actual /transcript la misma
+    // situación llega como 404 con error:"transcript-unavailable", que cae en
+    // la rama siguiente. Se conserva el 206 por si Supadata lo reutiliza: es
+    // un 2xx, asi que response.ok no lo filtraria, y cobrar 1 credito
+    // devolviendo un "exito" sin transcripcion seria el peor resultado posible.
+    const { code, message } = readSupadataError(body);
+    return { ok: false, reason: code || 'transcript_unavailable', message, retryable: true };
+  }
+  if (!status || status >= 400) {
+    const { code, message } = readSupadataError(body);
+    // 404 con transcript-unavailable sí reintenta: en mode=native puede haber
+    // subtítulos en otro idioma. Un 400 (peticion invalida) o un 401/403 no:
+    // reintentarlos solo gasta tiempo.
+    const reintentable = !(status === 400 || status === 401 || status === 403);
+    return { ok: false, reason: code || `http_${status}`, message, retryable: reintentable };
+  }
+  if (body.jobId) {
+    return { ...(await pollTranscriptJob(body.jobId, apiKey)), async: true };
+  }
+  return { ok: true, data: body };
+}
+
 /**
  * Obtener subtítulos de un video de YouTube usando Supadata.ai
  */
+/** Modos que acepta el endpoint /transcript. El valor por defecto de Supadata es 'auto'. */
+const SUPADATA_MODES = new Set(['native', 'auto', 'generate']);
+
 exports.getYoutubeCaptions = async (req, res) => {
-  const { video_id, language = 'es' } = req.body;
+  const { video_id, language = 'es', mode = 'auto' } = req.body;
 
   if (!video_id) {
     return res.status(400).json({ error: 'Falta video_id' });
+  }
+
+  // Se valida en vez de reenviar: un mode invalido seria un 400 de Supadata y
+  // un error opaco para el usuario, cuando el problema es de nuestra entrada.
+  if (!SUPADATA_MODES.has(mode)) {
+    return res.status(400).json({
+      error: `mode invalido: '${mode}'. Valores admitidos: ${[...SUPADATA_MODES].join(', ')}.`,
+    });
   }
 
   const SUPADATA_KEY = secrets.SUPADATA_API_KEY;
@@ -167,54 +302,53 @@ exports.getYoutubeCaptions = async (req, res) => {
     return res.status(500).json({ error: 'SUPADATA_API_KEY no configurada en el servidor.' });
   }
 
-  try {
-    let supadataRes = await fetch(
-      `https://api.supadata.ai/v1/youtube/transcript?videoId=${video_id}&text=true&lang=${language}`,
-      { headers: { 'x-api-key': SUPADATA_KEY, 'Content-Type': 'application/json' } }
-    );
+  /**
+   * Reintentos en orden de preferencia: idioma pedido, inglés, cualquier
+   * idioma disponible. Sin lang Supadata devuelve el primer idioma que exista.
+   *
+   * SOLO con mode=native. Coste real por petición (pricing oficial de Supadata):
+   *   native  -> 1 crédito, y otro idioma puede existir de verdad.
+   *   auto    -> si no hay subtítulos, genera con IA: 2 créditos POR MINUTO de
+   *              vídeo. Reintentar con otro idioma vuelve a generar y vuelve a
+   *              facturar. Para un vídeo de 20 minutos, 3 intentos_AUTO
+   *              costarian 120 créditos en vez de 40, y en auto Supadata ya
+   *              devuelve el primer idioma disponible cuando el pedido no
+   *              existe, asi que el reintento no aporta nada.
+   */
+  const attempts = mode === 'native'
+    ? [language, 'en', null].filter((lang, i, arr) => lang === null || arr.indexOf(lang) === i)
+    : [language];
 
-    if (!supadataRes.ok && language !== 'en') {
-      supadataRes = await fetch(
-        `https://api.supadata.ai/v1/youtube/transcript?videoId=${video_id}&text=true&lang=en`,
-        { headers: { 'x-api-key': SUPADATA_KEY, 'Content-Type': 'application/json' } }
-      );
+  let lastReason = 'desconocido';
+  let lastMessage = null;
+
+  for (const lang of attempts) {
+    const result = await requestSupadataTranscript(video_id, lang, mode, SUPADATA_KEY);
+    if (!result.ok) {
+      lastReason = result.reason;
+      lastMessage = result.message || lastMessage;
+      if (result.retryable === false) break;
+      continue;
     }
 
-    if (!supadataRes.ok) {
-      supadataRes = await fetch(
-        `https://api.supadata.ai/v1/youtube/transcript?videoId=${video_id}&text=true`,
-        { headers: { 'x-api-key': SUPADATA_KEY, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!supadataRes.ok) {
-      const errText = await supadataRes.text();
-      return res.status(404).json({
-        error: 'No se pudieron obtener los subtítulos de este video.',
-        details: `Supadata HTTP ${supadataRes.status}: ${errText}`,
-      });
-    }
-
-    const data = await supadataRes.json();
-
-    let captions = '';
-    if (typeof data.content === 'string') {
-      captions = data.content.trim();
-    } else if (Array.isArray(data.content)) {
-      captions = data.content.map(item => item.text || '').join(' ').trim();
-    } else if (Array.isArray(data.transcript)) {
-      captions = data.transcript.map(item => item.text || '').join(' ').trim();
-    }
-
+    const captions = extractCaptions(result.data);
     if (captions.length < 10) {
-      return res.status(404).json({ error: 'Los subtítulos estaban vacíos.', details: JSON.stringify(data).substring(0, 200) });
+      lastReason = 'vacio';
+      continue;
     }
 
-    return res.json({ captions, language: data.lang || language, source: 'supadata' });
-
-  } catch (error) {
-    return res.status(500).json({ error: 'Error interno al obtener subtítulos.', details: error.message });
+    return res.json({
+      captions,
+      language: result.data.lang || lang || 'auto',
+      source: 'supadata',
+      async: Boolean(result.async),
+    });
   }
+
+  return res.status(404).json({
+    error: 'No se pudieron obtener los subtítulos de este video.',
+    details: `Supadata: ${lastReason}${lastMessage ? ` - ${lastMessage}` : ''}`,
+  });
 };
 
 /**
