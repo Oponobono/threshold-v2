@@ -123,6 +123,12 @@ app.get('/api/grading-systems', gradingController.getGradingSystems);
 const modelRegistry = require('./utils/modelRegistry');
 app.get('/api/ai/models/online', modelRegistry.getOnlineModels);
 
+// Descubrimiento diario + purga de caché de salud. Se inicia explícitamente aquí y
+// no al importar el módulo, para que los tests y los scripts puedan require() del
+// registry sin disparar peticiones de red.
+modelRegistry.startBackgroundMaintenance();
+modelRegistry.refreshModelsCache().catch(() => {});
+
 // Ruta pública para el catálogo GGUF on-device (mismo patrón que /online: sin JWT para acceso en prod)
 app.get('/api/ai/models/gguf_catalog', (_req, res) => {
   res.json({

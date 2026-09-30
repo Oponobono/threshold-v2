@@ -1327,32 +1327,53 @@ exports.generateDeckFromImage = async (req, res) => {
 
   try {
     console.log(`[Groq Vision] Intentando generar ${count} ítems basados en imagen con JSON mode...`);
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview',
-        response_format: { type: "json_object" }, // Enforce JSON mode
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: `Eres un experto en OCR académico y pedagogía.\n1. Transcribe mentalmente la imagen ignorando ruido visual.\n2. A partir de esa información, genera ítems de evaluación de NIVEL UNIVERSITARIO.\n\n${buildSystemPrompt(mode, count)}\n\nGenera exactamente ${count} ítems basados en la imagen.` },
-            { type: 'image_url', image_url: { url: formattedBase64 } }
-          ]
-        }],
-        temperature: 0.2,
-        max_tokens: 3000,
-      }),
-    });
+    // Antes: fetch crudo contra 'llama-3.2-11b-vision-preview', que Groq responde
+    // 400 model_decommissioned. Ese ID estaba cableado aqui, asi que esta ruta
+    // fallaba siempre sin importar el estado del catalogo. Ahora pasa por el
+    // registry: usa un modelo con capacidad de vision declarada y, si falla,
+    // degrada al siguiente candidato en vez de romperse.
+    const { result: raw } = await callWithModelFallback(
+      'groq',
+      null,
+      async (model) => {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            response_format: { type: "json_object" }, // Enforce JSON mode
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: `Eres un experto en OCR académico y pedagogía.\n1. Transcribe mentalmente la imagen ignorando ruido visual.\n2. A partir de esa información, genera ítems de evaluación de NIVEL UNIVERSITARIO.\n\n${buildSystemPrompt(mode, count)}\n\nGenera exactamente ${count} ítems basados en la imagen.` },
+                { type: 'image_url', image_url: { url: formattedBase64 } }
+              ]
+            }],
+            temperature: 0.2,
+            max_tokens: 3000,
+          }),
+        });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('[Groq Vision] Falló petición a API:', errorData);
-      return res.status(500).json({ error: 'Error al llamar a Groq Vision API', details: errorData });
-    }
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          // Se propaga con status para que el registry clasifique el fallo
+          // (muerto / transitorio / sin capacidad) y decida si degrada.
+          const err = new Error(errorData?.error?.message || 'Error al llamar a Groq Vision API');
+          err.status = response.status;
+          err.details = errorData;
+          throw err;
+        }
 
-    const groqData = await response.json();
-    const raw = groqData.choices[0].message.content.trim();
+        const data = await response.json();
+        // Se devuelve el mensaje entero, no content.trim(): un content null
+        // (gpt-oss agotando el presupuesto en razonamiento) reventaria aqui con
+        // TypeError, que el registry clasificaria como fallo fatal y cortaria
+        // el fallback. extractText ya convierte eso en '' y prueba el siguiente
+        // candidato, que es justo el comportamiento buscado.
+        return data.choices?.[0]?.message;
+      },
+      { capability: 'vision' }
+    );
 
     // Extraer JSON robustamente
     let jsonString = raw;

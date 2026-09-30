@@ -3,13 +3,21 @@ const { MODEL_DEFAULTS, GROQ_PRIORITY_LIST } = require('../../../utils/modelRegi
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-// Modelos de razonamiento: generan bloques <think> que rompen el parsing de JSON estructurado.
-// Excluidos del ciclo de retry para tareas de generación de contenido estructurado.
-const REASONING_MODELS = new Set([
-  'qwen/qwen3.6-27b',
-  'deepseek-r1-distill-llama-70b',
-  'deepseek-r1-distill-qwen-32b',
-]);
+/**
+ * Modelos que INLINEAN su razonamiento como bloques <think> dentro de
+ * `content`, lo que rompe el parsing de JSON estructurado.
+ *
+ * Verificado contra Groq el 2026-09: los openai/gpt-oss NO deben entrar aquí.
+ * Devuelven el razonamiento en un campo `reasoning` aparte y `content` llega
+ * limpio, así que encaja en jsonMode sin necesidad de excluirlo. Medido con
+ * response_format=json_object: content = {"ciudad":"Madrid"}.
+ *
+ * Los IDs que hubo aquí (qwen3.6, deepseek-r1-*) están retired en Groq (404 /
+ * 400 model_decommissioned), así que se han retirado en lugar de dejarlos
+ * como configuracion muerta. Si algún día entra un modelo que sí inlina
+ * <think>, se declara aquí por su ID exacto.
+ */
+const REASONING_MODELS = new Set();
 
 function isModelNotFoundError(errorData) {
   const msg = errorData?.error?.message || '';

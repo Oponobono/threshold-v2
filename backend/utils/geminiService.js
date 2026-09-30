@@ -34,7 +34,7 @@ const { analyzeCardDensity, fragmentCard } = require('./atomicCardGenerator');
 const { buildAdaptivePrompt, buildSystemPrompt } = require('./academicPromptBuilder');
 
 const genAI = new GoogleGenerativeAI(secrets.GEMINI_API_KEY);
-const { MODEL_DEFAULTS, callWithModelFallback, resolveAutoModel, GROQ_PRIORITY_LIST } = require('./modelRegistry');
+const { MODEL_DEFAULTS, callWithModelFallback, resolveAutoModel, GROQ_PRIORITY_LIST, applySamplingPolicy } = require('./modelRegistry');
 const MODEL_NAME = MODEL_DEFAULTS.gemini; // Fuente de verdad centralizada en modelRegistry
 
 // ✅ SAFETY SETTINGS - strings en lugar de objetos HarmCategory
@@ -562,7 +562,10 @@ async function generateFlashcardsFromText(contextText, count = 10) {
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
       safetySettings: SAFETY_SETTINGS,
-      generationConfig: { temperature: 0.15 },
+      // Politica de muestreo segun el modelo (ver config/aiModels.js). Se
+      // aplica aqui y no en el llamador para que este camino no se quede
+      // envio de parametros que el modelo ignora.
+      generationConfig: applySamplingPolicy(MODEL_NAME, { temperature: 0.15 }),
     });
 
     // Auto-detectar disciplina y usar prompt especializado
