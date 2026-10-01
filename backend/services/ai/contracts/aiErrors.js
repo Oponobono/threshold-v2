@@ -21,6 +21,11 @@
  * infinito. Por eso un fallo de credencial del proveedor se traduce a un 500
  * interno que el movil nunca muestra, y solo UNAUTHENTICATED, que es el unico
  * codigo que el propio servidor emite para su JWT, significa "token malo".
+ *
+ * Y NOT_FOUND responde tambien a un acceso denegado. Un recurso que pertenece
+ * a otro usuario y uno que no existen tienen que ser indistinguibles: si el
+ * acceso denegado devuelve 403, el cliente aprende que ese ID existe y puede
+ * enumerar los recursos de los demas.
  */
 
 const crypto = require('node:crypto');
@@ -38,6 +43,9 @@ const { esFalloDeRed } = require('../../../utils/modelHealth');
  */
 const AI_ERRORS = {
   UNAUTHENTICATED: { status: 401, retryable: false },
+  // Un acceso denegado responde 404 y no 403 a proposito: indistinguible de
+  // "no existe", para no confirmar que IDs son reales.
+  NOT_FOUND: { status: 404, retryable: false },
   RATE_LIMITED: { status: 429, retryable: true, retryAfterSec: 30 },
   NO_MODEL_AVAILABLE: { status: 503, retryable: true, retryAfterSec: 30 },
   CAPABILITY_UNAVAILABLE: { status: 503, retryable: false },
@@ -48,6 +56,23 @@ const AI_ERRORS = {
 };
 
 const RETRY_AFTER_POR_DEFECTO = 30;
+
+/**
+ * Prefijo de la API de IA v2. Solo estas rutas hablan el sobre v2.
+ *
+ * Vive aqui y no en el middleware porque lo consultan tres capas distintas (el
+ * auth, el limitador de cuota y las guardas de propiedad) y la respuesta a la
+ * pregunta "este request habla v1 o v2" tiene que ser la MISMA en las tres. Si
+ * cada una Santiago su propio prefijo, un dia se desincronizan y un cliente
+ * recibe el dialecto equivocado sin que nada falle.
+ */
+const PREFIJO_AI_V2 = '/api/ai/v2';
+
+/** ¿Este request va a la API de IA v2? */
+function esRutaAiV2(req) {
+  const url = String((req && req.originalUrl) || (req && req.url) || '').split('?')[0];
+  return url === PREFIJO_AI_V2 || url.startsWith(`${PREFIJO_AI_V2}/`);
+}
 
 /** El codigo publico de un error de proveedor bloqueado: GROQ_AUTH_BLOCKED, GEMINI_AUTH_BLOCKED... */
 const ES_AUTH_DE_PROVEEDOR = /^[A-Z]+_AUTH_BLOCKED$/;
@@ -117,7 +142,16 @@ function toPublicAiError(err, requestId) {
   let logLevel = 'error';
   let logDetail = mensaje || String(err);
 
-  if (ES_AUTH_DE_PROVEEDOR.test(codigo)) {
+  if (Object.prototype.hasOwnProperty.call(AI_ERRORS, codigo)) {
+    // El codigo ya es publico. Quien llama (un limitador, un validador) sabe la
+    // respuesta antes de llegar aqui, y no deberia tener que disfrazar su
+    // decision de codigo interno ni acordarse de montar tambien el status: si lo
+    // hiciera, un RATE_LIMITED sin status se caeria en INTERNAL_ERROR y un 429
+    // acabaria siendo un 500. Pass-through, y el sobre sale igual de completo.
+    code = codigo;
+    logLevel = codigo === 'UNAUTHENTICATED' ? 'info' : 'warn';
+    if (codigo === 'RATE_LIMITED') retryAfterSec = retryAfterDe(err, RETRY_AFTER_POR_DEFECTO);
+  } else if (ES_AUTH_DE_PROVEEDOR.test(codigo)) {
     // La credencial DEL SERVIDOR esta rota. El cliente no puede hacer nada y su
     // sesion es valida: nunca se traduce a UNAUTHENTICATED.
     code = 'INTERNAL_ERROR';
@@ -133,6 +167,10 @@ function toPublicAiError(err, requestId) {
     // por eso se deja en warn para que se note sin tratarlo como incidente.
     code = 'CAPABILITY_UNAVAILABLE';
     logLevel = 'warn';
+  } else if (codigo === 'NOT_FOUND' || codigo === 'ACCESS_DENIED') {
+    // ACCESS_DENIED es el mismo caso: existe pero no es tuyo. Se responde 404.
+    code = 'NOT_FOUND';
+    logLevel = 'warn';
   } else if (codigo === 'UNAUTHENTICATED' || (err && err.authenticated === false)) {
     // El unico camino que produce esto es nuestro propio middleware de JWT.
     code = 'UNAUTHENTICATED';
@@ -145,6 +183,8 @@ function toPublicAiError(err, requestId) {
     code = 'UPSTREAM_TIMEOUT';
   } else if (status === 413) {
     code = 'PAYLOAD_TOO_LARGE';
+  } else if (status === 404) {
+    code = 'NOT_FOUND';
   } else if (status === 429) {
     code = 'RATE_LIMITED';
     retryAfterSec = retryAfterDe(err, RETRY_AFTER_POR_DEFECTO);
@@ -192,7 +232,9 @@ function sendAiError(res, err, requestId, opciones = {}) {
 
 module.exports = {
   AI_ERRORS,
+  PREFIJO_AI_V2,
   RETRY_AFTER_POR_DEFECTO,
+  esRutaAiV2,
   toPublicAiError,
   sendAiError,
 };

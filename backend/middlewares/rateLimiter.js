@@ -1,4 +1,5 @@
-const { rateLimit } = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { sendAiError, esRutaAiV2 } = require('../services/ai/contracts/aiErrors');
 
 /**
  * Rate Limiting v1 — in-process store
@@ -24,16 +25,50 @@ const globalLimiter = rateLimit({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AI — protect Groq/Gemini quota
-// ─────────────────────────────────────────────────────────────────────────────
+//
+// Key: user id del token, con IP como fallback.
+// La cuota que se protege es la del proveedor, y esa cuota la consume el
+// USUARIO, no la IP. Limitar por IP aqui era un error real: en una
+// universidad, un dormitorio o una CGNAT movil, decenas de personas comparten
+// una sola IP y una abuse de consumo bloquea a todos los demas.
+//
+// El AI limiter se monta dentro del router de IA, que va despues del
+// middleware global de auth, asi que req.user ya esta disponible. Antes de la
+// auth no lo estaria, y ese es el motivo por el que el limite contra fuerza
+// bruta del login sigue siendo por IP.
+const AI_LIMITE_POR_HORA = 200;
+
+/**
+ * El limitador de IA se monta despues de la auth, y solo entonces existe
+ * req.user. Se extrae el id tolerando las dos formas en que los controladores
+ * lo han ido dejando.
+ */
+function claveDeUsuario(req) {
+    const user = req && req.user;
+    if (!user) return null;
+    const id = user.id !== undefined ? user.id : user.userId;
+    return id === undefined || id === null ? null : String(id);
+}
+
 const aiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 200,
+  max: AI_LIMITE_POR_HORA,
   standardHeaders: true,
   legacyHeaders: false,
+  // ipKeyGenerator y no req.ip a secas: una IPv6 tiene /64 asignables, asi que
+  // un atacante que rote direcciones dentro de su bloque se evadia el limite
+  // entero. express-rate-limit aborta el arranque si se usa la IP cruda.
+  keyGenerator: (req) => `u:${claveDeUsuario(req) ?? 'ip:' + ipKeyGenerator(req.ip)}`,
   handler: (req, res, _next, options) => {
     const resetTimeMs = req.rateLimit?.resetTime?.getTime?.() ?? (Date.now() + options.windowMs);
     const retryAfterSeconds = Math.ceil((resetTimeMs - Date.now()) / 1000);
     res.setHeader('Retry-After', retryAfterSeconds);
+
+    // La API v2 habla el sobre estable; v1 sigue leyendo `error` como texto.
+    if (esRutaAiV2(req)) {
+      return sendAiError(res, { code: 'RATE_LIMITED', retryAfterSec: retryAfterSeconds }, req.id);
+    }
+
     res.status(options.statusCode).json({
       error: 'AI usage limit exceeded. Please try again later.',
       retryAfter: retryAfterSeconds,
@@ -94,6 +129,7 @@ const biometricRateLimiter = rateLimit({
 module.exports = {
   globalLimiter,
   aiLimiter,
+  AI_LIMITE_POR_HORA,
   // Preserved for backwards compat with any route that still references it.
   // Prefer loginRateLimiter / biometricRateLimiter for auth routes.
   authLimiter: loginRateLimiter,

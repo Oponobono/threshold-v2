@@ -72,6 +72,48 @@ test('la lista de intentos fallidos no viaja al cliente', () => {
   assert.equal(JSON.stringify(body).includes('attempts'), false);
 });
 
+// ── Un codigo ya publico pasa intacto ───────────────────────────────────────
+
+test('un codigo publico no se reinterpreta', () => {
+  // Un limitador sabe que va a responder RATE_LIMITED antes de llamar. Si tiene
+  // que disfrazarlo de error interno, el dia que olvide el status el 429 sale
+  // como 500 y el movil cree que el backend esta caido en vez de que debe
+  // esperar. El pass-through evita esa clase de error silencioso.
+  for (const code of Object.keys(AI_ERRORS)) {
+    const { status, body } = toPublicAiError({ code }, 'req-pt');
+    assert.equal(body.error.code, code, `${code} deberia pasar intacto`);
+    assert.equal(status, AI_ERRORS[code].status);
+  }
+});
+
+test('RATE_LIMITED en pass-through conserva el retryAfter que le pasan', () => {
+  const { status, body } = toPublicAiError({ code: 'RATE_LIMITED', retryAfterSec: 90 }, 'req-pt2');
+  assert.equal(status, 429);
+  assert.equal(body.error.retryAfterSec, 90);
+  assert.equal(body.error.retryable, true);
+});
+
+test('RATE_LIMITED en pass-through sin retryAfter usa el valor por defecto', () => {
+  const { body } = toPublicAiError({ code: 'RATE_LIMITED' }, 'req-pt3');
+  assert.equal(body.error.retryAfterSec, 30);
+});
+
+test('el pass-through no filtra detalles internos', () => {
+  const { body } = toPublicAiError({ code: 'NOT_FOUND', message: 'deck 42 es de otro usuario' }, 'req-pt4');
+  assert.equal(body.error.code, 'NOT_FOUND');
+  assert.equal(JSON.stringify(body).includes('42'), false);
+});
+
+test('un codigo desconocido NO pasa: se sigue traduciendo', () => {
+  // El pass-through es solo para la tabla publica. Un codigo que no esta en ella
+  // tiene que seguir su camino normal.
+  const err = new Error('fallo raro');
+  err.code = 'ALGO_INVENTADO';
+  const { status, body } = toPublicAiError(err, 'req-pt5');
+  assert.equal(status, 500);
+  assert.equal(body.error.code, 'INTERNAL_ERROR');
+});
+
 test('el sobre no puede crecer con campos nuevos', () => {
   // Comprobar una clave concreta no sirve: basta con llamarla de otra forma
   // para que el filtro deje de pasar. Lo que se protege es el CONJUNTO de
@@ -123,6 +165,7 @@ test('cada codigo tiene el estado HTTP que declara el contrato', () => {
     PAYLOAD_TOO_LARGE: 413,
     INVALID_REQUEST: 400,
     INTERNAL_ERROR: 500,
+    NOT_FOUND: 404,
   };
   for (const [code, status] of Object.entries(esperados)) {
     assert.equal(AI_ERRORS[code].status, status, `${code} deberia ser ${status}`);
@@ -150,6 +193,55 @@ test('CAPABILITY_UNAVAILABLE y NO_MODEL_AVAILABLE no se confunden', () => {
   const { body: agotados } = toPublicAiError(agotado(), 'req-5');
   assert.equal(agotados.error.code, 'NO_MODEL_AVAILABLE');
   assert.equal(agotados.error.retryable, true);
+});
+
+// ── Acceso denegado: indistinguible de "no existe" ───────────────────────────
+
+test('un recurso de otro usuario responde 404, no 403', () => {
+  // Si el acceso denegado devolviera 403, el cliente aprende que ese ID existe y
+  // puede enumerar los recursos de los demas comprobando la diferencia de status.
+  const denegado = new Error('no es tuyo');
+  denegado.code = 'ACCESS_DENIED';
+  const { status, body } = toPublicAiError(denegado, 'req-nf-1');
+  assert.equal(status, 404);
+  assert.equal(body.error.code, 'NOT_FOUND');
+  assert.equal(body.error.retryable, false);
+});
+
+test('no existe y es de otro usuario producen el mismo sobre', () => {
+  const inexistente = new Error('no encontrado');
+  inexistente.code = 'NOT_FOUND';
+  const deOtro = new Error('no es tuyo');
+  deOtro.code = 'ACCESS_DENIED';
+
+  const a = toPublicAiError(inexistente, 'req-nf-2');
+  const b = toPublicAiError(deOtro, 'req-nf-2');
+  assert.equal(a.status, b.status);
+  assert.deepEqual(a.body, b.body, 'el cliente no debe poder distinguirlos');
+});
+
+test('un 404 del upstream tambien es NOT_FOUND', () => {
+  const err = new Error('not found');
+  err.status = 404;
+  const { status, body } = toPublicAiError(err, 'req-nf-3');
+  assert.equal(status, 404);
+  assert.equal(body.error.code, 'NOT_FOUND');
+});
+
+test('el acceso denegado se registra como warn con detalle', () => {
+  const err = new Error('deck 42 pertenece a otro usuario');
+  err.code = 'ACCESS_DENIED';
+  const { logLevel, logDetail } = toPublicAiError(err, 'req-nf-4');
+  assert.equal(logLevel, 'warn');
+  assert.match(logDetail, /otro usuario/);
+});
+
+test('NOT_FOUND no filtra el motivo interno', () => {
+  const err = new Error('deck 42 pertenece al usuario 7');
+  err.code = 'ACCESS_DENIED';
+  const { body } = toPublicAiError(err, 'req-nf-5');
+  assert.equal(JSON.stringify(body).includes('usuario 7'), false);
+  assert.equal(JSON.stringify(body).includes('42'), false);
 });
 
 // ── El caso que separa un bug de unauez ─────────────────────────────────────

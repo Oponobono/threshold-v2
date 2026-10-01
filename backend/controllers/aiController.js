@@ -1,5 +1,6 @@
 const secrets = require('../config/secrets');
 const { db } = require('../db');
+const { exigirPropiedadEnPath } = require('../services/auth/ownership');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
@@ -511,8 +512,18 @@ ${deckIntent.shouldGenerate ? deckGenerationInstructions : ''}`;
  * Obtiene el historial de chat para una materia y usuario
  */
 exports.getChatHistory = async (req, res) => {
-  const { userId, subjectId } = req.params;
-  
+  const { subjectId } = req.params;
+
+  // El userId de la ruta solo sirve para COMPARAR. Antes de esto, el
+  // controlador lo metia tal cual en el SELECT y en el INSERT: cualquier
+  // usuario autenticado leia y borraba el historial de otro escribiendo su id
+  // en la URL. Ver services/auth/ownership.js.
+  if (exigirPropiedadEnPath(req, res)) return;
+
+  // El owner sale del token. Tras la guarda ya se ha comprobado que coincide
+  // con el userId de la ruta, asi que aqui no puede desviarse.
+  const userId = req.userId;
+
   try {
     // Limpieza de seguridad: eliminar mensajes mÃ¡s antiguos de 24 horas
     // Esto evita saturar el contexto de la IA y limpiar la base de datos
@@ -560,7 +571,14 @@ exports.getChatHistory = async (req, res) => {
  * Limpia el historial actual creando una nueva sesiÃ³n
  */
 exports.clearChatHistory = async (req, res) => {
-  const { userId, subjectId } = req.params;
+  const { subjectId } = req.params;
+
+  // Misma regla que en getChatHistory: sin comparar con el token, esta ruta
+  // crea sesiones en el historial de otro usuario.
+  if (exigirPropiedadEnPath(req, res)) return;
+
+  // El owner sale del token, nunca del path.
+  const userId = req.userId;
   try {
     db.run(
       'INSERT INTO ai_chat_sessions (id, user_id, subject_id, title) VALUES (?, ?, ?, ?)',

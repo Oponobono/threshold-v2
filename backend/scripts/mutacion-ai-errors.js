@@ -69,6 +69,26 @@ const MUTACIONES = [
     replace: "code = 'INTERNAL_ERROR';",
   },
   {
+    nombre: 'el acceso denegado confirma que el recurso existe',
+    buscar: "    code = 'NOT_FOUND';\n    logLevel = 'warn';",
+    replace: "    code = 'ACCESS_DENIED';\n    logLevel = 'warn';",
+  },
+  {
+    nombre: 'un recurso de otro usuario responde 403',
+    buscar: 'NOT_FOUND: { status: 404, retryable: false },',
+    replace: 'NOT_FOUND: { status: 403, retryable: false },',
+  },
+  {
+    nombre: 'ACCESS_DENIED se traduce a error interno',
+    buscar: "} else if (codigo === 'NOT_FOUND' || codigo === 'ACCESS_DENIED') {",
+    replace: "} else if (codigo === 'NOT_FOUND') {",
+  },
+  {
+    nombre: 'un codigo publico se reinterpreta como interno',
+    buscar: "if (Object.prototype.hasOwnProperty.call(AI_ERRORS, codigo)) {",
+    replace: "if (false) {",
+  },
+  {
     nombre: 'se filtran los intentos fallidos',
     buscar: 'const cuerpo = { code, retryable: def.retryable, requestId: id };',
     replace: 'const cuerpo = { code, retryable: def.retryable, requestId: id, intentos: (err && err.attempts) || undefined };',
@@ -121,7 +141,7 @@ try {
 
 console.log(
   sobrevividas === 0
-    ? '\nOK: las 10 mutaciones fueron detectadas.'
+    ? `\nOK: las ${MUTACIONES.length} mutaciones fueron detectadas.`
     : `\nFALLO: ${sobrevividas} mutacion(es) sobrevivieron. La suite no cubre esa decision.`
 );
 process.exit(sobrevividas === 0 ? 0 : 1);
