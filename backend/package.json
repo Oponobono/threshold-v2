@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "tsx --dns-result-order=ipv4first server.js",
-    "dev": "tsx --dns-result-order=ipv4first server.js",
+    "start": "node --dns-result-order=ipv4first server.js",
+    "dev": "node --dns-result-order=ipv4first server.js",
     "test": "node --test tests/*.test.js",
     "test:models": "node --test tests/modelRegistry.test.js",
     "typecheck": "tsc --noEmit",
