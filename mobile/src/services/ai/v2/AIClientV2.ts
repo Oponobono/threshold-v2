@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AIClientV2 — cliente de la API v2 de IA.
  *
  * Que problema resuelve este modulo
@@ -546,7 +546,7 @@ export class AIClientV2 {
           position,
           length
         });
-        chunkUri = FileSystem.documentDirectory + \chunk_\_\.m4a\;
+        chunkUri = FileSystem.documentDirectory + `chunk_${uploadId}_${i}.m4a`;
         await FileSystem.writeAsStringAsync(chunkUri, b64, { encoding: FileSystem.EncodingType.Base64 });
       }
 
@@ -556,7 +556,7 @@ export class AIClientV2 {
       formData.append('totalChunks', String(totalChunks));
       formData.append('chunk', {
         uri: chunkUri,
-        name: \chunk_\.m4a\,
+        name: `chunk_${i}.m4a`,
         type: 'audio/mp4',
       } as any);
 
@@ -608,7 +608,7 @@ export class AIClientV2 {
           origen: fallo.origen,
           codigo: fallo.codigo,
           local: true,
-          detalle: \el backend respondio \\,
+          detalle: `el backend respondio ${status}`,
           intentos: 1,
         };
       }
