@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -44,10 +44,6 @@ import { summarizeWithFallback } from '../../utils/groqHelpers';
 import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
 import { obtenerAIClientV2 } from '../../services/ai/v2/aiclient';
 
-// ---------------------------------------------------------------------------
-// Constants & Directories
-// ---------------------------------------------------------------------------
-const TRANSCRIPTS_DIR = () => \\Threshold/transcripts/\;
 
 // Groq helpers
 // ---------------------------------------------------------------------------
