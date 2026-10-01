@@ -97,6 +97,24 @@ const MUTACIONES = [
     buscar: "if (Object.prototype.hasOwnProperty.call(AI_ERRORS, codigo)) {",
     replace: "if (true) {",
   },
+  {
+    // ESTA ES LA MUTACION IMPORTANTE. Si el schema deja de rechazar el control
+    // de modelo, el movil puede elegir el modelo y los parametros de
+    // generacion. El ranking del registry deja de ser la unica fuente de
+    // decision y el contrato "el movil pide capacidad, nunca un modelo" se
+    // rompe sin que ninguna prueba de camino bueno se entere: todo sigue
+    // dando 200.
+    nombre: 'el cliente puede elegir modelo (el movil pide capacidad, no modelo)',
+    archivo: 'schema',
+    buscar: 'const intruso = buscarControlDeModelo(body);',
+    replace: 'const intruso = null;',
+  },
+  {
+    nombre: 'el cliente puede mandar temperature',
+    archivo: 'schema',
+    buscar: "if (body[clave] !== undefined) return clave;",
+    replace: "if (false) return clave;",
+  },
 ];
 
 function correrTests() {

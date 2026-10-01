@@ -135,50 +135,83 @@ function validarChat(body) {
     return { ok: false, status: 400, codigo: 'INVALID_REQUEST', detalle: 'cuerpo vacio o no JSON' };
   }
 
+  const intruso = buscarControlDeModelo(body);
+  if (intruso) {
+    return {
+      ok: false,
+      status: 400,
+      codigo: 'INVALID_REQUEST',
+      detalle: `${intruso} no lo decide el cliente`,
+    };
+  }
+
   const mensajes = validarMensajes(body.messages);
   if (!mensajes.ok) return mensajes;
 
   const contexto = validarContexto(body.context_text);
   if (!contexto.ok) return contexto;
 
-  const modelPreference = normalizarPreferencia(body.model_preference);
-
   return {
     ok: true,
     valor: {
       messages: mensajes.valor,
       contextText: contexto.valor,
-      modelPreference,
     },
   };
 }
 
 /**
- * La preferencia de modelo llega del movil y no es de fiar: un cliente
- * manipulado puede pedir un id cualquiera. Se acepta solo la forma que el
- * registry entiende, y cualquier otra cosa se degrada a 'auto' en lugar de
- * fallar, porque elegir modelo no es un error del usuario sino una opcion.
+ * El movil pide una CAPACIDAD y el servidor decide el modelo.
+ *
+ * Por que se rechaza en vez de ignorarse en silencio
+ * ---------------------------------------------------
+ * Un cliente puede pedir cualquier id de modelo. Si el servidor lo acepta, hay
+ * tres formas de que eso termine mal y ninguna se ve desde el movil:
+ *   - Se pide un modelo de otro provider. El registry lo descarta con un
+ *     warning y responde con otro. El cliente cree que uso el que pidio.
+ *   - Se pide un id inexistente. El registry lo ignora y responde con el
+ *     primero del ranking. El cliente cree que uso el que pidio.
+ *   - Se mandan temperature/top_p. Un cliente puede fijar 0 o 2 y cambiar el
+ *     comportamiento de la generacion desde fuera, con lo que eso implica para
+ *     el gasto y para el contenido.
+ *
+ * En los tres casos la respuesta seria un 200 correcto y silenciosamente
+ * distinto de lo pedido. Rechazar con 400 hace que la contradiccion sea
+ * visible en el cliente en vez de esconderse en un warning del servidor.
+ *
+ * Se rechazan por nombre las claves conocidas. No se aplica "rechazar todo lo
+ * que no conozco": los campos nuevos del schema tienen que poder anadirse sin
+ * que un movil antiguo que los envie empiece a dar 400.
  */
-function normalizarPreferencia(preferencia) {
-  if (!preferencia || typeof preferencia !== 'object') return null;
+const CLAVES_CONTROL_DE_MODELO = [
+  'model',
+  'modelId',
+  'model_id',
+  'model_preference',
+  'modelPreference',
+  'clientModelPreferences',
+  'temperature',
+  'top_p',
+  'topP',
+  'max_tokens',
+  'maxTokens',
+];
 
-  const modo = preferencia.mode;
-  if (modo !== 'auto' && modo !== 'manual') return null;
-  if (modo === 'manual' && typeof preferencia.modelId !== 'string') return null;
-  if (modo === 'manual' && preferencia.modelId === '') return null;
-
-  return modo === 'manual'
-    ? { mode: 'manual', modelId: preferencia.modelId }
-    : { mode: 'auto' };
+function buscarControlDeModelo(body) {
+  for (const clave of CLAVES_CONTROL_DE_MODELO) {
+    if (body[clave] !== undefined) return clave;
+  }
+  return null;
 }
 
 module.exports = {
   LIMITE_MENSAJES,
   LIMITE_CHARS_POR_MENSAJE,
   LIMITE_CHARS_CONTEXTO,
+  CLAVES_CONTROL_DE_MODELO,
   validarChat,
   validarMensajes,
   validarContexto,
-  normalizarPreferencia,
+  buscarControlDeModelo,
   AI_ERRORS,
 };

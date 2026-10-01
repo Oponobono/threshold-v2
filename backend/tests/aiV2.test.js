@@ -292,15 +292,103 @@ test('validarChat normaliza y devuelve el valor listo para el handler', () => {
   assert.equal(r.valor.contextText, 'matematica');
 });
 
-test('una preferencia de modelo manipulada se degrada a auto en vez de fallar', () => {
-  // Elegir modelo no es un error del usuario: es una opcion. Romper el contrato
-  // de la preferencia no debe impedir la pregunta.
+// ── El movil pide capacidad, nunca un modelo ────────────────────────────────
+//
+// Este es el contrato central de v2 y por eso tiene su propio bloque. Si el
+// esquema acepta un `model` del cliente, todo sigue dando 200: el registry
+// descarta lo que no reconoce con un warning en el log y responde con otro
+// modelo. El movil cree que uso el que pidio y no hay ningun sintoma visible
+// desde el cliente. Por eso se rechaza con 400 en vez de ignorarse.
+
+test('un cliente NO puede elegir modelo', () => {
+  const { CLAVES_CONTROL_DE_MODELO } = require('../services/ai/contracts/aiV2Schema');
+
+  const intrusos = [
+    'model', 'modelId', 'model_id', 'model_preference',
+    'modelPreference', 'clientModelPreferences',
+  ];
+  for (const clave of intrusos) {
+    const cuerpo = { messages: [{ role: 'user', content: 'hola' }] };
+    cuerpo[clave] = 'gemini-3-pro-preview';
+    const r = validarChat(cuerpo);
+    assert.equal(r.ok, false, `${clave} deberia rechazarse`);
+    assert.equal(r.status, 400, clave);
+    assert.equal(r.codigo, 'INVALID_REQUEST', clave);
+    assert.ok(r.detalle.includes(clave), `${clave}: el detalle deberia nombrarlo, dio "${r.detalle}"`);
+  }
+  assert.equal(CLAVES_CONTROL_DE_MODELO.length, intrusos.length + 5);
+});
+
+test('un cliente NO puede mandar los parametros de generacion', () => {
+  const parametros = ['temperature', 'top_p', 'topP', 'max_tokens', 'maxTokens'];
+  for (const clave of parametros) {
+    const cuerpo = { messages: [{ role: 'user', content: 'hola' }] };
+    cuerpo[clave] = clave.startsWith('max') ? 99999 : 2;
+    const r = validarChat(cuerpo);
+    assert.equal(r.ok, false, `${clave} deberia rechazarse`);
+    assert.equal(r.status, 400, clave);
+    assert.ok(r.detalle.includes(clave), `${clave}: el detalle deberia nombrarlo`);
+  }
+});
+
+test('el rechazo de control de modelo ocurre ANTES de validar los mensajes', () => {
+  // Un cuerpo con las dos cosas rotas debe decir cual se ve primero. Si el
+  // orden se invierte, el cliente ve "messages esta vacio" cuando su problema
+  // real es que esta intentando elegir el modelo, y corrige lo que no es.
+  const r = validarChat({ model: 'gemini-3-pro', messages: [] });
+  assert.equal(r.ok, false);
+  assert.ok(r.detalle.includes('model'), `esperaba que hablara del model, dio "${r.detalle}"`);
+});
+
+test('un cuerpo limpio no tiene ningun control de modelo', () => {
+  // La otra mitad del contrato: no basta con rechazar, hay que comprobar que
+  // el camino bueno no se ha cerrado por error.
+  const r = validarChat({ messages: [{ role: 'user', content: 'hola' }], context_text: 'matematica' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(Object.keys(r.valor).sort(), ['contextText', 'messages']);
+});
+
+test('un campo desconocido futuro NO rompe un movil antiguo', () => {
+  // Se rechazan las claves conocidas, no "todo lo que no conozco". Si no, cada
+  // campo nuevo del schema obliga a revisar el movil antes de poder usarlo.
   const r = validarChat({
     messages: [{ role: 'user', content: 'hola' }],
-    model_preference: { mode: 'inventado', modelId: 123 },
+    session_id: 'abc',
+    trace_id: 'xyz',
+    future_field: true,
   });
   assert.equal(r.ok, true);
-  assert.equal(r.valor.modelPreference, null);
+});
+
+test('el handler de /v2/chat no lee ninguna preferencia del req', () => {
+  // El schema ya lo rechaza, pero la defensa vale aqui tambien: si alguien
+  // reintroduce la lectura, el registry dejaria de ser la unica fuente de
+  // decision. Se comprueba sobre el codigo, no sobre el comportamiento, porque
+  // el comportamiento solo se ve con una llamada real al proveedor.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const fuente = fs.readFileSync(
+    path.join(__dirname, '..', 'controllers', 'aiV2Controller.js'),
+    'utf8'
+  );
+
+  assert.equal(
+    fuente.includes('resolveModelPreferenceFromRequest'),
+    false,
+    'el handler de v2 no debe resolver preferencia de modelo'
+  );
+  assert.equal(
+    fuente.includes('req.body.modelPreference'),
+    false,
+    'el handler de v2 no debe leer el modelPreference del cliente'
+  );
+  // Y el segundo argumento de callWithModelFallback tiene que ser null, no la
+  // preferencia: es requestedModelId.
+  assert.match(
+    fuente.replace(/\s+/g, ' '),
+    /callWithModelFallback\(\s*provider,\s*null,/,
+    'el handler debe pasar requestedModelId = null'
+  );
 });
 
 test('TODO camino de fallo de v2 responde con un codigo que existe en el contrato', async (t) => {

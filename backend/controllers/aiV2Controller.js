@@ -24,10 +24,7 @@
 
 const { sendAiError } = require('../services/ai/contracts/aiErrors');
 const { validarChat } = require('../services/ai/contracts/aiV2Schema');
-const {
-  callWithModelFallback,
-  resolveModelPreferenceFromRequest,
-} = require('../utils/modelRegistry');
+const { callWithModelFallback } = require('../utils/modelRegistry');
 const { shieldPrompt, detectJailbreak } = require('../utils/promptShield');
 const geminiService = require('../utils/geminiService');
 
@@ -104,7 +101,7 @@ exports.chatV2 = async (req, res) => {
     return sendAiError(res, { code: validado.codigo, message: validado.detalle }, req.id);
   }
 
-  const { messages, contextText, modelPreference } = validado.valor;
+  const { messages, contextText } = validado.valor;
   const provider = getLLMProvider(req);
 
   // Filtro de jailbreak antes de gastar tokens: un prompt de extraccion de
@@ -131,10 +128,10 @@ exports.chatV2 = async (req, res) => {
   const inicio = Date.now();
   const contextoProtegido = shieldPrompt(contextText);
 
-  const preferencia = modelPreference
-    ? { model_preference: modelPreference }
-    : resolveModelPreferenceFromRequest(req, provider);
-
+  // No se resuelve preferencia desde req: en v2 la peticion no puede traer
+  // ningun control de modelo (lo rechaza el schema), asi que el ranking entero
+  // queda disponible y `requestedModelId` es siempre null. Pass-through total de
+  // la decision al registry, que es quien sabe que modelo esta sano ahora.
   const llamado = (model) => geminiService.processAcademicChat(
     contextoProtegido,
     messages,
@@ -145,7 +142,7 @@ exports.chatV2 = async (req, res) => {
   try {
     const { result, resolution } = await callWithModelFallback(
       provider,
-      preferencia && preferencia.mode === 'manual' ? preferencia.modelId : null,
+      null,
       llamado,
       { capability: 'text' }
     );
