@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AIClientV2 — cliente de la API v2 de IA.
  *
  * Que problema resuelve este modulo
@@ -497,5 +497,132 @@ export class AIClientV2 {
     } catch {
       return { despierto: false, detalle: 'red' };
     }
+  }
+  /**
+   * Transcribe un archivo de audio dividiéndolo en trozos y enviándolos al backend.
+   * Utiliza el presupuesto TIMEOUT_PREWARM_MS por trozo ya que la subida puede ser lenta.
+   */
+  async transcribeChunked(audioUri: string, onProgress?: (percent: number) => void): Promise<ResultadoChat> {
+    if (this.breakerAbierto()) {
+      return {
+        ok: false,
+        origen: 'app',
+        codigo: 'BREAKER_OPEN',
+        local: true,
+        detalle: 'circuito abierto por fallos de capacidad del backend',
+        intentos: 0,
+      };
+    }
+
+    const { FileSystem } = require('expo-file-system');
+    let fileInfo;
+    try {
+      fileInfo = await FileSystem.getInfoAsync(audioUri);
+    } catch (e) {
+      return { ok: false, origen: 'app', local: true, detalle: 'Error leyendo archivo', intentos: 0 };
+    }
+
+    if (!fileInfo.exists) {
+      return { ok: false, origen: 'app', local: true, detalle: 'Archivo no encontrado', intentos: 0 };
+    }
+
+    const uploadId = 'up_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    const chunkSize = 4 * 1024 * 1024; // 4MB
+    const totalChunks = Math.ceil(fileInfo.size / chunkSize);
+
+    for (let i = 0; i < totalChunks; i++) {
+      let chunkUri = audioUri;
+
+      if (totalChunks > 1) {
+        // Si hay mas de 1 chunk, cortamos usando read/write en Base64
+        const position = i * chunkSize;
+        let length = chunkSize;
+        if (position + length > fileInfo.size) {
+          length = fileInfo.size - position;
+        }
+
+        const b64 = await FileSystem.readAsStringAsync(audioUri, {
+          encoding: FileSystem.EncodingType.Base64,
+          position,
+          length
+        });
+        chunkUri = FileSystem.documentDirectory + \chunk_\_\.m4a\;
+        await FileSystem.writeAsStringAsync(chunkUri, b64, { encoding: FileSystem.EncodingType.Base64 });
+      }
+
+      const formData = new FormData();
+      formData.append('uploadId', uploadId);
+      formData.append('chunkIndex', String(i));
+      formData.append('totalChunks', String(totalChunks));
+      formData.append('chunk', {
+        uri: chunkUri,
+        name: \chunk_\.m4a\,
+        type: 'audio/mp4',
+      } as any);
+
+      let status = 0;
+      let body: unknown = null;
+      let headers: { get(n: string): string | null } | undefined;
+      let peticionOk = false;
+      let finalResult = null;
+
+      try {
+        const peticion = this.transport('/ai/v2/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'multipart/form-data' },
+          body: formData,
+        });
+
+        // Damos bastante margen a la subida (75s por trozo)
+        const carrera = await this.conPresupuesto(peticion, TIMEOUT_PREWARM_MS);
+        
+        if (totalChunks > 1) {
+          await FileSystem.deleteAsync(chunkUri, { idempotent: true });
+        }
+
+        if (!carrera.ok) {
+           return { ok: false, origen: 'red', local: true, detalle: 'timeout subiendo trozo', intentos: 1 };
+        }
+
+        const res = carrera.valor;
+        status = res.status;
+        headers = res.headers;
+        body = await res.json().catch(() => null);
+        
+        if (status === 200 && esSobreExito(body)) {
+          if (i === totalChunks - 1) {
+             finalResult = { ok: true as const, data: adaptarChat(body.data), intentos: 1 };
+          }
+          peticionOk = true;
+        }
+      } catch (err) {
+        if (totalChunks > 1) await FileSystem.deleteAsync(chunkUri, { idempotent: true });
+        return { ok: false, origen: 'red', local: true, detalle: 'error de red', intentos: 1 };
+      }
+
+      if (!peticionOk) {
+        const fallo = clasificarFallo({ status, body, headers });
+        if (fallo.origen === 'app') this.registrarFalloDeApp();
+        return {
+          ok: false,
+          origen: fallo.origen,
+          codigo: fallo.codigo,
+          local: true,
+          detalle: \el backend respondio \\,
+          intentos: 1,
+        };
+      }
+
+      if (onProgress) {
+        onProgress((i + 1) / totalChunks);
+      }
+
+      if (finalResult) {
+        this.registrarExito();
+        return finalResult;
+      }
+    }
+
+    return { ok: false, origen: 'app', local: true, detalle: 'Finalizo sin resultado', intentos: 1 };
   }
 }

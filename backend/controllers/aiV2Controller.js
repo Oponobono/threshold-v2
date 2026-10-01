@@ -214,3 +214,105 @@ exports.statusV2 = (req, res) => {
     error: null,
   });
 };
+
+const fs = require('fs');
+const path = require('path');
+const FormData = require('form-data'); // Installed via npm
+
+// ── Transcripción por Trozos ────────────────────────────────────────────────
+exports.transcribeV2 = async (req, res) => {
+  if (!req.file) {
+    return sendAiError(res, { code: 'INVALID_REQUEST', message: 'No file chunk provided' }, req.id);
+  }
+
+  const { uploadId, chunkIndex, totalChunks } = req.body;
+  if (!uploadId || chunkIndex === undefined || !totalChunks) {
+    return sendAiError(res, { code: 'INVALID_REQUEST', message: 'Missing chunk metadata' }, req.id);
+  }
+
+  const tempDir = path.join(__dirname, '..', 'temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  const mergedFilePath = path.join(tempDir, uploadId + '.m4a');
+  
+  try {
+    const chunkData = fs.readFileSync(req.file.path);
+    fs.appendFileSync(mergedFilePath, chunkData);
+    fs.unlinkSync(req.file.path); // Delete the temp chunk
+
+    if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
+      // Last chunk received, process transcription
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(mergedFilePath));
+      formData.append('model', 'whisper-large-v3');
+      formData.append('language', 'es');
+      formData.append('response_format', 'text');
+
+      const groqKey = process.env.GROQ_API_KEY;
+      if (!groqKey) {
+         return sendAiError(res, { code: 'INTERNAL_ERROR', message: 'Groq API Key not configured' }, req.id);
+      }
+
+      // Fetch from Groq
+      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqKey}`,
+          ...formData.getHeaders()
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[aiV2/transcribe] Groq Whisper error:', errorText);
+        if (fs.existsSync(mergedFilePath)) fs.unlinkSync(mergedFilePath);
+        return sendAiError(res, { code: 'UPSTREAM_ERROR', message: 'Error from Groq Whisper' }, req.id);
+      }
+
+      const rawTranscription = (await response.text()).trim();
+      if (fs.existsSync(mergedFilePath)) fs.unlinkSync(mergedFilePath);
+
+      if (!rawTranscription) {
+        return res.status(200).json({
+          data: { reply: { role: 'assistant', content: '' }, meta: { provider: 'groq', model: 'whisper-large-v3', attempts: 1 } },
+          error: null
+        });
+      }
+
+      // Formatting with LLM
+      const SYSTEM_PROMPT = 'Eres un experto estructurador de textos académicos. Toma esta transcripción de audio y arréglala. Reglas estrictas:\n1. Agrega la puntuación y capitalización correctas (si faltan).\n2. Separa el texto por semántica.\n3. Identifica palabras clave que den origen a una nueva idea, y usa esas palabras como subtítulos (formato Markdown ###) para crear párrafos separados.\n4. Mantén todo el texto original, no omitas información ni resumas.\n5. No agregues saludos ni despedidas, solo devuelve el texto formateado.';
+      const messages = [{ role: 'user', content: rawTranscription }];
+
+      const llamado = (model) => geminiService.processAcademicChat(
+        '', messages, SYSTEM_PROMPT, { model, temperature: 0.2 }
+      );
+
+      try {
+        const { result, resolution } = await callWithModelFallback('groq', null, llamado, { capability: 'text' });
+        const contenido = typeof result === 'string' ? result : (result && result.content ? result.content : rawTranscription);
+        return res.status(200).json({
+          data: { reply: { role: 'assistant', content: contenido }, meta: { provider: 'groq', model: resolution.resolvedModelId, attempts: 1 } },
+          error: null
+        });
+      } catch (llmErr) {
+        console.warn('[aiV2/transcribe] Formatting failed, returning raw transcription', llmErr);
+        return res.status(200).json({
+          data: { reply: { role: 'assistant', content: rawTranscription }, meta: { provider: 'groq', model: 'whisper-large-v3', attempts: 1 } },
+          error: null
+        });
+      }
+    } else {
+      // Chunk appended successfully
+      return res.status(200).json({
+        data: { message: `Chunk ${chunkIndex} processed` },
+        error: null
+      });
+    }
+  } catch (error) {
+    console.error('[aiV2/transcribe] Chunking error:', error);
+    return sendAiError(res, { code: 'INTERNAL_ERROR', message: 'Error processing chunk' }, req.id);
+  }
+};

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -42,17 +42,16 @@ import { AutoUploadIndicator } from '../ui/AutoUploadIndicator';
 import { formatTranscription } from '../../utils/transcriptionFormatter';
 import { summarizeWithFallback } from '../../utils/groqHelpers';
 import { DeckTitleGenerator } from '../../services/domain/DeckTitleGenerator';
+import { obtenerAIClientV2 } from '../../services/ai/v2/aiclient';
 
 // ---------------------------------------------------------------------------
 // Constants & Directories
 // ---------------------------------------------------------------------------
-const GROQ_API_KEY: string = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
-const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
-const TRANSCRIPTS_DIR = () => `${FileSystem.documentDirectory}Threshold/transcripts/`;
+const TRANSCRIPTS_DIR = () => \\Threshold/transcripts/\;
 
 // Groq helpers
 // ---------------------------------------------------------------------------
-async function transcribeYouTubeWithWhisper(videoId: string, apiKey?: string): Promise<string> {
+async function transcribeYouTubeWithWhisper(videoId: string): Promise<string> {
   try {
     const result = await getYouTubeSubtitles(videoId, 'es');
     console.log('✓ YouTube captions fetched in', result.language);
@@ -60,54 +59,23 @@ async function transcribeYouTubeWithWhisper(videoId: string, apiKey?: string): P
 
     if (!rawCaptions) return '';
 
-    if (apiKey && rawCaptions.length > 50) {
-      console.log('Usando Groq para estructurar la transcripción semánticamente...');
-      const body = {
-        // DEUDA CONOCIDA: este ID sigue cableado y la llamada va directo a
-        // Groq desde el movil con EXPO_PUBLIC_GROQ_API_KEY (que viaja dentro
-        // del bundle). La migracion al backend, que ya tiene el catalogo y la
-        // clave en el servidor, es el arreglo de fondo. Se cambia solo el
-        // ID de aqui mientras tanto.
-        //
-        // Antes era 'llama-3.3-70b-versatile', retirado por Groq: pedia un
-        // modelo muerto desde una ruta que nadie miraba. La fuente de verdad
-        // para el resto del proyecto es backend/config/aiModels.js.
-        model: 'openai/gpt-oss-120b',
-        messages: [
-          {
-            role: 'system',
-            content: 'Eres un experto estructurador de textos académicos. Toma esta transcripción cruda de YouTube (que no tiene puntuación) y arréglala. Reglas estrictas:\n1. Agrega la puntuación y capitalización correctas.\n2. Separa el texto por semántica.\n3. Identifica palabras clave que den origen a una nueva idea, y usa esas palabras como subtítulos (formato Markdown ###) para crear párrafos separados.\n4. Mantén todo el texto original, no omitas información ni resumas.\n5. No agregues saludos ni despedidas, solo devuelve el texto formateado.',
-          },
-          {
-            role: 'user',
-            content: rawCaptions,
-          },
-        ],
-        temperature: 0.2,
-      };
-
-      const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const formatted = data?.choices?.[0]?.message?.content;
-        if (formatted) return formatted;
+    if (rawCaptions.length > 50) {
+      console.log('Usando IA Backend para estructurar la transcripción semánticamente...');
+      const client = await obtenerAIClientV2();
+      const SYSTEM_PROMPT = 'Eres un experto estructurador de textos académicos. Toma esta transcripción cruda de YouTube (que no tiene puntuación) y arréglala. Reglas estrictas:\n1. Agrega la puntuación y capitalización correctas.\n2. Separa el texto por semántica.\n3. Identifica palabras clave que den origen a una nueva idea, y usa esas palabras como subtítulos (formato Markdown ###) para crear párrafos separados.\n4. Mantén todo el texto original, no omitas información ni resumas.\n5. No agregues saludos ni despedidas, solo devuelve el texto formateado.';
+      
+      const res = await client.chat([{ role: 'user', content: rawCaptions }], SYSTEM_PROMPT);
+      if (res.ok) {
+        return res.data.content;
       } else {
-        console.warn('Groq formatting failed, falling back to raw captions');
+        console.warn('AI Client formatting failed, falling back to raw captions:', res.detalle);
       }
     }
 
     return rawCaptions;
   } catch (error) {
     console.error('✗ Error fetching YouTube captions:', error);
-    throw new Error(`Error obteniendo subtítulos: ${error instanceof Error ? error.message : error}`);
+    throw new Error(\Error obteniendo subtítulos: \\);
   }
 }
 
@@ -123,12 +91,9 @@ interface VideoDetailProps {
  * VideoDetail.tsx
  *
  * Pantalla completa de detalle para un Video de YouTube enlazado a la plataforma.
- * Instancia un iframe nativo optimizado con `react-native-youtube-iframe` y extrae sus subtítulos
+ * Instancia un iframe nativo optimizado con \eact-native-youtube-iframe\ y extrae sus subtítulos
  * originales desde la API conectada al backend de Python, en lugar de transcribir audio (por velocidad).
- * Permite mandar ese texto directamente al LLM (Groq) para extraer un resumen en viñetas o generar flashcards.
- *
- * @param videoId - Identificador interno o hash local del registro del video.
- * @param onBack - Callback para regresar y desmontar el reproductor Iframe.
+ * Permite mandar ese texto directamente al LLM para extraer un resumen en viñetas o generar flashcards.
  */
 export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => {
   const { t } = useTranslation();
@@ -172,9 +137,9 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       const dir = TRANSCRIPTS_DIR();
       let localTranscriptFound = false;
       try {
-        const ti = await FileSystem.getInfoAsync(`${dir}transcript_video_${key}.json`);
+        const ti = await FileSystem.getInfoAsync(\\transcript_video_\.json\);
         if (ti.exists) {
-          const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}transcript_video_${key}.json`));
+          const parsed = JSON.parse(await FileSystem.readAsStringAsync(\\transcript_video_\.json\));
           if (parsed.text) { 
             setTranscription(parsed.text); 
             
@@ -184,16 +149,14 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       } catch (e) { console.warn('transcript file:', e); }
 
       if (!localTranscriptFound && video?.transcript_text) {
-        console.log(`[VideoDetail] Fallback a transcript_text del servidor para video: ${video.id}`);
         setTranscription(video.transcript_text);
-        
       }
 
       let localSummaryFound = false;
       try {
-        const si = await FileSystem.getInfoAsync(`${dir}summary_video_${key}.json`);
+        const si = await FileSystem.getInfoAsync(\\summary_video_\.json\);
         if (si.exists) {
-          const parsed = JSON.parse(await FileSystem.readAsStringAsync(`${dir}summary_video_${key}.json`));
+          const parsed = JSON.parse(await FileSystem.readAsStringAsync(\\summary_video_\.json\));
           if (parsed.text) { 
             setSummary(parsed.text); 
             
@@ -204,9 +167,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
       } catch (e) { console.warn('summary file:', e); }
 
       if (!localSummaryFound && (video as any)?.summary_text) {
-        console.log(`[VideoDetail] Fallback a summary_text del servidor para video: ${video?.id}`);
         setSummary((video as any).summary_text);
-        
         setActiveTab('summary');
       }
     };
@@ -224,7 +185,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         if (video) {
           if (!video.title && video.video_id) {
             try {
-              const metadataRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${video.video_id}`);
+              const metadataRes = await fetch(\https://noembed.com/embed?url=https://www.youtube.com/watch?v=\\);
               if (metadataRes.ok) {
                 const metadata = await metadataRes.json();
                 if (metadata.title) {
@@ -255,7 +216,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
 
   const saveTextToFile = async (text: string, type: 'transcript' | 'summary') => {
     const dir = TRANSCRIPTS_DIR();
-    const fileUri = `${dir}${type}_video_${videoId}.json`;
+    const fileUri = \\\_video_\.json\;
     try {
       const di = await FileSystem.getInfoAsync(dir);
       if (!di.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
@@ -289,7 +250,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
     setSummary(null);
 
     try {
-      const text = await transcribeYouTubeWithWhisper(videoData.video_id, GROQ_API_KEY);
+      const text = await transcribeYouTubeWithWhisper(videoData.video_id);
       
       if (!text) {
         alertRef.show({ title: t('common.error') || 'Error', message: t('youtube.errors.captionsFetchFailed'), type: 'warning' });
@@ -327,7 +288,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
     setIsSummarizing(true);
     setSummary(null);
     try {
-      const result = await summarizeWithFallback(transcription, GROQ_API_KEY);
+      const result = await summarizeWithFallback(transcription);
       setSummary(result);
       
       setActiveTab('summary');
@@ -406,7 +367,6 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
                   end={{ x: 1, y: 1 }}
                   style={{ flex: 1, justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden' }}
                 >
-                  {/* Faded YouTube brand mark */}
                   <MaterialCommunityIcons
                     name="youtube"
                     size={140}
@@ -414,7 +374,6 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
                     style={{ position: 'absolute', bottom: -20, right: -20 }}
                   />
 
-                  {/* Icon stack */}
                   <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                     <View style={{
                       width: 64,
@@ -428,7 +387,6 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
                     }}>
                       <Ionicons name="wifi-outline" size={28} color="rgba(255,255,255,0.45)" />
                     </View>
-                    {/* Disconnection slash */}
                     <View style={{
                       position: 'absolute',
                       width: 2,
@@ -439,7 +397,6 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
                     }} />
                   </View>
 
-                  {/* Status badge */}
                   <View style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -481,7 +438,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         )}
 
         {videoTitle.length > 50 && (
-          <View style={{ paddingHorizontal: 12, marginBottom: 12, paddingVertical: 8, backgroundColor: `${theme.colors.primary}08`, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: theme.colors.primary }}>
+          <View style={{ paddingHorizontal: 12, marginBottom: 12, paddingVertical: 8, backgroundColor: \\08\, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: theme.colors.primary }}>
             <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontStyle: 'italic' }}>
               {t('common.title', { defaultValue: 'Title' })}: {videoTitle}
             </Text>
@@ -571,7 +528,6 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         <Modal visible={showStudyScreen} animationType="slide">
           <View style={{ flex: 1 }}>
             {(() => {
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
               const { FlashcardStudyScreenStandalone } = require('../flashcards/FlashcardStudyScreenStandalone');
               return (
                 <FlashcardStudyScreenStandalone

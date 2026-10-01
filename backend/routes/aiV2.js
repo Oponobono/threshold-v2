@@ -16,14 +16,17 @@
  */
 
 const express = require('express');
+const multer = require('multer');
 const { aiLimiter } = require('../middlewares/rateLimiter');
 const aiV2Controller = require('../controllers/aiV2Controller');
 
 const router = express.Router();
+const upload = multer({ dest: 'temp/' });
 
 router.use(aiLimiter);
 
 router.post('/chat', aiV2Controller.chatV2);
+router.post('/transcribe', upload.single('chunk'), aiV2Controller.transcribeV2);
 
 /**
  * El precalentamiento va por el MISMO limiter que el chat, a proposito.

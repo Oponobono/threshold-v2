@@ -47,7 +47,7 @@ import { formatTranscription } from '../../utils/transcriptionFormatter';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const GROQ_API_KEY: string = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
+
 const AUDIO_DIR = () => `${FileSystem.documentDirectory}Threshold/audio/`;
 const TRANSCRIPTS_DIR = () => `${FileSystem.documentDirectory}Threshold/transcripts/`;
 
@@ -64,11 +64,11 @@ interface RecordingDetailProps {
  *
  * Pantalla completa de detalle para un archivo de audio (nota de voz).
  * Implementa el reproductor nativo `expo-av` con una barra de progreso (`Slider`).
- * Carga o solicita la transcripción a la API de Groq (Whisper) y la sintetiza a un resumen
- * académico mediante Llama-3. También invoca la creación de flashcards desde la transcripción.
+ * Carga o solicita la transcripciÃ³n a la API de Groq (Whisper) y la sintetiza a un resumen
+ * acadÃ©mico mediante Llama-3. TambiÃ©n invoca la creaciÃ³n de flashcards desde la transcripciÃ³n.
  *
- * @param recordingId - Identificador único o nombre de archivo de la grabación.
- * @param onBack - Función para retroceder en la navegación y detener el audio.
+ * @param recordingId - Identificador Ãºnico o nombre de archivo de la grabaciÃ³n.
+ * @param onBack - FunciÃ³n para retroceder en la navegaciÃ³n y detener el audio.
  */
 export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, onBack }) => {
   const { t } = useTranslation();
@@ -115,7 +115,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
       const ts = parseInt(recordingId.split('_')[1] || '0', 10);
       return ts
         ? t('dashboard.audioRecorderModal.fileLabel', { date: new Date(ts).toLocaleDateString() })
-        : t('dashboard.audioRecorderModal.ai.recording') || 'Grabación';
+        : t('dashboard.audioRecorderModal.ai.recording') || 'GrabaciÃ³n';
     })();
 
   const date = recordingData?.created_at
@@ -170,7 +170,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
         setSelectedSubjectId(rec.subject_id ? String(rec.subject_id) : null); 
       }
       
-      // Determinar mejor URI de audio (Caché local -> Fallback a Nube -> Búsqueda)
+      // Determinar mejor URI de audio (CachÃ© local -> Fallback a Nube -> BÃºsqueda)
       let bestUri = rec?.local_uri || '';
       if (bestUri) {
         try {
@@ -420,21 +420,21 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
     setSummary(null);
 
     try {
-      const text = await transcribeWithFallback(audioUri, GROQ_API_KEY);
+      const text = await transcribeWithFallback(audioUri);
       
       if (!text) {
         alertRef.show({ title: t('common.error') || 'Error', message: t('recordings.errors.noVoiceDetected'), type: 'warning' });
         return;
       }
 
-      // Formatear la transcripción para mejorar presentación
+      // Formatear la transcripciÃ³n para mejorar presentaciÃ³n
       const formattedText = formatTranscription(text);
       
       setTranscription(formattedText);
       setShowTutorial(false);
       await saveTextToFile(formattedText, 'transcript');
     } catch (e) {
-      console.error('ERROR EN TRANSCRIPCIÓN:', e);
+      console.error('ERROR EN TRANSCRIPCIÃ“N:', e);
       alertRef.show({ title: t('common.error') || 'Error', message: e instanceof Error ? e.message : t('recordings.errors.transcriptionFailed'), type: 'error' });
     } finally {
       setIsTranscribing(false);
@@ -446,13 +446,13 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   // ---------------------------------------------------------------------------
   const startSummaryFlow = async () => {
     if (!transcription) {
-      alertRef.show({ title: t('common.error') || 'Error', message: t('dashboard.audioRecorderModal.ai.emptyTranscription') || 'Primero genera la transcripción.', type: 'warning' });
+      alertRef.show({ title: t('common.error') || 'Error', message: t('dashboard.audioRecorderModal.ai.emptyTranscription') || 'Primero genera la transcripciÃ³n.', type: 'warning' });
       return;
     }
     setIsSummarizing(true);
     setSummary(null);
     try {
-      const result = await summarizeWithFallback(transcription, GROQ_API_KEY);
+      const result = await summarizeWithFallback(transcription);
       setSummary(result);
       setShowTutorial(false);
       setActiveTab('summary');
@@ -470,7 +470,7 @@ export const RecordingDetail: React.FC<RecordingDetailProps> = ({ recordingId, o
   const copyToClipboard = async (text: string | null) => {
     if (!text) return;
     await Clipboard.setStringAsync(text);
-    alertRef.show({ title: t('common.success') || '¡Listo!', message: t('dashboard.audioRecorderModal.ai.copied') || '¡Texto copiado!', type: 'success' });
+    alertRef.show({ title: t('common.success') || 'Â¡Listo!', message: t('dashboard.audioRecorderModal.ai.copied') || 'Â¡Texto copiado!', type: 'success' });
   };
 
   // ---------------------------------------------------------------------------
