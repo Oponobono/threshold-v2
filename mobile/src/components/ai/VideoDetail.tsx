@@ -71,7 +71,7 @@ async function transcribeYouTubeWithWhisper(videoId: string): Promise<string> {
     return rawCaptions;
   } catch (error) {
     console.error('✗ Error fetching YouTube captions:', error);
-    throw new Error(\Error obteniendo subtítulos: \\);
+    throw new Error(`Error obteniendo subtítulos: ${error}`);
   }
 }
 
@@ -130,12 +130,13 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
 
   useEffect(() => {
     const loadPersistedTexts = async (key: string, video: YouTubeVideo | null) => {
-      const dir = TRANSCRIPTS_DIR();
+      const transcriptUri = `${FileSystem.documentDirectory}transcript_video_${key}.json`;
+      const summaryUri = `${FileSystem.documentDirectory}summary_video_${key}.json`;
       let localTranscriptFound = false;
       try {
-        const ti = await FileSystem.getInfoAsync(\\transcript_video_\.json\);
+        const ti = await FileSystem.getInfoAsync(transcriptUri);
         if (ti.exists) {
-          const parsed = JSON.parse(await FileSystem.readAsStringAsync(\\transcript_video_\.json\));
+          const parsed = JSON.parse(await FileSystem.readAsStringAsync(transcriptUri));
           if (parsed.text) { 
             setTranscription(parsed.text); 
             
@@ -150,9 +151,9 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
 
       let localSummaryFound = false;
       try {
-        const si = await FileSystem.getInfoAsync(\\summary_video_\.json\);
+        const si = await FileSystem.getInfoAsync(summaryUri);
         if (si.exists) {
-          const parsed = JSON.parse(await FileSystem.readAsStringAsync(\\summary_video_\.json\));
+          const parsed = JSON.parse(await FileSystem.readAsStringAsync(summaryUri));
           if (parsed.text) { 
             setSummary(parsed.text); 
             
@@ -181,7 +182,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         if (video) {
           if (!video.title && video.video_id) {
             try {
-              const metadataRes = await fetch(\https://noembed.com/embed?url=https://www.youtube.com/watch?v=\\);
+              const metadataRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${video.video_id}`);
               if (metadataRes.ok) {
                 const metadata = await metadataRes.json();
                 if (metadata.title) {
@@ -211,11 +212,8 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
   }, [videoId]);
 
   const saveTextToFile = async (text: string, type: 'transcript' | 'summary') => {
-    const dir = TRANSCRIPTS_DIR();
-    const fileUri = \\\_video_\.json\;
+    const fileUri = `${FileSystem.documentDirectory}${type}_video_${videoId}.json`;
     try {
-      const di = await FileSystem.getInfoAsync(dir);
-      if (!di.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify({ text, date: new Date().toISOString() }));
       
       if (videoData?.id) {
@@ -434,7 +432,7 @@ export const VideoDetail: React.FC<VideoDetailProps> = ({ videoId, onBack }) => 
         )}
 
         {videoTitle.length > 50 && (
-          <View style={{ paddingHorizontal: 12, marginBottom: 12, paddingVertical: 8, backgroundColor: \\08\, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: theme.colors.primary }}>
+          <View style={{ paddingHorizontal: 12, marginBottom: 12, paddingVertical: 8, backgroundColor: `${theme.colors.primary}18`, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: theme.colors.primary }}>
             <Text style={{ fontSize: 11, color: theme.colors.text.secondary, fontStyle: 'italic' }}>
               {t('common.title', { defaultValue: 'Title' })}: {videoTitle}
             </Text>
