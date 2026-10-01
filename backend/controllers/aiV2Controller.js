@@ -218,6 +218,7 @@ exports.statusV2 = (req, res) => {
 const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data'); // Installed via npm
+const AI_MODELS = require('../config/aiModels');
 
 // ── Transcripción por Trozos ────────────────────────────────────────────────
 exports.transcribeV2 = async (req, res) => {
@@ -243,10 +244,15 @@ exports.transcribeV2 = async (req, res) => {
     fs.unlinkSync(req.file.path); // Delete the temp chunk
 
     if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
+      // Elegir el mejor modelo STT disponible del registry (stt.groq)
+      const sttCandidates = AI_MODELS.getCandidates('stt.groq', 'stt');
+      const sttModel = sttCandidates[0]?.id || 'whisper-large-v3-turbo';
+      console.log(`[aiV2/transcribe] Usando modelo STT: ${sttModel}`);
+
       // Last chunk received, process transcription
       const formData = new FormData();
       formData.append('file', fs.createReadStream(mergedFilePath));
-      formData.append('model', 'whisper-large-v3');
+      formData.append('model', sttModel);
       formData.append('language', 'es');
       formData.append('response_format', 'text');
 
@@ -277,7 +283,7 @@ exports.transcribeV2 = async (req, res) => {
 
       if (!rawTranscription) {
         return res.status(200).json({
-          data: { reply: { role: 'assistant', content: '' }, meta: { provider: 'groq', model: 'whisper-large-v3', attempts: 1 } },
+          data: { reply: { role: 'assistant', content: '' }, meta: { provider: 'groq', model: sttModel, attempts: 1 } },
           error: null
         });
       }
@@ -300,7 +306,7 @@ exports.transcribeV2 = async (req, res) => {
       } catch (llmErr) {
         console.warn('[aiV2/transcribe] Formatting failed, returning raw transcription', llmErr);
         return res.status(200).json({
-          data: { reply: { role: 'assistant', content: rawTranscription }, meta: { provider: 'groq', model: 'whisper-large-v3', attempts: 1 } },
+          data: { reply: { role: 'assistant', content: rawTranscription }, meta: { provider: 'groq', model: sttModel, attempts: 1 } },
           error: null
         });
       }
