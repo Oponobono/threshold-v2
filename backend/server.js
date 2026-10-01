@@ -137,8 +137,8 @@ app.get('/api/ai/models/gguf_catalog', (_req, res) => {
       {
         modelId: 'tiny',
         familyId: 'llama-3.2',
-        quantization: 'Q2_K',
-        downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q2_K.gguf',
+        quantization: 'Q4_0',
+        downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_0.gguf',
         capabilities: ['text'],
       },
       {

@@ -50,8 +50,8 @@ export const MODELS: Record<LocalModelId, ModelInfo> = {
     downloadSizeBytes: 470 * 1024 * 1024,
     ramMin: '0.8 GB',
     capabilities: ['settings.localAI.tinyCap1', 'settings.localAI.tinyCap2', 'settings.localAI.tinyCap3'],
-    downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q2_K.gguf',
-    filename: 'llama-3.2-1b-q2.gguf',
+    downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_0.gguf',
+    filename: 'llama-3.2-1b-q4.gguf',
   },
   essential: {
     id: 'essential',
