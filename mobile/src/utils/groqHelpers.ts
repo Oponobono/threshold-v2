@@ -1,4 +1,4 @@
-﻿import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system/legacy';
 import ThresholdPdfExtractor from '../../modules/threshold-pdf-extractor/src/ThresholdPdfExtractorModule';
 import { obtenerAIClientV2 } from '../services/ai/v2/aiclient';
 
@@ -21,10 +21,10 @@ async function transcribeWithWhisperLocal(audioUri: string): Promise<string> {
   if (storedPath) {
     modelPath = storedPath;
   } else {
-    modelPath = \\models/\\;
+    modelPath = `${FileSystem.documentDirectory}models/${WHISPER_TINY_FILENAME}`;
     const info = await FileSystem.getInfoAsync(modelPath);
     if (!info.exists) {
-      modelPath = \\\\;
+      modelPath = `${FileSystem.documentDirectory}${WHISPER_TINY_FILENAME}`;
     }
   }
 
@@ -104,7 +104,7 @@ async function summarizeWithLocalLLM(transcription: string): Promise<string> {
 
   await loadModel(store.activeModelId);
 
-  const prompt = \Eres un asistente educativo experto especializado en crear material de estudio universitario. A partir de la transcripción proporcionada, genera un resumen estructurado siguiendo estas reglas:
+  const prompt = `Eres un asistente educativo experto especializado en crear material de estudio universitario. A partir de la transcripción proporcionada, genera un resumen estructurado siguiendo estas reglas:
 1. Extrae los conceptos fundamentales y ordénalos por temas usando títulos claros (###).
 2. Usa viñetas breves para desglosar los detalles importantes de cada tema.
 3. Identifica términos clave y resáltalos en **negrita**.
@@ -112,7 +112,7 @@ async function summarizeWithLocalLLM(transcription: string): Promise<string> {
 No agregues introducciones conversacionales.
 
 Transcripción:
-\\;
+${transcription}`;
 
   const result = await runInference({
     prompt,
@@ -160,7 +160,7 @@ export async function summarizeWithFallback(transcription: string, _ignoredKey?:
   try {
     const client = await obtenerAIClientV2();
     const result = await client.chat([
-      { role: 'user', content: \Resume el siguiente texto:\n\n\\ }
+      { role: 'user', content: `Resume el siguiente texto:\n\n${transcription}` }
     ], 'Eres un asistente educativo experto especializado en crear material de estudio universitario altamente efectivo. A partir de la transcripción proporcionada, genera un resumen estructurado siguiendo estas reglas:\n1. Extrae los conceptos fundamentales y ordénalos por temas usando títulos claros (###).\n2. Usa viñetas breves para desglosar los detalles importantes de cada tema.\n3. Identifica términos clave, definiciones o fechas y resáltalos en **negrita**.\n4. Elimina toda la "paja" (titubeos, saludos, repeticiones) y ve directo al grano.\n5. Finaliza con una sección de "Idea Central" de máximo 2 oraciones.\nTu tono debe ser académico, estructurado y directo. No agregues introducciones conversacionales.');
 
     if (result.ok) {
