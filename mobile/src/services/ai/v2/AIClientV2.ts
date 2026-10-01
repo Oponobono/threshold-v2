@@ -103,9 +103,19 @@ export interface ChatMeta {
 }
 
 export interface ChatData {
+  /** Respuesta textual del asistente. */
   content: string;
   meta?: ChatMeta;
+  /**
+   * Señal de bloqueo por prompt shield. En contrato v2 el backend expone
+   * `shield_blocked` (snake_case), y el cliente lo traduce aquí a camelCase.
+   */
   shieldBlocked?: boolean;
+  /**
+   * El backend indica si el contexto fue truncado. Aunque hoy es `false`,
+   * el cliente debe aceptarlo para no romper con futuras versiones del contrato.
+   */
+  contextTruncated?: boolean;
 }
 
 export type ResultadoChat =
@@ -120,6 +130,35 @@ export type ResultadoChat =
       detalle: string;
       intentos: number;
     };
+
+/**
+ * Traduce la forma del backend a la del cliente.
+ *
+ * Por que hace falta
+ * ------------------
+ * El backend responde `{ data: { reply: { role, content }, shield_blocked,
+ * context_truncated, meta } }`. Tipar `ChatData` con ese shape obligaria a cada
+ * componente a hacer `data.reply.content`, y `reply` no significa nada fuera de
+ * este endpoint: lo que consume es el mensaje del asistente.
+ *
+ * `reply.content` puede faltar si el backend devolvio un mensaje sin texto. Se
+ * convierte en cadena vacia en vez de propagar `undefined`: un componente que
+ * pinta `{undefined}` es un fallo de render, y uno que decide con `.length` sobre
+ * undefined es un fallo de logica. El texto vacio es un caso que todos los
+ * consumidores ya saben manejar.
+ */
+function adaptarChat(data: unknown): ChatData {
+  const d = (data ?? {}) as Record<string, unknown>;
+  const reply = d.reply as { content?: unknown } | undefined;
+  const crudo = reply?.content;
+
+  return {
+    content: typeof crudo === 'string' ? crudo : '',
+    shieldBlocked: d.shield_blocked === true,
+    contextTruncated: d.context_truncated === true,
+    meta: d.meta as ChatMeta | undefined,
+  };
+}
 
 // ── Rutas ───────────────────────────────────────────────────────────────────
 
@@ -390,7 +429,7 @@ export class AIClientV2 {
 
       if (esSobreExito(body)) {
         this.registrarExito();
-        return { ok: true, data: body.data, intentos };
+        return { ok: true, data: adaptarChat(body.data), intentos };
       }
 
       const fallo = clasificarFallo({ status, body, headers });

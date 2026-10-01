@@ -192,10 +192,23 @@ const RENDER_DORMIDO: RespuestaFabricada = {
   renderRouting: 'hibernate-wake-error',
 };
 
+/**
+ * Cuerpo de exito tal y como lo devuelve el backend.
+ *
+ * Se fabrica con la forma REAL (`reply.content`, `shield_blocked`,
+ * `context_truncated`) y no con la que consume el cliente. Si el test fabricara
+ * directamente `data.content`, pasaria aunque el backend y el cliente no
+ * coincidieran, que es exactamente el error que esto evita.
+ */
 const EXITO: RespuestaFabricada = {
   status: 200,
   body: {
-    data: { content: 'hola', meta: { provider: 'groq', model: 'm', attempts: 1 } },
+    data: {
+      reply: { role: 'assistant', content: 'hola' },
+      shield_blocked: false,
+      context_truncated: false,
+      meta: { provider: 'groq', model: 'm', attempts: 1 },
+    },
     error: null,
   },
 };
@@ -288,6 +301,60 @@ describe('clasificarFallo', () => {
 
   it('un 500 sin sobre es nuestro bug, no de la plataforma', () => {
     expect(clasificarFallo({ status: 500, body: { message: 'boom' } }).origen).toBe('app');
+  });
+});
+
+// ── La forma de la respuesta ─────────────────────────────────────────────────
+
+describe('adaptacion de la respuesta del backend', () => {
+  it('lee reply.content y lo expone como content', async () => {
+    const { client, reloj } = cliente(async () => respuesta(EXITO));
+    const r = await resuelve(client.chat([{ role: 'user', content: 'hola' }]), reloj);
+
+    expect(r.ok === true && r.data.content).toBe('hola');
+  });
+
+  it('traduce snake_case del contrato a camelCase del cliente', async () => {
+    const { client, reloj } = cliente(async () =>
+      respuesta({
+        status: 200,
+        body: {
+          data: {
+            reply: { role: 'assistant', content: 'texto' },
+            shield_blocked: true,
+            context_truncated: true,
+            meta: { provider: 'groq' },
+          },
+          error: null,
+        },
+      })
+    );
+    const r = await resuelve(client.chat([{ role: 'user', content: 'hola' }]), reloj);
+
+    expect(r.ok === true && r.data.shieldBlocked).toBe(true);
+    expect(r.ok === true && r.data.contextTruncated).toBe(true);
+  });
+
+  it('un reply sin texto NO produce undefined, sino cadena vacia', async () => {
+    // Un componente que decide con `.length` sobre undefined rompe en runtime, y
+    // uno que pinta `{undefined}` rompe el render. El texto vacio no rompe nada.
+    const { client, reloj } = cliente(async () =>
+      respuesta({
+        status: 200,
+        body: { data: { reply: { role: 'assistant' }, meta: {} }, error: null },
+      })
+    );
+    const r = await resuelve(client.chat([{ role: 'user', content: 'hola' }]), reloj);
+
+    expect(r.ok === true && r.data.content).toBe('');
+  });
+
+  it('el meta del backend llega intacto: el movil puede auditar que modelo uso', async () => {
+    const { client, reloj } = cliente(async () => respuesta(EXITO));
+    const r = await resuelve(client.chat([{ role: 'user', content: 'hola' }]), reloj);
+
+    expect(r.ok === true && r.data.meta?.provider).toBe('groq');
+    expect(r.ok === true && r.data.meta?.model).toBe('m');
   });
 });
 
@@ -401,6 +468,10 @@ describe('503 inmediato de plataforma', () => {
     expect(r.ok).toBe(true);
     expect(peticiones).toHaveLength(3);
     expect(client.breaker.fallosConsecutivos).toBe(0);
+
+    // Y el texto llego de verdad, no solo un 200. Este es el punto del adaptador:
+    // la respuesta se fabrica con `reply.content` y se consume como `content`.
+    expect(r.ok === true && r.data.content).toBe('hola');
   });
 
   it('30 platformas seguidas NO abren el breaker', async () => {
