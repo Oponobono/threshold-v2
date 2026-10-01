@@ -19,7 +19,17 @@ const { execFileSync } = require('node:child_process');
 
 const OBJETIVO = path.join(__dirname, '..', 'services', 'ai', 'contracts', 'aiErrors.js');
 const TESTS = path.join(__dirname, '..', 'tests', 'aiErrors.test.js');
-const original = fs.readFileSync(OBJETIVO, 'utf8');
+// Se normalizan los finales de linea a \n para que los patrones de varias
+// lineas no dependan de si el archivo esta guardado con CRLF o LF. Con CRLF, un
+// patron escrito con \n no aparece nunca y la mutacion se reporta como
+// "obsoleta", que es como paso al intentar mutar el bloque de codigo='INTERNAL_ERROR'.
+// Dos copias a proposito: `original` tiene finales de linea normalizados a \n
+// para que los patrones de varias lineas no dependan de si el archivo esta
+// guardado con CRLF o LF (con CRLF un patron escrito con \n no aparece nunca y la
+// mutacion se reporta como obsoleta). `pristino` es la copia intacta y es la que
+// se restaura, para no dejar el archivo con los finales de linea cambiados.
+const pristino = fs.readFileSync(OBJETIVO, 'utf8');
+const original = pristino.replace(/\r\n/g, '\n');
 
 /** Cada mutacion rompe una decision concreta del contrato. */
 const MUTACIONES = [
@@ -45,12 +55,14 @@ const MUTACIONES = [
   },
   {
     nombre: '401 del proveedor se disfraza de sesion expirada',
-    buscar: "    code = 'INTERNAL_ERROR';\n    logLevel = 'critical';\n    logDetail = `credencial del proveedor rechazada",
+    buscar: "code = 'INTERNAL_ERROR';\n    logLevel = 'critical';\n    logDetail = `credencial del proveedor rechazada",
+    replace: "code = 'UNAUTHENTICATED';\n    logLevel = 'critical';\n    logDetail = `credencial del proveedor rechazada",
     replace: "    code = 'UNAUTHENTICATED';\n    logLevel = 'critical';\n    logDetail = `credencial del proveedor rechazada",
   },
   {
     nombre: '401 sin marcar se atribuye al usuario',
-    buscar: "    code = 'INTERNAL_ERROR';\n    logLevel = 'critical';\n    logDetail = `401/403 sin marcar",
+    buscar: "code = 'INTERNAL_ERROR';\n    logLevel = 'critical';\n    logDetail = `401/403 sin marcar",
+    replace: "code = 'UNAUTHENTICATED';\n    logLevel = 'critical';\n    logDetail = `401/403 sin marcar",
     replace: "    code = 'UNAUTHENTICATED';\n    logLevel = 'critical';\n    logDetail = `401/403 sin marcar",
   },
   {
@@ -70,8 +82,8 @@ const MUTACIONES = [
   },
   {
     nombre: 'el acceso denegado confirma que el recurso existe',
-    buscar: "    code = 'NOT_FOUND';\n    logLevel = 'warn';",
-    replace: "    code = 'ACCESS_DENIED';\n    logLevel = 'warn';",
+    buscar: "code = 'NOT_FOUND';\n    logLevel = 'warn';",
+    replace: "code = 'ACCESS_DENIED';\n    logLevel = 'warn';",
   },
   {
     nombre: 'un recurso de otro usuario responde 403',
@@ -136,7 +148,7 @@ try {
     }
   }
 } finally {
-  fs.writeFileSync(OBJETIVO, original, 'utf8');
+  fs.writeFileSync(OBJETIVO, pristino, 'utf8');
 }
 
 console.log(

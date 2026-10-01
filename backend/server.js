@@ -31,6 +31,7 @@ const youtubeRoutes = require('./routes/youtube');
 const scannedDocumentsRoutes = require('./routes/scanned_documents');
 const learningRoutes = require('./routes/learning');
 const aiRoutes = require('./routes/ai');
+const aiV2Routes = require('./routes/aiV2');
 const uploadRoutes = require('./routes/upload');
 const backupRoutes = require('./routes/backup');
 const gradingRoutes = require('./routes/grading');
@@ -206,6 +207,12 @@ app.use('/api', audioRoutes);
 app.use('/api', youtubeRoutes);
 app.use('/api', scannedDocumentsRoutes);
 app.use('/api', learningRoutes);
+// v2 se monta ANTES que aiRoutes a proposito. Hoy ningun patrón de aiRoutes
+// coincide con /ai/v2/*, asi que el orden es irrelevante... y por eso mismo es
+// fragil: el dia que alguien añada un parametro ancho a v1, ese router puede
+// capturar una ruta de v2 sin que nada falle. Montar el especifico primero
+// hace que el solapamiento sea imposible en lugar de improbable.
+app.use('/api/ai/v2', aiV2Routes);
 app.use('/api', aiRoutes);
 app.use('/api', backupRoutes);
 app.use('/api', gradingRoutes);
