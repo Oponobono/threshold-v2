@@ -25,4 +25,13 @@ router.use(aiLimiter);
 
 router.post('/chat', aiV2Controller.chatV2);
 
+/**
+ * El precalentamiento va por el MISMO limiter que el chat, a proposito.
+ *
+ * Con /status sin cota, un movil que reintenta el wake en bucle consume la cuota
+ * de un endpoint pensado para ser barato. Con el limiter compartido, el
+ * precalentamiento no puede gastar la cuota que el chat necesita.
+ */
+router.get('/status', aiV2Controller.statusV2);
+
 module.exports = router;

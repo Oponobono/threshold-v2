@@ -65,11 +65,14 @@ function tokenValido(id = 'usuario-v2') {
 async function pedir(app, metodo, ruta, { token, cuerpo } = {}) {
   const headers = {};
   if (token) headers.authorization = token;
-  if (cuerpo !== undefined) headers['content-type'] = 'application/json';
+  // Un GET/HEAD no admite cuerpo: fetch lanza antes de salir. Se omite para no
+  // estar probando el transporte en vez de la ruta.
+  const admiteCuerpo = cuerpo !== undefined && metodo !== 'GET' && metodo !== 'HEAD';
+  if (admiteCuerpo) headers['content-type'] = 'application/json';
   const res = await fetch(`http://127.0.0.1:${app.__puerto}${ruta}`, {
     method: metodo,
     headers,
-    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+    body: admiteCuerpo ? JSON.stringify(cuerpo) : undefined,
   });
   try { return { status: res.status, json: await res.json() }; }
   catch { return { status: res.status, json: null }; }
@@ -506,4 +509,81 @@ test('validarChat nunca lanza, incluso con basura', () => {
     assert.equal(typeof r.ok, 'boolean');
     if (!r.ok) assert.ok(AI_ERRORS[r.codigo], `el codigo ${r.codigo} debe existir en el contrato`);
   }
+});
+
+// ── GET /status: el precalentamiento ────────────────────────────────────────
+//
+// /status existe para que el movil provoque el wake de Render al abrir la
+// pantalla de IA. Si hiciera trabajo real, seria el endpoint mas lento justo
+// cuando mas urge que sea rapido, asi que estos tests fijan que es trivial.
+
+test('/status responde con el sobre de exito y sin credenciales expuestas', async (t) => {
+  const app = appDePrueba();
+  const server = await listen(app);
+  t.after(() => server.close());
+
+  const res = await pedir(app, 'GET', '/api/ai/v2/status', { token: tokenValido() });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.json.error, null);
+  assert.equal(res.json.data.version, 2);
+  assert.equal(typeof res.json.data.listo, 'boolean');
+  assert.deepEqual(Object.keys(res.json.data.credenciales).sort(), ['gemini', 'groq']);
+
+  // Ni un valor de credencial, en ningun sitio del cuerpo.
+  const crudo = JSON.stringify(res.json);
+  assert.equal(crudo.includes(process.env.GROQ_API_KEY || '@@sin-groq@@'), false);
+  assert.equal(crudo.includes(process.env.GEMINI_API_KEY || '@@sin-gemini@@'), false);
+});
+
+test('/status NO llama a ningun proveedor', async (t) => {
+  // Se comprueba sobre el codigo y no sobre el tiempo: medir milisegundos es un
+  // test que pasa en local rapido y falla en CI con la maqueta ocupada. Lo que
+  // importa es que no haya una llamada saliente, y eso se ve en las referencias.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const fuente = fs.readFileSync(
+    path.join(__dirname, '..', 'controllers', 'aiV2Controller.js'),
+    'utf8'
+  );
+  const handler = fuente.slice(fuente.indexOf('exports.statusV2'));
+
+  for (const prohibido of ['callWithModelFallback', 'geminiService', 'axios', 'fetch(']) {
+    assert.equal(
+      handler.includes(prohibido),
+      false,
+      `/status no debe usar ${prohibido}: es el endpoint del wake, tiene que ser trivial`
+    );
+  }
+});
+
+test('/status funciona aunque no haya ninguna credencial cargada', async (t) => {
+  const app = appDePrueba();
+  const server = await listen(app);
+  t.after(() => server.close());
+
+  const groq = process.env.GROQ_API_KEY;
+  const gemini = process.env.GEMINI_API_KEY;
+  delete process.env.GROQ_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+
+  try {
+    const res = await pedir(app, 'GET', '/api/ai/v2/status', { token: tokenValido() });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.listo, false);
+    assert.equal(res.json.data.credenciales.groq, false);
+  } finally {
+    if (groq !== undefined) process.env.GROQ_API_KEY = groq;
+    if (gemini !== undefined) process.env.GEMINI_API_KEY = gemini;
+  }
+});
+
+test('/status tambien exige token: el wake no es una puerta abierta', async (t) => {
+  const app = appDePrueba();
+  const server = await listen(app);
+  t.after(() => server.close());
+
+  const res = await pedir(app, 'GET', '/api/ai/v2/status');
+  assert.equal(res.status, 401);
+  assert.equal(res.json.error.code, 'UNAUTHENTICATED');
 });

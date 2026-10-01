@@ -69,7 +69,7 @@ function rutaInterna(req) {
  * El registry distingue clases que el movil NO debe ver separadas: que un
  * proveedor rechazara la credencial (fatal, no tiene sentido reintentar) y que se
  * agotara la lista de modelos (puede tener sentido esperar) son dos cosas
- * distintas para el operador y la mismaFINALIDAD para el cliente: ahora no
+ * distintas para el operador y la misma finalidad para el cliente: ahora no
  * puedes, intentalo mas tarde. Lo que si se propaga intacto es `retryable`.
  */
 function enviarFalloDeProveedor(res, err, req) {
@@ -172,4 +172,45 @@ exports.chatV2 = async (req, res) => {
   } finally {
     console.log(`[aiV2/chat] ${provider} ${Date.now() - inicio}ms ruta=${rutaInterna(req)}`);
   }
+};
+
+/**
+ * GET /api/ai/v2/status
+ *
+ * Existe para el precalentamiento del movil, y esa es su unica funcion.
+ *
+ * Por que no consulta los proveedores
+ * -----------------------------------
+ * El movil llama a /status justo al abrir la pantalla de IA, con la intention de
+ * provocar el wake de Render. Si este endpoint llamara a /models de Groq y
+ * Gemini, cada precalentamiento seria una peticion saliente que puede tardar
+ * varios segundos, y entonces el endpoint mas rapido seria el mas lento: se
+ * llamaria al wake pero el usuario seguiria esperando. Solo comprueba que hay
+ * credencial cargada, que es una lectura de process.env.
+ *
+ * Por que `ready` no significa "puede responder"
+ * ---------------------------------------------
+ * Que haya credencial no garantiza que el proveedor este sano. Por eso el
+ * cliente trata este endpoint como una señal de vida, no como un permiso, y el
+ * chat sigue decidiendo por su cuenta. Un /status que promete mas de lo que
+ * sabe produce un cliente que se salta sus propios reintentos.
+ *
+ * No expone el valor de ninguna credencial, solo si existe.
+ */
+exports.statusV2 = (req, res) => {
+  const credenciales = {
+    groq: !!process.env.GROQ_API_KEY,
+    gemini: !!process.env.GEMINI_API_KEY,
+  };
+
+  const algunProveedor = Object.values(credenciales).some(Boolean);
+
+  return res.status(200).json({
+    data: {
+      listo: algunProveedor,
+      credenciales,
+      version: 2,
+    },
+    error: null,
+  });
 };
