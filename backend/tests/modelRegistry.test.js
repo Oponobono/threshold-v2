@@ -482,16 +482,16 @@ test('GeminiProvider no envia temperature a un modelo que la ignora', async () =
   const capturado = {};
   const requireOriginal = Module.prototype.require;
   Module.prototype.require = function (id) {
-    if (id === '@google/generative-ai') {
+    if (id === '@google/genai') {
       return {
-        GoogleGenerativeAI: class {
-          getGenerativeModel(cfg) {
-            capturado.generationConfig = cfg.generationConfig;
-            capturado.model = cfg.model;
-            return {
-              generateContent: async () => ({
-                response: { text: () => '{"ok":true}' },
-              }),
+        GoogleGenAI: class {
+          constructor() {
+            this.models = {
+              generateContent: async (cfg) => {
+                capturado.generationConfig = cfg.config;
+                capturado.model = cfg.model;
+                return { text: '{"ok":true}' };
+              }
             };
           }
         },

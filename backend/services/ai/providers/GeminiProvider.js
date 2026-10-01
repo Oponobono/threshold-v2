@@ -1,6 +1,6 @@
 const geminiService = require('../../../utils/geminiService');
 const secrets = require('../../../config/secrets');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
 const { MODEL_DEFAULTS, applySamplingPolicy } = require('../../../utils/modelRegistry');
 
 const SAFETY_SETTINGS = [
@@ -17,26 +17,28 @@ class GeminiProvider {
     if (!apiKey) throw new Error('[GeminiProvider] GEMINI_API_KEY no configurada');
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
+      const genAI = new GoogleGenAI({ apiKey });
       const modelName = options.model || MODEL_DEFAULTS.gemini;
       // La politica de muestreo la decide el registry segun el modelo
       // concreto, no el llamador. Aqui se aplica y no en cada ruta, para que
       // ningun camino productiveo pueda saltarsela por descuido.
       const sampling = applySamplingPolicy(modelName, { temperature });
-      const model = genAI.getGenerativeModel({
+      
+      const userContent = messages.map(m => m.content).join('\n\n');
+      
+      const result = await genAI.models.generateContent({
         model: modelName,
-        systemInstruction: systemPrompt,
-        safetySettings: SAFETY_SETTINGS,
-        generationConfig: {
+        contents: userContent,
+        config: {
+          systemInstruction: systemPrompt,
+          safetySettings: SAFETY_SETTINGS,
           ...sampling,
           maxOutputTokens: max_tokens,
           responseMimeType: 'application/json',
-        },
+        }
       });
-
-      const userContent = messages.map(m => m.content).join('\n\n');
-      const result = await model.generateContent(userContent);
-      const responseText = result.response.text();
+      
+      const responseText = result.text;
 
       return {
         content: responseText,

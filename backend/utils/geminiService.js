@@ -17,8 +17,7 @@
  */
 
 const secrets = require('../config/secrets');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { GoogleAIFileManager } = require("@google/generative-ai/server");
+const { GoogleGenAI } = require("@google/genai");
 const fs = require("fs").promises;
 const path = require("path");
 const os = require("os");
@@ -33,7 +32,7 @@ const { analyzeCardDensity, fragmentCard } = require('./atomicCardGenerator');
 // Módulo de construcción de prompts académicos de calidad (Taxonomía de Bloom)
 const { buildAdaptivePrompt, buildSystemPrompt } = require('./academicPromptBuilder');
 
-const genAI = new GoogleGenerativeAI(secrets.GEMINI_API_KEY);
+const genAI = new GoogleGenAI({ apiKey: secrets.GEMINI_API_KEY });
 const { MODEL_DEFAULTS, callWithModelFallback, resolveAutoModel, GROQ_PRIORITY_LIST, applySamplingPolicy } = require('./modelRegistry');
 const MODEL_NAME = MODEL_DEFAULTS.gemini; // Fuente de verdad centralizada en modelRegistry
 
@@ -123,7 +122,6 @@ async function fileToBase64(filePath) {
  * @returns {Promise<{uploadResult, fileManager, wasConverted: boolean, finalMimeType: string}>}
  */
 async function uploadBufferToGemini(fileBuffer, mimeType, filename = '') {
-  const fileManager = new GoogleAIFileManager(secrets.GEMINI_API_KEY);
 
   // Conversión automática si es DOCX/DOC (documentConverter devuelve text/plain)
   const prepared = await prepareBufferForGemini(fileBuffer, mimeType, filename);
@@ -141,13 +139,13 @@ async function uploadBufferToGemini(fileBuffer, mimeType, filename = '') {
   await fs.writeFile(tempFilePath, prepared.buffer);
 
   try {
-    const uploadResult = await fileManager.uploadFile(tempFilePath, {
+    const uploadResult = await genAI.files.upload({
+      file: tempFilePath,
       mimeType: prepared.mimeType,
     });
-    console.log(`[Gemini Files API] Buffer subido a Gemini: ${uploadResult.file.uri}`);
+    console.log(`[Gemini Files API] Buffer subido a Gemini: ${uploadResult.uri}`);
     return {
       uploadResult,
-      fileManager,
       wasConverted: prepared.wasConverted,
       finalMimeType: prepared.mimeType,
     };
@@ -182,7 +180,6 @@ async function processDocumentWithFilesAPI(filePath, mimeType = null, prompt) {
     const conversionInfo = await prepareFilePathForGemini(filePath);
     console.log(`[Gemini Files API] Tipo: ${conversionInfo.originalMimeType}${conversionInfo.wasConverted ? ' → ' + conversionInfo.mimeType : ' (nativo)'}`);
 
-    const fileManager = new GoogleAIFileManager(secrets.GEMINI_API_KEY);
     let uploadResult;
 
     if (conversionInfo.needsConversion) {
@@ -193,7 +190,8 @@ async function processDocumentWithFilesAPI(filePath, mimeType = null, prompt) {
       );
       await fs.writeFile(tempPath, conversionInfo.convertedBuffer);
       try {
-        uploadResult = await fileManager.uploadFile(tempPath, {
+        uploadResult = await genAI.files.upload({
+          file: tempPath,
           mimeType: conversionInfo.mimeType,
           displayName: path.basename(filePath) + ' (converted)',
         });
@@ -206,41 +204,39 @@ async function processDocumentWithFilesAPI(filePath, mimeType = null, prompt) {
       // PDF / TXT / HTML / MD: subir el archivo original directamente
       const fileContent = await fs.readFile(filePath);
       console.log(`[Gemini Files API] Tamaño: ${(fileContent.length / 1024 / 1024).toFixed(2)}MB`);
-      uploadResult = await fileManager.uploadFile(filePath, {
+      uploadResult = await genAI.files.upload({
+        file: filePath,
         mimeType: conversionInfo.mimeType,
         displayName: path.basename(filePath),
       });
     }
 
-    console.log(`[Gemini Files API] Archivo subido: ${uploadResult.file.uri}`);
-
-    const fileData = {
-      fileData: {
-        fileUri: uploadResult.file.uri,
-        mimeType: uploadResult.file.mimeType,
-      },
-    };
+    console.log(`[Gemini Files API] Archivo subido: ${uploadResult.uri}`);
 
     const initialModel = resolveAutoModel({ provider: 'gemini', capability: 'vision' });
     const responseText = await callWithModelFallback('gemini', initialModel, async (modelId) => {
-      const model = genAI.getGenerativeModel({
+      console.log(`[Gemini Files API] Enviando a modelo ${modelId}...`);
+      const res = await genAI.models.generateContent({
         model: modelId,
-        systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
+        contents: [
+          uploadResult,
+          prompt
+        ],
+        config: {
+          systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
 Responde en español. Si el documento es muy largo, organiza la respuesta de forma clara y estructurada.
 Utiliza el contexto completo del documento para dar respuestas precisas.`,
-        safetySettings: SAFETY_SETTINGS,
+          safetySettings: SAFETY_SETTINGS,
+        }
       });
-
-      console.log(`[Gemini Files API] Enviando a modelo ${modelId}...`);
-      const res = await model.generateContent([fileData, { text: prompt }]);
-      return res.response.text();
+      return res.text;
     }, { capability: 'vision' });
 
     console.log(`[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`);
 
     // Limpieza del archivo en Gemini
     try {
-      await fileManager.deleteFile(uploadResult.file.name);
+      await genAI.files.delete({ name: uploadResult.name });
       console.log(`[Gemini Files API] Archivo temporal eliminado de Gemini`);
     } catch (e) {
       console.warn(`[Gemini Files API] No se pudo eliminar archivo de Gemini:`, e.message);
@@ -267,12 +263,14 @@ Utiliza el contexto completo del documento para dar respuestas precisas.`,
  */
 async function processTextInline(text, prompt) {
   try {
-    const model = genAI.getGenerativeModel({
+    const result = await genAI.models.generateContent({
       model: MODEL_NAME,
-      safetySettings: SAFETY_SETTINGS,
+      contents: `${text}\n\n${prompt}`,
+      config: {
+        safetySettings: SAFETY_SETTINGS,
+      }
     });
-    const result = await model.generateContent([{ text: `${text}\n\n${prompt}` }]);
-    return result.response.text();
+    return result.text;
   } catch (error) {
     console.error(`[Gemini] Error procesando texto:`, error.message);
     throw new Error(`Error en Gemini Text: ${error.message}`);
@@ -298,12 +296,6 @@ async function processAcademicChat(contextText, messages, systemPrompt, options 
     console.log(`[Gemini] Iniciando chat académico con ${messages.length} mensajes`);
     console.log(`[Gemini] Usando modelo: ${modelToUse}`);
 
-    const model = genAI.getGenerativeModel({
-      model: modelToUse,
-      systemInstruction: systemPrompt,
-      safetySettings: SAFETY_SETTINGS,
-    });
-
     // Convertir formato OpenAI a formato Gemini
     // ⚠️ El último mensaje debe ser del usuario para sendMessage()
     const contents = [];
@@ -321,15 +313,22 @@ async function processAcademicChat(contextText, messages, systemPrompt, options 
       }
     }
 
-    const chat = model.startChat({ history: contents });
+    const chat = genAI.chats.create({
+      model: modelToUse,
+      config: {
+        systemInstruction: systemPrompt,
+        safetySettings: SAFETY_SETTINGS,
+      },
+      history: contents
+    });
 
     const lastMsg = validMessages[validMessages.length - 1];
     if (!lastMsg || lastMsg.role !== "user") {
       throw new Error("El último mensaje debe ser del usuario");
     }
 
-    const result = await chat.sendMessage(lastMsg.content);
-    const responseText = result.response.text();
+    const result = await chat.sendMessage({ message: lastMsg.content });
+    const responseText = result.text;
     console.log(`[Gemini] ✅ Respuesta de chat generada (${responseText.length} chars)`);
 
     return {
@@ -420,33 +419,30 @@ async function processDocumentBuffer(fileBuffer, mimeType, prompt, filename = ''
       console.log(`[Gemini Files API] Documento convertido a ${finalMimeType} para procesamiento`);
     }
 
-    const fileData = {
-      fileData: {
-        fileUri: uploadResult.file.uri,
-        mimeType: uploadResult.file.mimeType,
-      },
-    };
-
     const initialModel = resolveAutoModel({ provider: 'gemini', capability: 'vision' });
     const responseText = await callWithModelFallback('gemini', initialModel, async (modelId) => {
-      const model = genAI.getGenerativeModel({
+      console.log(`[Gemini Files API] Enviando buffer a modelo ${modelId}...`);
+      const res = await genAI.models.generateContent({
         model: modelId,
-        systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
+        contents: [
+          uploadResult,
+          prompt
+        ],
+        config: {
+          systemInstruction: `Eres un asistente académico experto. Procesa este documento completamente sin omitir información.
 Responde en español. Si el documento es muy largo, organiza la respuesta de forma clara y estructurada.
 Utiliza el contexto completo del documento para dar respuestas precisas.`,
-        safetySettings: SAFETY_SETTINGS,
+          safetySettings: SAFETY_SETTINGS,
+        }
       });
-
-      console.log(`[Gemini Files API] Enviando buffer a modelo ${modelId}...`);
-      const res = await model.generateContent([fileData, { text: prompt }]);
-      return res.response.text();
+      return res.text;
     }, { capability: 'vision' });
 
     console.log(`[Gemini Files API] ✅ Respuesta generada (${responseText.length} caracteres)`);
 
     // Limpieza
     try {
-      await fileManager.deleteFile(uploadResult.file.name);
+      await genAI.files.delete({ name: uploadResult.name });
     } catch (e) {
       console.warn(`[Gemini Files API] No se pudo eliminar archivo:`, e.message);
     }
@@ -498,28 +494,25 @@ CERO meta-datos. CERO trivialidades. TODO análisis/síntesis/evaluación.`;
       console.log(`[Gemini] Documento convertido a ${finalMimeType} para flashcards`);
     }
 
-    const fileData = {
-      fileData: {
-        fileUri: uploadResult.file.uri,
-        mimeType: uploadResult.file.mimeType,
-      },
-    };
-
     const initialModel = resolveAutoModel({ provider: 'gemini', capability: 'vision' });
     const response = await callWithModelFallback('gemini', initialModel, async (modelId) => {
-      const model = genAI.getGenerativeModel({
-        model: modelId,
-        safetySettings: SAFETY_SETTINGS,
-      });
-
       console.log(`[Gemini] Enviando a modelo ${modelId}...`);
-      const result = await model.generateContent([fileData, { text: finalPrompt }]);
-      return result.response.text();
+      const result = await genAI.models.generateContent({
+        model: modelId,
+        contents: [
+          uploadResult,
+          finalPrompt
+        ],
+        config: {
+          safetySettings: SAFETY_SETTINGS,
+        }
+      });
+      return result.text;
     }, { capability: 'vision' });
 
     // Limpieza
     try {
-      await fileManager.deleteFile(uploadResult.file.name);
+      await genAI.files.delete({ name: uploadResult.name });
     } catch (e) {
       console.warn(`[Gemini] No se pudo eliminar archivo:`, e.message);
     }
@@ -559,14 +552,7 @@ async function generateFlashcardsFromText(contextText, count = 10) {
   try {
     console.log(`[Gemini] Generando ${count} flashcards desde texto (${contextText.length} chars)`);
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
-      safetySettings: SAFETY_SETTINGS,
-      // Politica de muestreo segun el modelo (ver config/aiModels.js). Se
-      // aplica aqui y no en el llamador para que este camino no se quede
-      // envio de parametros que el modelo ignora.
-      generationConfig: applySamplingPolicy(MODEL_NAME, { temperature: 0.15 }),
-    });
+    const modelSampling = applySamplingPolicy(MODEL_NAME, { temperature: 0.15 });
 
     // Auto-detectar disciplina y usar prompt especializado
     const systemPrompt = buildAdaptivePrompt('mixed', count, contextText, 'posgrado');
@@ -596,8 +582,15 @@ REQUISITOS OBLIGATORIOS:
 
 Responde ÚNICAMENTE el array JSON. CERO texto adicional.`;
 
-    const result = await model.generateContent([{ text: finalPrompt }]);
-    const response = result.response.text();
+    const result = await genAI.models.generateContent({
+      model: MODEL_NAME,
+      contents: finalPrompt,
+      config: {
+        safetySettings: SAFETY_SETTINGS,
+        ...modelSampling,
+      }
+    });
+    const response = result.text;
 
     // Parsear respuesta JSON
     const jsonMatch = response.match(/\[[\s\S]*\]/);
