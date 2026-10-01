@@ -45,6 +45,35 @@ const TRANSIENT_MAX_MS = 5 * 60 * 1000;
 const PERSISTENT_COOLDOWN_THRESHOLD = 12;
 
 /**
+ * Subcadenas que identifican un fallo de RED o de timeout, no un rechazo del
+ * modelo. Vive aqui y no en cada consumidor porque ya ocurrio el fallo: el
+ * clasificador reconocia "socket hang up" y "fetch failed", el traductor de
+ * errores de la API los ignoraba, y los dos modulos dejaron de estar de
+ * acuerdo sobre que es un timeout. Una sola lista, un solo criterio.
+ */
+const SENALES_DE_RED = [
+  'timeout',
+  'timed out',
+  'econnreset',
+  'etimedout',
+  'econnrefused',
+  'econnaborted',
+  'enotfound',
+  'eai_again',
+  'fetch failed',
+  'socket hang up',
+  'abort_err',
+  'und_err_socket',
+];
+
+const REGEX_DE_RED = new RegExp(SENALES_DE_RED.join('|'), 'i');
+
+/** ¿El texto de este error es un fallo de red o de timeout? */
+function esFalloDeRed(msg = '') {
+  return REGEX_DE_RED.test(msg);
+}
+
+/**
  * @typedef {Object} HealthVerdict
  * @property {'dead'|'transient'|'incompatible'|'auth'|'fatal'} class
  * @property {string} reason   Texto corto y legible para diagnostico.
@@ -145,9 +174,7 @@ function classifyError(err, ctx = {}) {
     };
   }
 
-  if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('econnreset') ||
-      msg.includes('etimedout') || msg.includes('econnrefused') || msg.includes('enotfound') ||
-      msg.includes('fetch failed') || msg.includes('socket hang up')) {
+  if (esFalloDeRed(msg)) {
     return { class: 'transient', reason: 'fallo de red' };
   }
 
@@ -309,6 +336,8 @@ function reset() {
 }
 
 module.exports = {
+  SENALES_DE_RED,
+  esFalloDeRed,
   classifyError,
   isDead,
   isCoolingDown,
