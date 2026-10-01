@@ -13,7 +13,7 @@ const cors = require('cors');
 const multer = require('multer');
 const { db, initializeDb } = require('./db');
 const { swaggerUi, specs } = require('./swagger');
-const helmet = require('helmet');
+const { default: helmet } = require('helmet');
 const { globalLimiter } = require('./middlewares/rateLimiter');
 const os = require('os');
 
@@ -285,7 +285,7 @@ function startServer(port, retriesLeft) {
   // Mantiene una referencia activa del socket del servidor.
   server.ref();
 
-  server.on('error', (err) => {
+  server.on('error', (/** @type {NodeJS.ErrnoException} */ err) => {
     if (err.code === 'EADDRINUSE' && retriesLeft > 0) {
       const nextPort = port + 1;
       console.warn(`Puerto ${port} en uso. Reintentando en ${nextPort}...`);
