@@ -134,12 +134,13 @@ function buildExhaustedError(provider, capability, attempts, exhaustedCode) {
   const lines = attempts.map(
     (a) => `  - ${a.model}: ${a.reason}${a.status ? ` (HTTP ${a.status})` : ''}`
   );
-  const err = new Error(
-    `Sin modelos disponibles en ${provider} para '${capability}'. Ningun candidato de `
-    + `config/aiModels.js respondio:\n${lines.join('\n')}`
+  const err = Object.assign(
+    new Error(
+      `Sin modelos disponibles en ${provider} para '${capability}'. Ningun candidato de `
+      + `config/aiModels.js respondio:\n${lines.join('\n')}`
+    ),
+    { code: exhaustedCode, attempts }
   );
-  err.code = exhaustedCode;
-  err.attempts = attempts;
   return err;
 }
 
@@ -186,6 +187,7 @@ function extractText(result, custom) {
   // Bloques de contenido multimodal: [{type:'text', text:'...'}]
   if (Array.isArray(result.content)) return extractText(result.content);
 
+  if (typeof result.reply?.content === 'string') return result.reply.content.trim();
   for (const clave of ['content', 'text', 'transcript', 'output']) {
     if (typeof result[clave] === 'string') return result[clave].trim();
   }
@@ -203,12 +205,13 @@ async function callWithModelFallback(provider, requestedModelId, apiCallFn, opti
   const exhaustedCode = `${provider.toUpperCase()}_ALL_MODELS_EXHAUSTED`;
 
   if (health.isProviderBlocked(provider)) {
-    const err = new Error(
-      `Provider ${provider} bloqueado por credencial rechazada (401/403). `
-      + 'No se reintentan modelos; revisa la API key del provider.'
+    throw Object.assign(
+      new Error(
+        `Provider ${provider} bloqueado por credencial rechazada (401/403). `
+        + 'No se reintentan modelos; revisa la API key del provider.'
+      ),
+      { code: `${provider.toUpperCase()}_AUTH_BLOCKED` }
     );
-    err.code = `${provider.toUpperCase()}_AUTH_BLOCKED`;
-    throw err;
   }
 
   const key = useKeyFor(provider, capability);
@@ -285,19 +288,19 @@ async function callWithModelFallback(provider, requestedModelId, apiCallFn, opti
       if (verdict.class === 'auth') {
         health.blockProvider(provider);
         attempts.push({ model: entry.id, reason: verdict.reason, status: verdict.status });
-        const fatal = new Error(`Provider ${provider}: ${verdict.reason}`);
-        fatal.code = `${provider.toUpperCase()}_AUTH_BLOCKED`;
-        fatal.attempts = attempts;
-        throw fatal;
+        throw Object.assign(new Error(`Provider ${provider}: ${verdict.reason}`), {
+          code: `${provider.toUpperCase()}_AUTH_BLOCKED`,
+          attempts,
+        });
       }
 
       if (verdict.class === 'fatal') {
         attempts.push({ model: entry.id, reason: verdict.reason, status: verdict.status });
-        const propagated = new Error(`[modelRegistry] ${provider} fallo en ${entry.id}: ${verdict.reason}`);
-        propagated.code = 'MODEL_CALL_FAILED';
-        propagated.original = err;
-        propagated.attempts = attempts;
-        throw propagated;
+        throw Object.assign(new Error(`[modelRegistry] ${provider} fallo en ${entry.id}: ${verdict.reason}`), {
+          code: 'MODEL_CALL_FAILED',
+          original: err,
+          attempts,
+        });
       }
 
       health.record(entry.id, verdict);
@@ -323,13 +326,13 @@ async function fetchProviderCatalog(provider) {
         headers: { Authorization: `Bearer ${secrets.GROQ_API_KEY}` },
       });
       if (!res.ok) return null;
-      const data = await res.json();
+      const data = /** @type {{ data: Array<{ id: string }> }} */ (await res.json());
       return (data.data || []).map((m) => ({ id: m.id, name: m.id, provider: 'groq' }));
     }
     if (!secrets.GEMINI_API_KEY) return null;
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${secrets.GEMINI_API_KEY}`);
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = /** @type {{ models: Array<{ name: string, displayName?: string }> }} */ (await res.json());
     return (data.models || [])
       .map((m) => ({ id: String(m.name).replace('models/', ''), name: m.displayName || m.name, provider: 'gemini' }))
       .filter((m) => m.id.startsWith('gemini-'));
@@ -437,10 +440,10 @@ const VISION_PROBE_PNG_BASE64 =
 /**
  * Verifica un modelo con una invocacion minima. /models no sirve como prueba de
  * disponibilidad: gemini-2.5-flash aparecia listado y respondia 404 al usarlo.
- * @returns {Promise<{model:string, ok:boolean, status:number|null, reason:string}>}
+ * @returns {Promise<{model:string, ok:boolean, status:number|null, reason:string, verdict:object|null, class:string|null}>}
  */
 async function healthCheckModel(provider, modelId, capability = 'text') {
-  const verdict = { model: modelId, ok: false, status: null, reason: '' };
+  const verdict = { model: modelId, ok: false, status: null, reason: '', verdict: null, class: null };
   try {
     const prompt = HEALTH_PROMPTS[provider] || 'ok';
     // Para vision hay que mandar una imagen de verdad. Con solo texto, un modelo
