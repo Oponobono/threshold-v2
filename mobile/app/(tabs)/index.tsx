@@ -1,6 +1,6 @@
 import { RepositoryFactory } from '../../src/services/database/RepositoryFactory';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, FlatList, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Modal, Pressable, FlatList, RefreshControl, Animated } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { alertRef } from '../../src/components/ui/CustomAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,10 +51,10 @@ import { dashboardTelemetry } from '../../src/performance/DashboardTelemetry';
 
 
 
-const SUBJECT_LOOP_THRESHOLD = 4;
-const SUBJECT_LOOP_MULTIPLIER = 16;
 const SUBJECT_CARD_WIDTH = 144;
 const SUBJECT_CARD_GAP = 10;
+const CAROUSEL_NAV_THRESHOLD = 3;
+
 
 
 export default function HybridDashboardScreen() {
@@ -125,6 +125,22 @@ export default function HybridDashboardScreen() {
   const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const subjectsCarouselRef = useRef<FlatList<any> | null>(null);
+  const [carouselAtEnd, setCarouselAtEnd] = useState(false);
+  const carouselNavRotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(carouselNavRotation, {
+      toValue: carouselAtEnd ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [carouselAtEnd]);
+
+  const navRotateInterpolation = carouselNavRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '-180deg'],
+  });
+
   
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayText, setOverlayText] = useState<string | null>(null);
@@ -330,7 +346,7 @@ export default function HybridDashboardScreen() {
 
   const profileAvatarUri = localProfileImageUri || profile?.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(nickname || t('dashboard.defaultUser'))}&background=EDEEF2&color=111111&bold=true`;
 
-  const shouldUseInfiniteCarousel = subjects.length > SUBJECT_LOOP_THRESHOLD;
+
 
   const enrichedSubjects = useMemo(() => {
     return subjects.map((s) => {
@@ -353,6 +369,8 @@ export default function HybridDashboardScreen() {
     }
     return enrichedSubjects; // 'all'
   }, [enrichedSubjects, selectedDashboardCourseId]);
+
+
 
   const selectedCourse = useMemo(() => {
     if (!selectedDashboardCourseId || selectedDashboardCourseId === 'independent') return null;
@@ -394,20 +412,21 @@ export default function HybridDashboardScreen() {
     }
   }, [selectedCourse]);
 
-  const carouselSubjects = useMemo(() => {
-    if (!filteredEnrichedSubjects.length) return [] as (Subject & { __key: string })[];
-    const base = filteredEnrichedSubjects;
-    if (base.length <= SUBJECT_LOOP_THRESHOLD) {
-      return base.map(subject => ({ ...subject, __key: subject.id }));
-    }
-    const result: (Subject & { __key: string })[] = [];
-    for (let loop = 0; loop < SUBJECT_LOOP_MULTIPLIER; loop++) {
-      for (const subject of base) {
-        result.push({ ...subject, __key: `${subject.id}-${loop}` });
-      }
-    }
-    return result;
-  }, [filteredEnrichedSubjects]);
+  const carouselSubjects = useMemo(() =>
+    filteredEnrichedSubjects.map(subject => ({ ...subject, __key: subject.id })),
+    [filteredEnrichedSubjects]
+  );
+
+  const scrollCarouselToStart = useCallback(() => {
+    subjectsCarouselRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  const scrollCarouselToEnd = useCallback(() => {
+    if (!carouselSubjects.length) return;
+    subjectsCarouselRef.current?.scrollToEnd({ animated: true });
+  }, [carouselSubjects.length]);
+
+
 
   // Items para el hero carousel: tarjeta "Todas" + un card por curso + "Independientes" si hay
   const heroCourseItems = useMemo(() => {
@@ -422,6 +441,7 @@ export default function HybridDashboardScreen() {
 
   const handleHeroCardSelect = useCallback((courseId: string | null) => {
     setSelectedDashboardCourseId(courseId);
+    setCarouselAtEnd(false);
     subjectsCarouselRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, []);
 
@@ -485,27 +505,6 @@ export default function HybridDashboardScreen() {
     });
   }, [heroCourseItems, enrichedSubjects, courses, assessments, knowledgeSnapshot, globalHeroPresenter, courseHeroPresenter]);
 
-  const initialScrollIndex = useMemo(() => {
-    if (!shouldUseInfiniteCarousel || !subjects.length) return 0;
-    return Math.floor(SUBJECT_LOOP_MULTIPLIER / 2) * subjects.length;
-  }, [subjects.length, shouldUseInfiniteCarousel]);
-
-  const normalizeCarouselPosition = (xOffset: number) => {
-    if (!shouldUseInfiniteCarousel || !subjectsCarouselRef.current || !subjects.length) return;
-
-    const itemSpan = SUBJECT_CARD_WIDTH + SUBJECT_CARD_GAP;
-    const rawIndex = Math.round(xOffset / itemSpan);
-    const lowerBoundary = subjects.length * 2;
-    const upperBoundary = subjects.length * (SUBJECT_LOOP_MULTIPLIER - 2);
-
-    if (rawIndex <= lowerBoundary || rawIndex >= upperBoundary) {
-      const normalizedIndex = ((rawIndex % subjects.length) + subjects.length) % subjects.length;
-      const targetIndex = initialScrollIndex + normalizedIndex;
-      requestAnimationFrame(() => {
-        subjectsCarouselRef.current?.scrollToIndex({ index: targetIndex, animated: false });
-      });
-    }
-  };
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -981,13 +980,32 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
 
           {/* Subjects carousel filtered by active course */}
           <View style={{ marginTop: 16 }}>
-            <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>
-              {selectedDashboardCourseId === null
-                ? 'Todas las materias'
-                : selectedDashboardCourseId === 'independent'
-                ? 'Materias independientes'
-                : courses.find(c => c.id === selectedDashboardCourseId)?.name ?? 'Materias'}
-            </Text>
+            {/* Carousel title row: title + single context-aware nav button when > threshold */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
+                {selectedDashboardCourseId === null
+                  ? 'Todas las materias'
+                  : selectedDashboardCourseId === 'independent'
+                  ? 'Materias independientes'
+                  : courses.find(c => c.id === selectedDashboardCourseId)?.name ?? 'Materias'}
+              </Text>
+              {filteredEnrichedSubjects.length > CAROUSEL_NAV_THRESHOLD && (
+                <TouchableOpacity
+                  onPress={carouselAtEnd ? scrollCarouselToStart : scrollCarouselToEnd}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityLabel={carouselAtEnd ? 'Ir al inicio' : 'Ir al final'}
+                  accessibilityRole="button"
+                >
+                  <Animated.View style={{ transform: [{ rotate: navRotateInterpolation }] }}>
+                    <Ionicons
+                    name="arrow-forward"
+                    size={15}
+                    color={theme.colors.text.secondary}
+                  />
+                  </Animated.View>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {filteredEnrichedSubjects.length === 0 ? (
               <View style={styles.emptySubjectsCard}>
@@ -1011,6 +1029,12 @@ Te avisa qué tan cerca estás de olvidar lo que ya aprendiste. Muestra el porce
                   offset: (SUBJECT_CARD_WIDTH + SUBJECT_CARD_GAP) * index,
                   index,
                 })}
+                scrollEventThrottle={16}
+                onScroll={(e) => {
+                  const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+                  const atEnd = contentOffset.x + layoutMeasurement.width >= contentSize.width - 8;
+                  setCarouselAtEnd(atEnd);
+                }}
               />
             )}
           </View>

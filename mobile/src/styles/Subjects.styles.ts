@@ -28,19 +28,19 @@ export const subjectsStyles = StyleSheet.create({
 
   // ── Semester Hero ──
   semesterHero: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1A233A',
     borderRadius: 14,
     padding: SPACING.CARD,
     marginBottom: SPACING.SECTION,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
     position: 'relative',
     shadowColor: '#000',
-    shadowRadius: 6,
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    shadowRadius: 10,
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   gpaAmbientGlow: {
     position: 'absolute',
@@ -49,7 +49,7 @@ export const subjectsStyles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(99, 102, 241, 0.05)',
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
   },
   heroArc1: {
     position: 'absolute',
@@ -59,7 +59,7 @@ export const subjectsStyles = StyleSheet.create({
     marginTop: -60, marginLeft: -60,
     borderRadius: 60,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.08)',
+    borderColor: 'rgba(99, 102, 241, 0.2)',
     backgroundColor: 'transparent',
   },
   heroArc2: {
@@ -70,7 +70,7 @@ export const subjectsStyles = StyleSheet.create({
     marginTop: -85, marginLeft: -85,
     borderRadius: 85,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.05)',
+    borderColor: 'rgba(99, 102, 241, 0.15)',
     backgroundColor: 'transparent',
   },
   heroArc3: {
@@ -81,7 +81,7 @@ export const subjectsStyles = StyleSheet.create({
     marginTop: -115, marginLeft: -115,
     borderRadius: 115,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.03)',
+    borderColor: 'rgba(99, 102, 241, 0.1)',
     backgroundColor: 'transparent',
   },
   heroContentRow: {
@@ -101,9 +101,9 @@ export const subjectsStyles = StyleSheet.create({
     marginTop: SPACING.CARD,
     paddingVertical: 10,
     paddingHorizontal: SPACING.CARD,
-    backgroundColor: theme.colors.card,
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderTopWidth: 0.5,
-    borderTopColor: theme.colors.border,
+    borderTopColor: 'rgba(255,255,255,0.06)',
   },
   heroEngineChip: {
     flexDirection: 'row',
@@ -112,14 +112,14 @@ export const subjectsStyles = StyleSheet.create({
   },
   heroEngineSep: {
     fontSize: 10,
-    color: theme.colors.text.secondary,
+    color: 'rgba(255,255,255,0.4)',
     fontWeight: '300',
   },
   heroEngineIcon: { fontSize: 10 },
   heroEngineText: {
     fontSize: 10,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
     letterSpacing: 0.1,
   },
   gpaContainer: {
@@ -135,14 +135,14 @@ export const subjectsStyles = StyleSheet.create({
   },
   miniCard: {
     width: '47%',
-    backgroundColor: theme.colors.card,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 0.5,
-    borderColor: theme.colors.border,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   miniCardInRisk: {
     width: '47%',
@@ -158,7 +158,7 @@ export const subjectsStyles = StyleSheet.create({
   miniCardTitle: {
     fontSize: 8,
     fontWeight: '700',
-    color: theme.colors.text.secondary,
+    color: 'rgba(255,255,255,0.6)',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     marginBottom: 2,
@@ -174,7 +174,7 @@ export const subjectsStyles = StyleSheet.create({
   miniCardValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
     fontFamily: 'monospace',
     letterSpacing: -0.5,
   },
@@ -188,7 +188,7 @@ export const subjectsStyles = StyleSheet.create({
   miniCardSub: {
     fontSize: 10,
     fontWeight: '300',
-    color: theme.colors.text.secondary,
+    color: 'rgba(255,255,255,0.4)',
   },
   semesterGpaCircle: {
     width: 72,
@@ -198,18 +198,18 @@ export const subjectsStyles = StyleSheet.create({
     borderColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(99, 102, 241, 0.06)',
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
     shadowColor: '#6366f1',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
   semesterGpaValue: {
-    fontSize: 28, fontWeight: '200', color: theme.colors.text.primary,
+    fontSize: 28, fontWeight: '200', color: '#FFFFFF',
     letterSpacing: -1,
   },
   semesterGpaLabel: {
-    fontSize: 7, fontWeight: '600', color: theme.colors.text.secondary,
+    fontSize: 7, fontWeight: '600', color: 'rgba(255,255,255,0.6)',
     textTransform: 'uppercase', letterSpacing: 0.8, marginTop: -2,
   },
 

@@ -341,6 +341,63 @@ export const AllSubjectsHeroCard = React.memo(({ viewModel: vm, isActive, onPres
   return (
     <View style={{ overflow: 'visible' }} onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}>
       <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={[cHCardStyles.cardGlobal, isActive && cHCardStyles.cardActiveGlobal]}>
+        {/* Academic Background Symbols */}
+        <View style={cHCardStyles.academicBgContainer}>
+          <Text style={[cHCardStyles.academicSymbol, { top: '8%', left: '80%', fontSize: 20, transform: [{ rotate: '15deg' }] }]}>∑</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '65%', left: '85%', fontSize: 18, transform: [{ rotate: '-10deg' }] }]}>⌬</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '75%', left: '15%', fontSize: 16, transform: [{ rotate: '25deg' }] }]}>§</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '15%', left: '10%', fontSize: 22, transform: [{ rotate: '-15deg' }] }]}>¥</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '45%', left: '45%', fontSize: 24, transform: [{ rotate: '5deg' }] }]}>⚕</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '80%', left: '55%', fontSize: 18, transform: [{ rotate: '-20deg' }] }]}>{'{ }'}</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '25%', left: '50%', fontSize: 16, transform: [{ rotate: '30deg' }] }]}>♫</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '50%', left: '5%', fontSize: 20, transform: [{ rotate: '-5deg' }] }]}>△</Text>
+          
+          <Text style={[cHCardStyles.academicSymbol, { top: '10%', left: '35%', fontSize: 18, transform: [{ rotate: '45deg' }] }]}>α</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '30%', left: '90%', fontSize: 14, transform: [{ rotate: '-30deg' }] }]}>≈</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '40%', left: '20%', fontSize: 22, transform: [{ rotate: '10deg' }] }]}>±</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '60%', left: '35%', fontSize: 18, transform: [{ rotate: '-45deg' }] }]}>μ</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '25%', left: '70%', fontSize: 16, transform: [{ rotate: '0deg' }] }]}>{'</>'}</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '85%', left: '30%', fontSize: 20, transform: [{ rotate: '20deg' }] }]}>λ</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '55%', left: '70%', fontSize: 16, transform: [{ rotate: '-15deg' }] }]}>∀</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '90%', left: '80%', fontSize: 14, transform: [{ rotate: '35deg' }] }]}>∞</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '5%', left: '60%', fontSize: 16, transform: [{ rotate: '-25deg' }] }]}>β</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '70%', left: '5%', fontSize: 18, transform: [{ rotate: '15deg' }] }]}>Ω</Text>
+
+          {/* Third Wave: More Density & Diversity */}
+          <Text style={[cHCardStyles.academicSymbol, { top: '12%', left: '20%', fontSize: 16, transform: [{ rotate: '30deg' }] }]}>θ</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '35%', left: '8%', fontSize: 20, transform: [{ rotate: '-15deg' }] }]}>∇</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '48%', left: '88%', fontSize: 16, transform: [{ rotate: '10deg' }] }]}>∮</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '82%', left: '10%', fontSize: 18, transform: [{ rotate: '-5deg' }] }]}>∴</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '18%', left: '95%', fontSize: 14, transform: [{ rotate: '25deg' }] }]}>∩</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '68%', left: '65%', fontSize: 22, transform: [{ rotate: '-10deg' }] }]}>∅</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '38%', left: '78%', fontSize: 16, transform: [{ rotate: '5deg' }] }]}>€</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '75%', left: '40%', fontSize: 18, transform: [{ rotate: '-35deg' }] }]}>⊥</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '22%', left: '30%', fontSize: 20, transform: [{ rotate: '15deg' }] }]}>[ ]</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '55%', left: '25%', fontSize: 16, transform: [{ rotate: '-25deg' }] }]}>γ</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '88%', left: '68%', fontSize: 14, transform: [{ rotate: '20deg' }] }]}>∠</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '5%', left: '48%', fontSize: 18, transform: [{ rotate: '-10deg' }] }]}>∄</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '92%', left: '45%', fontSize: 16, transform: [{ rotate: '0deg' }] }]}>¢</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '32%', left: '60%', fontSize: 18, transform: [{ rotate: '12deg' }] }]}>⚖</Text>
+
+          {/* Fourth Wave: Sciences, Programming, Humanities, History & Religion */}
+          <Text style={[cHCardStyles.academicSymbol, { top: '42%', left: '55%', fontSize: 24, transform: [{ rotate: '0deg' }] }]}>⚛</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '78%', left: '25%', fontSize: 22, transform: [{ rotate: '15deg' }] }]}>⚗</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '62%', left: '15%', fontSize: 16, transform: [{ rotate: '-10deg' }] }]}>{'/* */'}</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '15%', left: '60%', fontSize: 14, transform: [{ rotate: '0deg' }] }]}>{'=>'}</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '50%', left: '80%', fontSize: 18, transform: [{ rotate: '45deg' }] }]}>⚔</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '28%', left: '40%', fontSize: 22, transform: [{ rotate: '-5deg' }] }]}>♚</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '85%', left: '90%', fontSize: 16, transform: [{ rotate: '-20deg' }] }]}>☯</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '8%', left: '5%', fontSize: 24, transform: [{ rotate: '10deg' }] }]}>✝</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '35%', left: '25%', fontSize: 22, transform: [{ rotate: '5deg' }] }]}>☪</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '58%', left: '55%', fontSize: 20, transform: [{ rotate: '30deg' }] }]}>✡</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '72%', left: '80%', fontSize: 24, transform: [{ rotate: '-15deg' }] }]}>ॐ</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '22%', left: '85%', fontSize: 18, transform: [{ rotate: '10deg' }] }]}>✒</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '90%', left: '20%', fontSize: 16, transform: [{ rotate: '-30deg' }] }]}>¶</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '65%', left: '45%', fontSize: 20, transform: [{ rotate: '-5deg' }] }]}>♬</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '48%', left: '35%', fontSize: 16, transform: [{ rotate: '15deg' }] }]}>♀</Text>
+          <Text style={[cHCardStyles.academicSymbol, { top: '25%', left: '15%', fontSize: 16, transform: [{ rotate: '-25deg' }] }]}>♂</Text>
+        </View>
+
         {/* Header: Panel Principal + Health Score */}
         <View style={cHCardStyles.globalHeaderBadgeRow}>
           <View style={cHCardStyles.globalPlatformBadge}>
