@@ -24,7 +24,8 @@ const tableSchema = {
         display_name TEXT,
         profile_image TEXT,
         reset_token TEXT,
-        reset_token_expiry DATETIME
+        reset_token_expiry DATETIME,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `,
     postgres: `
@@ -49,7 +50,8 @@ const tableSchema = {
         display_name TEXT,
         profile_image TEXT,
         reset_token TEXT,
-        reset_token_expiry TIMESTAMP
+        reset_token_expiry TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `,
     columns: [
@@ -70,7 +72,8 @@ const tableSchema = {
       { name: 'active_grading_version_id', type: 'INTEGER' },
       { name: 'approval_threshold', type: 'REAL DEFAULT 50.0' },
       { name: 'reset_token', type: 'TEXT' },
-      { name: 'reset_token_expiry', type: 'TIMESTAMP' }
+      { name: 'reset_token_expiry', type: 'TIMESTAMP' },
+      { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }
     ]
   },
   deleted_users: {

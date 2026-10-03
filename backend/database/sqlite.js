@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const tableSchema = require('./schema');
+const { migrateColumnsSqlite } = require('./migrations');
 const { seedGradingSystemsSqlite } = require('./seeders');
 
 // Promisify db.run, db.get, db.all for sequential execution
@@ -49,6 +50,10 @@ const initializeSqliteDb = async (db) => {
       try {
         const result = await dbRun(db, schema.sqlite);
         console.log(`✓ Tabla creada/verificada: ${tableName}`, result);
+        
+        if (schema.columns) {
+          await migrateColumnsSqlite(db, tableName, schema.columns);
+        }
       } catch (err) {
         console.error(`❌ Error creando tabla ${tableName}:`, err.message);
       }
