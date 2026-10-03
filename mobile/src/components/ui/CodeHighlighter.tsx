@@ -88,6 +88,21 @@ const initializeHighlightJS = () => {
     hljs.registerLanguage('graphql', require('highlight.js/lib/languages/graphql'));
     hljs.registerLanguage('mongodb', require('highlight.js/lib/languages/javascript'));
     hljs.registerLanguage('mongo', require('highlight.js/lib/languages/javascript'));
+    hljs.registerLanguage('yaml', require('highlight.js/lib/languages/yaml'));
+    hljs.registerLanguage('yml', require('highlight.js/lib/languages/yaml'));
+    hljs.registerLanguage('dockerfile', require('highlight.js/lib/languages/dockerfile'));
+    hljs.registerLanguage('docker', require('highlight.js/lib/languages/dockerfile'));
+    hljs.registerLanguage('toml', require('highlight.js/lib/languages/ini'));
+    hljs.registerLanguage('ini', require('highlight.js/lib/languages/ini'));
+    hljs.registerLanguage('makefile', require('highlight.js/lib/languages/makefile'));
+    hljs.registerLanguage('nginx', require('highlight.js/lib/languages/nginx'));
+    hljs.registerLanguage('http', require('highlight.js/lib/languages/http'));
+    hljs.registerLanguage('markdown', require('highlight.js/lib/languages/markdown'));
+    hljs.registerLanguage('md', require('highlight.js/lib/languages/markdown'));
+    hljs.registerLanguage('diff', require('highlight.js/lib/languages/diff'));
+    hljs.registerLanguage('plaintext', require('highlight.js/lib/languages/plaintext'));
+    hljs.registerLanguage('text', require('highlight.js/lib/languages/plaintext'));
+    hljs.registerLanguage('txt', require('highlight.js/lib/languages/plaintext'));
 
     initialized = true;
   } catch (error) {
@@ -198,7 +213,13 @@ export const CodeHighlighter: React.FC<CodeHighlighterProps> = ({
     try {
       if (language && language !== 'plaintext') {
         try {
-          const result = hljs.highlight(code, { language, ignoreIllegals: true });
+          // Verificar que el lenguaje esté registrado antes de intentar highlight.
+          // Si no lo está, hljs.highlight lanza sincrónicamente y el error
+          // se propaga fuera del useMemo antes de que el catch interno lo atrape.
+          const lang = hljs.getLanguage(language) ? language : null;
+          const result = lang
+            ? hljs.highlight(code, { language: lang, ignoreIllegals: true })
+            : hljs.highlightAuto(code);
           highlightedHTML = result.value;
         } catch {
           try {
