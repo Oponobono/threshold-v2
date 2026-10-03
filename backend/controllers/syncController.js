@@ -18,7 +18,7 @@ exports.initialSync = (req, res) => {
     user: `SELECT id, email, name, lastname, username, major, university, semester,
                   study_goal, reference_language, profile_image, share_pin,
                   active_grading_version_id, last_login, status,
-                  created_at, updated_at
+                  created_at
            FROM users WHERE id = ?`,
     courses: `SELECT * FROM courses WHERE user_id = ?`,
     subjects: `SELECT * FROM subjects WHERE user_id = ?`,
