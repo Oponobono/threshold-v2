@@ -46,4 +46,12 @@ const secrets = {
     UPLOADTHING_TOKEN: getSecret('UPLOADTHING_TOKEN', null, isProd),
 };
 
+// 🔐 FAIL-FAST: JWT_SECRET es no-negociable en producción.
+// Un secreto faltante degrada silenciosamente en un 403 permanente
+// indistinguible de un token de usuario malo. Es mejor fallar en el arranque.
+if (isProd && !secrets.JWT_SECRET) {
+    console.error('[🚨 FATAL] JWT_SECRET no está configurado en producción. El servidor no puede firmar ni verificar tokens. Agrega JWT_SECRET a tus variables de entorno en Render.');
+    process.exit(1);
+}
+
 module.exports = secrets;

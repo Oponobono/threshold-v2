@@ -384,6 +384,8 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
 
   const customInit = { ...init, headers, body: modifiedBody };
 
+  let authRejectedCount = 0;
+
   for (const base of candidates) {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -405,6 +407,18 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
 
       const response = await fetch(fullUrl, requestInit);
       if (timeoutId) clearTimeout(timeoutId);
+
+      // 🔐 Si el backend rechaza el token (401/403 con token presente), continuar
+      // al siguiente candidato. El token puede ser válido para otro backend (p.ej.,
+      // firmado con el JWT_SECRET del servidor local, no el de Render).
+      if ((response.status === 401 || response.status === 403) && token) {
+        console.warn(`[⚠ API] Auth rechazado en ${base.split('/api')[0]} (${response.status}). Intentando siguiente candidato...`);
+        recordUrlFailure(base);
+        authRejectedCount++;
+        // Guardamos como lastError para poder lanzarlo si todos fallan
+        lastError = buildApiError('Token inválido o expirado.');
+        continue;
+      }
 
       // ✅ Restaurar URL en caso de éxito
       if (response.ok) {
@@ -464,6 +478,16 @@ export const fetchWithFallback = async (path: string, init?: RequestInit): Promi
       recordUrlFailure(base);
       lastError = error;
     }
+  }
+
+  // 🔐 Si TODOS los candidatos rechazaron el token por auth inválido, el token está
+  // muerto (firmado por otro backend o expirado). Forzar logout inmediato para que
+  // el usuario vuelva a iniciar sesión y obtenga un token fresco del backend correcto.
+  if (authRejectedCount > 0 && authRejectedCount === candidates.length) {
+    console.warn('[Auth] ⚠ Token rechazado por todos los backends. Forzando cierre de sesión...');
+    // Fire-and-forget: no bloqueamos el throw con la promesa del signOut
+    import('./auth/session').then(({ signOut }) => signOut()).catch(() => {});
+    throw buildApiError('Sesión expirada. Por favor, inicia sesión nuevamente.');
   }
 
   // 🛡️ Activar circuit breaker: todas las URLs fallaron
