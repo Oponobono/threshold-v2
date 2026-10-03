@@ -34,16 +34,22 @@ class AIOrchestrator {
       this._cacheInitialized = true;
     }
 
+    // La caché semántica solo aplica a preguntas atómicas (sin historial).
+    // En conversaciones multi-turno, el match semántico ignora el contexto
+    // previo y puede devolver una respuesta de otra sesión sin relación.
+    const isMultiTurn = req.messages.filter(m => m.role !== 'system').length > 1;
     const queryText = req.messages.map(m => m.content).join('\n');
-    const cached = await semanticCache.get(queryText);
-    if (cached) {
-      return {
-        content: cached,
-        provider: 'cache',
-        model: 'semantic',
-        latencyMs: 0,
-        cached: true,
-      };
+    if (!isMultiTurn) {
+      const cached = await semanticCache.get(queryText);
+      if (cached) {
+        return {
+          content: cached,
+          provider: 'cache',
+          model: 'semantic',
+          latencyMs: 0,
+          cached: true,
+        };
+      }
     }
 
     const ctx = this._buildContext();
@@ -66,7 +72,7 @@ class AIOrchestrator {
 
     try {
       const result = await provider.chat(req);
-      if (result.content.length > 20) {
+      if (!isMultiTurn && result.content.length > 20) {
         await semanticCache.set(queryText, result.content, result.model);
       }
       return result;
@@ -80,7 +86,7 @@ class AIOrchestrator {
         const fallbackAvailable = await fallback.isAvailable();
         if (fallbackAvailable) {
           const result = await fallback.chat(req);
-          if (result.content.length > 20) {
+          if (!isMultiTurn && result.content.length > 20) {
             await semanticCache.set(queryText, result.content, result.model);
           }
           return result;
