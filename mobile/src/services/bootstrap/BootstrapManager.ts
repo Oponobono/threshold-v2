@@ -219,13 +219,32 @@ class BootstrapManager {
           await syncManager.login();
           console.log('[BACKGROUND] Sync login completed (async)');
 
+          // Si la BD local está vacía (primer arranque con sesión pre-existente o
+          // reinstalación), forzar Initial Sync para hidratar SQLite desde el servidor.
           const { syncService } = await import('../database/SyncService');
-          const pendingCount = await syncService.getPendingCount();
-          if (pendingCount > 0) {
-            console.log(`[BACKGROUND] ${pendingCount} pending operations, syncing...`);
-            syncManager.sync().catch(err =>
-              console.warn('[BACKGROUND] Sync on init failed:', err)
-            );
+          const { RepositoryFactory } = await import('../database/RepositoryFactory');
+          const subjectCount = await RepositoryFactory.subjects().count().catch(() => -1);
+          const isEmptyDb = subjectCount === 0;
+
+          if (isEmptyDb) {
+            console.log('[BACKGROUND] DB local vacía — disparando Initial Sync...');
+            const result = await syncManager.requestInitialSync(true);
+            if (result.success) {
+              console.log(`[BACKGROUND] Initial Sync completado — ${result.entitiesSynced} entidades`);
+              const { useDataStore } = await import('../../store/useDataStore');
+              await useDataStore.getState().loadAllData();
+              console.log('[BACKGROUND] DataStore re-hidratado tras Initial Sync');
+            } else {
+              console.warn('[BACKGROUND] Initial Sync falló:', result.errors);
+            }
+          } else {
+            const pendingCount = await syncService.getPendingCount();
+            if (pendingCount > 0) {
+              console.log(`[BACKGROUND] ${pendingCount} pending operations, syncing...`);
+              syncManager.sync().catch(err =>
+                console.warn('[BACKGROUND] Sync on init failed:', err)
+              );
+            }
           }
         } catch (err: any) {
           console.warn('[BACKGROUND] Sync login failed (non-blocking):', err?.message);
