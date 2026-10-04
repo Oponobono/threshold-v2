@@ -51,7 +51,7 @@ import { dashboardTelemetry } from '../../src/performance/DashboardTelemetry';
 
 
 
-const SUBJECT_CARD_WIDTH = 144;
+const SUBJECT_CARD_WIDTH = 160;
 const SUBJECT_CARD_GAP = 10;
 const CAROUSEL_NAV_THRESHOLD = 3;
 

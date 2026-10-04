@@ -5,6 +5,8 @@ import {
   StyleProp,
   Pressable,
   ScrollView,
+  AccessibilityInfo,
+  View,
 } from 'react-native';
 import { useAutoScroller } from '../../hooks/useAutoScroller';
 
@@ -18,32 +20,50 @@ interface Props {
   maxLoops?: number;
   autoplay?: boolean;
   pointerEvents?: 'auto' | 'none';
+  direction?: 'horizontal' | 'vertical';
+  numberOfLines?: number;
 }
 
 export function AutoScrollText({
   text,
   style,
   lineHeight = 20,
-  pixelsPerSecond = 50,
-  pauseAtEnd = 1000,
-  returnDuration = 600,
+  pixelsPerSecond = 30, // Más lento para vertical
+  pauseAtEnd = 1500,
+  returnDuration = 800,
   maxLoops = 0,
   autoplay = false,
   pointerEvents = 'auto',
+  direction = 'horizontal',
+  numberOfLines,
 }: Props) {
   const scrollRef = useRef<ScrollView>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [contentWidth, setContentWidth] = useState(0);
+  const [containerSize, setContainerSize] = useState(0);
+  const [contentSize, setContentSize] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
-  const overflows = containerWidth > 0 && contentWidth > containerWidth;
-  const dist = contentWidth - containerWidth;
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub.remove();
+  }, []);
+
+  const isHorizontal = direction === 'horizontal';
+  const overflows = containerSize > 0 && contentSize > containerSize;
+  const dist = contentSize - containerSize;
 
   const scrollTo = useCallback(
-    (x: number) => scrollRef.current?.scrollTo({ x, animated: false }),
-    [],
+    (val: number) => {
+      if (isHorizontal) {
+        scrollRef.current?.scrollTo({ x: val, animated: false });
+      } else {
+        scrollRef.current?.scrollTo({ y: val, animated: false });
+      }
+    },
+    [isHorizontal]
   );
 
-  const { trigger, cancel } = useAutoScroller(overflows, scrollTo, {
+  const { trigger, cancel } = useAutoScroller(overflows && !reduceMotion, scrollTo, {
     pixelsPerSecond,
     pauseAtEnd,
     returnDuration,
@@ -51,37 +71,55 @@ export function AutoScrollText({
   });
 
   const handlePress = useCallback(() => {
-    trigger(dist);
-  }, [trigger, dist]);
+    if (!reduceMotion) trigger(dist);
+  }, [trigger, dist, reduceMotion]);
 
   const hasAutoplayedRef = useRef(false);
   useEffect(() => {
-    if (!autoplay || !overflows || hasAutoplayedRef.current) return;
+    hasAutoplayedRef.current = false;
+  }, [text]); // Resetear autoplay si cambia el texto
+
+  useEffect(() => {
+    if (!autoplay || !overflows || reduceMotion || hasAutoplayedRef.current) return;
     hasAutoplayedRef.current = true;
     trigger(dist);
-    return () => cancel();
-  }, [autoplay, overflows, dist, trigger, cancel]);
+    return () => {
+      hasAutoplayedRef.current = false;
+      cancel();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoplay, overflows, dist, reduceMotion]);
+
+  const Container = pointerEvents === 'none' ? View : Pressable;
 
   return (
-    <Pressable
-      onPress={autoplay ? undefined : handlePress}
+    <Container
+      onPress={autoplay || pointerEvents === 'none' ? undefined : handlePress}
       pointerEvents={pointerEvents}
-      style={{ overflow: 'hidden', paddingVertical: 1, minHeight: lineHeight }}
+      style={{ overflow: 'hidden', minHeight: isHorizontal ? lineHeight : undefined }}
     >
       <ScrollView
         ref={scrollRef}
-        horizontal
+        horizontal={isHorizontal}
         showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
         scrollEnabled={false}
-        onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+        onLayout={(e) => {
+          const val = isHorizontal ? e.nativeEvent.layout.width : e.nativeEvent.layout.height;
+          setContainerSize(Math.round(val));
+        }}
       >
         <Text
           style={[style, { lineHeight }]}
-          onLayout={(e) => setContentWidth(e.nativeEvent.layout.width)}
+          numberOfLines={numberOfLines}
+          onLayout={(e) => {
+            const val = isHorizontal ? e.nativeEvent.layout.width : e.nativeEvent.layout.height;
+            setContentSize(Math.round(val));
+          }}
         >
           {text}
         </Text>
       </ScrollView>
-    </Pressable>
+    </Container>
   );
 }

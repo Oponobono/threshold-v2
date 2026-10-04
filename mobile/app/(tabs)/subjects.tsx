@@ -22,8 +22,8 @@ import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubject
 import { MomentumService } from '../../src/services/MomentumService';
 import { useDataStore } from '../../src/store/useDataStore';
 import { updateSubject, updateCourseCounters } from '../../src/services/api/subjects';
-import { FilterDropdown } from '../../src/components/ui/FilterDropdown';
-import { OptionSelectorModal, SelectorOption } from '../../src/components/ui/OptionSelectorModal';
+import { CourseFilterChip } from '../../src/components/subjects/CourseFilterChip';
+import { CoursePickerSheet, CoursePickerOption } from '../../src/components/subjects/CoursePickerSheet';
 import { ExpandableSearchBar } from '../../src/components/common/ExpandableSearchBar';
 
 const MomentumCard = ({ score }: { score: number }) => {
@@ -215,9 +215,31 @@ export default function SubjectsScreen() {
     return groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId)?.courseName ?? '';
   }, [selectedCourseId, groupedSections]);
 
-  const courseOptions: SelectorOption[] = useMemo(() => {
-    return coursesForPills.map(c => ({ id: c.id, name: c.name }));
-  }, [coursesForPills]);
+  const coursePickerOptions: CoursePickerOption[] = useMemo(() => {
+    // Conteo real desde enrichedSubjects (sin filtro de búsqueda ni estado de colapso)
+    const countByCourse = new Map<string, number>();
+    g.enrichedSubjects.forEach(s => {
+      if (s.course_id) {
+        countByCourse.set(s.course_id, (countByCourse.get(s.course_id) ?? 0) + 1);
+      }
+    });
+    return groupedSections
+      .filter(s => s.courseId !== 'independent' && s.courseId)
+      .map(s => ({
+        id: s.courseId as string,
+        name: s.courseName,
+        subjectCount: countByCourse.get(s.courseId as string) ?? 0,
+        platform: s.coursePlatform,
+      }));
+  }, [groupedSections, g.enrichedSubjects]);
+
+  const selectedCourseSubjectCount = useMemo(() => {
+    if (!selectedCourseId) return g.filteredSubjects.length;
+    const section = groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId);
+    // Si el curso está colapsado, data es []; obtenemos el conteo desde options calculadas
+    return coursePickerOptions.find(o => o.id === selectedCourseId)?.subjectCount
+      ?? section?.data?.length ?? 0;
+  }, [selectedCourseId, groupedSections, coursePickerOptions, g.filteredSubjects.length]);
 
   const handleSubjectPress = useCallback((s: any) => {
     router.push(`/subjects/${s.id}`);
@@ -436,15 +458,12 @@ export default function SubjectsScreen() {
                 courseName={selectedCourseName}
                 subHeader={
                   coursesForPills.length > 0 ? (
-                    <View style={{ flexDirection: 'row' }}>
-                      <FilterDropdown
-                        label={t('dashboard.course', { defaultValue: 'Curso' })}
-                        value={selectedCourseName}
-                        iconName="folder"
-                        onPress={() => setCourseModalVisible(true)}
-                        isActive={!!selectedCourseId}
-                      />
-                    </View>
+                    <CourseFilterChip
+                      selectedCourseName={selectedCourseName || null}
+                      subjectCount={selectedCourseSubjectCount}
+                      onPress={() => setCourseModalVisible(true)}
+                      onClear={() => setSelectedCourseId(null)}
+                    />
                   ) : undefined
                 }
                 onSubjectPress={handleSubjectPress}
@@ -509,14 +528,12 @@ export default function SubjectsScreen() {
             />
           )}
 
-          <OptionSelectorModal
+          <CoursePickerSheet
             visible={courseModalVisible}
-            title={t('subjects.selectCourse', { defaultValue: 'Seleccionar curso' })}
-            options={courseOptions}
+            options={coursePickerOptions}
             selectedId={selectedCourseId}
             onSelect={setSelectedCourseId}
             onClose={() => setCourseModalVisible(false)}
-            clearLabel={t('subjects.clearCourse', { defaultValue: 'Quitar filtro de curso' })}
           />
 
           <ScheduleModal
