@@ -569,7 +569,6 @@ export class AIClientV2 {
       try {
         const peticion = this.transport('/ai/v2/transcribe', {
           method: 'POST',
-          headers: { 'Content-Type': 'multipart/form-data' },
           body: formData,
         });
 
