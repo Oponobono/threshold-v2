@@ -514,7 +514,7 @@ export class AIClientV2 {
       };
     }
 
-    const { FileSystem } = require('expo-file-system');
+    const FileSystem = require('expo-file-system/legacy');
     let fileInfo;
     try {
       fileInfo = await FileSystem.getInfoAsync(audioUri);

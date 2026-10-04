@@ -138,7 +138,7 @@ export async function transcribeWithFallback(audioUri: string, _ignoredKey?: str
       return result.data.content;
     } else {
       if (result.local) {
-        console.warn('[GroqHelpers] Backend de IA no disponible, intentando Whisper local...');
+        console.warn('[GroqHelpers] Backend de IA no disponible, intentando Whisper local. Detalle:', result.codigo, '|', result.detalle, '| origen:', result.origen);
         return transcribeWithWhisperLocal(audioUri);
       }
       throw new Error(result.detalle);

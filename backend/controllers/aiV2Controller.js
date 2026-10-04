@@ -318,7 +318,7 @@ exports.transcribeV2 = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('[aiV2/transcribe] Chunking error:', error);
-    return sendAiError(res, { code: 'INTERNAL_ERROR', message: 'Error processing chunk' }, req.id);
+    console.error('[aiV2/transcribe] Chunking error:', error?.message || error, '| file:', req.file?.path, '| uploadId:', req.body?.uploadId);
+    return sendAiError(res, { code: 'INTERNAL_ERROR', message: error?.message || 'Error processing chunk' }, req.id);
   }
 };

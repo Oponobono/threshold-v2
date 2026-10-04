@@ -120,7 +120,7 @@ export const useRecordingsManager = () => {
 
       // Check if video_id already exists to prevent duplicates
       const existing = await databaseService.getFirstTracked(
-        'SELECT id FROM youtube_videos WHERE video_id = ?',
+        'SELECT id FROM youtube_videos WHERE video_id = ? AND deleted_at IS NULL',
         [videoId]
       );
       if (existing) {

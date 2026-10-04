@@ -20,8 +20,10 @@ const multer = require('multer');
 const { aiLimiter } = require('../middlewares/rateLimiter');
 const aiV2Controller = require('../controllers/aiV2Controller');
 
+const path = require('path');
+const upload = multer({ dest: path.join(__dirname, '..', 'temp') });
+
 const router = express.Router();
-const upload = multer({ dest: 'temp/' });
 
 router.use(aiLimiter);
 
