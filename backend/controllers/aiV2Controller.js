@@ -264,13 +264,15 @@ exports.transcribeV2 = async (req, res) => {
       }
 
       // Fetch from Groq
+      // Node 18+ native fetch no reconoce el FormData del paquete npm.
+      // getBuffer() convierte el form-data a Buffer que fetch sí acepta.
       const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${groqKey}`,
           ...formData.getHeaders()
         },
-        body: formData
+        body: formData.getBuffer()
       });
 
       if (!response.ok) {
