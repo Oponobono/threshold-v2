@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SubjectIcon } from './SubjectIcon';
 import { SCALE_MAX } from '../../utils/grades';
@@ -43,99 +43,100 @@ export const SubjectCard = React.memo((
 ) => {
 
   const color = subject.color || theme.colors.primary;
-  const darkenedColor = useMemo(() => darkenHex(color, 0.45), [color]);
+  // Fondo pastel para el icono (14% de opacidad del color del usuario)
+  const iconBg = color + '24';
 
   const raw = subject.avg_score ?? 0;
   const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
   const hasGrade = avg > 0;
 
-  let statusColor = '#999999';
-  let statusBgColor = '#F2F2F2';
-
-  if (hasGrade) {
-    if (avg >= 3.0) {
-      statusColor = '#059669';
-      statusBgColor = '#D1FAE5';
-    } else if (avg >= 2.5) {
-      statusColor = '#D97706';
-      statusBgColor = '#FEF3C7';
-    } else {
-      statusColor = '#DC2626';
-      statusBgColor = '#FEE2E2';
-    }
-  }
-
   const progress = subject.total_lessons && subject.total_lessons > 0
     ? (subject.completed_lessons || 0) / subject.total_lessons
     : (subject.completion_percent || 0) / 100;
   const progressPct = Math.min(Math.round(progress * 100), 100);
+  const isComplete = progressPct >= 100;
+
+  let statusColor = '#D97706'; // Ámbar para "En curso"
+  let statusBgColor = '#FEF3C7';
+  let statusBorderColor = '#FDE68A';
+  let statusIconName: 'time-outline' | 'checkmark-circle' | 'ellipse-outline' = 'time-outline';
+  let statusText = 'En curso';
+
+  if (isComplete) {
+    statusColor = '#059669'; // Verde para "Completa"
+    statusBgColor = '#D1FAE5';
+    statusBorderColor = '#A7F3D0';
+    statusIconName = 'checkmark-circle';
+    statusText = 'Completa';
+  } else if (progressPct === 0) {
+    statusColor = '#6B7280'; // Gris para "Sin iniciar"
+    statusBgColor = '#F3F4F6';
+    statusBorderColor = '#E5E7EB';
+    statusIconName = 'ellipse-outline';
+    statusText = 'Sin iniciar';
+  }
+
+  const milestoneStr = subject.next_micro_milestone || subject.next_milestone;
 
   return (
     <TouchableOpacity
       activeOpacity={0.8}
       style={styles.card}
       onPress={() => onPress(subject)}
+      accessibilityLabel={`${subject.name || 'Materia'}, estado ${statusText}, promedio ${hasGrade ? avg.toFixed(1) : 'sin calificar'}, ${progressPct}% de progreso`}
     >
-      <View style={styles.content}>
-        {/* header: icon + badge - fusionados en una sola capa */}
-        <View style={styles.header}>
-          <View style={[styles.iconContainer, { backgroundColor: color }]}>
-            <SubjectIcon iconName={subject.icon} color={darkenedColor} size={17} />
-          </View>
-          {hasGrade ? (
-            <View style={[styles.badge, { backgroundColor: statusBgColor }]}>
-              <Text style={[styles.badgeText, { color: statusColor }]}>{avg.toFixed(1)}</Text>
-            </View>
-          ) : subject.credits ? (
-            <View style={[styles.badge, { backgroundColor: '#F3F4F6' }]}>
-              <Text style={[styles.badgeText, { color: '#4B5563' }]}>{subject.credits} cr</Text>
-            </View>
-          ) : null}
+      <View style={styles.headerTitleBlock}>
+        <Text style={styles.title} numberOfLines={2}>
+          {subject.name || 'Materia'}
+        </Text>
+        <Text style={styles.professorText} numberOfLines={1}>
+          {subject.professor ? `Prof. ${subject.professor}` : 'Sin profesor'}
+        </Text>
+      </View>
+
+      <View style={styles.divider} />
+
+      <View style={styles.bodyContent}>
+        <View style={styles.avgBadge}>
+          <Text style={styles.avgBadgeText} numberOfLines={1} ellipsizeMode="tail">
+            Prom. <Text style={{ color: '#111827', fontWeight: '700' }}>{hasGrade ? avg.toFixed(1) : '—'}</Text>
+          </Text>
         </View>
 
-        {/* title + milestone sin infoContainer wrapper */}
-        <AutoScrollText text={subject.name} style={styles.title} />
-        {(subject.next_micro_milestone || subject.next_milestone) && (
-          <Text style={styles.milestoneText} numberOfLines={1}>
-            {subject.next_micro_milestone || subject.next_milestone}
+        <View style={[styles.statusChip, { backgroundColor: statusBgColor, borderColor: statusBorderColor }]}>
+          <Ionicons name={statusIconName} size={12} color={statusColor} />
+          <Text style={[styles.statusText, { color: statusColor }]} numberOfLines={1}>
+            {statusText}{milestoneStr && !isComplete ? ` · ${milestoneStr}` : ''}
           </Text>
-        )}
+        </View>
+      </View>
 
-        <View style={{ flex: 1 }} />
+      <View style={{ flex: 1 }} />
 
-        {/* progress: label row y barra sin progressContainer wrapper */}
+      <View style={styles.progressSection}>
         <View style={styles.progressLabelRow}>
-          <Text style={styles.progressLabel}>PROGRESO</Text>
+          <Text style={styles.progressLabel}>Progreso</Text>
           <Text style={styles.progressPercent}>{progressPct}%</Text>
         </View>
         <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: `${progressPct}%`, backgroundColor: color }]} />
+          <View style={[styles.progressBarFill, { width: `${progressPct}%`, backgroundColor: statusColor }]} />
         </View>
-
-        {/* action buttons sin actionsRow wrapper cuando solo hay uno */}
-        {(onContinue || onComplete) && (
-          <View style={styles.actionsRow}>
-            {onContinue && (
-              <TouchableOpacity
-                style={[styles.btn, styles.btnPrimary, { backgroundColor: color }]}
-                onPress={() => onContinue(subject)}
-              >
-                <Ionicons name="play" size={10} color="#FFFFFF" />
-                <Text style={styles.btnPrimaryText}>Continuar</Text>
-              </TouchableOpacity>
-            )}
-            {onComplete && (
-              <TouchableOpacity
-                style={[styles.btn, styles.btnSecondary, !onContinue && { flex: 1 }]}
-                onPress={() => onComplete(subject)}
-              >
-                <Ionicons name="sparkles" size={12} color="#059669" />
-                <Text style={styles.btnSecondaryText}>Procesar clase</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
       </View>
+
+      {/* Botón de Procesar clase - Disponible en todas las materias (permite tomar apuntes siempre) */}
+      {onComplete && (
+        <Pressable
+          style={styles.processClassBtn}
+          onPress={(e) => {
+            e.stopPropagation(); // Prevenir que abra la materia
+            onComplete(subject);
+          }}
+          accessibilityLabel="Procesar clase"
+        >
+          <Ionicons name="sparkles" size={14} color="#4B5563" />
+          <Text style={styles.processClassBtnText}>Procesar clase</Text>
+        </Pressable>
+      )}
     </TouchableOpacity>
   );
 });

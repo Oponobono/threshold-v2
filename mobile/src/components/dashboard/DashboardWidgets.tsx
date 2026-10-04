@@ -23,64 +23,113 @@ export const SubjectTile = ({ subject, onEdit, onDelete }: SubjectTileProps) => 
   const { t } = useTranslation();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
+
   const rawAvg = typeof subject.avg_score === 'number' ? subject.avg_score : 0;
   const avg = rawAvg > SCALE_MAX * 2 ? (rawAvg / 100) * SCALE_MAX : rawAvg;
+  const hasGrade = avg > 0;
   const completion = typeof subject.completion_percent === 'number' ? subject.completion_percent : 0;
   const isComplete = completion >= 100;
   const avgLabel = subject.display_label ? `≈ ${subject.display_label}` : avg.toFixed(1);
   const accentColor = subject.color ? toVividAccent(subject.color) : theme.colors.primary;
 
+  // Fondo pastel del ícono: 14% de opacidad del color del usuario (contraste garantizado)
+  const iconBg = accentColor + '24';
+
+  // Etiqueta de estado
+  const statusLabel = isComplete
+    ? t('dashboard.subjectCardComplete', { defaultValue: 'Completa' })
+    : completion > 0
+    ? t('dashboard.subjectCardInProgress', { defaultValue: 'En curso' })
+    : t('dashboard.subjectCardNotStarted', { defaultValue: 'Sin iniciar' });
+  const statusIcon = isComplete ? 'checkmark-circle' : completion > 0 ? 'time-outline' : 'ellipse-outline';
+  const statusBg = isComplete ? '#D1FAE5' : completion > 0 ? '#FEF3C7' : '#F3F4F6';
+  const statusColor = isComplete ? '#059669' : completion > 0 ? '#D97706' : '#6B7280';
+
+  // Texto de progreso contextual: usa next_micro_milestone si existe, sino porcentaje
+  const progressCtx = subject.next_micro_milestone || null;
+
   return (
     <View style={{ overflow: 'visible' }}>
-      <TouchableOpacity 
-        style={styles.subjectTile} 
-        activeOpacity={0.7}
+      <TouchableOpacity
+        style={[styles.subjectTile, isComplete && styles.subjectTileCompleted]}
+        activeOpacity={0.75}
+        accessibilityLabel={`${subject.name || 'Materia'}, ${subject.professor || ''}, ${statusLabel}, ${completion.toFixed(0)}% completado`}
         onPress={() => router.push(`/subjects/${subject.id}`)}
       >
-        <View style={styles.subjectTileNameRow}>
-          <View style={[styles.subjectBadge, { backgroundColor: accentColor + '20' }]}>
-            <MaterialCommunityIcons name={(subject.icon as any) || 'book-outline'} size={20} color={accentColor} />
+        {/* ── CABECERA: [nombre+profesor flex] [⋮ 44×44] ── */}
+        <View style={styles.subjectTileHeader}>
+          <View style={styles.subjectTileNameBlock}>
+            <View style={{ height: 34, width: '100%', overflow: 'hidden' }}>
+              <AutoScrollText
+                text={subject.name || ((subject as any)._isPending
+                  ? t('common.pending') || 'Pendiente'
+                  : t('dashboard.newSubject.title') || 'Materia')}
+                style={styles.subjectTileName}
+                direction="vertical"
+                autoplay={true}
+                pointerEvents="none"
+                lineHeight={17}
+              />
+            </View>
+            <View style={{ height: 16, width: '100%', overflow: 'hidden', marginTop: 2 }}>
+              <AutoScrollText
+                text={subject.professor || t('dashboard.newSubject.noProfessor')}
+                style={[styles.subjectTileMeta, { marginTop: 0 }]}
+                direction="horizontal"
+                numberOfLines={1}
+                autoplay={true}
+                pointerEvents="none"
+                lineHeight={16}
+              />
+            </View>
           </View>
+
           <TouchableOpacity
             style={styles.subjectTileMenuBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             onPress={() => setMenuVisible(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="ellipsis-vertical" size={14} color={theme.colors.text.secondary} />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.subjectTileName} numberOfLines={1}>
-          {subject.name || ((subject as any)._isPending ? t('common.pending') || 'Pendiente' : t('dashboard.newSubject.title') || 'Materia')}
-        </Text>
-        <Text style={styles.subjectTileMeta} numberOfLines={1}>
-          {subject.professor || t('dashboard.newSubject.noProfessor')}
-        </Text>
+        {/* ── SEPARADOR ── */}
+        <View style={styles.subjectTileDivider} />
 
-        <View style={styles.subjectTileBottomRow}>
-          <View style={styles.subjectTileAvg}>
-            <Ionicons name="star" size={11} color={theme.colors.text.secondary} />
-            <Text style={styles.subjectTileAvgText}>{avgLabel}</Text>
-          </View>
-          {isComplete ? (
-            <View style={styles.subjectTileChip}>
-              <Ionicons name="checkmark-circle" size={11} color={theme.colors.success} />
-              <Text style={styles.subjectTileChipText}>
-                {t('dashboard.subjectCardComplete', { defaultValue: 'Completa' })}
+        {/* ── CUERPO: [Promedio (izq)] [Progreso (der)] ── */}
+        <View style={styles.subjectTileBody}>
+          {/* Izquierda: etiqueta + badge con ícono y promedio/nota */}
+          <View>
+            <Text style={styles.subjectTileAvgLabel}>Promedio</Text>
+            <View style={[styles.avgBadge, { backgroundColor: iconBg }]}>
+              <MaterialCommunityIcons
+                name={(subject.icon as any) || 'book-outline'}
+                size={14}
+                color={accentColor}
+              />
+              <Text style={[styles.avgBadgeText, { color: accentColor }]}>
+                {hasGrade ? avgLabel : '—'}
               </Text>
             </View>
-          ) : (
-            <View style={styles.subjectTileChip}>
-              <Text style={styles.subjectTileChipText}>{completion.toFixed(0)}%</Text>
+          </View>
+
+          {/* Derecha: etiqueta + porcentaje de progreso (color universal) */}
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={styles.subjectTileAvgLabel}>Progreso</Text>
+            <View style={[styles.avgBadge, { backgroundColor: 'rgba(180,83,9,0.1)' }]}>
+              <Text style={[styles.avgBadgeText, { color: '#B45309' }]}>
+                {completion.toFixed(0)}%
+              </Text>
             </View>
-          )}
+          </View>
         </View>
 
+        {/* ── BARRA DE PROGRESO (color neutro universal) ── */}
         <View style={styles.subjectTileProgressBg}>
           <View
             style={[
               styles.subjectTileProgressFill,
-              { width: `${Math.min(Math.round(completion), 100)}%` as any, backgroundColor: accentColor },
+              { width: `${Math.min(Math.round(completion), 100)}%` as any, backgroundColor: '#94A3B8' },
             ]}
           />
         </View>
@@ -100,7 +149,7 @@ export const SubjectTile = ({ subject, onEdit, onDelete }: SubjectTileProps) => 
             onPress={() => setMenuVisible(false)}
           />
           <View style={{
-            position: 'absolute', top: 28, right: 8, zIndex: 21,
+            position: 'absolute', top: 40, right: 8, zIndex: 21,
             backgroundColor: theme.colors.card,
             borderRadius: 12,
             paddingVertical: 4,
@@ -132,6 +181,7 @@ export const SubjectTile = ({ subject, onEdit, onDelete }: SubjectTileProps) => 
     </View>
   );
 };
+
 
 export const MetricCard = ({ title, value, subtext, icon, color, showMood, onPress }: any) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;

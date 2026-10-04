@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { BoundedGrid } from '../ui/BoundedGrid';
@@ -35,10 +35,30 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
 
   const sortedSubjects = useMemo(() => {
     return [...subjects].sort((a, b) => {
+      // 1. Sort by status: "En curso" first (progress > 0 && < 100). 
+      // "Completa" (>= 100) and "Sin iniciar" (0) go after.
+      const getProgress = (s: any) => {
+        const p = s.total_lessons && s.total_lessons > 0
+          ? (s.completed_lessons || 0) / s.total_lessons
+          : (s.completion_percent || 0) / 100;
+        return Math.min(Math.round(p * 100), 100);
+      };
+      
+      const pA = getProgress(a);
+      const pB = getProgress(b);
+      const aInProgress = pA > 0 && pA < 100 ? 1 : 0;
+      const bInProgress = pB > 0 && pB < 100 ? 1 : 0;
+      
+      if (aInProgress !== bInProgress) {
+        return bInProgress - aInProgress; // "En curso" first
+      }
+
+      // 2. Sort by last accessed
       const aAccess = a.last_accessed_at ? new Date(a.last_accessed_at).getTime() : 0;
       const bAccess = b.last_accessed_at ? new Date(b.last_accessed_at).getTime() : 0;
       if (aAccess !== bAccess) return bAccess - aAccess;
       
+      // 3. Sort by created date
       const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
       const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
       return bCreated - aCreated;
@@ -57,31 +77,96 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
   );
 
   return (
-    <BoundedGrid
-      data={sortedSubjects}
-      keyExtractor={(item) => item.id}
-      title={t('subjects.yourSubjects', 'Tus materias')}
-      contextText={subjects.length > 0 ? `(${subjects.length})` : undefined}
-      numColumns={2}
-      maxHeight={500}
-      gap={8}
-      subHeader={subHeader}
-      ListEmptyComponent={emptyState}
-      renderItem={({ item, index, separators }) => (
-        <View style={{ flex: 1 }}>
-          <SubjectCard
-            subject={item}
-            onPress={onSubjectPress}
-            onContinue={item.external_url ? onContinue : undefined}
-            onComplete={onComplete}
-          />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{t('subjects.yourSubjects', 'Tus materias')}</Text>
+          {subjects.length > 0 && <Text style={styles.contextText}>({subjects.length})</Text>}
         </View>
+        {subHeader && <View>{subHeader}</View>}
+      </View>
+
+      {sortedSubjects.length === 0 ? (
+        emptyState
+      ) : (
+        <ScrollView 
+          style={styles.scrollGrid} 
+          contentContainerStyle={styles.scrollGridContent}
+          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.grid}>
+            {Array.from({ length: Math.ceil(sortedSubjects.length / 2) }).map((_, rowIndex) => (
+              <View key={`row-${rowIndex}`} style={styles.gridRow}>
+                {Array.from({ length: 2 }).map((_, colIndex) => {
+                  const itemIndex = rowIndex * 2 + colIndex;
+                  const item = sortedSubjects[itemIndex];
+                  if (!item) {
+                    return <View key={`empty-${colIndex}`} style={{ flex: 1 }} />;
+                  }
+                  return (
+                    <View key={item.id} style={{ flex: 1 }}>
+                      <SubjectCard
+                        subject={item}
+                        onPress={onSubjectPress}
+                        onContinue={item.external_url ? onContinue : undefined}
+                        onComplete={onComplete}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       )}
-    />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    marginBottom: 16,
+    gap: 12,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  title: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: '800',
+    color: theme.colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  contextText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
+  },
+  scrollGrid: {
+    maxHeight: 520,
+    marginHorizontal: -4,
+  },
+  scrollGridContent: {
+    paddingHorizontal: 4,
+    paddingBottom: 24,
+  },
+  grid: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',

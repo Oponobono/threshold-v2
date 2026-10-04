@@ -4,128 +4,111 @@ export const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    minHeight: 150,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-  },
-  content: {
-    flex: 1,
+    borderRadius: 16,
     padding: 12,
-    flexDirection: 'column',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minHeight: 180,
   },
-  header: {
+  headerTitleBlock: {
+    marginBottom: 8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 12,
+  },
+  bodyContent: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    gap: 4,
+    marginBottom: 12,
   },
-  iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+
+  avgBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    flexShrink: 1,
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+  avgBadgeText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#6B7280',
   },
-  infoContainer: {
-    marginBottom: 8,
-  },
+
   title: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#111827',
     lineHeight: 18,
-    letterSpacing: -0.3,
-    marginBottom: 3,
+    marginBottom: 4,
+    minHeight: 36, // Reserves 2 lines height
   },
-  milestoneContainer: {
+  professorText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexShrink: 1,
   },
-  milestoneText: {
+  statusText: {
     fontSize: 10,
-    color: '#6B7280',
-    fontWeight: '500',
-    flex: 1,
+    fontWeight: '600',
   },
-  footer: {
-    marginTop: 'auto',
-  },
-  progressContainer: {
-    marginBottom: 8,
+  progressSection: {
+    marginBottom: 12,
   },
   progressLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: 4,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#4B5563',
   },
   progressPercent: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#374151',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111827',
   },
   progressBarBg: {
-    height: 4,
+    height: 6,
     backgroundColor: '#F3F4F6',
-    borderRadius: 2,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
   },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  btn: {
+  processClassBtn: {
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-  },
-  btnPrimary: {
-    flex: 1,
-  },
-  btnPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  btnSecondary: {
-    backgroundColor: '#F0FDF4',
+    gap: 6,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#DCFCE7',
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FAFAFA',
   },
-  btnSecondaryText: {
-    color: '#059669',
-    fontSize: 11,
-    fontWeight: '700',
+  processClassBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
   },
 });
