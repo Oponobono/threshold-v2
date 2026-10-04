@@ -40,15 +40,15 @@ export const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#111827',
-    lineHeight: 18,
+    lineHeight: 17,
     marginBottom: 4,
-    minHeight: 36, // Reserves 2 lines height
+    minHeight: 34, // Reserves 2 lines height
   },
   professorText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: '#6B7280',
   },
@@ -76,12 +76,12 @@ export const styles = StyleSheet.create({
     marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: '#4B5563',
   },
   progressPercent: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#111827',
   },
@@ -96,12 +96,12 @@ export const styles = StyleSheet.create({
     borderRadius: 3,
   },
   processClassBtn: {
-    height: 44,
+    height: 36,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     backgroundColor: '#FAFAFA',

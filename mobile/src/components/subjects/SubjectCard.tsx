@@ -131,6 +131,7 @@ export const SubjectCard = React.memo((
             e.stopPropagation(); // Prevenir que abra la materia
             onComplete(subject);
           }}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           accessibilityLabel="Procesar clase"
         >
           <Ionicons name="sparkles" size={14} color="#4B5563" />

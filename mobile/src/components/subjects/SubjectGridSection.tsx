@@ -154,9 +154,13 @@ const styles = StyleSheet.create({
   scrollGrid: {
     maxHeight: 520,
     marginHorizontal: -4,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)', // Más opaco/visible
   },
   scrollGridContent: {
     paddingHorizontal: 4,
+    paddingTop: 16,
     paddingBottom: 24,
   },
   grid: {
