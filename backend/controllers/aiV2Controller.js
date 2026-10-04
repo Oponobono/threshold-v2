@@ -252,8 +252,11 @@ exports.transcribeV2 = async (req, res) => {
       console.log(`[aiV2/transcribe] Usando modelo STT: ${sttModel}`);
 
       // Last chunk received, process transcription
+      // readFileSync en vez de createReadStream: getBuffer() es síncrono
+      // y no puede serializar streams (DelayedStream error).
+      const audioBuffer = fs.readFileSync(mergedFilePath);
       const formData = new FormData();
-      formData.append('file', fs.createReadStream(mergedFilePath));
+      formData.append('file', audioBuffer, { filename: 'audio.m4a', contentType: 'audio/mp4' });
       formData.append('model', sttModel);
       formData.append('language', 'es');
       formData.append('response_format', 'text');
