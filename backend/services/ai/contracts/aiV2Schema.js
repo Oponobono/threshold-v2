@@ -146,10 +146,10 @@ function validarChat(body) {
   }
 
   const mensajes = validarMensajes(body.messages);
-  if (!mensajes.ok) return mensajes;
+  if (!mensajes.ok) return { ok: false, status: mensajes.status, codigo: mensajes.codigo, detalle: mensajes.detalle };
 
   const contexto = validarContexto(body.context_text);
-  if (!contexto.ok) return contexto;
+  if (!contexto.ok) return { ok: false, status: contexto.status, codigo: contexto.codigo, detalle: contexto.detalle };
 
   return {
     ok: true,

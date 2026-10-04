@@ -239,9 +239,11 @@ exports.transcribeV2 = async (req, res) => {
   const mergedFilePath = path.join(tempDir, uploadId + '.m4a');
   
   try {
+    console.log(`[aiV2/transcribe] Reading chunk: ${req.file.path}`);
     const chunkData = fs.readFileSync(req.file.path);
     fs.appendFileSync(mergedFilePath, chunkData);
-    fs.unlinkSync(req.file.path); // Delete the temp chunk
+    fs.unlinkSync(req.file.path);
+    console.log(`[aiV2/transcribe] Chunk ${chunkIndex}/${parseInt(totalChunks)-1} appended, size=${chunkData.length}`);
 
     if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
       // Elegir el mejor modelo STT disponible del registry (stt.groq)
@@ -273,12 +275,13 @@ exports.transcribeV2 = async (req, res) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[aiV2/transcribe] Groq Whisper error:', errorText);
+        console.error('[aiV2/transcribe] Groq Whisper error:', response.status, errorText.substring(0, 500));
         if (fs.existsSync(mergedFilePath)) fs.unlinkSync(mergedFilePath);
-        return sendAiError(res, { code: 'UPSTREAM_ERROR', message: 'Error from Groq Whisper' }, req.id);
+        return sendAiError(res, { code: 'INTERNAL_ERROR', message: `Groq STT ${response.status}` }, req.id);
       }
 
       const rawTranscription = (await response.text()).trim();
+      console.log(`[aiV2/transcribe] Groq STT OK, chars: ${rawTranscription.length}`);
       if (fs.existsSync(mergedFilePath)) fs.unlinkSync(mergedFilePath);
 
       if (!rawTranscription) {
