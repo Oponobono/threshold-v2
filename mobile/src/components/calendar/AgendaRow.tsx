@@ -11,7 +11,7 @@ interface AgendaRowProps {
   t: any;
 }
 
-export const AgendaRow: React.FC<AgendaRowProps> = ({ item, scope, isLast, onPress, t }) => {
+export const AgendaRow: React.FC<AgendaRowProps> = React.memo(({ item, scope, isLast, onPress, t }) => {
   const isCompleted = item.status?.is_completed;
   
   // Decide what to show on the second line based on scope
@@ -51,6 +51,8 @@ export const AgendaRow: React.FC<AgendaRowProps> = ({ item, scope, isLast, onPre
       ]}
       activeOpacity={0.7}
       onPress={() => onPress(item)}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}, ${item.allDay ? t('calendar.allDay') : item.start}${contextText ? `, ${contextText}` : ''}${isCompleted ? ', completado' : ''}`}
     >
       <View style={styles.timeCol}>
         <Text style={[styles.timeText, item.allDay && styles.allDayText]} numberOfLines={1}>
@@ -76,7 +78,8 @@ export const AgendaRow: React.FC<AgendaRowProps> = ({ item, scope, isLast, onPre
       </View>
     </TouchableOpacity>
   );
-};
+});
+AgendaRow.displayName = 'AgendaRow';
 
 const styles = StyleSheet.create({
   container: {
@@ -99,36 +102,39 @@ const styles = StyleSheet.create({
     paddingTop: 2, // slight visual alignment with title
   },
   timeText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
   allDayText: {
-    fontSize: 12,
+    fontSize: 11,
     color: theme.colors.text.secondary,
   },
   contentCol: {
     flex: 1,
     justifyContent: 'center',
+    minWidth: 0,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   title: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '400',
     color: theme.colors.text.primary,
     flexShrink: 1,
+    letterSpacing: -0.1,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
     color: theme.colors.text.secondary,
   },
   contextText: {
-    fontSize: 13,
+    fontSize: 11,
+    fontWeight: '500',
     color: theme.colors.text.secondary,
     marginTop: 2,
   },
@@ -136,14 +142,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.inputBackground,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 0.5,
+    borderColor: theme.colors.border,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: theme.colors.text.secondary,
-    letterSpacing: 0.5,
-  }
+    letterSpacing: 0.2,
+  },
 });

@@ -11,7 +11,7 @@ interface AgendaSectionHeaderProps {
   onToggle?: () => void;
 }
 
-export const AgendaSectionHeader: React.FC<AgendaSectionHeaderProps> = ({
+export const AgendaSectionHeader: React.FC<AgendaSectionHeaderProps> = React.memo(({
   title,
   count,
   collapsible,
@@ -44,7 +44,8 @@ export const AgendaSectionHeader: React.FC<AgendaSectionHeaderProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
+});
+AgendaSectionHeader.displayName = 'AgendaSectionHeader';
 
 const styles = StyleSheet.create({
   container: {

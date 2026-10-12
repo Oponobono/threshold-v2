@@ -399,4 +399,17 @@ const styles = StyleSheet.create({
     padding: 24,
     fontSize: 14,
   },
+  completedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+    marginTop: 4,
+  },
+  completedToggleText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: theme.colors.text.secondary,
+  },
 });

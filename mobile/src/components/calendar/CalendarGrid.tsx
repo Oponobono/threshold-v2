@@ -1,5 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Animated, Easing, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, AccessibilityInfo } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { calendarGridStyles } from '../../styles/CalendarGrid.styles';
@@ -20,7 +26,7 @@ interface CalendarGridProps {
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onSelectDay: (day: number) => void;
-  getActivitySummary: (day: number) => ActivitySummary;
+  getActivitySummary: (yearOrDay: number, month?: number, day?: number) => ActivitySummary;
   isToday: (day: number) => boolean;
   isExpanded?: boolean;
   onToggle?: () => void;
@@ -34,29 +40,88 @@ function getMonthData(m: number, y: number) {
   return { daysInMonth: days, startOffset: offset };
 }
 
-function MonthGrid({
+interface DayCellProps {
+  day: number;
+  selected: boolean;
+  today: boolean;
+  hasClasses: boolean;
+  hasTasks: boolean;
+  hasEvents: boolean;
+  onSelectDay: (day: number) => void;
+  isCurrentMonth: boolean;
+}
+
+const DayCell = React.memo<DayCellProps>(({
+  day,
+  selected,
+  today,
+  hasClasses,
+  hasTasks,
+  hasEvents,
+  onSelectDay,
+  isCurrentMonth,
+}) => {
+  const handlePress = useCallback(() => {
+    if (isCurrentMonth) onSelectDay(day);
+  }, [isCurrentMonth, onSelectDay, day]);
+
+  return (
+    <TouchableOpacity
+      onPress={handlePress}
+      activeOpacity={isCurrentMonth ? 0.7 : 1}
+      accessibilityRole="button"
+      accessibilityLabel={`${day}${today ? ', hoy' : ''}${selected ? ', seleccionado' : ''}${hasClasses ? ', clases programadas' : ''}${hasTasks ? ', tareas pendientes' : ''}${hasEvents ? ', eventos' : ''}`}
+      style={[
+        calendarGridStyles.cell,
+        selected && calendarGridStyles.selectedCell,
+        !selected && today && calendarGridStyles.todayCell,
+        !isCurrentMonth && { opacity: 0.35 },
+      ]}
+    >
+      <Text style={[
+        calendarGridStyles.cellText,
+        selected && calendarGridStyles.selectedCellText,
+        !selected && today && calendarGridStyles.todayCellText,
+      ]}>
+        {day}
+      </Text>
+      {(!selected && (hasClasses || hasTasks || hasEvents)) && (
+        <View style={calendarGridStyles.dotsContainer}>
+          {hasClasses && <View style={[calendarGridStyles.activityDot, { backgroundColor: '#2F80ED' }]} />}
+          {hasTasks && <View style={[calendarGridStyles.activityDot, { backgroundColor: '#FF9500' }]} />}
+          {hasEvents && <View style={[calendarGridStyles.activityDot, { backgroundColor: '#A2845E' }]} />}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+});
+DayCell.displayName = 'DayCell';
+
+interface MonthGridProps {
+  year: number;
+  month: number;
+  daysInMonth: number;
+  startOffset: number;
+  selectedDayNum: number;
+  weekLabels: string[];
+  onSelectDay: (day: number) => void;
+  getActivitySummary: (yearOrDay: number, month?: number, day?: number) => ActivitySummary;
+  isToday: (day: number) => boolean;
+}
+
+const MonthGrid = React.memo<MonthGridProps>(({
+  year,
+  month,
   daysInMonth,
   startOffset,
   selectedDayNum,
-  isCurrentMonth,
   weekLabels,
   onSelectDay,
   getActivitySummary,
   isToday,
-  width,
-}: {
-  daysInMonth: number;
-  startOffset: number;
-  selectedDayNum: number;
-  isCurrentMonth: boolean;
-  weekLabels: string[];
-  onSelectDay: (day: number) => void;
-  getActivitySummary: (day: number) => ActivitySummary;
-  isToday: (day: number) => boolean;
-  width: number;
-}) {
+}) => {
   return (
-    <View style={{ width }}>
+    <View style={{ width: '100%' }}>
       <View style={calendarGridStyles.weekLabels}>
         {weekLabels.map((d, i) => (
           <Text key={i} style={calendarGridStyles.weekLabelText}>{d}</Text>
@@ -68,43 +133,29 @@ function MonthGrid({
         ))}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
-          const selected = isCurrentMonth && day === selectedDayNum;
-          const today = isCurrentMonth && isToday(day);
-          const { hasClasses, hasTasks, hasEvents } = isCurrentMonth
-            ? getActivitySummary(day)
-            : { hasClasses: false, hasTasks: false, hasEvents: false };
+          const selected = day === selectedDayNum;
+          const today = isToday(day);
+          const { hasClasses, hasTasks, hasEvents } = getActivitySummary(year, month, day);
 
           return (
-            <TouchableOpacity
+            <DayCell
               key={day}
-              onPress={() => isCurrentMonth && onSelectDay(day)}
-              style={[
-                calendarGridStyles.cell,
-                selected && calendarGridStyles.selectedCell,
-                !selected && today && calendarGridStyles.todayCell,
-              ]}
-            >
-              <Text style={[
-                calendarGridStyles.cellText,
-                selected && calendarGridStyles.selectedCellText,
-                !selected && today && calendarGridStyles.todayCellText,
-              ]}>
-                {day}
-              </Text>
-              {(!selected && (hasClasses || hasTasks || hasEvents)) && (
-                <View style={calendarGridStyles.dotsContainer}>
-                  {hasClasses && <View style={[calendarGridStyles.activityDot, { backgroundColor: '#2F80ED' }]} />}
-                  {hasTasks && <View style={[calendarGridStyles.activityDot, { backgroundColor: '#FF9500' }]} />}
-                  {hasEvents && <View style={[calendarGridStyles.activityDot, { backgroundColor: '#A2845E' }]} />}
-                </View>
-              )}
-            </TouchableOpacity>
+              day={day}
+              selected={selected}
+              today={today}
+              hasClasses={hasClasses}
+              hasTasks={hasTasks}
+              hasEvents={hasEvents}
+              onSelectDay={onSelectDay}
+              isCurrentMonth={true}
+            />
           );
         })}
       </View>
     </View>
   );
-}
+});
+MonthGrid.displayName = 'MonthGrid';
 
 export const CalendarGrid: React.FC<CalendarGridProps> = ({
   monthLabel,
@@ -123,71 +174,49 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   onToggle,
   collapsedLabel,
 }) => {
-  const animatedHeight = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
-  const animatedOpacity = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
-  const scrollRef = useRef<ScrollView>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const isAnimating = useRef(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const progress = useSharedValue(isExpanded ? 1 : 0);
+  const monthFade = useSharedValue(1);
 
-  // Pre-compute adjacent months
-  const prevM = month === 0 ? 11 : month - 1;
-  const prevY = month === 0 ? year - 1 : year;
-  const nextM = month === 11 ? 0 : month + 1;
-  const nextY = month === 11 ? year + 1 : year;
-
-  const prevMonthData = getMonthData(prevM, prevY);
-  const nextMonthData = getMonthData(nextM, nextY);
-
-  // Expand/collapse animation
+  // Detección de movimiento reducido para accesibilidad
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(animatedHeight, {
-        toValue: isExpanded ? 1 : 0,
-        duration: EXPAND_DURATION,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
-        useNativeDriver: false,
-      }),
-      Animated.timing(animatedOpacity, {
-        toValue: isExpanded ? 1 : 0,
-        duration: isExpanded ? EXPAND_DURATION : EXPAND_DURATION * 0.6,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
-        useNativeDriver: false,
-      }),
-    ]).start();
-  }, [isExpanded]);
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub.remove();
+  }, []);
 
-  // After month changes (state update from parent), snap back to center page instantly
+  // Animación nativa en el hilo de UI para expandir / colapsar
   useEffect(() => {
-    if (containerWidth > 0) {
-      scrollRef.current?.scrollTo({ x: containerWidth, animated: false });
-      isAnimating.current = false;
+    if (reduceMotion) {
+      progress.value = isExpanded ? 1 : 0;
+    } else {
+      progress.value = withTiming(isExpanded ? 1 : 0, {
+        duration: isExpanded ? EXPAND_DURATION : EXPAND_DURATION * 0.7,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
+      });
     }
-  }, [month, year, containerWidth]);
+  }, [isExpanded, reduceMotion, progress]);
 
-  // When layout is ready, position to center page
-  const handleLayout = useCallback((width: number) => {
-    if (width === containerWidth) return;
-    setContainerWidth(width);
-    // scrollTo happens via the useEffect above once containerWidth is set
-  }, [containerWidth]);
+  // Transición sutil al cambiar de mes
+  useEffect(() => {
+    if (!reduceMotion) {
+      monthFade.value = 0.5;
+      monthFade.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
+    }
+  }, [month, year, reduceMotion, monthFade]);
 
-  const handlePrevMonth = () => {
-    if (isAnimating.current || containerWidth === 0) return;
-    isAnimating.current = true;
-    scrollRef.current?.scrollTo({ x: 0, animated: true });
-    setTimeout(() => onPrevMonth(), SLIDE_DURATION);
-  };
+  const animatedGridStyle = useAnimatedStyle(() => {
+    return {
+      maxHeight: progress.value * GRID_APPROX_HEIGHT,
+      opacity: progress.value,
+      overflow: 'hidden',
+    };
+  });
 
-  const handleNextMonth = () => {
-    if (isAnimating.current || containerWidth === 0) return;
-    isAnimating.current = true;
-    scrollRef.current?.scrollTo({ x: containerWidth * 2, animated: true });
-    setTimeout(() => onNextMonth(), SLIDE_DURATION);
-  };
-
-  const maxHeight = animatedHeight.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, GRID_APPROX_HEIGHT],
+  const animatedMonthStyle = useAnimatedStyle(() => {
+    return {
+      opacity: monthFade.value,
+    };
   });
 
   return (
@@ -195,70 +224,53 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       <View style={[calendarGridStyles.monthNav, !isExpanded && { marginBottom: 0 }]}>
         <TouchableOpacity
           style={calendarGridStyles.navBtn}
-          onPress={handlePrevMonth}
+          onPress={onPrevMonth}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Mes anterior"
         >
           <Ionicons name="chevron-back" size={20} color={theme.colors.text.primary} />
         </TouchableOpacity>
-        <TouchableOpacity activeOpacity={0.7} onPress={onToggle}>
-          <Text style={calendarGridStyles.monthLabel}>
+        <TouchableOpacity
+          style={calendarGridStyles.monthTitleBtn}
+          activeOpacity={0.7}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityLabel={`${isExpanded ? monthLabel : (collapsedLabel || monthLabel)}. ${isExpanded ? 'Toca para colapsar' : 'Toca para expandir'}`}
+        >
+          <Text
+            style={calendarGridStyles.monthLabel}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {isExpanded ? monthLabel : (collapsedLabel || monthLabel)}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={calendarGridStyles.navBtn}
-          onPress={handleNextMonth}
+          onPress={onNextMonth}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Mes siguiente"
         >
           <Ionicons name="chevron-forward" size={20} color={theme.colors.text.primary} />
         </TouchableOpacity>
       </View>
 
-      <Animated.View style={{ maxHeight, overflow: 'hidden', opacity: animatedOpacity }}>
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          scrollEnabled={false}
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onLayout={(e) => handleLayout(e.nativeEvent.layout.width)}
-          contentOffset={containerWidth > 0 ? { x: containerWidth, y: 0 } : { x: 0, y: 0 }}
-        >
-          {/* Previous month */}
+      <Animated.View style={animatedGridStyle}>
+        <Animated.View style={animatedMonthStyle}>
           <MonthGrid
-            {...prevMonthData}
-            selectedDayNum={selectedDayNum}
-            isCurrentMonth={false}
-            weekLabels={weekLabels}
-            onSelectDay={onSelectDay}
-            getActivitySummary={getActivitySummary}
-            isToday={isToday}
-            width={containerWidth || 1}
-          />
-          {/* Current month */}
-          <MonthGrid
+            year={year}
+            month={month}
             daysInMonth={daysInMonth}
             startOffset={startOffset}
             selectedDayNum={selectedDayNum}
-            isCurrentMonth={true}
             weekLabels={weekLabels}
             onSelectDay={onSelectDay}
             getActivitySummary={getActivitySummary}
             isToday={isToday}
-            width={containerWidth || 1}
           />
-          {/* Next month */}
-          <MonthGrid
-            {...nextMonthData}
-            selectedDayNum={selectedDayNum}
-            isCurrentMonth={false}
-            weekLabels={weekLabels}
-            onSelectDay={onSelectDay}
-            getActivitySummary={getActivitySummary}
-            isToday={isToday}
-            width={containerWidth || 1}
-          />
-        </ScrollView>
+        </Animated.View>
       </Animated.View>
     </View>
   );

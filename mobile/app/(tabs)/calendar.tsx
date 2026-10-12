@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ScrollView, View, LayoutAnimation, Platform } from 'react-native';
+import { ScrollView, View, LayoutAnimation, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { globalStyles } from '../../src/styles/globalStyles';
+import { theme } from '../../src/styles/theme';
 import { useDataStore } from '../../src/store/useDataStore';
 import { useCalendar } from '../../src/hooks/useCalendar';
 import { EventCreationModal } from '../../src/components/modals/EventCreationModal';
@@ -48,17 +49,24 @@ export default function CalendarScreen() {
   const selectedDayLabel = (() => {
     const d = new Date(calendar.viewYear, calendar.viewMonth, calendar.selectedDayNum);
     const locale = lang === 'en' ? 'en-US' : 'es-ES';
-    const weekday = d.toLocaleString(locale, { weekday: 'long' });
-    const month = d.toLocaleString(locale, { month: 'short' });
-    const capitalMonth = month.charAt(0).toUpperCase() + month.slice(1).replace('.', '');
+    const weekdayRaw = d.toLocaleString(locale, { weekday: 'long' });
+    const weekday = weekdayRaw.charAt(0).toUpperCase() + weekdayRaw.slice(1);
+    const monthRaw = d.toLocaleString(locale, { month: 'long' });
+    const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1);
     const day = calendar.selectedDayNum;
     const year = calendar.viewYear;
-    return `${weekday}, ${capitalMonth} ${day} - ${year}`;
+
+    if (lang === 'en') {
+      return `${weekday}, ${month} ${day} - ${year}`;
+    }
+    return `${weekday}, ${day} de ${month} - ${year}`;
   })();
 
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(true);
 
-  const { subjects, courses } = useDataStore();
+  // Selectores atómicos para evitar re-renders por mutaciones ajenas
+  const subjects = useDataStore(s => s.subjects);
+  const courses = useDataStore(s => s.courses);
 
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
@@ -216,15 +224,13 @@ export default function CalendarScreen() {
     });
   };
 
-  const toggleCalendar = () => {
-    LayoutAnimation.configureNext({
-      duration: 280,
-      create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-      update: { type: LayoutAnimation.Types.easeInEaseOut },
-      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-    });
-    setIsCalendarExpanded(!isCalendarExpanded);
-  };
+  const toggleCalendar = useCallback(() => {
+    setIsCalendarExpanded(prev => !prev);
+  }, []);
+
+  const handleSelectDay = useCallback((day: number) => {
+    calendar.setSelectedDayNum(day);
+  }, [calendar.setSelectedDayNum]);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={globalStyles.safeArea}>
@@ -249,16 +255,7 @@ export default function CalendarScreen() {
           weekLabels={weekLabels}
           onPrevMonth={calendar.goToPrevMonth}
           onNextMonth={calendar.goToNextMonth}
-          onSelectDay={(day) => {
-            LayoutAnimation.configureNext({
-              duration: 280,
-              create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-              update: { type: LayoutAnimation.Types.easeInEaseOut },
-              delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-            });
-            calendar.setSelectedDayNum(day);
-            setIsCalendarExpanded(false); // Auto-collapse
-          }}
+          onSelectDay={handleSelectDay}
           getActivitySummary={calendar.getActivitySummary}
           isToday={calendar.isToday}
           isExpanded={isCalendarExpanded}
@@ -278,7 +275,11 @@ export default function CalendarScreen() {
           />
         )}
 
-        {scopedEvents.length === 0 ? (
+        {!calendar.isReady ? (
+          <View style={{ padding: 48, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          </View>
+        ) : scopedEvents.length === 0 ? (
           <EmptyAgendaState
             scope={{ kind: selectedSubjectId ? 'subject' : selectedCourseId ? 'subject' : 'all', subjectId: selectedSubjectId || selectedCourseId || '' } as any}
             onClear={() => { setSelectedCourseId(null); setSelectedSubjectId(null); }}

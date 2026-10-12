@@ -20,6 +20,7 @@ export const calendarGridStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    width: '100%',
   },
   navBtn: {
     width: 36,
@@ -30,13 +31,22 @@ export const calendarGridStyles = StyleSheet.create({
     borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  monthTitleBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    minWidth: 0,
   },
   monthLabel: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
     color: theme.colors.text.primary,
     textTransform: 'capitalize',
-    letterSpacing: -0.3,
+    letterSpacing: -0.1,
+    textAlign: 'center',
   },
   weekLabels: {
     flexDirection: 'row',

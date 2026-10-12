@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, LayoutAnimation } from 'react-native';
 import { AgendaItem, CalendarScope } from '../../types/calendar';
 import { AgendaSectionHeader } from './AgendaSectionHeader';
@@ -15,7 +15,7 @@ interface AgendaListProps {
   onSubjectPress?: (subjectId: string) => void;
 }
 
-export const AgendaList: React.FC<AgendaListProps> = ({
+export const AgendaList: React.FC<AgendaListProps> = React.memo(({
   events,
   selectedDate,
   scope,
@@ -32,12 +32,12 @@ export const AgendaList: React.FC<AgendaListProps> = ({
     setPastExpanded(pastDefaultExpanded);
   }, [pastDefaultExpanded, selectedDate]);
 
-  const togglePast = () => {
+  const togglePast = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setPastExpanded(!pastExpanded);
-  };
+    setPastExpanded(prev => !prev);
+  }, []);
 
-  const handlePress = (item: AgendaItem) => {
+  const handlePress = useCallback((item: AgendaItem) => {
     if (item.kind === 'assessment') {
       onPressTask(item);
     } else if (item.kind === 'calendar_event') {
@@ -45,7 +45,7 @@ export const AgendaList: React.FC<AgendaListProps> = ({
     } else if (item.subjectId && onSubjectPress) {
       onSubjectPress(item.subjectId);
     }
-  };
+  }, [onPressTask, onPressEvent, onSubjectPress]);
 
   return (
     <View style={{ flex: 1, paddingBottom: 40, paddingTop: 8 }}>
@@ -104,4 +104,5 @@ export const AgendaList: React.FC<AgendaListProps> = ({
       )}
     </View>
   );
-};
+});
+AgendaList.displayName = 'AgendaList';
