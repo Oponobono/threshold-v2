@@ -252,7 +252,7 @@ export function useGallery(t: any) {
     imagePhotos, starred, totalPhotoCount,
     loadPhotos, toggleStar,
     handlePhotoDeleted, handleGroupDeleted, handleSave, handleOcrPress,
-    formatDate, subjects, loadAllData,
+    formatDate, subjects,
     availableCourseIds,
     availableSubjectIds,
   };
