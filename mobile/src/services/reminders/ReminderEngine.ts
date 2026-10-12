@@ -187,26 +187,51 @@ export class ReminderEngine {
 
   private async _process(): Promise<void> {
     while (this.eventQueue.length > 0 && !this.destroyed) {
-      const queued = this.eventQueue[0];
-      this.eventQueue.shift();
+      const batch = this.eventQueue.splice(0, this.eventQueue.length);
+      const start = this.clock.now().getTime();
+
+      let scheduleGroupDirty = false;
+      for (const queued of batch) {
+        try {
+          if (this._applyEventMutation(queued.event)) {
+            scheduleGroupDirty = true;
+          }
+        } catch (error) {
+          queued.reject(error);
+        }
+      }
+
+      if (scheduleGroupDirty && this.preferences) {
+        this._rebuildScheduleGroup();
+      }
+
+      let stats = { scheduled: 0, cancelled: 0 };
       try {
-        await this._handleEvent(queued.event);
+        stats = await this._runPipeline();
+      } catch (pipelineError) {
+        for (const queued of batch) {
+          queued.reject(pipelineError);
+        }
+        continue;
+      }
+
+      const durationMs = this.clock.now().getTime() - start;
+      for (const queued of batch) {
+        this._trace(queued.event.type, durationMs, stats);
         queued.resolve();
-      } catch (error) {
-        queued.reject(error);
       }
     }
     this.processing = false;
   }
 
-  private async _handleEvent(event: EngineEvent): Promise<void> {
-    const start = this.clock.now().getTime();
+  private _applyEventMutation(event: EngineEvent): boolean {
+    let scheduleDirty = false;
 
     switch (event.type) {
       case 'entity_changed': {
         if (event.entityType === 'schedule' && this.preferences) {
           this._upsertScheduleRow(event.entity);
-          this._rebuildScheduleGroup();
+          scheduleDirty = true;
         } else if (event.entityType === 'flashcard_deck') {
           const seq = buildReviewDueSequence(
             event.entity,
@@ -234,7 +259,7 @@ export class ReminderEngine {
       case 'entity_deleted': {
         if (event.entityType === 'schedule' && this.preferences) {
           this._removeScheduleRow(event.entityId);
-          this._rebuildScheduleGroup();
+          scheduleDirty = true;
         } else if (event.entityType === 'flashcard_deck') {
           this.desiredSequences.delete(`${event.entityType}::${event.entityId}::daily`);
         } else {
@@ -246,7 +271,7 @@ export class ReminderEngine {
       case 'action_completed': {
         if (event.entityType === 'schedule' && this.preferences) {
           this._markScheduleSessionCompleted(event.entityId);
-          this._rebuildScheduleGroup();
+          scheduleDirty = true;
         } else if (event.entityType === 'flashcard_deck') {
           this.desiredSequences.delete(`${event.entityType}::${event.entityId}::daily`);
         } else {
@@ -259,9 +284,7 @@ export class ReminderEngine {
         break;
     }
 
-    const stats = await this._runPipeline();
-    const durationMs = this.clock.now().getTime() - start;
-    this._trace(event.type, durationMs, stats);
+    return scheduleDirty;
   }
 
   private async _runPipeline(): Promise<{ scheduled: number; cancelled: number }> {

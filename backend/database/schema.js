@@ -513,6 +513,7 @@ const tableSchema = {
       )
     `,
     columns: [
+      { name: 'user_id', type: 'TEXT' },
       { name: 'transcript_text', type: 'TEXT' },
       { name: 'summary_text', type: 'TEXT' },
       { name: 'cloud_url', type: 'TEXT' },

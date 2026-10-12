@@ -210,9 +210,40 @@ export default function SubjectsScreen() {
     return section?.data ?? [];
   }, [selectedCourseId, groupedSections, g.filteredSubjects]);
 
+  // fullGroupedSections: same as groupedSections but always with full data (no collapse state).
+  // Used by SubjectGridSection to build the Todas grouped view independently of the hook's collapse.
+  const fullGroupedSections = useMemo(() => {
+    const map = new Map<string, any[]>();
+    const independent: any[] = [];
+    g.filteredSubjects.forEach(s => {
+      if (s.course_id) {
+        if (!map.has(s.course_id)) map.set(s.course_id, []);
+        map.get(s.course_id)!.push(s);
+      } else {
+        independent.push(s);
+      }
+    });
+    const sections: Array<{ courseId: string | null; courseName: string; coursePlatform?: string; data: any[] }> = [];
+    courses.forEach(course => {
+      const data = map.get(course.id) ?? [];
+      if (data.length > 0) {
+        sections.push({ courseId: course.id, courseName: course.name, coursePlatform: course.platform, data });
+        map.delete(course.id);
+      }
+    });
+    map.forEach((data, cId) => {
+      sections.push({ courseId: cId, courseName: `Curso ${cId.substring(0, 4).toUpperCase()}`, data });
+    });
+    if (independent.length > 0) {
+      sections.push({ courseId: 'independent', courseName: 'Independientes', data: independent });
+    }
+    return sections;
+  }, [g.filteredSubjects, courses]);
+
   const selectedCourseName = useMemo(() => {
     if (!selectedCourseId) return '';
     return groupedSections.find(s => (s.courseId ?? 'independent') === selectedCourseId)?.courseName ?? '';
+
   }, [selectedCourseId, groupedSections]);
 
   const coursePickerOptions: CoursePickerOption[] = useMemo(() => {
@@ -456,6 +487,8 @@ export default function SubjectsScreen() {
               <SubjectGridSection
                 subjects={displayedSubjects}
                 courseName={selectedCourseName}
+                groupedSections={fullGroupedSections}
+                isCourseFiltered={selectedCourseId !== null}
                 subHeader={
                   coursesForPills.length > 0 ? (
                     <CourseFilterChip
@@ -471,6 +504,7 @@ export default function SubjectsScreen() {
                 onComplete={handleCompleteSubject}
                 onCreateSubject={handleCreateSubject}
               />
+
             </>
           ) : null
         }
