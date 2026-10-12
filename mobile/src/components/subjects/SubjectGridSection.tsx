@@ -132,8 +132,9 @@ const CourseGroupHeader: React.FC<{
     style={groupSt.header}
     onPress={onToggle}
     activeOpacity={0.7}
-    accessibilityRole="button"
+    accessibilityRole="header"
     accessibilityState={{ expanded: !isCollapsed }}
+    accessibilityLabel={`Curso ${courseName}, ${total} materias, ${activeCount} en curso. ${isCollapsed ? 'Colapsado. Toca para expandir' : 'Expandido. Toca para colapsar'}`}
   >
     <View style={groupSt.headerLeft}>
       <Text style={groupSt.headerTitle} numberOfLines={2}>{courseName}</Text>
@@ -253,18 +254,24 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
     return sortSubjects(subjects);
   }, [subjects, tab]);
 
-  const groupedForAll = useMemo(() => {
+  // Grouped sections with per-tab filtering applied to each group's subjects.
+  // Works for all tabs: active, completed, and all.
+  const groupedForTab = useMemo(() => {
     if (!groupedSections || isCourseFiltered) return null;
     return groupedSections
       .map(sec => {
-        const all = sortSubjects(sec.data);
-        const activeCount = all.filter(s => getSubjectStatus(s) === 'active').length;
-        const scored = all.filter(s => getSubjectAvg(s) > 0);
+        const allInGroup = sortSubjects(sec.data);
+        const tabFiltered =
+          tab === 'active'    ? allInGroup.filter(s => getSubjectStatus(s) === 'active') :
+          tab === 'completed' ? allInGroup.filter(s => getSubjectStatus(s) === 'completed') :
+          allInGroup;
+        const activeCount = allInGroup.filter(s => getSubjectStatus(s) === 'active').length;
+        const scored = allInGroup.filter(s => getSubjectAvg(s) > 0);
         const avgGpa = scored.length ? scored.reduce((sum, s) => sum + getSubjectAvg(s), 0) / scored.length : null;
-        return { ...sec, allSubjects: all, activeCount, avgGpa };
+        return { ...sec, allSubjects: tabFiltered, activeCount, avgGpa };
       })
-      .filter(s => s.allSubjects.length > 0);
-  }, [groupedSections, isCourseFiltered]);
+      .filter(sec => sec.allSubjects.length > 0);
+  }, [groupedSections, isCourseFiltered, tab]);
 
   const renderItem = useCallback((subject: any, isLast: boolean) => {
     const status = getSubjectStatus(subject);
@@ -312,11 +319,16 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
     );
   }, [viewMode, renderItem]);
 
-  const renderGrouped = useCallback(() => {
-    if (!groupedForAll) return null;
-    return groupedForAll.map(sec => {
-      const key = sec.courseId ?? 'independent';
-      const isCol = collapsed[key] ?? false;
+  // Reset "Ver más" expansion when tab changes to avoid stale counts
+  useEffect(() => {
+    setExpanded({});
+  }, [tab]);
+
+  const renderGrouped = useCallback((sections: NonNullable<typeof groupedForTab>) => {
+    return sections.map(sec => {
+      const key = `${tab}:${sec.courseId ?? 'independent'}`;
+      const colKey = sec.courseId ?? 'independent';
+      const isCol = collapsed[colKey] ?? false;
       const isExp = expanded[key] ?? false;
       const visible = isCol ? [] : isExp ? sec.allSubjects : sec.allSubjects.slice(0, MAX_VISIBLE_PER_GROUP);
       const hidden  = sec.allSubjects.length - MAX_VISIBLE_PER_GROUP;
@@ -326,7 +338,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
           <CourseGroupHeader
             courseName={sec.courseName} total={sec.allSubjects.length}
             avgGpa={sec.avgGpa} activeCount={sec.activeCount}
-            isCollapsed={isCol} onToggle={() => handleToggle(key)}
+            isCollapsed={isCol} onToggle={() => handleToggle(colKey)}
           />
           {!isCol && (
             <>
@@ -365,12 +377,14 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
         </View>
       );
     });
-  }, [groupedForAll, collapsed, expanded, viewMode, renderItem, handleToggle, handleExpand]);
+  }, [groupedForTab, collapsed, expanded, tab, viewMode, renderItem, handleToggle, handleExpand]);
 
   if (!ready) return null;
 
-  const showGrouped = tab === 'all' && !isCourseFiltered && groupedForAll && groupedForAll.length > 1;
-  const isEmpty     = filteredSubjects.length === 0 && !(showGrouped && groupedForAll && groupedForAll.length > 0);
+  const showGrouped = !isCourseFiltered && groupedForTab !== null && groupedForTab.length > 1;
+  const isEmpty     = showGrouped
+    ? groupedForTab!.length === 0
+    : filteredSubjects.length === 0;
 
   return (
     <View style={secSt.container}>
@@ -388,7 +402,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
       {isEmpty ? (
         <EmptyTabState tab={tab} onCreateSubject={onCreateSubject} onSwitchToAll={() => handleTabChange('all')} />
       ) : showGrouped ? (
-        <View style={secSt.groupedWrap}>{renderGrouped()}</View>
+        <View style={secSt.groupedWrap}>{renderGrouped(groupedForTab!)}</View>
       ) : (
         renderFlat(filteredSubjects)
       )}
