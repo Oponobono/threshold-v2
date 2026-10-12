@@ -247,21 +247,34 @@ export default function SubjectsScreen() {
   }, [selectedCourseId, groupedSections]);
 
   const coursePickerOptions: CoursePickerOption[] = useMemo(() => {
-    // Conteo real desde enrichedSubjects (sin filtro de búsqueda ni estado de colapso)
+    // Conteo real y estado desde enrichedSubjects (sin filtro de búsqueda ni estado de colapso)
     const countByCourse = new Map<string, number>();
+    const activeByCourse = new Map<string, number>();
     g.enrichedSubjects.forEach(s => {
       if (s.course_id) {
         countByCourse.set(s.course_id, (countByCourse.get(s.course_id) ?? 0) + 1);
+        const p = s.total_lessons && s.total_lessons > 0
+          ? (s.completed_lessons || 0) / s.total_lessons
+          : (s.completion_percent || 0) / 100;
+        if (p < 1) {
+          activeByCourse.set(s.course_id, (activeByCourse.get(s.course_id) ?? 0) + 1);
+        }
       }
     });
     return groupedSections
       .filter(s => s.courseId !== 'independent' && s.courseId)
-      .map(s => ({
-        id: s.courseId as string,
-        name: s.courseName,
-        subjectCount: countByCourse.get(s.courseId as string) ?? 0,
-        platform: s.coursePlatform,
-      }));
+      .map(s => {
+        const cId = s.courseId as string;
+        const total = countByCourse.get(cId) ?? 0;
+        const activeCount = activeByCourse.get(cId) ?? 0;
+        return {
+          id: cId,
+          name: s.courseName,
+          subjectCount: total,
+          isActive: activeCount > 0,
+          platform: s.coursePlatform,
+        };
+      });
   }, [groupedSections, g.enrichedSubjects]);
 
   const selectedCourseSubjectCount = useMemo(() => {

@@ -22,6 +22,8 @@ export interface CoursePickerOption {
   icon?: string;
   color?: string;
   platform?: string;
+  /** True si el curso tiene materias en curso/activas */
+  isActive?: boolean;
 }
 
 interface CoursePickerSheetProps {
@@ -51,14 +53,11 @@ const getPlatformIcon = (platform?: string): keyof typeof MaterialCommunityIcons
   (platform && PLATFORM_ICON[platform.toLowerCase()]) || 'folder-outline';
 
 /**
- * Hoja de selección de cursos siguiendo el lenguaje bento de la app.
- * — Sin botón Cancelar (scrim + gesto de bajar cierran la hoja)
- * — Búsqueda condicional (>6 cursos)
- * — Primera fila fija "Todos los cursos"
- * — Cada fila: icono tonal 40×40, nombre (2 líneas), "N materias · X% completado"
+ * Hoja de selección de cursos con jerarquía para escalar (15+ cursos):
+ * — Lo activo a la vista directa (primeros cursos en curso)
+ * — Los completados plegados en un bloque colapsable "N cursos completados"
+ * — Búsqueda que filtra los 16 a la vez, sin importar el bloque
  * — Radio check + fondo tonal en fila seleccionada
- * — Cierre inmediato al tocar (selección única)
- * — Accesibilidad: radiogroup + radio por fila
  */
 export const CoursePickerSheet: React.FC<CoursePickerSheetProps> = ({
   visible,
@@ -69,10 +68,14 @@ export const CoursePickerSheet: React.FC<CoursePickerSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = React.useState('');
+  const [showCompleted, setShowCompleted] = React.useState(false);
   const mountTime = useRef(0);
 
   React.useEffect(() => {
-    if (!visible) setQuery('');
+    if (!visible) {
+      setQuery('');
+      setShowCompleted(false);
+    }
   }, [visible]);
 
   if (visible && mountTime.current === 0) {
@@ -87,12 +90,24 @@ export const CoursePickerSheet: React.FC<CoursePickerSheetProps> = ({
     onClose();
   };
 
-  const showSearch = options.length > 6;
+  const showSearch = options.length > 5;
+  const isSearching = query.trim().length > 0;
+
   const filteredOptions = React.useMemo(() => {
     if (!query.trim()) return options;
     const q = query.trim().toLowerCase();
     return options.filter(o => o.name.toLowerCase().includes(q));
   }, [options, query]);
+
+  // Si estamos buscando o hay pocos cursos (<= 5), mostrar lista plana directa.
+  // Si hay más cursos y no se está buscando: separar en activos y completados.
+  const activeCourses = React.useMemo(() => {
+    return filteredOptions.filter(o => o.isActive !== false);
+  }, [filteredOptions]);
+
+  const completedCourses = React.useMemo(() => {
+    return filteredOptions.filter(o => o.isActive === false);
+  }, [filteredOptions]);
 
   const handleSelect = (id: string | null) => {
     onSelect(id);
@@ -166,6 +181,8 @@ export const CoursePickerSheet: React.FC<CoursePickerSheetProps> = ({
 
   if (!visible) return null;
 
+  const shouldSplit = !isSearching && options.length > 5 && completedCourses.length > 0;
+
   return (
     <Modal
       visible={visible}
@@ -221,13 +238,34 @@ export const CoursePickerSheet: React.FC<CoursePickerSheetProps> = ({
 
               {/* List */}
               <FlatList
-                data={filteredOptions}
+                data={shouldSplit ? (showCompleted ? filteredOptions : activeCourses) : filteredOptions}
                 keyExtractor={item => item.id}
                 showsVerticalScrollIndicator={false}
                 style={{ maxHeight: '100%' }}
                 accessibilityRole="radiogroup"
                 ListHeaderComponent={query ? null : renderAllRow}
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
+                ListFooterComponent={() => {
+                  if (!shouldSplit) return null;
+                  return (
+                    <TouchableOpacity
+                      style={styles.completedToggle}
+                      onPress={() => setShowCompleted(p => !p)}
+                      activeOpacity={0.7}
+                    >
+                      <Feather
+                        name={showCompleted ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color={theme.colors.text.secondary}
+                      />
+                      <Text style={styles.completedToggleText}>
+                        {showCompleted
+                          ? 'Ocultar cursos completados'
+                          : `${completedCourses.length} cursos completados`}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }}
                 ListEmptyComponent={
                   <Text style={styles.emptyText}>Sin resultados para &quot;{query}&quot;</Text>
                 }

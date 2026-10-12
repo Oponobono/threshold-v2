@@ -41,11 +41,11 @@ export const styles = StyleSheet.create({
 
   title: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '400',
     color: '#111827',
-    lineHeight: 17,
+    lineHeight: 18,
     marginBottom: 4,
-    minHeight: 34, // Reserves 2 lines height
+    minHeight: 36, // Reserves 2 lines height
   },
   professorText: {
     fontSize: 11,

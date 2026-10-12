@@ -142,14 +142,16 @@ const CourseGroupHeader: React.FC<{
         <Text style={groupSt.headerMetaText}>
           {total} materia{total !== 1 ? 's' : ''}{avgGpa && avgGpa > 0 ? ` · Prom. ${avgGpa.toFixed(1)}` : ''}
         </Text>
-        {activeCount > 0 && (
-          <View style={groupSt.activeBadge}>
-            <Text style={groupSt.activeBadgeText}>{activeCount} en curso</Text>
-          </View>
-        )}
       </View>
     </View>
-    <Ionicons name={isCollapsed ? 'chevron-down' : 'chevron-up'} size={16} color={theme.colors.text.secondary} />
+    <View style={groupSt.headerRight}>
+      {activeCount > 0 && (
+        <View style={groupSt.activeBadge}>
+          <Text style={groupSt.activeBadgeText}>{activeCount} en curso</Text>
+        </View>
+      )}
+      <Ionicons name={isCollapsed ? 'chevron-down' : 'chevron-up'} size={18} color={theme.colors.text.secondary} />
+    </View>
   </TouchableOpacity>
 );
 
@@ -274,7 +276,6 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
   }, [groupedSections, isCourseFiltered, tab]);
 
   const renderItem = useCallback((subject: any, isLast: boolean) => {
-    const status = getSubjectStatus(subject);
     if (viewMode === 'grid') {
       return (
         <View key={subject.id} style={{ flex: 1 }}>
@@ -282,7 +283,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
             subject={subject}
             onPress={onSubjectPress}
             onContinue={subject.external_url ? onContinue : undefined}
-            onComplete={status !== 'completed' ? onComplete : undefined}
+            onComplete={onComplete}
           />
         </View>
       );
@@ -293,36 +294,48 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
         subject={subject}
         onPress={() => onSubjectPress(subject)}
         onContinue={subject.external_url ? () => onContinue(subject) : undefined}
-        onComplete={status !== 'completed' ? () => onComplete(subject) : undefined}
+        onComplete={() => onComplete(subject)}
         isLast={isLast}
       />
     );
   }, [viewMode, onSubjectPress, onContinue, onComplete]);
 
   const renderFlat = useCallback((list: any[]) => {
-    if (viewMode === 'grid') {
-      const rows: React.ReactElement[] = [];
-      for (let i = 0; i < list.length; i += 2) {
-        rows.push(
-          <View key={`gr-${i}`} style={listSt.gridRow}>
-            {renderItem(list[i], false)}
-            {list[i + 1] ? renderItem(list[i + 1], false) : <View style={{ flex: 1 }} />}
-          </View>
-        );
-      }
-      return <View style={listSt.gridWrap}>{rows}</View>;
-    }
     return (
       <View style={listSt.listWrap}>
-        {list.map((s, idx) => renderItem(s, idx === list.length - 1))}
+        {list.map((s, idx) => (
+          <SubjectRow
+            key={s.id}
+            subject={s}
+            onPress={() => onSubjectPress(s)}
+            onContinue={s.external_url ? () => onContinue(s) : undefined}
+            onComplete={() => onComplete(s)}
+            isLast={idx === list.length - 1}
+          />
+        ))}
       </View>
     );
-  }, [viewMode, renderItem]);
+  }, [onSubjectPress, onContinue, onComplete]);
 
   // Reset "Ver más" expansion when tab changes to avoid stale counts
   useEffect(() => {
     setExpanded({});
   }, [tab]);
+
+  // Dentro de grupos SIEMPRE usamos filas (SubjectRow) con ramificación visual (árbol)
+  // que se desprende desde el curso hacia cada una de las materias.
+  const renderRowItem = useCallback((subject: any, isLast: boolean, isFirst?: boolean) => (
+    <SubjectRow
+      key={subject.id}
+      subject={subject}
+      onPress={() => onSubjectPress(subject)}
+      onContinue={subject.external_url ? () => onContinue(subject) : undefined}
+      onComplete={() => onComplete(subject)}
+      isLast={isLast}
+      isBranch={true}
+      isFirst={isFirst}
+    />
+  ), [onSubjectPress, onContinue, onComplete]);
 
   const renderGrouped = useCallback((sections: NonNullable<typeof groupedForTab>) => {
     return sections.map(sec => {
@@ -342,26 +355,9 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
           />
           {!isCol && (
             <>
-              {viewMode === 'grid' ? (
-                <View style={listSt.gridWrap}>
-                  {(() => {
-                    const rows: React.ReactElement[] = [];
-                    for (let i = 0; i < visible.length; i += 2) {
-                      rows.push(
-                        <View key={`gr-${i}`} style={listSt.gridRow}>
-                          {renderItem(visible[i], false)}
-                          {visible[i + 1] ? renderItem(visible[i + 1], false) : <View style={{ flex: 1 }} />}
-                        </View>
-                      );
-                    }
-                    return rows;
-                  })()}
-                </View>
-              ) : (
-                <View style={[listSt.listWrap, groupSt.listInset]}>
-                  {visible.map((s, idx) => renderItem(s, idx === visible.length - 1 && !showMore))}
-                </View>
-              )}
+              <View style={listSt.listWrap}>
+                {visible.map((s, idx) => renderRowItem(s, idx === visible.length - 1 && !showMore, idx === 0))}
+              </View>
               {showMore && (
                 <TouchableOpacity
                   style={groupSt.verMas}
@@ -377,7 +373,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
         </View>
       );
     });
-  }, [groupedForTab, collapsed, expanded, tab, viewMode, renderItem, handleToggle, handleExpand]);
+  }, [groupedForTab, collapsed, expanded, tab, renderRowItem, handleToggle, handleExpand]);
 
   if (!ready) return null;
 
@@ -392,7 +388,6 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
       <View style={secSt.header}>
         <View style={secSt.titleRow}>
           <Text style={secSt.title}>{t('subjects.yourSubjects', 'Tus materias')}</Text>
-          <ViewToggle mode={viewMode} onToggle={handleViewToggle} />
         </View>
         {subHeader && <View style={secSt.subHeaderWrap}>{subHeader}</View>}
         <StatusFilterBar tab={tab} counts={counts} onTabChange={handleTabChange} />
@@ -438,21 +433,22 @@ const toggleSt = StyleSheet.create({
 });
 
 const groupSt = StyleSheet.create({
-  section:         { marginBottom: 4, backgroundColor: theme.colors.white, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, gap: 8 },
+  section:         { marginBottom: 14 },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 4, gap: 12 },
   headerLeft:      { flex: 1, gap: 3 },
-  headerTitle:     { fontSize: 13, fontWeight: '700', color: theme.colors.text.primary, lineHeight: 17 },
+  headerTitle:     { fontSize: 13, fontWeight: '400', color: theme.colors.text.primary, lineHeight: 18, letterSpacing: 0.4, textTransform: 'uppercase' },
   headerMeta:      { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   headerMetaText:  { fontSize: 11, color: theme.colors.text.secondary },
-  activeBadge:     { backgroundColor: '#FEF3C7', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1, borderWidth: 0.5, borderColor: '#FDE68A' },
-  activeBadgeText: { fontSize: 10, fontWeight: '600', color: '#D97706' },
-  listInset:       { borderTopWidth: 0.5, borderTopColor: theme.colors.border },
-  verMas:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: theme.colors.border },
+  headerRight:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  activeBadge:     { backgroundColor: '#FEF3C7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2.5, borderWidth: 0.5, borderColor: '#FDE68A' },
+  activeBadgeText: { fontSize: 12, fontWeight: '700', color: '#D97706' },
+  listInset:       { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border },
+  verMas:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border },
   verMasText:      { fontSize: 12, fontWeight: '600', color: theme.colors.text.secondary },
 });
 
 const listSt = StyleSheet.create({
-  listWrap:  { backgroundColor: theme.colors.white, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+  listWrap:  { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border },
   gridWrap:  { gap: 10, padding: 2 },
   gridRow:   { flexDirection: 'row', gap: 10 },
 });
