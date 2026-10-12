@@ -183,7 +183,7 @@ export default function GalleryScreen() {
 
       <FlatList
         data={g.imagePhotos}
-        keyExtractor={(item) => item[0].id?.toString() || Math.random().toString()}
+        keyExtractor={(item, index) => item[0]?.id ? String(item[0].id) : (item[0]?.local_uri || `group-${index}`)}
         numColumns={2}
         columnWrapperStyle={{ gap: 16, paddingHorizontal: theme.spacing.lg }}
         contentContainerStyle={[galleryStyles.scroll, { flexGrow: 1, paddingHorizontal: 0 }]}

@@ -1,10 +1,9 @@
 import { RepositoryFactory } from '../services/database/RepositoryFactory';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { InteractionManager } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 import { updatePhoto } from '../services/api';
 import { useDataStore } from '../store/useDataStore';
-import { GalleryPhoto, FilterTab } from '../types/gallery';
+import { repositoryEventBus } from '../services/events/RepositoryEventBus';
+import { GalleryPhoto } from '../types/gallery';
 import type { Course } from '../services/api/types';
 
 const formatDate = (dateStr?: string) => {
@@ -24,16 +23,26 @@ function enrichPhotos(rawPhotos: any[], subjects: any[], t: any): GalleryPhoto[]
   });
 }
 
+// Caché en memoria para evitar recargar y parpadear al cambiar de pestaña
+let cachedPhotos: GalleryPhoto[] | null = null;
+
 export function useGallery(t: any) {
   const storeSubjects = useDataStore(s => s.subjects);
   const storePhotos = useDataStore(s => s.photos);
   const storeCourses = useDataStore(s => s.courses);
-  const { loadAllData } = useDataStore();
 
   const subjects = storeSubjects;
+  const subjectsRef = useRef(storeSubjects);
+  useEffect(() => {
+    subjectsRef.current = storeSubjects;
+  }, [storeSubjects]);
 
-  const [photos, setPhotos] = useState<GalleryPhoto[]>(() => enrichPhotos(storePhotos, storeSubjects, t));
-  const [isLoading, setIsLoading] = useState(storePhotos.length === 0);
+  const [photos, setPhotos] = useState<GalleryPhoto[]>(() => {
+    if (cachedPhotos && cachedPhotos.length > 0) return cachedPhotos;
+    if (storePhotos && storePhotos.length > 0) return enrichPhotos(storePhotos, storeSubjects, t);
+    return [];
+  });
+  const [isLoading, setIsLoading] = useState(() => !cachedPhotos && (!storePhotos || storePhotos.length === 0));
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterStarred, setFilterStarred] = useState(false);
   const [filterOcr, setFilterOcr] = useState(false);
@@ -42,7 +51,7 @@ export function useGallery(t: any) {
   const [courses, setCourses] = useState<Course[]>(storeCourses as Course[]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(true);
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -52,8 +61,6 @@ export function useGallery(t: any) {
   const [ocrModalVisible, setOcrModalVisible] = useState(false);
   const [selectedOcrText, setSelectedOcrText] = useState('');
 
-  const hadInitialDataRef = useRef(storePhotos.length > 0);
-
   useEffect(() => {
     if (storeCourses.length > 0 && courses.length === 0) {
       setCourses(storeCourses as Course[]);
@@ -61,11 +68,15 @@ export function useGallery(t: any) {
   }, [storeCourses]);
 
   const loadPhotos = useCallback(async (refreshing = false) => {
-    if (refreshing) setIsRefreshing(true);
-    else setIsLoading(true);
+    if (refreshing) {
+      setIsRefreshing(true);
+    } else if (!cachedPhotos && photos.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const list = await RepositoryFactory.photos().getAll();
-      const enriched = enrichPhotos(list as any[], subjects, t);
+      const enriched = enrichPhotos(list as any[], subjectsRef.current, t);
+      cachedPhotos = enriched;
       setPhotos(enriched);
     } catch (err) {
       console.warn('[GalleryScreen] loadPhotos error:', err);
@@ -73,51 +84,72 @@ export function useGallery(t: any) {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [subjects, t]);
+  }, [t, photos.length]);
 
+  // Carga inicial solo si no hay fotos cacheadas
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsReady(true);
-      loadAllData();
-      if (!hadInitialDataRef.current) {
-        loadPhotos();
-      }
-      hadInitialDataRef.current = false;
-    });
-    return () => task.cancel();
-  }, [loadAllData, loadPhotos]);
+    if (!cachedPhotos || cachedPhotos.length === 0) {
+      loadPhotos(false);
+    }
+  }, [loadPhotos]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const task = InteractionManager.runAfterInteractions(() => {
-        loadPhotos(true);
+  // Escuchar mutaciones de fotos desde cualquier parte de la app silenciosamente
+  useEffect(() => {
+    const unsub = repositoryEventBus.onBatch('photos', () => {
+      loadPhotos(false);
+    });
+    return unsub;
+  }, [loadPhotos]);
+
+  // Si cambian los subjects en el store, re-enriquecer fotos existentes sin re-consultar SQLite
+  useEffect(() => {
+    if (photos.length > 0 && storeSubjects.length > 0) {
+      setPhotos(prev => {
+        const enriched = enrichPhotos(prev, storeSubjects, t);
+        cachedPhotos = enriched;
+        return enriched;
       });
-      return () => task.cancel();
-    }, [loadPhotos])
-  );
+    }
+  }, [storeSubjects, t]);
 
   const toggleStar = useCallback(async (photo: GalleryPhoto) => {
     const newVal = photo.es_favorita ? 0 : 1;
-    setPhotos((prev) => prev.map((p) => p.id === photo.id ? { ...p, es_favorita: newVal } : p));
+    setPhotos((prev) => {
+      const updated = prev.map((p) => p.id === photo.id ? { ...p, es_favorita: newVal } : p);
+      cachedPhotos = updated;
+      return updated;
+    });
     try {
       if (photo.id) await updatePhoto(photo.id, { es_favorita: newVal === 1 });
     } catch {
-      setPhotos((prev) => prev.map((p) => p.id === photo.id ? { ...p, es_favorita: photo.es_favorita } : p));
+      setPhotos((prev) => {
+        const rolledBack = prev.map((p) => p.id === photo.id ? { ...p, es_favorita: photo.es_favorita } : p);
+        cachedPhotos = rolledBack;
+        return rolledBack;
+      });
     }
   }, []);
 
   const handlePhotoDeleted = useCallback((id: string) => {
-    setPhotos((prev) => prev.filter((p) => p.id !== id));
+    setPhotos((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      cachedPhotos = updated;
+      return updated;
+    });
     setViewerPhotos((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
   const handleGroupDeleted = useCallback((group: GalleryPhoto[]) => {
     const ids = new Set(group.map((p) => p.id).filter(Boolean));
-    setPhotos((prev) => prev.filter((p) => p.id && !ids.has(p.id)));
+    setPhotos((prev) => {
+      const updated = prev.filter((p) => p.id && !ids.has(p.id));
+      cachedPhotos = updated;
+      return updated;
+    });
     setViewerPhotos((prev) => prev.filter((p) => p.id && !ids.has(p.id)));
   }, []);
 
-  const handleSave = useCallback(() => loadPhotos(true), [loadPhotos]);
+  const handleSave = useCallback(() => loadPhotos(false), [loadPhotos]);
 
   const handleOcrPress = useCallback((ocrText: string) => {
     setSelectedOcrText(ocrText);
