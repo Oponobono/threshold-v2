@@ -44,6 +44,10 @@ dist/
 out/
 .next/
 
+# ==================== GRADLE ====================
+# Local Gradle build cache (covers mobile/modules/*/android/.gradle/)
+.gradle/
+
 # ==================== MOBILE (EXPO/REACT NATIVE) ====================
 mobile/.expo/
 mobile/dist/
