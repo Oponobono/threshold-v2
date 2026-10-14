@@ -22,6 +22,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const STORAGE_KEY_VIEW = 'subjects_view_mode';
 const STORAGE_KEY_TAB  = 'subjects_status_tab';
+const STORAGE_KEY_GROUPS = 'subjects_expanded_groups';
 const MAX_VISIBLE_PER_GROUP = 3;
 
 type StatusTab = 'active' | 'completed' | 'all';
@@ -203,23 +204,37 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
   const { t } = useTranslation();
   const [tab, setTab]               = useState<StatusTab>('active');
   const [viewMode, setViewMode]     = useState<ViewMode>('list');
-  const [collapsed, setCollapsed]   = useState<Record<string, boolean>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded]     = useState<Record<string, boolean>>({});
   const [ready, setReady]           = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [v, s] = await Promise.all([
+        const [v, s, eg] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY_VIEW),
           AsyncStorage.getItem(STORAGE_KEY_TAB),
+          AsyncStorage.getItem(STORAGE_KEY_GROUPS),
         ]);
         if (v === 'grid' || v === 'list') setViewMode(v);
         if (s === 'active' || s === 'completed' || s === 'all') setTab(s);
+        if (eg) {
+          const parsed = JSON.parse(eg);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            setExpandedGroups(parsed);
+          }
+        }
       } catch { /* ignore */ }
       setReady(true);
     })();
   }, []);
+
+  // Persist per-course expansion so it survives tab changes, navigation between
+  // screens, and app restarts (same pattern as the selected tab / view mode).
+  useEffect(() => {
+    if (!ready) return;
+    AsyncStorage.setItem(STORAGE_KEY_GROUPS, JSON.stringify(expandedGroups)).catch(() => {});
+  }, [expandedGroups, ready]);
 
   const handleTabChange = useCallback((t: StatusTab) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -236,7 +251,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
 
   const handleToggle = useCallback((key: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setCollapsed(p => ({ ...p, [key]: !p[key] }));
+    setExpandedGroups(p => ({ ...p, [key]: !p[key] }));
   }, []);
 
   const handleExpand = useCallback((key: string) => {
@@ -317,10 +332,8 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
     );
   }, [onSubjectPress, onContinue, onComplete]);
 
-  // Reset "Ver más" expansion when tab changes to avoid stale counts
-  useEffect(() => {
-    setExpanded({});
-  }, [tab]);
+  // No reset on tab change: the user's per-course expansion and "Ver más" state
+  // are preserved when switching between tabs (En curso / Completas / Todas).
 
   // Dentro de grupos SIEMPRE usamos filas (SubjectRow) con ramificación visual (árbol)
   // que se desprende desde el curso hacia cada una de las materias.
@@ -341,7 +354,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
     return sections.map(sec => {
       const key = `${tab}:${sec.courseId ?? 'independent'}`;
       const colKey = sec.courseId ?? 'independent';
-      const isCol = collapsed[colKey] ?? false;
+      const isCol = !(expandedGroups[colKey] ?? false);
       const isExp = expanded[key] ?? false;
       const visible = isCol ? [] : isExp ? sec.allSubjects : sec.allSubjects.slice(0, MAX_VISIBLE_PER_GROUP);
       const hidden  = sec.allSubjects.length - MAX_VISIBLE_PER_GROUP;
@@ -373,7 +386,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
         </View>
       );
     });
-  }, [groupedForTab, collapsed, expanded, tab, renderRowItem, handleToggle, handleExpand]);
+  }, [groupedForTab, expandedGroups, expanded, tab, renderRowItem, handleToggle, handleExpand]);
 
   if (!ready) return null;
 
