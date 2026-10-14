@@ -64,17 +64,19 @@ test.after(() => {
 const JWT_SECRET = secrets.JWT_SECRET;
 
 // ── App que replica el orden de server.js ────────────────────────────────────
-// L124 en server.js monta /api/ai/models/online ANTES del middleware global,
-// y por eso es publica a proposito. Se replica para que el test documente
-// exactamente cual es la superficie publica y no una mas amplia o estrecha.
+// server.js monta /api/ai/models/online y /api/ai/models/gguf_catalog ANTES
+// del middleware global; ambos son publicos a proposito. Se replican aqui para
+// que el test documente exactamente cual es la superficie publica.
 function construirApp() {
   const app = express();
   app.use(express.json());
   app.get('/api/ai/models/online', (_req, res) => res.json({ groq: 11, gemini: 35 }));
+  app.get('/api/ai/models/gguf_catalog', (_req, res) => res.json({ data: [] }));
   app.use('/api', authenticateToken);
   app.use('/api', aiRoutes);
   return app;
 }
+
 
 function arrancar(app) {
   return new Promise((resolve) => {
@@ -277,12 +279,13 @@ test('las unicas rutas publicas de /api/ai son las montadas antes del auth', asy
   const { server, base } = await arrancar(construirApp());
   t.after(() => server.close());
 
-  // /api/ai/models/online se monta antes del middleware en server.js, asi que
-  // es publica a proposito. Este test falla si alguien la mueve despues sin
-  // darse cuenta, porque entonces recibiria 401 y el movil dejaria de listar
-  // modelos.
-  const { status } = await pedir(base, 'GET', '/api/ai/models/online', null);
-  assert.equal(status, 200);
+  // Ambos endpoints se montan antes del middleware en server.js, son publicos
+  // a proposito. Este test falla si alguien los mueve despues sin darse cuenta.
+  const { status: onlineStatus } = await pedir(base, 'GET', '/api/ai/models/online', null);
+  assert.equal(onlineStatus, 200, '/api/ai/models/online debe ser publico');
+
+  const { status: ggufStatus } = await pedir(base, 'GET', '/api/ai/models/gguf_catalog', null);
+  assert.equal(ggufStatus, 200, '/api/ai/models/gguf_catalog debe ser publico');
 });
 
 test('no hay ninguna otra ruta de IA accesible sin token', async (t) => {
@@ -290,7 +293,7 @@ test('no hay ninguna otra ruta de IA accesible sin token', async (t) => {
   t.after(() => server.close());
 
   // Rutas del router que NO son las montadas antes del middleware global.
-  const publicasEsperadas = ['/api/ai/models/online'];
+  const publicasEsperadas = ['/api/ai/models/online', '/api/ai/models/gguf_catalog'];
   const filtradas = RUTAS.filter((r) => !publicasEsperadas.includes(r.ruta));
   for (const { metodo, ruta } of filtradas) {
     const { status } = await pedir(base, metodo, ruta, null);

@@ -69,7 +69,7 @@ export class CatalogMergeService {
           console.log('[CatalogMergeService] Catalog refresh skipped (expected in offline mode). Retaining local state.');
         } else {
           // Only throw a red screen ERROR if we are online and it STILL failed
-          console.error('[CatalogMergeService] DIAGNOSTIC: Remote catalog fetch failed (likely 404). Retaining local state.');
+          console.warn('[CatalogMergeService] Remote catalog fetch failed (likely 404). Retaining local state.');
         }
         
         for (const prev of previousCatalog) {
