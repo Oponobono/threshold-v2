@@ -14,14 +14,11 @@ import { useSubjects, ACTIVITY_CONFIG } from '../../src/hooks/useSubjects';
 import { ScheduleGrid, ScheduleModal } from '../../src/components/subjects/ScheduleGrid';
 import { SCALE_MAX } from '../../src/utils/grades';
 import { useGroupedSubjects } from '../../src/hooks/useGroupedSubjects';
-import { SubjectCard } from '../../src/components/subjects/SubjectCard';
 import { SubjectGridSection } from '../../src/components/subjects/SubjectGridSection';
 import { openCourseLink } from '../../src/utils/linking';
 import { ZyrenIngestionModal } from '../../src/components/subjects/ZyrenIngestionModal';
 import { CreateSubjectModal } from '../../src/components/dashboard/CreateSubjectModal';
-import { MomentumService } from '../../src/services/MomentumService';
 import { useDataStore } from '../../src/store/useDataStore';
-import { updateSubject, updateCourseCounters } from '../../src/services/api/subjects';
 import { CourseFilterChip } from '../../src/components/subjects/CourseFilterChip';
 import { CoursePickerSheet, CoursePickerOption } from '../../src/components/subjects/CoursePickerSheet';
 import { ExpandableSearchBar } from '../../src/components/common/ExpandableSearchBar';
@@ -89,7 +86,6 @@ export default function SubjectsScreen() {
   const g = useSubjects(t, i18n.language);
   const courses = useDataStore(s => s.courses);
   const loadAllData = useDataStore(s => s.loadAllData);
-  const refreshSubjects = useDataStore(s => s.refreshSubjects);
   const refreshCourses = useDataStore(s => s.refreshCourses);
   const { groupedSections, toggleCourse, collapsedCourses, aggregatedMomentumScore } = useGroupedSubjects(courses, g.filteredSubjects);
 
@@ -134,7 +130,8 @@ export default function SubjectsScreen() {
     g.setSearch('');
   }, [g.setSearch]);
 
-  const handleClassComplete = useCallback((subject: any, courseName: string) => {
+  // El botón solo abre los apuntes: no registra progreso ni toca el contador del curso.
+  const handleOpenClassNotes = useCallback((subject: any, courseName: string) => {
     setZyrenSubject({
       id: subject.id,
       name: subject.name,
@@ -145,21 +142,7 @@ export default function SubjectsScreen() {
       icon: subject.icon,
     });
     setZyrenModalVisible(true);
-
-    const newCompleted = (subject.completed_lessons || 0) + 1;
-    updateSubject(subject.id, { completed_lessons: newCompleted })
-      .then(() => refreshSubjects())
-      .then(() => {
-        if (subject.course_id) {
-          return updateCourseCounters(subject.course_id)
-            .then(() => refreshCourses())
-            .then(() => MomentumService.boostMomentum(subject.course_id).catch(console.warn));
-        }
-      })
-      .catch((e) => {
-        console.warn('[handleClassComplete] Error persisting completed_lessons:', e);
-      });
-  }, [refreshSubjects, refreshCourses]);
+  }, []);
 
   const getCoursePlatform = useCallback((courseId?: string | null): string | undefined => {
     if (!courseId) return undefined;
@@ -172,31 +155,55 @@ export default function SubjectsScreen() {
       courseId: subject?.course_id,
       onVideoEnd: () => {
         if (subject) {
-          handleClassComplete(subject, courseName || '');
+          handleOpenClassNotes(subject, courseName || '');
         }
       }
     });
-  }, [handleClassComplete]);
+  }, [handleOpenClassNotes]);
 
-  const overallGpa = useMemo(() => {
-    const scored = g.enrichedSubjects.filter(s => (s.avg_score ?? 0) > 0);
+  // Ámbito de las estadísticas del hero: el curso seleccionado en el filtro, o
+  // todos los subjects cuando no hay filtro activo.
+  const heroSubjects = useMemo(() => {
+    if (!selectedCourseId) return g.enrichedSubjects;
+    return g.enrichedSubjects.filter(s => s.course_id === selectedCourseId);
+  }, [g.enrichedSubjects, selectedCourseId]);
+
+  const heroGpa = useMemo(() => {
+    const scored = heroSubjects.filter(s => (s.avg_score ?? 0) > 0);
     if (scored.length === 0) return 0;
     const sum = scored.reduce((acc, s) => {
       const raw = s.avg_score ?? 0;
       return acc + (raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw);
     }, 0);
     return sum / scored.length;
-  }, [g.enrichedSubjects]);
+  }, [heroSubjects]);
 
-  const approvedCount = useMemo(() => {
-    return g.enrichedSubjects.filter(s => {
+  const heroApprovedCount = useMemo(() => {
+    return heroSubjects.filter(s => {
       const raw = s.avg_score ?? 0;
       if (raw === 0) return false;
       const avg = raw > SCALE_MAX * 2 ? (raw / 100) * SCALE_MAX : raw;
       const threshold = s.target_grade ?? 3.0;
       return avg >= threshold;
     }).length;
-  }, [g.enrichedSubjects]);
+  }, [heroSubjects]);
+
+  const heroSubjectCount = selectedCourseId ? heroSubjects.length : g.subjects.length;
+
+  const heroCredits = useMemo(() => {
+    if (!selectedCourseId) return g.totalCredits;
+    return heroSubjects.reduce((sum, s) => sum + (s.credits || 0), 0);
+  }, [selectedCourseId, heroSubjects, g.totalCredits]);
+
+  const heroMomentum = useMemo(() => {
+    if (!selectedCourseId) return aggregatedMomentumScore;
+    return courses.find(c => c.id === selectedCourseId)?.momentum_score ?? 1.0;
+  }, [selectedCourseId, courses, aggregatedMomentumScore]);
+
+  // Mazos pendientes del curso seleccionado (o el total global si no hay filtro).
+  const heroDueDecks = selectedCourseId
+    ? (g.dueDecksByCourse[selectedCourseId] ?? 0)
+    : g.dueDecksToday;
 
   const coursesForPills = useMemo(() => {
     return groupedSections
@@ -296,8 +303,8 @@ export default function SubjectsScreen() {
   }, [handleContinueClass, getCoursePlatform, selectedCourseName]);
 
   const handleCompleteSubject = useCallback((s: any) => {
-    handleClassComplete(s, s.courseName || selectedCourseName);
-  }, [handleClassComplete, selectedCourseName]);
+    handleOpenClassNotes(s, s.courseName || selectedCourseName);
+  }, [handleOpenClassNotes, selectedCourseName]);
 
   const handleCreateSubject = useCallback(() => {
     setIsCreationMenuVisible(true);
@@ -381,7 +388,7 @@ export default function SubjectsScreen() {
                 <View style={styles.heroContentRow}>
                   <View style={styles.gpaContainer}>
                     <View style={styles.semesterGpaCircle}>
-                      <Text style={styles.semesterGpaValue}>{overallGpa.toFixed(1)}</Text>
+                      <Text style={styles.semesterGpaValue}>{heroGpa.toFixed(1)}</Text>
                       <Text style={styles.semesterGpaLabel}>{t('subjects.semesterGpa')}</Text>
                     </View>
                   </View>
@@ -389,45 +396,75 @@ export default function SubjectsScreen() {
                   <View style={styles.miniGridContainer}>
                     <View style={styles.miniCard}>
                       <Text style={styles.miniCardTitle}>{t('subjects.totalSubjects', { defaultValue: 'MATERIAS' })}</Text>
-                      <Text style={styles.miniCardValue}>{g.subjects.length}</Text>
+                      <Text style={styles.miniCardValue}>{heroSubjectCount}</Text>
                     </View>
 
                     <View style={styles.miniCard}>
                       <Text style={styles.miniCardTitle}>{t('subjects.semesterCredits', { defaultValue: 'CRÉDITOS' })}</Text>
                       <Text style={styles.miniCardValue}>
-                        {g.totalCredits}
+                        {heroCredits}
                         <Text style={styles.miniCardSub}>cr</Text>
                       </Text>
                     </View>
 
                     <View style={styles.miniCard}>
                       <Text style={styles.miniCardTitle}>{t('subjects.semesterApproved', { defaultValue: 'APROBADAS' })}</Text>
-                      <Text style={styles.miniCardValue}>{approvedCount}</Text>
+                      <Text style={styles.miniCardValue}>{heroApprovedCount}</Text>
                     </View>
 
-                    <MomentumCard score={aggregatedMomentumScore} />
+                    <MomentumCard score={heroMomentum} />
                   </View>
                 </View>
 
-                <View style={styles.heroEngineRow}>
-                  <View style={styles.heroEngineChip}>
-                    <Text style={styles.heroEngineIcon}>⚡</Text>
-                    <Text style={styles.heroEngineText}>
-                      {g.dueDecksToday > 0
-                        ? `${g.dueDecksToday} mazo${g.dueDecksToday !== 1 ? 's' : ''} para hoy`
-                        : 'Sin repasos pendientes'}
-                    </Text>
-                  </View>
-                  {g.studyStreak > 0 && (
-                    <>
-                      <Text style={styles.heroEngineSep}>·</Text>
-                      <View style={styles.heroEngineChip}>
-                        <Text style={styles.heroEngineIcon}>🔥</Text>
-                        <Text style={styles.heroEngineText}>Racha: {g.studyStreak} día{g.studyStreak !== 1 ? 's' : ''}</Text>
+                <View style={[styles.heroEngineRow, selectedCourseId ? styles.heroEngineRowScoped : null]}>
+                  {selectedCourseId ? (
+                    <View style={styles.heroEngineScoped}>
+                      <View style={styles.heroEngineNameRow}>
+                        <Ionicons name="school-outline" size={11} color="rgba(255,255,255,0.85)" style={styles.heroEngineIconVec} />
+                        <Text style={styles.heroEngineName}>{selectedCourseName || 'Curso'}</Text>
                       </View>
+                      <View style={styles.heroEngineMetaRow}>
+                        <Ionicons name="layers-outline" size={11} color="rgba(255,255,255,0.7)" style={styles.heroEngineIconVec} />
+                        <Text style={styles.heroEngineMetaText}>
+                          {heroDueDecks > 0
+                            ? `${heroDueDecks} Mazo${heroDueDecks !== 1 ? 's' : ''} por Repasar`
+                            : 'Sin Repasos'}
+                        </Text>
+                        {g.studyStreak > 0 && (
+                          <>
+                            <Text style={styles.heroEngineMetaSep}>·</Text>
+                            <Ionicons name="flame" size={11} color="#FF9500" style={styles.heroEngineIconVec} />
+                            <Text style={styles.heroEngineMetaText}>
+                              Racha: {g.studyStreak} Día{g.studyStreak !== 1 ? 's' : ''}
+                            </Text>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={styles.heroEngineChip}>
+                        <Ionicons name="layers-outline" size={11} color="rgba(255,255,255,0.7)" style={styles.heroEngineIconVec} />
+                        <Text style={styles.heroEngineText}>
+                          {g.dueDecksToday > 0
+                            ? `${g.dueDecksToday} Mazo${g.dueDecksToday !== 1 ? 's' : ''} para Hoy`
+                            : 'Sin Repasos Pendientes'}
+                        </Text>
+                      </View>
+                      {g.studyStreak > 0 && (
+                        <>
+                          <Text style={styles.heroEngineSep}>·</Text>
+                          <View style={styles.heroEngineChip}>
+                            <Ionicons name="flame" size={11} color="#FF9500" style={styles.heroEngineIconVec} />
+                            <Text style={styles.heroEngineText}>
+                              Racha: {g.studyStreak} Día{g.studyStreak !== 1 ? 's' : ''}
+                            </Text>
+                          </View>
+                        </>
+                      )}
                     </>
                   )}
-                  </View>
+                </View>
                 </View>
               )}
 

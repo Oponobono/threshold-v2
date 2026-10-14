@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SubjectIcon } from './SubjectIcon';
 import { SCALE_MAX } from '../../utils/grades';
 import { formatSubjectTitle } from '../../utils/textFormat';
 import { styles } from '../../styles/SubjectCard.styles';

@@ -105,17 +105,69 @@ export const subjectsStyles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
+  // Con curso seleccionado la fila lleva 2 líneas: se compensa el padding
+  // vertical (10 → 4) para que el panel crezca ~0px: 2 líneas compactas
+  // (13 + 1 + 12 = 26) + 8 de padding ≈ 34px, igual que la fila de 1 línea.
+  heroEngineRowScoped: {
+    paddingVertical: 4,
+  },
   heroEngineChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+  },
+  // Curso seleccionado: nombre completo en la línea 1 (sin truncar, envuelve si
+  // es muy largo) y, debajo, mazos por repasar + racha en una sola línea con
+  // fuente 1pt menor (9 vs 10) para que ambos quepan juntos.
+  heroEngineScoped: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 1,
+  },
+  heroEngineNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    maxWidth: '100%',
+  },
+  heroEngineName: {
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.1,
+    flexShrink: 1,
+    textAlign: 'center',
+  },
+  heroEngineMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  heroEngineMetaText: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.1,
+  },
+  heroEngineMetaSep: {
+    fontSize: 9,
+    lineHeight: 12,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '300',
   },
   heroEngineSep: {
     fontSize: 10,
     color: 'rgba(255,255,255,0.4)',
     fontWeight: '300',
   },
-  heroEngineIcon: { fontSize: 10 },
+  // Iconos vectoriales del footer (curso / mazos / racha): lineHeight fijo para
+  // no inflar la línea; el tamaño lo define el prop `size` del icono.
+  heroEngineIconVec: { lineHeight: 12 },
   heroEngineText: {
     fontSize: 10,
     fontWeight: '600',

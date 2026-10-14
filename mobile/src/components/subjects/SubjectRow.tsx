@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, Pressable } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { SubjectIcon } from './SubjectIcon';
@@ -36,6 +37,26 @@ export const SubjectRow = React.memo(({
   const statusLabel = progressPct >= 100 ? 'completada' : progressPct > 0 ? 'en curso' : 'sin iniciar';
   const gradeLabel = hasGrade ? `, promedio ${avg.toFixed(1)}` : '';
   const accessibilityLabel = `${subject.name}, ${statusLabel}${gradeLabel}`;
+
+  const [done, setDone] = useState(false);
+  const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const processing = useRef(false);
+
+  useEffect(() => () => {
+    if (doneTimer.current) clearTimeout(doneTimer.current);
+  }, []);
+
+  const handleProcess = useCallback(() => {
+    if (processing.current) return;
+    processing.current = true;
+    setDone(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onComplete?.();
+    doneTimer.current = setTimeout(() => {
+      setDone(false);
+      processing.current = false;
+    }, 600);
+  }, [onComplete]);
 
   return (
     <TouchableOpacity
@@ -115,15 +136,26 @@ export const SubjectRow = React.memo(({
         )}
 
         {onComplete && (
-          <TouchableOpacity
-            style={styles.processBtn}
-            onPress={onComplete}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          <Pressable
+            style={({ pressed }) => [
+              styles.processBtn,
+              pressed && styles.processBtnPressed,
+              done && styles.processBtnDone,
+            ]}
+            onPress={handleProcess}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            android_ripple={{ color: 'rgba(79, 70, 229, 0.18)', borderless: true }}
             accessibilityRole="button"
             accessibilityLabel={`Procesar clase de ${subject.name}`}
           >
-            <Ionicons name="sparkles" size={14} color="#FFFFFF" />
-          </TouchableOpacity>
+            {({ pressed }) => (
+              <Ionicons
+                name={done ? 'checkmark' : 'sparkles'}
+                size={14}
+                color={done || pressed ? theme.colors.accentOnAccent : theme.colors.accent}
+              />
+            )}
+          </Pressable>
         )}
 
         {onContinue && (

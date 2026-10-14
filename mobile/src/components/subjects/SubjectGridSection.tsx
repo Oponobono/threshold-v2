@@ -11,7 +11,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { SubjectCard } from './SubjectCard';
 import { SubjectRow } from './SubjectRow';
 import { theme } from '../../styles/theme';
 import { SCALE_MAX } from '../../utils/grades';
@@ -20,13 +19,11 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const STORAGE_KEY_VIEW = 'subjects_view_mode';
 const STORAGE_KEY_TAB  = 'subjects_status_tab';
 const STORAGE_KEY_GROUPS = 'subjects_expanded_groups';
 const MAX_VISIBLE_PER_GROUP = 3;
 
 type StatusTab = 'active' | 'completed' | 'all';
-type ViewMode  = 'list' | 'grid';
 
 interface GroupedSection {
   courseId: string | null;
@@ -60,6 +57,12 @@ function getSubjectStatus(s: any): 'active' | 'completed' | 'notstarted' {
   if (pct >= 100) return 'completed';
   if (pct > 0)   return 'active';
   return 'notstarted';
+}
+
+// "En curso" agrupa todo lo NO completado: una materia al 0% (sin iniciar) sigue
+// perteneciendo a la pestaña. El badge de cada fila conserva la distinción fina.
+function belongsToActiveTab(s: any): boolean {
+  return getSubjectStatus(s) !== 'completed';
 }
 
 function getSubjectAvg(s: any): number {
@@ -113,18 +116,6 @@ const StatusFilterBar: React.FC<{
   );
 };
 
-const ViewToggle: React.FC<{ mode: ViewMode; onToggle: () => void }> = ({ mode, onToggle }) => (
-  <TouchableOpacity
-    style={toggleSt.btn}
-    onPress={onToggle}
-    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    accessibilityRole="button"
-    accessibilityLabel={mode === 'list' ? 'Cambiar a cuadrícula' : 'Cambiar a lista'}
-  >
-    <Ionicons name={mode === 'list' ? 'grid-outline' : 'list-outline'} size={17} color={theme.colors.text.secondary} />
-  </TouchableOpacity>
-);
-
 const CourseGroupHeader: React.FC<{
   courseName: string; total: number; avgGpa: number | null;
   activeCount: number; isCollapsed: boolean; onToggle: () => void;
@@ -163,7 +154,7 @@ const EmptyTabState: React.FC<{
     <View style={emptySt.container}>
       <Ionicons name="checkmark-circle-outline" size={32} color={theme.colors.success} style={{ opacity: 0.6, marginBottom: 8 }} />
       <Text style={emptySt.title}>No tienes materias en curso</Text>
-      <Text style={emptySt.subtitle}>Todas tus materias están completas o sin iniciar</Text>
+      <Text style={emptySt.subtitle}>Todas tus materias están completas</Text>
       <TouchableOpacity style={emptySt.linkBtn} onPress={onSwitchToAll}>
         <Text style={emptySt.linkText}>Ver todas las materias</Text>
         <Ionicons name="arrow-forward" size={13} color={theme.colors.primary} />
@@ -203,7 +194,6 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
 }) => {
   const { t } = useTranslation();
   const [tab, setTab]               = useState<StatusTab>('active');
-  const [viewMode, setViewMode]     = useState<ViewMode>('list');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded]     = useState<Record<string, boolean>>({});
   const [ready, setReady]           = useState(false);
@@ -211,12 +201,10 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
   useEffect(() => {
     (async () => {
       try {
-        const [v, s, eg] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY_VIEW),
+        const [s, eg] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY_TAB),
           AsyncStorage.getItem(STORAGE_KEY_GROUPS),
         ]);
-        if (v === 'grid' || v === 'list') setViewMode(v);
         if (s === 'active' || s === 'completed' || s === 'all') setTab(s);
         if (eg) {
           const parsed = JSON.parse(eg);
@@ -230,7 +218,7 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
   }, []);
 
   // Persist per-course expansion so it survives tab changes, navigation between
-  // screens, and app restarts (same pattern as the selected tab / view mode).
+  // screens, and app restarts (same pattern as the selected tab).
   useEffect(() => {
     if (!ready) return;
     AsyncStorage.setItem(STORAGE_KEY_GROUPS, JSON.stringify(expandedGroups)).catch(() => {});
@@ -241,13 +229,6 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
     setTab(t);
     AsyncStorage.setItem(STORAGE_KEY_TAB, t).catch(() => {});
   }, []);
-
-  const handleViewToggle = useCallback(() => {
-    const next: ViewMode = viewMode === 'list' ? 'grid' : 'list';
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setViewMode(next);
-    AsyncStorage.setItem(STORAGE_KEY_VIEW, next).catch(() => {});
-  }, [viewMode]);
 
   const handleToggle = useCallback((key: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -260,13 +241,13 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
   }, []);
 
   const counts = useMemo(() => ({
-    active:    subjects.filter(s => getSubjectStatus(s) === 'active').length,
+    active:    subjects.filter(belongsToActiveTab).length,
     completed: subjects.filter(s => getSubjectStatus(s) === 'completed').length,
     all:       subjects.length,
   }), [subjects]);
 
   const filteredSubjects = useMemo(() => {
-    if (tab === 'active')    return sortSubjects(subjects.filter(s => getSubjectStatus(s) === 'active'));
+    if (tab === 'active')    return sortSubjects(subjects.filter(belongsToActiveTab));
     if (tab === 'completed') return sortSubjects(subjects.filter(s => getSubjectStatus(s) === 'completed'));
     return sortSubjects(subjects);
   }, [subjects, tab]);
@@ -279,41 +260,16 @@ export const SubjectGridSection: React.FC<SubjectGridSectionProps> = ({
       .map(sec => {
         const allInGroup = sortSubjects(sec.data);
         const tabFiltered =
-          tab === 'active'    ? allInGroup.filter(s => getSubjectStatus(s) === 'active') :
+          tab === 'active'    ? allInGroup.filter(belongsToActiveTab) :
           tab === 'completed' ? allInGroup.filter(s => getSubjectStatus(s) === 'completed') :
           allInGroup;
-        const activeCount = allInGroup.filter(s => getSubjectStatus(s) === 'active').length;
+        const activeCount = allInGroup.filter(belongsToActiveTab).length;
         const scored = allInGroup.filter(s => getSubjectAvg(s) > 0);
         const avgGpa = scored.length ? scored.reduce((sum, s) => sum + getSubjectAvg(s), 0) / scored.length : null;
         return { ...sec, allSubjects: tabFiltered, activeCount, avgGpa };
       })
       .filter(sec => sec.allSubjects.length > 0);
   }, [groupedSections, isCourseFiltered, tab]);
-
-  const renderItem = useCallback((subject: any, isLast: boolean) => {
-    if (viewMode === 'grid') {
-      return (
-        <View key={subject.id} style={{ flex: 1 }}>
-          <SubjectCard
-            subject={subject}
-            onPress={onSubjectPress}
-            onContinue={subject.external_url ? onContinue : undefined}
-            onComplete={onComplete}
-          />
-        </View>
-      );
-    }
-    return (
-      <SubjectRow
-        key={subject.id}
-        subject={subject}
-        onPress={() => onSubjectPress(subject)}
-        onContinue={subject.external_url ? () => onContinue(subject) : undefined}
-        onComplete={() => onComplete(subject)}
-        isLast={isLast}
-      />
-    );
-  }, [viewMode, onSubjectPress, onContinue, onComplete]);
 
   const renderFlat = useCallback((list: any[]) => {
     return (
@@ -441,10 +397,6 @@ const filterSt = StyleSheet.create({
   badgeTextActive:{ color: theme.colors.white },
 });
 
-const toggleSt = StyleSheet.create({
-  btn: { width: 32, height: 32, borderRadius: 8, backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center' },
-});
-
 const groupSt = StyleSheet.create({
   section:         { marginBottom: 14 },
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 4, gap: 12 },
@@ -462,8 +414,6 @@ const groupSt = StyleSheet.create({
 
 const listSt = StyleSheet.create({
   listWrap:  { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border },
-  gridWrap:  { gap: 10, padding: 2 },
-  gridRow:   { flexDirection: 'row', gap: 10 },
 });
 
 const emptySt = StyleSheet.create({

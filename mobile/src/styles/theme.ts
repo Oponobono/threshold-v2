@@ -27,6 +27,12 @@ export const theme = {
     danger: '#FF2D55',  // Used for "Impossible" status, destructive actions
     dangerTransparent: 'rgba(255, 45, 85, 0.08)',
     info: '#007AFF',
+    // Acento de acción para superficies claras. Medido sobre card #F4F6F8:
+    // accent 5.80:1 · accent sobre accentTint 4.87:1 · accentOnAccent sobre accent 6.29:1.
+    accent: '#4F46E5',
+    accentTint: '#E0E1F6',
+    accentStrong: '#4038C7',
+    accentOnAccent: '#FFFFFF',
   },
   spacing: {
     xs: 4,

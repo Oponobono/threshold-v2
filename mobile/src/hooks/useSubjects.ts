@@ -556,11 +556,27 @@ export function useSubjects(t: any, lang?: string) {
   }, [assessments, flashcardDecks, userStats, calendarEvents, subjects, courses, extraItems, t]);
 
   // ── Hero footer: motor de aprendizaje ──
-  const dueDecksToday = useMemo(() => {
-    // Mazos que tienen last_reviewed_at en algún momento y aún tienen cards pendientes (vía predictions)
-    const dueIds = useDataStore.getState().getDuedeckIds();
-    return dueIds.size;
-  }, [predictions]);
+  // Mazos con cartas pendientes (vía predictions) y su desglose por curso, para
+  // que el badge del hero pueda acotarse al curso seleccionado en el filtro.
+  const dueDeckIds = useMemo(() => useDataStore.getState().getDuedeckIds(), [predictions]);
+
+  const dueDecksToday = dueDeckIds.size;
+
+  const dueDecksByCourse = useMemo(() => {
+    const byCourse: Record<string, number> = {};
+    if (dueDeckIds.size === 0) return byCourse;
+    const courseBySubject = new Map<string, string>();
+    subjects.forEach(s => {
+      if (s.course_id) courseBySubject.set(String(s.id), String(s.course_id));
+    });
+    flashcardDecks.forEach((deck: any) => {
+      if (!dueDeckIds.has(String(deck.id))) return;
+      const courseId = deck.subject_id ? courseBySubject.get(String(deck.subject_id)) : undefined;
+      if (!courseId) return;
+      byCourse[courseId] = (byCourse[courseId] ?? 0) + 1;
+    });
+    return byCourse;
+  }, [dueDeckIds, subjects, flashcardDecks]);
 
   const studyStreak = useMemo(() => {
     if (!userStats?.study_streak) return 0;
@@ -570,7 +586,7 @@ export function useSubjects(t: any, lang?: string) {
   return {
     subjects, filteredSubjects, enrichedSubjects, criticalSubjects,
     totalCredits, recentActivity, loadActivityFeed,
-    dueDecksToday, studyStreak,
+    dueDecksToday, dueDecksByCourse, studyStreak,
     search, setSearch,
     overlayVisible, setOverlayVisible,
     overlayText, setOverlayText,

@@ -153,11 +153,6 @@ export const styles = StyleSheet.create({
     color: '#374151',
     letterSpacing: -0.2,
   },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
   actionPlayBtn: {
     width: 26,
     height: 26,
@@ -168,14 +163,15 @@ export const styles = StyleSheet.create({
   processBtn: {
     width: 30,
     height: 30,
-    borderRadius: 8,
-    backgroundColor: '#1E293B',
+    borderRadius: 15,
+    backgroundColor: theme.colors.accentTint,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-    elevation: 1,
+  },
+  processBtnPressed: {
+    backgroundColor: theme.colors.accent,
+  },
+  processBtnDone: {
+    backgroundColor: '#059669',
   },
 });
