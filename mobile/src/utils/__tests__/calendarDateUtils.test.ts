@@ -105,23 +105,81 @@ describe('calendarDateUtils', () => {
 
       const index = buildMonthActivityIndex(schedules, assessments, calendarEvents);
 
-      // 12 Oct 2026: Lunes (tiene clase y tarea, no evento)
+      // 12 Oct 2026: Lunes (tiene clase y tarea, no evento -> totalCount = 2)
       const day12 = getActivitySummaryForDay(index, 2026, 9, 12);
       expect(day12.hasClasses).toBe(true);
       expect(day12.hasTasks).toBe(true);
       expect(day12.hasEvents).toBe(false);
+      expect(day12.totalCount).toBe(2);
 
-      // 15 Oct 2026: Jueves (tiene evento, no clase ni tarea)
+      // 15 Oct 2026: Jueves (tiene evento, no clase ni tarea -> totalCount = 1)
       const day15 = getActivitySummaryForDay(index, 2026, 9, 15);
       expect(day15.hasClasses).toBe(false);
       expect(day15.hasTasks).toBe(false);
       expect(day15.hasEvents).toBe(true);
+      expect(day15.totalCount).toBe(1);
 
-      // 18 Oct 2026: Domingo (sin actividad)
+      // 18 Oct 2026: Domingo (sin actividad -> totalCount = 0)
       const day18 = getActivitySummaryForDay(index, 2026, 9, 18);
       expect(day18.hasClasses).toBe(false);
       expect(day18.hasTasks).toBe(false);
       expect(day18.hasEvents).toBe(false);
+      expect(day18.totalCount).toBe(0);
+    });
+
+    it('calcula totalCount correctamente acumulando múltiples actividades en un mismo día', () => {
+      const schedules = [
+        { id: 'sch1', day_of_week: 5, start_time: '08:00' }, // Viernes
+        { id: 'sch2', day_of_week: 5, start_time: '14:00' }, // Viernes
+      ];
+      const assessments = [
+        { id: 'a1', due_at: '2026-10-16T10:00:00Z' }, // 16 Oct 2026 (Viernes)
+        { id: 'a2', due_at: '2026-10-16T18:00:00Z' }, // 16 Oct 2026 (Viernes)
+      ];
+      const calendarEvents = [
+        { id: 'e1', startDate: '16-10-2026', endDate: '16-10-2026' }, // 16 Oct 2026 (Viernes)
+      ];
+
+      const index = buildMonthActivityIndex(schedules, assessments, calendarEvents);
+      const day16 = getActivitySummaryForDay(index, 2026, 9, 16);
+
+      // 2 clases + 2 tareas + 1 evento = 5 actividades
+      expect(day16.hasClasses).toBe(true);
+      expect(day16.hasTasks).toBe(true);
+      expect(day16.hasEvents).toBe(true);
+      expect(day16.totalCount).toBe(5);
+    });
+
+    it('deduplica bloques horarios de la misma materia para que cuenten como 1 sola clase en la agenda', () => {
+      // Caso reportado: Un día con 2 materias donde cada una tiene 2 bloques horarios (4 filas en schedules)
+      // + 2 tareas -> Antes daba 6, ahora debe dar exactamente 4 (2 clases + 2 tareas)
+      const schedules = [
+        { id: 'sch1', subject_id: 'sub-matematicas', day_of_week: 1, start_time: '08:00', end_time: '09:00' },
+        { id: 'sch2', subject_id: 'sub-matematicas', day_of_week: 1, start_time: '09:00', end_time: '10:00' },
+        { id: 'sch3', subject_id: 'sub-fisica', day_of_week: 1, start_time: '10:00', end_time: '11:00' },
+        { id: 'sch4', subject_id: 'sub-fisica', day_of_week: 1, start_time: '11:00', end_time: '12:00' },
+        // Martes con 1 sola materia que tiene 2 bloques de 1 hora
+        { id: 'sch5', subject_id: 'sub-quimica', day_of_week: 2, start_time: '14:00', end_time: '15:00' },
+        { id: 'sch6', subject_id: 'sub-quimica', day_of_week: 2, start_time: '15:00', end_time: '16:00' },
+      ];
+      const assessments = [
+        { id: 'a1', due_at: '2026-10-12T14:00:00Z' }, // 12 Oct 2026 (Lunes)
+        { id: 'a2', due_at: '2026-10-12T18:00:00Z' }, // 12 Oct 2026 (Lunes)
+      ];
+
+      const index = buildMonthActivityIndex(schedules, assessments, []);
+
+      // Lunes 12 Octubre: 2 materias distintas + 2 tareas = 4 eventos en total (no 6)
+      const day12 = getActivitySummaryForDay(index, 2026, 9, 12);
+      expect(day12.hasClasses).toBe(true);
+      expect(day12.hasTasks).toBe(true);
+      expect(day12.totalCount).toBe(4);
+
+      // Martes 13 Octubre: 1 materia (con 2 bloques) = 1 evento en total (no 2)
+      const day13 = getActivitySummaryForDay(index, 2026, 9, 13);
+      expect(day13.hasClasses).toBe(true);
+      expect(day13.hasTasks).toBe(false);
+      expect(day13.totalCount).toBe(1);
     });
   });
 });

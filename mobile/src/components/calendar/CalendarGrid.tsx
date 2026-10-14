@@ -47,17 +47,20 @@ interface DayCellProps {
   hasClasses: boolean;
   hasTasks: boolean;
   hasEvents: boolean;
+  eventCount: number;
   onSelectDay: (day: number) => void;
   isCurrentMonth: boolean;
 }
 
-const DayCell = React.memo<DayCellProps>(({
+const DayCell = React.memo<DayCellProps>((
+  {
   day,
   selected,
   today,
   hasClasses,
   hasTasks,
   hasEvents,
+  eventCount,
   onSelectDay,
   isCurrentMonth,
 }) => {
@@ -65,12 +68,14 @@ const DayCell = React.memo<DayCellProps>(({
     if (isCurrentMonth) onSelectDay(day);
   }, [isCurrentMonth, onSelectDay, day]);
 
+  const showBadge = isCurrentMonth && eventCount > 1;
+
   return (
     <TouchableOpacity
       onPress={handlePress}
       activeOpacity={isCurrentMonth ? 0.7 : 1}
       accessibilityRole="button"
-      accessibilityLabel={`${day}${today ? ', hoy' : ''}${selected ? ', seleccionado' : ''}${hasClasses ? ', clases programadas' : ''}${hasTasks ? ', tareas pendientes' : ''}${hasEvents ? ', eventos' : ''}`}
+      accessibilityLabel={`${day}${today ? ', hoy' : ''}${selected ? ', seleccionado' : ''}${hasClasses ? ', clases programadas' : ''}${hasTasks ? ', tareas pendientes' : ''}${hasEvents ? ', eventos' : ''}${eventCount > 1 ? `, ${eventCount} actividades` : ''}`}
       style={[
         calendarGridStyles.cell,
         selected && calendarGridStyles.selectedCell,
@@ -78,13 +83,28 @@ const DayCell = React.memo<DayCellProps>(({
         !isCurrentMonth && { opacity: 0.35 },
       ]}
     >
-      <Text style={[
-        calendarGridStyles.cellText,
-        selected && calendarGridStyles.selectedCellText,
-        !selected && today && calendarGridStyles.todayCellText,
-      ]}>
-        {day}
-      </Text>
+      <View style={calendarGridStyles.dayNumberWrapper}>
+        <Text style={[
+          calendarGridStyles.cellText,
+          selected && calendarGridStyles.selectedCellText,
+          !selected && today && calendarGridStyles.todayCellText,
+        ]}>
+          {day}
+        </Text>
+        {showBadge && (
+          <View style={[
+            calendarGridStyles.countBadge,
+            selected && calendarGridStyles.countBadgeSelected,
+          ]}>
+            <Text style={[
+              calendarGridStyles.countBadgeText,
+              selected && calendarGridStyles.countBadgeTextSelected,
+            ]}>
+              {eventCount > 9 ? '9+' : eventCount}
+            </Text>
+          </View>
+        )}
+      </View>
       {(!selected && (hasClasses || hasTasks || hasEvents)) && (
         <View style={calendarGridStyles.dotsContainer}>
           {hasClasses && <View style={[calendarGridStyles.activityDot, { backgroundColor: '#2F80ED' }]} />}
@@ -135,7 +155,7 @@ const MonthGrid = React.memo<MonthGridProps>(({
           const day = i + 1;
           const selected = day === selectedDayNum;
           const today = isToday(day);
-          const { hasClasses, hasTasks, hasEvents } = getActivitySummary(year, month, day);
+          const { hasClasses, hasTasks, hasEvents, totalCount } = getActivitySummary(year, month, day);
 
           return (
             <DayCell
@@ -146,6 +166,7 @@ const MonthGrid = React.memo<MonthGridProps>(({
               hasClasses={hasClasses}
               hasTasks={hasTasks}
               hasEvents={hasEvents}
+              eventCount={totalCount}
               onSelectDay={onSelectDay}
               isCurrentMonth={true}
             />

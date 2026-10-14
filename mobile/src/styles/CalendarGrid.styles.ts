@@ -94,6 +94,11 @@ export const calendarGridStyles = StyleSheet.create({
     color: theme.colors.primary,
     fontWeight: '700',
   },
+  dayNumberWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dotsContainer: {
     flexDirection: 'row',
     position: 'absolute',
@@ -105,4 +110,40 @@ export const calendarGridStyles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
   },
+  countBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -13,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: theme.colors.inputBackground,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  countBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '700',
+    color: theme.colors.text.secondary,
+    lineHeight: 11,
+    includeFontPadding: false,
+  },
+  countBadgeSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  countBadgeTextSelected: {
+    color: '#FFFFFF',
+  },
 });
+

@@ -11,7 +11,16 @@ import {
 
 export const TODAY = new Date();
 
-export function useCalendar(t: any, language: string = 'es-ES') {
+export interface CalendarScopeFilter {
+  courseId?: string | null;
+  subjectId?: string | null;
+}
+
+export function useCalendar(
+  t: any,
+  language: string = 'es-ES',
+  scopeFilter?: CalendarScopeFilter
+) {
   const [viewMonth, setViewMonth] = useState(TODAY.getMonth());
   const [viewYear, setViewYear] = useState(TODAY.getFullYear());
   const [selectedDayNum, setSelectedDayNum] = useState(TODAY.getDate());
@@ -62,14 +71,61 @@ export function useCalendar(t: any, language: string = 'es-ES') {
     setSelectedDayNum(TODAY.getDate());
   };
 
-  const getDaySchedule = useCallback((day: number): AgendaItem[] => {
+  const selectedCourseId = scopeFilter?.courseId ?? null;
+  const selectedSubjectId = scopeFilter?.subjectId ?? null;
+
+  // Filtrado por materia o curso seleccionado
+  const scopedSchedules = useMemo(() => {
+    if (!selectedCourseId && !selectedSubjectId) return allSchedules;
+    return (allSchedules || []).filter(s => {
+      const subjId = s.subject_id || (s as any).subjectId;
+      if (selectedSubjectId) return subjId === selectedSubjectId;
+      if (selectedCourseId) {
+        const subj = (subjects || []).find((sub: any) => sub.id === subjId);
+        return subj?.course_id === selectedCourseId;
+      }
+      return true;
+    });
+  }, [allSchedules, selectedCourseId, selectedSubjectId, subjects]);
+
+  const scopedAssessments = useMemo(() => {
+    if (!selectedCourseId && !selectedSubjectId) return allAssessments;
+    return (allAssessments || []).filter(a => {
+      if (selectedSubjectId) return a.subject_id === selectedSubjectId;
+      if (selectedCourseId) {
+        const subj = (subjects || []).find((sub: any) => sub.id === a.subject_id);
+        return subj?.course_id === selectedCourseId;
+      }
+      return true;
+    });
+  }, [allAssessments, selectedCourseId, selectedSubjectId, subjects]);
+
+  const scopedCalendarEvents = useMemo(() => {
+    if (!selectedCourseId && !selectedSubjectId) return calendarEvents;
+    return (calendarEvents || []).filter(e => {
+      const subjId = e.subjectId || e.subject_id;
+      if (selectedSubjectId) return subjId === selectedSubjectId;
+      if (selectedCourseId) {
+        const subj = (subjects || []).find((sub: any) => sub.id === subjId);
+        return subj?.course_id === selectedCourseId;
+      }
+      return true;
+    });
+  }, [calendarEvents, selectedCourseId, selectedSubjectId, subjects]);
+
+  const buildDayScheduleFromData = useCallback((
+    day: number,
+    schedulesData: any[],
+    assessmentsData: any[],
+    eventsData: any[]
+  ): AgendaItem[] => {
     const _t0 = __DEV__ ? performance.now() : 0;
     const date = new Date(viewYear, viewMonth, day);
     const dateWeekday = date.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
     const targetDateId = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     // 1. Clases recurrentes: normalizadas con toWeekday (0..6)
-    const rawClasses: AgendaItem[] = (allSchedules || [])
+    const rawClasses: AgendaItem[] = (schedulesData || [])
       .filter(s => toWeekday(s.day_of_week) === dateWeekday)
       .map(s => {
         const subject = subjects?.find((sub: any) => sub.id === s.subject_id);
@@ -89,8 +145,9 @@ export function useCalendar(t: any, language: string = 'es-ES') {
 
     const classMap = new Map<string, AgendaItem>();
     rawClasses.forEach(cls => {
-      if (cls.subjectId && classMap.has(cls.subjectId)) {
-        const existing = classMap.get(cls.subjectId)!;
+      const key = cls.subjectId || cls.id;
+      if (key && classMap.has(key)) {
+        const existing = classMap.get(key)!;
         const est = existing.start;
         const cst = cls.start;
         const eet = existing.end;
@@ -100,15 +157,15 @@ export function useCalendar(t: any, language: string = 'es-ES') {
         existing.start = newStartTime;
         existing.end = newEndTime;
         existing.time_label = `${newStartTime} - ${newEndTime}`;
-      } else if (cls.subjectId) {
-        classMap.set(cls.subjectId, cls);
+      } else if (key) {
+        classMap.set(key, cls);
       }
     });
 
     const classes = Array.from(classMap.values());
 
     // 2. Evaluaciones / Tareas: soporte para due_at, starts_at y date legacy
-    const tasks: AgendaItem[] = (allAssessments as any[])
+    const tasks: AgendaItem[] = (assessmentsData || [])
       .filter((a: any) => {
         const dateId = toDateId(a.due_at ?? a.starts_at ?? a.date);
         return dateId === targetDateId;
@@ -137,7 +194,7 @@ export function useCalendar(t: any, language: string = 'es-ES') {
       });
 
     // 3. Eventos de calendario: soporte multi-día y formatos YYYY-MM-DD / DD-MM-YYYY
-    const calendarDayEvents: AgendaItem[] = (calendarEvents || [])
+    const calendarDayEvents: AgendaItem[] = (eventsData || [])
       .filter((event: any) => {
         const startId = toDateId(event.startDate ?? event.start_date);
         if (!startId) return false;
@@ -184,16 +241,24 @@ export function useCalendar(t: any, language: string = 'es-ES') {
 
     if (__DEV__ && day === selectedDayNum) {
       const elapsedMs = performance.now() - _t0;
-      console.log(`[Calendar:Phase0] getDaySchedule(${targetDateId}) tomó ${elapsedMs.toFixed(2)}ms | Raw: [sch:${allSchedules.length}, ass:${allAssessments.length}, evt:${calendarEvents.length}] -> Matched: [cls:${classes.length}, tsk:${tasks.length}, evt:${calendarDayEvents.length}] = Total ${sorted.length}`);
+      console.log(`[Calendar:Phase0] getDaySchedule(${targetDateId}) tomó ${elapsedMs.toFixed(2)}ms | Raw: [sch:${schedulesData.length}, ass:${assessmentsData.length}, evt:${eventsData.length}] -> Matched: [cls:${classes.length}, tsk:${tasks.length}, evt:${calendarDayEvents.length}] = Total ${sorted.length}`);
     }
 
     return sorted;
-  }, [allSchedules, allAssessments, calendarEvents, subjects, viewYear, viewMonth, t, selectedDayNum]);
+  }, [viewYear, viewMonth, subjects, t, selectedDayNum]);
 
-  // Índice O(1) calculado una sola vez al mutar los datos
+  const getDaySchedule = useCallback((day: number): AgendaItem[] => {
+    return buildDayScheduleFromData(day, scopedSchedules, scopedAssessments, scopedCalendarEvents);
+  }, [buildDayScheduleFromData, scopedSchedules, scopedAssessments, scopedCalendarEvents]);
+
+  const getUnscopedDaySchedule = useCallback((day: number): AgendaItem[] => {
+    return buildDayScheduleFromData(day, allSchedules, allAssessments, calendarEvents);
+  }, [buildDayScheduleFromData, allSchedules, allAssessments, calendarEvents]);
+
+  // Índice O(1) calculado una sola vez con los datos del scope activo
   const activityIndex = useMemo(
-    () => buildMonthActivityIndex(allSchedules, allAssessments, calendarEvents),
-    [allSchedules, allAssessments, calendarEvents]
+    () => buildMonthActivityIndex(scopedSchedules, scopedAssessments, scopedCalendarEvents),
+    [scopedSchedules, scopedAssessments, scopedCalendarEvents]
   );
 
   // Consulta instantánea O(1) en lugar de resolver la agenda completa
@@ -210,6 +275,11 @@ export function useCalendar(t: any, language: string = 'es-ES') {
   const filteredEvents = useMemo(
     () => getDaySchedule(selectedDayNum),
     [getDaySchedule, selectedDayNum]
+  );
+
+  const unscopedDayEvents = useMemo(
+    () => getUnscopedDaySchedule(selectedDayNum),
+    [getUnscopedDaySchedule, selectedDayNum]
   );
 
   const isToday = (day: number) =>
@@ -235,6 +305,7 @@ export function useCalendar(t: any, language: string = 'es-ES') {
     getDaySchedule,
     getActivitySummary,
     filteredEvents,
+    unscopedDayEvents,
     isToday,
     reloadEventsForMonth,
     loadAllData: useDataStore.getState().loadAllData,

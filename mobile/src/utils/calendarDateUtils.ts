@@ -93,12 +93,23 @@ export function buildMonthActivityIndex(
   assessments: any[] = [],
   calendarEvents: any[] = []
 ): MonthActivityIndex {
-  const byWeekday = new Map<number, number>();
+  // Agrupar clases recurrentes por materia/identidad única para que los bloques
+  // horarios consecutivos de la misma materia cuenten como 1 sola clase (equivalente a la tarjeta en la agenda).
+  const byWeekdaySubjects = new Map<number, Set<string>>();
   for (const s of schedules) {
     const w = toWeekday(s.day_of_week);
-    if (w !== null) {
-      byWeekday.set(w, (byWeekday.get(w) ?? 0) + 1);
+    const key = s.subject_id || s.subjectId || s.id;
+    if (w !== null && key) {
+      if (!byWeekdaySubjects.has(w)) {
+        byWeekdaySubjects.set(w, new Set());
+      }
+      byWeekdaySubjects.get(w)!.add(String(key));
     }
+  }
+
+  const byWeekday = new Map<number, number>();
+  for (const [w, set] of byWeekdaySubjects.entries()) {
+    byWeekday.set(w, set.size);
   }
 
   const byDate = new Map<string, { tasks: number; events: number }>();
@@ -149,15 +160,20 @@ export function getActivitySummaryForDay(
   year: number,
   month: number,
   day: number
-): { hasClasses: boolean; hasTasks: boolean; hasEvents: boolean } {
+): { hasClasses: boolean; hasTasks: boolean; hasEvents: boolean; totalCount: number } {
   const date = new Date(year, month, day);
   const weekday = date.getDay(); // 0..6
   const targetDateId = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-  const hasClasses = (index.byWeekday.get(weekday) ?? 0) > 0;
+  const classCount = index.byWeekday.get(weekday) ?? 0;
+  const hasClasses = classCount > 0;
   const dateEntry = index.byDate.get(targetDateId);
-  const hasTasks = (dateEntry?.tasks ?? 0) > 0;
-  const hasEvents = (dateEntry?.events ?? 0) > 0;
+  const taskCount = dateEntry?.tasks ?? 0;
+  const eventCount = dateEntry?.events ?? 0;
+  const hasTasks = taskCount > 0;
+  const hasEvents = eventCount > 0;
+  const totalCount = classCount + taskCount + eventCount;
 
-  return { hasClasses, hasTasks, hasEvents };
+  return { hasClasses, hasTasks, hasEvents, totalCount };
 }
+

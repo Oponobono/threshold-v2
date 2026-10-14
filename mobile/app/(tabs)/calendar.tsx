@@ -33,7 +33,17 @@ export default function CalendarScreen() {
 
   const lang = i18n.language === 'en' ? 'en' : 'es-ES';
 
-  const calendar = useCalendar(t, lang);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [courseModalVisible, setCourseModalVisible] = useState(false);
+  const [subjectModalVisible, setSubjectModalVisible] = useState(false);
+
+  const scopeFilter = useMemo(() => ({
+    courseId: selectedCourseId,
+    subjectId: selectedSubjectId,
+  }), [selectedCourseId, selectedSubjectId]);
+
+  const calendar = useCalendar(t, lang, scopeFilter);
 
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
@@ -68,20 +78,15 @@ export default function CalendarScreen() {
   const subjects = useDataStore(s => s.subjects);
   const courses = useDataStore(s => s.courses);
 
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
-  const [courseModalVisible, setCourseModalVisible] = useState(false);
-  const [subjectModalVisible, setSubjectModalVisible] = useState(false);
-
-  // Courses que tienen al menos un evento en el día seleccionado
+  // Courses que tienen al menos un evento en el día seleccionado (usando eventos sin filtrar para preservar todas las opciones en el modal)
   const activeCourseIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const e of calendar.filteredEvents) {
+    for (const e of calendar.unscopedDayEvents) {
       const subj = subjects.find((s: any) => s.id === e.subjectId);
       if (subj?.course_id) ids.add(subj.course_id);
     }
     return ids;
-  }, [calendar.filteredEvents, subjects]);
+  }, [calendar.unscopedDayEvents, subjects]);
 
   const courseOptions: SelectorOption[] = useMemo(() =>
     (courses || []).filter((c: any) => activeCourseIds.has(c.id)).map((c: any) => ({ id: c.id, name: c.name })),
@@ -91,11 +96,11 @@ export default function CalendarScreen() {
   // Materias filtradas por curso seleccionado, con eventos en el día
   const activeSubjectIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const e of calendar.filteredEvents) {
+    for (const e of calendar.unscopedDayEvents) {
       if (e.subjectId) ids.add(e.subjectId);
     }
     return ids;
-  }, [calendar.filteredEvents]);
+  }, [calendar.unscopedDayEvents]);
 
   const subjectsForCourse = useMemo(() => {
     return (subjects || []).filter((s: any) => {
@@ -122,17 +127,7 @@ export default function CalendarScreen() {
   const showCourseFilter = courseOptions.length > 0;
   const showSubjectFilter = subjectOptions.length > 0;
 
-  const scopedEvents = useMemo(() => {
-    if (!selectedCourseId && !selectedSubjectId) return calendar.filteredEvents;
-    return calendar.filteredEvents.filter(e => {
-      if (selectedSubjectId) return e.subjectId === selectedSubjectId;
-      if (selectedCourseId) {
-        const subj = (subjects || []).find((s: any) => s.id === e.subjectId);
-        return subj?.course_id === selectedCourseId;
-      }
-      return true;
-    });
-  }, [calendar.filteredEvents, selectedCourseId, selectedSubjectId, subjects]);
+  const scopedEvents = calendar.filteredEvents;
 
   useFocusEffect(
     useCallback(() => {

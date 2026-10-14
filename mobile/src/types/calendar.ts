@@ -75,6 +75,7 @@ export interface ActivitySummary {
   hasClasses: boolean;
   hasTasks: boolean;
   hasEvents: boolean;
+  totalCount: number;
 }
 
 export interface DayScheduleParams {
