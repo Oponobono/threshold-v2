@@ -398,5 +398,75 @@ describe('Colombia Special Dates & Holidays Domain', () => {
       const totalSpecialItems = Array.from(yearIndex.values()).flatMap(r => r.items);
       expect(totalSpecialItems.length).toBeGreaterThan(180);
     });
+
+    it('respeta showHolidays: false desactivando festivos en el calendario sin afectar conmemoraciones', () => {
+      const yearIndex = getSpecialDaysForYear(2026, {
+        preferences: {
+          showHolidays: false,
+          showSpecialDates: true,
+          enabledCategories: {
+            religiosa: true,
+            nacional: true,
+            educacion: true,
+            internacional: true,
+          },
+        },
+      });
+
+      // 1 de enero: ya no es festivo en el índice
+      expect(yearIndex.get('2026-01-01')?.isHoliday).toBeFalsy();
+      expect(isColombianHoliday('2026-01-01', {
+        preferences: { showHolidays: false, enabledCategories: { religiosa: true, nacional: true, educacion: true, internacional: true } }
+      })).toBe(false);
+
+      // El mes de enero no tiene días festivos en el Set
+      const janHolidays = getMonthHolidayDaysSet(2026, 0, {
+        preferences: { showHolidays: false, enabledCategories: { religiosa: true, nacional: true, educacion: true, internacional: true } }
+      });
+      expect(janHolidays.size).toBe(0);
+
+      // Pero conmemoraciones siguen presentes
+      const oct24 = yearIndex.get('2026-10-24');
+      expect(oct24?.items.some(i => i.name.includes('Naciones Unidas'))).toBe(true);
+    });
+
+    it('respeta showSpecialDates: false desactivando efemérides pero conservando festivos', () => {
+      const yearIndex = getSpecialDaysForYear(2026, {
+        preferences: {
+          showHolidays: true,
+          showSpecialDates: false,
+          enabledCategories: {
+            religiosa: true,
+            nacional: true,
+            educacion: true,
+            internacional: true,
+          },
+        },
+      });
+
+      // 20 de julio: festivo oficial se conserva
+      const jul20 = yearIndex.get('2026-07-20');
+      expect(jul20?.isHoliday).toBe(true);
+
+      // 24 de octubre: efeméride de la ONU ya no aparece
+      const oct24 = yearIndex.get('2026-10-24');
+      expect(oct24).toBeUndefined();
+    });
+
+    it('cuando ambos showHolidays y showSpecialDates son false, no devuelve elementos', () => {
+      const yearIndex = getSpecialDaysForYear(2026, {
+        preferences: {
+          showHolidays: false,
+          showSpecialDates: false,
+          enabledCategories: {
+            religiosa: true,
+            nacional: true,
+            educacion: true,
+            internacional: true,
+          },
+        },
+      });
+      expect(yearIndex.size).toBe(0);
+    });
   });
 });

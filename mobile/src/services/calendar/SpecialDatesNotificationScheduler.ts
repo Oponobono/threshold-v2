@@ -15,6 +15,7 @@
 import * as ExpoNotifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { getSpecialDayRecord } from '../../domain/calendar/specialDatesEngine';
+import type { SpecialDatesPreferences } from '../../domain/calendar/types';
 import { getSpecialDatesPreferencesService } from './SpecialDatesPreferencesService';
 import { getSpecialDatesNotificationPreferencesService } from './SpecialDatesNotificationPreferencesService';
 import type { SpecialDatesNotificationPreferences } from './SpecialDatesNotificationPreferences';
@@ -43,14 +44,16 @@ export function computeTriggerDate(dateId: string, timeStr: string): Date {
   );
 }
 
+export const SPECIAL_DATES_WINDOW_DAYS = 30;
+
 export async function setupSpecialDatesChannel(): Promise<void> {
   if (Platform.OS === 'android') {
     try {
       await ExpoNotifications.setNotificationChannelAsync(SPECIAL_DATES_CHANNEL_ID, {
         name: 'Fechas especiales y festivos',
-        importance: ExpoNotifications.AndroidImportance.DEFAULT,
+        importance: ExpoNotifications.AndroidImportance.HIGH,
         sound: 'default',
-        vibrationPattern: [0, 150, 100, 150],
+        vibrationPattern: [0, 250, 250, 250],
         lightColor: '#E11D48',
       });
     } catch (err) {
@@ -67,6 +70,7 @@ export async function cancelAllSpecialDatesNotifications(): Promise<void> {
       .map((n: any) => n.identifier);
 
     if (toCancel.length > 0) {
+      console.log(`[CANCEL] ${toCancel.length} notificaciones de fechas especiales`);
       await Promise.all(
         toCancel.map((id) => ExpoNotifications.cancelScheduledNotificationAsync(id))
       );
@@ -81,12 +85,15 @@ export interface SyncResult {
 }
 
 /**
- * Sincroniza y reprograma las notificaciones de fechas especiales para una ventana de 14 días.
+ * Sincroniza y reprograma las notificaciones de fechas especiales para una ventana de 30 días.
  * Cancela las existentes con prefijo 'special_date::' y agenda las nuevas según preferencias.
  */
 export async function syncSpecialDatesNotifications(
   customPrefs?: SpecialDatesNotificationPreferences
 ): Promise<SyncResult> {
+  // Asegurar que el canal Android esté registrado con alta importancia
+  await setupSpecialDatesChannel();
+
   const notifPrefs =
     customPrefs || getSpecialDatesNotificationPreferencesService().getPreferences();
 
@@ -104,17 +111,25 @@ export async function syncSpecialDatesNotifications(
   const calendarPrefs = calendarPrefsService.getPreferences();
   const calendarOverrides = calendarPrefsService.getOverrides();
 
+  // Para las notificaciones, los festivos y conmemoraciones deben estar habilitados
+  // independientemente de si el usuario los tiene visibles o no en la cuadrícula del calendario.
+  const notificationCalendarPrefs: SpecialDatesPreferences = {
+    ...calendarPrefs,
+    showHolidays: true,
+    showSpecialDates: true,
+  };
+
   const now = new Date();
   const nowMs = now.getTime();
   let scheduledCount = 0;
 
-  // Ventana rodante de 14 días a partir de hoy
-  for (let offset = 0; offset <= 14; offset++) {
+  // Ventana rodante de 30 días a partir de hoy
+  for (let offset = 0; offset <= SPECIAL_DATES_WINDOW_DAYS; offset++) {
     const targetDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     const dateId = formatDateId(targetDay);
 
     const record = getSpecialDayRecord(dateId, {
-      preferences: calendarPrefs,
+      preferences: notificationCalendarPrefs,
       overrides: calendarOverrides,
     });
 
@@ -145,7 +160,7 @@ export async function syncSpecialDatesNotifications(
               ...(Platform.OS === 'android'
                 ? {
                     channelId: SPECIAL_DATES_CHANNEL_ID,
-                    priority: ExpoNotifications.AndroidNotificationPriority.DEFAULT,
+                    priority: ExpoNotifications.AndroidNotificationPriority.HIGH,
                   }
                 : {}),
             },
@@ -155,6 +170,8 @@ export async function syncSpecialDatesNotifications(
               channelId: SPECIAL_DATES_CHANNEL_ID,
             },
           });
+          const deltaSec = Math.floor((triggerDate.getTime() - nowMs) / 1000);
+          console.log(`[SCHEDULE] ${identifier} | DATE trigger | scheduledAt=${triggerDate.toISOString()} | delta=${deltaSec}s | ${holidayName}`);
           scheduledCount++;
         } catch (err) {
           console.warn(`[SpecialDatesScheduler] Error al agendar festivo ${dateId}:`, err);
@@ -196,7 +213,7 @@ export async function syncSpecialDatesNotifications(
                 ...(Platform.OS === 'android'
                   ? {
                       channelId: SPECIAL_DATES_CHANNEL_ID,
-                      priority: ExpoNotifications.AndroidNotificationPriority.DEFAULT,
+                      priority: ExpoNotifications.AndroidNotificationPriority.HIGH,
                     }
                   : {}),
               },
@@ -206,6 +223,8 @@ export async function syncSpecialDatesNotifications(
                 channelId: SPECIAL_DATES_CHANNEL_ID,
               },
             });
+            const deltaSec = Math.floor((triggerDate.getTime() - nowMs) / 1000);
+            console.log(`[SCHEDULE] ${identifier} | DATE trigger | scheduledAt=${triggerDate.toISOString()} | delta=${deltaSec}s | ${body}`);
             scheduledCount++;
           } catch (err) {
             console.warn(`[SpecialDatesScheduler] Error al agendar conmemoración ${dateId}:`, err);

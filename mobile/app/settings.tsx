@@ -38,6 +38,10 @@ import {
   PersonalizeSpecialDatesModal,
 } from '../src/components/settings';
 import { getSpecialDatesNotificationPreferencesService } from '../src/services/calendar/SpecialDatesNotificationPreferencesService';
+import {
+  getSpecialDatesPreferencesService,
+  useSpecialDatesPreferences,
+} from '../src/services/calendar/SpecialDatesPreferencesService';
 
 /**
  * Componente auxiliar para renderizar una fila de configuración individual.
@@ -70,6 +74,7 @@ export default function SettingsScreen() {
   const [gradeScalesExpanded, setGradeScalesExpanded] = useState(false);
   const [backupExpanded, setBackupExpanded] = useState(false);
   const [languageExpanded, setLanguageExpanded] = useState(false);
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
   const [remindersExpanded, setRemindersExpanded] = useState(false);
   const [securityExpanded, setSecurityExpanded] = useState(false);
   const [collaborationExpanded, setCollaborationExpanded] = useState(false);
@@ -195,6 +200,27 @@ export default function SettingsScreen() {
     }
     return parts.length > 0 ? parts.join(' • ') : t('common.disabled', 'Desactivado');
   }, [specialDatesRefreshKey, t]);
+
+  const specialDatesPrefs = useSpecialDatesPreferences();
+
+  const handleToggleShowHolidays = (val: boolean) => {
+    getSpecialDatesPreferencesService().setPreferences({ showHolidays: val });
+  };
+
+  const handleToggleShowSpecialDates = (val: boolean) => {
+    getSpecialDatesPreferencesService().setPreferences({ showSpecialDates: val });
+  };
+
+  const calendarSummary = React.useMemo(() => {
+    const parts: string[] = [];
+    if (specialDatesPrefs.showHolidays) {
+      parts.push(t('specialDates.holidaysTitle', 'Festivos'));
+    }
+    if (specialDatesPrefs.showSpecialDates) {
+      parts.push(t('specialDates.commemorationsTitle', 'Efemérides'));
+    }
+    return parts.length > 0 ? parts.join(' • ') : t('common.disabled', 'Desactivado');
+  }, [specialDatesPrefs.showHolidays, specialDatesPrefs.showSpecialDates, t]);
 
 
   const {
@@ -541,6 +567,62 @@ export default function SettingsScreen() {
         {/* ── LOCAL AI ENGINE ── */}
         {/* ─────────────────────────────────────────── */}
         <LocalAIEngineSection />
+
+        {/* ─────────────────────────────────────────── */}
+        {/* ── CALENDARIO ── */}
+        {/* ─────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            onPress={() => setCalendarExpanded(prev => !prev)}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="calendar-outline" size={18} color={theme.colors.text.secondary} />
+                <Text style={styles.sectionTitle}>{t('calendar.settingsTitle', 'Calendario')}</Text>
+              </View>
+              <Text style={styles.sectionDesc}>
+                {t('calendar.settingsDesc', 'Configura la visualización de fechas especiales y festivos en el calendario')}
+              </Text>
+              {!calendarExpanded && (
+                <View style={[styles.activeBadge, { alignSelf: 'flex-start', marginTop: 6 }]}>
+                  <Text style={styles.activeBadgeText}>{calendarSummary}</Text>
+                </View>
+              )}
+            </View>
+            <Ionicons name={calendarExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.text.secondary} style={{ marginTop: 2 }} />
+          </TouchableOpacity>
+
+          {calendarExpanded && (
+            <View style={{ marginTop: 16 }}>
+              <SettingRow
+                title={t('calendar.showHolidays', 'Festivos de Colombia')}
+                desc={t('calendar.showHolidaysDesc', 'Muestra los 19 festivos oficiales de la Ley Emiliani y puentes en la cuadrícula')}
+                right={
+                  <Switch
+                    value={specialDatesPrefs.showHolidays}
+                    onValueChange={handleToggleShowHolidays}
+                    trackColor={{ false: theme.colors.border, true: '#E11D48' }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
+
+              <SettingRow
+                title={t('calendar.showSpecialDates', 'Efemérides y fechas cívicas')}
+                desc={t('calendar.showSpecialDatesDesc', 'Muestra conmemoraciones internacionales, culturales, académicas y religiosas del catálogo')}
+                right={
+                  <Switch
+                    value={specialDatesPrefs.showSpecialDates}
+                    onValueChange={handleToggleShowSpecialDates}
+                    trackColor={{ false: theme.colors.border, true: '#2563EB' }}
+                    thumbColor={theme.colors.white}
+                  />
+                }
+              />
+            </View>
+          )}
+        </View>
 
         {/* ─────────────────────────────────────────── */}
         {/* ── RECORDATORIOS ── */}

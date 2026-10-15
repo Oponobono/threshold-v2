@@ -56,6 +56,10 @@ export interface SpecialDayRecord {
 }
 
 export interface SpecialDatesPreferences {
+  /** true si se muestran los festivos oficiales de Colombia en la cuadrícula y tarjeta */
+  readonly showHolidays?: boolean;
+  /** true si se muestran las conmemoraciones/efemérides en la tarjeta */
+  readonly showSpecialDates?: boolean;
   readonly enabledCategories: {
     readonly religiosa: boolean;
     readonly nacional: boolean;
@@ -65,6 +69,8 @@ export interface SpecialDatesPreferences {
 }
 
 export const DEFAULT_SPECIAL_DATES_PREFERENCES: SpecialDatesPreferences = {
+  showHolidays: true,
+  showSpecialDates: true,
   enabledCategories: {
     religiosa: true,
     nacional: true,

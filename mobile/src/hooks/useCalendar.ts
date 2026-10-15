@@ -13,6 +13,7 @@ import {
   getSpecialDayRecord,
   isColombianHoliday,
 } from '../domain/calendar/specialDatesEngine';
+import { useSpecialDatesPreferences } from '../services/calendar/SpecialDatesPreferencesService';
 
 export const TODAY = new Date();
 
@@ -39,6 +40,7 @@ export function useCalendar(
   const refreshCalendarEvents = useDataStore(s => s.refreshCalendarEvents);
 
   const isReady = !isInitialLoading;
+  const specialDatesPrefs = useSpecialDatesPreferences();
 
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayRaw = new Date(viewYear, viewMonth, 1).getDay();
@@ -130,7 +132,7 @@ export function useCalendar(
     const targetDateId = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     // 1. Clases recurrentes: normalizadas con toWeekday (0..6)
-    const isTargetDateHoliday = isColombianHoliday(targetDateId);
+    const isTargetDateHoliday = isColombianHoliday(targetDateId, { preferences: specialDatesPrefs });
     const rawClasses: AgendaItem[] = (schedulesData || [])
       .filter(s => toWeekday(s.day_of_week) === dateWeekday)
       .map(s => {
@@ -252,7 +254,7 @@ export function useCalendar(
     }
 
     return sorted;
-  }, [viewYear, viewMonth, subjects, t, selectedDayNum]);
+  }, [viewYear, viewMonth, subjects, t, selectedDayNum, specialDatesPrefs]);
 
   const getDaySchedule = useCallback((day: number): AgendaItem[] => {
     return buildDayScheduleFromData(day, scopedSchedules, scopedAssessments, scopedCalendarEvents);
@@ -297,8 +299,8 @@ export function useCalendar(
   }, [refreshCalendarEvents]);
 
   const monthHolidayDaysSet = useMemo(() => {
-    return getMonthHolidayDaysSet(viewYear, viewMonth);
-  }, [viewYear, viewMonth]);
+    return getMonthHolidayDaysSet(viewYear, viewMonth, { preferences: specialDatesPrefs });
+  }, [viewYear, viewMonth, specialDatesPrefs]);
 
   const selectedDateId = useMemo(() => {
     const mStr = String(viewMonth + 1).padStart(2, '0');
@@ -307,8 +309,8 @@ export function useCalendar(
   }, [viewYear, viewMonth, selectedDayNum]);
 
   const selectedSpecialDayRecord = useMemo(() => {
-    return getSpecialDayRecord(selectedDateId);
-  }, [selectedDateId]);
+    return getSpecialDayRecord(selectedDateId, { preferences: specialDatesPrefs });
+  }, [selectedDateId, specialDatesPrefs]);
 
   return {
     viewMonth, setViewMonth,

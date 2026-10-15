@@ -39,5 +39,11 @@
   "exam": "Exam",
   "task": "Task",
   "class": "Class",
-  "other": "Other"
+  "other": "Other",
+  "settingsTitle": "Calendar",
+  "settingsDesc": "Configure display of special dates and holidays on the calendar",
+  "showHolidays": "Colombian Holidays",
+  "showHolidaysDesc": "Show the 19 official Emiliani Law holidays and long weekends on the grid",
+  "showSpecialDates": "Commemorations and Civic Dates",
+  "showSpecialDatesDesc": "Show international, cultural, academic, and religious commemorations from the catalog"
 }

@@ -26,7 +26,10 @@ function buildCacheKey(
   prefs: SpecialDatesPreferences = DEFAULT_SPECIAL_DATES_PREFERENCES,
   overrides: readonly SpecialDateOverride[] = []
 ): string {
-  const pKey = `${prefs.enabledCategories.religiosa ? 1 : 0}${prefs.enabledCategories.nacional ? 1 : 0}${prefs.enabledCategories.educacion ? 1 : 0}${prefs.enabledCategories.internacional ? 1 : 0}`;
+  const showH = (prefs.showHolidays ?? true) ? 1 : 0;
+  const showS = (prefs.showSpecialDates ?? true) ? 1 : 0;
+  const cats = prefs.enabledCategories;
+  const pKey = `${showH}${showS}${cats?.religiosa ? 1 : 0}${cats?.nacional ? 1 : 0}${cats?.educacion ? 1 : 0}${cats?.internacional ? 1 : 0}`;
   const oKey = overrides.length > 0 ? overrides.map(o => `${o.id}:${o.action}`).join('|') : 'no-overrides';
   return `${year}_${pKey}_${oKey}`;
 }
@@ -131,15 +134,19 @@ export function getSpecialDaysForYear(
     return _yearCache.get(cacheKey)!;
   }
 
+  const showHolidays = prefs.showHolidays ?? true;
+  const showSpecialDates = prefs.showSpecialDates ?? true;
+
   // 1. Obtener festivos oficiales (Ley Emiliani)
-  const holidayItems = generateHolidaySpecialItems(year);
+  const holidayItems = showHolidays ? generateHolidaySpecialItems(year) : [];
 
   // 2. Obtener conmemoraciones y efemérides
-  const commemItems = generateCommemorations(year);
+  const commemItems = showSpecialDates ? generateCommemorations(year) : [];
 
   // 3. Filtrar según categorías permitidas en preferencias
   const allItems = [...holidayItems, ...commemItems].filter(item => {
-    if (item.category === 'festivo') return true; // Festivos siempre visibles
+    if (item.category === 'festivo') return true;
+    if (!prefs.enabledCategories) return true;
     if (item.category === 'religiosa') return prefs.enabledCategories.religiosa;
     if (item.category === 'nacional') return prefs.enabledCategories.nacional;
     if (item.category === 'educacion') return prefs.enabledCategories.educacion;

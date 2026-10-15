@@ -8,6 +8,7 @@ import {
   SPECIAL_DATES_CHANNEL_ID,
   SPECIAL_DATES_ID_PREFIX,
 } from '../SpecialDatesNotificationScheduler';
+import { getSpecialDatesPreferencesService } from '../SpecialDatesPreferencesService';
 
 const mockScheduleNotificationAsync = jest.fn();
 const mockCancelScheduledNotificationAsync = jest.fn();
@@ -20,8 +21,8 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: (...args: any[]) =>
     mockCancelScheduledNotificationAsync(...args),
   getAllScheduledNotificationsAsync: () => mockGetAllScheduledNotificationsAsync(),
-  AndroidImportance: { DEFAULT: 3 },
-  AndroidNotificationPriority: { DEFAULT: 'default' },
+  AndroidImportance: { DEFAULT: 3, HIGH: 4 },
+  AndroidNotificationPriority: { DEFAULT: 'default', HIGH: 'high' },
   SchedulableTriggerInputTypes: { DATE: 'date' },
 }));
 
@@ -54,13 +55,13 @@ describe('SpecialDatesNotificationScheduler', () => {
   });
 
   describe('setupSpecialDatesChannel', () => {
-    it('crea el canal Android special_dates con importancia normal y color coral', async () => {
+    it('crea el canal Android special_dates con alta importancia y color coral', async () => {
       await setupSpecialDatesChannel();
       expect(mockSetNotificationChannelAsync).toHaveBeenCalledWith(
         SPECIAL_DATES_CHANNEL_ID,
         expect.objectContaining({
           name: 'Fechas especiales y festivos',
-          importance: 3,
+          importance: 4,
           lightColor: '#E11D48',
         })
       );
@@ -114,6 +115,21 @@ describe('SpecialDatesNotificationScheduler', () => {
 
       expect(result.scheduledCount).toBe(0);
       expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    it('programa notificaciones aunque las preferencias del calendario tengan showHolidays: false y showSpecialDates: false', async () => {
+      const calPrefsService = getSpecialDatesPreferencesService();
+      calPrefsService.setPreferences({ showHolidays: false, showSpecialDates: false });
+
+      const result = await syncSpecialDatesNotifications({
+        holidaysEnabled: true,
+        holidaysTime: '08:00',
+        commemorationsEnabled: true,
+        commemorationsTime: '08:00',
+      });
+
+      expect(result.scheduledCount).toBeGreaterThan(0);
+      expect(mockScheduleNotificationAsync).toHaveBeenCalled();
     });
   });
 

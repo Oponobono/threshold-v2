@@ -10,6 +10,9 @@ export class NotificationReconciler {
     const existingMap = new Map(existing.map((e) => [e.identifier, e]));
 
     const toCancel = existing.filter((e) => {
+      if (e.identifier.startsWith('special_date::')) {
+        return false;
+      }
       const d = planMap.get(e.identifier);
       if (!d) {
         console.log(`[RECON] CANCEL ${e.identifier} | reason: not in plan`);
@@ -62,7 +65,9 @@ export class NotificationReconciler {
 
   async clear(provider: NotificationProvider): Promise<void> {
     const existing = await provider.getAll();
-    const ids = [...new Set(existing.map((e) => e.identifier))];
+    const ids = [...new Set(existing.map((e) => e.identifier))].filter(
+      (id) => !id.startsWith('special_date::')
+    );
     if (ids.length > 0) {
       await Promise.all(ids.map((id) => provider.cancel(id)));
     }

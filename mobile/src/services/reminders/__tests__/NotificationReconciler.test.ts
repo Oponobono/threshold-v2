@@ -109,14 +109,30 @@ describe('NotificationReconciler', () => {
     expect(provider.cancelCalls.length).toBe(0);
   });
 
-  it('clear cancels all existing notifications', async () => {
+  it('clear cancels all existing notifications except special_date::', async () => {
     provider.existing = [
       { identifier: 'r1', title: 'R1', body: '', triggerDate: new Date() },
+      { identifier: 'special_date::holiday::2026-11-02', title: 'Festivo', body: '', triggerDate: new Date() },
       { identifier: 'r2', title: 'R2', body: '', triggerDate: new Date() },
     ];
     await reconciler.clear(provider);
     expect(provider.cancelCalls).toContain('r1');
     expect(provider.cancelCalls).toContain('r2');
+    expect(provider.cancelCalls).not.toContain('special_date::holiday::2026-11-02');
     expect(provider.cancelCalls.length).toBe(2);
+  });
+
+  it('preserves special_date:: notifications during sync even when not in plan', async () => {
+    const plan = makePlan([makeReminder('r1')]);
+    const r1 = plan.deliverables[0];
+    provider.existing = [
+      { identifier: 'r1', title: r1.title, body: r1.body, triggerDate: r1.scheduledAt },
+      { identifier: 'special_date::commemoration::2026-10-16', title: 'Conmemoración', body: '', triggerDate: new Date() },
+      { identifier: 'special_date::holiday::2026-11-02', title: 'Festivo', body: '', triggerDate: new Date() },
+    ];
+    await reconciler.sync(plan, provider);
+    expect(provider.cancelCalls).not.toContain('special_date::commemoration::2026-10-16');
+    expect(provider.cancelCalls).not.toContain('special_date::holiday::2026-11-02');
+    expect(provider.cancelCalls.length).toBe(0);
   });
 });

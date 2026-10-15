@@ -83,4 +83,37 @@ describe('SpecialDatesPreferencesService', () => {
     expect(service.getPreferences()).toEqual(DEFAULT_SPECIAL_DATES_PREFERENCES);
     expect(service.getOverrides()).toEqual([]);
   });
+
+  it('actualiza y persiste showHolidays y showSpecialDates independientemente', () => {
+    const updated1 = service.setPreferences({ showHolidays: false });
+    expect(updated1.showHolidays).toBe(false);
+    expect(updated1.showSpecialDates).toBe(true);
+
+    const updated2 = service.setPreferences({ showSpecialDates: false });
+    expect(updated2.showHolidays).toBe(false);
+    expect(updated2.showSpecialDates).toBe(false);
+
+    const reloaded = service.getPreferences();
+    expect(reloaded.showHolidays).toBe(false);
+    expect(reloaded.showSpecialDates).toBe(false);
+  });
+
+  it('notifica a los suscriptores cuando cambian las preferencias o se hace reset', () => {
+    const listener = jest.fn();
+    const unsubscribe = service.subscribe(listener);
+
+    service.setPreferences({ showHolidays: false });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showHolidays: false, showSpecialDates: true })
+    );
+
+    service.reset();
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenLastCalledWith(DEFAULT_SPECIAL_DATES_PREFERENCES);
+
+    unsubscribe();
+    service.setPreferences({ showSpecialDates: false });
+    expect(listener).toHaveBeenCalledTimes(2); // no se llamó tras unsubscribe
+  });
 });

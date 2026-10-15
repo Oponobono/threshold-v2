@@ -39,5 +39,11 @@
   "exam": "Examen",
   "task": "Tarea",
   "class": "Clase",
-  "other": "Otro"
+  "other": "Otro",
+  "settingsTitle": "Calendario",
+  "settingsDesc": "Configura la visualización de fechas especiales y festivos en el calendario",
+  "showHolidays": "Festivos de Colombia",
+  "showHolidaysDesc": "Muestra los 19 festivos oficiales de la Ley Emiliani y puentes en la cuadrícula",
+  "showSpecialDates": "Efemérides y fechas cívicas",
+  "showSpecialDatesDesc": "Muestra conmemoraciones internacionales, culturales, académicas y religiosas del catálogo"
 }
