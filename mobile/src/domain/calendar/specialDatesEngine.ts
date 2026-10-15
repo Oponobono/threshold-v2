@@ -166,6 +166,14 @@ export function getSpecialDaysForYear(
     const merged = mergeDayItems(dayItems);
     const holidayItem = merged.find(i => i.isHoliday);
 
+    // Si hay un festivo oficial de Colombia, siempre es el elemento principal (items[0])
+    // de la tarjeta. Las demás efemérides (ej. Virgen del Pilar) se desplegarán en el acordeón.
+    merged.sort((a, b) => {
+      if (a.isHoliday && !b.isHoliday) return -1;
+      if (!a.isHoliday && b.isHoliday) return 1;
+      return 0;
+    });
+
     recordsMap.set(dateId, {
       dateId,
       isHoliday: Boolean(holidayItem),

@@ -38,17 +38,17 @@ describe('Colombia Special Dates & Holidays Domain', () => {
     });
   });
 
-  describe('18 Festivos Oficiales de Colombia (Ley 51 de 1983)', () => {
-    it('genera exactamente 18 festivos por año (2024, 2025, 2026, 2027)', () => {
+  describe('19 Festivos Oficiales de Colombia (Ley 51 de 1983 y Ley 2578 de 2026)', () => {
+    it('genera exactamente 19 festivos por año (2024, 2025, 2026, 2027)', () => {
       for (const year of [2024, 2025, 2026, 2027]) {
         const holidays = getColombiaHolidays(year);
-        expect(holidays).toHaveLength(18);
+        expect(holidays).toHaveLength(19);
       }
     });
 
-    it('coincide exactamente con el calendario oficial de Colombia para 2026 (18 festivos, 11 en lunes)', () => {
+    it('coincide exactamente con el calendario oficial de Colombia para 2026 (19 festivos, 12 en lunes)', () => {
       const holidays2026 = getColombiaHolidays(2026);
-      expect(holidays2026).toHaveLength(18);
+      expect(holidays2026).toHaveLength(19);
 
       const observedDates = holidays2026.map(h => h.observedDateId);
       const expectedDates2026 = [
@@ -62,6 +62,7 @@ describe('Colombia Special Dates & Holidays Domain', () => {
         '2026-06-08', // Corpus Christi
         '2026-06-15', // Sagrado Corazón
         '2026-06-29', // San Pedro y San Pablo (ya era lunes)
+        '2026-07-13', // Virgen de Chiquinquirá (Ley 2578 de 2026 - trasladado del 9 de julio)
         '2026-07-20', // Independencia (ya era lunes)
         '2026-08-07', // Batalla de Boyacá
         '2026-08-17', // Asunción de la Virgen
@@ -74,12 +75,12 @@ describe('Colombia Special Dates & Holidays Domain', () => {
 
       expect(observedDates).toEqual(expectedDates2026);
 
-      // Verificar que exactamente 11 caen en lunes (day of week === 1 en UTC)
+      // Verificar que exactamente 12 caen en lunes (day of week === 1 en UTC)
       const mondayHolidays = observedDates.filter(d => {
         const [y, m, day] = d.split('-').map(Number);
         return new Date(Date.UTC(y, m - 1, day)).getUTCDay() === 1;
       });
-      expect(mondayHolidays).toHaveLength(11);
+      expect(mondayHolidays).toHaveLength(12);
     });
 
     it('regla Emiliani: si la fecha original ya cae en lunes, se queda en ese lunes y no se traslada', () => {
@@ -351,6 +352,51 @@ describe('Colombia Special Dates & Holidays Domain', () => {
         .flatMap(r => r.items)
         .find(i => i.name.includes('Cartagena'));
       expect(cartagenaItem?.icon).toBe('castle');
+    });
+
+    it('prioriza el Festivo Nacional de Colombia como items[0] y coloca conmemoraciones como la Virgen del Pilar en el acordeón', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+      const oct12 = yearIndex.get('2026-10-12');
+      expect(oct12).toBeDefined();
+      expect(oct12?.isHoliday).toBe(true);
+
+      // El elemento primario (items[0]) DEBE ser el festivo oficial de Colombia
+      expect(oct12?.items[0].isHoliday).toBe(true);
+      expect(oct12?.items[0].name).toContain('Día de la Raza');
+
+      // En los items secundarios del acordeón debe estar la Virgen del Pilar
+      const virgenPilar = oct12?.items.find(i => i.name.includes('Virgen del Pilar'));
+      expect(virgenPilar).toBeDefined();
+      expect(virgenPilar?.isHoliday).toBe(false);
+      expect(virgenPilar?.icon).toBe('star-four-points');
+    });
+
+    it('incluye efemérides internacionales clave de octubre (Salud Mental, Alimentación, ONU)', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+
+      // 10 de octubre: Día Mundial de la Salud Mental
+      const oct10 = yearIndex.get('2026-10-10');
+      expect(oct10?.items.some(i => i.name.includes('Salud Mental'))).toBe(true);
+      const saludMental = oct10?.items.find(i => i.name.includes('Salud Mental'));
+      expect(saludMental?.icon).toBe('brain');
+
+      // 16 de octubre: Día Mundial de la Alimentación
+      const oct16 = yearIndex.get('2026-10-16');
+      expect(oct16?.items.some(i => i.name.includes('Alimentación'))).toBe(true);
+      const alimentacion = oct16?.items.find(i => i.name.includes('Alimentación'));
+      expect(alimentacion?.icon).toBe('food-apple');
+
+      // 24 de octubre: Día de las Naciones Unidas
+      const oct24 = yearIndex.get('2026-10-24');
+      expect(oct24?.items.some(i => i.name.includes('Naciones Unidas'))).toBe(true);
+      const onu = oct24?.items.find(i => i.name.includes('Naciones Unidas'));
+      expect(onu?.icon).toBe('earth');
+    });
+
+    it('el catálogo contiene más de 180 efemérides y fechas especiales anuales', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+      const totalSpecialItems = Array.from(yearIndex.values()).flatMap(r => r.items);
+      expect(totalSpecialItems.length).toBeGreaterThan(180);
     });
   });
 });

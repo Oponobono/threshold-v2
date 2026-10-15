@@ -1,10 +1,11 @@
 /**
  * colombiaHolidays.ts
  *
- * Motor de los 18 festivos oficiales de la República de Colombia (Ley 51 de 1983 - Ley Emiliani).
+ * Motor de los 19 festivos oficiales de la República de Colombia
+ * (Ley 51 de 1983 - Ley Emiliani y Ley 2578 del 1 de junio de 2026).
  *
  * Características:
- * 1. Calcula exactamente los 18 festivos oficiales del año (100% determinista).
+ * 1. Calcula exactamente los 19 festivos oficiales del año (100% determinista).
  * 2. Distingue la FECHA DE OBSERVANCIA (festivo no laborable que pinta la celda)
  *    de la FECHA CONMEMORADA (fecha original de la celebración).
  * 3. Provee una explicación concisa del motivo de la conmemoración (sin textos legales repetitivos)
@@ -47,7 +48,7 @@ function formatSpanishDate(dateId: string): string {
 }
 
 /**
- * Obtiene los 18 festivos oficiales de Colombia para el año dado con sus fechas observadas.
+ * Obtiene los 19 festivos oficiales de Colombia para el año dado con sus fechas observadas.
  */
 export function getColombiaHolidays(year: number): readonly HolidayEntry[] {
   const easter = getEasterSunday(year);
@@ -137,6 +138,14 @@ export function getColombiaHolidays(year: number): readonly HolidayEntry[] {
       commemorationName: 'San Pedro y San Pablo',
       meaning: 'Homenaje a los apóstoles Simón Pedro y Pablo de Tarso, pilares del cristianismo.',
       icon: 'key-variant',
+    },
+    {
+      name: 'Virgen de Chiquinquirá',
+      month: 7,
+      day: 9,
+      commemorationName: 'Día de la Virgen de Chiquinquirá (Patrona de Colombia)',
+      meaning: 'Homenaje a la patrona y reina de Colombia, fiesta de identidad espiritual y cultural nacional (Ley 2578 del 1 de junio de 2026).',
+      icon: 'crown',
     },
     {
       name: 'Asunción de la Virgen',
