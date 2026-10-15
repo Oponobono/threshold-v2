@@ -35,7 +35,9 @@ import {
   CreateGroupModal,
   ZyrenInfoModal,
   PersonalizeRemindersModal,
+  PersonalizeSpecialDatesModal,
 } from '../src/components/settings';
+import { getSpecialDatesNotificationPreferencesService } from '../src/services/calendar/SpecialDatesNotificationPreferencesService';
 
 /**
  * Componente auxiliar para renderizar una fila de configuración individual.
@@ -73,6 +75,8 @@ export default function SettingsScreen() {
   const [collaborationExpanded, setCollaborationExpanded] = useState(false);
   const [isZyrenInfoVisible, setIsZyrenInfoVisible] = useState(false);
   const [isPersonalizeRemindersVisible, setIsPersonalizeRemindersVisible] = useState(false);
+  const [isPersonalizeSpecialDatesVisible, setIsPersonalizeSpecialDatesVisible] = useState(false);
+  const [specialDatesRefreshKey, setSpecialDatesRefreshKey] = useState(0);
 
   const {
     t,
@@ -177,6 +181,20 @@ export default function SettingsScreen() {
   } = useSettingsLogic();
 
   const reminderCtx = useReminderPreferences();
+
+  const specialDatesSummary = React.useMemo(() => {
+    // Escucha specialDatesRefreshKey para recalcular tras cambios en el modal
+    void specialDatesRefreshKey;
+    const prefs = getSpecialDatesNotificationPreferencesService().getPreferences();
+    const parts: string[] = [];
+    if (prefs.holidaysEnabled) {
+      parts.push(`Festivos (${prefs.holidaysTime})`);
+    }
+    if (prefs.commemorationsEnabled) {
+      parts.push(`Conmemoraciones (${prefs.commemorationsTime})`);
+    }
+    return parts.length > 0 ? parts.join(' • ') : t('common.disabled', 'Desactivado');
+  }, [specialDatesRefreshKey, t]);
 
 
   const {
@@ -558,6 +576,16 @@ export default function SettingsScreen() {
                 desc={reminderCtx.summaryText}
                 right={
                   <TouchableOpacity style={[styles.outlinePill, { minWidth: 90, justifyContent: 'center' }]} onPress={() => setIsPersonalizeRemindersVisible(true)}>
+                    <Text style={[styles.outlinePillText, { textAlign: 'center' }]}>{t('common.manage', 'Gestionar')}</Text>
+                  </TouchableOpacity>
+                }
+              />
+
+              <SettingRow
+                title={t('specialDates.notificationsTitle', 'Festivos y fechas especiales')}
+                desc={specialDatesSummary}
+                right={
+                  <TouchableOpacity style={[styles.outlinePill, { minWidth: 90, justifyContent: 'center' }]} onPress={() => setIsPersonalizeSpecialDatesVisible(true)}>
                     <Text style={[styles.outlinePillText, { textAlign: 'center' }]}>{t('common.manage', 'Gestionar')}</Text>
                   </TouchableOpacity>
                 }
@@ -1306,6 +1334,14 @@ export default function SettingsScreen() {
         visible={isPersonalizeRemindersVisible}
         onClose={() => setIsPersonalizeRemindersVisible(false)}
         ctx={reminderCtx}
+      />
+
+      <PersonalizeSpecialDatesModal
+        visible={isPersonalizeSpecialDatesVisible}
+        onClose={() => {
+          setIsPersonalizeSpecialDatesVisible(false);
+          setSpecialDatesRefreshKey((k) => k + 1);
+        }}
       />
 
     </SafeAreaView>

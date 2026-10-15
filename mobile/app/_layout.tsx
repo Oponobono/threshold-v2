@@ -202,7 +202,7 @@ function RootNavigator() {
 
       // Fallback: legacy notification types (por migrar al Engine)
       const type = data?.type as string | undefined;
-      if (type === 'deadline') {
+      if (type === 'deadline' || type === 'special_date') {
         router.push('/calendar');
       } else if (type === 'class') {
         router.push('/');

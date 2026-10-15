@@ -279,6 +279,18 @@ class BootstrapManager {
         }
       })();
 
+      // Fire-and-forget: Special Dates & Holidays Notifications initialization
+      (async () => {
+        try {
+          const { initSpecialDatesNotifications } = await import(
+            '../calendar/SpecialDatesNotificationScheduler'
+          );
+          await initSpecialDatesNotifications();
+        } catch (err) {
+          console.warn('[BACKGROUND] Special dates notifications init failed (non-blocking):', err);
+        }
+      })();
+
       // Fire-and-forget: Re-hidrata el DataStore completo tras cada ciclo de sync exitoso.
       // Necesario porque la fase DATASTORE corre antes de que el Initial Sync
       // termine de escribir en SQLite (sync es fire-and-forget). Sin esto,

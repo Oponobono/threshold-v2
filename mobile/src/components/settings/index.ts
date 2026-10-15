@@ -9,4 +9,5 @@ export { SendFeedbackModal } from './SendFeedbackModal';
 export { CreateGroupModal } from './CreateGroupModal';
 export { ZyrenInfoModal } from './ZyrenInfoModal';
 export { PersonalizeRemindersModal } from './PersonalizeRemindersModal';
+export { PersonalizeSpecialDatesModal } from './PersonalizeSpecialDatesModal';
 export { CloudAIModelSection } from './CloudAIModelSection';
