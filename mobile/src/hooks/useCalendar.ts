@@ -8,6 +8,11 @@ import {
   buildMonthActivityIndex,
   getActivitySummaryForDay,
 } from '../utils/calendarDateUtils';
+import {
+  getMonthHolidayDaysSet,
+  getSpecialDayRecord,
+  isColombianHoliday,
+} from '../domain/calendar/specialDatesEngine';
 
 export const TODAY = new Date();
 
@@ -125,6 +130,7 @@ export function useCalendar(
     const targetDateId = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     // 1. Clases recurrentes: normalizadas con toWeekday (0..6)
+    const isTargetDateHoliday = isColombianHoliday(targetDateId);
     const rawClasses: AgendaItem[] = (schedulesData || [])
       .filter(s => toWeekday(s.day_of_week) === dateWeekday)
       .map(s => {
@@ -139,7 +145,8 @@ export function useCalendar(
           start: s.start_time || '00:00',
           end: s.end_time,
           time_label: `${s.start_time || ''} - ${s.end_time || ''}`,
-          allDay: false
+          allDay: false,
+          isHolidayClass: isTargetDateHoliday,
         };
       });
 
@@ -289,6 +296,20 @@ export function useCalendar(
     await refreshCalendarEvents().catch(() => {});
   }, [refreshCalendarEvents]);
 
+  const monthHolidayDaysSet = useMemo(() => {
+    return getMonthHolidayDaysSet(viewYear, viewMonth);
+  }, [viewYear, viewMonth]);
+
+  const selectedDateId = useMemo(() => {
+    const mStr = String(viewMonth + 1).padStart(2, '0');
+    const dStr = String(selectedDayNum).padStart(2, '0');
+    return `${viewYear}-${mStr}-${dStr}`;
+  }, [viewYear, viewMonth, selectedDayNum]);
+
+  const selectedSpecialDayRecord = useMemo(() => {
+    return getSpecialDayRecord(selectedDateId);
+  }, [selectedDateId]);
+
   return {
     viewMonth, setViewMonth,
     viewYear, setViewYear,
@@ -311,5 +332,7 @@ export function useCalendar(
     loadAllData: useDataStore.getState().loadAllData,
     allSchedules,
     allAssessments,
+    monthHolidayDaysSet,
+    selectedSpecialDayRecord,
   };
 }

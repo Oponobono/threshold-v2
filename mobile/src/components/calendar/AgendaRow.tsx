@@ -41,18 +41,20 @@ export const AgendaRow: React.FC<AgendaRowProps> = React.memo(({ item, scope, is
   // Badge for priority or assessment type (instead of an ambiguous "!" icon)
   const isAssessment = item.kind === 'assessment';
   const badgeLabel = isAssessment ? (item.type || t('calendar.defaultAssessmentTitle')) : null;
+  const isHolidayClass = item.kind === 'class' && Boolean(item.isHolidayClass);
 
   return (
     <TouchableOpacity
       style={[
         styles.container,
         isLast && styles.containerLast,
-        isCompleted && styles.containerCompleted
+        isCompleted && styles.containerCompleted,
+        isHolidayClass && styles.containerHolidayClass,
       ]}
       activeOpacity={0.7}
       onPress={() => onPress(item)}
       accessibilityRole="button"
-      accessibilityLabel={`${item.title}, ${item.allDay ? t('calendar.allDay') : item.start}${contextText ? `, ${contextText}` : ''}${isCompleted ? ', completado' : ''}`}
+      accessibilityLabel={`${item.title}${isHolidayClass ? ', festivo' : ''}, ${item.allDay ? t('calendar.allDay') : item.start}${contextText ? `, ${contextText}` : ''}${isCompleted ? ', completado' : ''}`}
     >
       <View style={styles.timeCol}>
         <Text style={[styles.timeText, item.allDay && styles.allDayText]} numberOfLines={1}>
@@ -68,6 +70,11 @@ export const AgendaRow: React.FC<AgendaRowProps> = React.memo(({ item, scope, is
           {badgeLabel && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{badgeLabel}</Text>
+            </View>
+          )}
+          {isHolidayClass && (
+            <View style={[styles.badge, styles.holidayBadge]}>
+              <Text style={styles.holidayBadgeText}>Festivo</Text>
             </View>
           )}
         </View>
@@ -152,6 +159,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: theme.colors.text.secondary,
+    letterSpacing: 0.2,
+  },
+  containerHolidayClass: {
+    opacity: 0.65,
+  },
+  holidayBadge: {
+    backgroundColor: '#FFE4E6',
+    borderColor: '#FDA4AF',
+  },
+  holidayBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#BE123C',
     letterSpacing: 0.2,
   },
 });

@@ -31,6 +31,7 @@ interface CalendarGridProps {
   isExpanded?: boolean;
   onToggle?: () => void;
   collapsedLabel?: string;
+  holidayDaysSet?: Set<number>;
 }
 
 function getMonthData(m: number, y: number) {
@@ -44,6 +45,7 @@ interface DayCellProps {
   day: number;
   selected: boolean;
   today: boolean;
+  isHoliday: boolean;
   hasClasses: boolean;
   hasTasks: boolean;
   hasEvents: boolean;
@@ -57,6 +59,7 @@ const DayCell = React.memo<DayCellProps>((
   day,
   selected,
   today,
+  isHoliday,
   hasClasses,
   hasTasks,
   hasEvents,
@@ -75,19 +78,21 @@ const DayCell = React.memo<DayCellProps>((
       onPress={handlePress}
       activeOpacity={isCurrentMonth ? 0.7 : 1}
       accessibilityRole="button"
-      accessibilityLabel={`${day}${today ? ', hoy' : ''}${selected ? ', seleccionado' : ''}${hasClasses ? ', clases programadas' : ''}${hasTasks ? ', tareas pendientes' : ''}${hasEvents ? ', eventos' : ''}${eventCount > 1 ? `, ${eventCount} actividades` : ''}`}
+      accessibilityLabel={`${day}${today ? ', hoy' : ''}${isHoliday ? ', festivo' : ''}${selected ? ', seleccionado' : ''}${hasClasses ? ', clases programadas' : ''}${hasTasks ? ', tareas pendientes' : ''}${hasEvents ? ', eventos' : ''}${eventCount > 1 ? `, ${eventCount} actividades` : ''}`}
       style={[
         calendarGridStyles.cell,
-        selected && calendarGridStyles.selectedCell,
+        !selected && !today && isHoliday && calendarGridStyles.holidayCell,
         !selected && today && calendarGridStyles.todayCell,
+        selected && calendarGridStyles.selectedCell,
         !isCurrentMonth && { opacity: 0.35 },
       ]}
     >
       <View style={calendarGridStyles.dayNumberWrapper}>
         <Text style={[
           calendarGridStyles.cellText,
-          selected && calendarGridStyles.selectedCellText,
+          !selected && !today && isHoliday && calendarGridStyles.holidayCellText,
           !selected && today && calendarGridStyles.todayCellText,
+          selected && calendarGridStyles.selectedCellText,
         ]}>
           {day}
         </Text>
@@ -127,6 +132,7 @@ interface MonthGridProps {
   onSelectDay: (day: number) => void;
   getActivitySummary: (yearOrDay: number, month?: number, day?: number) => ActivitySummary;
   isToday: (day: number) => boolean;
+  holidayDaysSet?: Set<number>;
 }
 
 const MonthGrid = React.memo<MonthGridProps>(({
@@ -139,6 +145,7 @@ const MonthGrid = React.memo<MonthGridProps>(({
   onSelectDay,
   getActivitySummary,
   isToday,
+  holidayDaysSet,
 }) => {
   return (
     <View style={{ width: '100%' }}>
@@ -155,6 +162,7 @@ const MonthGrid = React.memo<MonthGridProps>(({
           const day = i + 1;
           const selected = day === selectedDayNum;
           const today = isToday(day);
+          const isHoliday = Boolean(holidayDaysSet?.has(day));
           const { hasClasses, hasTasks, hasEvents, totalCount } = getActivitySummary(year, month, day);
 
           return (
@@ -163,6 +171,7 @@ const MonthGrid = React.memo<MonthGridProps>(({
               day={day}
               selected={selected}
               today={today}
+              isHoliday={isHoliday}
               hasClasses={hasClasses}
               hasTasks={hasTasks}
               hasEvents={hasEvents}
@@ -194,6 +203,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   isExpanded = true,
   onToggle,
   collapsedLabel,
+  holidayDaysSet,
 }) => {
   const [reduceMotion, setReduceMotion] = useState(false);
   const progress = useSharedValue(isExpanded ? 1 : 0);
@@ -290,6 +300,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             onSelectDay={onSelectDay}
             getActivitySummary={getActivitySummary}
             isToday={isToday}
+            holidayDaysSet={holidayDaysSet}
           />
         </Animated.View>
       </Animated.View>

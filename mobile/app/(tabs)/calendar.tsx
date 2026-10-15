@@ -18,6 +18,7 @@ import { TaskDetailModal } from '../../src/components/calendar/TaskDetailModal';
 import { EventDetailModal } from '../../src/components/calendar/EventDetailModal';
 import { EmptyAgendaState } from '../../src/components/calendar/EmptyAgendaState';
 import { OptionSelectorModal, SelectorOption } from '../../src/components/ui/OptionSelectorModal';
+import { CommemorationCard } from '../../src/components/calendar/CommemorationCard';
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from '../../src/services/api/calendar';
 import { deleteAssessment } from '../../src/services/api';
 import { alertRef } from '../../src/components/ui/CustomAlert';
@@ -256,6 +257,7 @@ export default function CalendarScreen() {
           isExpanded={isCalendarExpanded}
           onToggle={toggleCalendar}
           collapsedLabel={selectedDayLabel}
+          holidayDaysSet={calendar.monthHolidayDaysSet}
         />
 
         {showCourseFilter && (
@@ -269,6 +271,11 @@ export default function CalendarScreen() {
             showSubjectFilter={showSubjectFilter}
           />
         )}
+
+        {/* Mención Honorífica y Festivos del día:
+            Visible siempre que el día tenga conmemoraciones, incluso sin tareas ni clases
+            y sin importar los filtros de materia o curso */}
+        <CommemorationCard record={calendar.selectedSpecialDayRecord} />
 
         {!calendar.isReady ? (
           <View style={{ padding: 48, alignItems: 'center', justifyContent: 'center' }}>

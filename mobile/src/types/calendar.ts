@@ -31,6 +31,7 @@ export interface AgendaItem {
   time_label?: string; 
   linked_deck_id?: string;
   weight?: number;
+  isHolidayClass?: boolean;
 }
 
 export interface ScheduleItem {

@@ -94,6 +94,16 @@ export const calendarGridStyles = StyleSheet.create({
     color: theme.colors.primary,
     fontWeight: '700',
   },
+  holidayCell: {
+    backgroundColor: '#FFF1F2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+  },
+  holidayCellText: {
+    color: '#BE123C',
+    fontWeight: '700',
+  },
   dayNumberWrapper: {
     position: 'relative',
     alignItems: 'center',
