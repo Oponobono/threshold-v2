@@ -20,6 +20,35 @@ export type SpecialDateBasis =
   | 'tradicion'  // Costumbre cultural arraigada en Colombia
   | 'comercial'; // Fecha de observancia comercial/popular
 
+export type DateRule =
+  | { readonly type: 'fixed'; readonly month: number; readonly day: number }
+  | { readonly type: 'nth-weekday'; readonly month: number; readonly weekday: number; readonly occurrence: number }
+  | { readonly type: 'last-weekday'; readonly month: number; readonly weekday: number }
+  | { readonly type: 'easter-offset'; readonly days: number }
+  | { readonly type: 'day-of-year'; readonly day: number; readonly leapYearPolicy?: 'calendar-day-256' }
+  | { readonly type: 'date-range'; readonly startMonth: number; readonly startDay: number; readonly endMonth: number; readonly endDay: number };
+
+export type CommemorationStatus = 'verified' | 'needs-review' | 'deprecated' | 'historical';
+
+export interface CommemorationDefinition {
+  readonly id: string;
+  readonly name: string;
+  readonly category: SpecialDateCategory;
+  readonly basis: SpecialDateBasis;
+  readonly dateRule: DateRule;
+  readonly authority?: string;
+  readonly sourceUrl?: string;
+  readonly sourceId?: string;
+  readonly status?: CommemorationStatus;
+  readonly verifiedAt?: string;
+  readonly validFromYear?: number;
+  readonly validUntilYear?: number;
+  readonly note: string;
+  readonly icon: string;
+  readonly iconFamily?: 'material' | 'ionicons';
+  readonly subItems?: readonly SpecialSubItem[];
+}
+
 export interface SpecialSubItem {
   readonly title: string;
   readonly description?: string;
@@ -46,6 +75,28 @@ export interface SpecialDateItem {
   readonly iconFamily?: 'material' | 'ionicons';
   /** Sub-elementos detallados (ej. conmemoraciones litúrgicas día a día de Semana Santa) */
   readonly subItems?: readonly SpecialSubItem[];
+  /** Entidad u organismo que respalda o proclama la fecha (ej. ONU, OMS, UNESCO, Congreso de la República) */
+  readonly authority?: string;
+  /** Identificador de referencia de la fuente documental o normativa */
+  readonly sourceId?: string;
+  /** Enlace o URL de referencia oficial */
+  readonly sourceUrl?: string;
+  /** Estado de verificación del evento */
+  readonly status?: CommemorationStatus;
+  /** Fecha en que se auditó y validó la fuente documental */
+  readonly verifiedAt?: string;
+  /** Año desde el cual entra en vigor la observancia */
+  readonly validFromYear?: number;
+  /** Año hasta el cual estuvo en vigor la observancia */
+  readonly validUntilYear?: number;
+  /** Rango de fechas si la observancia abarca varios días (ej. semanas internacionales) */
+  readonly dateRange?: { readonly start: string; readonly end: string };
+  /**
+   * Regla de calendario que originó la fecha. La puebla el catálogo de
+   * conmemoraciones para que la política de presentación pueda distinguir una
+   * liturgia móvil (regla `easter-offset`) sin duplicar el catálogo.
+   */
+  readonly dateRule?: DateRule;
 }
 
 export interface SpecialDayRecord {

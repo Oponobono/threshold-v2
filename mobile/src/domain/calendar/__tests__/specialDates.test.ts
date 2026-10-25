@@ -7,7 +7,12 @@ import {
   getMonthHolidayDaysSet,
   clearSpecialDatesCache,
 } from '../specialDatesEngine';
-import { SpecialDateOverride } from '../types';
+import { SpecialDateOverride, CommemorationDefinition } from '../types';
+import {
+  resolveDefinition,
+  getNthWeekdayOfMonth,
+  getLastWeekdayOfMonth,
+} from '../colombiaCommemorations';
 
 describe('Colombia Special Dates & Holidays Domain', () => {
   beforeEach(() => {
@@ -469,4 +474,424 @@ describe('Colombia Special Dates & Holidays Domain', () => {
       expect(yearIndex.size).toBe(0);
     });
   });
+
+  describe('Correcciones Críticas: Ascensión del Señor, Bicicleta y Prematurez', () => {
+    it('calcula la fecha original de la Ascensión del Señor en jueves (Pascua + 39) y el festivo en lunes (Pascua + 43) en 2024, 2025, 2026, 2027, 2028', () => {
+      const cases = [
+        { year: 2024, original: '2024-05-09', observed: '2024-05-13' },
+        { year: 2025, original: '2025-05-29', observed: '2025-06-02' },
+        { year: 2026, original: '2026-05-14', observed: '2026-05-18' },
+        { year: 2027, original: '2027-05-06', observed: '2027-05-10' },
+        { year: 2028, original: '2028-05-25', observed: '2028-05-29' },
+      ];
+
+      for (const { year, original, observed } of cases) {
+        const holidays = getColombiaHolidays(year);
+        const ascension = holidays.find(h => h.name.includes('Ascensión'));
+        expect(ascension).toBeDefined();
+        expect(ascension!.originalDateId).toBe(original);
+        expect(ascension!.observedDateId).toBe(observed);
+        expect(ascension!.isMoved).toBe(true);
+
+        // Validar que la fecha original siempre sea Jueves (UTC day 4)
+        const [oy, om, od] = original.split('-').map(Number);
+        expect(new Date(Date.UTC(oy, om - 1, od)).getUTCDay()).toBe(4);
+
+        // Validar que la fecha observada siempre sea Lunes (UTC day 1)
+        const [ly, lm, ld] = observed.split('-').map(Number);
+        expect(new Date(Date.UTC(ly, lm - 1, ld)).getUTCDay()).toBe(1);
+      }
+    });
+
+    it('distingue el Día Mundial de la Bicicleta de la ONU (3 de junio) de la celebración popular (19 de abril)', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+
+      // 19 de abril: Celebración popular
+      const apr19 = yearIndex.get('2026-04-19');
+      expect(apr19).toBeDefined();
+      const biciPopular = apr19!.items.find(i => i.name.includes('Bicicleta'));
+      expect(biciPopular).toBeDefined();
+      expect(biciPopular!.basis).toBe('tradicion');
+      expect(biciPopular!.name).toContain('Celebración Popular');
+
+      // 3 de junio: Oficial de la ONU
+      const jun03 = yearIndex.get('2026-06-03');
+      expect(jun03).toBeDefined();
+      const biciOnu = jun03!.items.find(i => i.name === 'Día Mundial de la Bicicleta');
+      expect(biciOnu).toBeDefined();
+      expect(biciOnu!.basis).toBe('onu');
+      expect(biciOnu!.authority).toContain('Naciones Unidas');
+    });
+
+    it('Día Mundial del Niño Prematuro: tres registros con vigencia exacta según fuente OMS 2025', () => {
+      // ─── 2024: solo existe el registro histórico en 17 Nov ───────────────────────────
+      const idx2024 = getSpecialDaysForYear(2024);
+
+      const nov17_2024 = idx2024.get('2024-11-17');
+      expect(nov17_2024).toBeDefined();
+      const prematuro2024hist = nov17_2024!.items.find(i => i.id.endsWith('-prematuro'));
+      expect(prematuro2024hist).toBeDefined();
+      expect(prematuro2024hist!.status).toBe('historical');
+      expect(prematuro2024hist!.validUntilYear).toBe(2024);
+      expect(prematuro2024hist!.authority).toContain('EFCNI / OMS');
+
+      // En 2024, el 15 de noviembre NO tiene ningún registro de prematurez
+      const nov15_2024 = idx2024.get('2024-11-15');
+      expect(nov15_2024?.items.some(i => i.id.includes('prematuro'))).toBeFalsy();
+
+      // ─── 2025: fecha oficial OMS en 15 Nov + organizaciones socias en 17 Nov ─────────
+      const idx2025 = getSpecialDaysForYear(2025);
+
+      // 15 Nov 2025 → fecha oficial OMS, status 'verified', validFromYear 2025
+      const nov15_2025 = idx2025.get('2025-11-15');
+      expect(nov15_2025).toBeDefined();
+      const prematurOMS2025 = nov15_2025!.items.find(i => i.id.endsWith('-prematuro'));
+      expect(prematurOMS2025).toBeDefined();
+      expect(prematurOMS2025!.name).toBe('Día Mundial del Niño Prematuro');
+      expect(prematurOMS2025!.status).toBe('verified');
+      expect(prematurOMS2025!.validFromYear).toBe(2025);
+      expect(prematurOMS2025!.authority).toContain('OMS');
+
+      // 17 Nov 2025 → organizaciones socias, status 'needs-review', id distinto
+      const nov17_2025 = idx2025.get('2025-11-17');
+      expect(nov17_2025).toBeDefined();
+      const prematurOrg2025 = nov17_2025!.items.find(i => i.id.endsWith('-prematuro-organizaciones'));
+      expect(prematurOrg2025).toBeDefined();
+      expect(prematurOrg2025!.name).toContain('Organizaciones Asociadas');
+      expect(prematurOrg2025!.status).toBe('needs-review');
+      expect(prematurOrg2025!.validFromYear).toBe(2025);
+
+      // 17 Nov 2025 también tiene Cáncer de Cuello Uterino y NO el registro histórico (expiró en 2024)
+      expect(nov17_2025!.items.some(i => i.name.includes('Cáncer de Cuello Uterino'))).toBe(true);
+      expect(nov17_2025!.items.some(i => i.id.endsWith('-prematuro') && i.status === 'historical')).toBe(false);
+
+      // ─── 2026 y 2027: mismo patrón que 2025 ──────────────────────────────────────────
+      for (const year of [2026, 2027]) {
+        const idx = getSpecialDaysForYear(year);
+
+        // 15 Nov: fecha oficial OMS, verified
+        const nov15 = idx.get(`${year}-11-15`);
+        expect(nov15).toBeDefined();
+        const official = nov15!.items.find(i => i.id.endsWith('-prematuro'));
+        expect(official).toBeDefined();
+        expect(official!.status).toBe('verified');
+        expect(official!.validFromYear).toBe(2025);
+
+        // 17 Nov: organizaciones socias (needs-review) + Cuello Uterino, pero NO el histórico
+        const nov17 = idx.get(`${year}-11-17`);
+        expect(nov17).toBeDefined();
+        expect(nov17!.items.some(i => i.id.endsWith('-prematuro-organizaciones'))).toBe(true);
+        expect(nov17!.items.some(i => i.name.includes('Cáncer de Cuello Uterino'))).toBe(true);
+        expect(nov17!.items.some(i => i.id.endsWith('-prematuro') && i.status === 'historical')).toBe(false);
+      }
+    });
+
+    it('distingue el World Coding Day de la UNESCO (29 de octubre) del Día del Programador (Día 256)', () => {
+      const yearIndex2026 = getSpecialDaysForYear(2026);
+      const yearIndex2024 = getSpecialDaysForYear(2024); // Año bisiesto
+
+      // 29 de octubre: UNESCO
+      const oct29 = yearIndex2026.get('2026-10-29');
+      const codingUnesco = oct29!.items.find(i => i.name.includes('Programación'));
+      expect(codingUnesco).toBeDefined();
+      expect(codingUnesco!.authority).toContain('UNESCO');
+
+      // Día 256 en 2026 (no bisiesto): 13 de septiembre
+      const sep13 = yearIndex2026.get('2026-09-13');
+      expect(sep13!.items.some(i => i.name.includes('Día 256'))).toBe(true);
+
+      // Día 256 en 2024 (bisiesto): 12 de septiembre
+      const sep12 = yearIndex2024.get('2024-09-12');
+      expect(sep12!.items.some(i => i.name.includes('Día 256'))).toBe(true);
+    });
+  });
+
+  describe('Salud Pública (OMS) y Campañas Multirango', () => {
+    it('las campañas de duración semanal se registran como dateRange y cubren todos los días del intervalo', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+
+      // Semana Mundial de la Inmunización: 24 al 30 de abril
+      for (let day = 24; day <= 30; day++) {
+        const dId = `2026-04-${String(day).padStart(2, '0')}`;
+        const record = yearIndex.get(dId);
+        expect(record).toBeDefined();
+        const item = record!.items.find(i => i.name.includes('Inmunización'));
+        expect(item).toBeDefined();
+        expect(item!.dateRange).toEqual({ start: '2026-04-24', end: '2026-04-30' });
+      }
+
+      // Semana Mundial de la Lactancia Materna: 1 al 7 de agosto
+      for (let day = 1; day <= 7; day++) {
+        const dId = `2026-08-${String(day).padStart(2, '0')}`;
+        const record = yearIndex.get(dId);
+        expect(record).toBeDefined();
+        const item = record!.items.find(i => i.name.includes('Lactancia'));
+        expect(item).toBeDefined();
+        expect(item!.dateRange).toEqual({ start: '2026-08-01', end: '2026-08-07' });
+      }
+
+      // Semana de la Resistencia a los Antimicrobianos: 18 al 24 de noviembre
+      for (let day = 18; day <= 24; day++) {
+        const dId = `2026-11-${String(day).padStart(2, '0')}`;
+        const record = yearIndex.get(dId);
+        expect(record).toBeDefined();
+        const item = record!.items.find(i => i.name.includes('Antimicrobianos'));
+        expect(item).toBeDefined();
+        expect(item!.dateRange).toEqual({ start: '2026-11-18', end: '2026-11-24' });
+      }
+    });
+
+    it('incluye conmemoraciones de salud pública de la OMS ausentes anteriormente', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+
+      // 30 de enero: Enfermedades Tropicales Desatendidas
+      expect(yearIndex.get('2026-01-30')?.items.some(i => i.name.includes('Enfermedades Tropicales'))).toBe(true);
+
+      // 3 de marzo: Audición
+      expect(yearIndex.get('2026-03-03')?.items.some(i => i.name.includes('Audición'))).toBe(true);
+
+      // 14 de abril: Chagas
+      expect(yearIndex.get('2026-04-14')?.items.some(i => i.name.includes('Chagas'))).toBe(true);
+
+      // 5 de mayo: Higiene de Manos
+      expect(yearIndex.get('2026-05-05')?.items.some(i => i.name.includes('Higiene de Manos'))).toBe(true);
+
+      // 25 de julio: Prevención de Ahogamientos
+      expect(yearIndex.get('2026-07-25')?.items.some(i => i.name.includes('Ahogamientos'))).toBe(true);
+
+      // 17 de septiembre: Seguridad del Paciente
+      expect(yearIndex.get('2026-09-17')?.items.some(i => i.name.includes('Seguridad del Paciente'))).toBe(true);
+
+      // 28 de septiembre: Rabia
+      expect(yearIndex.get('2026-09-28')?.items.some(i => i.name.includes('Rabia'))).toBe(true);
+
+      // 17 de noviembre: Eliminación del Cáncer de Cuello Uterino
+      expect(yearIndex.get('2026-11-17')?.items.some(i => i.name.includes('Cáncer de Cuello Uterino'))).toBe(true);
+
+      // 12 de diciembre: Cobertura Sanitaria Universal
+      expect(yearIndex.get('2026-12-12')?.items.some(i => i.name.includes('Cobertura Sanitaria Universal'))).toBe(true);
+    });
+  });
+
+  describe('Fechas Nacionales, Profesionales y de Memoria de Colombia', () => {
+    it('incluye efemérides profesionales, cívicas y de memoria en Colombia con su respaldo', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+
+      // 6 de marzo: Víctimas de crímenes de Estado
+      expect(yearIndex.get('2026-03-06')?.items.some(i => i.name.includes('Víctimas de Crímenes de Estado'))).toBe(true);
+
+      // 31 de marzo: Visibilidad Trans
+      expect(yearIndex.get('2026-03-31')?.items.some(i => i.name.includes('Visibilidad Trans'))).toBe(true);
+
+      // 4 de abril: Minas Antipersonal
+      expect(yearIndex.get('2026-04-04')?.items.some(i => i.name.includes('Minas Antipersonal'))).toBe(true);
+
+      // 26 de abril: Secretaria
+      expect(yearIndex.get('2026-04-26')?.items.some(i => i.name.includes('Secretaria'))).toBe(true);
+
+      // 27 de junio: Servidor Público
+      expect(yearIndex.get('2026-06-27')?.items.some(i => i.name.includes('Servidor Público'))).toBe(true);
+
+      // 16 de julio: Día del Conductor
+      expect(yearIndex.get('2026-07-16')?.items.some(i => i.name.includes('Conductor'))).toBe(true);
+
+      // 4 de agosto: Comunicador Social y Periodista (Ley 918 de 2004)
+      const ago04 = yearIndex.get('2026-08-04');
+      const periodista = ago04?.items.find(i => i.name.includes('Comunicador Social'));
+      expect(periodista).toBeDefined();
+      expect(periodista?.basis).toBe('ley');
+
+      // 6 de septiembre: Fonoaudiólogo
+      expect(yearIndex.get('2026-09-06')?.items.some(i => i.name.includes('Fonoaudiólogo'))).toBe(true);
+
+      // 8 de septiembre: Fisioterapeuta
+      expect(yearIndex.get('2026-09-08')?.items.some(i => i.name.includes('Fisioterapeuta'))).toBe(true);
+
+      // 26 de septiembre: Químico Farmacéutico
+      expect(yearIndex.get('2026-09-26')?.items.some(i => i.name.includes('Químico Farmacéutico'))).toBe(true);
+
+      // 1 de octubre: Día Internacional del Café
+      expect(yearIndex.get('2026-10-01')?.items.some(i => i.name.includes('Café'))).toBe(true);
+
+      // 3 de octubre: Odontólogo
+      expect(yearIndex.get('2026-10-03')?.items.some(i => i.name.includes('Odontólogo'))).toBe(true);
+
+      // 7 de octubre: Algodón
+      expect(yearIndex.get('2026-10-07')?.items.some(i => i.name.includes('Algodón'))).toBe(true);
+
+      // 9 de octubre: Archivista (Ley 1409 de 2010)
+      expect(yearIndex.get('2026-10-09')?.items.some(i => i.name.includes('Archivista'))).toBe(true);
+
+      // 20 de octubre: Cocinero o Chef
+      expect(yearIndex.get('2026-10-20')?.items.some(i => i.name.includes('Cocinero'))).toBe(true);
+
+      // 22 de octubre: Trabajador Social
+      expect(yearIndex.get('2026-10-22')?.items.some(i => i.name.includes('Trabajador Social'))).toBe(true);
+
+      // 24 de octubre: Información sobre el Desarrollo
+      expect(yearIndex.get('2026-10-24')?.items.some(i => i.name.includes('Información sobre el Desarrollo'))).toBe(true);
+
+      // 25 de octubre: Instrumentador Quirúrgico
+      expect(yearIndex.get('2026-10-25')?.items.some(i => i.name.includes('Instrumentador Quirúrgico'))).toBe(true);
+
+      // 29 de octubre: Cuidados y Apoyo (ONU)
+      expect(yearIndex.get('2026-10-29')?.items.some(i => i.name.includes('Cuidados y el Apoyo'))).toBe(true);
+
+      // 3 de noviembre: Reservas de Biosfera
+      expect(yearIndex.get('2026-11-03')?.items.some(i => i.name.includes('Reservas de Biosfera'))).toBe(true);
+
+      // 4 de noviembre: Administrador de Empresas
+      expect(yearIndex.get('2026-11-04')?.items.some(i => i.name.includes('Administrador de Empresas'))).toBe(true);
+
+      // 8 de noviembre: Radiología
+      expect(yearIndex.get('2026-11-08')?.items.some(i => i.name.includes('Radiología'))).toBe(true);
+
+      // 20 de noviembre: Psicólogo (Ley 1090 de 2006)
+      expect(yearIndex.get('2026-11-20')?.items.some(i => i.name.includes('Psicólogo'))).toBe(true);
+
+      // 24 de noviembre: Agrónomo
+      expect(yearIndex.get('2026-11-24')?.items.some(i => i.name.includes('Agrónomo'))).toBe(true);
+
+      // 3 de diciembre: Médico
+      expect(yearIndex.get('2026-12-03')?.items.some(i => i.name.includes('Médico'))).toBe(true);
+    });
+
+    it('Día contra la Violencia y el Acoso Escolar (UNESCO) se calcula como 1er jueves de noviembre', () => {
+      const yearIndex2026 = getSpecialDaysForYear(2026);
+      expect(yearIndex2026.get('2026-11-05')?.items.some(i => i.name.includes('Acoso Escolar'))).toBe(true);
+
+      const yearIndex2025 = getSpecialDaysForYear(2025);
+      expect(yearIndex2025.get('2025-11-06')?.items.some(i => i.name.includes('Acoso Escolar'))).toBe(true);
+    });
+
+    it('Día Nacional del Servidor Público (27 de junio): Decreto 1083 de 2015 precisa que no constituye vacancia', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+      const jun27 = yearIndex.get('2026-06-27');
+      expect(jun27).toBeDefined();
+      expect(jun27!.isHoliday).toBe(false); // No es día no laborable
+
+      const servidor = jun27!.items.find(i => i.id.endsWith('-servidor-publico-colombia'));
+      expect(servidor).toBeDefined();
+      expect(servidor!.basis).toBe('ley');
+      expect(servidor!.authority).toContain('Decreto 1083 de 2015');
+      expect(servidor!.authority).toContain('Art. 2.2.15.1');
+      expect(servidor!.note).toContain('no constituye día de vacancia laboral');
+    });
+
+    it('29 de octubre: preserva legítima coexistencia del Día Mundial de la Programación (UNESCO) y Cuidados y Apoyo (ONU)', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+      const oct29 = yearIndex.get('2026-10-29');
+      expect(oct29).toBeDefined();
+      expect(oct29!.items.length).toBeGreaterThanOrEqual(2);
+
+      const coding = oct29!.items.find(i => i.id === 'commem-2026-10-29-programacion-unesco');
+      expect(coding).toBeDefined();
+      expect(coding!.name).toBe('Día Mundial de la Programación (UNESCO)');
+      expect(coding!.authority).toContain('UNESCO');
+
+      const cuidados = oct29!.items.find(i => i.id === 'commem-2026-10-29-cuidados-apoyo-onu');
+      expect(cuidados).toBeDefined();
+      expect(cuidados!.name).toBe('Día Internacional de los Cuidados y el Apoyo');
+      expect(cuidados!.authority).toContain('A/RES/77/317');
+
+      // Ambas identidades son distintas y ninguna suprime a la otra
+      expect(coding!.id).not.toBe(cuidados!.id);
+    });
+
+    it('date-range: resuelve correctamente rangos que cruzan fin de año (diciembre a enero)', () => {
+      const easter = getEasterSunday(2026);
+      const crossYearDef: CommemorationDefinition = {
+        id: 'campana-invierno',
+        name: 'Campaña Transanual de Invierno',
+        category: 'internacional',
+        basis: 'onu',
+        authority: 'Organización Internacional',
+        status: 'verified',
+        note: 'Campaña de prueba para rangos transanuales que cruzan diciembre y enero.',
+        icon: 'snowflake',
+        dateRule: {
+          type: 'date-range',
+          startMonth: 12,
+          startDay: 28,
+          endMonth: 1,
+          endDay: 4,
+        },
+      };
+
+      // Para el año 2026:
+      const items2026 = resolveDefinition(crossYearDef, 2026, easter);
+
+      // Debe incluir los 4 días de diciembre de 2026 (28, 29, 30, 31)
+      const decDays = items2026.filter(i => i.id.startsWith('commem-2026-12-'));
+      expect(decDays).toHaveLength(4);
+      expect(decDays[0].dateRange).toEqual({ start: '2026-12-28', end: '2027-01-04' });
+
+      // Debe incluir los 4 días de enero de 2026 que iniciaron en diciembre de 2025 (1, 2, 3, 4)
+      const janDays = items2026.filter(i => i.id.startsWith('commem-2026-01-'));
+      expect(janDays).toHaveLength(4);
+      expect(janDays[0].dateRange).toEqual({ start: '2025-12-28', end: '2026-01-04' });
+    });
+
+    it('day-of-year: cálculo multianual exacto del Día 256 en años bisiestos y comunes', () => {
+      const years = [
+        { year: 2024, isLeap: true, expectedDate: '2024-09-12' },
+        { year: 2025, isLeap: false, expectedDate: '2025-09-13' },
+        { year: 2026, isLeap: false, expectedDate: '2026-09-13' },
+        { year: 2027, isLeap: false, expectedDate: '2027-09-13' },
+        { year: 2028, isLeap: true, expectedDate: '2028-09-12' },
+      ];
+
+      for (const { year, expectedDate } of years) {
+        const yearIndex = getSpecialDaysForYear(year);
+        const record = yearIndex.get(expectedDate);
+        expect(record).toBeDefined();
+        // Slug del catálogo es 'programador' → id generado: commem-YYYY-MM-DD-programador
+        const progItem = record!.items.find(i => i.id.endsWith('-programador'));
+        expect(progItem).toBeDefined();
+        expect(progItem!.name).toContain('Día del Programador');
+      }
+    });
+
+    it('nth-weekday y last-weekday: exactitud matemática en límites de meses y años variados', () => {
+      // Día de la Madre: 2º domingo de mayo
+      expect(getNthWeekdayOfMonth(2024, 5, 0, 2)).toBe('2024-05-12');
+      expect(getNthWeekdayOfMonth(2025, 5, 0, 2)).toBe('2025-05-11');
+      expect(getNthWeekdayOfMonth(2026, 5, 0, 2)).toBe('2026-05-10');
+      expect(getNthWeekdayOfMonth(2027, 5, 0, 2)).toBe('2027-05-09');
+
+      // Día del Padre: 3º domingo de junio
+      expect(getNthWeekdayOfMonth(2024, 6, 0, 3)).toBe('2024-06-16');
+      expect(getNthWeekdayOfMonth(2025, 6, 0, 3)).toBe('2025-06-15');
+      expect(getNthWeekdayOfMonth(2026, 6, 0, 3)).toBe('2026-06-21');
+      expect(getNthWeekdayOfMonth(2027, 6, 0, 3)).toBe('2027-06-20');
+
+      // Acoso Escolar (UNESCO): 1er jueves de noviembre
+      expect(getNthWeekdayOfMonth(2024, 11, 4, 1)).toBe('2024-11-07');
+      expect(getNthWeekdayOfMonth(2025, 11, 4, 1)).toBe('2025-11-06');
+      expect(getNthWeekdayOfMonth(2026, 11, 4, 1)).toBe('2026-11-05');
+      expect(getNthWeekdayOfMonth(2027, 11, 4, 1)).toBe('2027-11-04');
+
+      // Día de la Niñez: último sábado de abril (Ley 724 de 2001)
+      expect(getLastWeekdayOfMonth(2024, 4, 6)).toBe('2024-04-27');
+      expect(getLastWeekdayOfMonth(2025, 4, 6)).toBe('2025-04-26');
+      expect(getLastWeekdayOfMonth(2026, 4, 6)).toBe('2026-04-25');
+      expect(getLastWeekdayOfMonth(2027, 4, 6)).toBe('2027-04-24');
+    });
+
+    it('garantiza ausencia de IDs duplicados en cada día del año y estados válidos', () => {
+      const yearIndex = getSpecialDaysForYear(2026);
+      for (const [, record] of yearIndex.entries()) {
+        const ids = new Set<string>();
+        for (const item of record.items) {
+          expect(ids.has(item.id)).toBe(false);
+          ids.add(item.id);
+          // Los festivos oficiales inyectados desde colombiaHolidays.ts no tienen campo status
+          if (item.status !== undefined) {
+            expect(['verified', 'historical', 'needs-review', 'deprecated']).toContain(item.status);
+          }
+        }
+      }
+    });
+  });
 });
+

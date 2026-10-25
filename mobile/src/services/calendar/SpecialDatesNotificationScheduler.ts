@@ -15,6 +15,7 @@
 import * as ExpoNotifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { getSpecialDayRecord } from '../../domain/calendar/specialDatesEngine';
+import { selectPrimaryCommemoration } from '../../domain/calendar/commemorations/engine/presentationPriority';
 import type { SpecialDatesPreferences } from '../../domain/calendar/types';
 import { getSpecialDatesPreferencesService } from './SpecialDatesPreferencesService';
 import { getSpecialDatesNotificationPreferencesService } from './SpecialDatesNotificationPreferencesService';
@@ -179,20 +180,24 @@ export async function syncSpecialDatesNotifications(
       }
     }
 
-    // ── 2. Fechas importantes y conmemorativas (no festivas) ──
     if (notifPrefs.commemorationsEnabled) {
-      const commemItems = record.items.filter((i) => !i.isHoliday);
+      const commemItems = record.items.filter((i) => {
+        if (i.isHoliday) return false;
+        // Si es una campaña multirango (semana internacional), notificar solo en su día inaugural
+        if (i.dateRange && i.dateRange.start !== dateId) return false;
+        return true;
+      });
       if (commemItems.length > 0) {
         const triggerDate = computeTriggerDate(dateId, notifPrefs.commemorationsTime);
-        if (triggerDate.getTime() > nowMs) {
-          const firstItem = commemItems[0];
-          let body = firstItem.name;
+        const primaryItem = selectPrimaryCommemoration(commemItems);
+        if (triggerDate.getTime() > nowMs && primaryItem) {
+          let body = primaryItem.name;
           if (commemItems.length === 1) {
-            if (firstItem.note) {
-              body = `${firstItem.name} — ${firstItem.note}`;
+            if (primaryItem.note) {
+              body = `${primaryItem.name} — ${primaryItem.note}`;
             }
           } else {
-            body = `${firstItem.name} y ${commemItems.length - 1} fechas más`;
+            body = `${primaryItem.name} y ${commemItems.length - 1} fechas más`;
           }
 
           const identifier = `${SPECIAL_DATES_ID_PREFIX}commemoration::${dateId}`;

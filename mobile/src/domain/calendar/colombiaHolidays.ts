@@ -229,7 +229,7 @@ export function getColombiaHolidays(year: number): readonly HolidayEntry[] {
     {
       name: 'Ascensión del Señor',
       observedDateId: ascensionDateId,
-      originalDateId: addDaysToDate(easter.year, easter.month, easter.day, 40),
+      originalDateId: addDaysToDate(easter.year, easter.month, easter.day, 39),
       isMoved: true,
       commemorationName: 'Ascensión del Señor',
       meaning: 'Celebración de la ascensión de Jesucristo al cielo ante sus apóstoles.',

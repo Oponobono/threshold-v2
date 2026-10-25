@@ -15,6 +15,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SpecialDayRecord, SpecialDateItem, SpecialDateBasis } from '../../domain/calendar/types';
+import { selectDayHeadline } from '../../domain/calendar/commemorations/engine/presentationPriority';
 import { theme } from '../../styles/theme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -112,8 +113,10 @@ export const CommemorationCard: React.FC<CommemorationCardProps> = React.memo(({
   }
 
   const { isHoliday, items } = record;
-  const primaryItem = items[0];
-  const secondaryItems = items.slice(1);
+  // El titular lo decide la misma política que usa el programador de notificaciones:
+  // el festivo oficial manda siempre; si no hay, gana la conmemoración de mayor jerarquía.
+  const primaryItem = selectDayHeadline(items) ?? items[0];
+  const secondaryItems = items.filter((item) => item !== primaryItem);
   const hasSubItems = Boolean(primaryItem.subItems && primaryItem.subItems.length > 0);
   const hasExpandableContent = secondaryItems.length > 0 || hasSubItems;
 
@@ -134,9 +137,21 @@ export const CommemorationCard: React.FC<CommemorationCardProps> = React.memo(({
                 <Text style={styles.holidayBadgeText}>🇨🇴 Festivo Nacional</Text>
               </View>
             )}
+            {primaryItem.status === 'needs-review' && (
+              <View style={styles.reviewBadge}>
+                <Text style={styles.reviewBadgeText}>⚠️ En revisión</Text>
+              </View>
+            )}
             <View style={styles.basisBadge}>
               <Text style={styles.basisBadgeText}>{getBasisLabel(primaryItem.basis)}</Text>
             </View>
+            {primaryItem.authority ? (
+              <View style={[styles.basisBadge, { backgroundColor: '#F1F5F9' }]}>
+                <Text style={[styles.basisBadgeText, { color: '#475569' }]} numberOfLines={1}>
+                  {primaryItem.authority}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <Text style={[styles.title, isHoliday && styles.holidayTitle]}>
@@ -202,9 +217,15 @@ export const CommemorationCard: React.FC<CommemorationCardProps> = React.memo(({
                 <View style={styles.secondaryHeaderRow}>
                   <RenderSpecialIcon iconInfo={secIcon} size={15} style={{ marginRight: 6 }} />
                   <Text style={styles.secondaryTitle}>{secItem.name}</Text>
-                  <View style={[styles.basisBadge, { marginLeft: 'auto' }]}>
-                    <Text style={styles.basisBadgeText}>{getBasisLabel(secItem.basis)}</Text>
-                  </View>
+                  {secItem.status === 'needs-review' ? (
+                    <View style={[styles.reviewBadge, { marginLeft: 'auto' }]}>
+                      <Text style={styles.reviewBadgeText}>⚠️ En revisión</Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.basisBadge, { marginLeft: 'auto' }]}>
+                      <Text style={styles.basisBadgeText}>{getBasisLabel(secItem.basis)}</Text>
+                    </View>
+                  )}
                 </View>
                 {secItem.note ? (
                   <Text style={styles.secondaryNote}>{secItem.note}</Text>
@@ -306,6 +327,20 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
+  },
+  reviewBadge: {
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: '#FDE68A',
+  },
+  reviewBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#92400E',
+    letterSpacing: 0.2,
   },
   title: {
     fontSize: 13.5,
